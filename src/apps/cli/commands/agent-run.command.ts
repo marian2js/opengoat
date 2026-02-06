@@ -21,7 +21,6 @@ export const agentRunCommand: CliCommand = {
       message: parsed.message,
       model: parsed.model,
       passthroughArgs: parsed.passthroughArgs,
-      cwd: process.cwd(),
       env: process.env,
       onStdout: parsed.stream
         ? (chunk) => {

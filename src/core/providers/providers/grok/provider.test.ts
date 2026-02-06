@@ -4,13 +4,13 @@ import {
   ProviderRuntimeError,
   UnsupportedProviderActionError
 } from "../../errors.js";
-import { OpenAIProvider } from "./provider.js";
+import { GrokProvider } from "./provider.js";
 
-describe("openai provider", () => {
+describe("grok provider", () => {
   it("parses responses API output", async () => {
-    const provider = new OpenAIProvider();
+    const provider = new GrokProvider();
     const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ output_text: "hello from openai" }), {
+      new Response(JSON.stringify({ output_text: "hello from grok" }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       })
@@ -19,20 +19,20 @@ describe("openai provider", () => {
     await withFetchMock(fetchMock, async () => {
       const result = await provider.invoke({
         message: "hello",
-        env: { OPENAI_API_KEY: "test-key" }
+        env: { XAI_API_KEY: "test-key" }
       });
 
       expect(result.code).toBe(0);
-      expect(result.stdout).toBe("hello from openai\n");
+      expect(result.stdout).toBe("hello from grok\n");
     });
   });
 
-  it("supports compatible base URL with chat completions", async () => {
-    const provider = new OpenAIProvider();
+  it("supports chat completions endpoint via base URL and path overrides", async () => {
+    const provider = new GrokProvider();
     const fetchMock = vi.fn(async () =>
       new Response(
         JSON.stringify({
-          choices: [{ message: { content: "hello from compatible endpoint" } }]
+          choices: [{ message: { content: "hello from chat completions" } }]
         }),
         {
           status: 200,
@@ -44,58 +44,27 @@ describe("openai provider", () => {
     await withFetchMock(fetchMock, async () => {
       const result = await provider.invoke({
         message: "hello",
-        systemPrompt: "You are OpenGoat.",
         env: {
-          OPENAI_API_KEY: "test-key",
-          OPENGOAT_OPENAI_BASE_URL: "https://compatible.example/v1/",
-          OPENGOAT_OPENAI_ENDPOINT_PATH: "/chat/completions"
+          XAI_API_KEY: "test-key",
+          OPENGOAT_GROK_BASE_URL: "https://api.x.ai/v1/",
+          OPENGOAT_GROK_ENDPOINT_PATH: "/chat/completions"
         }
       });
 
       expect(result.code).toBe(0);
-      expect(result.stdout).toBe("hello from compatible endpoint\n");
+      expect(result.stdout).toBe("hello from chat completions\n");
     });
 
     const [requestUrl, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(requestUrl).toBe("https://compatible.example/v1/chat/completions");
+    expect(requestUrl).toBe("https://api.x.ai/v1/chat/completions");
     expect(JSON.parse(String(requestInit.body))).toEqual({
-      model: "gpt-4.1-mini",
-      messages: [
-        { role: "system", content: "You are OpenGoat." },
-        { role: "user", content: "hello" }
-      ]
-    });
-  });
-
-  it("passes system prompt to responses API when provided", async () => {
-    const provider = new OpenAIProvider();
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ output_text: "ok" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      })
-    );
-
-    await withFetchMock(fetchMock, async () => {
-      await provider.invoke({
-        message: "hello",
-        systemPrompt: "System rules.",
-        env: { OPENAI_API_KEY: "test-key" }
-      });
-    });
-
-    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(String(requestInit.body))).toEqual({
-      model: "gpt-4.1-mini",
-      input: [
-        { role: "system", content: "System rules." },
-        { role: "user", content: "hello" }
-      ]
+      model: "grok-4",
+      messages: [{ role: "user", content: "hello" }]
     });
   });
 
   it("supports endpoint override precedence", async () => {
-    const provider = new OpenAIProvider();
+    const provider = new GrokProvider();
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify({ output_text: "override endpoint" }), {
         status: 200,
@@ -107,9 +76,9 @@ describe("openai provider", () => {
       const result = await provider.invoke({
         message: "hello",
         env: {
-          OPENAI_API_KEY: "test-key",
-          OPENGOAT_OPENAI_BASE_URL: "https://ignored.example/v1",
-          OPENGOAT_OPENAI_ENDPOINT: "https://override.example/custom/responses"
+          XAI_API_KEY: "test-key",
+          OPENGOAT_GROK_BASE_URL: "https://ignored.example/v1",
+          OPENGOAT_GROK_ENDPOINT: "https://override.example/custom/responses"
         }
       });
 
@@ -121,8 +90,8 @@ describe("openai provider", () => {
     expect(requestUrl).toBe("https://override.example/custom/responses");
   });
 
-  it("supports OPENGOAT_OPENAI_API_KEY fallback", async () => {
-    const provider = new OpenAIProvider();
+  it("supports OPENGOAT_GROK_API_KEY fallback", async () => {
+    const provider = new GrokProvider();
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify({ output_text: "fallback key" }), {
         status: 200,
@@ -133,7 +102,7 @@ describe("openai provider", () => {
     await withFetchMock(fetchMock, async () => {
       const result = await provider.invoke({
         message: "hello",
-        env: { OPENGOAT_OPENAI_API_KEY: "fallback-key" }
+        env: { OPENGOAT_GROK_API_KEY: "fallback-key" }
       });
 
       expect(result.code).toBe(0);
@@ -142,7 +111,7 @@ describe("openai provider", () => {
   });
 
   it("fails on malformed successful payload", async () => {
-    const provider = new OpenAIProvider();
+    const provider = new GrokProvider();
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify({ output_text: "" }), {
         status: 200,
@@ -152,13 +121,13 @@ describe("openai provider", () => {
 
     await withFetchMock(fetchMock, async () => {
       await expect(
-        provider.invoke({ message: "hello", env: { OPENAI_API_KEY: "test-key" } })
+        provider.invoke({ message: "hello", env: { XAI_API_KEY: "test-key" } })
       ).rejects.toThrow(ProviderRuntimeError);
     });
   });
 
   it("requires API key and does not support auth action", async () => {
-    const provider = new OpenAIProvider();
+    const provider = new GrokProvider();
 
     await expect(provider.invoke({ message: "hello", env: {} })).rejects.toThrow(
       ProviderAuthenticationError

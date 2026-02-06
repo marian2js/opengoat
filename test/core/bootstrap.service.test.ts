@@ -44,6 +44,9 @@ describe("BootstrapService", () => {
       "utf-8"
     );
     expect(orchestratorAgents).toContain("# Orchestrator (OpenGoat Agent)");
+    expect(
+      await readFile(path.join(paths.workspacesDir, "orchestrator", "BOOTSTRAP.md"), "utf-8")
+    ).toContain("First-run checklist");
   });
 
   it("is idempotent on repeated initialize", async () => {

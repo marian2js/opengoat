@@ -52,7 +52,7 @@ export class OpenRouterProvider extends BaseProvider {
       headers,
       body: JSON.stringify({
         model,
-        messages: [{ role: "user", content: options.message }]
+        messages: buildMessages(options.message, options.systemPrompt)
       })
     });
 
@@ -131,4 +131,19 @@ function formatHttpError(status: number, body: string): string {
   }
 
   return `HTTP ${status}: ${content}\n`;
+}
+
+function buildMessages(
+  message: string,
+  systemPrompt?: string
+): Array<{ role: "system" | "user"; content: string }> {
+  const trimmedSystemPrompt = systemPrompt?.trim();
+  if (!trimmedSystemPrompt) {
+    return [{ role: "user", content: message }];
+  }
+
+  return [
+    { role: "system", content: trimmedSystemPrompt },
+    { role: "user", content: message }
+  ];
 }

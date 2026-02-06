@@ -9,6 +9,7 @@ export interface ProviderCapabilities {
 
 export interface ProviderInvokeOptions {
   message: string;
+  systemPrompt?: string;
   agent?: string;
   model?: string;
   passthroughArgs?: string[];

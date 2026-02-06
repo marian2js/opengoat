@@ -46,6 +46,13 @@ describe("AgentService", () => {
 
     const agentsMd = await readFile(path.join(result.agent.workspaceDir, "AGENTS.md"), "utf-8");
     expect(agentsMd).toContain("# Orchestrator (OpenGoat Agent)");
+    expect(await readFile(path.join(result.agent.workspaceDir, "SOUL.md"), "utf-8")).toContain("# Soul");
+    expect(await readFile(path.join(result.agent.workspaceDir, "IDENTITY.md"), "utf-8")).toContain(
+      "- id: orchestrator"
+    );
+    expect(await readFile(path.join(result.agent.workspaceDir, "BOOTSTRAP.md"), "utf-8")).toContain(
+      "First-run checklist"
+    );
 
     const internalState = JSON.parse(
       await readFile(path.join(result.agent.internalConfigDir, "state.json"), "utf-8")
@@ -149,6 +156,20 @@ describe("AgentService", () => {
     expect(second.createdPaths).toEqual([]);
     expect(second.skippedPaths.length).toBeGreaterThan(0);
     expect(await readFile(agentsMdPath, "utf-8")).toBe("# Custom\n");
+  });
+
+  it("does not recreate BOOTSTRAP.md when workspace is already established", async () => {
+    const { service, paths, fileSystem } = await createAgentServiceWithPaths();
+
+    const workspaceDir = path.join(paths.workspacesDir, "orchestrator");
+    await fileSystem.ensureDir(workspaceDir);
+    await fileSystem.writeFile(path.join(workspaceDir, "AGENTS.md"), "# Existing\n");
+    await fileSystem.writeFile(path.join(workspaceDir, "CONTEXT.md"), "# Existing context\n");
+
+    await service.ensureAgent(paths, { id: "orchestrator", displayName: "Orchestrator" });
+
+    const bootstrapPath = path.join(workspaceDir, "BOOTSTRAP.md");
+    expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });
 });
 

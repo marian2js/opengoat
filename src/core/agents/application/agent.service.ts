@@ -12,7 +12,13 @@ import {
   renderInternalAgentMemoryMarkdown,
   renderInternalAgentState,
   renderWorkspaceAgentsMarkdown,
+  renderWorkspaceBootstrapMarkdown,
   renderWorkspaceContextMarkdown,
+  renderWorkspaceHeartbeatMarkdown,
+  renderWorkspaceIdentityMarkdown,
+  renderWorkspaceSoulMarkdown,
+  renderWorkspaceToolsMarkdown,
+  renderWorkspaceUserMarkdown,
   renderWorkspaceMetadata
 } from "../../templates/default-templates.js";
 
@@ -64,6 +70,8 @@ export class AgentService {
     await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
     await this.ensureDirectory(internalConfigDir, createdPaths, skippedPaths);
 
+    const shouldCreateBootstrapFile = await this.isBrandNewWorkspace(workspaceDir);
+
     await this.writeJsonIfMissing(
       this.pathPort.join(workspaceDir, "workspace.json"),
       renderWorkspaceMetadata(identity),
@@ -82,6 +90,44 @@ export class AgentService {
       createdPaths,
       skippedPaths
     );
+    await this.writeMarkdownIfMissing(
+      this.pathPort.join(workspaceDir, "SOUL.md"),
+      renderWorkspaceSoulMarkdown(identity),
+      createdPaths,
+      skippedPaths
+    );
+    await this.writeMarkdownIfMissing(
+      this.pathPort.join(workspaceDir, "TOOLS.md"),
+      renderWorkspaceToolsMarkdown(),
+      createdPaths,
+      skippedPaths
+    );
+    await this.writeMarkdownIfMissing(
+      this.pathPort.join(workspaceDir, "IDENTITY.md"),
+      renderWorkspaceIdentityMarkdown(identity),
+      createdPaths,
+      skippedPaths
+    );
+    await this.writeMarkdownIfMissing(
+      this.pathPort.join(workspaceDir, "USER.md"),
+      renderWorkspaceUserMarkdown(),
+      createdPaths,
+      skippedPaths
+    );
+    await this.writeMarkdownIfMissing(
+      this.pathPort.join(workspaceDir, "HEARTBEAT.md"),
+      renderWorkspaceHeartbeatMarkdown(),
+      createdPaths,
+      skippedPaths
+    );
+    if (shouldCreateBootstrapFile) {
+      await this.writeMarkdownIfMissing(
+        this.pathPort.join(workspaceDir, "BOOTSTRAP.md"),
+        renderWorkspaceBootstrapMarkdown(identity),
+        createdPaths,
+        skippedPaths
+      );
+    }
 
     await this.writeJsonIfMissing(
       this.pathPort.join(internalConfigDir, "config.json"),
@@ -137,6 +183,24 @@ export class AgentService {
     }
 
     return descriptors.sort((left, right) => left.id.localeCompare(right.id));
+  }
+
+  private async isBrandNewWorkspace(workspaceDir: string): Promise<boolean> {
+    const firstRunFiles = [
+      "AGENTS.md",
+      "CONTEXT.md",
+      "SOUL.md",
+      "TOOLS.md",
+      "IDENTITY.md",
+      "USER.md",
+      "HEARTBEAT.md"
+    ];
+
+    const existence = await Promise.all(
+      firstRunFiles.map((fileName) => this.fileSystem.exists(this.pathPort.join(workspaceDir, fileName)))
+    );
+
+    return existence.every((value) => !value);
   }
 
   private async ensureDirectory(

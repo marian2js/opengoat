@@ -12,6 +12,7 @@ import type {
 } from "../../providers/index.js";
 import { createDefaultProviderRegistry } from "../../providers/index.js";
 import { AgentService } from "../../agents/application/agent.service.js";
+import { WorkspaceContextService } from "../../agents/application/workspace-context.service.js";
 import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
 import { ProviderService } from "../../providers/application/provider.service.js";
 
@@ -47,10 +48,15 @@ export class OpenGoatService {
       agentService: this.agentService,
       nowIso
     });
+    const workspaceContextService = new WorkspaceContextService({
+      fileSystem: deps.fileSystem,
+      pathPort: deps.pathPort
+    });
     this.providerService = new ProviderService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       providerRegistry: providerRegistryPromise,
+      workspaceContextService,
       nowIso
     });
   }

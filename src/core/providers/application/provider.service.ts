@@ -1,3 +1,4 @@
+import { DEFAULT_BOOTSTRAP_MAX_CHARS, WorkspaceContextService } from "../../agents/index.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
@@ -16,10 +17,18 @@ interface ProviderServiceDeps {
   fileSystem: FileSystemPort;
   pathPort: PathPort;
   providerRegistry: Promise<ProviderRegistry> | ProviderRegistry;
+  workspaceContextService: WorkspaceContextService;
   nowIso: () => string;
 }
 
 interface AgentConfigShape {
+  displayName?: string;
+  prompt?: {
+    bootstrapFiles?: string[];
+  };
+  runtime?: {
+    bootstrapMaxChars?: number;
+  };
   provider?: {
     id?: string;
     updatedAt?: string;
@@ -31,12 +40,14 @@ export class ProviderService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
   private readonly providerRegistry: Promise<ProviderRegistry>;
+  private readonly workspaceContextService: WorkspaceContextService;
   private readonly nowIso: () => string;
 
   public constructor(deps: ProviderServiceDeps) {
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
     this.providerRegistry = Promise.resolve(deps.providerRegistry);
+    this.workspaceContextService = deps.workspaceContextService;
     this.nowIso = deps.nowIso;
   }
 
@@ -45,9 +56,13 @@ export class ProviderService {
     return listProviderSummaries(registry);
   }
 
-  public async getAgentProvider(paths: OpenGoatPaths, agentId: string): Promise<AgentProviderBinding> {
+  public async getAgentProvider(
+    paths: OpenGoatPaths,
+    agentId: string,
+    configOverride?: AgentConfigShape
+  ): Promise<AgentProviderBinding> {
     const registry = await this.providerRegistry;
-    const config = await this.readAgentConfig(paths, agentId);
+    const config = configOverride ?? (await this.readAgentConfig(paths, agentId));
     const configuredProviderId = getConfiguredProviderId(config);
 
     // Validate at read time so invalid configs are surfaced early.
@@ -88,10 +103,34 @@ export class ProviderService {
     options: ProviderInvokeOptions
   ): Promise<ProviderExecutionResult & AgentProviderBinding> {
     const registry = await this.providerRegistry;
-    const binding = await this.getAgentProvider(paths, agentId);
+    const config = await this.readAgentConfig(paths, agentId);
+    const binding = await this.getAgentProvider(paths, agentId, config);
     const provider = registry.create(binding.providerId);
 
-    const result = await provider.invoke(options);
+    const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
+    const bootstrapFiles = await this.workspaceContextService.loadWorkspaceBootstrapFiles(
+      workspaceDir,
+      this.workspaceContextService.resolveBootstrapFileNames(config.prompt?.bootstrapFiles)
+    );
+    const contextFiles = this.workspaceContextService.buildContextFiles(bootstrapFiles, {
+      maxChars: resolveBootstrapMaxChars(config.runtime?.bootstrapMaxChars)
+    });
+    const systemPrompt = this.workspaceContextService.buildSystemPrompt({
+      agentId,
+      displayName: config.displayName?.trim() || agentId,
+      workspaceDir,
+      nowIso: this.nowIso(),
+      contextFiles
+    });
+
+    const invokeOptions: ProviderInvokeOptions = {
+      ...options,
+      systemPrompt,
+      cwd: options.cwd || workspaceDir,
+      agent: provider.capabilities.agent ? options.agent || agentId : options.agent
+    };
+
+    const result = await provider.invoke(invokeOptions);
 
     return {
       ...result,
@@ -129,3 +168,12 @@ function getConfiguredProviderId(config: AgentConfigShape): string {
   const providerId = config.provider?.id?.trim().toLowerCase();
   return providerId || DEFAULT_PROVIDER_ID;
 }
+
+function resolveBootstrapMaxChars(raw: number | undefined): number {
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+    return Math.floor(raw);
+  }
+
+  return DEFAULT_BOOTSTRAP_MAX_CHARS;
+}
+

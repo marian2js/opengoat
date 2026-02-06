@@ -6,15 +6,15 @@ import {
 import { BaseProvider } from "../../base-provider.js";
 import type { ProviderExecutionResult, ProviderInvokeOptions } from "../../types.js";
 
-const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
-const DEFAULT_OPENAI_ENDPOINT_PATH = "/responses";
-const DEFAULT_OPENAI_MODEL = "gpt-4.1-mini";
+const DEFAULT_GROK_BASE_URL = "https://api.x.ai/v1";
+const DEFAULT_GROK_ENDPOINT_PATH = "/responses";
+const DEFAULT_GROK_MODEL = "grok-4";
 
-export class OpenAIProvider extends BaseProvider {
+export class GrokProvider extends BaseProvider {
   public constructor() {
     super({
-      id: "openai",
-      displayName: "OpenAI",
+      id: "grok",
+      displayName: "Grok",
       kind: "http",
       capabilities: {
         agent: false,
@@ -29,13 +29,13 @@ export class OpenAIProvider extends BaseProvider {
     this.validateInvokeOptions(options);
 
     const env = options.env ?? process.env;
-    const apiKey = env.OPENAI_API_KEY?.trim() || env.OPENGOAT_OPENAI_API_KEY?.trim();
+    const apiKey = env.XAI_API_KEY?.trim() || env.OPENGOAT_GROK_API_KEY?.trim();
     if (!apiKey) {
-      throw new ProviderAuthenticationError(this.id, "set OPENAI_API_KEY");
+      throw new ProviderAuthenticationError(this.id, "set XAI_API_KEY");
     }
 
-    const endpoint = resolveOpenAIEndpoint(env);
-    const model = options.model || env.OPENGOAT_OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
+    const endpoint = resolveGrokEndpoint(env);
+    const model = options.model || env.OPENGOAT_GROK_MODEL || DEFAULT_GROK_MODEL;
     const style = resolveApiStyle(env, endpoint);
 
     const response = await fetch(endpoint, {
@@ -56,7 +56,7 @@ export class OpenAIProvider extends BaseProvider {
       };
     }
 
-    const output = extractOpenAIResponseText(responseText, style);
+    const output = extractGrokResponseText(responseText, style);
     options.onStdout?.(output);
 
     return {
@@ -71,20 +71,20 @@ export class OpenAIProvider extends BaseProvider {
   }
 }
 
-function resolveOpenAIEndpoint(env: NodeJS.ProcessEnv): string {
-  const endpointOverride = env.OPENGOAT_OPENAI_ENDPOINT?.trim();
+function resolveGrokEndpoint(env: NodeJS.ProcessEnv): string {
+  const endpointOverride = env.OPENGOAT_GROK_ENDPOINT?.trim();
   if (endpointOverride) {
     return endpointOverride;
   }
 
-  const baseUrl = (env.OPENGOAT_OPENAI_BASE_URL?.trim() || DEFAULT_OPENAI_BASE_URL).replace(/\/+$/, "");
-  const endpointPath = env.OPENGOAT_OPENAI_ENDPOINT_PATH?.trim() || DEFAULT_OPENAI_ENDPOINT_PATH;
+  const baseUrl = (env.OPENGOAT_GROK_BASE_URL?.trim() || DEFAULT_GROK_BASE_URL).replace(/\/+$/, "");
+  const endpointPath = env.OPENGOAT_GROK_ENDPOINT_PATH?.trim() || DEFAULT_GROK_ENDPOINT_PATH;
 
   return `${baseUrl}${endpointPath.startsWith("/") ? "" : "/"}${endpointPath}`;
 }
 
 function resolveApiStyle(env: NodeJS.ProcessEnv, endpoint: string): "responses" | "chat" {
-  const explicit = env.OPENGOAT_OPENAI_API_STYLE?.trim().toLowerCase();
+  const explicit = env.OPENGOAT_GROK_API_STYLE?.trim().toLowerCase();
   if (explicit === "responses" || explicit === "chat") {
     return explicit;
   }
@@ -135,27 +135,27 @@ function buildRequestPayload(
   };
 }
 
-function extractOpenAIResponseText(raw: string, style: "responses" | "chat"): string {
+function extractGrokResponseText(raw: string, style: "responses" | "chat"): string {
   let payload: unknown;
 
   try {
     payload = JSON.parse(raw);
   } catch {
-    throw new ProviderRuntimeError("openai", "received non-JSON response");
+    throw new ProviderRuntimeError("grok", "received non-JSON response");
   }
 
   if (typeof payload !== "object" || payload === null) {
-    throw new ProviderRuntimeError("openai", "received invalid response payload");
+    throw new ProviderRuntimeError("grok", "received invalid response payload");
   }
 
   if (style === "chat") {
-    return extractOpenAIChatText(payload);
+    return extractGrokChatText(payload);
   }
 
-  return extractOpenAIResponsesText(payload);
+  return extractGrokResponsesText(payload);
 }
 
-function extractOpenAIResponsesText(payload: unknown): string {
+function extractGrokResponsesText(payload: unknown): string {
   const record = payload as {
     output_text?: unknown;
     output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
@@ -171,13 +171,13 @@ function extractOpenAIResponsesText(payload: unknown): string {
     .join("\n");
 
   if (!textBlocks) {
-    throw new ProviderRuntimeError("openai", "no textual output found in response");
+    throw new ProviderRuntimeError("grok", "no textual output found in response");
   }
 
   return ensureTrailingNewline(textBlocks);
 }
 
-function extractOpenAIChatText(payload: unknown): string {
+function extractGrokChatText(payload: unknown): string {
   const record = payload as {
     choices?: Array<{
       message?: {
@@ -202,7 +202,7 @@ function extractOpenAIChatText(payload: unknown): string {
     }
   }
 
-  throw new ProviderRuntimeError("openai", "no textual output found in response");
+  throw new ProviderRuntimeError("grok", "no textual output found in response");
 }
 
 function ensureTrailingNewline(value: string): string {

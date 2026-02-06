@@ -22,6 +22,18 @@ describe("codex provider", () => {
     ]);
   });
 
+  it("prepends system prompt for CLI providers", () => {
+    const provider = new CodexProvider();
+    const invocation = provider.buildInvocation({
+      message: "ping",
+      systemPrompt: "You are an orchestrator."
+    });
+
+    expect(invocation.args[invocation.args.length - 1]).toBe(
+      "You are an orchestrator.\n\n# User Message\nping"
+    );
+  });
+
   it("maps auth invocation", () => {
     const provider = new CodexProvider();
     const invocation = provider.buildAuthInvocation({ passthroughArgs: ["--device-auth"] });

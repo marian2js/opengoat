@@ -54,6 +54,7 @@ describe("openrouter provider", () => {
     await withFetchMock(fetchMock, async () => {
       const result = await provider.invoke({
         message: "hello",
+        systemPrompt: "System rules.",
         env: {
           OPENROUTER_API_KEY: "test-key",
           OPENGOAT_OPENROUTER_HTTP_REFERER: "https://example.test",
@@ -66,6 +67,13 @@ describe("openrouter provider", () => {
     });
 
     const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(requestInit.body))).toEqual({
+      model: "openai/gpt-4o-mini",
+      messages: [
+        { role: "system", content: "System rules." },
+        { role: "user", content: "hello" }
+      ]
+    });
     expect(requestInit.headers).toEqual(
       expect.objectContaining({
         "HTTP-Referer": "https://example.test",

@@ -67,6 +67,63 @@ export function renderWorkspaceContextMarkdown(agent: AgentIdentity): string {
   ].join("\n");
 }
 
+export function renderWorkspaceSoulMarkdown(agent: AgentIdentity): string {
+  return [
+    `# Soul (${agent.displayName})`,
+    "",
+    "- Define tone, style, and non-negotiable guardrails here.",
+    "- Keep this file concise and stable across runs."
+  ].join("\n");
+}
+
+export function renderWorkspaceToolsMarkdown(): string {
+  return [
+    "# Tools",
+    "",
+    "- Document local tool conventions and execution preferences.",
+    "- This file is guidance only; it does not grant tool permissions."
+  ].join("\n");
+}
+
+export function renderWorkspaceIdentityMarkdown(agent: AgentIdentity): string {
+  return [
+    "# Identity",
+    "",
+    `- id: ${agent.id}`,
+    `- displayName: ${agent.displayName}`,
+    "- role: OpenGoat agent"
+  ].join("\n");
+}
+
+export function renderWorkspaceUserMarkdown(): string {
+  return [
+    "# User",
+    "",
+    "- Capture durable user preferences here.",
+    "- Avoid secrets; reference secure storage instead."
+  ].join("\n");
+}
+
+export function renderWorkspaceHeartbeatMarkdown(): string {
+  return [
+    "# Heartbeat",
+    "",
+    "Read this file when asked to perform heartbeat checks.",
+    "If nothing needs attention, return HEARTBEAT_OK."
+  ].join("\n");
+}
+
+export function renderWorkspaceBootstrapMarkdown(agent: AgentIdentity): string {
+  return [
+    `# Bootstrap (${agent.displayName})`,
+    "",
+    "First-run checklist:",
+    "- Review AGENTS.md, SOUL.md, and IDENTITY.md.",
+    "- Confirm USER.md and CONTEXT.md reflect current goals.",
+    "- Delete this file after the bootstrap ritual is complete."
+  ].join("\n");
+}
+
 export function renderWorkspaceMetadata(agent: AgentIdentity): Record<string, unknown> {
   return {
     schemaVersion: 1,
@@ -87,10 +144,22 @@ export function renderInternalAgentConfig(agent: AgentIdentity): Record<string, 
     },
     runtime: {
       mode: "orchestrated",
-      contextBudgetTokens: 128_000
+      contextBudgetTokens: 128_000,
+      bootstrapMaxChars: 20_000
     },
     prompt: {
-      bootstrapFiles: ["AGENTS.md", "CONTEXT.md"]
+      bootstrapFiles: [
+        "AGENTS.md",
+        "SOUL.md",
+        "TOOLS.md",
+        "IDENTITY.md",
+        "USER.md",
+        "HEARTBEAT.md",
+        "CONTEXT.md",
+        "BOOTSTRAP.md",
+        "MEMORY.md",
+        "memory.md"
+      ]
     }
   };
 }

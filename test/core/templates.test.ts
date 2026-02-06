@@ -7,7 +7,10 @@ import {
   renderInternalAgentMemoryMarkdown,
   renderInternalAgentState,
   renderWorkspaceAgentsMarkdown,
+  renderWorkspaceBootstrapMarkdown,
   renderWorkspaceContextMarkdown,
+  renderWorkspaceHeartbeatMarkdown,
+  renderWorkspaceIdentityMarkdown,
   renderWorkspaceMetadata
 } from "../../src/core/templates/default-templates.js";
 
@@ -41,6 +44,10 @@ describe("default templates", () => {
     const contextMarkdown = renderWorkspaceContextMarkdown(identity);
     expect(contextMarkdown).toContain("# Context (Orchestrator)");
 
+    expect(renderWorkspaceIdentityMarkdown(identity)).toContain("- id: orchestrator");
+    expect(renderWorkspaceHeartbeatMarkdown()).toContain("HEARTBEAT_OK");
+    expect(renderWorkspaceBootstrapMarkdown(identity)).toContain("First-run checklist:");
+
     const metadata = renderWorkspaceMetadata(identity);
     expect(metadata).toEqual({
       schemaVersion: 1,
@@ -52,11 +59,23 @@ describe("default templates", () => {
 
     const internalConfig = renderInternalAgentConfig(identity) as {
       prompt: { bootstrapFiles: string[] };
-      runtime: { contextBudgetTokens: number };
+      runtime: { contextBudgetTokens: number; bootstrapMaxChars: number };
       provider: { id: string };
     };
-    expect(internalConfig.prompt.bootstrapFiles).toEqual(["AGENTS.md", "CONTEXT.md"]);
+    expect(internalConfig.prompt.bootstrapFiles).toEqual([
+      "AGENTS.md",
+      "SOUL.md",
+      "TOOLS.md",
+      "IDENTITY.md",
+      "USER.md",
+      "HEARTBEAT.md",
+      "CONTEXT.md",
+      "BOOTSTRAP.md",
+      "MEMORY.md",
+      "memory.md"
+    ]);
     expect(internalConfig.runtime.contextBudgetTokens).toBe(128_000);
+    expect(internalConfig.runtime.bootstrapMaxChars).toBe(20_000);
     expect(internalConfig.provider.id).toBe("codex");
 
     const internalMemory = renderInternalAgentMemoryMarkdown(identity);

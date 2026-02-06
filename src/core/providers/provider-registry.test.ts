@@ -12,6 +12,7 @@ describe("provider registry", () => {
       "claude",
       "codex",
       "cursor",
+      "grok",
       "openai",
       "openclaw",
       "openrouter"

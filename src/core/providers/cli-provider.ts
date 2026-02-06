@@ -41,7 +41,7 @@ export abstract class BaseCliProvider extends BaseProvider {
   public buildInvocation(options: ProviderInvokeOptions, env: NodeJS.ProcessEnv = process.env): ProviderInvocation {
     this.validateInvokeOptions(options);
     const command = this.resolveCommand(env);
-    const args = this.buildInvocationArgs(options, command);
+    const args = this.buildInvocationArgs(this.mergeSystemPrompt(options), command);
 
     return { command, args };
   }
@@ -98,6 +98,18 @@ export abstract class BaseCliProvider extends BaseProvider {
 
       throw error;
     }
+  }
+
+  private mergeSystemPrompt(options: ProviderInvokeOptions): ProviderInvokeOptions {
+    const systemPrompt = options.systemPrompt?.trim();
+    if (!systemPrompt) {
+      return options;
+    }
+
+    return {
+      ...options,
+      message: `${systemPrompt}\n\n# User Message\n${options.message}`
+    };
   }
 }
 
