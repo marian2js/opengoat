@@ -19,6 +19,9 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
+        with:
+          # verifying later needs history, or we bump blindly
+          fetch-depth: 0
 
       - name: Setup Node.js 20.x
         uses: actions/setup-node@v4
@@ -29,12 +32,40 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Create Release Pull Request or Publish to npm
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          # This expects you to have a script called release which does a build for your packages and calls changeset publish
-          publish: npm run release
+      - name: Check for Changesets
+        id: check_changesets
+        run: |
+          if [ -n "$(find .changeset -name '*.md' -not -name 'README.md')" ]; then
+            echo "has_changesets=true" >> $GITHUB_OUTPUT
+            echo "Changesets found."
+          else
+            echo "has_changesets=false" >> $GITHUB_OUTPUT
+            echo "No changesets found."
+          fi
+
+      - name: Configure Git
+        if: steps.check_changesets.outputs.has_changesets == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Version Packages (CalVer)
+        if: steps.check_changesets.outputs.has_changesets == 'true'
+        run: npm run version-packages
+
+      - name: Publish to NPM
+        if: steps.check_changesets.outputs.has_changesets == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm set //registry.npmjs.org/:_authToken $NPM_TOKEN
+          npm publish --access public
+
+      - name: Push Changes
+        if: steps.check_changesets.outputs.has_changesets == 'true'
+        run: |
+          git add package.json CHANGELOG.md .changeset
+          git commit -m "chore: release $(node -p "require('./package.json').version")"
+          git push
+          git tag v$(node -p "require('./package.json').version")
+          git push --tags
