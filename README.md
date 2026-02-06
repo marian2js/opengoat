@@ -33,7 +33,7 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - `orchestrator` is the immutable default agent for inbound message routing.
 - Every agent has exactly one assigned provider (`~/.opengoat/agents/<agent>/config.json`).
 - On every `agent run`, OpenGoat loads configured workspace bootstrap files, injects them into a generated system prompt with missing-file markers + truncation protection, and runs the provider with the agent workspace as default `cwd`.
-- Built-in providers: `codex`, `claude`, `cursor`, `grok`, `openclaw`, `openai`, `openrouter`.
+- Built-in providers: `codex`, `claude`, `cursor`, `gemini`, `grok`, `openclaw`, `openai`, `openrouter`.
   - Each provider lives in its own folder with code + tests.
   - New providers are auto-discovered from provider folders (no central registration edits).
   - `onboard` uses provider-declared onboarding metadata to collect required credentials/settings.
@@ -63,6 +63,15 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
   - `OPENAI_BASE_URL` (for example `https://your-gateway.example/v1`)
   - `OPENAI_ENDPOINT_PATH` (for example `/responses` or `/chat/completions`)
   - `OPENAI_ENDPOINT` can override the full URL directly.
+
+## Gemini Provider
+
+`gemini` is a CLI provider.
+
+- Command: `gemini`
+- Non-interactive execution: `--prompt <text>`
+- Optional command override: `GEMINI_CMD`
+- Optional default model: `GEMINI_MODEL`
 
 ## Grok Provider
 

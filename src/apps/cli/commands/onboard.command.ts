@@ -6,6 +6,7 @@ import type { CliCommand } from "../framework/command.js";
 const DEFAULT_AGENT_ID = "orchestrator";
 
 const PROVIDER_MODEL_ENV_KEY: Record<string, string> = {
+  gemini: "GEMINI_MODEL",
   openai: "OPENAI_MODEL",
   openrouter: "OPENROUTER_MODEL",
   grok: "GROK_MODEL"

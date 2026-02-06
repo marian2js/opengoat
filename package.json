@@ -3,7 +3,15 @@
   "version": "0.1.0",
   "description": "OpenGoat agent orchestrator CLI",
   "type": "module",
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
   "bin": {
     "opengoat": "bin/opengoat"
   },

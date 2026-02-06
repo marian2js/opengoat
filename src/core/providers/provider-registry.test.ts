@@ -12,6 +12,7 @@ describe("provider registry", () => {
       "claude",
       "codex",
       "cursor",
+      "gemini",
       "grok",
       "openai",
       "openclaw",
@@ -21,6 +22,7 @@ describe("provider registry", () => {
     expect(registry.getProviderOnboarding("openai")?.env?.some((field) => field.key === "OPENAI_API_KEY")).toBe(
       true
     );
+    expect(registry.getProviderOnboarding("gemini")?.env?.some((field) => field.key === "GEMINI_CMD")).toBe(true);
   });
 
   it("supports custom registration", async () => {
