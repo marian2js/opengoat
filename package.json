@@ -24,7 +24,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "changeset": "changeset",
-    "release": "changeset publish"
+    "version-packages": "node scripts/release.mjs",
+    "release": "node scripts/release.mjs && npm publish"
   },
   "engines": {
     "node": ">=20.11.0"
