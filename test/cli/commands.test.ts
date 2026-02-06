@@ -87,7 +87,7 @@ describe("CLI commands", () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         { id: "orchestrator", displayName: "Orchestrator" },
-        { id: "research", displayName: "Research" }
+        { id: "research", displayName: "research" }
       ]);
 
     const first = createContext({ listAgents });
@@ -100,8 +100,8 @@ describe("CLI commands", () => {
     const secondCode = await agentListCommand.run([], second.context);
 
     expect(secondCode).toBe(0);
-    expect(second.stdout.output()).toContain("orchestrator\tOrchestrator");
-    expect(second.stdout.output()).toContain("research\tResearch");
+    expect(second.stdout.output()).toContain("orchestrator\n");
+    expect(second.stdout.output()).toContain("research\n");
   });
 
   it("agent command defaults to orchestrator when agent id is omitted", async () => {

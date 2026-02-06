@@ -1,0 +1,6 @@
+{
+  "name": "writer-routing",
+  "userMessage": "Draft a concise launch email announcing the new orchestration feature.",
+  "expectedTargetAgentId": "writer-agent",
+  "expectedRewriteIncludes": ["Delegation target", "Writer Agent", "Original user request"]
+}

@@ -10,6 +10,7 @@ import { agentRunCommand } from "./commands/agent-run.command.js";
 import { initCommand } from "./commands/init.command.js";
 import { onboardCommand } from "./commands/onboard.command.js";
 import { providerListCommand } from "./commands/provider-list.command.js";
+import { routeCommand } from "./commands/route.command.js";
 import { CommandRouter } from "./framework/router.js";
 
 export async function runCli(argv: string[]): Promise<number> {
@@ -25,6 +26,7 @@ export async function runCli(argv: string[]): Promise<number> {
     [
       initCommand,
       onboardCommand,
+      routeCommand,
       agentCommand,
       agentCreateCommand,
       agentListCommand,

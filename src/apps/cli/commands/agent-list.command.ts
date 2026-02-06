@@ -12,7 +12,13 @@ export const agentListCommand: CliCommand = {
     }
 
     for (const agent of agents) {
-      context.stdout.write(`${agent.id}\t${agent.displayName}\n`);
+      const displayName = agent.displayName.trim();
+      if (!displayName || displayName.toLowerCase() === agent.id.toLowerCase()) {
+        context.stdout.write(`${agent.id}\n`);
+        continue;
+      }
+
+      context.stdout.write(`${agent.id} (${displayName})\n`);
     }
 
     return 0;

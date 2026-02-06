@@ -184,6 +184,7 @@ async function createPaths(root: string): Promise<{ paths: OpenGoatPaths; fileSy
     workspacesDir: path.join(root, "workspaces"),
     agentsDir: path.join(root, "agents"),
     providersDir: path.join(root, "providers"),
+    runsDir: path.join(root, "runs"),
     globalConfigJsonPath: path.join(root, "config.json"),
     globalConfigMarkdownPath: path.join(root, "CONFIG.md"),
     agentsIndexJsonPath: path.join(root, "agents.json")
@@ -192,6 +193,7 @@ async function createPaths(root: string): Promise<{ paths: OpenGoatPaths; fileSy
   await fileSystem.ensureDir(paths.workspacesDir);
   await fileSystem.ensureDir(paths.agentsDir);
   await fileSystem.ensureDir(paths.providersDir);
+  await fileSystem.ensureDir(paths.runsDir);
   await fileSystem.ensureDir(path.join(paths.workspacesDir, "orchestrator"));
   await fileSystem.ensureDir(path.join(paths.agentsDir, "orchestrator"));
 

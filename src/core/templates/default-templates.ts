@@ -32,13 +32,34 @@ export function renderGlobalConfigMarkdown(): string {
     "- `workspaces/`: user-visible agent workspaces",
     "- `agents/`: internal per-agent configuration",
     "- `providers/`: provider credentials and endpoint settings",
+    "- `runs/`: run traces (routing + execution history)",
     "",
     "Only Markdown and JSON files are used for OpenGoat configuration and state."
   ].join("\n");
 }
 
-export function renderWorkspaceAgentsMarkdown(agent: AgentIdentity): string {
+export function renderWorkspaceAgentsMarkdown(agent: AgentIdentity, providerId = DEFAULT_PROVIDER_ID): string {
+  const description =
+    agent.id === DEFAULT_AGENT_ID
+      ? "Primary orchestration agent that routes work to specialized agents."
+      : `Specialized agent for ${agent.displayName}.`;
+  const tags = agent.id === DEFAULT_AGENT_ID ? "orchestration, routing" : "specialized, delegated";
+  const canDelegate = agent.id === DEFAULT_AGENT_ID ? "true" : "false";
+  const priority = agent.id === DEFAULT_AGENT_ID ? "100" : "50";
+
   return [
+    "---",
+    `id: ${agent.id}`,
+    `name: ${agent.displayName}`,
+    `description: ${description}`,
+    `provider: ${providerId}`,
+    `tags: [${tags}]`,
+    "delegation:",
+    "  canReceive: true",
+    `  canDelegate: ${canDelegate}`,
+    `priority: ${priority}`,
+    "---",
+    "",
     `# ${agent.displayName} (OpenGoat Agent)`,
     "",
     "## Role",

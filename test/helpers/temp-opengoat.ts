@@ -17,6 +17,7 @@ export class TestPathsProvider implements OpenGoatPathsProvider {
       workspacesDir: path.join(this.root, "workspaces"),
       agentsDir: path.join(this.root, "agents"),
       providersDir: path.join(this.root, "providers"),
+      runsDir: path.join(this.root, "runs"),
       globalConfigJsonPath: path.join(this.root, "config.json"),
       globalConfigMarkdownPath: path.join(this.root, "CONFIG.md"),
       agentsIndexJsonPath: path.join(this.root, "agents.json")

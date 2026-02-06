@@ -1,0 +1,6 @@
+{
+  "name": "research-routing",
+  "userMessage": "Research OpenAI API migration notes and summarize the key changes.",
+  "expectedTargetAgentId": "research-agent",
+  "expectedRewriteIncludes": ["Delegation target", "Research Agent", "Original user request"]
+}

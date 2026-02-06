@@ -53,6 +53,12 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
     return 1;
   }
 
+  if (hasRoutingDetails(result) && result.entryAgentId !== result.routing.targetAgentId) {
+    context.stderr.write(
+      `Routed ${result.entryAgentId} -> ${result.routing.targetAgentId} (confidence ${result.routing.confidence}).\n`
+    );
+  }
+
   if (!request.stream) {
     const stdout = stdoutBuffer.join("") || result.stdout;
     const stderr = stderrBuffer.join("") || result.stderr;
@@ -86,4 +92,26 @@ function formatError(error: unknown): string {
   }
 
   return String(error);
+}
+
+function hasRoutingDetails(
+  value: unknown
+): value is {
+  entryAgentId: string;
+  routing: { targetAgentId: string; confidence: number };
+} {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const record = value as {
+    entryAgentId?: unknown;
+    routing?: { targetAgentId?: unknown; confidence?: unknown };
+  };
+
+  return (
+    typeof record.entryAgentId === "string" &&
+    typeof record.routing?.targetAgentId === "string" &&
+    typeof record.routing?.confidence === "number"
+  );
 }

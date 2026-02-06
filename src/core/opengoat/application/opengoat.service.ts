@@ -5,8 +5,8 @@ import type { PathPort } from "../../ports/path.port.js";
 import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import type {
   AgentProviderBinding,
-  ProviderAuthOptions,
   ProviderExecutionResult,
+  ProviderAuthOptions,
   ProviderInvokeOptions,
   ProviderOnboardingSpec,
   ProviderRegistry,
@@ -14,9 +14,11 @@ import type {
   ProviderSummary
 } from "../../providers/index.js";
 import { createDefaultProviderRegistry } from "../../providers/index.js";
+import { AgentManifestService } from "../../agents/application/agent-manifest.service.js";
 import { AgentService } from "../../agents/application/agent.service.js";
 import { WorkspaceContextService } from "../../agents/application/workspace-context.service.js";
 import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
+import { OrchestrationService, type RoutingDecision } from "../../orchestration/index.js";
 import { ProviderService } from "../../providers/application/provider.service.js";
 
 interface OpenGoatServiceDeps {
@@ -30,8 +32,10 @@ interface OpenGoatServiceDeps {
 export class OpenGoatService {
   private readonly pathsProvider: OpenGoatPathsProvider;
   private readonly agentService: AgentService;
+  private readonly agentManifestService: AgentManifestService;
   private readonly bootstrapService: BootstrapService;
   private readonly providerService: ProviderService;
+  private readonly orchestrationService: OrchestrationService;
 
   public constructor(deps: OpenGoatServiceDeps) {
     const nowIso = deps.nowIso ?? (() => new Date().toISOString());
@@ -44,6 +48,10 @@ export class OpenGoatService {
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       nowIso
+    });
+    this.agentManifestService = new AgentManifestService({
+      fileSystem: deps.fileSystem,
+      pathPort: deps.pathPort
     });
     this.bootstrapService = new BootstrapService({
       fileSystem: deps.fileSystem,
@@ -60,6 +68,13 @@ export class OpenGoatService {
       pathPort: deps.pathPort,
       providerRegistry: providerRegistryPromise,
       workspaceContextService,
+      nowIso
+    });
+    this.orchestrationService = new OrchestrationService({
+      providerService: this.providerService,
+      agentManifestService: this.agentManifestService,
+      fileSystem: deps.fileSystem,
+      pathPort: deps.pathPort,
       nowIso
     });
   }
@@ -112,15 +127,29 @@ export class OpenGoatService {
 
   public async setAgentProvider(agentId: string, providerId: string): Promise<AgentProviderBinding> {
     const paths = this.pathsProvider.getPaths();
-    return this.providerService.setAgentProvider(paths, agentId, providerId);
+    const binding = await this.providerService.setAgentProvider(paths, agentId, providerId);
+    await this.agentManifestService.syncManifestProvider(paths, binding.agentId, binding.providerId);
+    return binding;
+  }
+
+  public async routeMessage(agentId: string, message: string): Promise<RoutingDecision> {
+    const paths = this.pathsProvider.getPaths();
+    return this.orchestrationService.routeMessage(paths, agentId, message);
   }
 
   public async runAgent(
     agentId: string,
     options: ProviderInvokeOptions
-  ): Promise<ProviderExecutionResult & AgentProviderBinding> {
+  ): Promise<
+    ProviderExecutionResult &
+      AgentProviderBinding & {
+        entryAgentId: string;
+        routing: RoutingDecision;
+        tracePath: string;
+      }
+  > {
     const paths = this.pathsProvider.getPaths();
-    return this.providerService.invokeAgent(paths, agentId, options);
+    return this.orchestrationService.runAgent(paths, agentId, options);
   }
 
   public getHomeDir(): string {

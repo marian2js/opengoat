@@ -7,5 +7,6 @@ export * from "./core/agents/index.js";
 export * from "./core/bootstrap/index.js";
 export * from "./core/providers/index.js";
 export * from "./core/opengoat/index.js";
+export * from "./core/orchestration/index.js";
 export * from "./platform/node/node-file-system.js";
 export * from "./platform/node/node-path.port.js";

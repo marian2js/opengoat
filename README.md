@@ -9,6 +9,7 @@ The codebase is split into layers to keep product surfaces decoupled from orches
 - `src/core/agents`: agent lifecycle domain (`AgentService`).
 - `src/core/bootstrap`: filesystem bootstrap domain (`BootstrapService`).
 - `src/core/providers`: provider domain (`ProviderService`, registry, implementations).
+- `src/core/orchestration`: routing + orchestration runtime (`RoutingService`, `OrchestrationService`).
 - `src/core/opengoat`: orchestration facade used by app surfaces (`OpenGoatService`).
 - `src/core/domain`, `src/core/templates`, `src/core/ports`: shared contracts and rendering helpers.
 - `src/core/providers/providers/<provider-id>`: self-contained provider modules and tests.
@@ -32,7 +33,9 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - CLI automatically loads environment variables from `.env` in the current working directory.
 - `orchestrator` is the immutable default agent for inbound message routing.
 - Every agent has exactly one assigned provider (`~/.opengoat/agents/<agent>/config.json`).
+- Agent metadata lives in front matter at `AGENTS.md` (`id`, `name`, `description`, `provider`, `tags`, `delegation`, `priority`) and is used for routing decisions.
 - On every `agent run`, OpenGoat loads configured workspace bootstrap files, injects them into a generated system prompt with missing-file markers + truncation protection, and runs the provider with the agent workspace as default `cwd`.
+- Every agent run writes a trace JSON file at `~/.opengoat/runs/<run-id>.json` containing entry agent, routing decision, and provider execution output.
 - Built-in providers: `codex`, `claude`, `cursor`, `gemini`, `grok`, `openclaw`, `openai`, `openrouter`.
   - Each provider lives in its own folder with code + tests.
   - New providers are auto-discovered from provider folders (no central registration edits).
@@ -48,6 +51,7 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - `./bin/opengoat agent create <name>`
 - `./bin/opengoat agent list`
 - `./bin/opengoat provider list`
+- `./bin/opengoat route --message "<text>" [--agent <id>] [--json]`
 - `./bin/opengoat agent provider get <agent-id>`
 - `./bin/opengoat agent provider set <agent-id> <provider-id>`
 - `./bin/opengoat agent run <agent-id> --message <text> [--model <model>] [-- <provider-args>]`
