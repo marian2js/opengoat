@@ -1,0 +1,159 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import type { OpenGoatPaths } from "../../src/core/domain/opengoat-paths.js";
+import { AgentService } from "../../src/core/services/agent.service.js";
+import { BootstrapService } from "../../src/core/services/bootstrap.service.js";
+import { NodeFileSystem } from "../../src/platform/node/node-file-system.js";
+import { NodePathPort } from "../../src/platform/node/node-path.port.js";
+import { TestPathsProvider, createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
+
+const roots: string[] = [];
+
+afterEach(async () => {
+  while (roots.length > 0) {
+    const root = roots.pop();
+    if (root) {
+      await removeTempDir(root);
+    }
+  }
+});
+
+describe("BootstrapService", () => {
+  it("initializes the full OpenGoat home and orchestrator agent", async () => {
+    const { service, paths } = await createBootstrapService();
+
+    const result = await service.initialize();
+
+    expect(result.paths.homeDir).toBe(paths.homeDir);
+    expect(result.defaultAgent).toBe("orchestrator");
+    expect(result.createdPaths.length).toBeGreaterThan(0);
+
+    const config = JSON.parse(await readFile(paths.globalConfigJsonPath, "utf-8")) as {
+      defaultAgent: string;
+    };
+    expect(config.defaultAgent).toBe("orchestrator");
+
+    const orchestratorConfig = JSON.parse(
+      await readFile(path.join(paths.agentsDir, "orchestrator", "config.json"), "utf-8")
+    ) as { provider?: { id?: string } };
+    expect(orchestratorConfig.provider?.id).toBe("codex");
+
+    const orchestratorAgents = await readFile(
+      path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"),
+      "utf-8"
+    );
+    expect(orchestratorAgents).toContain("# Orchestrator (OpenGoat Agent)");
+  });
+
+  it("is idempotent on repeated initialize", async () => {
+    const { service } = await createBootstrapService();
+
+    const first = await service.initialize();
+    const second = await service.initialize();
+
+    expect(first.createdPaths.length).toBeGreaterThan(0);
+    expect(second.createdPaths).toEqual([]);
+    expect(second.skippedPaths.length).toBeGreaterThan(0);
+  });
+
+  it("forces orchestrator as default even when config was changed", async () => {
+    const { service, paths, fileSystem } = await createBootstrapService();
+
+    await fileSystem.ensureDir(paths.homeDir);
+    await fileSystem.ensureDir(paths.workspacesDir);
+    await fileSystem.ensureDir(paths.agentsDir);
+    await fileSystem.writeFile(
+      paths.globalConfigJsonPath,
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          defaultAgent: "custom-agent",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z"
+        },
+        null,
+        2
+      ) + "\n"
+    );
+
+    await service.initialize();
+
+    const config = JSON.parse(await readFile(paths.globalConfigJsonPath, "utf-8")) as {
+      defaultAgent: string;
+    };
+
+    expect(config.defaultAgent).toBe("orchestrator");
+  });
+
+  it("repairs config when it is malformed", async () => {
+    const { service, paths, fileSystem } = await createBootstrapService();
+
+    await fileSystem.ensureDir(paths.homeDir);
+    await fileSystem.ensureDir(paths.workspacesDir);
+    await fileSystem.ensureDir(paths.agentsDir);
+    await fileSystem.writeFile(paths.globalConfigJsonPath, "{not json");
+
+    await service.initialize();
+
+    const config = JSON.parse(await readFile(paths.globalConfigJsonPath, "utf-8")) as {
+      defaultAgent: string;
+    };
+    expect(config.defaultAgent).toBe("orchestrator");
+  });
+
+  it("ensures agents index always includes orchestrator", async () => {
+    const { service, paths, fileSystem } = await createBootstrapService();
+
+    await fileSystem.ensureDir(paths.homeDir);
+    await fileSystem.ensureDir(paths.workspacesDir);
+    await fileSystem.ensureDir(paths.agentsDir);
+    await fileSystem.writeFile(
+      paths.agentsIndexJsonPath,
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          agents: ["research"],
+          updatedAt: "2026-01-01T00:00:00.000Z"
+        },
+        null,
+        2
+      ) + "\n"
+    );
+
+    await service.initialize();
+
+    const index = JSON.parse(await readFile(paths.agentsIndexJsonPath, "utf-8")) as {
+      agents: string[];
+    };
+    expect(index.agents).toEqual(["orchestrator", "research"]);
+  });
+});
+
+async function createBootstrapService(): Promise<{
+  service: BootstrapService;
+  paths: OpenGoatPaths;
+  fileSystem: NodeFileSystem;
+}> {
+  const root = await createTempDir("opengoat-bootstrap-service-");
+  roots.push(root);
+
+  const fileSystem = new NodeFileSystem();
+  const pathsProvider = new TestPathsProvider(root);
+  const pathPort = new NodePathPort();
+  const nowIso = () => "2026-02-06T00:00:00.000Z";
+
+  const agentService = new AgentService({ fileSystem, pathPort, nowIso });
+  const service = new BootstrapService({
+    fileSystem,
+    pathsProvider,
+    agentService,
+    nowIso
+  });
+
+  return {
+    service,
+    paths: pathsProvider.getPaths(),
+    fileSystem
+  };
+}
