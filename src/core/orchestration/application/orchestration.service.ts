@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AgentManifestService } from "../../agents/index.js";
+import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
@@ -108,18 +109,14 @@ function generateRunId(): string {
 }
 
 function resolveEntryAgentId(entryAgentId: string, manifests: Array<{ agentId: string }>): string {
-  const normalizedEntryAgentId = normalizeAgentId(entryAgentId) || "orchestrator";
+  const normalizedEntryAgentId = normalizeAgentId(entryAgentId) || DEFAULT_AGENT_ID;
   if (manifests.some((manifest) => manifest.agentId === normalizedEntryAgentId)) {
     return normalizedEntryAgentId;
   }
 
-  if (manifests.some((manifest) => manifest.agentId === "orchestrator")) {
-    return "orchestrator";
+  if (manifests.some((manifest) => manifest.agentId === DEFAULT_AGENT_ID)) {
+    return DEFAULT_AGENT_ID;
   }
 
   return manifests[0]?.agentId || normalizedEntryAgentId;
-}
-
-function normalizeAgentId(agentId: string): string {
-  return agentId.trim().toLowerCase();
 }

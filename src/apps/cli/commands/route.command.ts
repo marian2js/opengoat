@@ -1,6 +1,5 @@
+import { DEFAULT_AGENT_ID } from "../../../core/domain/agent-id.js";
 import type { CliCommand } from "../framework/command.js";
-
-const DEFAULT_AGENT_ID = "orchestrator";
 
 export const routeCommand: CliCommand = {
   path: ["route"],

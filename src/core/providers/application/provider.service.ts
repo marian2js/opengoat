@@ -5,6 +5,8 @@ import type { PathPort } from "../../ports/path.port.js";
 import {
   AgentConfigNotFoundError,
   DEFAULT_PROVIDER_ID,
+  InvalidAgentConfigError,
+  InvalidProviderConfigError,
   listProviderSummaries,
   type AgentProviderBinding,
   type ProviderAuthOptions,
@@ -98,16 +100,19 @@ export class ProviderService {
       return null;
     }
 
+    const raw = await this.fileSystem.readFile(configPath);
+    let parsed: unknown;
     try {
-      const raw = await this.fileSystem.readFile(configPath);
-      const parsed = JSON.parse(raw) as unknown;
-      if (!isProviderStoredConfig(parsed)) {
-        return null;
-      }
-      return parsed;
+      parsed = JSON.parse(raw) as unknown;
     } catch {
-      return null;
+      throw new InvalidProviderConfigError(providerId, configPath);
     }
+
+    if (!isProviderStoredConfig(parsed)) {
+      throw new InvalidProviderConfigError(providerId, configPath, "schema mismatch");
+    }
+
+    return parsed;
   }
 
   public async setProviderConfig(
@@ -228,18 +233,19 @@ export class ProviderService {
       throw new AgentConfigNotFoundError(agentId);
     }
 
+    const raw = await this.fileSystem.readFile(configPath);
+    let parsed: unknown;
     try {
-      const raw = await this.fileSystem.readFile(configPath);
-      const parsed = JSON.parse(raw) as unknown;
-
-      if (!parsed || typeof parsed !== "object") {
-        return {};
-      }
-
-      return parsed as AgentConfigShape;
+      parsed = JSON.parse(raw) as unknown;
     } catch {
-      return {};
+      throw new InvalidAgentConfigError(agentId, configPath);
     }
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new InvalidAgentConfigError(agentId, configPath, "expected JSON object");
+    }
+
+    return parsed as AgentConfigShape;
   }
 
   private getAgentConfigPath(paths: OpenGoatPaths, agentId: string): string {

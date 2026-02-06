@@ -1,3 +1,4 @@
+import { isDefaultAgentId, normalizeAgentId } from "../../domain/agent-id.js";
 import { DEFAULT_PROVIDER_ID } from "../../providers/index.js";
 
 export interface AgentDelegationMetadata {
@@ -97,7 +98,7 @@ export function parseAgentManifestMarkdown(markdown: string): ParsedFrontMatter 
     }
 
     if (key === "id") {
-      data.id = sanitizeId(unquote(rawValue));
+      data.id = normalizeAgentId(unquote(rawValue));
       continue;
     }
 
@@ -133,16 +134,16 @@ export function normalizeAgentManifestMetadata(params: {
   metadata?: Partial<AgentManifestMetadata>;
 }): AgentManifestMetadata {
   const metadata = params.metadata ?? {};
-  const agentId = sanitizeId(metadata.id ?? params.agentId) || sanitizeId(params.agentId) || "agent";
+  const agentId = normalizeAgentId(metadata.id ?? params.agentId) || normalizeAgentId(params.agentId) || "agent";
   const name = metadata.name?.trim() || params.displayName.trim() || agentId;
   const description =
-    metadata.description?.trim() || (agentId === "orchestrator" ? "Primary orchestration agent." : `Agent ${name}.`);
+    metadata.description?.trim() || (isDefaultAgentId(agentId) ? "Primary orchestration agent." : `Agent ${name}.`);
   const provider =
     sanitizeId(metadata.provider ?? params.providerId) || sanitizeId(params.providerId) || DEFAULT_PROVIDER_ID;
   const tags = dedupeTags(metadata.tags ?? []);
   const delegation = {
     canReceive: metadata.delegation?.canReceive ?? true,
-    canDelegate: metadata.delegation?.canDelegate ?? agentId === "orchestrator"
+    canDelegate: metadata.delegation?.canDelegate ?? isDefaultAgentId(agentId)
   };
   const priority =
     typeof metadata.priority === "number" && Number.isFinite(metadata.priority) ? metadata.priority : DEFAULT_PRIORITY;

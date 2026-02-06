@@ -1,3 +1,4 @@
+import { DEFAULT_AGENT_ID } from "../../../core/domain/agent-id.js";
 import type { OpenGoatService } from "../../../core/opengoat/index.js";
 import type { ProviderOnboardingSpec, ProviderSummary } from "../../../core/providers/index.js";
 import type { CliCommand } from "../framework/command.js";
@@ -6,8 +7,6 @@ import {
   PromptCancelledError,
   type CliPrompter
 } from "../framework/prompter.js";
-
-const DEFAULT_AGENT_ID = "orchestrator";
 
 const PROVIDER_MODEL_ENV_KEY: Record<string, string> = {
   gemini: "GEMINI_MODEL",
@@ -459,6 +458,6 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("Notes:\n");
   output.write("  - Providers are auto-discovered from provider folders.\n");
   output.write("  - Interactive mode supports arrow-key selection.\n");
-  output.write("  - Agent defaults to orchestrator.\n");
+  output.write(`  - Agent defaults to ${DEFAULT_AGENT_ID}.\n`);
   output.write("  - Provider settings are stored in ~/.opengoat/providers/<provider>/config.json.\n");
 }

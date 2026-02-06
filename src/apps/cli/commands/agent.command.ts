@@ -1,7 +1,6 @@
+import { DEFAULT_AGENT_ID } from "../../../core/domain/agent-id.js";
 import type { CliCommand } from "../framework/command.js";
 import { executeAgentRun } from "./agent-run.shared.js";
-
-const DEFAULT_AGENT_ID = "orchestrator";
 
 export const agentCommand: CliCommand = {
   path: ["agent"],
@@ -129,4 +128,3 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("  agent provider set  Assign one provider to an agent.\n");
   output.write("  agent run           Explicit run command (requires <agent-id>).\n");
 }
-

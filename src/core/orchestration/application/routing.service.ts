@@ -1,4 +1,5 @@
 import type { AgentManifest } from "../../agents/index.js";
+import { DEFAULT_AGENT_ID, isDefaultAgentId } from "../../domain/agent-id.js";
 import type { RoutingCandidate, RoutingDecision } from "../domain/routing.js";
 
 interface RoutingServiceInput {
@@ -23,7 +24,7 @@ export class RoutingService {
       };
     }
 
-    if (entryAgentId !== "orchestrator") {
+    if (!isDefaultAgentId(entryAgentId)) {
       return {
         entryAgentId,
         targetAgentId: entryAgentId,
@@ -35,7 +36,7 @@ export class RoutingService {
     }
 
     const candidates = input.manifests
-      .filter((manifest) => manifest.agentId !== "orchestrator")
+      .filter((manifest) => !isDefaultAgentId(manifest.agentId))
       .filter((manifest) => manifest.metadata.delegation.canReceive)
       .map((manifest) => scoreCandidate(message, manifest))
       .sort((left, right) => right.score - left.score);
@@ -44,7 +45,7 @@ export class RoutingService {
     if (!top || top.score <= 0) {
       return {
         entryAgentId,
-        targetAgentId: "orchestrator",
+        targetAgentId: DEFAULT_AGENT_ID,
         confidence: 0.35,
         reason: "No specialized agent strongly matched the request.",
         rewrittenMessage: message,

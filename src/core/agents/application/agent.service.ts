@@ -3,6 +3,7 @@ import type {
   AgentDescriptor,
   AgentIdentity
 } from "../../domain/agent.js";
+import { normalizeAgentId } from "../../domain/agent-id.js";
 import type { AgentsIndex, OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
@@ -45,10 +46,7 @@ export class AgentService {
       throw new Error("Agent name cannot be empty.");
     }
 
-    const id = displayName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
+    const id = normalizeAgentId(displayName);
 
     if (!id) {
       throw new Error("Agent name must contain at least one alphanumeric character.");

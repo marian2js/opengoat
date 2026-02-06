@@ -1,4 +1,5 @@
 export * from "./core/domain/agent.js";
+export * from "./core/domain/agent-id.js";
 export * from "./core/domain/opengoat-paths.js";
 export * from "./core/ports/file-system.port.js";
 export * from "./core/ports/path.port.js";

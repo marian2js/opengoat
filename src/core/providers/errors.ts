@@ -52,3 +52,15 @@ export class AgentConfigNotFoundError extends OpenGoatProviderError {
     );
   }
 }
+
+export class InvalidAgentConfigError extends OpenGoatProviderError {
+  public constructor(agentId: string, configPath: string, message = "invalid JSON") {
+    super(`Agent "${agentId}" has an invalid config at ${configPath}: ${message}.`);
+  }
+}
+
+export class InvalidProviderConfigError extends OpenGoatProviderError {
+  public constructor(providerId: string, configPath: string, message = "invalid JSON") {
+    super(`Provider "${providerId}" has an invalid config at ${configPath}: ${message}.`);
+  }
+}

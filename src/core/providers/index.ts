@@ -43,6 +43,8 @@ export type {
 } from "./types.js";
 export {
   AgentConfigNotFoundError,
+  InvalidAgentConfigError,
+  InvalidProviderConfigError,
   OpenGoatProviderError,
   ProviderAuthenticationError,
   ProviderCommandNotFoundError,

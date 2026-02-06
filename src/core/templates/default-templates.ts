@@ -1,8 +1,9 @@
 import type { AgentIdentity } from "../domain/agent.js";
+import { DEFAULT_AGENT_ID, isDefaultAgentId } from "../domain/agent-id.js";
 import type { AgentsIndex, OpenGoatConfig } from "../domain/opengoat-paths.js";
 import { DEFAULT_PROVIDER_ID } from "../providers/index.js";
 
-export const DEFAULT_AGENT_ID = "orchestrator";
+export { DEFAULT_AGENT_ID } from "../domain/agent-id.js";
 
 export function renderGlobalConfig(nowIso: string): OpenGoatConfig {
   return {
@@ -40,12 +41,12 @@ export function renderGlobalConfigMarkdown(): string {
 
 export function renderWorkspaceAgentsMarkdown(agent: AgentIdentity, providerId = DEFAULT_PROVIDER_ID): string {
   const description =
-    agent.id === DEFAULT_AGENT_ID
+    isDefaultAgentId(agent.id)
       ? "Primary orchestration agent that routes work to specialized agents."
       : `Specialized agent for ${agent.displayName}.`;
-  const tags = agent.id === DEFAULT_AGENT_ID ? "orchestration, routing" : "specialized, delegated";
-  const canDelegate = agent.id === DEFAULT_AGENT_ID ? "true" : "false";
-  const priority = agent.id === DEFAULT_AGENT_ID ? "100" : "50";
+  const tags = isDefaultAgentId(agent.id) ? "orchestration, routing" : "specialized, delegated";
+  const canDelegate = isDefaultAgentId(agent.id) ? "true" : "false";
+  const priority = isDefaultAgentId(agent.id) ? "100" : "50";
 
   return [
     "---",

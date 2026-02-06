@@ -1,9 +1,9 @@
 import type { AgentIdentity } from "../../domain/agent.js";
+import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
 import type { InitializationResult, OpenGoatConfig } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import {
-  DEFAULT_AGENT_ID,
   renderAgentsIndex,
   renderGlobalConfig,
   renderGlobalConfigMarkdown

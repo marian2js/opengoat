@@ -2,7 +2,11 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { WorkspaceContextService } from "../../src/core/agents/index.js";
 import type { OpenGoatPaths } from "../../src/core/domain/opengoat-paths.js";
-import { ProviderService } from "../../src/core/providers/index.js";
+import {
+  InvalidAgentConfigError,
+  InvalidProviderConfigError,
+  ProviderService
+} from "../../src/core/providers/index.js";
 import { ProviderRegistry } from "../../src/core/providers/registry.js";
 import type { Provider, ProviderInvokeOptions } from "../../src/core/providers/types.js";
 import { NodeFileSystem } from "../../src/platform/node/node-file-system.js";
@@ -153,6 +157,60 @@ describe("ProviderService", () => {
     });
 
     expect(captured[0]?.env?.FAKE_PROVIDER_TOKEN).toBe("runtime-token");
+  });
+
+  it("throws InvalidAgentConfigError when agent config json is malformed", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+
+    const { paths, fileSystem } = await createPaths(root);
+    await fileSystem.writeFile(path.join(paths.agentsDir, "orchestrator", "config.json"), "{not-json");
+    await fileSystem.writeFile(path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"), "# Rules\n");
+
+    const registry = new ProviderRegistry();
+    registry.register("fake", () =>
+      createProvider({
+        id: "fake",
+        capabilities: { agent: false, model: true, auth: false, passthrough: false },
+        onInvoke: () => undefined
+      })
+    );
+
+    const service = createProviderService(fileSystem, registry);
+    await expect(service.invokeAgent(paths, "orchestrator", { message: "hello" })).rejects.toBeInstanceOf(
+      InvalidAgentConfigError
+    );
+  });
+
+  it("throws InvalidProviderConfigError when provider config schema is invalid", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+
+    const { paths, fileSystem } = await createPaths(root);
+    await seedAgent(fileSystem, paths, {
+      providerId: "fake",
+      bootstrapFiles: ["AGENTS.md"]
+    });
+    await fileSystem.writeFile(path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"), "# Rules\n");
+    await fileSystem.ensureDir(path.join(paths.providersDir, "fake"));
+    await fileSystem.writeFile(
+      path.join(paths.providersDir, "fake", "config.json"),
+      JSON.stringify({ schemaVersion: 999, providerId: "fake", env: {}, updatedAt: "2026-02-06T00:00:00.000Z" })
+    );
+
+    const registry = new ProviderRegistry();
+    registry.register("fake", () =>
+      createProvider({
+        id: "fake",
+        capabilities: { agent: false, model: true, auth: false, passthrough: false },
+        onInvoke: () => undefined
+      })
+    );
+
+    const service = createProviderService(fileSystem, registry);
+    await expect(service.invokeAgent(paths, "orchestrator", { message: "hello" })).rejects.toBeInstanceOf(
+      InvalidProviderConfigError
+    );
   });
 });
 
