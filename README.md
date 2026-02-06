@@ -36,6 +36,18 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - `./bin/opengoat agent provider set <agent-id> <provider-id>`
 - `./bin/opengoat agent run <agent-id> --message <text> [--model <model>] [-- <provider-args>]`
 
+## OpenAI Provider
+
+`openai` is an API provider (no CLI required).
+
+- Required auth: `OPENAI_API_KEY` (or `OPENGOAT_OPENAI_API_KEY`)
+- Default endpoint: `https://api.openai.com/v1/responses`
+- Optional model override: `OPENGOAT_OPENAI_MODEL`
+- OpenAI-compatible base URL support:
+  - `OPENGOAT_OPENAI_BASE_URL` (for example `https://your-gateway.example/v1`)
+  - `OPENGOAT_OPENAI_ENDPOINT_PATH` (for example `/responses` or `/chat/completions`)
+  - `OPENGOAT_OPENAI_ENDPOINT` can override the full URL directly.
+
 ## Development
 
 ```bash

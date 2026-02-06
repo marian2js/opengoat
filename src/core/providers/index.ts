@@ -34,7 +34,8 @@ export function listProviderSummaries(registry: ProviderRegistry): ProviderSumma
 }
 
 export { ProviderRegistry, type ProviderFactory } from "./registry.js";
-export { BaseProvider, BaseCliProvider } from "./base-provider.js";
+export { BaseProvider } from "./base-provider.js";
+export { BaseCliProvider, type BaseCliProviderConfig } from "./cli-provider.js";
 export { CodexProvider } from "./builtins/codex.provider.js";
 export { ClaudeProvider } from "./builtins/claude.provider.js";
 export { CursorProvider } from "./builtins/cursor.provider.js";

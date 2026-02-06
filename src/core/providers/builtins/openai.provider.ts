@@ -6,6 +6,10 @@ import {
 import { BaseProvider } from "../base-provider.js";
 import type { ProviderExecutionResult, ProviderInvokeOptions } from "../types.js";
 
+const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
+const DEFAULT_OPENAI_ENDPOINT_PATH = "/responses";
+const DEFAULT_OPENAI_MODEL = "gpt-4.1-mini";
+
 export class OpenAIProvider extends BaseProvider {
   public constructor() {
     super({
@@ -25,13 +29,14 @@ export class OpenAIProvider extends BaseProvider {
     this.validateInvokeOptions(options);
 
     const env = options.env ?? process.env;
-    const apiKey = env.OPENAI_API_KEY?.trim();
+    const apiKey = env.OPENAI_API_KEY?.trim() || env.OPENGOAT_OPENAI_API_KEY?.trim();
     if (!apiKey) {
       throw new ProviderAuthenticationError(this.id, "set OPENAI_API_KEY");
     }
 
-    const endpoint = env.OPENGOAT_OPENAI_ENDPOINT?.trim() || "https://api.openai.com/v1/responses";
-    const model = options.model || env.OPENGOAT_OPENAI_MODEL || "gpt-4.1-mini";
+    const endpoint = resolveOpenAIEndpoint(env);
+    const model = options.model || env.OPENGOAT_OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
+    const style = resolveApiStyle(env, endpoint);
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -39,10 +44,17 @@ export class OpenAIProvider extends BaseProvider {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        model,
-        input: options.message
-      })
+      body: JSON.stringify(
+        style === "chat"
+          ? {
+              model,
+              messages: [{ role: "user", content: options.message }]
+            }
+          : {
+              model,
+              input: options.message
+            }
+      )
     });
 
     const responseText = await response.text();
@@ -54,7 +66,7 @@ export class OpenAIProvider extends BaseProvider {
       };
     }
 
-    const output = extractOpenAIResponseText(responseText);
+    const output = extractOpenAIResponseText(responseText, style);
     options.onStdout?.(output);
 
     return {
@@ -69,7 +81,32 @@ export class OpenAIProvider extends BaseProvider {
   }
 }
 
-function extractOpenAIResponseText(raw: string): string {
+function resolveOpenAIEndpoint(env: NodeJS.ProcessEnv): string {
+  const endpointOverride = env.OPENGOAT_OPENAI_ENDPOINT?.trim();
+  if (endpointOverride) {
+    return endpointOverride;
+  }
+
+  const baseUrl = (env.OPENGOAT_OPENAI_BASE_URL?.trim() || DEFAULT_OPENAI_BASE_URL).replace(/\/+$/, "");
+  const endpointPath = env.OPENGOAT_OPENAI_ENDPOINT_PATH?.trim() || DEFAULT_OPENAI_ENDPOINT_PATH;
+
+  return `${baseUrl}${endpointPath.startsWith("/") ? "" : "/"}${endpointPath}`;
+}
+
+function resolveApiStyle(env: NodeJS.ProcessEnv, endpoint: string): "responses" | "chat" {
+  const explicit = env.OPENGOAT_OPENAI_API_STYLE?.trim().toLowerCase();
+  if (explicit === "responses" || explicit === "chat") {
+    return explicit;
+  }
+
+  if (endpoint.toLowerCase().includes("/chat/completions")) {
+    return "chat";
+  }
+
+  return "responses";
+}
+
+function extractOpenAIResponseText(raw: string, style: "responses" | "chat"): string {
   let payload: unknown;
 
   try {
@@ -82,11 +119,18 @@ function extractOpenAIResponseText(raw: string): string {
     throw new ProviderRuntimeError("openai", "received invalid response payload");
   }
 
+  if (style === "chat") {
+    return extractOpenAIChatText(payload);
+  }
+
+  return extractOpenAIResponsesText(payload);
+}
+
+function extractOpenAIResponsesText(payload: unknown): string {
   const record = payload as {
     output_text?: unknown;
     output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
   };
-
   if (typeof record.output_text === "string" && record.output_text.length > 0) {
     return ensureTrailingNewline(record.output_text);
   }
@@ -102,6 +146,34 @@ function extractOpenAIResponseText(raw: string): string {
   }
 
   return ensureTrailingNewline(textBlocks);
+}
+
+function extractOpenAIChatText(payload: unknown): string {
+  const record = payload as {
+    choices?: Array<{
+      message?: {
+        content?: string | Array<{ type?: string; text?: string }>;
+      };
+    }>;
+  };
+
+  const content = record.choices?.[0]?.message?.content;
+  if (typeof content === "string" && content.length > 0) {
+    return ensureTrailingNewline(content);
+  }
+
+  if (Array.isArray(content)) {
+    const text = content
+      .filter((entry) => entry.type === "text" && typeof entry.text === "string")
+      .map((entry) => entry.text as string)
+      .join("\n");
+
+    if (text) {
+      return ensureTrailingNewline(text);
+    }
+  }
+
+  throw new ProviderRuntimeError("openai", "no textual output found in response");
 }
 
 function ensureTrailingNewline(value: string): string {
