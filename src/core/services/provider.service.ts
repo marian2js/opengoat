@@ -15,7 +15,7 @@ import {
 interface ProviderServiceDeps {
   fileSystem: FileSystemPort;
   pathPort: PathPort;
-  providerRegistry: ProviderRegistry;
+  providerRegistry: Promise<ProviderRegistry> | ProviderRegistry;
   nowIso: () => string;
 }
 
@@ -30,26 +30,28 @@ interface AgentConfigShape {
 export class ProviderService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
-  private readonly providerRegistry: ProviderRegistry;
+  private readonly providerRegistry: Promise<ProviderRegistry>;
   private readonly nowIso: () => string;
 
   public constructor(deps: ProviderServiceDeps) {
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
-    this.providerRegistry = deps.providerRegistry;
+    this.providerRegistry = Promise.resolve(deps.providerRegistry);
     this.nowIso = deps.nowIso;
   }
 
-  public listProviders(): ProviderSummary[] {
-    return listProviderSummaries(this.providerRegistry);
+  public async listProviders(): Promise<ProviderSummary[]> {
+    const registry = await this.providerRegistry;
+    return listProviderSummaries(registry);
   }
 
   public async getAgentProvider(paths: OpenGoatPaths, agentId: string): Promise<AgentProviderBinding> {
+    const registry = await this.providerRegistry;
     const config = await this.readAgentConfig(paths, agentId);
     const configuredProviderId = getConfiguredProviderId(config);
 
     // Validate at read time so invalid configs are surfaced early.
-    const provider = this.providerRegistry.create(configuredProviderId);
+    const provider = registry.create(configuredProviderId);
 
     return {
       agentId,
@@ -62,7 +64,8 @@ export class ProviderService {
     agentId: string,
     providerId: string
   ): Promise<AgentProviderBinding> {
-    const provider = this.providerRegistry.create(providerId);
+    const registry = await this.providerRegistry;
+    const provider = registry.create(providerId);
     const configPath = this.getAgentConfigPath(paths, agentId);
     const config = await this.readAgentConfig(paths, agentId);
 
@@ -84,8 +87,9 @@ export class ProviderService {
     agentId: string,
     options: ProviderInvokeOptions
   ): Promise<ProviderExecutionResult & AgentProviderBinding> {
+    const registry = await this.providerRegistry;
     const binding = await this.getAgentProvider(paths, agentId);
-    const provider = this.providerRegistry.create(binding.providerId);
+    const provider = registry.create(binding.providerId);
 
     const result = await provider.invoke(options);
 

@@ -2,9 +2,9 @@ import {
   ProviderAuthenticationError,
   ProviderRuntimeError,
   UnsupportedProviderActionError
-} from "../errors.js";
-import { BaseProvider } from "../base-provider.js";
-import type { ProviderExecutionResult, ProviderInvokeOptions } from "../types.js";
+} from "../../errors.js";
+import { BaseProvider } from "../../base-provider.js";
+import type { ProviderExecutionResult, ProviderInvokeOptions } from "../../types.js";
 
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_ENDPOINT_PATH = "/responses";

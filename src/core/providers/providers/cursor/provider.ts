@@ -1,6 +1,6 @@
 import path from "node:path";
-import type { ProviderAuthOptions, ProviderInvocation, ProviderInvokeOptions } from "../types.js";
-import { BaseCliProvider } from "../cli-provider.js";
+import type { ProviderAuthOptions, ProviderInvocation, ProviderInvokeOptions } from "../../types.js";
+import { BaseCliProvider } from "../../cli-provider.js";
 
 export class CursorProvider extends BaseCliProvider {
   public constructor() {

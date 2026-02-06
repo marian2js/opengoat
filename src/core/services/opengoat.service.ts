@@ -31,7 +31,9 @@ export class OpenGoatService {
 
   public constructor(deps: OpenGoatServiceDeps) {
     const nowIso = deps.nowIso ?? (() => new Date().toISOString());
-    const providerRegistry = deps.providerRegistry ?? createDefaultProviderRegistry();
+    const providerRegistryPromise = deps.providerRegistry
+      ? Promise.resolve(deps.providerRegistry)
+      : createDefaultProviderRegistry();
 
     this.pathsProvider = deps.pathsProvider;
     this.agentService = new AgentService({
@@ -48,7 +50,7 @@ export class OpenGoatService {
     this.providerService = new ProviderService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
-      providerRegistry,
+      providerRegistry: providerRegistryPromise,
       nowIso
     });
   }
@@ -68,7 +70,7 @@ export class OpenGoatService {
     return this.agentService.listAgents(paths);
   }
 
-  public listProviders(): ProviderSummary[] {
+  public listProviders(): Promise<ProviderSummary[]> {
     return this.providerService.listProviders();
   }
 

@@ -2,9 +2,9 @@ import {
   ProviderAuthenticationError,
   ProviderRuntimeError,
   UnsupportedProviderActionError
-} from "../errors.js";
-import { BaseProvider } from "../base-provider.js";
-import type { ProviderExecutionResult, ProviderInvokeOptions } from "../types.js";
+} from "../../errors.js";
+import { BaseProvider } from "../../base-provider.js";
+import type { ProviderExecutionResult, ProviderInvokeOptions } from "../../types.js";
 
 export class OpenRouterProvider extends BaseProvider {
   public constructor() {
