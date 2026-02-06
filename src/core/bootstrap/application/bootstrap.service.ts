@@ -1,14 +1,14 @@
-import type { AgentIdentity } from "../domain/agent.js";
-import type { InitializationResult, OpenGoatConfig } from "../domain/opengoat-paths.js";
-import type { FileSystemPort } from "../ports/file-system.port.js";
-import type { OpenGoatPathsProvider } from "../ports/paths-provider.port.js";
+import type { AgentIdentity } from "../../domain/agent.js";
+import type { InitializationResult, OpenGoatConfig } from "../../domain/opengoat-paths.js";
+import type { FileSystemPort } from "../../ports/file-system.port.js";
+import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import {
   DEFAULT_AGENT_ID,
   renderAgentsIndex,
   renderGlobalConfig,
   renderGlobalConfigMarkdown
-} from "../templates/default-templates.js";
-import { AgentService } from "./agent.service.js";
+} from "../../templates/default-templates.js";
+import { AgentService } from "../../agents/application/agent.service.js";
 
 interface BootstrapServiceDeps {
   fileSystem: FileSystemPort;
@@ -135,22 +135,6 @@ export class BootstrapService {
       return;
     }
     createdPaths.push(directoryPath);
-  }
-
-  private async writeJsonIfMissing(
-    filePath: string,
-    payload: unknown,
-    createdPaths: string[],
-    skippedPaths: string[]
-  ): Promise<void> {
-    const exists = await this.fileSystem.exists(filePath);
-    if (exists) {
-      skippedPaths.push(filePath);
-      return;
-    }
-
-    await this.fileSystem.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`);
-    createdPaths.push(filePath);
   }
 
   private async writeMarkdownIfMissing(

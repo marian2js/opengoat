@@ -6,8 +6,11 @@ OpenGoat is a high-level agent orchestrator foundation with a CLI entrypoint tod
 
 The codebase is split into layers to keep product surfaces decoupled from orchestration logic:
 
-- `src/core`: domain models, templates, ports, and application services.
-- `src/core/providers`: pluggable provider registry + provider implementations.
+- `src/core/agents`: agent lifecycle domain (`AgentService`).
+- `src/core/bootstrap`: filesystem bootstrap domain (`BootstrapService`).
+- `src/core/providers`: provider domain (`ProviderService`, registry, implementations).
+- `src/core/opengoat`: orchestration facade used by app surfaces (`OpenGoatService`).
+- `src/core/domain`, `src/core/templates`, `src/core/ports`: shared contracts and rendering helpers.
 - `src/core/providers/providers/<provider-id>`: self-contained provider modules and tests.
 - `src/platform/node`: Node-specific adapters (filesystem and OS path resolution).
 - `src/apps/cli`: CLI command routing and text output only.

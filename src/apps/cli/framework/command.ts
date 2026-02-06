@@ -1,4 +1,4 @@
-import type { OpenGoatService } from "../../../core/services/opengoat.service.js";
+import type { OpenGoatService } from "../../../core/opengoat/index.js";
 
 export interface CliContext {
   service: OpenGoatService;

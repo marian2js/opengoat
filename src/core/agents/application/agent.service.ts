@@ -2,10 +2,10 @@ import type {
   AgentCreationResult,
   AgentDescriptor,
   AgentIdentity
-} from "../domain/agent.js";
-import type { AgentsIndex, OpenGoatPaths } from "../domain/opengoat-paths.js";
-import type { FileSystemPort } from "../ports/file-system.port.js";
-import type { PathPort } from "../ports/path.port.js";
+} from "../../domain/agent.js";
+import type { AgentsIndex, OpenGoatPaths } from "../../domain/opengoat-paths.js";
+import type { FileSystemPort } from "../../ports/file-system.port.js";
+import type { PathPort } from "../../ports/path.port.js";
 import {
   renderAgentsIndex,
   renderInternalAgentConfig,
@@ -14,7 +14,7 @@ import {
   renderWorkspaceAgentsMarkdown,
   renderWorkspaceContextMarkdown,
   renderWorkspaceMetadata
-} from "../templates/default-templates.js";
+} from "../../templates/default-templates.js";
 
 interface AgentServiceDeps {
   fileSystem: FileSystemPort;

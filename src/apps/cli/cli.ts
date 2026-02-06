@@ -1,6 +1,6 @@
 import { NodeFileSystem } from "../../platform/node/node-file-system.js";
 import { NodeOpenGoatPathsProvider, NodePathPort } from "../../platform/node/node-path.port.js";
-import { OpenGoatService } from "../../core/services/opengoat.service.js";
+import { OpenGoatService } from "../../core/opengoat/index.js";
 import { agentCreateCommand } from "./commands/agent-create.command.js";
 import { agentListCommand } from "./commands/agent-list.command.js";
 import { agentProviderGetCommand } from "./commands/agent-provider-get.command.js";

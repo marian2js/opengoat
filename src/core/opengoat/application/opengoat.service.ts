@@ -1,19 +1,19 @@
-import type { AgentCreationResult, AgentDescriptor } from "../domain/agent.js";
-import type { InitializationResult } from "../domain/opengoat-paths.js";
-import type { FileSystemPort } from "../ports/file-system.port.js";
-import type { PathPort } from "../ports/path.port.js";
-import type { OpenGoatPathsProvider } from "../ports/paths-provider.port.js";
+import type { AgentCreationResult, AgentDescriptor } from "../../domain/agent.js";
+import type { InitializationResult } from "../../domain/opengoat-paths.js";
+import type { FileSystemPort } from "../../ports/file-system.port.js";
+import type { PathPort } from "../../ports/path.port.js";
+import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import type {
   AgentProviderBinding,
   ProviderExecutionResult,
   ProviderInvokeOptions,
   ProviderRegistry,
   ProviderSummary
-} from "../providers/index.js";
-import { createDefaultProviderRegistry } from "../providers/index.js";
-import { AgentService } from "./agent.service.js";
-import { BootstrapService } from "./bootstrap.service.js";
-import { ProviderService } from "./provider.service.js";
+} from "../../providers/index.js";
+import { createDefaultProviderRegistry } from "../../providers/index.js";
+import { AgentService } from "../../agents/application/agent.service.js";
+import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
+import { ProviderService } from "../../providers/application/provider.service.js";
 
 interface OpenGoatServiceDeps {
   fileSystem: FileSystemPort;

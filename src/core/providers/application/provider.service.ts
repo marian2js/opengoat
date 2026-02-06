@@ -1,6 +1,6 @@
-import type { OpenGoatPaths } from "../domain/opengoat-paths.js";
-import type { FileSystemPort } from "../ports/file-system.port.js";
-import type { PathPort } from "../ports/path.port.js";
+import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
+import type { FileSystemPort } from "../../ports/file-system.port.js";
+import type { PathPort } from "../../ports/path.port.js";
 import {
   AgentConfigNotFoundError,
   DEFAULT_PROVIDER_ID,
@@ -10,7 +10,7 @@ import {
   type ProviderInvokeOptions,
   type ProviderSummary,
   type ProviderRegistry
-} from "../providers/index.js";
+} from "../index.js";
 
 interface ProviderServiceDeps {
   fileSystem: FileSystemPort;
