@@ -1,7 +1,11 @@
-import { createInterface } from "node:readline/promises";
 import type { OpenGoatService } from "../../../core/opengoat/index.js";
 import type { ProviderOnboardingSpec, ProviderSummary } from "../../../core/providers/index.js";
 import type { CliCommand } from "../framework/command.js";
+import {
+  createCliPrompter,
+  PromptCancelledError,
+  type CliPrompter
+} from "../framework/prompter.js";
 
 const DEFAULT_AGENT_ID = "orchestrator";
 
@@ -37,100 +41,121 @@ export const onboardCommand: CliCommand = {
       return 1;
     }
 
-    const providerId = await resolveProviderId({
-      service: context.service,
-      providers,
-      agentId,
-      requestedProviderId: parsed.providerId,
-      nonInteractive: parsed.nonInteractive,
+    const prompter = createCliPrompter({
       stdin: process.stdin,
-      stdout: process.stdout
+      stdout: process.stdout,
+      stderr: process.stderr
     });
-    if (!providerId) {
-      return 1;
+    const interactive = !parsed.nonInteractive;
+
+    if (interactive) {
+      await prompter.intro("OpenGoat Onboarding");
+      await prompter.note(`Agent: ${agentId}`, "Setup");
+      await prompter.note("Use arrow keys to move and Enter to select.", "Controls");
     }
 
-    const provider = providers.find((entry) => entry.id === providerId);
-    if (!provider) {
-      context.stderr.write(`Unknown provider: ${providerId}\n`);
-      return 1;
-    }
-
-    await context.service.setAgentProvider(agentId, provider.id);
-
-    const onboarding = (await context.service.getProviderOnboarding(provider.id)) ?? {};
-    const existingConfig = await context.service.getProviderConfig(provider.id);
-    const envUpdates = {
-      ...(existingConfig?.env ?? {}),
-      ...parsed.env
-    };
-
-    const modelEnvKey = PROVIDER_MODEL_ENV_KEY[provider.id];
-    if (parsed.model && modelEnvKey) {
-      envUpdates[modelEnvKey] = parsed.model;
-    }
-
-    if (parsed.nonInteractive) {
-      const missing = findMissingRequiredEnv(envUpdates, onboarding, process.env);
-      if (missing.length > 0) {
-        context.stderr.write(
-          `Missing required provider settings for ${provider.id}: ${missing.join(", ")}\n`
-        );
-        context.stderr.write("Provide values with --env KEY=VALUE or provider-specific key flags.\n");
+    try {
+      const providerId = await resolveProviderId({
+        service: context.service,
+        providers,
+        agentId,
+        requestedProviderId: parsed.providerId,
+        nonInteractive: parsed.nonInteractive,
+        prompter
+      });
+      if (!providerId) {
         return 1;
       }
-    } else {
-      await promptForEnvValues({
+
+      const provider = providers.find((entry) => entry.id === providerId);
+      if (!provider) {
+        context.stderr.write(`Unknown provider: ${providerId}\n`);
+        return 1;
+      }
+
+      await context.service.setAgentProvider(agentId, provider.id);
+
+      const onboarding = (await context.service.getProviderOnboarding(provider.id)) ?? {};
+      const existingConfig = await context.service.getProviderConfig(provider.id);
+      const envUpdates = {
+        ...(existingConfig?.env ?? {}),
+        ...parsed.env
+      };
+
+      const modelEnvKey = PROVIDER_MODEL_ENV_KEY[provider.id];
+      if (parsed.model && modelEnvKey) {
+        envUpdates[modelEnvKey] = parsed.model;
+      }
+
+      if (parsed.nonInteractive) {
+        const missing = findMissingRequiredEnv(envUpdates, onboarding, process.env);
+        if (missing.length > 0) {
+          context.stderr.write(
+            `Missing required provider settings for ${provider.id}: ${missing.join(", ")}\n`
+          );
+          context.stderr.write("Provide values with --env KEY=VALUE or provider-specific key flags.\n");
+          return 1;
+        }
+      } else {
+        await promptForEnvValues({
+          provider,
+          onboarding,
+          env: envUpdates,
+          prompter
+        });
+      }
+
+      if (Object.keys(envUpdates).length > 0) {
+        await context.service.setProviderConfig(provider.id, envUpdates);
+      }
+
+      const shouldRunAuth = await resolveRunAuth({
+        parsed,
         provider,
         onboarding,
-        env: envUpdates,
-        stdin: process.stdin,
-        stdout: process.stdout
+        prompter
       });
-    }
 
-    if (Object.keys(envUpdates).length > 0) {
-      await context.service.setProviderConfig(provider.id, envUpdates);
-    }
+      if (shouldRunAuth) {
+        const authResult = await context.service.authenticateProvider(provider.id, {
+          env: process.env,
+          onStdout: (chunk) => {
+            context.stdout.write(chunk);
+          },
+          onStderr: (chunk) => {
+            context.stderr.write(chunk);
+          }
+        });
 
-    const shouldRunAuth = await resolveRunAuth({
-      parsed,
-      provider,
-      onboarding,
-      stdin: process.stdin,
-      stdout: process.stdout
-    });
-
-    if (shouldRunAuth) {
-      const authResult = await context.service.authenticateProvider(provider.id, {
-        env: process.env,
-        onStdout: (chunk) => {
-          context.stdout.write(chunk);
-        },
-        onStderr: (chunk) => {
-          context.stderr.write(chunk);
+        if (authResult.code !== 0) {
+          context.stderr.write(`Provider auth failed for ${provider.id}.\n`);
+          return authResult.code;
         }
-      });
-
-      if (authResult.code !== 0) {
-        context.stderr.write(`Provider auth failed for ${provider.id}.\n`);
-        return authResult.code;
       }
-    }
 
-    context.stdout.write("Onboarding complete.\n");
-    context.stdout.write(`Agent: ${agentId}\n`);
-    context.stdout.write(`Provider: ${provider.id}\n`);
-    if (Object.keys(envUpdates).length > 0) {
-      context.stdout.write(
-        `Saved provider config: ${context.service.getPaths().providersDir}/${provider.id}/config.json\n`
-      );
-    }
-    if (shouldRunAuth) {
-      context.stdout.write("Provider auth flow completed.\n");
-    }
+      if (interactive) {
+        await prompter.outro("Onboarding complete.");
+      } else {
+        context.stdout.write("Onboarding complete.\n");
+      }
+      context.stdout.write(`Agent: ${agentId}\n`);
+      context.stdout.write(`Provider: ${provider.id}\n`);
+      if (Object.keys(envUpdates).length > 0) {
+        context.stdout.write(
+          `Saved provider config: ${context.service.getPaths().providersDir}/${provider.id}/config.json\n`
+        );
+      }
+      if (shouldRunAuth) {
+        context.stdout.write("Provider auth flow completed.\n");
+      }
 
-    return 0;
+      return 0;
+    } catch (error) {
+      if (error instanceof PromptCancelledError) {
+        return 0;
+      }
+      throw error;
+    }
   }
 };
 
@@ -284,8 +309,7 @@ async function resolveProviderId(params: {
   agentId: string;
   requestedProviderId?: string;
   nonInteractive: boolean;
-  stdin: NodeJS.ReadableStream;
-  stdout: NodeJS.WritableStream;
+  prompter: CliPrompter;
 }): Promise<string | null> {
   if (params.requestedProviderId) {
     return params.requestedProviderId;
@@ -303,85 +327,66 @@ async function resolveProviderId(params: {
     return currentProviderId ?? "codex";
   }
 
-  const rl = createInterface({
-    input: params.stdin,
-    output: params.stdout
-  });
+  const defaultProvider =
+    currentProviderId && params.providers.some((provider) => provider.id === currentProviderId)
+      ? currentProviderId
+      : params.providers[0]?.id;
 
-  try {
-    params.stdout.write("\nAvailable providers:\n");
-    for (let index = 0; index < params.providers.length; index += 1) {
-      const provider = params.providers[index];
-      if (!provider) {
-        continue;
-      }
-      const marker = provider.id === currentProviderId ? " (current)" : "";
-      params.stdout.write(`  ${index + 1}. ${provider.id}${marker}\n`);
-    }
+  const selected = await params.prompter.select(
+    "Choose a provider",
+    params.providers.map((provider) => ({
+      value: provider.id,
+      label: `${provider.displayName} (${provider.id})`,
+      hint: provider.id === currentProviderId ? "current" : provider.kind
+    })),
+    defaultProvider
+  );
 
-    const defaultProvider =
-      currentProviderId && params.providers.some((provider) => provider.id === currentProviderId)
-        ? currentProviderId
-        : params.providers[0]?.id;
-
-    const answer = await rl.question(`Select provider [${defaultProvider}]: `);
-    const input = answer.trim();
-
-    if (!input) {
-      return defaultProvider ?? null;
-    }
-
-    const asNumber = Number.parseInt(input, 10);
-    if (!Number.isNaN(asNumber) && asNumber >= 1 && asNumber <= params.providers.length) {
-      return params.providers[asNumber - 1]?.id ?? null;
-    }
-
-    const byId = params.providers.find((provider) => provider.id === input.toLowerCase());
-    return byId?.id ?? null;
-  } finally {
-    rl.close();
-  }
+  return selected || null;
 }
 
 async function promptForEnvValues(params: {
   provider: ProviderSummary;
   onboarding: ProviderOnboardingSpec;
   env: Record<string, string>;
-  stdin: NodeJS.ReadableStream;
-  stdout: NodeJS.WritableStream;
+  prompter: CliPrompter;
 }): Promise<void> {
   const fields = params.onboarding.env ?? [];
   if (fields.length === 0) {
     return;
   }
 
-  const rl = createInterface({
-    input: params.stdin,
-    output: params.stdout
-  });
+  await params.prompter.note(`Configure settings for provider "${params.provider.id}".`, "Provider Setup");
 
-  try {
-    params.stdout.write(`\nProvider settings for ${params.provider.id}:\n`);
-
-    for (const field of fields) {
-      const existing = params.env[field.key] ?? process.env[field.key]?.trim();
-      const requiredLabel = field.required ? " (required)" : " (optional)";
-      const defaultLabel = existing ? " [already set]" : "";
-      const prompt = `${field.description}${requiredLabel}${defaultLabel}: `;
-
-      if (existing && !field.required) {
+  for (const field of fields) {
+    const existing = params.env[field.key] ?? process.env[field.key]?.trim();
+    if (existing) {
+      const keepExisting = await params.prompter.confirm({
+        message: `Keep existing ${field.key}?`,
+        initialValue: true
+      });
+      if (keepExisting) {
+        params.env[field.key] = existing;
         continue;
       }
-
-      const answer = (await rl.question(prompt)).trim();
-      if (answer) {
-        params.env[field.key] = answer;
-      } else if (existing) {
-        params.env[field.key] = existing;
-      }
     }
-  } finally {
-    rl.close();
+
+    const value = await params.prompter.text({
+      message: `${field.description} (${field.key})`,
+      initialValue: field.secret ? undefined : existing,
+      placeholder: field.required ? undefined : "Leave empty to skip",
+      required: Boolean(field.required),
+      secret: Boolean(field.secret)
+    });
+
+    if (value) {
+      params.env[field.key] = value;
+      continue;
+    }
+
+    if (!field.required) {
+      delete params.env[field.key];
+    }
   }
 }
 
@@ -389,8 +394,7 @@ async function resolveRunAuth(params: {
   parsed: Extract<ParsedOnboardArgs, { ok: true }>;
   provider: ProviderSummary;
   onboarding: ProviderOnboardingSpec;
-  stdin: NodeJS.ReadableStream;
-  stdout: NodeJS.WritableStream;
+  prompter: CliPrompter;
 }): Promise<boolean> {
   if (params.parsed.skipAuth) {
     return false;
@@ -404,18 +408,10 @@ async function resolveRunAuth(params: {
     return false;
   }
 
-  const rl = createInterface({
-    input: params.stdin,
-    output: params.stdout
+  return params.prompter.confirm({
+    message: `Run provider auth now? ${auth.description}`,
+    initialValue: false
   });
-  try {
-    const answer = (await rl.question(`Run provider auth now? (${auth.description}) [y/N]: `))
-      .trim()
-      .toLowerCase();
-    return answer === "y" || answer === "yes";
-  } finally {
-    rl.close();
-  }
 }
 
 function findMissingRequiredEnv(
@@ -462,6 +458,7 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("\n");
   output.write("Notes:\n");
   output.write("  - Providers are auto-discovered from provider folders.\n");
+  output.write("  - Interactive mode supports arrow-key selection.\n");
   output.write("  - Agent defaults to orchestrator.\n");
   output.write("  - Provider settings are stored in ~/.opengoat/providers/<provider>/config.json.\n");
 }
