@@ -34,21 +34,53 @@ export class OpenAIProvider extends BaseProvider {
       throw new ProviderAuthenticationError(this.id, "set OPENAI_API_KEY");
     }
 
-    const endpoint = resolveOpenAIEndpoint(env);
-    const model = options.model || env.OPENGOAT_OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
-    const style = resolveApiStyle(env, endpoint);
+    const model = resolveModel(options, env);
+    if (!model) {
+      return {
+        code: 1,
+        stdout: "",
+        stderr:
+          "Missing model for OpenAI-compatible base URL. Set OPENGOAT_OPENAI_MODEL (or OPENAI_MODEL) or pass --model.\n"
+      };
+    }
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(buildRequestPayload(style, model, options.message, options.systemPrompt))
+    const explicitEndpoint = Boolean(resolveEndpointOverride(env));
+    const explicitEndpointPath = Boolean(resolveEndpointPathOverride(env));
+    const explicitStyle = Boolean(resolveApiStyleOverride(env));
+    const primaryEndpoint = resolveOpenAIEndpoint(env);
+    const primaryStyle = resolveApiStyle(env, primaryEndpoint);
+    let finalStyle: "responses" | "chat" = primaryStyle;
+
+    let response = await performOpenAIRequest({
+      endpoint: primaryEndpoint,
+      style: primaryStyle,
+      apiKey,
+      model,
+      message: options.message,
+      systemPrompt: options.systemPrompt
     });
 
-    const responseText = await response.text();
+    if (
+      response.status === 404 &&
+      !explicitEndpoint &&
+      !explicitEndpointPath &&
+      !explicitStyle &&
+      primaryStyle === "responses"
+    ) {
+      const fallbackEndpoint = resolveOpenAIEndpoint(env, "/chat/completions");
+      response = await performOpenAIRequest({
+        endpoint: fallbackEndpoint,
+        style: "chat",
+        apiKey,
+        model,
+        message: options.message,
+        systemPrompt: options.systemPrompt
+      });
+      finalStyle = "chat";
+    }
+
     if (!response.ok) {
+      const responseText = await response.text();
       return {
         code: 1,
         stdout: "",
@@ -56,7 +88,8 @@ export class OpenAIProvider extends BaseProvider {
       };
     }
 
-    const output = extractOpenAIResponseText(responseText, style);
+    const responseText = await response.text();
+    const output = extractOpenAIResponseText(responseText, finalStyle);
     options.onStdout?.(output);
 
     return {
@@ -71,20 +104,20 @@ export class OpenAIProvider extends BaseProvider {
   }
 }
 
-function resolveOpenAIEndpoint(env: NodeJS.ProcessEnv): string {
-  const endpointOverride = env.OPENGOAT_OPENAI_ENDPOINT?.trim();
+function resolveOpenAIEndpoint(env: NodeJS.ProcessEnv, defaultPath = DEFAULT_OPENAI_ENDPOINT_PATH): string {
+  const endpointOverride = resolveEndpointOverride(env);
   if (endpointOverride) {
     return endpointOverride;
   }
 
-  const baseUrl = (env.OPENGOAT_OPENAI_BASE_URL?.trim() || DEFAULT_OPENAI_BASE_URL).replace(/\/+$/, "");
-  const endpointPath = env.OPENGOAT_OPENAI_ENDPOINT_PATH?.trim() || DEFAULT_OPENAI_ENDPOINT_PATH;
+  const baseUrl = resolveBaseUrl(env).replace(/\/+$/, "");
+  const endpointPath = resolveEndpointPathOverride(env) || defaultPath;
 
   return `${baseUrl}${endpointPath.startsWith("/") ? "" : "/"}${endpointPath}`;
 }
 
 function resolveApiStyle(env: NodeJS.ProcessEnv, endpoint: string): "responses" | "chat" {
-  const explicit = env.OPENGOAT_OPENAI_API_STYLE?.trim().toLowerCase();
+  const explicit = resolveApiStyleOverride(env);
   if (explicit === "responses" || explicit === "chat") {
     return explicit;
   }
@@ -94,6 +127,62 @@ function resolveApiStyle(env: NodeJS.ProcessEnv, endpoint: string): "responses" 
   }
 
   return "responses";
+}
+
+function resolveEndpointOverride(env: NodeJS.ProcessEnv): string | undefined {
+  return env.OPENGOAT_OPENAI_ENDPOINT?.trim() || env.OPENAI_ENDPOINT?.trim();
+}
+
+function resolveEndpointPathOverride(env: NodeJS.ProcessEnv): string | undefined {
+  return env.OPENGOAT_OPENAI_ENDPOINT_PATH?.trim() || env.OPENAI_ENDPOINT_PATH?.trim();
+}
+
+function resolveApiStyleOverride(env: NodeJS.ProcessEnv): string | undefined {
+  return env.OPENGOAT_OPENAI_API_STYLE?.trim().toLowerCase() || env.OPENAI_API_STYLE?.trim().toLowerCase();
+}
+
+function resolveBaseUrl(env: NodeJS.ProcessEnv): string {
+  return env.OPENGOAT_OPENAI_BASE_URL?.trim() || env.OPENAI_BASE_URL?.trim() || DEFAULT_OPENAI_BASE_URL;
+}
+
+function resolveModel(options: ProviderInvokeOptions, env: NodeJS.ProcessEnv): string | null {
+  const explicitModel = options.model?.trim() || env.OPENGOAT_OPENAI_MODEL?.trim() || env.OPENAI_MODEL?.trim();
+  if (explicitModel) {
+    return explicitModel;
+  }
+
+  if (shouldUseDefaultOpenAIModel(env)) {
+    return DEFAULT_OPENAI_MODEL;
+  }
+
+  return null;
+}
+
+function shouldUseDefaultOpenAIModel(env: NodeJS.ProcessEnv): boolean {
+  if (resolveEndpointOverride(env) || resolveEndpointPathOverride(env) || resolveApiStyleOverride(env)) {
+    return false;
+  }
+
+  const baseUrl = resolveBaseUrl(env).replace(/\/+$/, "");
+  return baseUrl === DEFAULT_OPENAI_BASE_URL;
+}
+
+async function performOpenAIRequest(params: {
+  endpoint: string;
+  style: "responses" | "chat";
+  apiKey: string;
+  model: string;
+  message: string;
+  systemPrompt?: string;
+}): Promise<Response> {
+  return fetch(params.endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${params.apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(buildRequestPayload(params.style, params.model, params.message, params.systemPrompt))
+  });
 }
 
 function buildRequestPayload(

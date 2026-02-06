@@ -48,7 +48,8 @@ describe("openai provider", () => {
         env: {
           OPENAI_API_KEY: "test-key",
           OPENGOAT_OPENAI_BASE_URL: "https://compatible.example/v1/",
-          OPENGOAT_OPENAI_ENDPOINT_PATH: "/chat/completions"
+          OPENGOAT_OPENAI_ENDPOINT_PATH: "/chat/completions",
+          OPENGOAT_OPENAI_MODEL: "compatible-model"
         }
       });
 
@@ -59,7 +60,7 @@ describe("openai provider", () => {
     const [requestUrl, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(requestUrl).toBe("https://compatible.example/v1/chat/completions");
     expect(JSON.parse(String(requestInit.body))).toEqual({
-      model: "gpt-4.1-mini",
+      model: "compatible-model",
       messages: [
         { role: "system", content: "You are OpenGoat." },
         { role: "user", content: "hello" }
@@ -109,7 +110,8 @@ describe("openai provider", () => {
         env: {
           OPENAI_API_KEY: "test-key",
           OPENGOAT_OPENAI_BASE_URL: "https://ignored.example/v1",
-          OPENGOAT_OPENAI_ENDPOINT: "https://override.example/custom/responses"
+          OPENGOAT_OPENAI_ENDPOINT: "https://override.example/custom/responses",
+          OPENGOAT_OPENAI_MODEL: "custom-model"
         }
       });
 
@@ -139,6 +141,100 @@ describe("openai provider", () => {
       expect(result.code).toBe(0);
       expect(result.stdout).toBe("fallback key\n");
     });
+  });
+
+  it("retries with chat completions when responses endpoint returns 404", async () => {
+    const provider = new OpenAIProvider();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("404 page not found", {
+          status: 404,
+          headers: { "Content-Type": "text/plain" }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "fallback chat endpoint works" } }]
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        )
+      );
+
+    await withFetchMock(fetchMock, async () => {
+      const result = await provider.invoke({
+        message: "hello",
+        env: {
+          OPENAI_API_KEY: "test-key",
+          OPENGOAT_OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
+          OPENGOAT_OPENAI_MODEL: "meta/llama-3.1-8b-instruct"
+        }
+      });
+
+      expect(result.code).toBe(0);
+      expect(result.stdout).toBe("fallback chat endpoint works\n");
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [firstUrl] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [secondUrl] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(firstUrl).toBe("https://integrate.api.nvidia.com/v1/responses");
+    expect(secondUrl).toBe("https://integrate.api.nvidia.com/v1/chat/completions");
+  });
+
+  it("supports OPENAI_BASE_URL and OPENAI_MODEL aliases", async () => {
+    const provider = new OpenAIProvider();
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ output_text: "alias vars" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      })
+    );
+
+    await withFetchMock(fetchMock, async () => {
+      const result = await provider.invoke({
+        message: "hello",
+        env: {
+          OPENAI_API_KEY: "test-key",
+          OPENAI_BASE_URL: "https://gateway.example/v1/",
+          OPENAI_MODEL: "gateway-model"
+        }
+      });
+
+      expect(result.code).toBe(0);
+      expect(result.stdout).toBe("alias vars\n");
+    });
+
+    const [requestUrl, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(requestUrl).toBe("https://gateway.example/v1/responses");
+    expect(JSON.parse(String(requestInit.body))).toEqual({
+      model: "gateway-model",
+      input: "hello"
+    });
+  });
+
+  it("requires explicit model for non-default base URLs", async () => {
+    const provider = new OpenAIProvider();
+    const fetchMock = vi.fn();
+
+    await withFetchMock(fetchMock, async () => {
+      const result = await provider.invoke({
+        message: "hello",
+        env: {
+          OPENAI_API_KEY: "test-key",
+          OPENGOAT_OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1"
+        }
+      });
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("Missing model for OpenAI-compatible base URL");
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("fails on malformed successful payload", async () => {

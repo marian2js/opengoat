@@ -11,6 +11,8 @@ export interface AgentRunRequest {
 export async function executeAgentRun(request: AgentRunRequest, context: CliContext): Promise<number> {
   const stdoutBuffer: string[] = [];
   const stderrBuffer: string[] = [];
+  let sawStdoutChunk = false;
+  let sawStderrChunk = false;
 
   let result;
   try {
@@ -21,16 +23,28 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
       env: process.env,
       onStdout: request.stream
         ? (chunk) => {
+            if (chunk) {
+              sawStdoutChunk = true;
+            }
             context.stdout.write(chunk);
           }
         : (chunk) => {
+            if (chunk) {
+              sawStdoutChunk = true;
+            }
             stdoutBuffer.push(chunk);
           },
       onStderr: request.stream
         ? (chunk) => {
+            if (chunk) {
+              sawStderrChunk = true;
+            }
             context.stderr.write(chunk);
           }
         : (chunk) => {
+            if (chunk) {
+              sawStderrChunk = true;
+            }
             stderrBuffer.push(chunk);
           }
     });
@@ -47,6 +61,14 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
     }
     if (stderr) {
       context.stderr.write(stderr);
+    }
+  } else {
+    // HTTP/API providers often return final stdout/stderr without streaming callbacks.
+    if (!sawStdoutChunk && result.stdout) {
+      context.stdout.write(result.stdout);
+    }
+    if (!sawStderrChunk && result.stderr) {
+      context.stderr.write(result.stderr);
     }
   }
 

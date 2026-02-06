@@ -116,4 +116,21 @@ describe("provider CLI commands", () => {
     expect(failCode).toBe(2);
     expect(second.stderr.output()).toContain("Provider run failed");
   });
+
+  it("agent run prints provider stderr in stream mode when provider returns final output only", async () => {
+    const runAgent = vi.fn(async () => ({
+      code: 1,
+      stdout: "",
+      stderr: "HTTP 401: invalid_api_key\n",
+      agentId: "orchestrator",
+      providerId: "openai"
+    }));
+
+    const { context, stderr } = createContext({ runAgent });
+    const code = await agentRunCommand.run(["orchestrator", "--message", "hi"], context);
+
+    expect(code).toBe(1);
+    expect(stderr.output()).toContain("HTTP 401: invalid_api_key");
+    expect(stderr.output()).toContain("Provider run failed for orchestrator (openai).");
+  });
 });
