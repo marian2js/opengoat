@@ -1,27 +1,17 @@
 import type { ProviderSummary } from "./types.js";
-import { ClaudeProvider } from "./builtins/claude.provider.js";
-import { CodexProvider } from "./builtins/codex.provider.js";
-import { CursorProvider } from "./builtins/cursor.provider.js";
-import { OpenAIProvider } from "./builtins/openai.provider.js";
-import { OpenClawProvider } from "./builtins/openclaw.provider.js";
-import { OpenRouterProvider } from "./builtins/openrouter.provider.js";
+import { loadProviderModules } from "./loader.js";
 import { ProviderRegistry, type ProviderFactory } from "./registry.js";
 
 export const DEFAULT_PROVIDER_ID = "codex";
 
-export function createDefaultProviderRegistry(): ProviderRegistry {
+export async function createDefaultProviderRegistry(): Promise<ProviderRegistry> {
   const registry = new ProviderRegistry();
-  registerBuiltinProviders(registry);
+  await loadProviderModules(registry);
   return registry;
 }
 
-export function registerBuiltinProviders(registry: ProviderRegistry): void {
-  registry.register("codex", () => new CodexProvider());
-  registry.register("claude", () => new ClaudeProvider());
-  registry.register("cursor", () => new CursorProvider());
-  registry.register("openclaw", () => new OpenClawProvider());
-  registry.register("openai", () => new OpenAIProvider());
-  registry.register("openrouter", () => new OpenRouterProvider());
+export async function registerBuiltinProviders(registry: ProviderRegistry): Promise<void> {
+  await loadProviderModules(registry);
 }
 
 export function listProviderSummaries(registry: ProviderRegistry): ProviderSummary[] {
@@ -36,12 +26,8 @@ export function listProviderSummaries(registry: ProviderRegistry): ProviderSumma
 export { ProviderRegistry, type ProviderFactory } from "./registry.js";
 export { BaseProvider } from "./base-provider.js";
 export { BaseCliProvider, type BaseCliProviderConfig } from "./cli-provider.js";
-export { CodexProvider } from "./builtins/codex.provider.js";
-export { ClaudeProvider } from "./builtins/claude.provider.js";
-export { CursorProvider } from "./builtins/cursor.provider.js";
-export { OpenClawProvider } from "./builtins/openclaw.provider.js";
-export { OpenAIProvider } from "./builtins/openai.provider.js";
-export { OpenRouterProvider } from "./builtins/openrouter.provider.js";
+export { loadProviderModules } from "./loader.js";
+export type { ProviderModule } from "./provider-module.js";
 export type {
   Provider,
   ProviderAuthOptions,

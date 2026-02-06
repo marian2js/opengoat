@@ -8,6 +8,7 @@ The codebase is split into layers to keep product surfaces decoupled from orches
 
 - `src/core`: domain models, templates, ports, and application services.
 - `src/core/providers`: pluggable provider registry + provider implementations.
+- `src/core/providers/providers/<provider-id>`: self-contained provider modules and tests.
 - `src/platform/node`: Node-specific adapters (filesystem and OS path resolution).
 - `src/apps/cli`: CLI command routing and text output only.
 
@@ -25,6 +26,8 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - `orchestrator` is the immutable default agent for inbound message routing.
 - Every agent has exactly one assigned provider (`~/.opengoat/agents/<agent>/config.json`).
 - Built-in providers: `codex`, `claude`, `cursor`, `openclaw`, `openai`, `openrouter`.
+  - Each provider lives in its own folder with code + tests.
+  - New providers are auto-discovered from provider folders (no central registration edits).
 
 ## Commands
 

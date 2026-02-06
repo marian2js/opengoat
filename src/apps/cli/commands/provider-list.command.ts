@@ -4,7 +4,7 @@ export const providerListCommand: CliCommand = {
   path: ["provider", "list"],
   description: "List available providers and capabilities.",
   async run(_args, context): Promise<number> {
-    const providers = context.service.listProviders();
+    const providers = await context.service.listProviders();
 
     if (providers.length === 0) {
       context.stdout.write("No providers registered.\n");
