@@ -1,4 +1,5 @@
 import type { CliCommand } from "../framework/command.js";
+import { executeAgentRun } from "./agent-run.shared.js";
 
 export const agentRunCommand: CliCommand = {
   path: ["agent", "run"],
@@ -14,47 +15,7 @@ export const agentRunCommand: CliCommand = {
       return 1;
     }
 
-    const stdoutBuffer: string[] = [];
-    const stderrBuffer: string[] = [];
-
-    const result = await context.service.runAgent(parsed.agentId, {
-      message: parsed.message,
-      model: parsed.model,
-      passthroughArgs: parsed.passthroughArgs,
-      env: process.env,
-      onStdout: parsed.stream
-        ? (chunk) => {
-            context.stdout.write(chunk);
-          }
-        : (chunk) => {
-            stdoutBuffer.push(chunk);
-          },
-      onStderr: parsed.stream
-        ? (chunk) => {
-            context.stderr.write(chunk);
-          }
-        : (chunk) => {
-            stderrBuffer.push(chunk);
-          }
-    });
-
-    if (!parsed.stream) {
-      const stdout = stdoutBuffer.join("") || result.stdout;
-      const stderr = stderrBuffer.join("") || result.stderr;
-      if (stdout) {
-        context.stdout.write(stdout);
-      }
-      if (stderr) {
-        context.stderr.write(stderr);
-      }
-    }
-
-    if (result.code !== 0) {
-      context.stderr.write(`Provider run failed for ${result.agentId} (${result.providerId}).\n`);
-      return result.code;
-    }
-
-    return 0;
+    return executeAgentRun(parsed, context);
   }
 };
 

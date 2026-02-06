@@ -46,4 +46,13 @@ describe("runCli", () => {
     const code = await runCli(["does-not-exist"]);
     expect(code).toBe(1);
   });
+
+  it("supports agent --help", async () => {
+    const root = await createTempDir("opengoat-runcli-");
+    roots.push(root);
+    process.env.OPENGOAT_HOME = root;
+
+    const code = await runCli(["agent", "--help"]);
+    expect(code).toBe(0);
+  });
 });

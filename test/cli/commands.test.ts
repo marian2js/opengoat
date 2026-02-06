@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { agentCommand } from "../../src/apps/cli/commands/agent.command.js";
 import { agentCreateCommand } from "../../src/apps/cli/commands/agent-create.command.js";
 import { agentListCommand } from "../../src/apps/cli/commands/agent-list.command.js";
 import { initCommand } from "../../src/apps/cli/commands/init.command.js";
@@ -101,5 +102,53 @@ describe("CLI commands", () => {
     expect(secondCode).toBe(0);
     expect(second.stdout.output()).toContain("orchestrator\tOrchestrator");
     expect(second.stdout.output()).toContain("research\tResearch");
+  });
+
+  it("agent command defaults to orchestrator when agent id is omitted", async () => {
+    const runAgent = vi.fn(async () => ({
+      code: 0,
+      stdout: "ok\n",
+      stderr: "",
+      agentId: "orchestrator",
+      providerId: "codex"
+    }));
+
+    const { context } = createContext({ runAgent });
+
+    const code = await agentCommand.run(["--message", "hello"], context);
+
+    expect(code).toBe(0);
+    expect(runAgent).toHaveBeenCalledWith(
+      "orchestrator",
+      expect.objectContaining({
+        message: "hello"
+      })
+    );
+  });
+
+  it("agent command accepts explicit agent id and prints usage for --help", async () => {
+    const runAgent = vi.fn(async () => ({
+      code: 0,
+      stdout: "",
+      stderr: "",
+      agentId: "research",
+      providerId: "codex"
+    }));
+
+    const first = createContext({ runAgent });
+    const firstCode = await agentCommand.run(["research", "--message", "hello"], first.context);
+    expect(firstCode).toBe(0);
+    expect(runAgent).toHaveBeenCalledWith(
+      "research",
+      expect.objectContaining({
+        message: "hello"
+      })
+    );
+
+    const second = createContext({ runAgent });
+    const secondCode = await agentCommand.run(["--help"], second.context);
+    expect(secondCode).toBe(0);
+    expect(second.stdout.output()).toContain("Usage:");
+    expect(second.stdout.output()).toContain("defaults to orchestrator");
   });
 });

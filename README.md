@@ -39,6 +39,8 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 ## Commands
 
 - `./bin/opengoat` or `./bin/opengoat init`
+- `./bin/opengoat agent --message "<text>"` (defaults to `orchestrator`)
+- `./bin/opengoat agent <agent-id> --message "<text>"`
 - `./bin/opengoat agent create <name>`
 - `./bin/opengoat agent list`
 - `./bin/opengoat provider list`
