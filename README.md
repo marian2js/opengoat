@@ -35,10 +35,13 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - Built-in providers: `codex`, `claude`, `cursor`, `grok`, `openclaw`, `openai`, `openrouter`.
   - Each provider lives in its own folder with code + tests.
   - New providers are auto-discovered from provider folders (no central registration edits).
+  - `onboard` uses provider-declared onboarding metadata to collect required credentials/settings.
+  - Provider settings persist at `~/.opengoat/providers/<provider-id>/config.json` and are auto-loaded at runtime.
 
 ## Commands
 
 - `./bin/opengoat` or `./bin/opengoat init`
+- `./bin/opengoat onboard`
 - `./bin/opengoat agent --message "<text>"` (defaults to `orchestrator`)
 - `./bin/opengoat agent <agent-id> --message "<text>"`
 - `./bin/opengoat agent create <name>`

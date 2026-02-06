@@ -31,6 +31,7 @@ export function renderGlobalConfigMarkdown(): string {
     "- `agents.json`: registered agent ids",
     "- `workspaces/`: user-visible agent workspaces",
     "- `agents/`: internal per-agent configuration",
+    "- `providers/`: provider credentials and endpoint settings",
     "",
     "Only Markdown and JSON files are used for OpenGoat configuration and state."
   ].join("\n");

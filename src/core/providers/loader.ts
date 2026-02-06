@@ -28,7 +28,7 @@ export async function loadProviderModules(registry: ProviderRegistry): Promise<v
       continue;
     }
 
-    registry.register(imported.providerModule.id, imported.providerModule.create);
+    registry.register(imported.providerModule.id, imported.providerModule.create, imported.providerModule);
   }
 }
 

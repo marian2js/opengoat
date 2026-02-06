@@ -81,6 +81,79 @@ describe("ProviderService", () => {
 
     expect(captured[0]?.agent).toBeUndefined();
   });
+
+  it("persists provider config and injects it into provider invoke env", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+
+    const { paths, fileSystem } = await createPaths(root);
+    await seedAgent(fileSystem, paths, {
+      providerId: "fake",
+      bootstrapFiles: ["AGENTS.md"]
+    });
+    await fileSystem.writeFile(path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"), "# Rules\n");
+
+    const captured: ProviderInvokeOptions[] = [];
+    const provider = createProvider({
+      id: "fake",
+      capabilities: { agent: false, model: true, auth: false, passthrough: false },
+      onInvoke: (options) => captured.push(options)
+    });
+
+    const registry = new ProviderRegistry();
+    registry.register("fake", () => provider);
+
+    const service = createProviderService(fileSystem, registry);
+    await service.setProviderConfig(paths, "fake", {
+      FAKE_PROVIDER_TOKEN: "stored-token"
+    });
+
+    await service.invokeAgent(paths, "orchestrator", {
+      message: "hello",
+      env: {
+        EXTRA_FLAG: "1"
+      }
+    });
+
+    expect(captured[0]?.env?.FAKE_PROVIDER_TOKEN).toBe("stored-token");
+    expect(captured[0]?.env?.EXTRA_FLAG).toBe("1");
+  });
+
+  it("allows runtime env to override stored provider config", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+
+    const { paths, fileSystem } = await createPaths(root);
+    await seedAgent(fileSystem, paths, {
+      providerId: "fake",
+      bootstrapFiles: ["AGENTS.md"]
+    });
+    await fileSystem.writeFile(path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"), "# Rules\n");
+
+    const captured: ProviderInvokeOptions[] = [];
+    const provider = createProvider({
+      id: "fake",
+      capabilities: { agent: false, model: true, auth: false, passthrough: false },
+      onInvoke: (options) => captured.push(options)
+    });
+
+    const registry = new ProviderRegistry();
+    registry.register("fake", () => provider);
+
+    const service = createProviderService(fileSystem, registry);
+    await service.setProviderConfig(paths, "fake", {
+      FAKE_PROVIDER_TOKEN: "stored-token"
+    });
+
+    await service.invokeAgent(paths, "orchestrator", {
+      message: "hello",
+      env: {
+        FAKE_PROVIDER_TOKEN: "runtime-token"
+      }
+    });
+
+    expect(captured[0]?.env?.FAKE_PROVIDER_TOKEN).toBe("runtime-token");
+  });
 });
 
 function createProvider(params: {
@@ -110,6 +183,7 @@ async function createPaths(root: string): Promise<{ paths: OpenGoatPaths; fileSy
     homeDir: root,
     workspacesDir: path.join(root, "workspaces"),
     agentsDir: path.join(root, "agents"),
+    providersDir: path.join(root, "providers"),
     globalConfigJsonPath: path.join(root, "config.json"),
     globalConfigMarkdownPath: path.join(root, "CONFIG.md"),
     agentsIndexJsonPath: path.join(root, "agents.json")
@@ -117,6 +191,7 @@ async function createPaths(root: string): Promise<{ paths: OpenGoatPaths; fileSy
 
   await fileSystem.ensureDir(paths.workspacesDir);
   await fileSystem.ensureDir(paths.agentsDir);
+  await fileSystem.ensureDir(paths.providersDir);
   await fileSystem.ensureDir(path.join(paths.workspacesDir, "orchestrator"));
   await fileSystem.ensureDir(path.join(paths.agentsDir, "orchestrator"));
 
@@ -161,4 +236,3 @@ function createProviderService(fileSystem: NodeFileSystem, registry: ProviderReg
     nowIso: () => "2026-02-06T00:00:00.000Z"
   });
 }
-

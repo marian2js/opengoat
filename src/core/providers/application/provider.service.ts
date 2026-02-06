@@ -7,7 +7,9 @@ import {
   DEFAULT_PROVIDER_ID,
   listProviderSummaries,
   type AgentProviderBinding,
+  type ProviderAuthOptions,
   type ProviderExecutionResult,
+  type ProviderOnboardingSpec,
   type ProviderInvokeOptions,
   type ProviderSummary,
   type ProviderRegistry
@@ -36,6 +38,13 @@ interface AgentConfigShape {
   [key: string]: unknown;
 }
 
+export interface ProviderStoredConfig {
+  schemaVersion: number;
+  providerId: string;
+  env: Record<string, string>;
+  updatedAt: string;
+}
+
 export class ProviderService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
@@ -54,6 +63,79 @@ export class ProviderService {
   public async listProviders(): Promise<ProviderSummary[]> {
     const registry = await this.providerRegistry;
     return listProviderSummaries(registry);
+  }
+
+  public async getProviderOnboarding(providerId: string): Promise<ProviderOnboardingSpec | undefined> {
+    const registry = await this.providerRegistry;
+    return registry.getProviderOnboarding(providerId);
+  }
+
+  public async invokeProviderAuth(
+    paths: OpenGoatPaths,
+    providerId: string,
+    options: ProviderAuthOptions = {}
+  ): Promise<ProviderExecutionResult> {
+    const registry = await this.providerRegistry;
+    const provider = registry.create(providerId);
+    const env = await this.resolveProviderEnv(paths, provider.id, options.env);
+    return provider.invokeAuth?.({
+      ...options,
+      env
+    }) ?? {
+      code: 1,
+      stdout: "",
+      stderr: `${provider.id} does not support auth\n`
+    };
+  }
+
+  public async getProviderConfig(
+    paths: OpenGoatPaths,
+    providerId: string
+  ): Promise<ProviderStoredConfig | null> {
+    const configPath = this.getProviderConfigPath(paths, providerId);
+    const exists = await this.fileSystem.exists(configPath);
+    if (!exists) {
+      return null;
+    }
+
+    try {
+      const raw = await this.fileSystem.readFile(configPath);
+      const parsed = JSON.parse(raw) as unknown;
+      if (!isProviderStoredConfig(parsed)) {
+        return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  public async setProviderConfig(
+    paths: OpenGoatPaths,
+    providerId: string,
+    env: Record<string, string>
+  ): Promise<ProviderStoredConfig> {
+    const registry = await this.providerRegistry;
+    const provider = registry.create(providerId);
+    const providerDir = this.pathPort.join(paths.providersDir, provider.id);
+    const configPath = this.getProviderConfigPath(paths, provider.id);
+    const existing = await this.getProviderConfig(paths, provider.id);
+
+    const mergedEnv = sanitizeEnvMap({
+      ...(existing?.env ?? {}),
+      ...env
+    });
+
+    const next: ProviderStoredConfig = {
+      schemaVersion: 1,
+      providerId: provider.id,
+      env: mergedEnv,
+      updatedAt: this.nowIso()
+    };
+
+    await this.fileSystem.ensureDir(providerDir);
+    await this.fileSystem.writeFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
+    return next;
   }
 
   public async getAgentProvider(
@@ -127,6 +209,7 @@ export class ProviderService {
       ...options,
       systemPrompt,
       cwd: options.cwd || workspaceDir,
+      env: await this.resolveProviderEnv(paths, provider.id, options.env),
       agent: provider.capabilities.agent ? options.agent || agentId : options.agent
     };
 
@@ -162,6 +245,22 @@ export class ProviderService {
   private getAgentConfigPath(paths: OpenGoatPaths, agentId: string): string {
     return this.pathPort.join(paths.agentsDir, agentId, "config.json");
   }
+
+  private getProviderConfigPath(paths: OpenGoatPaths, providerId: string): string {
+    return this.pathPort.join(paths.providersDir, providerId, "config.json");
+  }
+
+  private async resolveProviderEnv(
+    paths: OpenGoatPaths,
+    providerId: string,
+    inputEnv: NodeJS.ProcessEnv | undefined
+  ): Promise<NodeJS.ProcessEnv> {
+    const config = await this.getProviderConfig(paths, providerId);
+    return {
+      ...(config?.env ?? {}),
+      ...(inputEnv ?? process.env)
+    };
+  }
 }
 
 function getConfiguredProviderId(config: AgentConfigShape): string {
@@ -177,3 +276,46 @@ function resolveBootstrapMaxChars(raw: number | undefined): number {
   return DEFAULT_BOOTSTRAP_MAX_CHARS;
 }
 
+function isProviderStoredConfig(value: unknown): value is ProviderStoredConfig {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const record = value as {
+    schemaVersion?: unknown;
+    providerId?: unknown;
+    env?: unknown;
+    updatedAt?: unknown;
+  };
+
+  if (record.schemaVersion !== 1) {
+    return false;
+  }
+
+  if (typeof record.providerId !== "string" || !record.providerId.trim()) {
+    return false;
+  }
+
+  if (typeof record.updatedAt !== "string" || !record.updatedAt.trim()) {
+    return false;
+  }
+
+  if (typeof record.env !== "object" || record.env === null) {
+    return false;
+  }
+
+  return true;
+}
+
+function sanitizeEnvMap(input: Record<string, string>): Record<string, string> {
+  const sanitized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input)) {
+    const normalizedKey = key.trim();
+    const normalizedValue = String(value).trim();
+    if (!normalizedKey || !normalizedValue) {
+      continue;
+    }
+    sanitized[normalizedKey] = normalizedValue;
+  }
+  return sanitized;
+}

@@ -27,8 +27,10 @@ export { ProviderRegistry, type ProviderFactory } from "./registry.js";
 export { BaseProvider } from "./base-provider.js";
 export { BaseCliProvider, type BaseCliProviderConfig } from "./cli-provider.js";
 export { ProviderService } from "./application/provider.service.js";
+export type { ProviderStoredConfig } from "./application/provider.service.js";
 export { loadProviderModules } from "./loader.js";
 export type { ProviderModule } from "./provider-module.js";
+export type { ProviderOnboardingEnvField, ProviderOnboardingSpec } from "./provider-module.js";
 export type {
   Provider,
   ProviderAuthOptions,

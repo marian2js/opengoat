@@ -17,6 +17,10 @@ describe("provider registry", () => {
       "openclaw",
       "openrouter"
     ]);
+
+    expect(registry.getProviderOnboarding("openai")?.env?.some((field) => field.key === "OPENAI_API_KEY")).toBe(
+      true
+    );
   });
 
   it("supports custom registration", async () => {

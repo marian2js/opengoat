@@ -5,9 +5,12 @@ import type { PathPort } from "../../ports/path.port.js";
 import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import type {
   AgentProviderBinding,
+  ProviderAuthOptions,
   ProviderExecutionResult,
   ProviderInvokeOptions,
+  ProviderOnboardingSpec,
   ProviderRegistry,
+  ProviderStoredConfig,
   ProviderSummary
 } from "../../providers/index.js";
 import { createDefaultProviderRegistry } from "../../providers/index.js";
@@ -80,6 +83,28 @@ export class OpenGoatService {
     return this.providerService.listProviders();
   }
 
+  public getProviderOnboarding(providerId: string): Promise<ProviderOnboardingSpec | undefined> {
+    return this.providerService.getProviderOnboarding(providerId);
+  }
+
+  public async getProviderConfig(providerId: string): Promise<ProviderStoredConfig | null> {
+    const paths = this.pathsProvider.getPaths();
+    return this.providerService.getProviderConfig(paths, providerId);
+  }
+
+  public async setProviderConfig(providerId: string, env: Record<string, string>): Promise<ProviderStoredConfig> {
+    const paths = this.pathsProvider.getPaths();
+    return this.providerService.setProviderConfig(paths, providerId, env);
+  }
+
+  public async authenticateProvider(
+    providerId: string,
+    options: ProviderAuthOptions = {}
+  ): Promise<ProviderExecutionResult> {
+    const paths = this.pathsProvider.getPaths();
+    return this.providerService.invokeProviderAuth(paths, providerId, options);
+  }
+
   public async getAgentProvider(agentId: string): Promise<AgentProviderBinding> {
     const paths = this.pathsProvider.getPaths();
     return this.providerService.getAgentProvider(paths, agentId);
@@ -100,5 +125,9 @@ export class OpenGoatService {
 
   public getHomeDir(): string {
     return this.pathsProvider.getPaths().homeDir;
+  }
+
+  public getPaths() {
+    return this.pathsProvider.getPaths();
   }
 }
