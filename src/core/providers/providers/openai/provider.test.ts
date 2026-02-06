@@ -47,9 +47,9 @@ describe("openai provider", () => {
         systemPrompt: "You are OpenGoat.",
         env: {
           OPENAI_API_KEY: "test-key",
-          OPENGOAT_OPENAI_BASE_URL: "https://compatible.example/v1/",
-          OPENGOAT_OPENAI_ENDPOINT_PATH: "/chat/completions",
-          OPENGOAT_OPENAI_MODEL: "compatible-model"
+          OPENAI_BASE_URL: "https://compatible.example/v1/",
+          OPENAI_ENDPOINT_PATH: "/chat/completions",
+          OPENAI_MODEL: "compatible-model"
         }
       });
 
@@ -109,9 +109,9 @@ describe("openai provider", () => {
         message: "hello",
         env: {
           OPENAI_API_KEY: "test-key",
-          OPENGOAT_OPENAI_BASE_URL: "https://ignored.example/v1",
-          OPENGOAT_OPENAI_ENDPOINT: "https://override.example/custom/responses",
-          OPENGOAT_OPENAI_MODEL: "custom-model"
+          OPENAI_BASE_URL: "https://ignored.example/v1",
+          OPENAI_ENDPOINT: "https://override.example/custom/responses",
+          OPENAI_MODEL: "custom-model"
         }
       });
 
@@ -121,26 +121,6 @@ describe("openai provider", () => {
 
     const [requestUrl] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(requestUrl).toBe("https://override.example/custom/responses");
-  });
-
-  it("supports OPENGOAT_OPENAI_API_KEY fallback", async () => {
-    const provider = new OpenAIProvider();
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ output_text: "fallback key" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      })
-    );
-
-    await withFetchMock(fetchMock, async () => {
-      const result = await provider.invoke({
-        message: "hello",
-        env: { OPENGOAT_OPENAI_API_KEY: "fallback-key" }
-      });
-
-      expect(result.code).toBe(0);
-      expect(result.stdout).toBe("fallback key\n");
-    });
   });
 
   it("retries with chat completions when responses endpoint returns 404", async () => {
@@ -170,8 +150,8 @@ describe("openai provider", () => {
         message: "hello",
         env: {
           OPENAI_API_KEY: "test-key",
-          OPENGOAT_OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
-          OPENGOAT_OPENAI_MODEL: "meta/llama-3.1-8b-instruct"
+          OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
+          OPENAI_MODEL: "meta/llama-3.1-8b-instruct"
         }
       });
 
@@ -226,7 +206,7 @@ describe("openai provider", () => {
         message: "hello",
         env: {
           OPENAI_API_KEY: "test-key",
-          OPENGOAT_OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1"
+          OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1"
         }
       });
 

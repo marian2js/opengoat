@@ -2,4 +2,4 @@
 
 - Type: CLI
 - Command: `claude`
-- Env override: `OPENGOAT_CLAUDE_CMD`
+- Env override: `CLAUDE_CMD`

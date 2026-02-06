@@ -29,13 +29,13 @@ export class GrokProvider extends BaseProvider {
     this.validateInvokeOptions(options);
 
     const env = options.env ?? process.env;
-    const apiKey = env.XAI_API_KEY?.trim() || env.OPENGOAT_GROK_API_KEY?.trim();
+    const apiKey = env.XAI_API_KEY?.trim();
     if (!apiKey) {
       throw new ProviderAuthenticationError(this.id, "set XAI_API_KEY");
     }
 
     const endpoint = resolveGrokEndpoint(env);
-    const model = options.model || env.OPENGOAT_GROK_MODEL || DEFAULT_GROK_MODEL;
+    const model = options.model || env.GROK_MODEL || DEFAULT_GROK_MODEL;
     const style = resolveApiStyle(env, endpoint);
 
     const response = await fetch(endpoint, {
@@ -72,19 +72,19 @@ export class GrokProvider extends BaseProvider {
 }
 
 function resolveGrokEndpoint(env: NodeJS.ProcessEnv): string {
-  const endpointOverride = env.OPENGOAT_GROK_ENDPOINT?.trim();
+  const endpointOverride = env.GROK_ENDPOINT?.trim();
   if (endpointOverride) {
     return endpointOverride;
   }
 
-  const baseUrl = (env.OPENGOAT_GROK_BASE_URL?.trim() || DEFAULT_GROK_BASE_URL).replace(/\/+$/, "");
-  const endpointPath = env.OPENGOAT_GROK_ENDPOINT_PATH?.trim() || DEFAULT_GROK_ENDPOINT_PATH;
+  const baseUrl = (env.GROK_BASE_URL?.trim() || DEFAULT_GROK_BASE_URL).replace(/\/+$/, "");
+  const endpointPath = env.GROK_ENDPOINT_PATH?.trim() || DEFAULT_GROK_ENDPOINT_PATH;
 
   return `${baseUrl}${endpointPath.startsWith("/") ? "" : "/"}${endpointPath}`;
 }
 
 function resolveApiStyle(env: NodeJS.ProcessEnv, endpoint: string): "responses" | "chat" {
-  const explicit = env.OPENGOAT_GROK_API_STYLE?.trim().toLowerCase();
+  const explicit = env.GROK_API_STYLE?.trim().toLowerCase();
   if (explicit === "responses" || explicit === "chat") {
     return explicit;
   }

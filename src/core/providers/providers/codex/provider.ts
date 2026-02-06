@@ -8,7 +8,7 @@ export class CodexProvider extends BaseCliProvider {
       displayName: "Codex CLI",
       kind: "cli",
       command: "codex",
-      commandEnvVar: "OPENGOAT_CODEX_CMD",
+      commandEnvVar: "CODEX_CMD",
       capabilities: {
         agent: false,
         model: true,

@@ -8,7 +8,7 @@ export class ClaudeProvider extends BaseCliProvider {
       displayName: "Claude Code",
       kind: "cli",
       command: "claude",
-      commandEnvVar: "OPENGOAT_CLAUDE_CMD",
+      commandEnvVar: "CLAUDE_CMD",
       capabilities: {
         agent: true,
         model: true,

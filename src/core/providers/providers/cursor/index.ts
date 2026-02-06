@@ -7,7 +7,7 @@ export const providerModule: ProviderModule = {
   onboarding: {
     env: [
       {
-        key: "OPENGOAT_CURSOR_CMD",
+        key: "CURSOR_CMD",
         description: "Optional cursor binary path override"
       }
     ],

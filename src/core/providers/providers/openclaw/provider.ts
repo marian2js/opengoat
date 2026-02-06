@@ -8,7 +8,7 @@ export class OpenClawProvider extends BaseCliProvider {
       displayName: "OpenClaw",
       kind: "cli",
       command: "openclaw",
-      commandEnvVar: "OPENGOAT_OPENCLAW_CMD",
+      commandEnvVar: "OPENCLAW_CMD",
       capabilities: {
         agent: true,
         model: true,

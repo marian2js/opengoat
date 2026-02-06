@@ -31,20 +31,22 @@ export class OpenRouterProvider extends BaseProvider {
     }
 
     const endpoint =
-      env.OPENGOAT_OPENROUTER_ENDPOINT?.trim() || "https://openrouter.ai/api/v1/chat/completions";
-    const model = options.model || env.OPENGOAT_OPENROUTER_MODEL || "openai/gpt-4o-mini";
+      env.OPENROUTER_ENDPOINT?.trim() || "https://openrouter.ai/api/v1/chat/completions";
+    const model = options.model || env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     };
 
-    if (env.OPENGOAT_OPENROUTER_HTTP_REFERER?.trim()) {
-      headers["HTTP-Referer"] = env.OPENGOAT_OPENROUTER_HTTP_REFERER.trim();
+    const referer = env.OPENROUTER_HTTP_REFERER?.trim();
+    if (referer) {
+      headers["HTTP-Referer"] = referer;
     }
 
-    if (env.OPENGOAT_OPENROUTER_X_TITLE?.trim()) {
-      headers["X-Title"] = env.OPENGOAT_OPENROUTER_X_TITLE.trim();
+    const title = env.OPENROUTER_X_TITLE?.trim();
+    if (title) {
+      headers["X-Title"] = title;
     }
 
     const response = await fetch(endpoint, {

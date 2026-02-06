@@ -7,7 +7,7 @@ export const providerModule: ProviderModule = {
   onboarding: {
     env: [
       {
-        key: "OPENGOAT_CODEX_CMD",
+        key: "CODEX_CMD",
         description: "Optional codex binary path override"
       }
     ],

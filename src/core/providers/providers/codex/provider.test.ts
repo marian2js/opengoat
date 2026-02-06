@@ -41,4 +41,11 @@ describe("codex provider", () => {
     expect(invocation.command).toBe("codex");
     expect(invocation.args).toEqual(["login", "--device-auth"]);
   });
+
+  it("supports command override with CODEX_CMD", () => {
+    const provider = new CodexProvider();
+
+    const preferred = provider.buildInvocation({ message: "ping" }, { ...process.env, CODEX_CMD: "codex-beta" });
+    expect(preferred.command).toBe("codex-beta");
+  });
 });

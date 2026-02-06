@@ -13,19 +13,23 @@ export const providerModule: ProviderModule = {
         secret: true
       },
       {
-        key: "OPENGOAT_GROK_BASE_URL",
+        key: "GROK_BASE_URL",
         description: "Optional Grok-compatible base URL"
       },
       {
-        key: "OPENGOAT_GROK_ENDPOINT_PATH",
+        key: "GROK_ENDPOINT_PATH",
         description: "Optional endpoint path (default: /responses)"
       },
       {
-        key: "OPENGOAT_GROK_MODEL",
+        key: "GROK_ENDPOINT",
+        description: "Optional full endpoint override"
+      },
+      {
+        key: "GROK_MODEL",
         description: "Optional default model id"
       },
       {
-        key: "OPENGOAT_GROK_API_STYLE",
+        key: "GROK_API_STYLE",
         description: "Optional API style override: responses or chat"
       }
     ],

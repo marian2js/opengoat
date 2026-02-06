@@ -15,7 +15,7 @@ describe("cursor provider", () => {
     const provider = new CursorProvider();
     const invocation = provider.buildInvocation(
       { message: "summarize repo" },
-      { ...process.env, OPENGOAT_CURSOR_CMD: "cursor-agent" }
+      { ...process.env, CURSOR_CMD: "cursor-agent" }
     );
 
     expect(invocation.command).toBe("cursor-agent");
@@ -31,7 +31,7 @@ describe("cursor provider", () => {
 
     const directInvocation = provider.buildAuthInvocation(
       {},
-      { ...process.env, OPENGOAT_CURSOR_CMD: "cursor-agent" }
+      { ...process.env, CURSOR_CMD: "cursor-agent" }
     );
     expect(directInvocation.command).toBe("cursor-agent");
     expect(directInvocation.args).toEqual(["login"]);

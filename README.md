@@ -29,6 +29,7 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
   - `~/.opengoat/agents/orchestrator/`
 - Uses only `.md` and `.json` files for configuration/state artifacts.
 - Supports custom home root with `OPENGOAT_HOME`.
+- CLI automatically loads environment variables from `.env` in the current working directory.
 - `orchestrator` is the immutable default agent for inbound message routing.
 - Every agent has exactly one assigned provider (`~/.opengoat/agents/<agent>/config.json`).
 - On every `agent run`, OpenGoat loads configured workspace bootstrap files, injects them into a generated system prompt with missing-file markers + truncation protection, and runs the provider with the agent workspace as default `cwd`.
@@ -55,26 +56,26 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 
 `openai` is an API provider (no CLI required).
 
-- Required auth: `OPENAI_API_KEY` (or `OPENGOAT_OPENAI_API_KEY`)
+- Required auth: `OPENAI_API_KEY`
 - Default endpoint: `https://api.openai.com/v1/responses`
-- Optional model override: `OPENGOAT_OPENAI_MODEL`
+- Optional model override: `OPENAI_MODEL`
 - OpenAI-compatible base URL support:
-  - `OPENGOAT_OPENAI_BASE_URL` (for example `https://your-gateway.example/v1`)
-  - `OPENGOAT_OPENAI_ENDPOINT_PATH` (for example `/responses` or `/chat/completions`)
-  - `OPENGOAT_OPENAI_ENDPOINT` can override the full URL directly.
+  - `OPENAI_BASE_URL` (for example `https://your-gateway.example/v1`)
+  - `OPENAI_ENDPOINT_PATH` (for example `/responses` or `/chat/completions`)
+  - `OPENAI_ENDPOINT` can override the full URL directly.
 
 ## Grok Provider
 
 `grok` is an API provider (no CLI required).
 
-- Required auth: `XAI_API_KEY` (or `OPENGOAT_GROK_API_KEY`)
+- Required auth: `XAI_API_KEY`
 - Default endpoint: `https://api.x.ai/v1/responses`
-- Optional model override: `OPENGOAT_GROK_MODEL`
+- Optional model override: `GROK_MODEL`
 - Endpoint controls:
-  - `OPENGOAT_GROK_BASE_URL`
-  - `OPENGOAT_GROK_ENDPOINT_PATH`
-  - `OPENGOAT_GROK_ENDPOINT`
-  - `OPENGOAT_GROK_API_STYLE` (`responses` or `chat`)
+  - `GROK_BASE_URL`
+  - `GROK_ENDPOINT_PATH`
+  - `GROK_ENDPOINT`
+  - `GROK_API_STYLE` (`responses` or `chat`)
 
 ## Development
 

@@ -9,7 +9,7 @@ export class CursorProvider extends BaseCliProvider {
       displayName: "Cursor",
       kind: "cli",
       command: "cursor",
-      commandEnvVar: "OPENGOAT_CURSOR_CMD",
+      commandEnvVar: "CURSOR_CMD",
       capabilities: {
         agent: false,
         model: false,

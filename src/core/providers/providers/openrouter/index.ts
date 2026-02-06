@@ -13,19 +13,19 @@ export const providerModule: ProviderModule = {
         secret: true
       },
       {
-        key: "OPENGOAT_OPENROUTER_ENDPOINT",
+        key: "OPENROUTER_ENDPOINT",
         description: "Optional endpoint override"
       },
       {
-        key: "OPENGOAT_OPENROUTER_MODEL",
+        key: "OPENROUTER_MODEL",
         description: "Optional default model id"
       },
       {
-        key: "OPENGOAT_OPENROUTER_HTTP_REFERER",
+        key: "OPENROUTER_HTTP_REFERER",
         description: "Optional HTTP-Referer header"
       },
       {
-        key: "OPENGOAT_OPENROUTER_X_TITLE",
+        key: "OPENROUTER_X_TITLE",
         description: "Optional X-Title header"
       }
     ],

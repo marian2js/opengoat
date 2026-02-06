@@ -57,8 +57,8 @@ describe("openrouter provider", () => {
         systemPrompt: "System rules.",
         env: {
           OPENROUTER_API_KEY: "test-key",
-          OPENGOAT_OPENROUTER_HTTP_REFERER: "https://example.test",
-          OPENGOAT_OPENROUTER_X_TITLE: "OpenGoat"
+          OPENROUTER_HTTP_REFERER: "https://example.test",
+          OPENROUTER_X_TITLE: "OpenGoat"
         }
       });
 

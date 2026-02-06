@@ -46,8 +46,8 @@ describe("grok provider", () => {
         message: "hello",
         env: {
           XAI_API_KEY: "test-key",
-          OPENGOAT_GROK_BASE_URL: "https://api.x.ai/v1/",
-          OPENGOAT_GROK_ENDPOINT_PATH: "/chat/completions"
+          GROK_BASE_URL: "https://api.x.ai/v1/",
+          GROK_ENDPOINT_PATH: "/chat/completions"
         }
       });
 
@@ -77,8 +77,8 @@ describe("grok provider", () => {
         message: "hello",
         env: {
           XAI_API_KEY: "test-key",
-          OPENGOAT_GROK_BASE_URL: "https://ignored.example/v1",
-          OPENGOAT_GROK_ENDPOINT: "https://override.example/custom/responses"
+          GROK_BASE_URL: "https://ignored.example/v1",
+          GROK_ENDPOINT: "https://override.example/custom/responses"
         }
       });
 
@@ -88,26 +88,6 @@ describe("grok provider", () => {
 
     const [requestUrl] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(requestUrl).toBe("https://override.example/custom/responses");
-  });
-
-  it("supports OPENGOAT_GROK_API_KEY fallback", async () => {
-    const provider = new GrokProvider();
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ output_text: "fallback key" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      })
-    );
-
-    await withFetchMock(fetchMock, async () => {
-      const result = await provider.invoke({
-        message: "hello",
-        env: { OPENGOAT_GROK_API_KEY: "fallback-key" }
-      });
-
-      expect(result.code).toBe(0);
-      expect(result.stdout).toBe("fallback key\n");
-    });
   });
 
   it("fails on malformed successful payload", async () => {

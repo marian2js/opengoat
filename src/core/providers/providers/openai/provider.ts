@@ -29,7 +29,7 @@ export class OpenAIProvider extends BaseProvider {
     this.validateInvokeOptions(options);
 
     const env = options.env ?? process.env;
-    const apiKey = env.OPENAI_API_KEY?.trim() || env.OPENGOAT_OPENAI_API_KEY?.trim();
+    const apiKey = env.OPENAI_API_KEY?.trim();
     if (!apiKey) {
       throw new ProviderAuthenticationError(this.id, "set OPENAI_API_KEY");
     }
@@ -40,7 +40,7 @@ export class OpenAIProvider extends BaseProvider {
         code: 1,
         stdout: "",
         stderr:
-          "Missing model for OpenAI-compatible base URL. Set OPENGOAT_OPENAI_MODEL (or OPENAI_MODEL) or pass --model.\n"
+          "Missing model for OpenAI-compatible base URL. Set OPENAI_MODEL or pass --model.\n"
       };
     }
 
@@ -130,23 +130,23 @@ function resolveApiStyle(env: NodeJS.ProcessEnv, endpoint: string): "responses" 
 }
 
 function resolveEndpointOverride(env: NodeJS.ProcessEnv): string | undefined {
-  return env.OPENGOAT_OPENAI_ENDPOINT?.trim() || env.OPENAI_ENDPOINT?.trim();
+  return env.OPENAI_ENDPOINT?.trim();
 }
 
 function resolveEndpointPathOverride(env: NodeJS.ProcessEnv): string | undefined {
-  return env.OPENGOAT_OPENAI_ENDPOINT_PATH?.trim() || env.OPENAI_ENDPOINT_PATH?.trim();
+  return env.OPENAI_ENDPOINT_PATH?.trim();
 }
 
 function resolveApiStyleOverride(env: NodeJS.ProcessEnv): string | undefined {
-  return env.OPENGOAT_OPENAI_API_STYLE?.trim().toLowerCase() || env.OPENAI_API_STYLE?.trim().toLowerCase();
+  return env.OPENAI_API_STYLE?.trim().toLowerCase();
 }
 
 function resolveBaseUrl(env: NodeJS.ProcessEnv): string {
-  return env.OPENGOAT_OPENAI_BASE_URL?.trim() || env.OPENAI_BASE_URL?.trim() || DEFAULT_OPENAI_BASE_URL;
+  return env.OPENAI_BASE_URL?.trim() || DEFAULT_OPENAI_BASE_URL;
 }
 
 function resolveModel(options: ProviderInvokeOptions, env: NodeJS.ProcessEnv): string | null {
-  const explicitModel = options.model?.trim() || env.OPENGOAT_OPENAI_MODEL?.trim() || env.OPENAI_MODEL?.trim();
+  const explicitModel = options.model?.trim() || env.OPENAI_MODEL?.trim();
   if (explicitModel) {
     return explicitModel;
   }

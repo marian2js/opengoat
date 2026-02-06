@@ -7,7 +7,7 @@ export const providerModule: ProviderModule = {
   onboarding: {
     env: [
       {
-        key: "OPENGOAT_CLAUDE_CMD",
+        key: "CLAUDE_CMD",
         description: "Optional claude binary path override"
       }
     ],

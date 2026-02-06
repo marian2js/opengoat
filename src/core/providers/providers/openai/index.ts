@@ -13,19 +13,23 @@ export const providerModule: ProviderModule = {
         secret: true
       },
       {
-        key: "OPENGOAT_OPENAI_BASE_URL",
+        key: "OPENAI_BASE_URL",
         description: "Optional OpenAI-compatible base URL (for gateways/proxies)"
       },
       {
-        key: "OPENGOAT_OPENAI_ENDPOINT_PATH",
+        key: "OPENAI_ENDPOINT_PATH",
         description: "Optional endpoint path (default: /responses)"
       },
       {
-        key: "OPENGOAT_OPENAI_MODEL",
+        key: "OPENAI_ENDPOINT",
+        description: "Optional full endpoint override"
+      },
+      {
+        key: "OPENAI_MODEL",
         description: "Optional default model id"
       },
       {
-        key: "OPENGOAT_OPENAI_API_STYLE",
+        key: "OPENAI_API_STYLE",
         description: "Optional API style override: responses or chat"
       }
     ],

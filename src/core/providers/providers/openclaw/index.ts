@@ -7,7 +7,7 @@ export const providerModule: ProviderModule = {
   onboarding: {
     env: [
       {
-        key: "OPENGOAT_OPENCLAW_CMD",
+        key: "OPENCLAW_CMD",
         description: "Optional openclaw binary path override"
       }
     ],
