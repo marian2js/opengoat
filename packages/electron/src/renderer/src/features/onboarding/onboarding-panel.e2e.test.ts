@@ -1,0 +1,191 @@
+/** @vitest-environment happy-dom */
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createElement, useState } from "react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { WorkbenchOnboarding } from "@shared/workbench";
+import { OnboardingPanel } from "./onboarding-panel";
+
+afterEach(() => {
+  cleanup();
+});
+
+describe("OnboardingPanel e2e", () => {
+  it("filters providers from the search input", async () => {
+    const user = userEvent.setup();
+
+    render(
+      createElement(OnboardingPanel, {
+        onboarding: createOnboardingFixture(),
+        providerId: "openai",
+        env: {},
+        error: null,
+        canClose: true,
+        isSubmitting: false,
+        onSelectProvider: vi.fn(),
+        onEnvChange: vi.fn(),
+        onClose: vi.fn(),
+        onSubmit: vi.fn()
+      })
+    );
+
+    expect(screen.getByRole("button", { name: /openai/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /openrouter/i })).toBeTruthy();
+
+    await user.type(screen.getByPlaceholderText("Search providers"), "router");
+
+    expect(screen.queryByRole("button", { name: /openai/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /openrouter/i })).toBeTruthy();
+  });
+
+  it("runs the full provider select and required-field submit flow", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    function StatefulHarness() {
+      const [providerId, setProviderId] = useState("openai");
+      const [env, setEnv] = useState<Record<string, string>>({});
+
+      return createElement(OnboardingPanel, {
+        onboarding: createOnboardingFixture(),
+        providerId,
+        env,
+        error: null,
+        canClose: true,
+        isSubmitting: false,
+        onSelectProvider: setProviderId,
+        onEnvChange: (key: string, value: string) => {
+          setEnv((current) => ({
+            ...current,
+            [key]: value
+          }));
+        },
+        onClose: vi.fn(),
+        onSubmit
+      });
+    }
+
+    render(createElement(StatefulHarness));
+
+    const saveButton = screen.getByRole("button", { name: /save and start/i });
+    expect(saveButton.hasAttribute("disabled")).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: /openrouter/i }));
+    expect(screen.getByPlaceholderText("OpenRouter API key")).toBeTruthy();
+
+    await user.type(screen.getByPlaceholderText("OpenRouter API key"), "or-test-key");
+    expect(saveButton.hasAttribute("disabled")).toBe(false);
+
+    await user.click(saveButton);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses independent scroll areas for provider list and setup pane", () => {
+    render(
+      createElement(OnboardingPanel, {
+        onboarding: createLargeOnboardingFixture(36),
+        providerId: "provider-1",
+        env: {},
+        error: null,
+        canClose: true,
+        isSubmitting: false,
+        onSelectProvider: vi.fn(),
+        onEnvChange: vi.fn(),
+        onClose: vi.fn(),
+        onSubmit: vi.fn()
+      })
+    );
+
+    const scrollAreas = document.querySelectorAll('[data-slot="scroll-area"]');
+    expect(scrollAreas.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByRole("button", { name: /save and start/i })).toBeTruthy();
+  });
+});
+
+function createOnboardingFixture(): WorkbenchOnboarding {
+  return {
+    activeProviderId: "openai",
+    needsOnboarding: true,
+    families: [
+      {
+        id: "openai",
+        label: "OpenAI",
+        providerIds: ["openai"]
+      },
+      {
+        id: "openrouter",
+        label: "OpenRouter",
+        providerIds: ["openrouter"]
+      }
+    ],
+    providers: [
+      {
+        id: "openai",
+        displayName: "OpenAI",
+        kind: "http",
+        envFields: [
+          {
+            key: "OPENAI_API_KEY",
+            description: "OpenAI API key",
+            required: true,
+            secret: true
+          }
+        ],
+        configuredEnvKeys: [],
+        configuredEnvValues: {},
+        missingRequiredEnv: ["OPENAI_API_KEY"],
+        hasConfig: false
+      },
+      {
+        id: "openrouter",
+        displayName: "OpenRouter",
+        kind: "http",
+        envFields: [
+          {
+            key: "OPENROUTER_API_KEY",
+            description: "OpenRouter API key",
+            required: true,
+            secret: true
+          }
+        ],
+        configuredEnvKeys: [],
+        configuredEnvValues: {},
+        missingRequiredEnv: ["OPENROUTER_API_KEY"],
+        hasConfig: false
+      }
+    ]
+  };
+}
+
+function createLargeOnboardingFixture(totalProviders: number): WorkbenchOnboarding {
+  const providerIds = Array.from({ length: totalProviders }, (_entry, index) => `provider-${index + 1}`);
+  return {
+    activeProviderId: providerIds[0] ?? "provider-1",
+    needsOnboarding: true,
+    families: [
+      {
+        id: "stress",
+        label: "Stress Test",
+        providerIds
+      }
+    ],
+    providers: providerIds.map((id, index) => ({
+      id,
+      displayName: `Provider ${index + 1}`,
+      kind: "http" as const,
+      envFields: [
+        {
+          key: `${id.toUpperCase().replace(/-/g, "_")}_API_KEY`,
+          description: `API key for ${id}`,
+          required: true,
+          secret: true
+        }
+      ],
+      configuredEnvKeys: [],
+      configuredEnvValues: {},
+      missingRequiredEnv: [`${id.toUpperCase().replace(/-/g, "_")}_API_KEY`],
+      hasConfig: false
+    }))
+  };
+}

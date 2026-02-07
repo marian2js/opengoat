@@ -4,6 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
+      "@": path.resolve(__dirname, "packages/electron/src/renderer/src"),
       "@opengoat/core": path.resolve(__dirname, "packages/core/src/index.ts"),
       "@main": path.resolve(__dirname, "packages/electron/src/main"),
       "@renderer": path.resolve(__dirname, "packages/electron/src/renderer/src"),
