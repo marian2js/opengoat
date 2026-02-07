@@ -20,8 +20,6 @@ describe("workbench flow e2e", () => {
       store.getState().onboardingDraftEnv
     );
     expect(store.getState().onboardingDraftProviderId).toBe("codex");
-
-    store.getState().closeOnboarding();
     expect(store.getState().showOnboarding).toBe(false);
     expect(store.getState().onboardingState).toBe("hidden");
 

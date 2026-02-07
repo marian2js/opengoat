@@ -125,9 +125,44 @@ describe("workbench store", () => {
         CODEX_API_KEY: "abc123"
       }
     });
-    expect(store.getState().onboardingState).toBe("editing");
-    expect(store.getState().showOnboarding).toBe(true);
+    expect(store.getState().onboardingState).toBe("hidden");
+    expect(store.getState().showOnboarding).toBe(false);
     expect(store.getState().onboardingDraftProviderId).toBe("codex");
+  });
+
+  it("keeps onboarding open when submit result still requires setup", async () => {
+    const api = createApiMock({
+      submitOnboarding: vi.fn(async (): Promise<WorkbenchOnboarding> => ({
+        activeProviderId: "openai",
+        needsOnboarding: true,
+        providers: [
+          {
+            id: "openai",
+            displayName: "OpenAI",
+            kind: "http",
+            envFields: [
+              {
+                key: "OPENAI_API_KEY",
+                description: "OpenAI API key",
+                required: true,
+                secret: true
+              }
+            ],
+            configuredEnvKeys: [],
+            configuredEnvValues: {},
+            missingRequiredEnv: ["OPENAI_API_KEY"],
+            hasConfig: false
+          }
+        ]
+      })) as WorkbenchApiClient["submitOnboarding"]
+    });
+    const store = createWorkbenchStore(api);
+
+    await store.getState().bootstrap();
+    await store.getState().submitOnboarding("openai", {});
+
+    expect(store.getState().showOnboarding).toBe(true);
+    expect(store.getState().onboardingState).toBe("editing");
   });
 
   it("surfaces contract mismatch during bootstrap", async () => {

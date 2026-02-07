@@ -226,11 +226,12 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           onboarding,
           onboarding.activeProviderId
         );
+        const showOnboarding = onboarding.needsOnboarding;
 
         set({
           onboarding,
-          showOnboarding: true,
-          onboardingState: "editing",
+          showOnboarding,
+          onboardingState: showOnboarding ? "editing" : "hidden",
           onboardingDraftProviderId: onboardingDraft.providerId,
           onboardingDraftEnv: onboardingDraft.env,
           isBusy: false
