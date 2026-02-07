@@ -1,8 +1,8 @@
-import {
-  createUIMessageStream,
-  type ChatTransport,
-  type TextUIPart,
-  type UIMessage
+import type {
+  ChatTransport,
+  TextUIPart,
+  UIMessage,
+  UIMessageChunk
 } from "ai";
 import type { WorkbenchMessage } from "@shared/workbench";
 
@@ -40,16 +40,13 @@ export function createElectronChatTransport(
       const metadata = buildMetadata(reply);
       const textPartId = `${reply.id}-text`;
 
-      return createUIMessageStream<ElectronUiMessage>({
-        originalMessages: messages,
-        execute: ({ writer }) => {
-          writer.write({ type: "start", messageId: reply.id, messageMetadata: metadata });
-          writer.write({ type: "text-start", id: textPartId });
-          writer.write({ type: "text-delta", id: textPartId, delta: reply.content });
-          writer.write({ type: "text-end", id: textPartId });
-          writer.write({ type: "finish", messageMetadata: metadata, finishReason: "stop" });
-        }
-      });
+      return createSingleReplyStream([
+        { type: "start", messageId: reply.id, messageMetadata: metadata },
+        { type: "text-start", id: textPartId },
+        { type: "text-delta", id: textPartId, delta: reply.content },
+        { type: "text-end", id: textPartId },
+        { type: "finish", messageMetadata: metadata, finishReason: "stop" }
+      ]);
     },
     reconnectToStream: async () => null
   };
@@ -103,4 +100,17 @@ function buildMetadata(message: WorkbenchMessage): ElectronUiMessageMetadata | u
     metadata.createdAt || metadata.tracePath || metadata.providerId
   );
   return hasData ? metadata : undefined;
+}
+
+function createSingleReplyStream(
+  chunks: UIMessageChunk<ElectronUiMessageMetadata>[]
+): ReadableStream<UIMessageChunk<ElectronUiMessageMetadata>> {
+  return new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(chunk);
+      }
+      controller.close();
+    }
+  });
 }
