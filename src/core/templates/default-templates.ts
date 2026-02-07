@@ -34,6 +34,7 @@ export function renderGlobalConfigMarkdown(): string {
     "- `agents/`: internal per-agent configuration",
     "- `skills/`: managed shared skills (optional source for agent installs)",
     "- `providers/`: provider credentials and endpoint settings",
+    "- `sessions/`: transient per-run orchestration working files",
     "- `runs/`: run traces (routing + execution history)",
     "",
     "Only Markdown and JSON files are used for OpenGoat configuration and state."

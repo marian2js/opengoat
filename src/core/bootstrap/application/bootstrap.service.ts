@@ -40,6 +40,7 @@ export class BootstrapService {
     await this.ensureDirectory(paths.agentsDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.skillsDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.providersDir, createdPaths, skippedPaths);
+    await this.ensureDirectory(paths.sessionsDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.runsDir, createdPaths, skippedPaths);
 
     const now = this.nowIso();

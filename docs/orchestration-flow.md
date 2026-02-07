@@ -86,7 +86,7 @@ Orchestrator invokes the target agent provider with a delegation message.
 
 Orchestrator writes markdown handoff files under:
 
-- `~/.opengoat/workspaces/orchestrator/coordination/<run-id>/`
+- `~/.opengoat/sessions/<run-id>/`
 
 Then target response is captured back into markdown files.
 
@@ -127,6 +127,16 @@ Plugin sources:
 - These plugin skill dirs are injected into the same merged skill resolution path used by providers.
 
 ## Sessions
+
+Run vs Session:
+
+- Run:
+  - one top-level `opengoat agent ...` execution
+  - identified by `runId`
+  - transient run artifacts live under `~/.opengoat/sessions/<run-id>/`
+- Session:
+  - conversational continuity for an agent across runs
+  - stored under `~/.opengoat/agents/<agent-id>/sessions/`
 
 Each agent has isolated session storage:
 

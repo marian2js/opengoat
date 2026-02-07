@@ -4,6 +4,7 @@ export interface OpenGoatPaths {
   agentsDir: string;
   skillsDir: string;
   providersDir: string;
+  sessionsDir: string;
   runsDir: string;
   globalConfigJsonPath: string;
   globalConfigMarkdownPath: string;

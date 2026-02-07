@@ -478,12 +478,7 @@ export class OrchestrationService {
       taskKey,
       sessionPolicy: effectiveSessionPolicy
     });
-    const handoffBaseDir = this.pathPort.join(
-      params.paths.workspacesDir,
-      DEFAULT_AGENT_ID,
-      "coordination",
-      params.runId
-    );
+    const handoffBaseDir = this.pathPort.join(params.paths.sessionsDir, params.runId);
     let outboundPath: string | undefined;
     if (mode === "artifacts" || mode === "hybrid") {
       await this.fileSystem.ensureDir(handoffBaseDir);
