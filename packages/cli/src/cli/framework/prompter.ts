@@ -8,6 +8,7 @@ import {
   outro as clackOutro,
   password as clackPassword,
   select as clackSelect,
+  spinner as clackSpinner,
   text as clackText,
   type Option
 } from "@clack/prompts";
@@ -38,6 +39,7 @@ export interface CliPrompter {
   select<T>(message: string, options: PromptSelectOption<T>[], initialValue?: T): Promise<T>;
   text(options: PromptTextOptions): Promise<string>;
   confirm(options: PromptConfirmOptions): Promise<boolean>;
+  progress(initialMessage: string): { update(message: string): void; stop(message?: string): void };
 }
 
 export class PromptCancelledError extends Error {
@@ -109,6 +111,18 @@ function createClackPrompter(): CliPrompter {
       });
 
       return guardCancelled(value);
+    },
+    progress(initialMessage: string): { update(message: string): void; stop(message?: string): void } {
+      const spin = clackSpinner();
+      spin.start(initialMessage);
+      return {
+        update(message: string) {
+          spin.message(message);
+        },
+        stop(message?: string) {
+          spin.stop(message);
+        }
+      };
     }
   };
 }
@@ -215,6 +229,19 @@ function createReadlinePrompter(params: CliPrompterParams): CliPrompter {
       } finally {
         rl.close();
       }
+    },
+    progress(initialMessage: string): { update(message: string): void; stop(message?: string): void } {
+      params.stdout.write(`${initialMessage}\n`);
+      return {
+        update(message: string) {
+          params.stdout.write(`${message}\n`);
+        },
+        stop(message?: string) {
+          if (message) {
+            params.stdout.write(`${message}\n`);
+          }
+        }
+      };
     }
   };
 }

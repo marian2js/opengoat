@@ -29,6 +29,11 @@ interface ResolvedCredential {
   envVar: string;
 }
 
+interface GitHubCopilotAccessToken {
+  token: string;
+  baseUrl: string | null;
+}
+
 export class ExtendedHttpProvider extends BaseProvider {
   private readonly spec: ExtendedHttpProviderSpec;
   private readonly fetchFn: typeof fetch;
@@ -82,15 +87,6 @@ export class ExtendedHttpProvider extends BaseProvider {
     options: ProviderInvokeOptions,
     env: NodeJS.ProcessEnv
   ): Promise<ProviderExecutionResult> {
-    const endpoint = this.resolveEndpoint(env, "/chat/completions");
-    if (!endpoint) {
-      return {
-        code: 1,
-        stdout: "",
-        stderr: `Missing endpoint for ${this.id}. Configure ${this.describeEndpointEnvHints()}\n`
-      };
-    }
-
     const model = this.resolveModel(options, env);
     if (!model) {
       return {
@@ -100,7 +96,31 @@ export class ExtendedHttpProvider extends BaseProvider {
       };
     }
 
-    const credential = this.resolveCredential(env);
+    let credential = this.resolveCredential(env);
+    let baseUrlOverride: string | undefined;
+
+    if (this.spec.id === "github-copilot" && credential) {
+      const access = await this.resolveGitHubCopilotAccessToken(credential.value);
+      credential = {
+        ...credential,
+        value: access.token
+      };
+      baseUrlOverride = access.baseUrl ?? undefined;
+    }
+
+    if (this.spec.id === "qwen-portal" && credential) {
+      credential = await this.refreshQwenOauthIfNeeded(env, credential);
+    }
+
+    const endpoint = this.resolveEndpoint(env, "/chat/completions", baseUrlOverride);
+    if (!endpoint) {
+      return {
+        code: 1,
+        stdout: "",
+        stderr: `Missing endpoint for ${this.id}. Configure ${this.describeEndpointEnvHints()}\n`
+      };
+    }
+
     const headers = this.buildHeaders(env, credential, "application/json");
 
     const payload = {
@@ -253,7 +273,11 @@ export class ExtendedHttpProvider extends BaseProvider {
     return raw;
   }
 
-  private resolveEndpoint(env: NodeJS.ProcessEnv, fallbackPath: string): string | null {
+  private resolveEndpoint(
+    env: NodeJS.ProcessEnv,
+    fallbackPath: string,
+    baseUrlOverride?: string
+  ): string | null {
     const endpointOverride = this.spec.endpoint.endpointEnvVar
       ? env[this.spec.endpoint.endpointEnvVar]?.trim()
       : undefined;
@@ -262,6 +286,7 @@ export class ExtendedHttpProvider extends BaseProvider {
     }
 
     const resolvedBaseUrl =
+      baseUrlOverride?.trim() ||
       this.spec.endpoint.resolveBaseUrl?.(env)?.trim() ||
       (this.spec.endpoint.baseUrlEnvVar ? env[this.spec.endpoint.baseUrlEnvVar]?.trim() : undefined) ||
       this.spec.endpoint.baseUrl?.trim();
@@ -442,6 +467,90 @@ export class ExtendedHttpProvider extends BaseProvider {
       stdout: normalized,
       stderr: "",
       providerSessionId: params.parseSessionId(parsed.value) ?? undefined
+    };
+  }
+
+  private async resolveGitHubCopilotAccessToken(githubToken: string): Promise<GitHubCopilotAccessToken> {
+    const response = await this.fetchFn("https://api.github.com/copilot_internal/v2/token", {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${githubToken}`
+      }
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new ProviderAuthenticationError(
+        this.id,
+        `GitHub token exchange failed (HTTP ${response.status}): ${body || response.statusText}`
+      );
+    }
+
+    const parsed = safeParseJson(await response.text());
+    if (!parsed.ok || !parsed.value || typeof parsed.value !== "object") {
+      throw new ProviderAuthenticationError(this.id, "invalid Copilot token exchange response");
+    }
+
+    const token = extractStringValue((parsed.value as Record<string, unknown>).token);
+    if (!token) {
+      throw new ProviderAuthenticationError(this.id, "missing token in Copilot response");
+    }
+
+    return {
+      token,
+      baseUrl: deriveCopilotBaseUrl(token)
+    };
+  }
+
+  private async refreshQwenOauthIfNeeded(
+    env: NodeJS.ProcessEnv,
+    credential: ResolvedCredential
+  ): Promise<ResolvedCredential> {
+    const rawExpiresAt = env.QWEN_OAUTH_EXPIRES_AT?.trim();
+    const refreshToken = env.QWEN_OAUTH_REFRESH_TOKEN?.trim();
+    const needsRefresh =
+      !credential.value ||
+      (rawExpiresAt ? Number.parseInt(rawExpiresAt, 10) <= Date.now() + 60_000 : false);
+
+    if (!needsRefresh || !refreshToken) {
+      return credential;
+    }
+
+    const response = await this.fetchFn("https://chat.qwen.ai/api/v1/oauth2/token", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        accept: "application/json"
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: "f0304373b74a44d2b584a3fb70ca9e56"
+      })
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new ProviderAuthenticationError(
+        this.id,
+        `Qwen OAuth refresh failed (HTTP ${response.status}): ${body || response.statusText}`
+      );
+    }
+
+    const parsed = safeParseJson(await response.text());
+    if (!parsed.ok || !parsed.value || typeof parsed.value !== "object") {
+      throw new ProviderAuthenticationError(this.id, "invalid Qwen OAuth refresh response");
+    }
+
+    const accessToken = extractStringValue((parsed.value as Record<string, unknown>).access_token);
+    if (!accessToken) {
+      throw new ProviderAuthenticationError(this.id, "Qwen OAuth refresh did not return access token");
+    }
+
+    return {
+      ...credential,
+      value: accessToken
     };
   }
 }
@@ -644,4 +753,19 @@ function resolvePositiveInteger(value: string | undefined): number | null {
   }
 
   return parsed;
+}
+
+function deriveCopilotBaseUrl(token: string): string | null {
+  const match = token.match(/(?:^|;)\s*proxy-ep=([^;\s]+)/i);
+  const proxyEp = match?.[1]?.trim();
+  if (!proxyEp) {
+    return null;
+  }
+
+  const host = proxyEp.replace(/^https?:\/\//, "").replace(/^proxy\./i, "api.");
+  if (!host) {
+    return null;
+  }
+
+  return `https://${host}`;
 }

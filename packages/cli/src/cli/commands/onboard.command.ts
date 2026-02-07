@@ -4,6 +4,7 @@ import type { OpenGoatService } from "@opengoat/core";
 import type { ProviderOnboardingSpec, ProviderSummary } from "@opengoat/core";
 import { resolveExtendedHttpProviderModelEnvVar } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
+import { resolveGuidedAuth, runGuidedAuth } from "./onboard-guided-auth.js";
 import {
   createCliPrompter,
   PromptCancelledError,
@@ -42,6 +43,80 @@ const PROVIDER_ORDER = [
 const providerPriorityById = new Map<string, number>(
   PROVIDER_ORDER.map((id, index) => [id, index])
 );
+
+type ProviderFamily = {
+  id: string;
+  label: string;
+  hint?: string;
+  providerIds: string[];
+};
+
+const ORGANIZED_PROVIDER_FAMILIES: Array<{
+  id: string;
+  label: string;
+  hint?: string;
+  providerIds: string[];
+}> = [
+  { id: "openai", label: "OpenAI", providerIds: ["openai", "openai-codex", "azure-openai-responses"] },
+  { id: "anthropic", label: "Anthropic", providerIds: ["anthropic"] },
+  { id: "minimax", label: "MiniMax", providerIds: ["minimax", "minimax-cn", "minimax-portal"] },
+  { id: "moonshot", label: "Moonshot AI (Kimi)", providerIds: ["moonshot", "kimi-coding"] },
+  {
+    id: "google",
+    label: "Google",
+    providerIds: ["google", "google-antigravity", "google-gemini-cli", "google-vertex"]
+  },
+  { id: "openrouter", label: "OpenRouter", providerIds: ["openrouter"] },
+  { id: "qwen", label: "Qwen", hint: "OAuth", providerIds: ["qwen-portal"] },
+  { id: "zai", label: "Z.AI (GLM)", providerIds: ["zai"] },
+  { id: "copilot", label: "Copilot", providerIds: ["github-copilot", "copilot-proxy"] },
+  { id: "vercel", label: "Vercel AI Gateway", providerIds: ["vercel-ai-gateway"] },
+  { id: "opencode", label: "OpenCode Zen", providerIds: ["opencode-zen"] },
+  { id: "xiaomi", label: "Xiaomi", providerIds: ["xiaomi"] },
+  { id: "synthetic", label: "Synthetic", providerIds: ["synthetic"] },
+  { id: "venice", label: "Venice AI", providerIds: ["venice"] },
+  { id: "cloudflare", label: "Cloudflare AI Gateway", providerIds: ["cloudflare-ai-gateway"] },
+  { id: "groq", label: "Groq", providerIds: ["groq"] },
+  { id: "mistral", label: "Mistral", providerIds: ["mistral"] },
+  { id: "qianfan", label: "Qianfan", providerIds: ["qianfan"] },
+  { id: "bedrock", label: "Amazon Bedrock", providerIds: ["amazon-bedrock"] },
+  { id: "cerebras", label: "Cerebras", providerIds: ["cerebras"] },
+  { id: "chutes", label: "Chutes", providerIds: ["chutes"] },
+  { id: "huggingface", label: "Hugging Face", providerIds: ["huggingface"] },
+  { id: "ollama", label: "Ollama", providerIds: ["ollama"] },
+  { id: "cli-tools", label: "Local CLI tools", providerIds: ["claude", "codex", "cursor", "gemini", "opencode", "openclaw"] }
+];
+
+const PROVIDER_SETUP_URLS: Record<string, string> = {
+  openai: "https://platform.openai.com/api-keys",
+  "openai-codex": "https://platform.openai.com",
+  anthropic: "https://console.anthropic.com/settings/keys",
+  google: "https://aistudio.google.com/app/apikey",
+  "google-antigravity": "https://github.com/openclaw/google-antigravity-auth",
+  "google-gemini-cli": "https://github.com/openclaw/google-gemini-cli-auth",
+  grok: "https://console.x.ai",
+  groq: "https://console.groq.com/keys",
+  openrouter: "https://openrouter.ai/keys",
+  moonshot: "https://platform.moonshot.ai",
+  "kimi-coding": "https://platform.moonshot.ai",
+  mistral: "https://console.mistral.ai/api-keys",
+  cerebras: "https://cloud.cerebras.ai/platform",
+  chutes: "https://chutes.ai/docs/sign-in-with-chutes/overview",
+  huggingface: "https://huggingface.co/settings/tokens",
+  minimax: "https://platform.minimax.io",
+  "minimax-cn": "https://platform.minimax.io",
+  "minimax-portal": "https://platform.minimax.io",
+  "qwen-portal": "https://chat.qwen.ai",
+  zai: "https://bigmodel.cn",
+  qianfan: "https://cloud.baidu.com/product/wenxinworkshop",
+  "vercel-ai-gateway": "https://vercel.com/dashboard/ai-gateway",
+  "cloudflare-ai-gateway": "https://dash.cloudflare.com",
+  "github-copilot": "https://github.com/features/copilot",
+  "copilot-proxy": "https://github.com/openclaw/copilot-proxy",
+  venice: "https://venice.ai",
+  synthetic: "https://synthetic.new",
+  xiaomi: "https://platform.xiaomi.com"
+};
 
 export const onboardCommand: CliCommand = {
   path: ["onboard"],
@@ -131,9 +206,28 @@ export const onboardCommand: CliCommand = {
           ...parsed.env
         };
 
+        const guidedAuth = resolveGuidedAuth(provider.id);
+
         const modelEnvKey = resolveProviderModelEnvKey(provider.id, onboarding);
         if (parsed.model && modelEnvKey) {
           envUpdates[modelEnvKey] = parsed.model;
+        }
+
+        if (
+          guidedAuth &&
+          !parsed.nonInteractive &&
+          !parsed.skipAuth &&
+          (parsed.runAuth ||
+            (await prompter.confirm({
+              message: `${guidedAuth.title}: ${guidedAuth.description} Start guided sign-in now?`,
+              initialValue: true
+            })))
+        ) {
+          const authResult = await runGuidedAuth(provider.id, { prompter });
+          Object.assign(envUpdates, authResult.env);
+          if (authResult.note) {
+            await prompter.note(authResult.note, guidedAuth.title);
+          }
         }
 
         if (parsed.nonInteractive) {
@@ -151,7 +245,8 @@ export const onboardCommand: CliCommand = {
             onboarding,
             env: envUpdates,
             prompter,
-            allowBack: !parsed.providerId
+            allowBack: !parsed.providerId,
+            guidedAuthAvailable: Boolean(guidedAuth)
           });
           if (envAction === "back") {
             continue;
@@ -401,17 +496,42 @@ async function resolveProviderId(params: {
       : currentProviderId && params.providers.some((provider) => provider.id === currentProviderId)
       ? currentProviderId
       : params.providers[0]?.id;
+  const families = buildProviderFamilies(params.providers);
+  const defaultFamilyId = resolveDefaultFamilyId(defaultProvider, families);
 
-  const selected = await params.prompter.select(
-    "Choose a provider",
-    params.providers.map((provider) => ({
-      value: provider.id,
-      label: `${formatProviderDisplayName(provider)} (${provider.id})`
+  const selectedFamilyId = await params.prompter.select(
+    "Model/auth provider",
+    families.map((family) => ({
+      value: family.id,
+      label: family.hint ? `${family.label} (${family.hint})` : family.label
     })),
-    defaultProvider
+    defaultFamilyId
+  );
+  const selectedFamily = families.find((family) => family.id === selectedFamilyId);
+  if (!selectedFamily) {
+    return null;
+  }
+
+  if (selectedFamily.providerIds.length === 1) {
+    return selectedFamily.providerIds[0] ?? null;
+  }
+
+  const selectedProviderId = await params.prompter.select(
+    `${selectedFamily.label} auth method`,
+    selectedFamily.providerIds
+      .map((id) => params.providers.find((provider) => provider.id === id))
+      .filter((provider): provider is ProviderSummary => Boolean(provider))
+      .map((provider) => ({
+        value: provider.id,
+        label: `${formatProviderDisplayName(provider)} (${provider.id})`,
+        hint: resolveGuidedAuth(provider.id)?.description
+      })),
+    defaultProvider && selectedFamily.providerIds.includes(defaultProvider)
+      ? defaultProvider
+      : selectedFamily.providerIds[0]
   );
 
-  return selected || null;
+  return selectedProviderId || null;
 }
 
 async function promptForEnvValues(params: {
@@ -420,6 +540,7 @@ async function promptForEnvValues(params: {
   env: Record<string, string>;
   prompter: CliPrompter;
   allowBack: boolean;
+  guidedAuthAvailable: boolean;
 }): Promise<"continue" | "back"> {
   const fields = (params.onboarding.env ?? []).filter((field) => Boolean(field.required));
   if (fields.length === 0) {
@@ -441,7 +562,7 @@ async function promptForEnvValues(params: {
     if (params.allowBack) {
       const response = await promptTextOrBack({
         prompter: params.prompter,
-        message: `${field.description} (${field.key})`,
+        message: formatEnvPromptMessage(params.provider.id, field, params.guidedAuthAvailable),
         initialValue: field.secret ? undefined : existing,
         existingValue: existing,
         required: true,
@@ -455,7 +576,7 @@ async function promptForEnvValues(params: {
     }
 
     const value = await params.prompter.text({
-      message: `${field.description} (${field.key})`,
+      message: formatEnvPromptMessage(params.provider.id, field, params.guidedAuthAvailable),
       initialValue: field.secret ? undefined : existing,
       required: true,
       secret: Boolean(field.secret)
@@ -559,6 +680,66 @@ function isDefaultAgent(agentId: string): boolean {
 
 function formatProviderDisplayName(provider: ProviderSummary): string {
   return provider.displayName;
+}
+
+function buildProviderFamilies(providers: ProviderSummary[]): ProviderFamily[] {
+  const providerById = new Map(providers.map((provider) => [provider.id, provider] as const));
+  const families: ProviderFamily[] = [];
+  const usedProviderIds = new Set<string>();
+
+  for (const family of ORGANIZED_PROVIDER_FAMILIES) {
+    const presentIds = family.providerIds.filter((id) => providerById.has(id));
+    if (presentIds.length === 0) {
+      continue;
+    }
+    presentIds.forEach((id) => usedProviderIds.add(id));
+    families.push({
+      id: family.id,
+      label: family.label,
+      hint: family.hint,
+      providerIds: presentIds
+    });
+  }
+
+  const leftovers = providers
+    .filter((provider) => !usedProviderIds.has(provider.id))
+    .sort((left, right) => left.displayName.localeCompare(right.displayName));
+  for (const provider of leftovers) {
+    families.push({
+      id: `provider:${provider.id}`,
+      label: provider.displayName,
+      providerIds: [provider.id]
+    });
+  }
+
+  return families;
+}
+
+function resolveDefaultFamilyId(defaultProviderId: string | undefined, families: ProviderFamily[]): string | undefined {
+  if (!defaultProviderId) {
+    return families[0]?.id;
+  }
+  return families.find((family) => family.providerIds.includes(defaultProviderId))?.id ?? families[0]?.id;
+}
+
+function formatEnvPromptMessage(
+  providerId: string,
+  field: { key: string; description: string },
+  guidedAuthAvailable: boolean
+): string {
+  const base = `${field.description} (${field.key})`;
+  const lines = [base];
+
+  const setupUrl = PROVIDER_SETUP_URLS[providerId];
+  if (setupUrl) {
+    lines.push(`Get credentials: ${setupUrl}`);
+  }
+
+  if (guidedAuthAvailable && /OAUTH|TOKEN/i.test(field.key)) {
+    lines.push("Tip: guided sign-in can fill this automatically.");
+  }
+
+  return lines.join("\n");
 }
 
 function isBackCommand(value: string): boolean {

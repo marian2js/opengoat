@@ -216,7 +216,7 @@ export const extendedHttpProviderCatalog: ExtendedHttpProviderSpec[] = [
       header: "bearer"
     },
     requiredEnv: [
-      field("COPILOT_GITHUB_TOKEN", "GitHub token for Copilot proxy", {
+      field("COPILOT_GITHUB_TOKEN", "GitHub token (use guided GitHub login)", {
         required: true,
         secret: true
       })
@@ -240,7 +240,7 @@ export const extendedHttpProviderCatalog: ExtendedHttpProviderSpec[] = [
       header: "bearer"
     },
     requiredEnv: [
-      field("COPILOT_GITHUB_TOKEN", "GitHub Copilot token", {
+      field("COPILOT_GITHUB_TOKEN", "GitHub token (use guided GitHub login)", {
         required: true,
         secret: true
       })
@@ -273,6 +273,7 @@ export const extendedHttpProviderCatalog: ExtendedHttpProviderSpec[] = [
     displayName: "Google Antigravity",
     protocol: "openai-chat",
     endpoint: {
+      baseUrl: "https://cloudcode-pa.googleapis.com/v1",
       baseUrlEnvVar: "GOOGLE_ANTIGRAVITY_BASE_URL",
       endpointPath: "/chat/completions",
       endpointPathEnvVar: "GOOGLE_ANTIGRAVITY_ENDPOINT_PATH",
@@ -283,8 +284,7 @@ export const extendedHttpProviderCatalog: ExtendedHttpProviderSpec[] = [
       header: "bearer"
     },
     requiredEnv: [
-      field("GOOGLE_ANTIGRAVITY_BASE_URL", "Google Antigravity base URL", { required: true }),
-      field("GOOGLE_ANTIGRAVITY_TOKEN", "Google Antigravity OAuth token", {
+      field("GOOGLE_ANTIGRAVITY_TOKEN", "Google Antigravity OAuth token (use guided sign-in)", {
         required: true,
         secret: true
       })
@@ -297,6 +297,7 @@ export const extendedHttpProviderCatalog: ExtendedHttpProviderSpec[] = [
     displayName: "Google Gemini CLI OAuth",
     protocol: "openai-chat",
     endpoint: {
+      baseUrl: "https://cloudcode-pa.googleapis.com/v1",
       baseUrlEnvVar: "GOOGLE_GEMINI_CLI_BASE_URL",
       endpointPath: "/chat/completions",
       endpointPathEnvVar: "GOOGLE_GEMINI_CLI_ENDPOINT_PATH",
@@ -307,10 +308,7 @@ export const extendedHttpProviderCatalog: ExtendedHttpProviderSpec[] = [
       header: "bearer"
     },
     requiredEnv: [
-      field("GOOGLE_GEMINI_CLI_BASE_URL", "Google Gemini CLI-compatible base URL", {
-        required: true
-      }),
-      field("GOOGLE_GEMINI_CLI_OAUTH_TOKEN", "Google Gemini CLI OAuth token", {
+      field("GOOGLE_GEMINI_CLI_OAUTH_TOKEN", "Google Gemini CLI OAuth token (use guided sign-in)", {
         required: true,
         secret: true
       })
@@ -465,7 +463,7 @@ export const extendedHttpProviderCatalog: ExtendedHttpProviderSpec[] = [
       oauthTokenHeader: "bearer"
     },
     requiredEnv: [
-      field("MINIMAX_OAUTH_TOKEN", "MiniMax OAuth token (or set MINIMAX_API_KEY)", {
+      field("MINIMAX_OAUTH_TOKEN", "MiniMax OAuth token (use guided sign-in, or set MINIMAX_API_KEY)", {
         required: true,
         secret: true
       })
@@ -556,7 +554,7 @@ export const extendedHttpProviderCatalog: ExtendedHttpProviderSpec[] = [
       header: "bearer"
     },
     requiredEnv: [
-      field("OPENAI_CODEX_OAUTH_TOKEN", "OpenAI Codex OAuth token (or set OPENAI_API_KEY)", {
+      field("OPENAI_CODEX_OAUTH_TOKEN", "OpenAI Codex OAuth token (or set OPENAI_API_KEY; API key recommended)", {
         required: true,
         secret: true
       })
@@ -626,7 +624,7 @@ export const extendedHttpProviderCatalog: ExtendedHttpProviderSpec[] = [
       header: "bearer"
     },
     requiredEnv: [
-      field("QWEN_OAUTH_TOKEN", "Qwen OAuth token (or set QWEN_PORTAL_API_KEY)", {
+      field("QWEN_OAUTH_TOKEN", "Qwen OAuth token (use guided sign-in, or set QWEN_PORTAL_API_KEY)", {
         required: true,
         secret: true
       })
