@@ -47,6 +47,11 @@ describe("BootstrapService", () => {
     expect(
       await readFile(path.join(paths.workspacesDir, "orchestrator", "BOOTSTRAP.md"), "utf-8")
     ).toContain("First-run checklist");
+    const defaultSkill = await readFile(
+      path.join(paths.workspacesDir, "orchestrator", "skills", "opengoat-skill", "SKILL.md"),
+      "utf-8"
+    );
+    expect(defaultSkill).toContain("# OpenGoat Skill");
   });
 
   it("is idempotent on repeated initialize", async () => {

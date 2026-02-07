@@ -3,7 +3,7 @@ import type {
   AgentDescriptor,
   AgentIdentity
 } from "../../domain/agent.js";
-import { normalizeAgentId } from "../../domain/agent-id.js";
+import { isDefaultAgentId, normalizeAgentId } from "../../domain/agent-id.js";
 import type { AgentsIndex, OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
@@ -17,6 +17,7 @@ import {
   renderWorkspaceContextMarkdown,
   renderWorkspaceHeartbeatMarkdown,
   renderWorkspaceIdentityMarkdown,
+  renderDefaultOrchestratorSkillMarkdown,
   renderWorkspaceSoulMarkdown,
   renderWorkspaceToolsMarkdown,
   renderWorkspaceUserMarkdown,
@@ -126,6 +127,16 @@ export class AgentService {
       await this.writeMarkdownIfMissing(
         this.pathPort.join(workspaceDir, "BOOTSTRAP.md"),
         renderWorkspaceBootstrapMarkdown(identity),
+        createdPaths,
+        skippedPaths
+      );
+    }
+    if (isDefaultAgentId(identity.id)) {
+      const orchestratorSkillDir = this.pathPort.join(workspaceSkillsDir, "opengoat-skill");
+      await this.ensureDirectory(orchestratorSkillDir, createdPaths, skippedPaths);
+      await this.writeMarkdownIfMissing(
+        this.pathPort.join(orchestratorSkillDir, "SKILL.md"),
+        renderDefaultOrchestratorSkillMarkdown(),
         createdPaths,
         skippedPaths
       );
