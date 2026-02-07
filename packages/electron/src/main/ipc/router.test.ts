@@ -69,6 +69,7 @@ function createServiceStub(): WorkbenchService {
       onboarding: {
         activeProviderId: "codex",
         needsOnboarding: true,
+        families: [],
         providers: []
       }
     })),
@@ -96,11 +97,13 @@ function createServiceStub(): WorkbenchService {
     getOnboardingState: vi.fn(async () => ({
       activeProviderId: "codex",
       needsOnboarding: true,
+      families: [],
       providers: []
     })),
     submitOnboarding: vi.fn(async () => ({
       activeProviderId: "openai",
       needsOnboarding: false,
+      families: [],
       providers: []
     })),
     sendMessage: vi.fn(async () => ({

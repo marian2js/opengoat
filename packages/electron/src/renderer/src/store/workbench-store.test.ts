@@ -10,6 +10,7 @@ describe("workbench store", () => {
       {
         activeProviderId: "openai",
         needsOnboarding: true,
+        families: [],
         providers: [
           {
             id: "openai",
@@ -22,9 +23,9 @@ describe("workbench store", () => {
             hasConfig: true
           },
           {
-            id: "codex",
-            displayName: "Codex",
-            kind: "cli",
+            id: "openrouter",
+            displayName: "OpenRouter",
+            kind: "http",
             envFields: [],
             configuredEnvKeys: [],
             configuredEnvValues: {},
@@ -33,10 +34,10 @@ describe("workbench store", () => {
           }
         ]
       },
-      "codex"
+      "openrouter"
     );
 
-    expect(providerId).toBe("codex");
+    expect(providerId).toBe("openrouter");
   });
 
   it("retains onboarding draft provider across refreshes", async () => {
@@ -44,13 +45,13 @@ describe("workbench store", () => {
     const store = createWorkbenchStore(api);
 
     await store.getState().bootstrap();
-    store.getState().setOnboardingDraftProvider("codex");
+    store.getState().setOnboardingDraftProvider("openrouter");
     await store.getState().openOnboarding();
 
     const state = store.getState();
     expect(state.showOnboarding).toBe(true);
     expect(state.onboardingState).toBe("editing");
-    expect(state.onboardingDraftProviderId).toBe("codex");
+    expect(state.onboardingDraftProviderId).toBe("openrouter");
   });
 
   it("opens onboarding when send fails with provider error", async () => {
@@ -91,15 +92,16 @@ describe("workbench store", () => {
 
   it("submits onboarding for selected provider and refreshes draft values", async () => {
     const submitOnboardingMock = vi.fn(async (): Promise<WorkbenchOnboarding> => ({
-      activeProviderId: "codex",
+      activeProviderId: "openrouter",
       needsOnboarding: false,
+      families: [],
       providers: [
         {
-          id: "codex",
-          displayName: "Codex",
-          kind: "cli",
+          id: "openrouter",
+          displayName: "OpenRouter",
+          kind: "http",
           envFields: [],
-          configuredEnvKeys: ["CODEX_API_KEY"],
+          configuredEnvKeys: ["OPENROUTER_API_KEY"],
           configuredEnvValues: {},
           missingRequiredEnv: [],
           hasConfig: true
@@ -112,22 +114,22 @@ describe("workbench store", () => {
     const store = createWorkbenchStore(api);
 
     await store.getState().bootstrap();
-    store.getState().setOnboardingDraftProvider("codex");
-    store.getState().setOnboardingDraftField("CODEX_API_KEY", "abc123");
+    store.getState().setOnboardingDraftProvider("openrouter");
+    store.getState().setOnboardingDraftField("OPENROUTER_API_KEY", "abc123");
     await store.getState().submitOnboarding(
       store.getState().onboardingDraftProviderId,
       store.getState().onboardingDraftEnv
     );
 
     expect(submitOnboardingMock).toHaveBeenCalledWith({
-      providerId: "codex",
+      providerId: "openrouter",
       env: {
-        CODEX_API_KEY: "abc123"
+        OPENROUTER_API_KEY: "abc123"
       }
     });
     expect(store.getState().onboardingState).toBe("hidden");
     expect(store.getState().showOnboarding).toBe(false);
-    expect(store.getState().onboardingDraftProviderId).toBe("codex");
+    expect(store.getState().onboardingDraftProviderId).toBe("openrouter");
   });
 
   it("keeps onboarding open when submit result still requires setup", async () => {
@@ -135,6 +137,7 @@ describe("workbench store", () => {
       submitOnboarding: vi.fn(async (): Promise<WorkbenchOnboarding> => ({
         activeProviderId: "openai",
         needsOnboarding: true,
+        families: [],
         providers: [
           {
             id: "openai",
@@ -184,6 +187,7 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
   const bootstrapOnboarding: WorkbenchOnboarding = {
     activeProviderId: "openai",
     needsOnboarding: true,
+    families: [],
     providers: [
       {
         id: "openai",
@@ -198,9 +202,9 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
         hasConfig: true
       },
       {
-        id: "codex",
-        displayName: "Codex",
-        kind: "cli",
+        id: "openrouter",
+        displayName: "OpenRouter",
+        kind: "http",
         envFields: [],
         configuredEnvKeys: [],
         configuredEnvValues: {},
@@ -238,6 +242,7 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
   const submittedOnboarding: WorkbenchOnboarding = {
     activeProviderId: "openai",
     needsOnboarding: false,
+    families: [],
     providers: [
       {
         id: "openai",

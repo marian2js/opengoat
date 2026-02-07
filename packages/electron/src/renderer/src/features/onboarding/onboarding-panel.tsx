@@ -25,8 +25,8 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
     props.onboarding,
     props.providerId
   );
-  const providerGroups = useMemo(
-    () => splitProviderGroups(props.onboarding),
+  const providerFamilies = useMemo(
+    () => resolveProviderFamilies(props.onboarding),
     [props.onboarding]
   );
   const envPartition = useMemo(
@@ -88,7 +88,7 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
           {step === "provider" ? (
             <ProviderStep
               providerId={props.providerId}
-              groups={providerGroups}
+              families={providerFamilies}
               onSelectProvider={props.onSelectProvider}
               disabled={props.isSubmitting}
             />
@@ -168,38 +168,43 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
 
 function ProviderStep(props: {
   providerId: string;
-  groups: {
-    api: WorkbenchOnboarding["providers"];
-    local: WorkbenchOnboarding["providers"];
-  };
+  families: Array<{
+    id: string;
+    label: string;
+    hint?: string;
+    providers: WorkbenchOnboarding["providers"];
+  }>;
   disabled: boolean;
   onSelectProvider: (providerId: string) => void;
 }) {
+  if (props.families.length === 0) {
+    return (
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--muted-foreground)]">
+        No onboarding providers were discovered.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <ProviderGroup
-        title="Cloud APIs"
-        subtitle="Use API keys with OpenAI-compatible or hosted providers."
-        providers={props.groups.api}
-        selectedProviderId={props.providerId}
-        disabled={props.disabled}
-        onSelectProvider={props.onSelectProvider}
-      />
-      <ProviderGroup
-        title="Local Tools"
-        subtitle="Use installed CLIs like Codex, Claude, Cursor, OpenCode, or OpenClaw."
-        providers={props.groups.local}
-        selectedProviderId={props.providerId}
-        disabled={props.disabled}
-        onSelectProvider={props.onSelectProvider}
-      />
+      {props.families.map((family) => (
+        <ProviderGroup
+          key={family.id}
+          title={family.label}
+          subtitle={family.hint}
+          providers={family.providers}
+          selectedProviderId={props.providerId}
+          disabled={props.disabled}
+          onSelectProvider={props.onSelectProvider}
+        />
+      ))}
     </div>
   );
 }
 
 function ProviderGroup(props: {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   providers: WorkbenchOnboarding["providers"];
   selectedProviderId: string;
   disabled: boolean;
@@ -215,7 +220,9 @@ function ProviderGroup(props: {
         <p className="text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
           {props.title}
         </p>
-        <p className="mt-1 text-sm text-[var(--muted-foreground)]">{props.subtitle}</p>
+        {props.subtitle ? (
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">{props.subtitle}</p>
+        ) : null}
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {props.providers.map((provider) => {
@@ -443,21 +450,39 @@ function resolveSelectedOnboardingProvider(
   return onboarding.providers[0] ?? null;
 }
 
-function splitProviderGroups(onboarding: WorkbenchOnboarding) {
-  return onboarding.providers.reduce(
-    (groups, provider) => {
-      if (provider.kind === "http") {
-        groups.api.push(provider);
-      } else {
-        groups.local.push(provider);
-      }
-      return groups;
-    },
-    {
-      api: [] as WorkbenchOnboarding["providers"],
-      local: [] as WorkbenchOnboarding["providers"]
-    }
-  );
+function resolveProviderFamilies(onboarding: WorkbenchOnboarding): Array<{
+  id: string;
+  label: string;
+  hint?: string;
+  providers: WorkbenchOnboarding["providers"];
+}> {
+  const providerById = new Map(onboarding.providers.map((provider) => [provider.id, provider] as const));
+  const usedIds = new Set<string>();
+
+  const families = onboarding.families
+    .map((family) => {
+      const providers = family.providerIds
+        .map((providerId) => providerById.get(providerId))
+        .filter((provider): provider is WorkbenchOnboarding["providers"][number] => Boolean(provider));
+      providers.forEach((provider) => usedIds.add(provider.id));
+      return {
+        id: family.id,
+        label: family.label,
+        hint: family.hint,
+        providers
+      };
+    })
+    .filter((family) => family.providers.length > 0);
+
+  const leftovers = onboarding.providers
+    .filter((provider) => !usedIds.has(provider.id))
+    .map((provider) => ({
+      id: `provider:${provider.id}`,
+      label: provider.displayName,
+      providers: [provider]
+    }));
+
+  return [...families, ...leftovers];
 }
 
 function splitEnvFields(

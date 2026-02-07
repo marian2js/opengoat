@@ -30,6 +30,14 @@ describe("WorkbenchService onboarding", () => {
 
     expect(boot.onboarding.activeProviderId).toBe("openai");
     expect(boot.onboarding.needsOnboarding).toBe(true);
+    expect(boot.onboarding.providers.map((provider) => provider.id)).toEqual(["openai"]);
+    expect(boot.onboarding.families).toEqual([
+      {
+        id: "openai",
+        label: "OpenAI",
+        providerIds: ["openai"]
+      }
+    ]);
     expect(active?.missingRequiredEnv).toEqual(["OPENAI_API_KEY"]);
   });
 

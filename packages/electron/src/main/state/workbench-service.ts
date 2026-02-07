@@ -1,7 +1,13 @@
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { dialog } from "electron";
-import { loadDotEnv, type OpenGoatService } from "@opengoat/core";
+import {
+  DEFAULT_AGENT_ID,
+  buildProviderFamilies,
+  loadDotEnv,
+  selectProvidersForOnboarding,
+  type OpenGoatService
+} from "@opengoat/core";
 import type {
   WorkbenchBootstrap,
   WorkbenchMessage,
@@ -38,9 +44,10 @@ export class WorkbenchService {
   }
 
   public async getOnboardingState(): Promise<WorkbenchOnboarding> {
-    const activeProvider = await this.opengoat.getAgentProvider("orchestrator");
+    const activeProvider = await this.opengoat.getAgentProvider(DEFAULT_AGENT_ID);
     const allProviders = await this.opengoat.listProviders();
-    const providers = selectDesktopProviders(allProviders, activeProvider.providerId);
+    const providers = selectProvidersForOnboarding(DEFAULT_AGENT_ID, allProviders);
+    const families = buildProviderFamilies(providers);
     const withOnboarding = await Promise.all(
       providers.map(async (provider) => {
         const onboarding = await this.opengoat.getProviderOnboarding(provider.id);
@@ -82,6 +89,7 @@ export class WorkbenchService {
     return {
       activeProviderId: activeProvider.providerId,
       needsOnboarding,
+      families,
       providers: withOnboarding
     };
   }
@@ -91,7 +99,7 @@ export class WorkbenchService {
     env: Record<string, string>;
   }): Promise<WorkbenchOnboarding> {
     await this.opengoat.setProviderConfig(input.providerId, input.env);
-    await this.opengoat.setAgentProvider("orchestrator", input.providerId);
+    await this.opengoat.setAgentProvider(DEFAULT_AGENT_ID, input.providerId);
     return this.getOnboardingState();
   }
 
@@ -200,37 +208,6 @@ export class WorkbenchService {
 
     return env;
   }
-}
-
-const desktopProviderOrder = [
-  "codex",
-  "claude",
-  "cursor",
-  "opencode",
-  "openai",
-  "gemini",
-  "grok",
-  "openrouter",
-  "openclaw"
-] as const;
-
-function selectDesktopProviders(
-  allProviders: Array<{ id: string; displayName: string; kind: "cli" | "http" }>,
-  activeProviderId: string
-): Array<{ id: string; displayName: string; kind: "cli" | "http" }> {
-  const preferred = new Set<string>([...desktopProviderOrder, activeProviderId]);
-  const selected = allProviders.filter((provider) => preferred.has(provider.id));
-
-  return selected.sort((left, right) => {
-    const leftIndex = desktopProviderOrder.indexOf(left.id as (typeof desktopProviderOrder)[number]);
-    const rightIndex = desktopProviderOrder.indexOf(right.id as (typeof desktopProviderOrder)[number]);
-    const normalizedLeft = leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex;
-    const normalizedRight = rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex;
-    if (normalizedLeft !== normalizedRight) {
-      return normalizedLeft - normalizedRight;
-    }
-    return left.displayName.localeCompare(right.displayName);
-  });
 }
 
 async function assertDirectory(targetPath: string): Promise<void> {

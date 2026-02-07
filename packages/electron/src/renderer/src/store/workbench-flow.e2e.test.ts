@@ -13,13 +13,13 @@ describe("workbench flow e2e", () => {
     expect(store.getState().showOnboarding).toBe(true);
     expect(store.getState().onboardingDraftProviderId).toBe("openai");
 
-    store.getState().setOnboardingDraftProvider("codex");
-    store.getState().setOnboardingDraftField("CODEX_API_KEY", "codex-key");
+    store.getState().setOnboardingDraftProvider("openrouter");
+    store.getState().setOnboardingDraftField("OPENROUTER_API_KEY", "openrouter-key");
     await store.getState().submitOnboarding(
       store.getState().onboardingDraftProviderId,
       store.getState().onboardingDraftEnv
     );
-    expect(store.getState().onboardingDraftProviderId).toBe("codex");
+    expect(store.getState().onboardingDraftProviderId).toBe("openrouter");
     expect(store.getState().showOnboarding).toBe(false);
     expect(store.getState().onboardingState).toBe("hidden");
 
@@ -34,6 +34,7 @@ function createStatefulApiMock(): WorkbenchApiClient {
   let onboarding: WorkbenchOnboarding = {
     activeProviderId: "openai",
     needsOnboarding: true,
+    families: [],
     providers: [
       {
         id: "openai",
@@ -48,9 +49,9 @@ function createStatefulApiMock(): WorkbenchApiClient {
         hasConfig: true
       },
       {
-        id: "codex",
-        displayName: "Codex",
-        kind: "cli",
+        id: "openrouter",
+        displayName: "OpenRouter",
+        kind: "http",
         envFields: [],
         configuredEnvKeys: [],
         configuredEnvValues: {},
@@ -103,6 +104,7 @@ function createStatefulApiMock(): WorkbenchApiClient {
         ...onboarding,
         activeProviderId: input.providerId,
         needsOnboarding: false,
+        families: [],
         providers: onboarding.providers.map((provider) =>
           provider.id === input.providerId
             ? {

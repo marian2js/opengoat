@@ -50,9 +50,17 @@ export const workbenchOnboardingProviderSchema = z.object({
   hasConfig: z.boolean()
 });
 
+export const workbenchOnboardingFamilySchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  hint: z.string().optional(),
+  providerIds: z.array(z.string())
+});
+
 export const workbenchOnboardingSchema = z.object({
   activeProviderId: z.string(),
   needsOnboarding: z.boolean(),
+  families: z.array(workbenchOnboardingFamilySchema),
   providers: z.array(workbenchOnboardingProviderSchema)
 });
 
