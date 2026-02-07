@@ -53,6 +53,12 @@ describe("AgentService", () => {
     expect(await readFile(path.join(result.agent.workspaceDir, "BOOTSTRAP.md"), "utf-8")).toContain(
       "First-run checklist"
     );
+    const defaultSkill = await readFile(
+      path.join(result.agent.workspaceDir, "skills", "opengoat-skill", "SKILL.md"),
+      "utf-8"
+    );
+    expect(defaultSkill).toContain("name: OpenGoat Skill");
+    expect(defaultSkill).toContain("opengoat onboard");
 
     const internalState = JSON.parse(
       await readFile(path.join(result.agent.internalConfigDir, "state.json"), "utf-8")
@@ -63,6 +69,18 @@ describe("AgentService", () => {
       agents: string[];
     };
     expect(index.agents).toEqual(["orchestrator"]);
+  });
+
+  it("does not seed orchestrator default skill for non-default agents", async () => {
+    const { service, paths, fileSystem } = await createAgentServiceWithPaths();
+
+    const result = await service.ensureAgent(paths, {
+      id: "developer",
+      displayName: "Developer"
+    });
+
+    const defaultSkillPath = path.join(result.agent.workspaceDir, "skills", "opengoat-skill", "SKILL.md");
+    expect(await fileSystem.exists(defaultSkillPath)).toBe(false);
   });
 
   it("never changes global default agent during agent creation", async () => {

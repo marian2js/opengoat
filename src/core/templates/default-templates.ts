@@ -149,6 +149,40 @@ export function renderWorkspaceBootstrapMarkdown(agent: AgentIdentity): string {
   ].join("\n");
 }
 
+export function renderDefaultOrchestratorSkillMarkdown(): string {
+  return [
+    "---",
+    "name: OpenGoat Skill",
+    "description: Use the OpenGoat CLI to orchestrate agents, providers, sessions, skills, and plugins.",
+    "user-invocable: true",
+    "---",
+    "",
+    "# OpenGoat Skill",
+    "",
+    "## When to Use",
+    "- Use this skill when the task requires OpenGoat platform operations.",
+    "- Use it for agent lifecycle, provider setup, routing checks, and session inspection.",
+    "",
+    "## Command Playbook",
+    "- Send message to default orchestrator: `opengoat agent --message \"<text>\"`",
+    "- Send message to specific agent: `opengoat agent <agent-id> --message \"<text>\"`",
+    "- Create agent: `opengoat agent create --name \"<name>\"`",
+    "- List agents: `opengoat agent list`",
+    "- Inspect/set provider: `opengoat agent provider get --agent <agent-id>` / `opengoat agent provider set --agent <agent-id> --provider <provider-id>`",
+    "- List providers: `opengoat provider list`",
+    "- Configure providers and credentials: `opengoat onboard`",
+    "- Inspect routing: `opengoat route --message \"<text>\"`",
+    "- Manage sessions: `opengoat session list|history|reset|compact ...`",
+    "- Manage skills: `opengoat skill list|install ...`",
+    "- Manage plugins: `opengoat plugin list|install|enable|disable|doctor ...`",
+    "",
+    "## Rules",
+    "- Treat `orchestrator` as the default entry agent unless explicitly overridden.",
+    "- Prefer non-destructive inspection commands before changing provider or plugin state.",
+    "- After CLI actions, report what changed and where."
+  ].join("\n");
+}
+
 export function renderWorkspaceMetadata(agent: AgentIdentity): Record<string, unknown> {
   return {
     schemaVersion: 1,
