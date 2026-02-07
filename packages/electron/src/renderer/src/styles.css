@@ -1,20 +1,68 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  --background: #0e1417;
-  --foreground: #eff3ea;
-  --surface: #152126;
-  --surface-strong: #1b2b31;
-  --muted-foreground: #a9bbb4;
-  --border: #335056;
-  --accent: #2a9d6f;
-  --accent-strong: #1f7a56;
-  --accent-foreground: #f3fff8;
-  --ring: #7ed7b0;
+  --radius: 0.85rem;
+
+  --background: hsl(218 42% 7%);
+  --foreground: hsl(210 24% 96%);
+  --card: hsl(218 35% 11%);
+  --card-foreground: hsl(210 24% 96%);
+  --popover: hsl(218 35% 10%);
+  --popover-foreground: hsl(210 24% 96%);
+
+  --primary: hsl(157 77% 43%);
+  --primary-foreground: hsl(158 95% 8%);
+  --secondary: hsl(217 23% 18%);
+  --secondary-foreground: hsl(210 24% 95%);
+  --muted: hsl(217 22% 15%);
+  --muted-foreground: hsl(212 15% 69%);
+  --accent: hsl(160 54% 22%);
+  --accent-foreground: hsl(156 68% 92%);
+  --destructive: hsl(0 67% 52%);
+  --destructive-foreground: hsl(210 20% 96%);
+  --border: hsl(216 19% 24%);
+  --input: hsl(216 19% 24%);
+  --ring: hsl(160 75% 45%);
+
+  --surface: hsl(218 35% 11%);
+  --surface-strong: hsl(217 32% 14%);
+  --accent-strong: hsl(157 71% 34%);
+  --accent-foreground: hsl(160 75% 96%);
 }
 
-* {
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -25,12 +73,17 @@ body,
   height: 100%;
 }
 
+html {
+  color-scheme: dark;
+}
+
 body {
-  color: var(--foreground);
   background: var(--background);
-  font-family: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", sans-serif;
+  color: var(--foreground);
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
 .font-heading {
-  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  font-family: "Space Grotesk", "IBM Plex Sans", "Avenir Next", sans-serif;
 }

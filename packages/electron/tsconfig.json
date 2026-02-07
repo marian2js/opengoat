@@ -14,6 +14,7 @@
     "types": ["node", "electron"],
     "baseUrl": ".",
     "paths": {
+      "@/*": ["src/renderer/src/*"],
       "@main/*": ["src/main/*"],
       "@renderer/*": ["src/renderer/src/*"],
       "@shared/*": ["src/shared/*"],

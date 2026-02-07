@@ -63,8 +63,8 @@ export function App() {
 
   if (isBootstrapping) {
     return (
-      <div className="flex h-screen items-center justify-center text-sm text-[var(--muted-foreground)]">
-        Loading OpenGoat desktop...
+      <div className="dark flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Loading OpenGoat Desktop...
       </div>
     );
   }
@@ -87,37 +87,40 @@ export function App() {
   }
 
   return (
-    <div className="h-screen bg-[radial-gradient(1200px_500px_at_10%_-20%,_rgba(22,163,74,0.16),transparent_55%),radial-gradient(900px_450px_at_100%_0%,_rgba(245,158,11,0.15),transparent_55%),var(--background)] text-[var(--foreground)]">
-      <div className="grid h-full grid-cols-[340px_1fr]">
-        <ProjectsSidebar
-          projects={projects}
-          activeProjectId={activeProjectId}
-          activeSessionId={activeSessionId}
-          manualPath={manualPath}
-          busy={isBusy}
-          onManualPathChange={setManualPath}
-          onAddProjectDialog={() => void addProjectFromDialog()}
-          onAddProjectPath={() => void onManualAdd()}
-          onSelectProject={(projectId) => void selectProject(projectId)}
-          onCreateSession={(projectId) => void createSession(projectId)}
-          onSelectSession={(projectId, sessionId) => void selectSession(projectId, sessionId)}
-        />
-        <ChatPanel
-          key={`${activeProjectId ?? "none"}:${activeSessionId ?? "none"}`}
-          homeDir={homeDir}
-          activeProject={activeProject}
-          activeSession={activeSession}
-          messages={activeMessages}
-          error={error}
-          busy={isBusy}
-          onSubmitMessage={(message) =>
-            sendMessage(message, {
-              rethrow: true
-            })
-          }
-          onOpenOnboarding={() => void openOnboarding()}
-          onDismissError={clearError}
-        />
+    <div className="dark h-screen bg-background text-foreground">
+      <div className="relative h-full overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_460px_at_0%_0%,hsl(163_74%_45%_/_0.11),transparent_60%),radial-gradient(760px_360px_at_95%_8%,hsl(156_72%_25%_/_0.1),transparent_58%),linear-gradient(180deg,hsl(215_40%_8%),hsl(215_38%_6%))]" />
+        <div className="relative grid h-full grid-cols-[340px_1fr]">
+          <ProjectsSidebar
+            projects={projects}
+            activeProjectId={activeProjectId}
+            activeSessionId={activeSessionId}
+            manualPath={manualPath}
+            busy={isBusy}
+            onManualPathChange={setManualPath}
+            onAddProjectDialog={() => void addProjectFromDialog()}
+            onAddProjectPath={() => void onManualAdd()}
+            onSelectProject={(projectId) => void selectProject(projectId)}
+            onCreateSession={(projectId) => void createSession(projectId)}
+            onSelectSession={(projectId, sessionId) => void selectSession(projectId, sessionId)}
+          />
+          <ChatPanel
+            key={`${activeProjectId ?? "none"}:${activeSessionId ?? "none"}`}
+            homeDir={homeDir}
+            activeProject={activeProject}
+            activeSession={activeSession}
+            messages={activeMessages}
+            error={error}
+            busy={isBusy}
+            onSubmitMessage={(message) =>
+              sendMessage(message, {
+                rethrow: true
+              })
+            }
+            onOpenOnboarding={() => void openOnboarding()}
+            onDismissError={clearError}
+          />
+        </div>
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ export default defineConfig({
   resolve: {
     dedupe: ["react", "react-dom"],
     alias: {
+      "@": path.resolve(currentDir, "src/renderer/src"),
       react: reactRoot,
       "react-dom": reactDomRoot,
       "@main": path.resolve(currentDir, "src/main"),
