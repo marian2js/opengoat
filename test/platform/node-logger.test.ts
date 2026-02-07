@@ -40,5 +40,28 @@ describe("createNodeLogger", () => {
     expect(output).not.toContain("ignored");
     expect(output).toContain("visible");
   });
-});
 
+  it("renders multiline context fields in pretty format", () => {
+    const capture = createStreamCapture();
+    const logger = createNodeLogger({
+      level: "debug",
+      format: "pretty",
+      stream: capture.stream
+    });
+
+    logger.debug("planner payload", {
+      scope: "orchestration-service",
+      step: 1,
+      prompt: "line one\nline two",
+      nested: {
+        mode: "direct"
+      }
+    });
+
+    const output = capture.output();
+    expect(output).toContain("DEBUG orchestration-service planner payload");
+    expect(output).toContain("\n  prompt: |\n    line one\n    line two");
+    expect(output).toContain("\n  nested:\n");
+    expect(output).toContain('"mode": "direct"');
+  });
+});

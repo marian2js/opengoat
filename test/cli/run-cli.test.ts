@@ -73,4 +73,13 @@ describe("runCli", () => {
     const code = await runCli(["--log-level", "debug", "--log-format", "json", "init"]);
     expect(code).toBe(0);
   });
+
+  it("supports global log flags after command options", async () => {
+    const root = await createTempDir("opengoat-runcli-");
+    roots.push(root);
+    process.env.OPENGOAT_HOME = root;
+
+    const code = await runCli(["agent", "--help", "--log-level", "debug", "--log-format", "pretty"]);
+    expect(code).toBe(0);
+  });
 });

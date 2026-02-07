@@ -102,63 +102,48 @@ function parseGlobalCliOptions(argv: string[]): GlobalCliOptions {
   const passthrough: string[] = [];
   let logLevel: LogLevel | undefined;
   let logFormat: "pretty" | "json" | undefined;
-  let index = 0;
-  let parsingGlobals = true;
-
-  while (index < argv.length) {
+  for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
-    if (token === undefined) {
-      break;
+    if (!token) {
+      continue;
     }
 
-    if (!parsingGlobals) {
-      passthrough.push(token);
-      index += 1;
-      continue;
+    if (token === "--") {
+      passthrough.push(...argv.slice(index));
+      break;
     }
 
     if (token === "--log-level") {
       const value = argv[index + 1];
-      if (!value) {
+      if (!value || value === "--") {
         throw new Error("Missing value for --log-level.");
       }
       logLevel = parseLogLevel(value);
-      index += 2;
+      index += 1;
       continue;
     }
 
     if (token.startsWith("--log-level=")) {
       logLevel = parseLogLevel(token.slice("--log-level=".length));
-      index += 1;
       continue;
     }
 
     if (token === "--log-format") {
-      const value = argv[index + 1]?.trim().toLowerCase();
-      if (!value) {
+      const value = argv[index + 1];
+      if (!value || value === "--") {
         throw new Error("Missing value for --log-format.");
       }
-      if (value !== "pretty" && value !== "json") {
-        throw new Error('Invalid --log-format. Use "pretty" or "json".');
-      }
-      logFormat = value;
-      index += 2;
-      continue;
-    }
-
-    if (token.startsWith("--log-format=")) {
-      const value = token.slice("--log-format=".length).trim().toLowerCase();
-      if (value !== "pretty" && value !== "json") {
-        throw new Error('Invalid --log-format. Use "pretty" or "json".');
-      }
-      logFormat = value;
+      logFormat = parseLogFormat(value);
       index += 1;
       continue;
     }
 
-    parsingGlobals = false;
+    if (token.startsWith("--log-format=")) {
+      logFormat = parseLogFormat(token.slice("--log-format=".length));
+      continue;
+    }
+
     passthrough.push(token);
-    index += 1;
   }
 
   return {
@@ -174,6 +159,14 @@ function parseLogLevel(raw: string): LogLevel {
     return value;
   }
   throw new Error('Invalid --log-level. Use "silent", "error", "warn", "info", or "debug".');
+}
+
+function parseLogFormat(raw: string): "pretty" | "json" {
+  const value = raw.trim().toLowerCase();
+  if (value === "pretty" || value === "json") {
+    return value;
+  }
+  throw new Error('Invalid --log-format. Use "pretty" or "json".');
 }
 
 function createLazyService(factory: () => OpenGoatService): OpenGoatService {
