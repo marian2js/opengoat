@@ -18,6 +18,12 @@ const PROVIDER_MODEL_ENV_KEY: Record<string, string> = {
   openclaw: "OPENGOAT_OPENCLAW_MODEL"
 };
 
+const OPENCLAW_COMPAT_PROVIDER_PREFIX = "openclaw-";
+const ORCHESTRATOR_COMPAT_NATIVE_PROVIDER_ALIASES: Record<string, string> = {
+  google: "gemini",
+  xai: "grok"
+};
+
 export const onboardCommand: CliCommand = {
   path: ["onboard"],
   description: "Onboard an agent/provider and configure credentials.",
@@ -42,6 +48,11 @@ export const onboardCommand: CliCommand = {
       context.stderr.write("No providers discovered.\n");
       return 1;
     }
+    const selectableProviders = filterProvidersForOnboarding(agentId, providers);
+    if (selectableProviders.length === 0) {
+      context.stderr.write(`No eligible providers available for agent "${agentId}".\n`);
+      return 1;
+    }
 
     const prompter = createCliPrompter({
       stdin: process.stdin,
@@ -59,7 +70,7 @@ export const onboardCommand: CliCommand = {
     try {
       const providerId = await resolveProviderId({
         service: context.service,
-        providers,
+        providers: selectableProviders,
         agentId,
         requestedProviderId: parsed.providerId,
         nonInteractive: parsed.nonInteractive,
@@ -69,8 +80,19 @@ export const onboardCommand: CliCommand = {
         return 1;
       }
 
-      const provider = providers.find((entry) => entry.id === providerId);
+      const provider = selectableProviders.find((entry) => entry.id === providerId);
       if (!provider) {
+        if (
+          isDefaultAgent(agentId) &&
+          providers.some((entry) => entry.id === providerId) &&
+          !selectableProviders.some((entry) => entry.id === providerId)
+        ) {
+          context.stderr.write(
+            `Provider "${providerId}" is not supported for orchestrator onboarding. ` +
+              "Choose an internal provider or an OpenClaw compatibility provider.\n"
+          );
+          return 1;
+        }
         context.stderr.write(`Unknown provider: ${providerId}\n`);
         return 1;
       }
@@ -326,7 +348,10 @@ async function resolveProviderId(params: {
   }
 
   if (params.nonInteractive) {
-    return currentProviderId ?? "codex";
+    if (currentProviderId && params.providers.some((provider) => provider.id === currentProviderId)) {
+      return currentProviderId;
+    }
+    return params.providers[0]?.id ?? null;
   }
 
   const defaultProvider =
@@ -450,6 +475,45 @@ function parseEnvPair(raw: string): { key: string; value: string } | null {
   return { key, value };
 }
 
+function filterProvidersForOnboarding(agentId: string, providers: ProviderSummary[]): ProviderSummary[] {
+  if (!isDefaultAgent(agentId)) {
+    return providers;
+  }
+
+  const orchestratorEligible = providers.filter(
+    (provider) => provider.kind === "http" || isOpenClawCompatProvider(provider.id)
+  );
+  const nativeProviderKeys = new Set(
+    orchestratorEligible
+      .filter((provider) => !isOpenClawCompatProvider(provider.id))
+      .map((provider) => resolveProviderDedupKey(provider.id))
+  );
+
+  return orchestratorEligible.filter((provider) => {
+    if (!isOpenClawCompatProvider(provider.id)) {
+      return true;
+    }
+    return !nativeProviderKeys.has(resolveProviderDedupKey(provider.id));
+  });
+}
+
+function isDefaultAgent(agentId: string): boolean {
+  return agentId.trim().toLowerCase() === DEFAULT_AGENT_ID;
+}
+
+function isOpenClawCompatProvider(providerId: string): boolean {
+  return providerId.trim().toLowerCase().startsWith(OPENCLAW_COMPAT_PROVIDER_PREFIX);
+}
+
+function resolveProviderDedupKey(providerId: string): string {
+  const normalized = providerId.trim().toLowerCase();
+  if (!isOpenClawCompatProvider(normalized)) {
+    return normalized;
+  }
+  const compatProviderId = normalized.slice(OPENCLAW_COMPAT_PROVIDER_PREFIX.length);
+  return ORCHESTRATOR_COMPAT_NATIVE_PROVIDER_ALIASES[compatProviderId] ?? compatProviderId;
+}
+
 function resolveProviderModelEnvKey(providerId: string): string | undefined {
   if (providerId.startsWith("openclaw-")) {
     const provider = providerId.slice("openclaw-".length);
@@ -473,6 +537,10 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("Notes:\n");
   output.write("  - On first run, this bootstraps ~/.opengoat automatically.\n");
   output.write("  - Providers are auto-discovered from provider folders.\n");
+  output.write(
+    "  - Orchestrator onboarding only allows internal providers and OpenClaw compatibility providers.\n"
+  );
+  output.write("  - OpenClaw compatibility options are hidden when an equivalent native provider already exists.\n");
   output.write("  - Interactive mode supports arrow-key selection.\n");
   output.write(`  - Agent defaults to ${DEFAULT_AGENT_ID}.\n`);
   output.write("  - Provider settings are stored in ~/.opengoat/providers/<provider>/config.json.\n");

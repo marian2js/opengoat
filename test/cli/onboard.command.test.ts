@@ -124,8 +124,8 @@ describe("onboard command", () => {
           capabilities: { agent: true, model: true, auth: true, passthrough: true }
         }
       ]),
-      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "codex" })),
-      setAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "codex" })),
+      getAgentProvider: vi.fn(async () => ({ agentId: "developer", providerId: "codex" })),
+      setAgentProvider: vi.fn(async () => ({ agentId: "developer", providerId: "codex" })),
       getProviderOnboarding: vi.fn(async () => ({
         auth: { supported: true, description: "Runs codex login" }
       })),
@@ -136,7 +136,10 @@ describe("onboard command", () => {
     };
 
     const { context, stdout } = createContext(service);
-    const code = await onboardCommand.run(["--non-interactive", "--provider", "codex", "--run-auth"], context);
+    const code = await onboardCommand.run(
+      ["--non-interactive", "--agent", "developer", "--provider", "codex", "--run-auth"],
+      context
+    );
 
     expect(code).toBe(0);
     expect(service.authenticateProvider).toHaveBeenCalledTimes(1);
@@ -190,5 +193,81 @@ describe("onboard command", () => {
         OPENGOAT_OPENCLAW_OPENAI_MODEL: "openai/gpt-5.1-codex"
       })
     );
+  });
+
+  it("defaults orchestrator to eligible providers and deduplicates compat/native overlaps", async () => {
+    const service = {
+      initialize: vi.fn(async () => ({})),
+      listProviders: vi.fn(async () => [
+        {
+          id: "openclaw-openai",
+          displayName: "OpenAI (OpenClaw Compat)",
+          kind: "cli",
+          capabilities: { agent: true, model: true, auth: true, passthrough: true }
+        },
+        {
+          id: "codex",
+          displayName: "Codex CLI",
+          kind: "cli",
+          capabilities: { agent: false, model: true, auth: true, passthrough: true }
+        },
+        {
+          id: "openai",
+          displayName: "OpenAI",
+          kind: "http",
+          capabilities: { agent: false, model: true, auth: false, passthrough: false }
+        }
+      ]),
+      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "codex" })),
+      setAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openai" })),
+      getProviderOnboarding: vi.fn(async () => ({})),
+      getProviderConfig: vi.fn(async () => null),
+      setProviderConfig: vi.fn(),
+      authenticateProvider: vi.fn(),
+      getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
+    };
+
+    const { context } = createContext(service);
+    const code = await onboardCommand.run(["--non-interactive"], context);
+
+    expect(code).toBe(0);
+    expect(service.setAgentProvider).toHaveBeenCalledWith("orchestrator", "openai");
+  });
+
+  it("rejects explicit external orchestrator provider selections", async () => {
+    const service = {
+      initialize: vi.fn(async () => ({})),
+      listProviders: vi.fn(async () => [
+        {
+          id: "codex",
+          displayName: "Codex CLI",
+          kind: "cli",
+          capabilities: { agent: false, model: true, auth: true, passthrough: true }
+        },
+        {
+          id: "openai",
+          displayName: "OpenAI",
+          kind: "http",
+          capabilities: { agent: false, model: true, auth: false, passthrough: false }
+        }
+      ]),
+      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openai" })),
+      setAgentProvider: vi.fn(),
+      getProviderOnboarding: vi.fn(),
+      getProviderConfig: vi.fn(),
+      setProviderConfig: vi.fn(),
+      authenticateProvider: vi.fn(),
+      getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
+    };
+
+    const { context, stderr } = createContext(service);
+    const code = await onboardCommand.run(
+      ["--non-interactive", "--agent", "orchestrator", "--provider", "codex"],
+      context
+    );
+
+    expect(code).toBe(1);
+    expect(stderr.output()).toContain("not supported for orchestrator onboarding");
+    expect(service.setAgentProvider).not.toHaveBeenCalled();
   });
 });
