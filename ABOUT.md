@@ -21,8 +21,8 @@ Primary goal:
 The architecture is modular so the same core can support:
 
 - CLI (today),
-- server/API (future),
-- desktop app (future).
+- desktop app (now bootstrapped in monorepo),
+- server/API (future).
 
 ## 2) Product Purpose
 
@@ -134,6 +134,8 @@ Code is domain-organized:
 
 - `src/apps/cli`:
   - CLI commands + routing + formatting only.
+- `packages/electron`:
+  - Electron desktop shell (Forge + React + Zustand + tRPC IPC), reusing core runtime.
 
 Design intent:
 

@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "description": "OpenGoat agent orchestrator CLI",
   "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -19,6 +26,9 @@
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist coverage",
     "dev": "tsx src/apps/cli/index.ts",
+    "desktop:dev": "npm run start -w @opengoat/desktop",
+    "desktop:package": "npm run package -w @opengoat/desktop",
+    "desktop:make": "npm run make -w @opengoat/desktop",
     "start": "node bin/opengoat",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -74,6 +74,19 @@ opengoat agent --message "Add unit tests for the API layer"
 opengoat agent --message "Add unit tests" --cwd /path/to/your/project
 ```
 
+## Desktop app (Electron)
+
+OpenGoat now includes a desktop workspace package built with Electron Forge, React, Tailwind, shadcn-style UI primitives, Zustand, and tRPC-over-IPC.
+
+From the repo root:
+
+```bash
+npm install
+npm run desktop:dev
+```
+
+Desktop architecture details are documented in [`docs/electron-app.md`](docs/electron-app.md).
+
 <details>
 <summary><strong>Install from source</strong></summary>
 

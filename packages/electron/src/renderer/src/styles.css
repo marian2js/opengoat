@@ -1,0 +1,36 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+:root {
+  --background: #0e1417;
+  --foreground: #eff3ea;
+  --surface: #152126;
+  --surface-strong: #1b2b31;
+  --muted-foreground: #a9bbb4;
+  --border: #335056;
+  --accent: #2a9d6f;
+  --accent-strong: #1f7a56;
+  --accent-foreground: #f3fff8;
+  --ring: #7ed7b0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+.font-heading {
+  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+}

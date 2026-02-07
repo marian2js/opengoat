@@ -1,7 +1,4 @@
-import { NodeFileSystem } from "../../platform/node/node-file-system.js";
-import { NodeCommandRunner } from "../../platform/node/node-command-runner.js";
-import { createNodeLogger } from "../../platform/node/node-logger.js";
-import { NodeOpenGoatPathsProvider, NodePathPort } from "../../platform/node/node-path.port.js";
+import { createOpenGoatRuntime } from "../runtime/create-opengoat-runtime.js";
 import { OpenGoatService } from "../../core/opengoat/index.js";
 import type { LogLevel } from "../../core/logging/index.js";
 import { acpCommand } from "./commands/acp.command.js";
@@ -36,19 +33,14 @@ import { CommandRouter } from "./framework/router.js";
 
 export async function runCli(argv: string[]): Promise<number> {
   const globalOptions = parseGlobalCliOptions(argv);
-  const logger = createNodeLogger({
-    level: globalOptions.logLevel,
-    format: globalOptions.logFormat
-  }).child({ scope: "cli" });
+  const runtime = createOpenGoatRuntime({
+    logLevel: globalOptions.logLevel,
+    logFormat: globalOptions.logFormat
+  });
+  const logger = runtime.logger.child({ scope: "cli" });
 
   const service = createLazyService(() => {
-    return new OpenGoatService({
-      fileSystem: new NodeFileSystem(),
-      pathPort: new NodePathPort(),
-      pathsProvider: new NodeOpenGoatPathsProvider(),
-      commandRunner: new NodeCommandRunner(),
-      logger
-    });
+    return runtime.service;
   });
 
   const router = new CommandRouter(
