@@ -229,7 +229,13 @@ export class ProviderService {
     const workspaceAccess = resolveWorkspaceAccess(agentId, config.runtime?.workspaceAccess, provider.kind);
     const contextSystemPrompt =
       workspaceAccess === "internal"
-        ? await this.buildInternalWorkspacePrompt(paths, agentId, config, workspaceDir)
+        ? await this.buildInternalWorkspacePrompt(
+            paths,
+            agentId,
+            config,
+            workspaceDir,
+            options.skillsPromptOverride
+          )
         : "";
     const sessionContext = options.sessionContext?.trim();
     const sessionContextPrompt = sessionContext ? ["## Session Context", sessionContext].join("\n") : "";
@@ -307,7 +313,8 @@ export class ProviderService {
     paths: OpenGoatPaths,
     agentId: string,
     config: AgentConfigShape,
-    workspaceDir: string
+    workspaceDir: string,
+    skillsPromptOverride?: string
   ): Promise<string> {
     const bootstrapFiles = await this.workspaceContextService.loadWorkspaceBootstrapFiles(
       workspaceDir,
@@ -323,8 +330,11 @@ export class ProviderService {
       nowIso: this.nowIso(),
       contextFiles
     });
-    const skillsPrompt = await this.skillService.buildSkillsPrompt(paths, agentId, config.runtime?.skills);
-    return [systemPrompt, skillsPrompt.prompt.trim()].filter(Boolean).join("\n\n");
+    const skillsPrompt =
+      typeof skillsPromptOverride === "string" && skillsPromptOverride.trim().length > 0
+        ? skillsPromptOverride.trim()
+        : (await this.skillService.buildSkillsPrompt(paths, agentId, config.runtime?.skills)).prompt.trim();
+    return [systemPrompt, skillsPrompt].filter(Boolean).join("\n\n");
   }
 
   private async readAgentConfig(paths: OpenGoatPaths, agentId: string): Promise<AgentConfigShape> {

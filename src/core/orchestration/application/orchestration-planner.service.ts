@@ -22,6 +22,12 @@ export interface OrchestrationPlannerInput {
     updatedStep: number;
     lastResponse?: string;
   }>;
+  skills?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    source: string;
+  }>;
 }
 
 export class OrchestrationPlannerService {
@@ -50,6 +56,14 @@ export class OrchestrationPlannerService {
         (agent) =>
           `- ${agent.agentId}: name=${agent.name}; description=${agent.description}; provider=${agent.provider}; canDelegate=${agent.canDelegate}`
       ),
+      "",
+      "Available orchestrator skills:",
+      ...(input.skills && input.skills.length > 0
+        ? input.skills.map(
+            (skill) =>
+              `- ${skill.id}: name=${skill.name}; source=${skill.source}; description=${skill.description}`
+          )
+        : ["- (none)"]),
       "",
       `Step ${input.step}/${input.maxSteps}`,
       "",

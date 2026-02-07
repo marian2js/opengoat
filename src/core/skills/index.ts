@@ -7,6 +7,7 @@ export type {
   InstallSkillResult,
   ResolvedSkill,
   SkillFrontmatter,
+  SkillScope,
   SkillSource,
   SkillsPromptResult
 } from "./domain/skill.js";

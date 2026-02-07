@@ -119,6 +119,15 @@ Skill directories:
 - Managed: `~/.opengoat/skills/<skill-id>/SKILL.md`
 - Per-agent workspace: `~/.opengoat/workspaces/<agent-id>/skills/<skill-id>/SKILL.md`
 
+Skill scopes:
+
+- Global skills:
+  - stored in `~/.opengoat/skills`
+  - reusable defaults across agents
+- Agent-level skills:
+  - stored in `~/.opengoat/workspaces/<agent-id>/skills`
+  - highest precedence for that agent
+
 Precedence:
 
 - workspace skill overrides plugin/managed skill with the same id.
@@ -130,6 +139,17 @@ Runtime behavior:
 2. A bounded skills section is injected into the system prompt.
 3. Agents can self-install/update by creating `skills/<skill-id>/SKILL.md` in their workspace.
 4. Orchestrator can install skills via `install_skill` action during orchestration.
+
+OpenClaw-inspired prompt gating:
+
+- Skills with frontmatter `disable-model-invocation: true` remain installed and listable.
+- Those skills are excluded from model prompt injection, matching OpenClaw behavior.
+
+Orchestrator loading model:
+
+- At orchestration loop start, OpenGoat resolves orchestrator skills once (snapshot style).
+- That snapshot is reused for every planner step in the run.
+- For internal HTTP providers (OpenAI/OpenRouter/Grok), planner/model execution goes through the shared Vercel AI SDK runtime.
 
 Plugin sources:
 

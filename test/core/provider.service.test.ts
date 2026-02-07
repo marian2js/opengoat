@@ -104,6 +104,39 @@ describe("ProviderService", () => {
     expect(captured[0]?.systemPrompt).toContain("[MISSING] Expected at:");
   });
 
+  it("uses skillsPromptOverride when provided by orchestration runtime", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+
+    const { paths, fileSystem } = await createPaths(root);
+    await seedAgent(fileSystem, paths, {
+      agentId: "orchestrator",
+      providerId: "fake",
+      bootstrapFiles: ["AGENTS.md"]
+    });
+    await fileSystem.writeFile(path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"), "# Rules\n");
+
+    const captured: ProviderInvokeOptions[] = [];
+    const provider = createProvider({
+      id: "fake",
+      kind: "http",
+      capabilities: { agent: false, model: true, auth: false, passthrough: false },
+      onInvoke: (options) => captured.push(options)
+    });
+
+    const registry = new ProviderRegistry();
+    registry.register("fake", () => provider);
+
+    const service = createProviderService(fileSystem, registry);
+    await service.invokeAgent(paths, "orchestrator", {
+      message: "hello",
+      skillsPromptOverride: "## Skills\n<available_skills>\n  <skill><id>x</id></skill>\n</available_skills>"
+    });
+
+    expect(captured[0]?.systemPrompt).toContain("<available_skills>");
+    expect(captured[0]?.systemPrompt).toContain("<id>x</id>");
+  });
+
   it("does not force agent option for providers without agent capability", async () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);

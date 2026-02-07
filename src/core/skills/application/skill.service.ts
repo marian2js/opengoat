@@ -9,6 +9,7 @@ import {
   type InstallSkillRequest,
   type InstallSkillResult,
   type ResolvedSkill,
+  type SkillScope,
   resolveSkillsConfig,
   type SkillsPromptResult
 } from "../domain/skill.js";
@@ -53,6 +54,11 @@ export class SkillService {
     return [...discovered].sort((left, right) => left.id.localeCompare(right.id));
   }
 
+  public async listGlobalSkills(paths: OpenGoatPaths): Promise<ResolvedSkill[]> {
+    const loaded = await this.loadSkillsFromDirectory(paths.skillsDir, "managed");
+    return loaded.sort((left, right) => left.id.localeCompare(right.id));
+  }
+
   public async buildSkillsPrompt(
     paths: OpenGoatPaths,
     agentId = DEFAULT_AGENT_ID,
@@ -68,7 +74,7 @@ export class SkillService {
 
     const selected: ResolvedSkill[] = [];
     let budgetUsed = 0;
-    for (const skill of skills) {
+    for (const skill of skills.filter((entry) => entry.frontmatter.disableModelInvocation !== true)) {
       if (selected.length >= resolvedConfig.prompt.maxSkills) {
         break;
       }
@@ -129,18 +135,20 @@ export class SkillService {
   }
 
   public async installSkill(paths: OpenGoatPaths, request: InstallSkillRequest): Promise<InstallSkillResult> {
+    const scope: SkillScope = request.scope === "global" ? "global" : "agent";
     const normalizedAgentId = normalizeAgentId(request.agentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
     const skillId = normalizeAgentId(request.skillName);
     if (!skillId) {
       throw new Error("Skill name must contain at least one alphanumeric character.");
     }
 
-    const workspaceSkillsDir = this.pathPort.join(paths.workspacesDir, normalizedAgentId, "skills");
-    const targetDir = this.pathPort.join(workspaceSkillsDir, skillId);
+    const baseDir =
+      scope === "global" ? paths.skillsDir : this.pathPort.join(paths.workspacesDir, normalizedAgentId, "skills");
+    const targetDir = this.pathPort.join(baseDir, skillId);
     const targetSkillFile = this.pathPort.join(targetDir, "SKILL.md");
     const replaced = await this.fileSystem.exists(targetDir);
 
-    await this.fileSystem.ensureDir(workspaceSkillsDir);
+    await this.fileSystem.ensureDir(baseDir);
 
     if (request.sourcePath?.trim()) {
       const sourcePath = resolveUserPath(request.sourcePath.trim());
@@ -158,7 +166,8 @@ export class SkillService {
       await this.fileSystem.copyDir(sourceDir, targetDir);
 
       return {
-        agentId: normalizedAgentId,
+        scope,
+        agentId: scope === "agent" ? normalizedAgentId : undefined,
         skillId,
         skillName: request.skillName.trim(),
         source: "source-path",
@@ -167,19 +176,22 @@ export class SkillService {
       };
     }
 
-    const managedDir = this.pathPort.join(paths.skillsDir, skillId);
-    const managedSkillFile = this.pathPort.join(managedDir, "SKILL.md");
-    if (await this.fileSystem.exists(managedSkillFile)) {
-      await this.fileSystem.removeDir(targetDir);
-      await this.fileSystem.copyDir(managedDir, targetDir);
-      return {
-        agentId: normalizedAgentId,
-        skillId,
-        skillName: request.skillName.trim(),
-        source: "managed",
-        installedPath: targetSkillFile,
-        replaced
-      };
+    if (scope === "agent") {
+      const managedDir = this.pathPort.join(paths.skillsDir, skillId);
+      const managedSkillFile = this.pathPort.join(managedDir, "SKILL.md");
+      if (await this.fileSystem.exists(managedSkillFile)) {
+        await this.fileSystem.removeDir(targetDir);
+        await this.fileSystem.copyDir(managedDir, targetDir);
+        return {
+          scope,
+          agentId: normalizedAgentId,
+          skillId,
+          skillName: request.skillName.trim(),
+          source: "managed",
+          installedPath: targetSkillFile,
+          replaced
+        };
+      }
     }
 
     const description = request.description?.trim() || `Skill instructions for ${request.skillName.trim()}.`;
@@ -188,7 +200,8 @@ export class SkillService {
     await this.fileSystem.writeFile(targetSkillFile, ensureTrailingNewline(content));
 
     return {
-      agentId: normalizedAgentId,
+      scope,
+      agentId: scope === "agent" ? normalizedAgentId : undefined,
       skillId,
       skillName: request.skillName.trim(),
       source: "generated",
@@ -324,6 +337,8 @@ function parseSkillMarkdown(content: string): {
     name?: string;
     description?: string;
     enabled?: boolean;
+    userInvocable?: boolean;
+    disableModelInvocation?: boolean;
   };
   body: string;
 } {
@@ -347,6 +362,8 @@ function parseSkillMarkdown(content: string): {
     name?: string;
     description?: string;
     enabled?: boolean;
+    userInvocable?: boolean;
+    disableModelInvocation?: boolean;
   } = {};
   for (const line of frontmatterLines) {
     const separator = line.indexOf(":");
@@ -369,6 +386,24 @@ function parseSkillMarkdown(content: string): {
         frontmatter.enabled = true;
       } else if (normalized === "false") {
         frontmatter.enabled = false;
+      }
+      continue;
+    }
+    if (key === "user-invocable" || key === "user_invocable") {
+      const normalized = value.toLowerCase();
+      if (normalized === "true") {
+        frontmatter.userInvocable = true;
+      } else if (normalized === "false") {
+        frontmatter.userInvocable = false;
+      }
+      continue;
+    }
+    if (key === "disable-model-invocation" || key === "disable_model_invocation") {
+      const normalized = value.toLowerCase();
+      if (normalized === "true") {
+        frontmatter.disableModelInvocation = true;
+      } else if (normalized === "false") {
+        frontmatter.disableModelInvocation = false;
       }
     }
   }

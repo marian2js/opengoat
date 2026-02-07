@@ -58,6 +58,30 @@ describe("SkillService", () => {
     expect(prompt.prompt).toContain("Self-install/update");
   });
 
+  it("omits disable-model-invocation skills from prompt while keeping them installed", async () => {
+    const { service, paths, fileSystem } = await createHarness();
+    const workspacePath = path.join(paths.workspacesDir, "orchestrator", "skills", "hidden-skill");
+    await fileSystem.ensureDir(workspacePath);
+    await fileSystem.writeFile(
+      path.join(workspacePath, "SKILL.md"),
+      [
+        "---",
+        "name: Hidden Skill",
+        "description: Should not be injected into model prompt",
+        "disable-model-invocation: true",
+        "---",
+        "",
+        "# Hidden"
+      ].join("\n")
+    );
+
+    const allSkills = await service.listSkills(paths, "orchestrator");
+    expect(allSkills.some((skill) => skill.id === "hidden-skill")).toBe(true);
+
+    const prompt = await service.buildSkillsPrompt(paths, "orchestrator");
+    expect(prompt.prompt).not.toContain("hidden-skill");
+  });
+
   it("loads plugin skills as part of merged skill context", async () => {
     const pluginSkillRoots: string[] = [];
     const { service, paths, fileSystem } = await createHarness({
@@ -113,6 +137,22 @@ describe("SkillService", () => {
     expect(result.source).toBe("generated");
     expect(markdown).toContain("# Release Notes");
     expect(markdown).toContain("Generate release notes");
+  });
+
+  it("installs and lists global managed skills", async () => {
+    const { service, paths } = await createHarness();
+    const result = await service.installSkill(paths, {
+      skillName: "Global Helper",
+      scope: "global",
+      description: "Global helper instructions"
+    });
+
+    expect(result.scope).toBe("global");
+    expect(result.agentId).toBeUndefined();
+    expect(result.installedPath).toContain(`${path.sep}skills${path.sep}global-helper${path.sep}SKILL.md`);
+
+    const globalSkills = await service.listGlobalSkills(paths);
+    expect(globalSkills.some((skill) => skill.id === "global-helper")).toBe(true);
   });
 });
 

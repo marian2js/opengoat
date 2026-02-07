@@ -1,6 +1,7 @@
 import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
 
 export type SkillSource = "workspace" | "managed" | "plugin" | "extra";
+export type SkillScope = "agent" | "global";
 
 export interface AgentSkillsLoadConfig {
   extraDirs?: string[];
@@ -25,6 +26,8 @@ export interface SkillFrontmatter {
   name?: string;
   description?: string;
   enabled?: boolean;
+  userInvocable?: boolean;
+  disableModelInvocation?: boolean;
 }
 
 export interface ResolvedSkill {
@@ -49,10 +52,12 @@ export interface InstallSkillRequest {
   sourcePath?: string;
   description?: string;
   content?: string;
+  scope?: SkillScope;
 }
 
 export interface InstallSkillResult {
-  agentId: string;
+  scope: SkillScope;
+  agentId?: string;
   skillId: string;
   skillName: string;
   source: "managed" | "source-path" | "generated";

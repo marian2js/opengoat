@@ -10,6 +10,7 @@ export interface ProviderCapabilities {
 export interface ProviderInvokeOptions {
   message: string;
   systemPrompt?: string;
+  skillsPromptOverride?: string;
   sessionRef?: string;
   forceNewSession?: boolean;
   disableSession?: boolean;
