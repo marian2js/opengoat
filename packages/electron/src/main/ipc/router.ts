@@ -17,14 +17,8 @@ export function createDesktopRouter(service: WorkbenchService) {
     bootstrap: t.procedure.query(async () => {
       return service.bootstrap();
     }),
-    bootstrapMutate: t.procedure.mutation(async () => {
-      return service.bootstrap();
-    }),
     projects: t.router({
       list: t.procedure.query(async () => {
-        return service.listProjects();
-      }),
-      listMutate: t.procedure.mutation(async () => {
         return service.listProjects();
       }),
       add: t.procedure
@@ -42,11 +36,6 @@ export function createDesktopRouter(service: WorkbenchService) {
         .query(async ({ input }) => {
           return service.listSessions(input.projectId);
         }),
-      listMutate: t.procedure
-        .input(createSessionInputSchema.pick({ projectId: true }))
-        .mutation(async ({ input }) => {
-          return service.listSessions(input.projectId);
-        }),
       create: t.procedure
         .input(createSessionInputSchema)
         .mutation(async ({ input }) => {
@@ -57,17 +46,9 @@ export function createDesktopRouter(service: WorkbenchService) {
         .query(async ({ input }) => {
           return service.listMessages(input.projectId, input.sessionId);
         }),
-      messagesMutate: t.procedure
-        .input(sessionLookupInputSchema)
-        .mutation(async ({ input }) => {
-          return service.listMessages(input.projectId, input.sessionId);
-        }),
     }),
     onboarding: t.router({
       status: t.procedure.query(async () => {
-        return service.getOnboardingState();
-      }),
-      statusMutate: t.procedure.mutation(async () => {
         return service.getOnboardingState();
       }),
       submit: t.procedure

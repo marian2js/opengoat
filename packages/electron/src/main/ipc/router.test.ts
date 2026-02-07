@@ -3,20 +3,19 @@ import { createDesktopRouter } from "./router";
 import type { WorkbenchService } from "../state/workbench-service";
 
 describe("desktop IPC router", () => {
-  it("registers bootstrap/read fallback mutations and executes them through the caller", async () => {
+  it("executes bootstrap query and read procedures through the caller", async () => {
     const service = createServiceStub();
     const router = createDesktopRouter(service);
     const caller = router.createCaller({});
 
     await caller.bootstrap();
-    await caller.bootstrapMutate();
-    await caller.projects.listMutate();
-    await caller.sessions.messagesMutate({
+    await caller.projects.list();
+    await caller.sessions.messages({
       projectId: "p1",
       sessionId: "s1"
     });
 
-    expect(service.bootstrap).toHaveBeenCalledTimes(2);
+    expect(service.bootstrap).toHaveBeenCalledTimes(1);
     expect(service.listProjects).toHaveBeenCalledTimes(1);
     expect(service.listMessages).toHaveBeenCalledWith("p1", "s1");
   });

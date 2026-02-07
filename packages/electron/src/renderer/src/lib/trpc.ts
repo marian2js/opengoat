@@ -1,9 +1,7 @@
 import type { AppRouter } from "@main/ipc/router";
 import {
   createTRPCProxyClient,
-  createTRPCUntypedClient,
-  type TRPCLink,
-  type TRPCUntypedClient
+  type TRPCLink
 } from "@trpc/client";
 import { ipcLink } from "electron-trpc/renderer";
 import superjson from "superjson";
@@ -16,7 +14,6 @@ const transformerLink: TRPCLink<AppRouter> = (runtime) => {
 };
 
 let proxyClient: ReturnType<typeof createTRPCProxyClient<AppRouter>> | null = null;
-let untypedClient: TRPCUntypedClient<AppRouter> | null = null;
 
 export function getTrpcClient(): ReturnType<typeof createTRPCProxyClient<AppRouter>> {
   if (!proxyClient) {
@@ -25,13 +22,4 @@ export function getTrpcClient(): ReturnType<typeof createTRPCProxyClient<AppRout
     });
   }
   return proxyClient;
-}
-
-export function getTrpcUntypedClient(): TRPCUntypedClient<AppRouter> {
-  if (!untypedClient) {
-    untypedClient = createTRPCUntypedClient<AppRouter>({
-      links: [transformerLink]
-    });
-  }
-  return untypedClient;
 }
