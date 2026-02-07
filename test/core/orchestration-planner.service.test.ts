@@ -1,0 +1,101 @@
+import { describe, expect, it } from "vitest";
+import { OrchestrationPlannerService, type AgentManifest } from "../../src/index.js";
+
+describe("OrchestrationPlannerService", () => {
+  it("builds planner prompt with agent metadata", () => {
+    const service = new OrchestrationPlannerService();
+    const prompt = service.buildPlannerPrompt({
+      userMessage: "Ship feature X",
+      step: 1,
+      maxSteps: 10,
+      sharedNotes: "none",
+      recentEvents: [],
+      agents: createManifests()
+    });
+
+    expect(prompt).toContain("Allowed agents:");
+    expect(prompt).toContain("developer");
+    expect(prompt).toContain("qa-agent");
+  });
+
+  it("parses fenced JSON decisions and sanitizes defaults", () => {
+    const service = new OrchestrationPlannerService();
+    const decision = service.parseDecision(
+      "```json\n{\"rationale\":\"delegate\",\"action\":{\"type\":\"delegate_to_agent\",\"targetAgentId\":\"Developer\",\"message\":\"Do it\"}}\n```",
+      "fallback"
+    );
+
+    expect(decision.action.type).toBe("delegate_to_agent");
+    if (decision.action.type !== "delegate_to_agent") {
+      throw new Error("Expected delegate action");
+    }
+
+    expect(decision.action.targetAgentId).toBe("developer");
+    expect(decision.action.mode).toBe("hybrid");
+  });
+
+  it("falls back to respond_user when output is not valid JSON", () => {
+    const service = new OrchestrationPlannerService();
+    const decision = service.parseDecision("not-json", "fallback");
+
+    expect(decision.action.type).toBe("respond_user");
+    if (decision.action.type !== "respond_user") {
+      throw new Error("Expected respond_user action");
+    }
+
+    expect(decision.action.message).toContain("fallback");
+  });
+});
+
+function createManifests(): AgentManifest[] {
+  return [
+    {
+      agentId: "orchestrator",
+      filePath: "/tmp/orchestrator/AGENTS.md",
+      workspaceDir: "/tmp/orchestrator",
+      metadata: {
+        id: "orchestrator",
+        name: "Orchestrator",
+        description: "Routes work",
+        provider: "openai",
+        tags: ["orchestration"],
+        delegation: { canReceive: true, canDelegate: true },
+        priority: 100
+      },
+      body: "",
+      source: "frontmatter"
+    },
+    {
+      agentId: "developer",
+      filePath: "/tmp/developer/AGENTS.md",
+      workspaceDir: "/tmp/developer",
+      metadata: {
+        id: "developer",
+        name: "Developer",
+        description: "Implements tasks",
+        provider: "cursor",
+        tags: ["implementation"],
+        delegation: { canReceive: true, canDelegate: false },
+        priority: 80
+      },
+      body: "",
+      source: "frontmatter"
+    },
+    {
+      agentId: "qa-agent",
+      filePath: "/tmp/qa/AGENTS.md",
+      workspaceDir: "/tmp/qa",
+      metadata: {
+        id: "qa-agent",
+        name: "QA",
+        description: "Verifies output",
+        provider: "openai",
+        tags: ["qa"],
+        delegation: { canReceive: true, canDelegate: false },
+        priority: 80
+      },
+      body: "",
+      source: "frontmatter"
+    }
+  ];
+}
