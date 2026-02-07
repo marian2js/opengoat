@@ -62,6 +62,25 @@ describe("orchestration scenarios", () => {
     expect(result.entryAgentId).toBe("orchestrator");
     expect(result.orchestration?.mode).toBe("ai-loop");
   });
+
+  it("supports orchestration install_skill actions that write skills into agent workspaces", async () => {
+    const { service, root } = await createScenarioHarness();
+    const result = await service.runAgent("orchestrator", {
+      message: "Please install skill release-checklist for the developer agent."
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("Installed skill release-checklist");
+    const installedPath = path.join(
+      root,
+      "workspaces",
+      "developer",
+      "skills",
+      "release-checklist",
+      "SKILL.md"
+    );
+    expect(await readFile(installedPath, "utf8")).toContain("# Release Checklist");
+  });
 });
 
 async function createScenarioHarness(): Promise<{ service: OpenGoatService; root: string }> {
@@ -188,6 +207,30 @@ class ScriptedProvider extends BaseProvider {
     action: Record<string, string>;
   } {
     const normalized = message.toLowerCase();
+    if (normalized.includes("install skill release-checklist")) {
+      if (!normalized.includes("installed skill release-checklist")) {
+        return {
+          rationale: "Install requested skill before continuing.",
+          action: {
+            type: "install_skill",
+            mode: "artifacts",
+            targetAgentId: "developer",
+            skillName: "release-checklist",
+            description: "Checklist for release readiness."
+          }
+        };
+      }
+
+      return {
+        rationale: "Skill installation confirmed.",
+        action: {
+          type: "finish",
+          mode: "direct",
+          message: "Installed skill release-checklist for developer."
+        }
+      };
+    }
+
     if (!normalized.includes("delegated to product-manager")) {
       return {
         rationale: "Start with product planning.",

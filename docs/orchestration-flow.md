@@ -40,6 +40,7 @@ This document explains the current orchestration architecture in OpenGoat, inclu
   - `delegate_to_agent`
   - `read_workspace_file`
   - `write_workspace_file`
+  - `install_skill`
   - `respond_user`
   - `finish`
 5. Delegation mode can be:
@@ -65,6 +66,24 @@ Then target response is captured back into markdown files.
 ### Hybrid
 
 Combines direct invocation and markdown handoff artifacts.
+
+## Skills
+
+Skill directories:
+
+- Managed: `~/.opengoat/skills/<skill-id>/SKILL.md`
+- Per-agent workspace: `~/.opengoat/workspaces/<agent-id>/skills/<skill-id>/SKILL.md`
+
+Precedence:
+
+- workspace skill overrides managed skill with the same id.
+
+Runtime behavior:
+
+1. OpenGoat resolves merged skills for the running agent.
+2. A bounded skills section is injected into the system prompt.
+3. Agents can self-install/update by creating `skills/<skill-id>/SKILL.md` in their workspace.
+4. Orchestrator can install skills via `install_skill` action during orchestration.
 
 ## Sessions
 

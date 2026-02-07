@@ -2,6 +2,7 @@ import { DEFAULT_BOOTSTRAP_MAX_CHARS, WorkspaceContextService } from "../../agen
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
+import type { AgentSkillsConfig, SkillService } from "../../skills/index.js";
 import {
   AgentConfigNotFoundError,
   DEFAULT_PROVIDER_ID,
@@ -22,6 +23,7 @@ interface ProviderServiceDeps {
   pathPort: PathPort;
   providerRegistry: Promise<ProviderRegistry> | ProviderRegistry;
   workspaceContextService: WorkspaceContextService;
+  skillService: SkillService;
   nowIso: () => string;
 }
 
@@ -32,6 +34,7 @@ interface AgentConfigShape {
   };
   runtime?: {
     bootstrapMaxChars?: number;
+    skills?: AgentSkillsConfig;
   };
   provider?: {
     id?: string;
@@ -52,6 +55,7 @@ export class ProviderService {
   private readonly pathPort: PathPort;
   private readonly providerRegistry: Promise<ProviderRegistry>;
   private readonly workspaceContextService: WorkspaceContextService;
+  private readonly skillService: SkillService;
   private readonly nowIso: () => string;
 
   public constructor(deps: ProviderServiceDeps) {
@@ -59,6 +63,7 @@ export class ProviderService {
     this.pathPort = deps.pathPort;
     this.providerRegistry = Promise.resolve(deps.providerRegistry);
     this.workspaceContextService = deps.workspaceContextService;
+    this.skillService = deps.skillService;
     this.nowIso = deps.nowIso;
   }
 
@@ -209,10 +214,15 @@ export class ProviderService {
       nowIso: this.nowIso(),
       contextFiles
     });
+    const skillsPrompt = await this.skillService.buildSkillsPrompt(paths, agentId, config.runtime?.skills);
     const sessionContext = options.sessionContext?.trim();
-    const mergedSystemPrompt = sessionContext
-      ? [systemPrompt, "## Session Context", sessionContext].join("\n\n")
-      : systemPrompt;
+    const mergedSystemPrompt = [
+      systemPrompt,
+      skillsPrompt.prompt.trim(),
+      sessionContext ? ["## Session Context", sessionContext].join("\n") : ""
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     const invokeOptions: ProviderInvokeOptions = {
       ...options,

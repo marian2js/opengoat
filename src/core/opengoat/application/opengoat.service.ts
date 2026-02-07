@@ -21,6 +21,7 @@ import { WorkspaceContextService } from "../../agents/application/workspace-cont
 import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
 import { OrchestrationService, type OrchestrationRunResult, type RoutingDecision } from "../../orchestration/index.js";
 import { ProviderService } from "../../providers/application/provider.service.js";
+import { SkillService, type InstallSkillRequest, type InstallSkillResult, type ResolvedSkill } from "../../skills/index.js";
 import {
   SessionService,
   type SessionCompactionResult,
@@ -43,6 +44,7 @@ export class OpenGoatService {
   private readonly agentManifestService: AgentManifestService;
   private readonly bootstrapService: BootstrapService;
   private readonly providerService: ProviderService;
+  private readonly skillService: SkillService;
   private readonly sessionService: SessionService;
   private readonly orchestrationService: OrchestrationService;
 
@@ -72,11 +74,16 @@ export class OpenGoatService {
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort
     });
+    this.skillService = new SkillService({
+      fileSystem: deps.fileSystem,
+      pathPort: deps.pathPort
+    });
     this.providerService = new ProviderService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       providerRegistry: providerRegistryPromise,
       workspaceContextService,
+      skillService: this.skillService,
       nowIso
     });
     this.sessionService = new SessionService({
@@ -87,6 +94,7 @@ export class OpenGoatService {
     });
     this.orchestrationService = new OrchestrationService({
       providerService: this.providerService,
+      skillService: this.skillService,
       agentManifestService: this.agentManifestService,
       sessionService: this.sessionService,
       fileSystem: deps.fileSystem,
@@ -159,6 +167,16 @@ export class OpenGoatService {
   ): Promise<OrchestrationRunResult> {
     const paths = this.pathsProvider.getPaths();
     return this.orchestrationService.runAgent(paths, agentId, options);
+  }
+
+  public async listSkills(agentId = DEFAULT_AGENT_ID): Promise<ResolvedSkill[]> {
+    const paths = this.pathsProvider.getPaths();
+    return this.skillService.listSkills(paths, agentId);
+  }
+
+  public async installSkill(request: InstallSkillRequest): Promise<InstallSkillResult> {
+    const paths = this.pathsProvider.getPaths();
+    return this.skillService.installSkill(paths, request);
   }
 
   public async listSessions(agentId = DEFAULT_AGENT_ID, options: { activeMinutes?: number } = {}): Promise<SessionSummary[]> {

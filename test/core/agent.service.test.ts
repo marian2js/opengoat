@@ -194,6 +194,7 @@ async function createAgentServiceWithPaths(): Promise<{
     homeDir: root,
     workspacesDir: path.join(root, "workspaces"),
     agentsDir: path.join(root, "agents"),
+    skillsDir: path.join(root, "skills"),
     providersDir: path.join(root, "providers"),
     runsDir: path.join(root, "runs"),
     globalConfigJsonPath: path.join(root, "config.json"),
@@ -204,6 +205,7 @@ async function createAgentServiceWithPaths(): Promise<{
   await fileSystem.ensureDir(paths.homeDir);
   await fileSystem.ensureDir(paths.workspacesDir);
   await fileSystem.ensureDir(paths.agentsDir);
+  await fileSystem.ensureDir(paths.skillsDir);
   await fileSystem.ensureDir(paths.providersDir);
   await fileSystem.ensureDir(paths.runsDir);
 

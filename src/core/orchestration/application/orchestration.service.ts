@@ -7,6 +7,7 @@ import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import type { AgentProviderBinding, ProviderExecutionResult, ProviderInvokeOptions, ProviderService } from "../../providers/index.js";
 import { SessionService, type PreparedSessionRun, type SessionCompactionResult, type SessionRunInfo } from "../../sessions/index.js";
+import type { SkillService } from "../../skills/index.js";
 import type {
   OrchestrationAction,
   OrchestrationPlannerDecision,
@@ -19,6 +20,7 @@ import { RoutingService } from "./routing.service.js";
 
 interface OrchestrationServiceDeps {
   providerService: ProviderService;
+  skillService: SkillService;
   agentManifestService: AgentManifestService;
   sessionService: SessionService;
   routingService?: RoutingService;
@@ -50,6 +52,7 @@ const RECENT_EVENTS_WINDOW = 10;
 
 export class OrchestrationService {
   private readonly providerService: ProviderService;
+  private readonly skillService: SkillService;
   private readonly agentManifestService: AgentManifestService;
   private readonly sessionService: SessionService;
   private readonly routingService: RoutingService;
@@ -60,6 +63,7 @@ export class OrchestrationService {
 
   public constructor(deps: OrchestrationServiceDeps) {
     this.providerService = deps.providerService;
+    this.skillService = deps.skillService;
     this.agentManifestService = deps.agentManifestService;
     this.sessionService = deps.sessionService;
     this.routingService = deps.routingService ?? new RoutingService();
@@ -341,6 +345,27 @@ export class OrchestrationService {
       await this.fileSystem.writeFile(resolvedPath, ensureTrailingNewline(action.content));
       params.stepLog.artifactIO = { writePath: resolvedPath };
       this.addRecentEvent(params.recentEvents, `Wrote file ${action.path}`);
+      return {};
+    }
+
+    if (action.type === "install_skill") {
+      const targetAgentId = normalizeAgentId(action.targetAgentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
+      const result = await this.skillService.installSkill(params.paths, {
+        agentId: targetAgentId,
+        skillName: action.skillName,
+        sourcePath: action.sourcePath,
+        description: action.description,
+        content: action.content
+      });
+
+      params.stepLog.note = `Installed skill ${result.skillId} for ${result.agentId} (${result.source}).`;
+      params.sharedNotes.push(
+        `Skill installed: ${result.skillId} for ${result.agentId} from ${result.source} at ${result.installedPath}`
+      );
+      this.addRecentEvent(
+        params.recentEvents,
+        `Installed skill ${result.skillId} for ${result.agentId} (${result.source})`
+      );
       return {};
     }
 

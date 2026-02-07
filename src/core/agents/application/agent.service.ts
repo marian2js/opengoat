@@ -60,6 +60,7 @@ export class AgentService {
     identity: AgentIdentity
   ): Promise<AgentCreationResult> {
     const workspaceDir = this.pathPort.join(paths.workspacesDir, identity.id);
+    const workspaceSkillsDir = this.pathPort.join(workspaceDir, "skills");
     const internalConfigDir = this.pathPort.join(paths.agentsDir, identity.id);
     const sessionsDir = this.pathPort.join(internalConfigDir, "sessions");
 
@@ -67,6 +68,7 @@ export class AgentService {
     const skippedPaths: string[] = [];
 
     await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
+    await this.ensureDirectory(workspaceSkillsDir, createdPaths, skippedPaths);
     await this.ensureDirectory(internalConfigDir, createdPaths, skippedPaths);
     await this.ensureDirectory(sessionsDir, createdPaths, skippedPaths);
 

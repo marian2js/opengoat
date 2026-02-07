@@ -10,7 +10,13 @@ export interface OrchestrationAgentDescriptor {
 }
 
 export interface OrchestrationBaseAction {
-  type: "delegate_to_agent" | "read_workspace_file" | "write_workspace_file" | "respond_user" | "finish";
+  type:
+    | "delegate_to_agent"
+    | "read_workspace_file"
+    | "write_workspace_file"
+    | "install_skill"
+    | "respond_user"
+    | "finish";
   mode?: OrchestrationCommunicationMode;
   reason?: string;
 }
@@ -33,6 +39,15 @@ export interface WriteWorkspaceFileAction extends OrchestrationBaseAction {
   content: string;
 }
 
+export interface InstallSkillAction extends OrchestrationBaseAction {
+  type: "install_skill";
+  skillName: string;
+  targetAgentId?: string;
+  sourcePath?: string;
+  description?: string;
+  content?: string;
+}
+
 export interface RespondUserAction extends OrchestrationBaseAction {
   type: "respond_user";
   message: string;
@@ -47,6 +62,7 @@ export type OrchestrationAction =
   | DelegateToAgentAction
   | ReadWorkspaceFileAction
   | WriteWorkspaceFileAction
+  | InstallSkillAction
   | RespondUserAction
   | FinishAction;
 

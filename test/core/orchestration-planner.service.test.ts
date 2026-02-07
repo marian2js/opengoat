@@ -45,6 +45,31 @@ describe("OrchestrationPlannerService", () => {
 
     expect(decision.action.message).toContain("fallback");
   });
+
+  it("parses install_skill and normalizes optional fields", () => {
+    const service = new OrchestrationPlannerService();
+    const decision = service.parseDecision(
+      JSON.stringify({
+        rationale: "Install a missing skill before delegation.",
+        action: {
+          type: "install_skill",
+          targetAgentId: "Developer",
+          skillName: "Code Review",
+          sourcePath: "~/skills/code-review"
+        }
+      }),
+      "fallback"
+    );
+
+    expect(decision.action.type).toBe("install_skill");
+    if (decision.action.type !== "install_skill") {
+      throw new Error("Expected install_skill action");
+    }
+
+    expect(decision.action.targetAgentId).toBe("developer");
+    expect(decision.action.skillName).toBe("Code Review");
+    expect(decision.action.mode).toBe("artifacts");
+  });
 });
 
 function createManifests(): AgentManifest[] {
