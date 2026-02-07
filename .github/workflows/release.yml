@@ -23,14 +23,16 @@ jobs:
           # verifying later needs history, or we bump blindly
           fetch-depth: 0
 
+      - uses: pnpm/action-setup@v2
+
       - name: Setup Node.js 20.x
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Install Dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Check for Changesets
         id: check_changesets
@@ -51,15 +53,15 @@ jobs:
 
       - name: Version Packages (CalVer)
         if: steps.check_changesets.outputs.has_changesets == 'true'
-        run: npm run version-packages
+        run: pnpm run version-packages
 
       - name: Publish to NPM
         if: steps.check_changesets.outputs.has_changesets == 'true'
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          npm set //registry.npmjs.org/:_authToken $NPM_TOKEN
-          npm publish --access public
+          pnpm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
+          pnpm publish --access public --no-git-checks
 
       - name: Push Changes
         if: steps.check_changesets.outputs.has_changesets == 'true'
