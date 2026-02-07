@@ -1,8 +1,9 @@
-import type { ForgeConfig } from "@electron-forge/shared-types";
+import { VitePlugin } from "@electron-forge/plugin-vite";
 import { MakerDeb } from "@electron-forge/maker-deb";
 import { MakerRpm } from "@electron-forge/maker-rpm";
 import { MakerSquirrel } from "@electron-forge/maker-squirrel";
 import { MakerZIP } from "@electron-forge/maker-zip";
+import type { ForgeConfig } from "@electron-forge/shared-types";
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -12,30 +13,28 @@ const config: ForgeConfig = {
     new MakerSquirrel({}),
     new MakerZIP({}, ["darwin"]),
     new MakerRpm({}),
+    new MakerZIP({}, ["linux"]),
     new MakerDeb({})
   ],
   plugins: [
-    {
-      name: "@electron-forge/plugin-vite",
-      config: {
-        build: [
-          {
-            entry: "src/main/main.ts",
-            config: "vite.main.config.ts"
-          },
-          {
-            entry: "src/main/preload.ts",
-            config: "vite.preload.config.ts"
-          }
-        ],
-        renderer: [
-          {
-            name: "main_window",
-            config: "vite.renderer.config.ts"
-          }
-        ]
-      }
-    }
+    new VitePlugin({
+      build: [
+        {
+          entry: "src/main/main.ts",
+          config: "vite.main.config.ts"
+        },
+        {
+          entry: "src/main/preload.ts",
+          config: "vite.preload.config.ts"
+        }
+      ],
+      renderer: [
+        {
+          name: "main_window",
+          config: "vite.renderer.config.ts"
+        }
+      ]
+    })
   ]
 };
 
