@@ -10,6 +10,7 @@ import {
 
 const PROVIDER_MODEL_ENV_KEY: Record<string, string> = {
   gemini: "GEMINI_MODEL",
+  opencode: "OPENCODE_MODEL",
   openai: "OPENAI_MODEL",
   openrouter: "OPENROUTER_MODEL",
   grok: "GROK_MODEL"

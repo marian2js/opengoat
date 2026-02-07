@@ -11,6 +11,8 @@ import { initCommand } from "./commands/init.command.js";
 import { onboardCommand } from "./commands/onboard.command.js";
 import { providerListCommand } from "./commands/provider-list.command.js";
 import { routeCommand } from "./commands/route.command.js";
+import { scenarioCommand } from "./commands/scenario.command.js";
+import { scenarioRunCommand } from "./commands/scenario-run.command.js";
 import { sessionCommand } from "./commands/session.command.js";
 import { sessionCompactCommand } from "./commands/session-compact.command.js";
 import { sessionHistoryCommand } from "./commands/session-history.command.js";
@@ -32,6 +34,8 @@ export async function runCli(argv: string[]): Promise<number> {
       initCommand,
       onboardCommand,
       routeCommand,
+      scenarioCommand,
+      scenarioRunCommand,
       sessionCommand,
       sessionListCommand,
       sessionHistoryCommand,

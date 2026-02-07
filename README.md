@@ -37,6 +37,7 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - Agent metadata lives in front matter at `AGENTS.md` (`id`, `name`, `description`, `provider`, `tags`, `delegation`, `priority`) and is used for routing decisions.
 - On every `agent run`, OpenGoat loads configured workspace bootstrap files, injects them into a generated system prompt with missing-file markers + truncation protection, and runs the provider with the agent workspace as default `cwd`.
 - Every agent run writes a trace JSON file at `~/.opengoat/runs/<run-id>.json` containing entry agent, routing decision, and provider execution output.
+- Orchestrator runs an AI-driven delegation loop with action types (`delegate_to_agent`, `read_workspace_file`, `write_workspace_file`, `respond_user`, `finish`) and configurable communication mode (`direct`, `artifacts`, `hybrid`).
 - Sessions are persisted per agent under `~/.opengoat/agents/<agent-id>/sessions/`:
   - `sessions.json` (session store map keyed by session key)
   - `<session-id>.jsonl` (transcript events)
@@ -46,7 +47,7 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
   - context pruning
   - transcript compaction
 - Session context is injected into the system prompt on each run.
-- Built-in providers: `codex`, `claude`, `cursor`, `gemini`, `grok`, `openclaw`, `openai`, `openrouter`.
+- Built-in providers: `codex`, `claude`, `cursor`, `gemini`, `grok`, `openclaw`, `opencode`, `openai`, `openrouter`.
   - Each provider lives in its own folder with code + tests.
   - New providers are auto-discovered from provider folders (no central registration edits).
   - `onboard` uses provider-declared onboarding metadata to collect required credentials/settings.
@@ -68,9 +69,14 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - `./bin/opengoat session history [--agent <id>] [--session <key|id>] [--limit <n>] [--include-compaction]`
 - `./bin/opengoat session reset [--agent <id>] [--session <key|id>]`
 - `./bin/opengoat session compact [--agent <id>] [--session <key|id>]`
+- `./bin/opengoat scenario run --file <scenario.json> [--mode live|scripted] [--json]`
 - `./bin/opengoat agent provider get <agent-id>`
 - `./bin/opengoat agent provider set <agent-id> <provider-id>`
 - `./bin/opengoat agent run <agent-id> --message <text> [--session <key|id>] [--new-session|--no-session] [--model <model>] [-- <provider-args>]`
+
+Detailed orchestration flow and scenario strategy:
+
+- `/Users/marian2js/workspace/opengoat/docs/orchestration-flow.md`
 
 ## OpenAI Provider
 
@@ -92,6 +98,16 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - Non-interactive execution: `--prompt <text>`
 - Optional command override: `GEMINI_CMD`
 - Optional default model: `GEMINI_MODEL`
+
+## OpenCode Provider
+
+`opencode` is a CLI provider.
+
+- Command: `opencode`
+- Non-interactive execution: `opencode run <message>`
+- Optional command override: `OPENCODE_CMD`
+- Optional default model: `OPENCODE_MODEL`
+- Auth flow: `opencode auth login`
 
 ## Grok Provider
 

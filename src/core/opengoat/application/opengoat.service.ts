@@ -19,7 +19,7 @@ import { AgentManifestService } from "../../agents/application/agent-manifest.se
 import { AgentService } from "../../agents/application/agent.service.js";
 import { WorkspaceContextService } from "../../agents/application/workspace-context.service.js";
 import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
-import { OrchestrationService, type RoutingDecision } from "../../orchestration/index.js";
+import { OrchestrationService, type OrchestrationRunResult, type RoutingDecision } from "../../orchestration/index.js";
 import { ProviderService } from "../../providers/application/provider.service.js";
 import {
   SessionService,
@@ -156,14 +156,7 @@ export class OpenGoatService {
   public async runAgent(
     agentId: string,
     options: ProviderInvokeOptions
-  ): Promise<
-    ProviderExecutionResult &
-      AgentProviderBinding & {
-        entryAgentId: string;
-        routing: RoutingDecision;
-        tracePath: string;
-      }
-  > {
+  ): Promise<OrchestrationRunResult> {
     const paths = this.pathsProvider.getPaths();
     return this.orchestrationService.runAgent(paths, agentId, options);
   }

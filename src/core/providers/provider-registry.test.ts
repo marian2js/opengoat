@@ -16,6 +16,7 @@ describe("provider registry", () => {
       "grok",
       "openai",
       "openclaw",
+      "opencode",
       "openrouter"
     ]);
 
@@ -23,6 +24,9 @@ describe("provider registry", () => {
       true
     );
     expect(registry.getProviderOnboarding("gemini")?.env?.some((field) => field.key === "GEMINI_CMD")).toBe(true);
+    expect(registry.getProviderOnboarding("opencode")?.env?.some((field) => field.key === "OPENCODE_CMD")).toBe(
+      true
+    );
   });
 
   it("supports custom registration", async () => {
