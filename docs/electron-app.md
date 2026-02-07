@@ -84,13 +84,13 @@ This aligns with OpenGoat's working-path model.
 
 From repo root:
 
-- `npm run desktop:dev` - start Electron desktop in dev mode
-- `npm run desktop:package` - package desktop app
-- `npm run desktop:make` - build installables (platform makers)
+- `pnpm desktop:dev` - start Electron desktop in dev mode
+- `pnpm desktop:package` - package desktop app
+- `pnpm desktop:make` - build installables (platform makers)
 
 Or directly:
 
-- `npm run start -w @opengoat/desktop`
+- `pnpm --filter @opengoat/desktop start`
 
 ## Next Steps
 

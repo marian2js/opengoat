@@ -81,8 +81,8 @@ OpenGoat now includes a desktop workspace package built with Electron Forge, Rea
 From the repo root:
 
 ```bash
-npm install
-npm run desktop:dev
+pnpm install
+pnpm desktop:dev
 ```
 
 Desktop architecture details are documented in [`docs/electron-app.md`](docs/electron-app.md).
@@ -93,8 +93,8 @@ Desktop architecture details are documented in [`docs/electron-app.md`](docs/ele
 ```bash
 git clone https://github.com/marian2js/opengoat.git
 cd opengoat
-npm install
-npm run build
+pnpm install
+pnpm build
 
 ./bin/opengoat init
 ./bin/opengoat onboard
