@@ -84,15 +84,17 @@ Orchestrator invokes the target agent provider with a delegation message.
 
 ### Artifacts
 
-For internal targets, orchestrator writes markdown handoff files under:
+Orchestrator writes markdown handoff files under:
 
 - `~/.opengoat/workspaces/orchestrator/coordination/<run-id>/`
 
-For external targets, artifacts are written under the project path:
-
-- `<project-cwd>/.opengoat/coordination/<run-id>/`
-
 Then target response is captured back into markdown files.
+
+Important for external/tool agents:
+
+- OpenGoat may still use artifact mode internally.
+- Internal artifact filesystem paths are not disclosed to external providers.
+- External providers receive the delegation instructions, shared notes, and expected output, but not internal coordination paths.
 
 ### Hybrid
 
