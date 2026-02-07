@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { pluginCommand } from "../../src/apps/cli/commands/plugin.command.js";
-import { pluginDisableCommand } from "../../src/apps/cli/commands/plugin-disable.command.js";
-import { pluginDoctorCommand } from "../../src/apps/cli/commands/plugin-doctor.command.js";
-import { pluginEnableCommand } from "../../src/apps/cli/commands/plugin-enable.command.js";
-import { pluginInfoCommand } from "../../src/apps/cli/commands/plugin-info.command.js";
-import { pluginInstallCommand } from "../../src/apps/cli/commands/plugin-install.command.js";
-import { pluginListCommand } from "../../src/apps/cli/commands/plugin-list.command.js";
+import { pluginCommand } from "../../packages/cli/src/cli/commands/plugin.command.js";
+import { pluginDisableCommand } from "../../packages/cli/src/cli/commands/plugin-disable.command.js";
+import { pluginDoctorCommand } from "../../packages/cli/src/cli/commands/plugin-doctor.command.js";
+import { pluginEnableCommand } from "../../packages/cli/src/cli/commands/plugin-enable.command.js";
+import { pluginInfoCommand } from "../../packages/cli/src/cli/commands/plugin-info.command.js";
+import { pluginInstallCommand } from "../../packages/cli/src/cli/commands/plugin-install.command.js";
+import { pluginListCommand } from "../../packages/cli/src/cli/commands/plugin-list.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
 function createContext(service: unknown) {

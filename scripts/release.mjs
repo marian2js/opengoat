@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 const CWD = process.cwd();
 const CHANGESET_DIR = join(CWD, ".changeset");
-const PACKAGE_JSON_PATH = join(CWD, "package.json");
+const PACKAGE_JSON_PATH = join(CWD, "packages", "cli", "package.json");
 const CHANGELOG_PATH = join(CWD, "CHANGELOG.md");
 
 function getCalVer() {

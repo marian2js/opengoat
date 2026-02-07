@@ -1,8 +1,8 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { OpenGoatPaths } from "../../src/core/domain/opengoat-paths.js";
-import type { OpenGoatPathsProvider } from "../../src/core/ports/paths-provider.port.js";
+import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
+import type { OpenGoatPathsProvider } from "../../packages/core/src/core/ports/paths-provider.port.js";
 
 export class TestPathsProvider implements OpenGoatPathsProvider {
   private readonly root: string;

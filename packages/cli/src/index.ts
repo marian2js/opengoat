@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { runCli } from "./cli.js";
-import { loadDotEnv } from "../../platform/node/dotenv.js";
+import { runCli } from "./cli/cli.js";
+import { loadDotEnv } from "@opengoat/core";
 
 try {
   await loadDotEnv();

@@ -1,4 +1,4 @@
-import { DEFAULT_AGENT_ID } from "../../../core/domain/agent-id.js";
+import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
 
 export const sessionHistoryCommand: CliCommand = {

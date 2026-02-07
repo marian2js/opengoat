@@ -6,7 +6,7 @@ import type {
   NewSessionResponse,
   PromptResponse
 } from "@agentclientprotocol/sdk";
-import { OpenGoatAcpAgent } from "../../src/core/acp/index.js";
+import { OpenGoatAcpAgent } from "../../packages/core/src/core/acp/index.js";
 
 function createHarness(overrides: Partial<ReturnType<typeof createDefaultService>> = {}) {
   const sessionUpdate = vi.fn(async () => undefined);

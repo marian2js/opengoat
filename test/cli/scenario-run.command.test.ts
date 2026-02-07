@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { scenarioRunCommand } from "../../src/apps/cli/commands/scenario-run.command.js";
+import { scenarioRunCommand } from "../../packages/cli/src/cli/commands/scenario-run.command.js";
 import { removeTempDir } from "../helpers/temp-opengoat.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 

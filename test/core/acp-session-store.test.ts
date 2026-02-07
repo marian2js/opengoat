@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InMemoryAcpSessionStore } from "../../src/core/acp/index.js";
+import { InMemoryAcpSessionStore } from "../../packages/core/src/core/acp/index.js";
 
 describe("InMemoryAcpSessionStore", () => {
   it("stores sessions, updates entries, and tracks active runs", () => {

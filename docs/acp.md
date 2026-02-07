@@ -26,21 +26,21 @@ OpenGoat is an orchestrator that can route work across multiple agents and provi
 ### Core
 
 - ACP adapter:
-  - `./src/core/acp/application/acp-agent.ts`
+  - `./packages/core/src/core/acp/application/acp-agent.ts`
 - ACP session store:
-  - `./src/core/acp/application/session-store.ts`
+  - `./packages/core/src/core/acp/application/session-store.ts`
 - ACP metadata parsing:
-  - `./src/core/acp/domain/meta.ts`
+  - `./packages/core/src/core/acp/domain/meta.ts`
 
 ### Transport
 
 - Node stdio server wiring:
-  - `./src/platform/node/acp-server.ts`
+  - `./packages/core/src/platform/node/acp-server.ts`
 
 ### CLI
 
 - ACP entry command:
-  - `./src/apps/cli/commands/acp.command.ts`
+  - `./packages/cli/src/cli/commands/acp.command.ts`
 
 ## Supported Protocol Flow
 

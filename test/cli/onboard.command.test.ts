@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { onboardCommand } from "../../src/apps/cli/commands/onboard.command.js";
+import { onboardCommand } from "../../packages/cli/src/cli/commands/onboard.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
 function createContext(service: unknown) {

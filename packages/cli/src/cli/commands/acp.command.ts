@@ -1,5 +1,5 @@
 import type { CliCommand } from "../framework/command.js";
-import { startOpenGoatAcpServer } from "../../../platform/node/acp-server.js";
+import { startOpenGoatAcpServer } from "@opengoat/core";
 
 export const acpCommand: CliCommand = {
   path: ["acp"],

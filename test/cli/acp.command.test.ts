@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { acpCommand } from "../../src/apps/cli/commands/acp.command.js";
+import { acpCommand } from "../../packages/cli/src/cli/commands/acp.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
 function createContext(service: unknown) {

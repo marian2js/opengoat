@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCli } from "../../src/apps/cli/cli.js";
+import { runCli } from "../../packages/cli/src/cli/cli.js";
 import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
 const roots: string[] = [];

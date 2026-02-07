@@ -1,6 +1,6 @@
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { NodeFileSystem } from "../../src/platform/node/node-file-system.js";
+import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
 import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
 const roots: string[] = [];

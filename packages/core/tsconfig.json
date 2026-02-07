@@ -10,8 +10,12 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["test/**/*.ts", "packages/**/*.ts", "scripts/**/*.ts"],
-  "exclude": ["node_modules", "**/dist/**", "**/.vite/**", "**/out/**"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }

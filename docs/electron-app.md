@@ -22,7 +22,7 @@ This is an incremental monorepo setup: desktop is isolated in its own workspace 
 
 Shared runtime factory:
 
-- `src/apps/runtime/create-opengoat-runtime.ts`
+- `packages/core/src/apps/runtime/create-opengoat-runtime.ts`
 
 Both CLI and desktop instantiate services through this factory. This avoids duplicated bootstrap/provider/session wiring and keeps behavior consistent across app surfaces.
 

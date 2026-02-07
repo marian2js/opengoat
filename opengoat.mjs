@@ -4,10 +4,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
-const entrypoint = resolve(currentDir, "dist/apps/cli/index.js");
+const entrypoint = resolve(currentDir, "packages/cli/dist/index.js");
 
 if (!existsSync(entrypoint)) {
-  console.error("OpenGoat is not built yet. Run: npm run build");
+  console.error("OpenGoat CLI is not built yet. Run: pnpm build");
   process.exit(1);
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { skillCommand } from "../../src/apps/cli/commands/skill.command.js";
-import { skillInstallCommand } from "../../src/apps/cli/commands/skill-install.command.js";
-import { skillListCommand } from "../../src/apps/cli/commands/skill-list.command.js";
+import { skillCommand } from "../../packages/cli/src/cli/commands/skill.command.js";
+import { skillInstallCommand } from "../../packages/cli/src/cli/commands/skill-install.command.js";
+import { skillListCommand } from "../../packages/cli/src/cli/commands/skill-list.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
 function createContext(service: unknown) {

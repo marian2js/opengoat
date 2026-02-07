@@ -17,7 +17,7 @@ export default defineConfig({
     alias: {
       "@main": path.resolve(currentDir, "src/main"),
       "@shared": path.resolve(currentDir, "src/shared"),
-      "@opengoat/core": path.resolve(currentDir, "../../src/index.ts")
+      "@opengoat/core": path.resolve(currentDir, "../core/src/index.ts")
     }
   },
   build: {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { RoutingService } from "../../src/core/orchestration/index.js";
-import type { AgentManifest } from "../../src/core/agents/index.js";
+import { RoutingService } from "../../packages/core/src/core/orchestration/index.js";
+import type { AgentManifest } from "../../packages/core/src/core/agents/index.js";
 
 describe("RoutingService", () => {
   it("routes orchestrator traffic to best matching specialized agent", () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { agentCommand } from "../../src/apps/cli/commands/agent.command.js";
-import { agentCreateCommand } from "../../src/apps/cli/commands/agent-create.command.js";
-import { agentListCommand } from "../../src/apps/cli/commands/agent-list.command.js";
-import { initCommand } from "../../src/apps/cli/commands/init.command.js";
+import { agentCommand } from "../../packages/cli/src/cli/commands/agent.command.js";
+import { agentCreateCommand } from "../../packages/cli/src/cli/commands/agent-create.command.js";
+import { agentListCommand } from "../../packages/cli/src/cli/commands/agent-list.command.js";
+import { initCommand } from "../../packages/cli/src/cli/commands/init.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
 function createContext(service: unknown) {

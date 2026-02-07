@@ -1,6 +1,6 @@
-import { createOpenGoatRuntime } from "../runtime/create-opengoat-runtime.js";
-import { OpenGoatService } from "../../core/opengoat/index.js";
-import type { LogLevel } from "../../core/logging/index.js";
+import { createOpenGoatRuntime } from "@opengoat/core";
+import type { OpenGoatService } from "@opengoat/core";
+import type { LogLevel } from "@opengoat/core";
 import { acpCommand } from "./commands/acp.command.js";
 import { agentCommand } from "./commands/agent.command.js";
 import { agentCreateCommand } from "./commands/agent-create.command.js";

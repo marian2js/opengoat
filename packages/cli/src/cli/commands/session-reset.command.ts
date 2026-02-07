@@ -1,9 +1,9 @@
-import { DEFAULT_AGENT_ID } from "../../../core/domain/agent-id.js";
+import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
 
-export const sessionCompactCommand: CliCommand = {
-  path: ["session", "compact"],
-  description: "Force transcript compaction for one session.",
+export const sessionResetCommand: CliCommand = {
+  path: ["session", "reset"],
+  description: "Start a fresh session id for one session key.",
   async run(args, context): Promise<number> {
     const parsed = parseArgs(args);
     if (!parsed.ok) {
@@ -17,15 +17,10 @@ export const sessionCompactCommand: CliCommand = {
       return 0;
     }
 
-    const result = await context.service.compactSession(parsed.agentId, parsed.sessionRef);
-    context.stdout.write(`Session key: ${result.sessionKey}\n`);
+    const result = await context.service.resetSession(parsed.agentId, parsed.sessionRef);
+    context.stdout.write(`Reset session ${result.sessionKey}\n`);
     context.stdout.write(`Session id: ${result.sessionId}\n`);
     context.stdout.write(`Transcript: ${result.transcriptPath}\n`);
-    context.stdout.write(`Compaction applied: ${result.applied}\n`);
-    context.stdout.write(`Compacted messages: ${result.compactedMessages}\n`);
-    if (result.summary) {
-      context.stdout.write(`Summary: ${result.summary}\n`);
-    }
     return 0;
   }
 };
@@ -78,7 +73,7 @@ function parseArgs(args: string[]): Parsed {
 
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
-  output.write("  opengoat session compact [--agent <id>] [--session <key|id>]\n");
+  output.write("  opengoat session reset [--agent <id>] [--session <key|id>]\n");
   output.write("\n");
   output.write(`Defaults: agent-id=${DEFAULT_AGENT_ID}, session=main\n`);
 }

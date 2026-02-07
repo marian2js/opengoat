@@ -48,15 +48,15 @@ Resolution model:
 ## Core Components
 
 - Orchestration runtime:
-  - `./src/core/orchestration/application/orchestration.service.ts`
+  - `./packages/core/src/core/orchestration/application/orchestration.service.ts`
 - Planner prompt + decision parsing:
-  - `./src/core/orchestration/application/orchestration-planner.service.ts`
+  - `./packages/core/src/core/orchestration/application/orchestration-planner.service.ts`
 - Session lifecycle + transcripts:
-  - `./src/core/sessions/application/session.service.ts`
+  - `./packages/core/src/core/sessions/application/session.service.ts`
 - Provider invocation + system prompt build:
-  - `./src/core/providers/application/provider.service.ts`
+  - `./packages/core/src/core/providers/application/provider.service.ts`
 - Internal HTTP LLM runtime (Vercel AI SDK):
-  - `./src/core/llm/application/vercel-ai-text-runtime.ts`
+  - `./packages/core/src/core/llm/application/vercel-ai-text-runtime.ts`
 
 ## High-Level Runtime
 
@@ -301,11 +301,11 @@ Side-effect capture strategy:
 
 Scenario model:
 
-- `./src/core/scenarios/domain/scenario.ts`
+- `./packages/core/src/core/scenarios/domain/scenario.ts`
 
 Runner:
 
-- `./src/core/scenarios/application/scenario-runner.service.ts`
+- `./packages/core/src/core/scenarios/application/scenario-runner.service.ts`
 
 CLI:
 
@@ -322,8 +322,8 @@ This allows fast deterministic tests and realistic integration tests with real p
 
 OpenGoat exposes its orchestration runtime through ACP so editor clients can drive sessions through a standard protocol.
 
-- ACP adapter: `./src/core/acp/application/acp-agent.ts`
-- Node stdio server: `./src/platform/node/acp-server.ts`
+- ACP adapter: `./packages/core/src/core/acp/application/acp-agent.ts`
+- Node stdio server: `./packages/core/src/platform/node/acp-server.ts`
 - CLI entrypoint: `opengoat acp`
 
 ACP prompt turns map to `OpenGoatService.runAgent(...)`, so the same orchestrator behavior is reused without a separate execution path.

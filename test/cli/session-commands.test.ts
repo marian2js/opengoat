@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { sessionCommand } from "../../src/apps/cli/commands/session.command.js";
-import { sessionCompactCommand } from "../../src/apps/cli/commands/session-compact.command.js";
-import { sessionHistoryCommand } from "../../src/apps/cli/commands/session-history.command.js";
-import { sessionListCommand } from "../../src/apps/cli/commands/session-list.command.js";
-import { sessionResetCommand } from "../../src/apps/cli/commands/session-reset.command.js";
+import { sessionCommand } from "../../packages/cli/src/cli/commands/session.command.js";
+import { sessionCompactCommand } from "../../packages/cli/src/cli/commands/session-compact.command.js";
+import { sessionHistoryCommand } from "../../packages/cli/src/cli/commands/session-history.command.js";
+import { sessionListCommand } from "../../packages/cli/src/cli/commands/session-list.command.js";
+import { sessionResetCommand } from "../../packages/cli/src/cli/commands/session-reset.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
 function createContext(service: unknown) {

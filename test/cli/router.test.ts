@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CliCommand } from "../../src/apps/cli/framework/command.js";
-import { CommandRouter } from "../../src/apps/cli/framework/router.js";
+import type { CliCommand } from "../../packages/cli/src/cli/framework/command.js";
+import { CommandRouter } from "../../packages/cli/src/cli/framework/router.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
 describe("CommandRouter", () => {

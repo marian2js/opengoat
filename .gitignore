@@ -3,6 +3,7 @@ packages/*/node_modules
 .pnpm-store
 coverage
 dist
+packages/*/dist
 packages/electron/.vite
 packages/electron/src/renderer/.vite
 packages/electron/out

@@ -17,7 +17,7 @@
       "@main/*": ["src/main/*"],
       "@renderer/*": ["src/renderer/src/*"],
       "@shared/*": ["src/shared/*"],
-      "@opengoat/core": ["../../src/index.ts"]
+      "@opengoat/core": ["../core/src/index.ts"]
     }
   },
   "include": ["forge.config.ts", "vite.*.config.ts", "src/**/*.ts", "src/**/*.tsx"]

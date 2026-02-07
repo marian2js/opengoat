@@ -1,33 +1,22 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 const binDir = dirname(fileURLToPath(import.meta.url));
-const projectRoot = resolve(binDir, "..");
-const distEntrypoint = resolve(projectRoot, "dist/apps/cli/index.js");
-const srcEntrypoint = resolve(projectRoot, "src/apps/cli/index.ts");
+const workspaceRoot = resolve(binDir, "..");
+const cliBin = resolve(workspaceRoot, "packages/cli/bin/opengoat");
 
-if (existsSync(distEntrypoint)) {
-  await import(pathToFileURL(distEntrypoint).href);
-} else {
-  const child = spawn(
-    process.execPath,
-    ["--import", "tsx", srcEntrypoint, ...process.argv.slice(2)],
-    {
-      stdio: "inherit",
-      env: process.env,
-      cwd: projectRoot
-    }
-  );
+const child = spawn(process.execPath, [cliBin, ...process.argv.slice(2)], {
+  stdio: "inherit",
+  env: process.env,
+  cwd: workspaceRoot
+});
 
-  child.on("exit", (code, signal) => {
-    if (signal) {
-      process.kill(process.pid, signal);
-      return;
-    }
-
-    process.exit(code ?? 1);
-  });
-}
+child.on("exit", (code, signal) => {
+  if (signal) {
+    process.kill(process.pid, signal);
+    return;
+  }
+  process.exit(code ?? 1);
+});

@@ -1,7 +1,7 @@
-import { DEFAULT_AGENT_ID } from "../../../core/domain/agent-id.js";
-import type { OpenGoatService } from "../../../core/opengoat/index.js";
-import type { ProviderOnboardingSpec, ProviderSummary } from "../../../core/providers/index.js";
-import { resolveOpenClawCompatModelEnvVar } from "../../../core/providers/providers/openclaw-compat/index.js";
+import { DEFAULT_AGENT_ID } from "@opengoat/core";
+import type { OpenGoatService } from "@opengoat/core";
+import type { ProviderOnboardingSpec, ProviderSummary } from "@opengoat/core";
+import { resolveOpenClawCompatModelEnvVar } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
 import {
   createCliPrompter,

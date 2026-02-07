@@ -1,10 +1,10 @@
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { OpenGoatPaths } from "../../src/core/domain/opengoat-paths.js";
-import type { CommandRunRequest, CommandRunResult, CommandRunnerPort } from "../../src/core/ports/command-runner.port.js";
-import { PluginService, resolveOpenClawCompatPaths } from "../../src/core/plugins/index.js";
-import { NodeFileSystem } from "../../src/platform/node/node-file-system.js";
-import { NodePathPort } from "../../src/platform/node/node-path.port.js";
+import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
+import type { CommandRunRequest, CommandRunResult, CommandRunnerPort } from "../../packages/core/src/core/ports/command-runner.port.js";
+import { PluginService, resolveOpenClawCompatPaths } from "../../packages/core/src/core/plugins/index.js";
+import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
+import { NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
 import { TestPathsProvider, createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
 const roots: string[] = [];

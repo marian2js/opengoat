@@ -107,7 +107,7 @@ Requires Node.js >= 20.11.0.
 
 ## Providers
 
-OpenGoat ships with 10 built-in providers. Adding your own is a single folder under `src/core/providers/providers/`.
+OpenGoat ships with 10 built-in providers. Adding your own is a single folder under `packages/core/src/core/providers/providers/`.
 
 | Provider          | Type | What it connects to               |
 | ----------------- | ---- | --------------------------------- |
@@ -184,22 +184,16 @@ Global flags: `--log-level <silent|error|warn|info|debug>` &middot; `--log-forma
 OpenGoat is domain-structured for long-term maintainability. Core modules are reusable outside the CLI, and platform adapters are replaceable.
 
 ```
-src/
+packages/
 ├── core/
-│   ├── orchestration/    # AI planner loop, delegation runtime, routing
-│   ├── providers/        # Provider contracts, registry, auto-discovery
-│   ├── sessions/         # Session lifecycle, transcripts, pruning
-│   ├── agents/           # Agent creation, manifest parsing (AGENTS.md)
-│   ├── skills/           # Skill resolution, install, prompt injection
-│   ├── plugins/          # OpenClaw-compatible plugin lifecycle
-│   ├── acp/              # Agent Client Protocol integration
-│   ├── opengoat/         # Facade service (OpenGoatService)
-│   ├── bootstrap/        # Home initialization, default orchestrator seeding
-│   └── domain/           # Shared types and contracts
-├── platform/
-│   └── node/             # Node.js adapters (fs, paths, command runner)
-└── apps/
-    └── cli/              # CLI commands and formatting
+│   └── src/
+│       ├── core/         # Domain/application modules (orchestration, providers, sessions, agents, etc.)
+│       ├── platform/     # Node.js adapters (fs, paths, command runner, logger, ACP transport)
+│       └── apps/runtime/ # Shared runtime factory used by app surfaces
+├── cli/
+│   └── src/cli/          # CLI commands, router, and terminal UX
+└── electron/
+    └── src/              # Desktop main/renderer + typed IPC layer
 ```
 
 ## Documentation

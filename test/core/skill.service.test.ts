@@ -1,9 +1,9 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { SkillService } from "../../src/core/skills/index.js";
-import { NodeFileSystem } from "../../src/platform/node/node-file-system.js";
-import { NodePathPort } from "../../src/platform/node/node-path.port.js";
+import { SkillService } from "../../packages/core/src/core/skills/index.js";
+import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
+import { NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
 import { TestPathsProvider, createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
 const roots: string[] = [];

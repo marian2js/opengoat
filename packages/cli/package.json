@@ -1,0 +1,35 @@
+{
+  "name": "@opengoat/cli",
+  "version": "0.1.0",
+  "description": "OpenGoat agent orchestrator CLI",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "opengoat": "bin/opengoat"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist",
+    "dev": "tsx src/index.ts",
+    "start": "node bin/opengoat",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.0.0",
+    "@opengoat/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

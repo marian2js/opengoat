@@ -1,6 +1,6 @@
 import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
-import { createCliPrompter } from "../../src/apps/cli/framework/prompter.js";
+import { createCliPrompter } from "../../packages/cli/src/cli/framework/prompter.js";
 
 describe("cli prompter", () => {
   it("uses readline fallback and supports numeric select", async () => {

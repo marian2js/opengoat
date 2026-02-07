@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { ScenarioSpec } from "../../../core/scenarios/index.js";
-import { ScenarioRunnerService } from "../../../core/scenarios/index.js";
-import { NodeFileSystem } from "../../../platform/node/node-file-system.js";
-import { NodeOpenGoatPathsProvider, NodePathPort } from "../../../platform/node/node-path.port.js";
+import type { ScenarioSpec } from "@opengoat/core";
+import { ScenarioRunnerService } from "@opengoat/core";
+import { NodeFileSystem } from "@opengoat/core";
+import { NodeOpenGoatPathsProvider, NodePathPort } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
 
 export const scenarioRunCommand: CliCommand = {

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { agentProviderGetCommand } from "../../src/apps/cli/commands/agent-provider-get.command.js";
-import { agentProviderSetCommand } from "../../src/apps/cli/commands/agent-provider-set.command.js";
-import { agentRunCommand } from "../../src/apps/cli/commands/agent-run.command.js";
-import { providerListCommand } from "../../src/apps/cli/commands/provider-list.command.js";
+import { agentProviderGetCommand } from "../../packages/cli/src/cli/commands/agent-provider-get.command.js";
+import { agentProviderSetCommand } from "../../packages/cli/src/cli/commands/agent-provider-set.command.js";
+import { agentRunCommand } from "../../packages/cli/src/cli/commands/agent-run.command.js";
+import { providerListCommand } from "../../packages/cli/src/cli/commands/provider-list.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
 function createContext(service: unknown) {

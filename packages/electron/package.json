@@ -11,6 +11,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@opengoat/core": "workspace:*",
     "@trpc/client": "^11.9.0",
     "@trpc/server": "^11.9.0",
     "class-variance-authority": "^0.7.1",

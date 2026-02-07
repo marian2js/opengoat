@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createNodeLogger } from "../../src/platform/node/node-logger.js";
+import { createNodeLogger } from "../../packages/core/src/platform/node/node-logger.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
 describe("createNodeLogger", () => {

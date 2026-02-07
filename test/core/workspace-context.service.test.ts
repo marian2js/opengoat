@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { WorkspaceContextService } from "../../src/core/agents/index.js";
-import { NodeFileSystem } from "../../src/platform/node/node-file-system.js";
-import { NodePathPort } from "../../src/platform/node/node-path.port.js";
+import { WorkspaceContextService } from "../../packages/core/src/core/agents/index.js";
+import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
+import { NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
 
 describe("WorkspaceContextService", () => {
   it("builds missing markers and truncates large files", () => {

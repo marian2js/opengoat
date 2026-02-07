@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OrchestrationPlannerService, type AgentManifest } from "../../src/index.js";
+import { OrchestrationPlannerService, type AgentManifest } from "../../packages/core/src/index.js";
 
 describe("OrchestrationPlannerService", () => {
   it("builds planner prompt with agent metadata", () => {

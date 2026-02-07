@@ -7,10 +7,10 @@ import {
   ProviderRegistry,
   type ProviderExecutionResult,
   type ProviderInvokeOptions
-} from "../../src/index.js";
-import type { CommandRunnerPort } from "../../src/core/ports/command-runner.port.js";
-import { NodeFileSystem } from "../../src/platform/node/node-file-system.js";
-import { NodePathPort } from "../../src/platform/node/node-path.port.js";
+} from "../../packages/core/src/index.js";
+import type { CommandRunnerPort } from "../../packages/core/src/core/ports/command-runner.port.js";
+import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
+import { NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
 import { TestPathsProvider, createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
 const roots: string[] = [];

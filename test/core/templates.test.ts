@@ -12,7 +12,7 @@ import {
   renderWorkspaceHeartbeatMarkdown,
   renderWorkspaceIdentityMarkdown,
   renderWorkspaceMetadata
-} from "../../src/core/templates/default-templates.js";
+} from "../../packages/core/src/core/templates/default-templates.js";
 
 describe("default templates", () => {
   it("renders the global config payload", () => {

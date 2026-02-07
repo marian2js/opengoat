@@ -10,8 +10,12 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@opengoat/core": ["../core/src/index.ts"]
+    }
   },
-  "include": ["test/**/*.ts", "packages/**/*.ts", "scripts/**/*.ts"],
-  "exclude": ["node_modules", "**/dist/**", "**/.vite/**", "**/out/**"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }

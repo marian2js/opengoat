@@ -96,47 +96,47 @@ It is designed for:
 
 Code is domain-organized:
 
-- `src/core/opengoat`:
+- `packages/core/src/core/opengoat`:
 
   - Facade API (`OpenGoatService`) used by app surfaces.
 
-- `src/core/bootstrap`:
+- `packages/core/src/core/bootstrap`:
 
   - Initializes OpenGoat home and seeds default orchestrator.
 
-- `src/core/agents`:
+- `packages/core/src/core/agents`:
 
   - Agent lifecycle + manifest parsing.
 
-- `src/core/providers`:
+- `packages/core/src/core/providers`:
 
   - Provider contract, registry, loader, service, implementations.
 
-- `src/core/orchestration`:
+- `packages/core/src/core/orchestration`:
 
   - Routing + AI planner loop + delegation runtime.
 
-- `src/core/sessions`:
+- `packages/core/src/core/sessions`:
 
   - Session lifecycle, transcripts, pruning/compaction, history APIs.
 
-- `src/core/skills`:
+- `packages/core/src/core/skills`:
 
   - Skill resolution/install and prompt injection.
 
-- `src/core/plugins`:
+- `packages/core/src/core/plugins`:
 
   - OpenClaw-compatible plugin lifecycle.
 
-- `src/core/acp`:
+- `packages/core/src/core/acp`:
 
   - Agent Client Protocol integration.
 
-- `src/platform/node`:
+- `packages/core/src/platform/node`:
 
   - Node adapters (filesystem, paths, command runner, logger, ACP server transport).
 
-- `src/apps/cli`:
+- `packages/cli/src/cli`:
   - CLI commands + routing + formatting only.
 - `packages/electron`:
   - Electron desktop shell (Forge + React + Zustand + tRPC IPC), reusing core runtime.
@@ -203,7 +203,7 @@ Capabilities:
 
 Auto-discovery:
 
-- providers are discovered from `src/core/providers/providers/<provider-id>/index.ts`.
+- providers are discovered from `packages/core/src/core/providers/providers/<provider-id>/index.ts`.
 - each provider folder is self-contained (code + tests + onboarding metadata).
 
 Runtime profile:
@@ -514,10 +514,10 @@ Phase 7: Product hardening
 - ACP deep dive:
   - `docs/acp.md`
 - Core facade:
-  - `src/core/opengoat/application/opengoat.service.ts`
+  - `packages/core/src/core/opengoat/application/opengoat.service.ts`
 - Orchestration runtime:
-  - `src/core/orchestration/application/orchestration.service.ts`
+  - `packages/core/src/core/orchestration/application/orchestration.service.ts`
 - Session runtime:
-  - `src/core/sessions/application/session.service.ts`
+  - `packages/core/src/core/sessions/application/session.service.ts`
 - Provider runtime:
-  - `src/core/providers/application/provider.service.ts`
+  - `packages/core/src/core/providers/application/provider.service.ts`

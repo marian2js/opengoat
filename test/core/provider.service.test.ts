@@ -1,17 +1,17 @@
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { WorkspaceContextService } from "../../src/core/agents/index.js";
-import type { OpenGoatPaths } from "../../src/core/domain/opengoat-paths.js";
+import { WorkspaceContextService } from "../../packages/core/src/core/agents/index.js";
+import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
 import {
   InvalidAgentConfigError,
   InvalidProviderConfigError,
   ProviderService
-} from "../../src/core/providers/index.js";
-import { SkillService } from "../../src/core/skills/index.js";
-import { ProviderRegistry } from "../../src/core/providers/registry.js";
-import type { Provider, ProviderInvokeOptions } from "../../src/core/providers/types.js";
-import { NodeFileSystem } from "../../src/platform/node/node-file-system.js";
-import { NodePathPort } from "../../src/platform/node/node-path.port.js";
+} from "../../packages/core/src/core/providers/index.js";
+import { SkillService } from "../../packages/core/src/core/skills/index.js";
+import { ProviderRegistry } from "../../packages/core/src/core/providers/registry.js";
+import type { Provider, ProviderInvokeOptions } from "../../packages/core/src/core/providers/types.js";
+import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
+import { NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
 import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
 const roots: string[] = [];

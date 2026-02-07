@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { NodeOpenGoatPathsProvider, NodePathPort } from "../../src/platform/node/node-path.port.js";
+import { NodeOpenGoatPathsProvider, NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
 
 describe("NodePathPort", () => {
   it("joins path segments", () => {

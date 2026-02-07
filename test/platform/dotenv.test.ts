@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadDotEnv, parseDotEnv } from "../../src/platform/node/dotenv.js";
+import { loadDotEnv, parseDotEnv } from "../../packages/core/src/platform/node/dotenv.js";
 import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
 const roots: string[] = [];
