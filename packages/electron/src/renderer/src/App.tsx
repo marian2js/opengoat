@@ -1,9 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
-import { FolderPlus, MessageSquare, Plus, Send, TerminalSquare } from "lucide-react";
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
 import { Textarea } from "@renderer/components/ui/textarea";
-import { getActiveProject, useWorkbenchStore } from "@renderer/store/workbench-store";
+import {
+  getActiveProject,
+  useWorkbenchStore,
+} from "@renderer/store/workbench-store";
+import {
+  FolderPlus,
+  MessageSquare,
+  Plus,
+  Send,
+  TerminalSquare,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 export function App() {
   const {
@@ -22,7 +31,7 @@ export function App() {
     selectProject,
     selectSession,
     sendMessage,
-    clearError
+    clearError,
   } = useWorkbenchStore();
 
   const [manualPath, setManualPath] = useState("");
@@ -34,14 +43,19 @@ export function App() {
 
   const activeProject = useMemo(
     () => getActiveProject(projects, activeProjectId),
-    [projects, activeProjectId]
+    [projects, activeProjectId],
   );
   const activeSession = useMemo(
-    () => activeProject?.sessions.find((session) => session.id === activeSessionId) ?? null,
-    [activeProject, activeSessionId]
+    () =>
+      activeProject?.sessions.find(
+        (session) => session.id === activeSessionId,
+      ) ?? null,
+    [activeProject, activeSessionId],
   );
 
-  const canSend = Boolean(activeProject && activeSession && draft.trim().length > 0 && !isBusy);
+  const canSend = Boolean(
+    activeProject && activeSession && draft.trim().length > 0 && !isBusy,
+  );
 
   const onManualAdd = async () => {
     await addProjectByPath(manualPath);
@@ -55,7 +69,11 @@ export function App() {
   };
 
   if (isBootstrapping) {
-    return <div className="flex h-screen items-center justify-center text-sm text-[var(--muted-foreground)]">Loading OpenGoat desktop...</div>;
+    return (
+      <div className="flex h-screen items-center justify-center text-sm text-[var(--muted-foreground)]">
+        Loading OpenGoat desktop...
+      </div>
+    );
   }
 
   return (
@@ -65,13 +83,19 @@ export function App() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <p className="font-heading text-lg tracking-wide">OpenGoat</p>
-              <p className="text-xs text-[var(--muted-foreground)]">Projects + Sessions</p>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Projects + Sessions
+              </p>
             </div>
             <TerminalSquare className="size-5 text-[var(--accent)]" />
           </div>
 
           <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] p-3">
-            <Button className="w-full" onClick={() => void addProjectFromDialog()} disabled={isBusy}>
+            <Button
+              className="w-full"
+              onClick={() => void addProjectFromDialog()}
+              disabled={isBusy}
+            >
               <FolderPlus className="size-4" />
               Add Project
             </Button>
@@ -81,7 +105,11 @@ export function App() {
                 onChange={(event) => setManualPath(event.target.value)}
                 placeholder="/path/to/project"
               />
-              <Button variant="outline" onClick={() => void onManualAdd()} disabled={isBusy || !manualPath.trim()}>
+              <Button
+                variant="outline"
+                onClick={() => void onManualAdd()}
+                disabled={isBusy || !manualPath.trim()}
+              >
                 <Plus className="size-4" />
               </Button>
             </div>
@@ -105,11 +133,15 @@ export function App() {
                     onClick={() => void selectProject(project.id)}
                   >
                     <p className="font-medium">{project.name}</p>
-                    <p className="truncate text-xs text-[var(--muted-foreground)]">{project.rootPath}</p>
+                    <p className="truncate text-xs text-[var(--muted-foreground)]">
+                      {project.rootPath}
+                    </p>
                   </button>
 
                   <div className="mt-2 flex items-center justify-between">
-                    <p className="text-xs uppercase tracking-wide text-[var(--muted-foreground)]">Sessions</p>
+                    <p className="text-xs uppercase tracking-wide text-[var(--muted-foreground)]">
+                      Sessions
+                    </p>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -122,10 +154,14 @@ export function App() {
 
                   <div className="mt-2 space-y-1">
                     {project.sessions.length === 0 ? (
-                      <p className="text-xs text-[var(--muted-foreground)]">No sessions yet.</p>
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        No sessions yet.
+                      </p>
                     ) : (
                       project.sessions.map((session) => {
-                        const active = activeProjectId === project.id && activeSessionId === session.id;
+                        const active =
+                          activeProjectId === project.id &&
+                          activeSessionId === session.id;
                         return (
                           <button
                             key={session.id}
@@ -135,7 +171,9 @@ export function App() {
                                 ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
                                 : "hover:bg-[var(--surface-strong)]"
                             }`}
-                            onClick={() => void selectSession(project.id, session.id)}
+                            onClick={() =>
+                              void selectSession(project.id, session.id)
+                            }
                           >
                             <MessageSquare className="size-3.5" />
                             <span className="truncate">{session.title}</span>
@@ -152,16 +190,21 @@ export function App() {
 
         <main className="flex min-w-0 flex-col">
           <header className="border-b border-[var(--border)] bg-[var(--surface)] px-5 py-4">
-            <p className="font-heading text-lg">{activeProject?.name ?? "No project selected"}</p>
+            <p className="font-heading text-lg">
+              {activeProject?.name ?? "No project selected"}
+            </p>
             <p className="text-sm text-[var(--muted-foreground)]">
-              {activeSession ? `Session: ${activeSession.title}` : "Create a session to start chatting"}
+              {activeSession
+                ? `Session: ${activeSession.title}`
+                : "Create a session to start chatting"}
             </p>
           </header>
 
           <div className="flex-1 overflow-y-auto px-5 py-4">
             {activeMessages.length === 0 ? (
               <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--muted-foreground)]">
-                Messages will appear here. OpenGoat always talks to the orchestrator internally.
+                Messages will appear here. OpenGoat always talks to the
+                orchestrator internally.
               </div>
             ) : (
               <div className="space-y-3">
@@ -177,9 +220,13 @@ export function App() {
                     <p className="mb-1 text-xs uppercase tracking-wide text-[var(--muted-foreground)]">
                       {message.role === "user" ? "You" : "OpenGoat"}
                     </p>
-                    <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p>
+                    <p className="whitespace-pre-wrap text-sm leading-6">
+                      {message.content}
+                    </p>
                     {message.tracePath ? (
-                      <p className="mt-2 truncate text-xs text-[var(--muted-foreground)]">Trace: {message.tracePath}</p>
+                      <p className="mt-2 truncate text-xs text-[var(--muted-foreground)]">
+                        Trace: {message.tracePath}
+                      </p>
                     ) : null}
                   </article>
                 ))}
@@ -209,7 +256,10 @@ export function App() {
                 disabled={!activeSession || isBusy}
                 className="min-h-[88px]"
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                  if (
+                    event.key === "Enter" &&
+                    (event.metaKey || event.ctrlKey)
+                  ) {
                     event.preventDefault();
                     if (canSend) {
                       void onSend();
@@ -222,7 +272,9 @@ export function App() {
                   <Send className="size-4" />
                   Send
                 </Button>
-                <p className="text-xs text-[var(--muted-foreground)]">{homeDir}</p>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  {homeDir}
+                </p>
               </div>
             </div>
           </footer>

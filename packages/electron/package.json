@@ -2,7 +2,6 @@
   "name": "@opengoat/desktop",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "main": ".vite/build/main.js",
   "scripts": {
     "start": "electron-forge start",
