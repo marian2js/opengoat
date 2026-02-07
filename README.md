@@ -107,7 +107,7 @@ Requires Node.js >= 20.11.0.
 
 ## Providers
 
-OpenGoat ships with 10 built-in providers. Adding your own is a single folder under `packages/core/src/core/providers/providers/`.
+OpenGoat ships with built-in CLI providers plus a native HTTP provider catalog (OpenAI, Anthropic, Bedrock, Groq, OpenRouter, and many more). Adding your own is a single folder under `packages/core/src/core/providers/providers/`.
 
 | Provider          | Type | What it connects to               |
 | ----------------- | ---- | --------------------------------- |
@@ -120,11 +120,30 @@ OpenGoat ships with 10 built-in providers. Adding your own is a single folder un
 | `gemini`          | HTTP | Google Gemini API                 |
 | `grok`            | HTTP | xAI Grok API                      |
 | `openrouter`      | HTTP | OpenRouter (multi-model gateway)  |
-| `openclaw-compat` | HTTP | OpenClaw-compatible model catalog |
-
 **CLI providers** invoke external tools in your terminal. **HTTP providers** call model APIs directly. Both types are first-class citizens &mdash; the orchestrator picks the right agent regardless of provider type.
 
 HTTP providers are implemented through a shared Vercel AI SDK runtime so orchestrator-facing capabilities can evolve consistently (tool calling, MCP integration, and structured generation).
+
+## Provider testing
+
+Use the opt-in live smoke suite to validate configured HTTP providers in your own environment:
+
+```bash
+OPENGOAT_LIVE_TEST=1 pnpm test:providers:live
+```
+
+Useful filters:
+
+```bash
+# only these providers
+OPENGOAT_LIVE_TEST=1 OPENGOAT_LIVE_PROVIDERS=anthropic,openrouter pnpm test:providers:live
+
+# include providers with no required env fields (e.g. local endpoints)
+OPENGOAT_LIVE_TEST=1 OPENGOAT_LIVE_INCLUDE_OPTIONAL=1 pnpm test:providers:live
+
+# fail when required onboarding vars are missing instead of skipping
+OPENGOAT_LIVE_TEST=1 OPENGOAT_LIVE_REQUIRE_CONFIG=1 pnpm test:providers:live
+```
 
 ## Core concepts
 

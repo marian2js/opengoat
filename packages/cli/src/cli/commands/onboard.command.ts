@@ -2,7 +2,7 @@ import { emitKeypressEvents } from "node:readline";
 import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { OpenGoatService } from "@opengoat/core";
 import type { ProviderOnboardingSpec, ProviderSummary } from "@opengoat/core";
-import { resolveOpenClawCompatModelEnvVar } from "@opengoat/core";
+import { resolveExtendedHttpProviderModelEnvVar } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
 import {
   createCliPrompter,
@@ -12,18 +12,36 @@ import {
 
 const PROVIDER_MODEL_ENV_KEY: Record<string, string> = {
   gemini: "GEMINI_MODEL",
-  opencode: "OPENCODE_MODEL",
-  openai: "OPENAI_MODEL",
-  openrouter: "OPENROUTER_MODEL",
   grok: "GROK_MODEL",
-  openclaw: "OPENGOAT_OPENCLAW_MODEL"
+  openai: "OPENAI_MODEL",
+  openclaw: "OPENGOAT_OPENCLAW_MODEL",
+  opencode: "OPENCODE_MODEL",
+  openrouter: "OPENROUTER_MODEL"
 };
 
-const OPENCLAW_COMPAT_PROVIDER_PREFIX = "openclaw-";
-const ORCHESTRATOR_COMPAT_NATIVE_PROVIDER_ALIASES: Record<string, string> = {
-  google: "gemini",
-  xai: "grok"
-};
+const PROVIDER_ORDER = [
+  "openai",
+  "anthropic",
+  "grok",
+  "openrouter",
+  "google",
+  "gemini",
+  "amazon-bedrock",
+  "azure-openai-responses",
+  "groq",
+  "mistral",
+  "moonshot",
+  "ollama",
+  "claude",
+  "codex",
+  "cursor",
+  "opencode",
+  "openclaw"
+] as const;
+
+const providerPriorityById = new Map<string, number>(
+  PROVIDER_ORDER.map((id, index) => [id, index])
+);
 
 export const onboardCommand: CliCommand = {
   path: ["onboard"],
@@ -97,7 +115,7 @@ export const onboardCommand: CliCommand = {
           ) {
             context.stderr.write(
               `Provider "${providerId}" is not supported for orchestrator onboarding. ` +
-                "Choose an internal provider or an OpenClaw compatibility provider.\n"
+                "Choose an internal provider.\n"
             );
             return 1;
           }
@@ -113,7 +131,7 @@ export const onboardCommand: CliCommand = {
           ...parsed.env
         };
 
-        const modelEnvKey = resolveProviderModelEnvKey(provider.id);
+        const modelEnvKey = resolveProviderModelEnvKey(provider.id, onboarding);
         if (parsed.model && modelEnvKey) {
           envUpdates[modelEnvKey] = parsed.model;
         }
@@ -511,50 +529,35 @@ function filterProvidersForOnboarding(agentId: string, providers: ProviderSummar
     return providers;
   }
 
-  const orchestratorEligible = providers.filter(
-    (provider) => provider.kind === "http" || isOpenClawCompatProvider(provider.id)
-  );
-  const nativeProviderKeys = new Set(
-    orchestratorEligible
-      .filter((provider) => !isOpenClawCompatProvider(provider.id))
-      .map((provider) => resolveProviderDedupKey(provider.id))
-  );
-
-  return orchestratorEligible.filter((provider) => {
-    if (!isOpenClawCompatProvider(provider.id)) {
-      return true;
-    }
-    return !nativeProviderKeys.has(resolveProviderDedupKey(provider.id));
-  });
+  return providers.filter((provider) => provider.kind === "http");
 }
 
 function sortProvidersForOnboarding(providers: ProviderSummary[]): ProviderSummary[] {
-  const nativeProviders = providers.filter((provider) => !isOpenClawCompatProvider(provider.id));
-  const compatProviders = providers.filter((provider) => isOpenClawCompatProvider(provider.id));
-  return [...nativeProviders, ...compatProviders];
+  return providers.slice().sort((left, right) => {
+    if (left.kind !== right.kind) {
+      return left.kind === "http" ? -1 : 1;
+    }
+
+    const leftPriority = providerPriorityById.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+    const rightPriority = providerPriorityById.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority;
+    }
+
+    const byName = left.displayName.localeCompare(right.displayName);
+    if (byName !== 0) {
+      return byName;
+    }
+
+    return left.id.localeCompare(right.id);
+  });
 }
 
 function isDefaultAgent(agentId: string): boolean {
   return agentId.trim().toLowerCase() === DEFAULT_AGENT_ID;
 }
 
-function isOpenClawCompatProvider(providerId: string): boolean {
-  return providerId.trim().toLowerCase().startsWith(OPENCLAW_COMPAT_PROVIDER_PREFIX);
-}
-
-function resolveProviderDedupKey(providerId: string): string {
-  const normalized = providerId.trim().toLowerCase();
-  if (!isOpenClawCompatProvider(normalized)) {
-    return normalized;
-  }
-  const compatProviderId = normalized.slice(OPENCLAW_COMPAT_PROVIDER_PREFIX.length);
-  return ORCHESTRATOR_COMPAT_NATIVE_PROVIDER_ALIASES[compatProviderId] ?? compatProviderId;
-}
-
 function formatProviderDisplayName(provider: ProviderSummary): string {
-  if (isOpenClawCompatProvider(provider.id)) {
-    return provider.displayName.replace(/\s+\(OpenClaw Compat\)\s*$/i, "").trim();
-  }
   return provider.displayName;
 }
 
@@ -732,16 +735,15 @@ async function promptTextOrBack(params: {
   });
 }
 
-function resolveProviderModelEnvKey(providerId: string): string | undefined {
-  if (providerId.startsWith("openclaw-")) {
-    const provider = providerId.slice("openclaw-".length);
-    if (!provider) {
-      return "OPENGOAT_OPENCLAW_MODEL";
-    }
-    return resolveOpenClawCompatModelEnvVar(provider);
+function resolveProviderModelEnvKey(providerId: string, onboarding: ProviderOnboardingSpec): string | undefined {
+  const candidate = (onboarding.env ?? [])
+    .map((field) => field.key.trim())
+    .find((key) => /_MODEL$/.test(key));
+  if (candidate) {
+    return candidate;
   }
 
-  return PROVIDER_MODEL_ENV_KEY[providerId];
+  return PROVIDER_MODEL_ENV_KEY[providerId] ?? resolveExtendedHttpProviderModelEnvVar(providerId);
 }
 
 function printHelp(output: NodeJS.WritableStream): void {
@@ -755,10 +757,7 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("Notes:\n");
   output.write("  - On first run, this bootstraps ~/.opengoat automatically.\n");
   output.write("  - Providers are auto-discovered from provider folders.\n");
-  output.write(
-    "  - Orchestrator onboarding only allows internal providers and OpenClaw compatibility providers.\n"
-  );
-  output.write("  - OpenClaw compatibility options are hidden when an equivalent native provider already exists.\n");
+  output.write("  - Orchestrator onboarding only allows internal providers.\n");
   output.write("  - Interactive mode supports arrow-key selection.\n");
   output.write(`  - Agent defaults to ${DEFAULT_AGENT_ID}.\n`);
   output.write("  - Provider settings are stored in ~/.opengoat/providers/<provider>/config.json.\n");

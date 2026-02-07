@@ -14,7 +14,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "clean": "rm -rf dist",
     "dev": "tsx src/index.ts",
     "start": "node bin/opengoat",
