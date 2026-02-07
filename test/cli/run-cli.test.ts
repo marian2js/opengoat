@@ -23,6 +23,21 @@ afterEach(async () => {
 });
 
 describe("runCli", () => {
+  it("bootstraps through CLI onboard command on a fresh home", async () => {
+    const root = await createTempDir("opengoat-runcli-");
+    roots.push(root);
+    process.env.OPENGOAT_HOME = root;
+
+    const code = await runCli(["onboard", "--non-interactive", "--provider", "openai", "--openai-api-key", "sk-test"]);
+
+    expect(code).toBe(0);
+
+    const config = JSON.parse(await readFile(path.join(root, "config.json"), "utf-8")) as {
+      defaultAgent: string;
+    };
+    expect(config.defaultAgent).toBe("orchestrator");
+  });
+
   it("bootstraps through CLI init command", async () => {
     const root = await createTempDir("opengoat-runcli-");
     roots.push(root);
