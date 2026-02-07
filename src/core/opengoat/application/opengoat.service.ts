@@ -1,6 +1,7 @@
 import type { AgentCreationResult, AgentDescriptor } from "../../domain/agent.js";
 import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
 import type { InitializationResult } from "../../domain/opengoat-paths.js";
+import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { CommandRunResult, CommandRunnerPort } from "../../ports/command-runner.port.js";
 import type { PathPort } from "../../ports/path.port.js";
@@ -46,6 +47,7 @@ interface OpenGoatServiceDeps {
   providerRegistry?: ProviderRegistry;
   commandRunner?: CommandRunnerPort;
   pluginService?: PluginService;
+  logger?: Logger;
 }
 
 export class OpenGoatService {
@@ -61,6 +63,7 @@ export class OpenGoatService {
 
   public constructor(deps: OpenGoatServiceDeps) {
     const nowIso = deps.nowIso ?? (() => new Date().toISOString());
+    const rootLogger = (deps.logger ?? createNoopLogger()).child({ scope: "opengoat-service" });
     const providerRegistryFactory = deps.providerRegistry
       ? () => deps.providerRegistry as ProviderRegistry
       : () => createDefaultProviderRegistry();
@@ -103,7 +106,8 @@ export class OpenGoatService {
       providerRegistry: providerRegistryFactory,
       workspaceContextService,
       skillService: this.skillService,
-      nowIso
+      nowIso,
+      logger: rootLogger.child({ scope: "provider" })
     });
     this.sessionService = new SessionService({
       fileSystem: deps.fileSystem,
@@ -118,7 +122,8 @@ export class OpenGoatService {
       sessionService: this.sessionService,
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
-      nowIso
+      nowIso,
+      logger: rootLogger.child({ scope: "orchestration" })
     });
   }
 

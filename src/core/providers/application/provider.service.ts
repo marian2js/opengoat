@@ -1,5 +1,6 @@
 import { DEFAULT_BOOTSTRAP_MAX_CHARS, WorkspaceContextService } from "../../agents/index.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
+import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import type { AgentSkillsConfig, SkillService } from "../../skills/index.js";
@@ -28,6 +29,7 @@ interface ProviderServiceDeps {
   workspaceContextService: WorkspaceContextService;
   skillService: SkillService;
   nowIso: () => string;
+  logger?: Logger;
 }
 
 interface AgentConfigShape {
@@ -64,6 +66,7 @@ export class ProviderService {
   private readonly workspaceContextService: WorkspaceContextService;
   private readonly skillService: SkillService;
   private readonly nowIso: () => string;
+  private readonly logger: Logger;
 
   public constructor(deps: ProviderServiceDeps) {
     this.fileSystem = deps.fileSystem;
@@ -72,6 +75,7 @@ export class ProviderService {
     this.workspaceContextService = deps.workspaceContextService;
     this.skillService = deps.skillService;
     this.nowIso = deps.nowIso;
+    this.logger = (deps.logger ?? createNoopLogger()).child({ scope: "provider-service" });
   }
 
   public async listProviders(): Promise<ProviderSummary[]> {
@@ -92,6 +96,9 @@ export class ProviderService {
     const registry = await this.getProviderRegistry();
     const provider = registry.create(providerId);
     const env = await this.resolveProviderEnv(paths, provider.id, options.env);
+    this.logger.info("Invoking provider auth.", {
+      providerId: provider.id
+    });
     return provider.invokeAuth?.({
       ...options,
       env
@@ -239,7 +246,36 @@ export class ProviderService {
       agent: provider.capabilities.agent ? options.agent || agentId : options.agent
     };
 
+    this.logger.info("Invoking provider for agent.", {
+      agentId,
+      providerId: provider.id,
+      cwd: invokeOptions.cwd
+    });
+    this.logger.debug("Provider invoke request payload.", {
+      agentId,
+      providerId: provider.id,
+      message: invokeOptions.message,
+      systemPrompt: invokeOptions.systemPrompt,
+      sessionRef: options.sessionRef,
+      forceNewSession: options.forceNewSession,
+      disableSession: options.disableSession,
+      passthroughArgs: invokeOptions.passthroughArgs,
+      model: invokeOptions.model
+    });
+
     const result = await provider.invoke(invokeOptions);
+    this.logger.info("Provider invocation completed.", {
+      agentId,
+      providerId: provider.id,
+      code: result.code
+    });
+    this.logger.debug("Provider invoke response payload.", {
+      agentId,
+      providerId: provider.id,
+      code: result.code,
+      stdout: result.stdout,
+      stderr: result.stderr
+    });
 
     return {
       ...result,

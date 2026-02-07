@@ -3,6 +3,7 @@ import path from "node:path";
 import type { AgentManifest, AgentManifestService } from "../../agents/index.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
+import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import type { AgentProviderBinding, ProviderExecutionResult, ProviderInvokeOptions, ProviderService } from "../../providers/index.js";
@@ -28,6 +29,7 @@ interface OrchestrationServiceDeps {
   fileSystem: FileSystemPort;
   pathPort: PathPort;
   nowIso: () => string;
+  logger?: Logger;
 }
 
 interface AgentInvocationResult {
@@ -60,6 +62,7 @@ export class OrchestrationService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
   private readonly nowIso: () => string;
+  private readonly logger: Logger;
 
   public constructor(deps: OrchestrationServiceDeps) {
     this.providerService = deps.providerService;
@@ -71,6 +74,7 @@ export class OrchestrationService {
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
     this.nowIso = deps.nowIso;
+    this.logger = (deps.logger ?? createNoopLogger()).child({ scope: "orchestration-service" });
   }
 
   public async routeMessage(
@@ -94,11 +98,19 @@ export class OrchestrationService {
     options: ProviderInvokeOptions
   ): Promise<OrchestrationRunResult> {
     const runId = generateRunId();
+    const runLogger = this.logger.child({ runId });
     const startedAt = this.nowIso();
     const manifests = await this.agentManifestService.listManifests(paths);
     const resolvedEntryAgentId = resolveEntryAgentId(entryAgentId, manifests);
+    runLogger.info("Starting agent run.", {
+      entryAgentId,
+      resolvedEntryAgentId
+    });
 
     if (resolvedEntryAgentId !== DEFAULT_AGENT_ID) {
+      runLogger.info("Running direct non-orchestrator invocation.", {
+        targetAgentId: resolvedEntryAgentId
+      });
       const direct = await this.invokeAgentWithSession(paths, resolvedEntryAgentId, {
         ...options,
         message: options.message
@@ -151,7 +163,7 @@ export class OrchestrationService {
     }
 
     const startTime = Date.now();
-    const loopResult = await this.runAiOrchestrationLoop(paths, runId, manifests, options);
+    const loopResult = await this.runAiOrchestrationLoop(paths, runId, manifests, options, runLogger);
     const durationMs = Date.now() - startTime;
     const completedAt = this.nowIso();
     const routing: RoutingDecision = {
@@ -194,7 +206,8 @@ export class OrchestrationService {
     paths: OpenGoatPaths,
     runId: string,
     manifests: AgentManifest[],
-    options: ProviderInvokeOptions
+    options: ProviderInvokeOptions,
+    runLogger: Logger
   ): Promise<OrchestrationLoopResult> {
     const steps: OrchestrationStepLog[] = [];
     const sessionGraph: OrchestrationRunLedger["sessionGraph"] = {
@@ -206,8 +219,13 @@ export class OrchestrationService {
     let delegationCount = 0;
     let finalMessage = "";
     let lastExecution: ProviderExecutionResult & AgentProviderBinding = await this.buildSyntheticExecution(paths, DEFAULT_AGENT_ID);
+    runLogger.info("Starting orchestration loop.", {
+      maxSteps: MAX_ORCHESTRATION_STEPS,
+      maxDelegations: MAX_DELEGATION_STEPS
+    });
 
     for (let step = 1; step <= MAX_ORCHESTRATION_STEPS; step += 1) {
+      const stepLogger = runLogger.child({ step });
       const plannerPrompt = this.plannerService.buildPlannerPrompt({
         userMessage: options.message,
         step,
@@ -215,6 +233,9 @@ export class OrchestrationService {
         sharedNotes: clampText(sharedNotes.join("\n\n"), SHARED_NOTES_MAX_CHARS),
         recentEvents,
         agents: manifests
+      });
+      stepLogger.debug("Planner prompt payload.", {
+        prompt: plannerPrompt
       });
 
       const plannerCall = await this.invokeAgentWithSession(paths, DEFAULT_AGENT_ID, {
@@ -224,10 +245,18 @@ export class OrchestrationService {
         forceNewSession: step === 1 ? options.forceNewSession : false
       }, { silent: true });
       const plannerRawOutput = plannerCall.execution.stdout.trim() || plannerCall.execution.stderr.trim();
+      stepLogger.debug("Planner raw output payload.", {
+        output: plannerRawOutput
+      });
       const plannerDecision = this.plannerService.parseDecision(
         plannerRawOutput,
         "I could not complete orchestration due to planner output parsing issues."
       );
+      stepLogger.info("Planner decision parsed.", {
+        actionType: plannerDecision.action.type,
+        actionMode: plannerDecision.action.mode ?? "direct",
+        rationale: plannerDecision.rationale
+      });
       addSessionNode(sessionGraph, DEFAULT_AGENT_ID, plannerCall.session);
 
       const stepLog: OrchestrationStepLog = {
@@ -247,7 +276,8 @@ export class OrchestrationService {
         sessionGraph,
         stepLog,
         sharedNotes,
-        recentEvents
+        recentEvents,
+        logger: stepLogger
       });
       steps.push(stepLog);
 
@@ -267,6 +297,7 @@ export class OrchestrationService {
         delegationCount += 1;
       }
       if (delegationCount >= MAX_DELEGATION_STEPS) {
+        stepLogger.warn("Delegation safety limit reached.");
         finalMessage = "Stopped orchestration after reaching delegation safety limit.";
         break;
       }
@@ -307,6 +338,7 @@ export class OrchestrationService {
     stepLog: OrchestrationStepLog;
     sharedNotes: string[];
     recentEvents: string[];
+    logger: Logger;
   }): Promise<{
     finalMessage?: string;
     execution?: ProviderExecutionResult & AgentProviderBinding;
@@ -315,6 +347,9 @@ export class OrchestrationService {
 
     if (action.type === "finish" || action.type === "respond_user") {
       const message = action.message.trim() || "Completed.";
+      params.logger.info("Completing orchestration with direct response.", {
+        actionType: action.type
+      });
       params.stepLog.note = action.reason;
       this.addRecentEvent(params.recentEvents, `Step ${params.step}: ${action.type}`);
       return {
@@ -329,6 +364,9 @@ export class OrchestrationService {
 
     if (action.type === "read_workspace_file") {
       const resolvedPath = this.resolveWorkspacePath(params.paths, action.path);
+      params.logger.info("Reading workspace file for orchestration context.", {
+        path: resolvedPath
+      });
       const exists = await this.fileSystem.exists(resolvedPath);
       const content = exists ? await this.fileSystem.readFile(resolvedPath) : `[MISSING] ${resolvedPath}`;
       params.sharedNotes.push(
@@ -341,6 +379,9 @@ export class OrchestrationService {
 
     if (action.type === "write_workspace_file") {
       const resolvedPath = this.resolveWorkspacePath(params.paths, action.path);
+      params.logger.info("Writing workspace file for orchestration context.", {
+        path: resolvedPath
+      });
       await this.fileSystem.ensureDir(path.dirname(resolvedPath));
       await this.fileSystem.writeFile(resolvedPath, ensureTrailingNewline(action.content));
       params.stepLog.artifactIO = { writePath: resolvedPath };
@@ -350,6 +391,10 @@ export class OrchestrationService {
 
     if (action.type === "install_skill") {
       const targetAgentId = normalizeAgentId(action.targetAgentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
+      params.logger.info("Installing skill requested by orchestrator action.", {
+        targetAgentId,
+        skillName: action.skillName
+      });
       const result = await this.skillService.installSkill(params.paths, {
         agentId: targetAgentId,
         skillName: action.skillName,
@@ -373,6 +418,9 @@ export class OrchestrationService {
     const targetManifest = params.manifests.find((manifest) => manifest.agentId === targetAgentId);
     if (!targetManifest || !targetManifest.metadata.delegation.canReceive) {
       const note = `Invalid delegation target "${action.targetAgentId}".`;
+      params.logger.warn("Invalid delegation target.", {
+        requestedTargetAgentId: action.targetAgentId
+      });
       params.sharedNotes.push(note);
       params.stepLog.note = note;
       this.addRecentEvent(params.recentEvents, note);
@@ -380,6 +428,12 @@ export class OrchestrationService {
     }
 
     const mode = action.mode ?? "hybrid";
+    params.logger.info("Delegating task to agent.", {
+      fromAgentId: DEFAULT_AGENT_ID,
+      toAgentId: targetAgentId,
+      mode,
+      reason: action.reason
+    });
     const handoffBaseDir = this.pathPort.join(
       params.paths.workspacesDir,
       DEFAULT_AGENT_ID,
@@ -413,6 +467,13 @@ export class OrchestrationService {
       outboundPath,
       sharedNotes: params.sharedNotes
     });
+    params.logger.debug("Delegation message payload.", {
+      fromAgentId: DEFAULT_AGENT_ID,
+      toAgentId: targetAgentId,
+      request: delegateMessage,
+      mode,
+      outboundPath
+    });
 
     const delegateCall = await this.invokeAgentWithSession(params.paths, targetAgentId, {
       message: delegateMessage,
@@ -423,6 +484,13 @@ export class OrchestrationService {
     const responseText =
       delegateCall.execution.stdout.trim() ||
       (delegateCall.execution.stderr.trim() ? `[stderr] ${delegateCall.execution.stderr.trim()}` : "");
+    params.logger.debug("Delegation response payload.", {
+      fromAgentId: DEFAULT_AGENT_ID,
+      toAgentId: targetAgentId,
+      code: delegateCall.execution.code,
+      providerId: delegateCall.execution.providerId,
+      response: responseText
+    });
 
     let inboundPath: string | undefined;
     if (mode === "artifacts" || mode === "hybrid") {
@@ -485,6 +553,13 @@ export class OrchestrationService {
     options: ProviderInvokeOptions,
     behavior: { silent?: boolean } = {}
   ): Promise<AgentInvocationResult> {
+    this.logger.debug("Preparing agent invocation with session context.", {
+      agentId,
+      message: options.message,
+      sessionRef: options.sessionRef,
+      forceNewSession: options.forceNewSession,
+      disableSession: options.disableSession
+    });
     const preparedSession = await this.sessionService.prepareRunSession(paths, agentId, {
       sessionRef: options.sessionRef,
       forceNew: options.forceNewSession,
@@ -500,6 +575,13 @@ export class OrchestrationService {
       delete invokeOptions.onStderr;
     }
     const execution = await this.providerService.invokeAgent(paths, agentId, invokeOptions);
+    this.logger.debug("Agent invocation execution returned.", {
+      agentId,
+      providerId: execution.providerId,
+      code: execution.code,
+      stdout: execution.stdout,
+      stderr: execution.stderr
+    });
     if (!preparedSession.enabled) {
       return {
         execution,

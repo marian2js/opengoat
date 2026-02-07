@@ -80,6 +80,7 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 ## Commands
 
 - `./bin/opengoat` or `./bin/opengoat init`
+- `./bin/opengoat --log-level debug --log-format pretty agent --message "hi"`
 - `./bin/opengoat acp [--agent <id>] [--session-prefix <prefix>] [--history-limit <n>] [--verbose]`
 - `./bin/opengoat onboard`
 - `./bin/opengoat agent --message "<text>"` (defaults to `orchestrator`)
@@ -106,6 +107,18 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - `./bin/opengoat agent provider get <agent-id>`
 - `./bin/opengoat agent provider set <agent-id> <provider-id>`
 - `./bin/opengoat agent run <agent-id> --message <text> [--session <key|id>] [--new-session|--no-session] [--model <model>] [-- <provider-args>]`
+
+Global logging flags (must be before the command):
+
+- `--log-level <silent|error|warn|info|debug>`
+- `--log-format <pretty|json>`
+
+Environment alternatives:
+
+- `OPENGOAT_LOG_LEVEL`
+- `OPENGOAT_LOG_FORMAT`
+
+At `debug` level, OpenGoat logs orchestration planner prompts, delegated agent request prompts, and provider responses to help diagnose agent-to-agent communication.
 
 Detailed orchestration flow and scenario strategy:
 

@@ -1,7 +1,9 @@
 import { NodeFileSystem } from "../../platform/node/node-file-system.js";
 import { NodeCommandRunner } from "../../platform/node/node-command-runner.js";
+import { createNodeLogger } from "../../platform/node/node-logger.js";
 import { NodeOpenGoatPathsProvider, NodePathPort } from "../../platform/node/node-path.port.js";
 import { OpenGoatService } from "../../core/opengoat/index.js";
+import type { LogLevel } from "../../core/logging/index.js";
 import { acpCommand } from "./commands/acp.command.js";
 import { agentCommand } from "./commands/agent.command.js";
 import { agentCreateCommand } from "./commands/agent-create.command.js";
@@ -33,12 +35,19 @@ import { sessionResetCommand } from "./commands/session-reset.command.js";
 import { CommandRouter } from "./framework/router.js";
 
 export async function runCli(argv: string[]): Promise<number> {
+  const globalOptions = parseGlobalCliOptions(argv);
+  const logger = createNodeLogger({
+    level: globalOptions.logLevel,
+    format: globalOptions.logFormat
+  }).child({ scope: "cli" });
+
   const service = createLazyService(() => {
     return new OpenGoatService({
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
       pathsProvider: new NodeOpenGoatPathsProvider(),
-      commandRunner: new NodeCommandRunner()
+      commandRunner: new NodeCommandRunner(),
+      logger
     });
   });
 
@@ -80,7 +89,91 @@ export async function runCli(argv: string[]): Promise<number> {
     }
   );
 
-  return router.dispatch(argv);
+  return router.dispatch(globalOptions.passthroughArgv);
+}
+
+interface GlobalCliOptions {
+  passthroughArgv: string[];
+  logLevel?: LogLevel;
+  logFormat?: "pretty" | "json";
+}
+
+function parseGlobalCliOptions(argv: string[]): GlobalCliOptions {
+  const passthrough: string[] = [];
+  let logLevel: LogLevel | undefined;
+  let logFormat: "pretty" | "json" | undefined;
+  let index = 0;
+  let parsingGlobals = true;
+
+  while (index < argv.length) {
+    const token = argv[index];
+    if (token === undefined) {
+      break;
+    }
+
+    if (!parsingGlobals) {
+      passthrough.push(token);
+      index += 1;
+      continue;
+    }
+
+    if (token === "--log-level") {
+      const value = argv[index + 1];
+      if (!value) {
+        throw new Error("Missing value for --log-level.");
+      }
+      logLevel = parseLogLevel(value);
+      index += 2;
+      continue;
+    }
+
+    if (token.startsWith("--log-level=")) {
+      logLevel = parseLogLevel(token.slice("--log-level=".length));
+      index += 1;
+      continue;
+    }
+
+    if (token === "--log-format") {
+      const value = argv[index + 1]?.trim().toLowerCase();
+      if (!value) {
+        throw new Error("Missing value for --log-format.");
+      }
+      if (value !== "pretty" && value !== "json") {
+        throw new Error('Invalid --log-format. Use "pretty" or "json".');
+      }
+      logFormat = value;
+      index += 2;
+      continue;
+    }
+
+    if (token.startsWith("--log-format=")) {
+      const value = token.slice("--log-format=".length).trim().toLowerCase();
+      if (value !== "pretty" && value !== "json") {
+        throw new Error('Invalid --log-format. Use "pretty" or "json".');
+      }
+      logFormat = value;
+      index += 1;
+      continue;
+    }
+
+    parsingGlobals = false;
+    passthrough.push(token);
+    index += 1;
+  }
+
+  return {
+    passthroughArgv: passthrough,
+    logLevel,
+    logFormat
+  };
+}
+
+function parseLogLevel(raw: string): LogLevel {
+  const value = raw.trim().toLowerCase();
+  if (value === "silent" || value === "error" || value === "warn" || value === "info" || value === "debug") {
+    return value;
+  }
+  throw new Error('Invalid --log-level. Use "silent", "error", "warn", "info", or "debug".');
 }
 
 function createLazyService(factory: () => OpenGoatService): OpenGoatService {
