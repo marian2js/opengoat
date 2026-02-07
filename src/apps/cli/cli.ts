@@ -1,4 +1,5 @@
 import { NodeFileSystem } from "../../platform/node/node-file-system.js";
+import { NodeCommandRunner } from "../../platform/node/node-command-runner.js";
 import { NodeOpenGoatPathsProvider, NodePathPort } from "../../platform/node/node-path.port.js";
 import { OpenGoatService } from "../../core/opengoat/index.js";
 import { agentCommand } from "./commands/agent.command.js";
@@ -9,6 +10,13 @@ import { agentProviderSetCommand } from "./commands/agent-provider-set.command.j
 import { agentRunCommand } from "./commands/agent-run.command.js";
 import { initCommand } from "./commands/init.command.js";
 import { onboardCommand } from "./commands/onboard.command.js";
+import { pluginCommand } from "./commands/plugin.command.js";
+import { pluginDisableCommand } from "./commands/plugin-disable.command.js";
+import { pluginDoctorCommand } from "./commands/plugin-doctor.command.js";
+import { pluginEnableCommand } from "./commands/plugin-enable.command.js";
+import { pluginInfoCommand } from "./commands/plugin-info.command.js";
+import { pluginInstallCommand } from "./commands/plugin-install.command.js";
+import { pluginListCommand } from "./commands/plugin-list.command.js";
 import { providerListCommand } from "./commands/provider-list.command.js";
 import { routeCommand } from "./commands/route.command.js";
 import { scenarioCommand } from "./commands/scenario.command.js";
@@ -28,7 +36,8 @@ export async function runCli(argv: string[]): Promise<number> {
     return new OpenGoatService({
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
-      pathsProvider: new NodeOpenGoatPathsProvider()
+      pathsProvider: new NodeOpenGoatPathsProvider(),
+      commandRunner: new NodeCommandRunner()
     });
   });
 
@@ -39,6 +48,13 @@ export async function runCli(argv: string[]): Promise<number> {
       routeCommand,
       scenarioCommand,
       scenarioRunCommand,
+      pluginCommand,
+      pluginListCommand,
+      pluginInstallCommand,
+      pluginInfoCommand,
+      pluginEnableCommand,
+      pluginDisableCommand,
+      pluginDoctorCommand,
       skillCommand,
       skillListCommand,
       skillInstallCommand,

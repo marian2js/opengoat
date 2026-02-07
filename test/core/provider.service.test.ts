@@ -26,6 +26,46 @@ afterEach(async () => {
 });
 
 describe("ProviderService", () => {
+  it("loads provider registry lazily only when first provider operation is requested", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+    const { fileSystem } = await createPaths(root);
+
+    const registry = new ProviderRegistry();
+    registry.register("fake", () =>
+      createProvider({
+        id: "fake",
+        capabilities: { agent: false, model: true, auth: false, passthrough: false },
+        onInvoke: () => undefined
+      })
+    );
+
+    let loadCount = 0;
+    const service = new ProviderService({
+      fileSystem,
+      pathPort: new NodePathPort(),
+      providerRegistry: () => {
+        loadCount += 1;
+        return registry;
+      },
+      workspaceContextService: new WorkspaceContextService({
+        fileSystem,
+        pathPort: new NodePathPort()
+      }),
+      skillService: new SkillService({
+        fileSystem,
+        pathPort: new NodePathPort()
+      }),
+      nowIso: () => "2026-02-06T00:00:00.000Z"
+    });
+
+    expect(loadCount).toBe(0);
+    await service.listProviders();
+    expect(loadCount).toBe(1);
+    await service.listProviders();
+    expect(loadCount).toBe(1);
+  });
+
   it("injects workspace context into system prompt and defaults cwd to workspace", async () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
