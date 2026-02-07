@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const rootModules = path.resolve(currentDir, "../../node_modules");
 
 const externals = [
   "electron",
@@ -17,7 +18,9 @@ export default defineConfig({
     alias: {
       "@main": path.resolve(currentDir, "src/main"),
       "@shared": path.resolve(currentDir, "src/shared"),
-      "@opengoat/core": path.resolve(currentDir, "../core/src/index.ts")
+      "@opengoat/core": path.resolve(currentDir, "../core/src/index.ts"),
+      "@trpc/server": path.resolve(rootModules, "@trpc/server"),
+      "@trpc/client": path.resolve(rootModules, "@trpc/client")
     }
   },
   build: {

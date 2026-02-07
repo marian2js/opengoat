@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const rootModules = path.resolve(currentDir, "../../node_modules");
 
 export default defineConfig({
   root: path.resolve(currentDir, "src/renderer"),
@@ -13,7 +14,9 @@ export default defineConfig({
     alias: {
       "@main": path.resolve(currentDir, "src/main"),
       "@renderer": path.resolve(currentDir, "src/renderer/src"),
-      "@shared": path.resolve(currentDir, "src/shared")
+      "@shared": path.resolve(currentDir, "src/shared"),
+      "@trpc/server": path.resolve(rootModules, "@trpc/server"),
+      "@trpc/client": path.resolve(rootModules, "@trpc/client")
     }
   },
   build: {
