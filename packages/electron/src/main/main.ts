@@ -59,16 +59,16 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
 
 app.whenReady().then(async () => {
   await runtime.service.initialize();
-  const window = await createMainWindow();
 
-  createIPCHandler({
-    router,
-    windows: [window],
-  });
+  const ipcHandler = createIPCHandler({ router, windows: [] });
+
+  const window = await createMainWindow();
+  ipcHandler.attachWindow(window);
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      await createMainWindow();
+      const newWindow = await createMainWindow();
+      ipcHandler.attachWindow(newWindow);
     }
   });
 });
