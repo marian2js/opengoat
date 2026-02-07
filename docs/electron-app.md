@@ -79,6 +79,20 @@ Entity model:
 - Session: id, title, `sessionKey` (mapped to OpenGoat sessionRef), messages[]
 - Message: role (`user`/`assistant`), content, optional trace/provider metadata
 
+## Onboarding UX
+
+Desktop onboarding is now a guided first-run flow aligned with CLI intent:
+
+- Step 1: choose a provider (grouped by Cloud APIs vs Local Tools)
+- Step 2: complete only required fields in "Quick Setup"
+- Optional fields stay collapsed under "Advanced Settings"
+
+Behavior rules:
+
+- If bootstrap reports `needsOnboarding=true`, onboarding is shown before chat.
+- On successful submit where `needsOnboarding=false`, onboarding closes automatically.
+- If provider execution later fails, onboarding can reopen with error context for repair.
+
 ## Project Working Path Behavior
 
 When sending a chat message from desktop:
