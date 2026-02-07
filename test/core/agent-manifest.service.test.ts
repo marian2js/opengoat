@@ -96,6 +96,7 @@ async function createHarness(): Promise<{
     homeDir: root,
     workspacesDir: path.join(root, "workspaces"),
     agentsDir: path.join(root, "agents"),
+    skillsDir: path.join(root, "skills"),
     providersDir: path.join(root, "providers"),
     runsDir: path.join(root, "runs"),
     globalConfigJsonPath: path.join(root, "config.json"),

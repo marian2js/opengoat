@@ -34,10 +34,16 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - CLI automatically loads environment variables from `.env` in the current working directory.
 - `orchestrator` is the immutable default agent for inbound message routing.
 - Every agent has exactly one assigned provider (`~/.opengoat/agents/<agent>/config.json`).
+- Every agent has skill support:
+  - managed skills: `~/.opengoat/skills/<skill-id>/SKILL.md`
+  - workspace skills: `~/.opengoat/workspaces/<agent-id>/skills/<skill-id>/SKILL.md`
+  - workspace skills override managed skills with the same id.
 - Agent metadata lives in front matter at `AGENTS.md` (`id`, `name`, `description`, `provider`, `tags`, `delegation`, `priority`) and is used for routing decisions.
 - On every `agent run`, OpenGoat loads configured workspace bootstrap files, injects them into a generated system prompt with missing-file markers + truncation protection, and runs the provider with the agent workspace as default `cwd`.
+- OpenGoat also injects a bounded skills section into the system prompt, including skill metadata and SKILL.md content.
 - Every agent run writes a trace JSON file at `~/.opengoat/runs/<run-id>.json` containing entry agent, routing decision, and provider execution output.
 - Orchestrator runs an AI-driven delegation loop with action types (`delegate_to_agent`, `read_workspace_file`, `write_workspace_file`, `respond_user`, `finish`) and configurable communication mode (`direct`, `artifacts`, `hybrid`).
+- Orchestrator can also execute `install_skill` actions to install skills for target agents during orchestration.
 - Sessions are persisted per agent under `~/.opengoat/agents/<agent-id>/sessions/`:
   - `sessions.json` (session store map keyed by session key)
   - `<session-id>.jsonl` (transcript events)
@@ -70,6 +76,8 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - `./bin/opengoat session reset [--agent <id>] [--session <key|id>]`
 - `./bin/opengoat session compact [--agent <id>] [--session <key|id>]`
 - `./bin/opengoat scenario run --file <scenario.json> [--mode live|scripted] [--json]`
+- `./bin/opengoat skill list [--agent <id>] [--json]`
+- `./bin/opengoat skill install <name> [--agent <id>] [--from <path>] [--description <text>] [--json]`
 - `./bin/opengoat agent provider get <agent-id>`
 - `./bin/opengoat agent provider set <agent-id> <provider-id>`
 - `./bin/opengoat agent run <agent-id> --message <text> [--session <key|id>] [--new-session|--no-session] [--model <model>] [-- <provider-args>]`
@@ -108,6 +116,17 @@ Detailed orchestration flow and scenario strategy:
 - Optional command override: `OPENCODE_CMD`
 - Optional default model: `OPENCODE_MODEL`
 - Auth flow: `opencode auth login`
+
+## Skills
+
+- Install by CLI:
+  - `./bin/opengoat skill install release-checklist --agent developer`
+  - `./bin/opengoat skill install code-review --agent developer --from ~/skills/code-review`
+- List installed skills:
+  - `./bin/opengoat skill list --agent developer`
+- Install by asking the orchestrator:
+  - `./bin/opengoat agent --message "Install skill release-checklist for developer"`
+  - The orchestrator can use `install_skill` actions to materialize the skill under the target agent workspace.
 
 ## Grok Provider
 

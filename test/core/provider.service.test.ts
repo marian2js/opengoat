@@ -7,6 +7,7 @@ import {
   InvalidProviderConfigError,
   ProviderService
 } from "../../src/core/providers/index.js";
+import { SkillService } from "../../src/core/skills/index.js";
 import { ProviderRegistry } from "../../src/core/providers/registry.js";
 import type { Provider, ProviderInvokeOptions } from "../../src/core/providers/types.js";
 import { NodeFileSystem } from "../../src/platform/node/node-file-system.js";
@@ -56,6 +57,7 @@ describe("ProviderService", () => {
     expect(captured[0]?.message).toBe("hello");
     expect(captured[0]?.systemPrompt).toContain("# Project Context");
     expect(captured[0]?.systemPrompt).toContain("## AGENTS.md");
+    expect(captured[0]?.systemPrompt).toContain("## Skills");
     expect(captured[0]?.systemPrompt).toContain("[MISSING] Expected at:");
   });
 
@@ -241,6 +243,7 @@ async function createPaths(root: string): Promise<{ paths: OpenGoatPaths; fileSy
     homeDir: root,
     workspacesDir: path.join(root, "workspaces"),
     agentsDir: path.join(root, "agents"),
+    skillsDir: path.join(root, "skills"),
     providersDir: path.join(root, "providers"),
     runsDir: path.join(root, "runs"),
     globalConfigJsonPath: path.join(root, "config.json"),
@@ -250,6 +253,7 @@ async function createPaths(root: string): Promise<{ paths: OpenGoatPaths; fileSy
 
   await fileSystem.ensureDir(paths.workspacesDir);
   await fileSystem.ensureDir(paths.agentsDir);
+  await fileSystem.ensureDir(paths.skillsDir);
   await fileSystem.ensureDir(paths.providersDir);
   await fileSystem.ensureDir(paths.runsDir);
   await fileSystem.ensureDir(path.join(paths.workspacesDir, "orchestrator"));
@@ -293,6 +297,7 @@ function createProviderService(fileSystem: NodeFileSystem, registry: ProviderReg
     pathPort,
     providerRegistry: registry,
     workspaceContextService: new WorkspaceContextService({ fileSystem, pathPort }),
+    skillService: new SkillService({ fileSystem, pathPort }),
     nowIso: () => "2026-02-06T00:00:00.000Z"
   });
 }

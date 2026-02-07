@@ -11,5 +11,6 @@ export * from "./core/opengoat/index.js";
 export * from "./core/orchestration/index.js";
 export * from "./core/sessions/index.js";
 export * from "./core/scenarios/index.js";
+export * from "./core/skills/index.js";
 export * from "./platform/node/node-file-system.js";
 export * from "./platform/node/node-path.port.js";

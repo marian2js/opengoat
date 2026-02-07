@@ -32,6 +32,7 @@ export function renderGlobalConfigMarkdown(): string {
     "- `agents.json`: registered agent ids",
     "- `workspaces/`: user-visible agent workspaces",
     "- `agents/`: internal per-agent configuration",
+    "- `skills/`: managed shared skills (optional source for agent installs)",
     "- `providers/`: provider credentials and endpoint settings",
     "- `runs/`: run traces (routing + execution history)",
     "",
@@ -188,6 +189,20 @@ export function renderInternalAgentConfig(agent: AgentIdentity): Record<string, 
           triggerChars: 32_000,
           keepRecentMessages: 20,
           summaryMaxChars: 4_000
+        },
+        skills: {
+          enabled: true,
+          includeWorkspace: true,
+          includeManaged: true,
+          load: {
+            extraDirs: []
+          },
+          prompt: {
+            maxSkills: 12,
+            maxCharsPerSkill: 6_000,
+            maxTotalChars: 36_000,
+            includeContent: true
+          }
         }
       }
     },

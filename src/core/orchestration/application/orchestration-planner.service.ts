@@ -24,6 +24,7 @@ export class OrchestrationPlannerService {
       "",
       "Action policy:",
       "- Use delegate_to_agent when a specialized agent should execute the next step.",
+      "- Use install_skill when a skill should be installed for an agent before continuing.",
       "- Use read_workspace_file / write_workspace_file when coordination artifacts are needed.",
       "- Use respond_user when you can directly answer with high confidence.",
       "- Use finish when the task is complete.",
@@ -50,14 +51,17 @@ export class OrchestrationPlannerService {
       "{",
       '  "rationale": "short reason",',
       '  "action": {',
-      '    "type": "delegate_to_agent|read_workspace_file|write_workspace_file|respond_user|finish",',
+      '    "type": "delegate_to_agent|read_workspace_file|write_workspace_file|install_skill|respond_user|finish",',
       '    "mode": "direct|artifacts|hybrid",',
       '    "reason": "optional short reason",',
       '    "targetAgentId": "required for delegate_to_agent",',
       '    "message": "required for delegate_to_agent/respond_user/finish",',
       '    "expectedOutput": "optional for delegate_to_agent",',
       '    "path": "required for read_workspace_file/write_workspace_file",',
-      '    "content": "required for write_workspace_file"',
+      '    "content": "required for write_workspace_file; optional for install_skill to create inline skill content",',
+      '    "skillName": "required for install_skill",',
+      '    "description": "optional for install_skill",',
+      '    "sourcePath": "optional for install_skill"',
       "  }",
       "}"
     ];
@@ -163,6 +167,9 @@ function isAction(value: unknown): value is OrchestrationAction {
     message?: unknown;
     path?: unknown;
     content?: unknown;
+    skillName?: unknown;
+    description?: unknown;
+    sourcePath?: unknown;
   };
   if (
     record.mode !== undefined &&
@@ -181,6 +188,24 @@ function isAction(value: unknown): value is OrchestrationAction {
   }
   if (record.type === "write_workspace_file") {
     return typeof record.path === "string" && typeof record.content === "string";
+  }
+  if (record.type === "install_skill") {
+    if (typeof record.skillName !== "string") {
+      return false;
+    }
+    if (record.targetAgentId !== undefined && typeof record.targetAgentId !== "string") {
+      return false;
+    }
+    if (record.sourcePath !== undefined && typeof record.sourcePath !== "string") {
+      return false;
+    }
+    if (record.description !== undefined && typeof record.description !== "string") {
+      return false;
+    }
+    if (record.content !== undefined && typeof record.content !== "string") {
+      return false;
+    }
+    return true;
   }
   if (record.type === "respond_user" || record.type === "finish") {
     return typeof record.message === "string";
@@ -220,6 +245,21 @@ function sanitizeDecision(decision: OrchestrationPlannerDecision): Orchestration
       action: {
         ...action,
         path: action.path.trim(),
+        mode: action.mode ?? "artifacts"
+      }
+    };
+  }
+
+  if (action.type === "install_skill") {
+    return {
+      rationale: decision.rationale.trim() || "Installing skill.",
+      action: {
+        ...action,
+        skillName: action.skillName.trim(),
+        targetAgentId: action.targetAgentId?.trim().toLowerCase(),
+        sourcePath: action.sourcePath?.trim(),
+        description: action.description?.trim(),
+        content: action.content,
         mode: action.mode ?? "artifacts"
       }
     };

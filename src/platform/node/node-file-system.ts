@@ -1,10 +1,18 @@
-import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import type { FileSystemPort } from "../../core/ports/file-system.port.js";
 
 export class NodeFileSystem implements FileSystemPort {
   public async ensureDir(path: string): Promise<void> {
     await mkdir(path, { recursive: true });
+  }
+
+  public async removeDir(path: string): Promise<void> {
+    await rm(path, { recursive: true, force: true });
+  }
+
+  public async copyDir(sourcePath: string, targetPath: string): Promise<void> {
+    await cp(sourcePath, targetPath, { recursive: true, force: true });
   }
 
   public async exists(path: string): Promise<boolean> {
