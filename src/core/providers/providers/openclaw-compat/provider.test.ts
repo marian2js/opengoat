@@ -34,6 +34,33 @@ describe("openclaw compat provider", () => {
     ]);
   });
 
+  it("passes provider session id through --session-id", async () => {
+    const requests: Array<{ command: string; args: string[] }> = [];
+    const provider = new OpenClawCompatProvider(findSpec("openai"), {
+      execute: async (request) => {
+        requests.push({ command: request.command, args: request.args });
+        return { code: 0, stdout: "ok\n", stderr: "" };
+      }
+    });
+
+    const result = await provider.invoke({
+      message: "continue",
+      model: "openai/gpt-5.1-codex",
+      providerSessionId: "provider-session-9"
+    });
+
+    expect(requests[0]?.args).toEqual([
+      "agent",
+      "--session-id",
+      "provider-session-9",
+      "--model",
+      "openai/gpt-5.1-codex",
+      "--message",
+      "continue"
+    ]);
+    expect(result.providerSessionId).toBe("provider-session-9");
+  });
+
   it("uses provider model env var fallback when --model is missing", async () => {
     const requests: Array<{ command: string; args: string[] }> = [];
     const modelEnvVar = resolveOpenClawCompatModelEnvVar("openrouter");
@@ -205,4 +232,3 @@ function findSpec(providerId: string) {
   }
   return spec;
 }
-

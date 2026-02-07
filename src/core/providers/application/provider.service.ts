@@ -259,6 +259,8 @@ export class ProviderService {
       sessionRef: options.sessionRef,
       forceNewSession: options.forceNewSession,
       disableSession: options.disableSession,
+      providerSessionId: options.providerSessionId,
+      forceNewProviderSession: options.forceNewProviderSession,
       passthroughArgs: invokeOptions.passthroughArgs,
       model: invokeOptions.model
     });
@@ -274,7 +276,8 @@ export class ProviderService {
       providerId: provider.id,
       code: result.code,
       stdout: result.stdout,
-      stderr: result.stderr
+      stderr: result.stderr,
+      providerSessionId: result.providerSessionId
     });
 
     return {

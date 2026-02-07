@@ -13,6 +13,8 @@ export interface ProviderInvokeOptions {
   sessionRef?: string;
   forceNewSession?: boolean;
   disableSession?: boolean;
+  providerSessionId?: string;
+  forceNewProviderSession?: boolean;
   sessionContext?: string;
   agent?: string;
   model?: string;
@@ -35,6 +37,7 @@ export interface ProviderExecutionResult {
   code: number;
   stdout: string;
   stderr: string;
+  providerSessionId?: string;
 }
 
 export interface ProviderInvocation {

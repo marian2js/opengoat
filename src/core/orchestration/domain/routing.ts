@@ -41,6 +41,7 @@ export interface AgentRunTrace {
     steps: OrchestrationStepLog[];
     finalMessage: string;
     sessionGraph: OrchestrationRunLedger["sessionGraph"];
+    taskThreads?: OrchestrationRunLedger["taskThreads"];
   };
 }
 
@@ -54,6 +55,7 @@ export type OrchestrationRunResult = ProviderExecutionResult &
       steps: OrchestrationStepLog[];
       finalMessage: string;
       sessionGraph: OrchestrationRunLedger["sessionGraph"];
+      taskThreads?: OrchestrationRunLedger["taskThreads"];
     };
     session?: SessionRunInfo & {
       preRunCompactionApplied: boolean;

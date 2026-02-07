@@ -13,7 +13,8 @@ import type {
   OrchestrationAction,
   OrchestrationPlannerDecision,
   OrchestrationRunLedger,
-  OrchestrationStepLog
+  OrchestrationStepLog,
+  OrchestrationTaskSessionPolicy
 } from "../domain/loop.js";
 import type { AgentRunTrace, OrchestrationRunResult, RoutingDecision } from "../domain/routing.js";
 import { OrchestrationPlannerService } from "./orchestration-planner.service.js";
@@ -45,6 +46,19 @@ interface OrchestrationLoopResult {
   execution: ProviderExecutionResult & AgentProviderBinding;
   steps: OrchestrationStepLog[];
   sessionGraph: OrchestrationRunLedger["sessionGraph"];
+  taskThreads: NonNullable<OrchestrationRunLedger["taskThreads"]>;
+}
+
+interface TaskThreadState {
+  taskKey: string;
+  agentId: string;
+  providerId?: string;
+  providerSessionId?: string;
+  sessionKey?: string;
+  sessionId?: string;
+  createdStep: number;
+  updatedStep: number;
+  lastResponse?: string;
 }
 
 const MAX_ORCHESTRATION_STEPS = 12;
@@ -135,20 +149,23 @@ export class OrchestrationService {
         execution: direct.execution,
         durationMs: 0,
         session: direct.session,
-        orchestration: {
-          mode: "single-agent",
-          finalMessage: direct.execution.stdout,
-          steps: [],
-          sessionGraph: {
+          orchestration: {
+            mode: "single-agent",
+            finalMessage: direct.execution.stdout,
+            steps: [],
+            sessionGraph: {
             nodes: [
               {
                 agentId: resolvedEntryAgentId,
+                providerId: direct.execution.providerId,
                 sessionKey: direct.session?.sessionKey,
-                sessionId: direct.session?.sessionId
+                sessionId: direct.session?.sessionId,
+                providerSessionId: direct.execution.providerSessionId
               }
             ],
             edges: []
-          }
+          },
+          taskThreads: []
         }
       });
 
@@ -189,7 +206,8 @@ export class OrchestrationService {
         mode: "ai-loop",
         finalMessage: loopResult.finalMessage,
         steps: loopResult.steps,
-        sessionGraph: loopResult.sessionGraph
+        sessionGraph: loopResult.sessionGraph,
+        taskThreads: loopResult.taskThreads
       }
     });
 
@@ -214,6 +232,7 @@ export class OrchestrationService {
       nodes: [],
       edges: []
     };
+    const taskThreads = new Map<string, TaskThreadState>();
     const sharedNotes: string[] = [];
     const recentEvents: string[] = [];
     let delegationCount = 0;
@@ -232,7 +251,8 @@ export class OrchestrationService {
         maxSteps: MAX_ORCHESTRATION_STEPS,
         sharedNotes: clampText(sharedNotes.join("\n\n"), SHARED_NOTES_MAX_CHARS),
         recentEvents,
-        agents: manifests
+        agents: manifests,
+        taskThreads: summarizeTaskThreads(taskThreads)
       });
       stepLogger.debug("Planner prompt payload.", {
         prompt: plannerPrompt
@@ -257,7 +277,7 @@ export class OrchestrationService {
         actionMode: plannerDecision.action.mode ?? "direct",
         rationale: plannerDecision.rationale
       });
-      addSessionNode(sessionGraph, DEFAULT_AGENT_ID, plannerCall.session);
+      addSessionNode(sessionGraph, DEFAULT_AGENT_ID, plannerCall.session, plannerCall.execution);
 
       const stepLog: OrchestrationStepLog = {
         step,
@@ -277,6 +297,7 @@ export class OrchestrationService {
         stepLog,
         sharedNotes,
         recentEvents,
+        taskThreads,
         logger: stepLogger
       });
       steps.push(stepLog);
@@ -323,7 +344,8 @@ export class OrchestrationService {
       finalMessage,
       execution: lastExecution,
       steps,
-      sessionGraph
+      sessionGraph,
+      taskThreads: summarizeTaskThreads(taskThreads)
     };
   }
 
@@ -338,6 +360,7 @@ export class OrchestrationService {
     stepLog: OrchestrationStepLog;
     sharedNotes: string[];
     recentEvents: string[];
+    taskThreads: Map<string, TaskThreadState>;
     logger: Logger;
   }): Promise<{
     finalMessage?: string;
@@ -427,12 +450,31 @@ export class OrchestrationService {
       return {};
     }
 
+    const taskKey = resolveTaskKey(action.taskKey, targetAgentId, params.step);
+    const requestedSessionPolicy = action.sessionPolicy ?? "auto";
+    const existingThread = params.taskThreads.get(taskKey);
+    const canReuseThread = Boolean(existingThread && existingThread.agentId === targetAgentId);
+    const effectiveSessionPolicy: OrchestrationTaskSessionPolicy =
+      requestedSessionPolicy === "reuse" ? (canReuseThread ? "reuse" : "new") : requestedSessionPolicy;
+    const forceNewTaskSession = effectiveSessionPolicy === "new" || !canReuseThread;
+    if (requestedSessionPolicy === "reuse" && !canReuseThread) {
+      const note = `Requested reuse for task "${taskKey}" but no matching thread exists; creating a new session.`;
+      params.sharedNotes.push(note);
+      this.addRecentEvent(params.recentEvents, note);
+      params.logger.warn("Requested task session reuse but no matching thread was found.", {
+        taskKey,
+        targetAgentId
+      });
+    }
+
     const mode = action.mode ?? "hybrid";
     params.logger.info("Delegating task to agent.", {
       fromAgentId: DEFAULT_AGENT_ID,
       toAgentId: targetAgentId,
       mode,
-      reason: action.reason
+      reason: action.reason,
+      taskKey,
+      sessionPolicy: effectiveSessionPolicy
     });
     const handoffBaseDir = this.pathPort.join(
       params.paths.workspacesDir,
@@ -470,16 +512,24 @@ export class OrchestrationService {
     params.logger.debug("Delegation message payload.", {
       fromAgentId: DEFAULT_AGENT_ID,
       toAgentId: targetAgentId,
+      taskKey,
       request: delegateMessage,
       mode,
       outboundPath
     });
 
+    const providerSessionId =
+      effectiveSessionPolicy !== "new" && existingThread?.agentId === targetAgentId
+        ? existingThread.providerSessionId
+        : undefined;
     const delegateCall = await this.invokeAgentWithSession(params.paths, targetAgentId, {
       message: delegateMessage,
       env: params.options.env,
       cwd: params.options.cwd,
-      sessionRef: `agent:${targetAgentId}:delegation:${params.runId}`
+      sessionRef: `agent:${targetAgentId}:task:${taskKey}`,
+      forceNewSession: forceNewTaskSession,
+      providerSessionId,
+      forceNewProviderSession: forceNewTaskSession
     }, { silent: true });
     const responseText =
       delegateCall.execution.stdout.trim() ||
@@ -505,22 +555,36 @@ export class OrchestrationService {
 
     params.stepLog.agentCall = {
       targetAgentId,
+      taskKey,
+      sessionPolicy: effectiveSessionPolicy,
       request: delegateMessage,
       response: responseText,
       code: delegateCall.execution.code,
       providerId: delegateCall.execution.providerId,
       sessionKey: delegateCall.session?.sessionKey,
-      sessionId: delegateCall.session?.sessionId
+      sessionId: delegateCall.session?.sessionId,
+      providerSessionId: delegateCall.execution.providerSessionId
     };
 
-    addSessionNode(params.sessionGraph, targetAgentId, delegateCall.session);
+    addSessionNode(params.sessionGraph, targetAgentId, delegateCall.session, delegateCall.execution);
+    upsertTaskThread(params.taskThreads, {
+      taskKey,
+      agentId: targetAgentId,
+      createdStep: params.step,
+      updatedStep: params.step,
+      providerId: delegateCall.execution.providerId,
+      providerSessionId: delegateCall.execution.providerSessionId,
+      sessionKey: delegateCall.session?.sessionKey,
+      sessionId: delegateCall.session?.sessionId,
+      lastResponse: summarizeText(responseText || "(no response)")
+    });
     params.sessionGraph.edges.push({
       fromAgentId: DEFAULT_AGENT_ID,
       toAgentId: targetAgentId,
       reason: action.reason || params.stepLog.plannerDecision.rationale
     });
 
-    const note = `Delegated to ${targetAgentId}: ${summarizeText(responseText || "(no response)")}`;
+    const note = `Delegated to ${targetAgentId} [task:${taskKey}]: ${summarizeText(responseText || "(no response)")}`;
     params.sharedNotes.push(clampText(note, 2000));
     this.addRecentEvent(params.recentEvents, note);
 
@@ -558,7 +622,9 @@ export class OrchestrationService {
       message: options.message,
       sessionRef: options.sessionRef,
       forceNewSession: options.forceNewSession,
-      disableSession: options.disableSession
+      disableSession: options.disableSession,
+      providerSessionId: options.providerSessionId,
+      forceNewProviderSession: options.forceNewProviderSession
     });
     const preparedSession = await this.sessionService.prepareRunSession(paths, agentId, {
       sessionRef: options.sessionRef,
@@ -580,7 +646,8 @@ export class OrchestrationService {
       providerId: execution.providerId,
       code: execution.code,
       stdout: execution.stdout,
-      stderr: execution.stderr
+      stderr: execution.stderr,
+      providerSessionId: execution.providerSessionId
     });
     if (!preparedSession.enabled) {
       return {
@@ -765,7 +832,8 @@ function addSessionNode(
         preRunCompactionApplied: boolean;
         postRunCompaction?: SessionCompactionResult;
       })
-    | undefined
+    | undefined,
+  execution?: ProviderExecutionResult & AgentProviderBinding
 ): void {
   if (!session) {
     return;
@@ -774,8 +842,10 @@ function addSessionNode(
   const exists = graph.nodes.some(
     (node) =>
       node.agentId === agentId &&
+      node.providerId === execution?.providerId &&
       node.sessionKey === session.sessionKey &&
-      node.sessionId === session.sessionId
+      node.sessionId === session.sessionId &&
+      node.providerSessionId === execution?.providerSessionId
   );
   if (exists) {
     return;
@@ -783,9 +853,52 @@ function addSessionNode(
 
   graph.nodes.push({
     agentId,
+    providerId: execution?.providerId,
     sessionKey: session.sessionKey,
-    sessionId: session.sessionId
+    sessionId: session.sessionId,
+    providerSessionId: execution?.providerSessionId
   });
+}
+
+function resolveTaskKey(actionTaskKey: string | undefined, targetAgentId: string, step: number): string {
+  const explicit = actionTaskKey?.trim().toLowerCase();
+  if (explicit) {
+    return explicit;
+  }
+  return `${targetAgentId}-step-${String(step).padStart(2, "0")}`;
+}
+
+function upsertTaskThread(threads: Map<string, TaskThreadState>, next: TaskThreadState): void {
+  const existing = threads.get(next.taskKey);
+  if (!existing) {
+    threads.set(next.taskKey, next);
+    return;
+  }
+
+  threads.set(next.taskKey, {
+    ...existing,
+    ...next,
+    createdStep: existing.createdStep,
+    updatedStep: next.updatedStep
+  });
+}
+
+function summarizeTaskThreads(
+  threads: Map<string, TaskThreadState>
+): NonNullable<OrchestrationRunLedger["taskThreads"]> {
+  return [...threads.values()]
+    .sort((left, right) => left.createdStep - right.createdStep)
+    .map((thread) => ({
+      taskKey: thread.taskKey,
+      agentId: thread.agentId,
+      providerId: thread.providerId,
+      providerSessionId: thread.providerSessionId,
+      sessionKey: thread.sessionKey,
+      sessionId: thread.sessionId,
+      createdStep: thread.createdStep,
+      updatedStep: thread.updatedStep,
+      lastResponse: thread.lastResponse
+    }));
 }
 
 function summarizeText(value: string): string {

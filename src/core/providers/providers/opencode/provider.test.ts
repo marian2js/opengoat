@@ -61,4 +61,14 @@ describe("opencode provider", () => {
 
     expect(invocation.command).toBe("opencode-beta");
   });
+
+  it("passes provider session id through --session", () => {
+    const provider = new OpenCodeProvider();
+    const invocation = provider.buildInvocation({
+      message: "continue this task",
+      providerSessionId: "oc-session-123"
+    });
+
+    expect(invocation.args).toEqual(["run", "--session", "oc-session-123", "continue this task"]);
+  });
 });
