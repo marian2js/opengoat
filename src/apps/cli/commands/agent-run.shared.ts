@@ -4,6 +4,7 @@ export interface AgentRunRequest {
   agentId: string;
   message: string;
   model?: string;
+  cwd?: string;
   sessionRef?: string;
   forceNewSession?: boolean;
   disableSession?: boolean;
@@ -22,6 +23,7 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
     result = await context.service.runAgent(request.agentId, {
       message: request.message,
       model: request.model,
+      cwd: request.cwd,
       sessionRef: request.sessionRef,
       forceNewSession: request.forceNewSession,
       disableSession: request.disableSession,

@@ -159,6 +159,7 @@ export function renderWorkspaceMetadata(agent: AgentIdentity): Record<string, un
 }
 
 export function renderInternalAgentConfig(agent: AgentIdentity): Record<string, unknown> {
+  const workspaceAccess = isDefaultAgentId(agent.id) ? "internal" : "auto";
   return {
     schemaVersion: 1,
     id: agent.id,
@@ -168,6 +169,7 @@ export function renderInternalAgentConfig(agent: AgentIdentity): Record<string, 
     },
     runtime: {
       mode: "orchestrated",
+      workspaceAccess,
       contextBudgetTokens: 128_000,
       bootstrapMaxChars: 20_000,
       sessions: {

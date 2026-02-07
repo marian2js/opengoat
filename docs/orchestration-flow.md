@@ -2,6 +2,27 @@
 
 This document explains the current orchestration architecture in OpenGoat, including AI-driven delegation, sessions, artifact-based coordination, and scenario testing.
 
+## Agent Runtime Types
+
+OpenGoat supports two runtime types for agent execution:
+
+- Internal agents:
+  - receive full OpenGoat workspace context injection (`AGENTS.md`, `CONTEXT.md`, etc.)
+  - default working directory is `~/.opengoat/workspaces/<agent-id>` (unless `--cwd` is explicitly set)
+- External agents:
+  - do not receive OpenGoat workspace context injection
+  - execute in the caller project directory (`process.cwd()`) by default
+  - are intended for tool-style providers (OpenCode, Cursor, Gemini CLI, etc.)
+
+Resolution model:
+
+- `orchestrator` defaults to internal.
+- Non-orchestrator agents default to:
+  - internal for HTTP/API providers (OpenAI, Grok, OpenRouter, etc.)
+  - external for CLI/tool providers
+- This can be overridden per-agent in `~/.opengoat/agents/<agent-id>/config.json` with:
+  - `runtime.workspaceAccess: "internal" | "external" | "auto"`
+
 ## Goals
 
 - Keep agent setup minimal:
@@ -63,9 +84,13 @@ Orchestrator invokes the target agent provider with a delegation message.
 
 ### Artifacts
 
-Orchestrator writes markdown handoff files under:
+For internal targets, orchestrator writes markdown handoff files under:
 
 - `~/.opengoat/workspaces/orchestrator/coordination/<run-id>/`
+
+For external targets, artifacts are written under the project path:
+
+- `<project-cwd>/.opengoat/coordination/<run-id>/`
 
 Then target response is captured back into markdown files.
 

@@ -35,6 +35,7 @@ describe("ProviderService", () => {
     registry.register("fake", () =>
       createProvider({
         id: "fake",
+        kind: "cli",
         capabilities: { agent: false, model: true, auth: false, passthrough: false },
         onInvoke: () => undefined
       })
@@ -72,6 +73,7 @@ describe("ProviderService", () => {
 
     const { paths, fileSystem } = await createPaths(root);
     await seedAgent(fileSystem, paths, {
+      agentId: "orchestrator",
       providerId: "fake",
       bootstrapFiles: ["AGENTS.md", "MISSING.md"]
     });
@@ -81,6 +83,7 @@ describe("ProviderService", () => {
     const captured: ProviderInvokeOptions[] = [];
     const provider = createProvider({
       id: "fake",
+      kind: "cli",
       capabilities: { agent: true, model: true, auth: false, passthrough: false },
       onInvoke: (options) => captured.push(options)
     });
@@ -107,6 +110,7 @@ describe("ProviderService", () => {
 
     const { paths, fileSystem } = await createPaths(root);
     await seedAgent(fileSystem, paths, {
+      agentId: "orchestrator",
       providerId: "no-agent",
       bootstrapFiles: ["AGENTS.md"]
     });
@@ -115,6 +119,7 @@ describe("ProviderService", () => {
     const captured: ProviderInvokeOptions[] = [];
     const provider = createProvider({
       id: "no-agent",
+      kind: "cli",
       capabilities: { agent: false, model: true, auth: false, passthrough: false },
       onInvoke: (options) => captured.push(options)
     });
@@ -134,6 +139,7 @@ describe("ProviderService", () => {
 
     const { paths, fileSystem } = await createPaths(root);
     await seedAgent(fileSystem, paths, {
+      agentId: "orchestrator",
       providerId: "fake",
       bootstrapFiles: ["AGENTS.md"]
     });
@@ -142,6 +148,7 @@ describe("ProviderService", () => {
     const captured: ProviderInvokeOptions[] = [];
     const provider = createProvider({
       id: "fake",
+      kind: "cli",
       capabilities: { agent: false, model: true, auth: false, passthrough: false },
       onInvoke: (options) => captured.push(options)
     });
@@ -171,6 +178,7 @@ describe("ProviderService", () => {
 
     const { paths, fileSystem } = await createPaths(root);
     await seedAgent(fileSystem, paths, {
+      agentId: "orchestrator",
       providerId: "fake",
       bootstrapFiles: ["AGENTS.md"]
     });
@@ -179,6 +187,7 @@ describe("ProviderService", () => {
     const captured: ProviderInvokeOptions[] = [];
     const provider = createProvider({
       id: "fake",
+      kind: "cli",
       capabilities: { agent: false, model: true, auth: false, passthrough: false },
       onInvoke: (options) => captured.push(options)
     });
@@ -213,6 +222,7 @@ describe("ProviderService", () => {
     registry.register("fake", () =>
       createProvider({
         id: "fake",
+        kind: "cli",
         capabilities: { agent: false, model: true, auth: false, passthrough: false },
         onInvoke: () => undefined
       })
@@ -230,6 +240,7 @@ describe("ProviderService", () => {
 
     const { paths, fileSystem } = await createPaths(root);
     await seedAgent(fileSystem, paths, {
+      agentId: "orchestrator",
       providerId: "fake",
       bootstrapFiles: ["AGENTS.md"]
     });
@@ -244,6 +255,7 @@ describe("ProviderService", () => {
     registry.register("fake", () =>
       createProvider({
         id: "fake",
+        kind: "cli",
         capabilities: { agent: false, model: true, auth: false, passthrough: false },
         onInvoke: () => undefined
       })
@@ -254,17 +266,87 @@ describe("ProviderService", () => {
       InvalidProviderConfigError
     );
   });
+
+  it("runs external agents in caller cwd without injecting workspace prompt", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+
+    const { paths, fileSystem } = await createPaths(root);
+    await fileSystem.ensureDir(path.join(paths.workspacesDir, "developer"));
+    await fileSystem.ensureDir(path.join(paths.agentsDir, "developer"));
+    await seedAgent(fileSystem, paths, {
+      agentId: "developer",
+      providerId: "ext-cli",
+      bootstrapFiles: ["AGENTS.md"]
+    });
+
+    const captured: ProviderInvokeOptions[] = [];
+    const provider = createProvider({
+      id: "ext-cli",
+      kind: "cli",
+      capabilities: { agent: true, model: true, auth: false, passthrough: false },
+      onInvoke: (options) => captured.push(options)
+    });
+
+    const registry = new ProviderRegistry();
+    registry.register("ext-cli", () => provider);
+
+    const service = createProviderService(fileSystem, registry);
+    await service.invokeAgent(paths, "developer", { message: "hello" });
+    expect(captured[0]?.cwd).toBe(process.cwd());
+    expect(captured[0]?.systemPrompt).toBeUndefined();
+
+    const requestedCwd = path.join(root, "target-project");
+    await fileSystem.ensureDir(requestedCwd);
+    await service.invokeAgent(paths, "developer", { message: "hello", cwd: requestedCwd });
+    expect(captured[1]?.cwd).toBe(requestedCwd);
+    expect(captured[1]?.systemPrompt).toBeUndefined();
+  });
+
+  it("keeps non-orchestrator HTTP agents internal by default", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+
+    const { paths, fileSystem } = await createPaths(root);
+    await fileSystem.ensureDir(path.join(paths.workspacesDir, "research"));
+    await fileSystem.ensureDir(path.join(paths.agentsDir, "research"));
+    await seedAgent(fileSystem, paths, {
+      agentId: "research",
+      providerId: "http-provider",
+      bootstrapFiles: ["AGENTS.md"]
+    });
+    await fileSystem.writeFile(path.join(paths.workspacesDir, "research", "AGENTS.md"), "# Research Rules\n");
+
+    const captured: ProviderInvokeOptions[] = [];
+    const provider = createProvider({
+      id: "http-provider",
+      kind: "http",
+      capabilities: { agent: false, model: true, auth: false, passthrough: false },
+      onInvoke: (options) => captured.push(options)
+    });
+
+    const registry = new ProviderRegistry();
+    registry.register("http-provider", () => provider);
+
+    const service = createProviderService(fileSystem, registry);
+    await service.invokeAgent(paths, "research", { message: "hello" });
+
+    expect(captured[0]?.cwd).toBe(path.join(paths.workspacesDir, "research"));
+    expect(captured[0]?.systemPrompt).toContain("# Project Context");
+    expect(captured[0]?.systemPrompt).toContain("## AGENTS.md");
+  });
 });
 
 function createProvider(params: {
   id: string;
+  kind: Provider["kind"];
   capabilities: Provider["capabilities"];
   onInvoke: (options: ProviderInvokeOptions) => void;
 }): Provider {
   return {
     id: params.id,
     displayName: params.id,
-    kind: "cli",
+    kind: params.kind,
     capabilities: params.capabilities,
     async invoke(options) {
       params.onInvoke(options);
@@ -305,15 +387,15 @@ async function createPaths(root: string): Promise<{ paths: OpenGoatPaths; fileSy
 async function seedAgent(
   fileSystem: NodeFileSystem,
   paths: OpenGoatPaths,
-  params: { providerId: string; bootstrapFiles: string[] }
+  params: { agentId: string; providerId: string; bootstrapFiles: string[] }
 ): Promise<void> {
   await fileSystem.writeFile(
-    path.join(paths.agentsDir, "orchestrator", "config.json"),
+    path.join(paths.agentsDir, params.agentId, "config.json"),
     JSON.stringify(
       {
         schemaVersion: 1,
-        id: "orchestrator",
-        displayName: "Orchestrator",
+        id: params.agentId,
+        displayName: params.agentId,
         provider: {
           id: params.providerId
         },
