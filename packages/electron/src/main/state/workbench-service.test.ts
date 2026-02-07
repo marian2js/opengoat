@@ -132,6 +132,48 @@ describe("WorkbenchService onboarding", () => {
     });
     expect(active?.missingRequiredEnv).toEqual([]);
   });
+
+  it("runs guided auth and returns env updates", async () => {
+    const opengoat = createOpenGoatStub({
+      providers: createProviderSummaries(),
+      activeProviderId: "openai",
+      onboardingByProvider: {}
+    });
+    const store = createStoreStub();
+    const runGuidedAuthFn = vi.fn(async () => ({
+      env: {
+        QWEN_OAUTH_TOKEN: "qwen-test-token"
+      },
+      note: "Saved Qwen OAuth token."
+    }));
+    const service = new WorkbenchService({
+      opengoat,
+      store,
+      resolveGuidedAuthFn: vi.fn((providerId: string) =>
+        providerId === "qwen-portal"
+          ? {
+              title: "Qwen OAuth",
+              description: "Open browser and approve access.",
+              run: async () => ({
+                env: {}
+              })
+            }
+          : undefined
+      ),
+      runGuidedAuthFn: runGuidedAuthFn as never
+    });
+
+    const result = await service.runOnboardingGuidedAuth({
+      providerId: "qwen-portal"
+    });
+
+    expect(runGuidedAuthFn).toHaveBeenCalledTimes(1);
+    expect(result.providerId).toBe("qwen-portal");
+    expect(result.env).toEqual({
+      QWEN_OAUTH_TOKEN: "qwen-test-token"
+    });
+    expect(result.note).toBe("Saved Qwen OAuth token.");
+  });
 });
 
 describe("WorkbenchService sendMessage", () => {

@@ -3,6 +3,7 @@ import { DESKTOP_IPC_CONTRACT_VERSION } from "@shared/workbench-contract";
 import {
   addProjectInputSchema,
   createSessionInputSchema,
+  runGuidedAuthInputSchema,
   sendMessageInputSchema,
   sessionLookupInputSchema,
   submitOnboardingInputSchema,
@@ -57,6 +58,11 @@ export function createDesktopRouter(service: WorkbenchService) {
       status: t.procedure.query(async () => {
         return service.getOnboardingState();
       }),
+      guidedAuth: t.procedure
+        .input(runGuidedAuthInputSchema)
+        .mutation(async ({ input }) => {
+          return service.runOnboardingGuidedAuth(input);
+        }),
       submit: t.procedure
         .input(submitOnboardingInputSchema)
         .mutation(async ({ input }) => {

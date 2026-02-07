@@ -99,6 +99,13 @@ function createStatefulApiMock(): WorkbenchApiClient {
     createSession: vi.fn(async () => project.sessions[0]!),
     getSessionMessages: vi.fn(async () => []),
     getOnboardingStatus: vi.fn(async () => onboarding),
+    runOnboardingGuidedAuth: vi.fn(async () => ({
+      providerId: "openai",
+      env: {
+        OPENAI_API_KEY: "sk-test"
+      },
+      notes: ["Guided auth complete."]
+    })),
     submitOnboarding: vi.fn(async (input: { providerId: string; env: Record<string, string> }) => {
       onboarding = {
         ...onboarding,

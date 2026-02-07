@@ -51,6 +51,20 @@ describe("desktop IPC router", () => {
     });
   });
 
+  it("executes guided auth via mutation and forwards provider id", async () => {
+    const service = createServiceStub();
+    const router = createDesktopRouter(service);
+    const caller = router.createCaller({});
+
+    await caller.onboarding.guidedAuth({
+      providerId: "qwen-portal"
+    });
+
+    expect(service.runOnboardingGuidedAuth).toHaveBeenCalledWith({
+      providerId: "qwen-portal"
+    });
+  });
+
   it("initializes router with a callable getErrorShape for Electron IPC transport", () => {
     const service = createServiceStub();
     const router = createDesktopRouter(service) as {
@@ -105,6 +119,16 @@ function createServiceStub(): WorkbenchService {
       needsOnboarding: false,
       families: [],
       providers: []
+    })),
+    runOnboardingGuidedAuth: vi.fn(async () => ({
+      providerId: "qwen-portal",
+      env: {
+        QWEN_OAUTH_TOKEN: "qwen-test-token"
+      },
+      notes: [
+        "Qwen OAuth: Open https://chat.qwen.ai/authorize",
+        "Qwen OAuth complete."
+      ]
     })),
     sendMessage: vi.fn(async () => ({
       reply: {

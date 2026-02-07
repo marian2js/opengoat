@@ -2,6 +2,10 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { dialog } from "electron";
 import {
+  resolveGuidedAuth as resolveCliGuidedAuth,
+  runGuidedAuth as runCliGuidedAuth
+} from "@cli/onboard-guided-auth";
+import {
   DEFAULT_AGENT_ID,
   buildProviderFamilies,
   loadDotEnv,
@@ -10,6 +14,7 @@ import {
 } from "@opengoat/core";
 import type {
   WorkbenchBootstrap,
+  WorkbenchGuidedAuthResult,
   WorkbenchMessage,
   WorkbenchOnboarding,
   WorkbenchProject,
@@ -21,17 +26,23 @@ interface WorkbenchServiceDeps {
   opengoat: OpenGoatService;
   store: WorkbenchStore;
   loadDotEnvFn?: typeof loadDotEnv;
+  resolveGuidedAuthFn?: typeof resolveCliGuidedAuth;
+  runGuidedAuthFn?: typeof runCliGuidedAuth;
 }
 
 export class WorkbenchService {
   private readonly opengoat: OpenGoatService;
   private readonly store: WorkbenchStore;
   private readonly loadDotEnvFn: typeof loadDotEnv;
+  private readonly resolveGuidedAuthFn: typeof resolveCliGuidedAuth;
+  private readonly runGuidedAuthFn: typeof runCliGuidedAuth;
 
   public constructor(deps: WorkbenchServiceDeps) {
     this.opengoat = deps.opengoat;
     this.store = deps.store;
     this.loadDotEnvFn = deps.loadDotEnvFn ?? loadDotEnv;
+    this.resolveGuidedAuthFn = deps.resolveGuidedAuthFn ?? resolveCliGuidedAuth;
+    this.runGuidedAuthFn = deps.runGuidedAuthFn ?? runCliGuidedAuth;
   }
 
   public async bootstrap(): Promise<WorkbenchBootstrap> {
@@ -51,6 +62,7 @@ export class WorkbenchService {
     const withOnboarding = await Promise.all(
       providers.map(async (provider) => {
         const onboarding = await this.opengoat.getProviderOnboarding(provider.id);
+        const guidedAuth = this.resolveGuidedAuthFn(provider.id);
         const config = await this.opengoat.getProviderConfig(provider.id);
         const envFields = onboarding?.env ?? [];
         const configuredEnv = config?.env ?? {};
@@ -74,6 +86,12 @@ export class WorkbenchService {
           id: provider.id,
           displayName: provider.displayName,
           kind: provider.kind,
+          guidedAuth: guidedAuth
+            ? {
+                title: guidedAuth.title,
+                description: guidedAuth.description
+              }
+            : undefined,
           envFields,
           configuredEnvKeys,
           configuredEnvValues,
@@ -101,6 +119,28 @@ export class WorkbenchService {
     await this.opengoat.setProviderConfig(input.providerId, input.env);
     await this.opengoat.setAgentProvider(DEFAULT_AGENT_ID, input.providerId);
     return this.getOnboardingState();
+  }
+
+  public async runOnboardingGuidedAuth(input: {
+    providerId: string;
+  }): Promise<WorkbenchGuidedAuthResult> {
+    const providerId = input.providerId.trim().toLowerCase();
+    const guidedAuth = this.resolveGuidedAuthFn(providerId);
+    if (!guidedAuth) {
+      throw new Error(`Guided auth is not available for provider "${providerId}".`);
+    }
+
+    const notes: string[] = [];
+    const result = await this.runGuidedAuthFn(providerId, {
+      prompter: createDesktopGuidedAuthPrompter(notes)
+    });
+
+    return {
+      providerId,
+      env: result.env,
+      note: result.note,
+      notes
+    };
   }
 
   public listProjects(): Promise<WorkbenchProject[]> {
@@ -249,4 +289,78 @@ function collectDotEnvDirectories(projectRootPath: string): string[] {
   }
 
   return resolved;
+}
+
+function createDesktopGuidedAuthPrompter(notes: string[]): {
+  intro: (message: string) => Promise<void>;
+  outro: (message: string) => Promise<void>;
+  note: (message: string, title?: string) => Promise<void>;
+  select: <T>(message: string, options: Array<{ value: T; label: string; hint?: string }>, initialValue?: T) => Promise<T>;
+  text: (options: {
+    message: string;
+    initialValue?: string;
+    placeholder?: string;
+    required?: boolean;
+    secret?: boolean;
+  }) => Promise<string>;
+  confirm: (options: { message: string; initialValue?: boolean }) => Promise<boolean>;
+  progress: (initialMessage: string) => { update: (message: string) => void; stop: (message?: string) => void };
+} {
+  return {
+    async intro(message: string): Promise<void> {
+      notes.push(message);
+    },
+    async outro(message: string): Promise<void> {
+      notes.push(message);
+    },
+    async note(message: string, title?: string): Promise<void> {
+      notes.push(title ? `${title}: ${message}` : message);
+    },
+    async select<T>(
+      message: string,
+      options: Array<{ value: T; label: string; hint?: string }>,
+      initialValue?: T
+    ): Promise<T> {
+      const selected = initialValue ?? options[0]?.value;
+      if (selected === undefined) {
+        throw new Error(`Guided auth could not auto-select an option for: ${message}`);
+      }
+      return selected;
+    },
+    async text(options: {
+      message: string;
+      initialValue?: string;
+      placeholder?: string;
+      required?: boolean;
+      secret?: boolean;
+    }): Promise<string> {
+      const value = options.initialValue?.trim();
+      if (value) {
+        return value;
+      }
+      if (options.required) {
+        throw new Error(
+          `Guided auth requires manual input for "${options.message}". ` +
+            "Use CLI onboarding for this provider or configure env vars first."
+        );
+      }
+      return "";
+    },
+    async confirm(options: { message: string; initialValue?: boolean }): Promise<boolean> {
+      return options.initialValue ?? true;
+    },
+    progress(initialMessage: string): { update: (message: string) => void; stop: (message?: string) => void } {
+      notes.push(initialMessage);
+      return {
+        update(message: string): void {
+          notes.push(message);
+        },
+        stop(message?: string): void {
+          if (message) {
+            notes.push(message);
+          }
+        }
+      };
+    }
+  };
 }

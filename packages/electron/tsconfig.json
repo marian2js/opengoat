@@ -18,7 +18,8 @@
       "@main/*": ["src/main/*"],
       "@renderer/*": ["src/renderer/src/*"],
       "@shared/*": ["src/shared/*"],
-      "@opengoat/core": ["../core/src/index.ts"]
+      "@opengoat/core": ["../core/src/index.ts"],
+      "@cli/onboard-guided-auth": ["../cli/src/cli/commands/onboard-guided-auth.ts"]
     }
   },
   "include": ["forge.config.ts", "vite.*.config.ts", "src/**/*.ts", "src/**/*.tsx"]

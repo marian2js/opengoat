@@ -18,6 +18,10 @@ export default defineConfig({
     alias: {
       "@main": path.resolve(currentDir, "src/main"),
       "@shared": path.resolve(currentDir, "src/shared"),
+      "@cli/onboard-guided-auth": path.resolve(
+        currentDir,
+        "../cli/src/cli/commands/onboard-guided-auth.ts"
+      ),
       "@opengoat/core": path.resolve(currentDir, "../core/src/index.ts"),
       "@trpc/server": path.resolve(rootModules, "@trpc/server"),
       "@trpc/client": path.resolve(rootModules, "@trpc/client")

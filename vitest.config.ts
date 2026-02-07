@@ -5,6 +5,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "packages/electron/src/renderer/src"),
+      "@cli/onboard-guided-auth": path.resolve(
+        __dirname,
+        "packages/cli/src/cli/commands/onboard-guided-auth.ts"
+      ),
       "@opengoat/core": path.resolve(__dirname, "packages/core/src/index.ts"),
       "@main": path.resolve(__dirname, "packages/electron/src/main"),
       "@renderer": path.resolve(__dirname, "packages/electron/src/renderer/src"),
