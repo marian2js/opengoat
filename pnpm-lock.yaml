@@ -68,11 +68,11 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@trpc/client':
-        specifier: ^11.9.0
-        version: 11.9.0(@trpc/server@11.9.0(typescript@5.9.3))(typescript@5.9.3)
+        specifier: ^10.45.2
+        version: 10.45.4(@trpc/server@10.45.4)
       '@trpc/server':
-        specifier: ^11.9.0
-        version: 11.9.0(typescript@5.9.3)
+        specifier: ^10.45.2
+        version: 10.45.4
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -81,7 +81,7 @@ importers:
         version: 2.1.1
       electron-trpc:
         specifier: ^0.7.1
-        version: 0.7.1(@trpc/client@11.9.0(@trpc/server@11.9.0(typescript@5.9.3))(typescript@5.9.3))(@trpc/server@11.9.0(typescript@5.9.3))(electron@40.2.1)
+        version: 0.7.1(@trpc/client@10.45.4(@trpc/server@10.45.4))(@trpc/server@10.45.4)(electron@40.2.1)
       lucide-react:
         specifier: ^0.563.0
         version: 0.563.0(react@19.2.4)
@@ -981,16 +981,13 @@ packages:
     resolution: {integrity: sha512-XCuKFP5PS55gnMVu3dty8KPatLqUoy/ZYzDzAGCQ8JNFCkLXzmI7vNHCR+XpbZaMWQK/vQubr7PkYq8g470J/A==}
     engines: {node: '>= 10'}
 
-  '@trpc/client@11.9.0':
-    resolution: {integrity: sha512-3r4RT/GbR263QO+2gCPyrs5fEYaXua3/AzCs+GbWC09X0F+mVkyBpO3GRSDObiNU/N1YB597U7WGW3WA1d1TVw==}
+  '@trpc/client@10.45.4':
+    resolution: {integrity: sha512-ItpH5FMIJFt862kbAgC8hf5NJnDLo0FwEvMEX6zSLCenzWD0UH6H/fvAX1suFo1e0wcAmMhiEU1Tl6xKk/Pd1g==}
     peerDependencies:
-      '@trpc/server': 11.9.0
-      typescript: '>=5.7.2'
+      '@trpc/server': 10.45.4
 
-  '@trpc/server@11.9.0':
-    resolution: {integrity: sha512-T8gC4NOCzx8tCsQEQ5sSjf24bN+9AEqXZRfpThG+YCEmcEwXfS7RP8VVrl5Vodt1S+zGEDyQSof4YVAj1zq/mg==}
-    peerDependencies:
-      typescript: '>=5.7.2'
+  '@trpc/server@10.45.4':
+    resolution: {integrity: sha512-5MuyK5sDuFVGHOT9EMVHgRjP5I5j3RqGymcb5D47UOp8tzn6LH0g1lEgYrAsOZ12vmk1gpxMw/v/y4xHHK/Qdg==}
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -4271,14 +4268,11 @@ snapshots:
 
   '@tootallnate/once@2.0.0': {}
 
-  '@trpc/client@11.9.0(@trpc/server@11.9.0(typescript@5.9.3))(typescript@5.9.3)':
+  '@trpc/client@10.45.4(@trpc/server@10.45.4)':
     dependencies:
-      '@trpc/server': 11.9.0(typescript@5.9.3)
-      typescript: 5.9.3
+      '@trpc/server': 10.45.4
 
-  '@trpc/server@11.9.0(typescript@5.9.3)':
-    dependencies:
-      typescript: 5.9.3
+  '@trpc/server@10.45.4': {}
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -4890,10 +4884,10 @@ snapshots:
 
   electron-to-chromium@1.5.286: {}
 
-  electron-trpc@0.7.1(@trpc/client@11.9.0(@trpc/server@11.9.0(typescript@5.9.3))(typescript@5.9.3))(@trpc/server@11.9.0(typescript@5.9.3))(electron@40.2.1):
+  electron-trpc@0.7.1(@trpc/client@10.45.4(@trpc/server@10.45.4))(@trpc/server@10.45.4)(electron@40.2.1):
     dependencies:
-      '@trpc/client': 11.9.0(@trpc/server@11.9.0(typescript@5.9.3))(typescript@5.9.3)
-      '@trpc/server': 11.9.0(typescript@5.9.3)
+      '@trpc/client': 10.45.4(@trpc/server@10.45.4)
+      '@trpc/server': 10.45.4
       debug: 4.4.3
       electron: 40.2.1
     transitivePeerDependencies:

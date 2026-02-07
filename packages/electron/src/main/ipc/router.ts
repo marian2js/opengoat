@@ -1,13 +1,14 @@
-import { initTRPC } from "@trpc/server";
+import type { WorkbenchService } from "@main/state/workbench-service";
 import {
   addProjectInputSchema,
   createSessionInputSchema,
   sendMessageInputSchema,
-  sessionLookupInputSchema
+  sessionLookupInputSchema,
 } from "@shared/workbench";
-import type { WorkbenchService } from "@main/state/workbench-service";
+import { initTRPC } from "@trpc/server";
+import superjson from "superjson";
 
-const t = initTRPC.create();
+const t = initTRPC.create({ transformer: superjson });
 
 export function createDesktopRouter(service: WorkbenchService) {
   return t.router({
@@ -18,12 +19,14 @@ export function createDesktopRouter(service: WorkbenchService) {
       list: t.procedure.query(async () => {
         return service.listProjects();
       }),
-      add: t.procedure.input(addProjectInputSchema).mutation(async ({ input }) => {
-        return service.addProject(input.rootPath);
-      }),
+      add: t.procedure
+        .input(addProjectInputSchema)
+        .mutation(async ({ input }) => {
+          return service.addProject(input.rootPath);
+        }),
       pick: t.procedure.mutation(async () => {
         return service.pickAndAddProject();
-      })
+      }),
     }),
     sessions: t.router({
       list: t.procedure
@@ -31,18 +34,24 @@ export function createDesktopRouter(service: WorkbenchService) {
         .query(async ({ input }) => {
           return service.listSessions(input.projectId);
         }),
-      create: t.procedure.input(createSessionInputSchema).mutation(async ({ input }) => {
-        return service.createSession(input.projectId, input.title);
-      }),
-      messages: t.procedure.input(sessionLookupInputSchema).query(async ({ input }) => {
-        return service.listMessages(input.projectId, input.sessionId);
-      })
+      create: t.procedure
+        .input(createSessionInputSchema)
+        .mutation(async ({ input }) => {
+          return service.createSession(input.projectId, input.title);
+        }),
+      messages: t.procedure
+        .input(sessionLookupInputSchema)
+        .query(async ({ input }) => {
+          return service.listMessages(input.projectId, input.sessionId);
+        }),
     }),
     chat: t.router({
-      send: t.procedure.input(sendMessageInputSchema).mutation(async ({ input }) => {
-        return service.sendMessage(input);
-      })
-    })
+      send: t.procedure
+        .input(sendMessageInputSchema)
+        .mutation(async ({ input }) => {
+          return service.sendMessage(input);
+        }),
+    }),
   });
 }
 
