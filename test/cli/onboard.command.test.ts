@@ -149,4 +149,45 @@ describe("onboard command", () => {
     );
     expect(stdout.output()).toContain("Provider auth flow completed.");
   });
+
+  it("maps --model to OpenClaw compatibility model env var", async () => {
+    const service = {
+      initialize: vi.fn(async () => ({})),
+      listProviders: vi.fn(async () => [
+        {
+          id: "openclaw-openai",
+          displayName: "OpenAI (OpenClaw Compat)",
+          kind: "cli",
+          capabilities: { agent: true, model: true, auth: true, passthrough: true }
+        }
+      ]),
+      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openclaw-openai" })),
+      setAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openclaw-openai" })),
+      getProviderOnboarding: vi.fn(async () => ({
+        env: [{ key: "OPENAI_API_KEY", description: "OpenAI key", required: false, secret: true }],
+        auth: { supported: true, description: "Runs openclaw onboard" }
+      })),
+      getProviderConfig: vi.fn(async () => null),
+      setProviderConfig: vi.fn(async () => ({
+        providerId: "openclaw-openai",
+        env: { OPENGOAT_OPENCLAW_OPENAI_MODEL: "openai/gpt-5.1-codex" }
+      })),
+      authenticateProvider: vi.fn(),
+      getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
+    };
+
+    const { context } = createContext(service);
+    const code = await onboardCommand.run(
+      ["--non-interactive", "--provider", "openclaw-openai", "--model", "openai/gpt-5.1-codex"],
+      context
+    );
+
+    expect(code).toBe(0);
+    expect(service.setProviderConfig).toHaveBeenCalledWith(
+      "openclaw-openai",
+      expect.objectContaining({
+        OPENGOAT_OPENCLAW_OPENAI_MODEL: "openai/gpt-5.1-codex"
+      })
+    );
+  });
 });

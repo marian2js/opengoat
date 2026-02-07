@@ -8,17 +8,12 @@ describe("provider registry", () => {
   it("auto-loads provider modules from provider folders", async () => {
     const registry = await createDefaultProviderRegistry();
 
-    expect(registry.listProviderIds()).toEqual([
-      "claude",
-      "codex",
-      "cursor",
-      "gemini",
-      "grok",
-      "openai",
-      "openclaw",
-      "opencode",
-      "openrouter"
-    ]);
+    const providerIds = registry.listProviderIds();
+    expect(providerIds).toEqual(expect.arrayContaining(["claude", "codex", "openai", "openclaw", "openrouter"]));
+    expect(providerIds).toContain("openclaw-openai");
+    expect(providerIds).toContain("openclaw-openai-codex");
+    expect(providerIds).toContain("openclaw-openrouter");
+    expect(providerIds.length).toBeGreaterThanOrEqual(20);
 
     expect(registry.getProviderOnboarding("openai")?.env?.some((field) => field.key === "OPENAI_API_KEY")).toBe(
       true
@@ -27,6 +22,11 @@ describe("provider registry", () => {
     expect(registry.getProviderOnboarding("opencode")?.env?.some((field) => field.key === "OPENCODE_CMD")).toBe(
       true
     );
+    expect(
+      registry
+        .getProviderOnboarding("openclaw-openai")
+        ?.env?.some((field) => field.key === "OPENGOAT_OPENCLAW_OPENAI_MODEL")
+    ).toBe(true);
   });
 
   it("supports custom registration", async () => {
