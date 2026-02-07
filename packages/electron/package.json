@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "main": ".vite/build/main.js",
+  "main": ".vite/build/main.cjs",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",

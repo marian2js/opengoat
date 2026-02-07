@@ -24,6 +24,11 @@ export default defineConfig({
     }
   },
   build: {
+    lib: {
+      entry: path.resolve(currentDir, "src/main/main.ts"),
+      fileName: () => "main.cjs",
+      formats: ["cjs"]
+    },
     rollupOptions: {
       external: externals
     }

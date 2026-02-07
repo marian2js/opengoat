@@ -39,7 +39,7 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
     minHeight: 700,
     title: "OpenGoat",
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
