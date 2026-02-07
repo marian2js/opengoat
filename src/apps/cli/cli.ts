@@ -2,6 +2,7 @@ import { NodeFileSystem } from "../../platform/node/node-file-system.js";
 import { NodeCommandRunner } from "../../platform/node/node-command-runner.js";
 import { NodeOpenGoatPathsProvider, NodePathPort } from "../../platform/node/node-path.port.js";
 import { OpenGoatService } from "../../core/opengoat/index.js";
+import { acpCommand } from "./commands/acp.command.js";
 import { agentCommand } from "./commands/agent.command.js";
 import { agentCreateCommand } from "./commands/agent-create.command.js";
 import { agentListCommand } from "./commands/agent-list.command.js";
@@ -44,6 +45,7 @@ export async function runCli(argv: string[]): Promise<number> {
   const router = new CommandRouter(
     [
       initCommand,
+      acpCommand,
       onboardCommand,
       routeCommand,
       scenarioCommand,

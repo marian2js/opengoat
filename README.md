@@ -10,6 +10,7 @@ The codebase is split into layers to keep product surfaces decoupled from orches
 - `src/core/bootstrap`: filesystem bootstrap domain (`BootstrapService`).
 - `src/core/providers`: provider domain (`ProviderService`, registry, implementations).
 - `src/core/plugins`: OpenClaw-compatible plugin domain (`PluginService`).
+- `src/core/acp`: Agent Client Protocol domain (ACP agent adapter + session mapping).
 - `src/core/orchestration`: routing + orchestration runtime (`RoutingService`, `OrchestrationService`).
 - `src/core/sessions`: session store/transcript lifecycle (reset, pruning, compaction, history).
 - `src/core/opengoat`: orchestration facade used by app surfaces (`OpenGoatService`).
@@ -50,6 +51,11 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
   - Uses OpenClaw CLI under isolated state at `~/.opengoat/openclaw-compat`.
   - Supports install/list/info/enable/disable/doctor through OpenGoat CLI.
   - Plugin skill folders are auto-discovered and merged into agent skill context.
+- ACP (Agent Client Protocol) server support:
+  - Runs OpenGoat as an ACP agent over stdio for editor/IDE integration.
+  - Exposes session creation/loading/listing and prompt execution via OpenGoat orchestration.
+  - Supports ACP session modes mapped to OpenGoat agents.
+  - Supports cancellation with protocol-compliant `cancelled` stop reason.
 - Sessions are persisted per agent under `~/.opengoat/agents/<agent-id>/sessions/`:
   - `sessions.json` (session store map keyed by session key)
   - `<session-id>.jsonl` (transcript events)
@@ -68,6 +74,7 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 ## Commands
 
 - `./bin/opengoat` or `./bin/opengoat init`
+- `./bin/opengoat acp [--agent <id>] [--session-prefix <prefix>] [--history-limit <n>] [--verbose]`
 - `./bin/opengoat onboard`
 - `./bin/opengoat agent --message "<text>"` (defaults to `orchestrator`)
 - `./bin/opengoat agent <agent-id> --message "<text>"`
@@ -153,6 +160,36 @@ OpenGoat executes OpenClaw plugins through the OpenClaw CLI to preserve plugin r
   - optional override: `OPENGOAT_OPENCLAW_CMD`
 
 Plugin-declared `skills` directories (and default `<plugin>/skills`) are automatically folded into the agent skills prompt.
+
+## ACP (Agent Client Protocol)
+
+ACP is a standard protocol for connecting coding agents to editor/IDE clients. In OpenGoat, ACP provides:
+
+- one protocol surface for integrations instead of custom editor-specific bridges
+- native session lifecycle interoperability (`new`, `load`, `list`, `resume`, `prompt`, `cancel`)
+- compatibility with clients that already speak ACP
+
+Run the ACP server:
+
+- `./bin/opengoat acp`
+
+Useful options:
+
+- `--agent <id>`: default target agent for new ACP sessions
+- `--session-prefix <prefix>`: prefix for generated session keys
+- `--history-limit <n>`: max replayed history items on `session/load`
+- `--verbose`: ACP server logs to stderr
+
+Session metadata supported from ACP `_meta`:
+
+- `agentId` / `agent` / `targetAgent`
+- `sessionKey` / `sessionRef` / `session`
+- `forceNewSession` / `newSession`
+- `disableSession` / `noSession`
+
+Implementation reference:
+
+- `/Users/marian2js/workspace/opengoat/docs/acp.md`
 
 ## Grok Provider
 
