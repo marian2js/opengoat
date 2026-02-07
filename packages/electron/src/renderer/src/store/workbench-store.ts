@@ -5,7 +5,7 @@ import type {
   WorkbenchOnboarding,
   WorkbenchProject
 } from "@shared/workbench";
-import { trpc } from "@renderer/lib/trpc";
+import { getTrpcClient, getTrpcUntypedClient } from "@renderer/lib/trpc";
 
 interface WorkbenchUiState {
   homeDir: string;
@@ -74,6 +74,7 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
   addProjectFromDialog: async () => {
     set({ isBusy: true, error: null });
     try {
+      const trpc = getTrpcClient();
       const project = await trpc.projects.pick.mutate();
       if (!project) {
         set({ isBusy: false });
@@ -101,6 +102,7 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
 
     set({ isBusy: true, error: null });
     try {
+      const trpc = getTrpcClient();
       const project = await trpc.projects.add.mutate({ rootPath: normalized });
       const projects = await requestProjectsList();
       set({
@@ -141,6 +143,7 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
   createSession: async (projectId: string, title?: string) => {
     set({ isBusy: true, error: null });
     try {
+      const trpc = getTrpcClient();
       const session = await trpc.sessions.create.mutate({
         projectId,
         title
@@ -176,6 +179,7 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
   submitOnboarding: async (providerId: string, env: Record<string, string>) => {
     set({ isBusy: true, error: null });
     try {
+      const trpc = getTrpcClient();
       const onboarding = await trpc.onboarding.submit.mutate({
         providerId,
         env
@@ -217,6 +221,7 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
     });
 
     try {
+      const trpc = getTrpcClient();
       await trpc.chat.send.mutate({
         projectId,
         sessionId,
@@ -241,39 +246,39 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
 }));
 
 async function requestBootstrap(): Promise<WorkbenchBootstrap> {
-  try {
-    return await trpc.bootstrap.query();
-  } catch (error) {
-    if (isMissingQueryProcedureError(error)) {
-      return trpc.bootstrapMutate.mutate();
-    }
-    throw error;
-  }
+  const trpc = getTrpcClient();
+  const trpcUntyped = getTrpcUntypedClient();
+  return callWithProcedureFallback<WorkbenchBootstrap>([
+    () => trpc.bootstrap.query(),
+    () => trpc.bootstrapMutate.mutate(),
+    () => trpcUntyped.mutation("bootstrap") as Promise<WorkbenchBootstrap>,
+    () => trpcUntyped.query("bootstrapMutate") as Promise<WorkbenchBootstrap>
+  ]);
 }
 
 async function requestProjectsList(): Promise<WorkbenchProject[]> {
-  try {
-    return await trpc.projects.list.query();
-  } catch (error) {
-    if (isMissingQueryProcedureError(error)) {
-      return trpc.projects.listMutate.mutate();
-    }
-    throw error;
-  }
+  const trpc = getTrpcClient();
+  const trpcUntyped = getTrpcUntypedClient();
+  return callWithProcedureFallback<WorkbenchProject[]>([
+    () => trpc.projects.list.query(),
+    () => trpc.projects.listMutate.mutate(),
+    () => trpcUntyped.mutation("projects.list") as Promise<WorkbenchProject[]>,
+    () => trpcUntyped.query("projects.listMutate") as Promise<WorkbenchProject[]>
+  ]);
 }
 
 async function requestSessionMessages(input: {
   projectId: string;
   sessionId: string;
 }): Promise<WorkbenchMessage[]> {
-  try {
-    return await trpc.sessions.messages.query(input);
-  } catch (error) {
-    if (isMissingQueryProcedureError(error)) {
-      return trpc.sessions.messagesMutate.mutate(input);
-    }
-    throw error;
-  }
+  const trpc = getTrpcClient();
+  const trpcUntyped = getTrpcUntypedClient();
+  return callWithProcedureFallback<WorkbenchMessage[]>([
+    () => trpc.sessions.messages.query(input),
+    () => trpc.sessions.messagesMutate.mutate(input),
+    () => trpcUntyped.mutation("sessions.messages", input) as Promise<WorkbenchMessage[]>,
+    () => trpcUntyped.query("sessions.messagesMutate", input) as Promise<WorkbenchMessage[]>
+  ]);
 }
 
 export function getActiveProject(
@@ -293,9 +298,26 @@ function toErrorMessage(error: unknown): string {
   return "Unexpected error.";
 }
 
-function isMissingQueryProcedureError(error: unknown): boolean {
+export function isMissingQueryProcedureError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;
   }
-  return error.message.includes('No "query"-procedure on path');
+  return error.message.includes('-procedure on path');
+}
+
+export async function callWithProcedureFallback<T>(attempts: Array<() => Promise<T>>): Promise<T> {
+  let lastError: unknown;
+
+  for (const attempt of attempts) {
+    try {
+      return await attempt();
+    } catch (error) {
+      if (!isMissingQueryProcedureError(error)) {
+        throw error;
+      }
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Procedure resolution failed.");
 }
