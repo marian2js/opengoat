@@ -28,6 +28,7 @@ type AgentArgsResult =
       agentId: string;
       message: string;
       model?: string;
+      cwd?: string;
       sessionRef?: string;
       forceNewSession: boolean;
       disableSession: boolean;
@@ -55,6 +56,7 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
 
   let message: string | undefined;
   let model: string | undefined;
+  let cwd: string | undefined;
   let sessionRef: string | undefined;
   let forceNewSession = false;
   let disableSession = false;
@@ -108,6 +110,16 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
       continue;
     }
 
+    if (token === "--cwd") {
+      const value = known[index + 1];
+      if (!value) {
+        return { ok: false, error: "Missing value for --cwd." };
+      }
+      cwd = value.trim();
+      index += 1;
+      continue;
+    }
+
     return { ok: false, error: `Unknown option: ${token}` };
   }
 
@@ -123,6 +135,7 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
     agentId,
     message: message.trim(),
     model,
+    cwd,
     sessionRef,
     forceNewSession,
     disableSession,
@@ -150,7 +163,7 @@ function printHelp(output: NodeJS.WritableStream): void {
     "  opengoat agent [agent-id] --message <text> [--session <key|id>] [--new-session|--no-session]\n"
   );
   output.write(
-    "                [--model <model>] [--no-stream] [-- <provider-args>]\n"
+    "                [--model <model>] [--cwd <path>] [--no-stream] [-- <provider-args>]\n"
   );
   output.write("\n");
   output.write("Defaults:\n");

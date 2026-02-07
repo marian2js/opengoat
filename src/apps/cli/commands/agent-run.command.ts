@@ -13,7 +13,7 @@ export const agentRunCommand: CliCommand = {
         "Usage: opengoat agent run <agent-id> --message <text> [--session <key|id>] [--new-session|--no-session]\n"
       );
       context.stderr.write(
-        "       [--model <model>] [--no-stream] [-- <provider-args>]\n"
+        "       [--model <model>] [--cwd <path>] [--no-stream] [-- <provider-args>]\n"
       );
       return 1;
     }
@@ -28,6 +28,7 @@ type RunArgsResult =
       agentId: string;
       message: string;
       model?: string;
+      cwd?: string;
       sessionRef?: string;
       forceNewSession: boolean;
       disableSession: boolean;
@@ -52,6 +53,7 @@ function parseRunArgs(args: string[]): RunArgsResult {
 
   let message: string | undefined;
   let model: string | undefined;
+  let cwd: string | undefined;
   let sessionRef: string | undefined;
   let forceNewSession = false;
   let disableSession = false;
@@ -105,6 +107,16 @@ function parseRunArgs(args: string[]): RunArgsResult {
       continue;
     }
 
+    if (token === "--cwd") {
+      const value = known[index + 1];
+      if (!value) {
+        return { ok: false, error: "Missing value for --cwd." };
+      }
+      cwd = value.trim();
+      index += 1;
+      continue;
+    }
+
     return { ok: false, error: `Unknown option: ${token}` };
   }
 
@@ -120,6 +132,7 @@ function parseRunArgs(args: string[]): RunArgsResult {
     agentId,
     message: message.trim(),
     model,
+    cwd,
     sessionRef,
     forceNewSession,
     disableSession,

@@ -88,7 +88,7 @@ describe("provider CLI commands", () => {
 
     const first = createContext({ runAgent });
     const code = await agentRunCommand.run(
-      ["orchestrator", "--message", "hi", "--model", "o3", "--", "--foo", "bar"],
+      ["orchestrator", "--message", "hi", "--model", "o3", "--cwd", "/tmp/project", "--", "--foo", "bar"],
       first.context
     );
 
@@ -98,6 +98,7 @@ describe("provider CLI commands", () => {
       expect.objectContaining({
         message: "hi",
         model: "o3",
+        cwd: "/tmp/project",
         passthroughArgs: ["--foo", "bar"]
       })
     );

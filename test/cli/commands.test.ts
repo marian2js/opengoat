@@ -151,4 +151,29 @@ describe("CLI commands", () => {
     expect(second.stdout.output()).toContain("Usage:");
     expect(second.stdout.output()).toContain("defaults to orchestrator");
   });
+
+  it("agent command passes --cwd to service run options", async () => {
+    const runAgent = vi.fn(async () => ({
+      code: 0,
+      stdout: "ok\n",
+      stderr: "",
+      agentId: "research",
+      providerId: "codex"
+    }));
+
+    const { context } = createContext({ runAgent });
+    const code = await agentCommand.run(
+      ["research", "--message", "hello", "--cwd", "/tmp/project"],
+      context
+    );
+
+    expect(code).toBe(0);
+    expect(runAgent).toHaveBeenCalledWith(
+      "research",
+      expect.objectContaining({
+        message: "hello",
+        cwd: "/tmp/project"
+      })
+    );
+  });
 });

@@ -467,20 +467,23 @@ export class OrchestrationService {
       });
     }
 
+    const targetRuntime = await this.providerService.getAgentRuntimeProfile(params.paths, targetAgentId);
     const mode = action.mode ?? "hybrid";
     params.logger.info("Delegating task to agent.", {
       fromAgentId: DEFAULT_AGENT_ID,
       toAgentId: targetAgentId,
+      targetWorkspaceAccess: targetRuntime.workspaceAccess,
       mode,
       reason: action.reason,
       taskKey,
       sessionPolicy: effectiveSessionPolicy
     });
-    const handoffBaseDir = this.pathPort.join(
-      params.paths.workspacesDir,
-      DEFAULT_AGENT_ID,
-      "coordination",
-      params.runId
+    const handoffBaseDir = resolveDelegationHandoffBaseDir(
+      this.pathPort,
+      params.paths,
+      params.runId,
+      targetRuntime.workspaceAccess,
+      params.options.cwd
     );
     let outboundPath: string | undefined;
     if (mode === "artifacts" || mode === "hybrid") {
@@ -920,4 +923,19 @@ function clampText(value: string, maxChars: number): string {
   const head = value.slice(0, Math.floor(maxChars * 0.7));
   const tail = value.slice(-(maxChars - head.length - 20));
   return `${head}\n...[truncated]...\n${tail}`;
+}
+
+function resolveDelegationHandoffBaseDir(
+  pathPort: PathPort,
+  paths: OpenGoatPaths,
+  runId: string,
+  workspaceAccess: "internal" | "external",
+  requestedCwd: string | undefined
+): string {
+  if (workspaceAccess === "external") {
+    const root = requestedCwd?.trim() || process.cwd();
+    return pathPort.join(root, ".opengoat", "coordination", runId);
+  }
+
+  return pathPort.join(paths.workspacesDir, DEFAULT_AGENT_ID, "coordination", runId);
 }

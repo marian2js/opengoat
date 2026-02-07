@@ -1,4 +1,5 @@
 import { DEFAULT_BOOTSTRAP_MAX_CHARS, WorkspaceContextService } from "../../agents/index.js";
+import { isDefaultAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
@@ -40,12 +41,23 @@ interface AgentConfigShape {
   runtime?: {
     bootstrapMaxChars?: number;
     skills?: AgentSkillsConfig;
+    workspaceAccess?: AgentWorkspaceAccess;
   };
   provider?: {
     id?: string;
     updatedAt?: string;
   };
   [key: string]: unknown;
+}
+
+type AgentWorkspaceAccess = "internal" | "external" | "auto";
+type ResolvedWorkspaceAccess = Exclude<AgentWorkspaceAccess, "auto">;
+
+export interface AgentRuntimeProfile {
+  agentId: string;
+  providerId: string;
+  providerKind: "cli" | "http";
+  workspaceAccess: ResolvedWorkspaceAccess;
 }
 
 export interface ProviderStoredConfig {
@@ -214,34 +226,25 @@ export class ProviderService {
     const provider = registry.create(binding.providerId);
 
     const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
-    const bootstrapFiles = await this.workspaceContextService.loadWorkspaceBootstrapFiles(
-      workspaceDir,
-      this.workspaceContextService.resolveBootstrapFileNames(config.prompt?.bootstrapFiles)
-    );
-    const contextFiles = this.workspaceContextService.buildContextFiles(bootstrapFiles, {
-      maxChars: resolveBootstrapMaxChars(config.runtime?.bootstrapMaxChars)
-    });
-    const systemPrompt = this.workspaceContextService.buildSystemPrompt({
-      agentId,
-      displayName: config.displayName?.trim() || agentId,
-      workspaceDir,
-      nowIso: this.nowIso(),
-      contextFiles
-    });
-    const skillsPrompt = await this.skillService.buildSkillsPrompt(paths, agentId, config.runtime?.skills);
+    const workspaceAccess = resolveWorkspaceAccess(agentId, config.runtime?.workspaceAccess, provider.kind);
+    const contextSystemPrompt =
+      workspaceAccess === "internal"
+        ? await this.buildInternalWorkspacePrompt(paths, agentId, config, workspaceDir)
+        : "";
     const sessionContext = options.sessionContext?.trim();
+    const sessionContextPrompt = sessionContext ? ["## Session Context", sessionContext].join("\n") : "";
     const mergedSystemPrompt = [
-      systemPrompt,
-      skillsPrompt.prompt.trim(),
-      sessionContext ? ["## Session Context", sessionContext].join("\n") : ""
+      options.systemPrompt?.trim() || "",
+      contextSystemPrompt,
+      sessionContextPrompt
     ]
       .filter(Boolean)
       .join("\n\n");
-
+    const resolvedCwd = resolveInvokeCwd(workspaceAccess, options.cwd, workspaceDir);
     const invokeOptions: ProviderInvokeOptions = {
       ...options,
-      systemPrompt: mergedSystemPrompt,
-      cwd: options.cwd || workspaceDir,
+      systemPrompt: mergedSystemPrompt || undefined,
+      cwd: resolvedCwd,
       env: await this.resolveProviderEnv(paths, provider.id, options.env),
       agent: provider.capabilities.agent ? options.agent || agentId : options.agent
     };
@@ -249,7 +252,8 @@ export class ProviderService {
     this.logger.info("Invoking provider for agent.", {
       agentId,
       providerId: provider.id,
-      cwd: invokeOptions.cwd
+      cwd: invokeOptions.cwd,
+      workspaceAccess
     });
     this.logger.debug("Provider invoke request payload.", {
       agentId,
@@ -284,6 +288,43 @@ export class ProviderService {
       ...result,
       ...binding
     };
+  }
+
+  public async getAgentRuntimeProfile(paths: OpenGoatPaths, agentId: string): Promise<AgentRuntimeProfile> {
+    const registry = await this.getProviderRegistry();
+    const config = await this.readAgentConfig(paths, agentId);
+    const binding = await this.getAgentProvider(paths, agentId, config);
+    const provider = registry.create(binding.providerId);
+    return {
+      agentId,
+      providerId: provider.id,
+      providerKind: provider.kind,
+      workspaceAccess: resolveWorkspaceAccess(agentId, config.runtime?.workspaceAccess, provider.kind)
+    };
+  }
+
+  private async buildInternalWorkspacePrompt(
+    paths: OpenGoatPaths,
+    agentId: string,
+    config: AgentConfigShape,
+    workspaceDir: string
+  ): Promise<string> {
+    const bootstrapFiles = await this.workspaceContextService.loadWorkspaceBootstrapFiles(
+      workspaceDir,
+      this.workspaceContextService.resolveBootstrapFileNames(config.prompt?.bootstrapFiles)
+    );
+    const contextFiles = this.workspaceContextService.buildContextFiles(bootstrapFiles, {
+      maxChars: resolveBootstrapMaxChars(config.runtime?.bootstrapMaxChars)
+    });
+    const systemPrompt = this.workspaceContextService.buildSystemPrompt({
+      agentId,
+      displayName: config.displayName?.trim() || agentId,
+      workspaceDir,
+      nowIso: this.nowIso(),
+      contextFiles
+    });
+    const skillsPrompt = await this.skillService.buildSkillsPrompt(paths, agentId, config.runtime?.skills);
+    return [systemPrompt, skillsPrompt.prompt.trim()].filter(Boolean).join("\n\n");
   }
 
   private async readAgentConfig(paths: OpenGoatPaths, agentId: string): Promise<AgentConfigShape> {
@@ -348,6 +389,29 @@ export class ProviderService {
 
     return Promise.resolve(input);
   }
+}
+
+function resolveWorkspaceAccess(
+  agentId: string,
+  configuredAccess: AgentWorkspaceAccess | undefined,
+  providerKind: "cli" | "http"
+): ResolvedWorkspaceAccess {
+  if (configuredAccess === "internal" || configuredAccess === "external") {
+    return configuredAccess;
+  }
+
+  if (isDefaultAgentId(agentId)) {
+    return "internal";
+  }
+
+  return providerKind === "http" ? "internal" : "external";
+}
+
+function resolveInvokeCwd(workspaceAccess: ResolvedWorkspaceAccess, requestedCwd: string | undefined, workspaceDir: string): string {
+  if (workspaceAccess === "internal") {
+    return requestedCwd || workspaceDir;
+  }
+  return requestedCwd || process.cwd();
 }
 
 function getConfiguredProviderId(config: AgentConfigShape): string {
