@@ -17,6 +17,8 @@ export const skillCommand: CliCommand = {
 
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
-  output.write("  opengoat skill list [--agent <id>] [--json]\n");
-  output.write("  opengoat skill install <name> [--agent <id>] [--from <path>] [--description <text>] [--json]\n");
+  output.write("  opengoat skill list [--agent <id> | --global] [--json]\n");
+  output.write(
+    "  opengoat skill install <name> [--agent <id> | --global] [--from <path>] [--description <text>] [--json]\n"
+  );
 }

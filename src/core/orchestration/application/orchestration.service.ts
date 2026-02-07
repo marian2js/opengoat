@@ -260,12 +260,20 @@ export class OrchestrationService {
     const taskThreads = new Map<string, TaskThreadState>();
     const sharedNotes: string[] = [];
     const recentEvents: string[] = [];
+    let orchestratorSkillsSnapshot = await this.skillService.buildSkillsPrompt(paths, DEFAULT_AGENT_ID);
+    let orchestratorSkillsSummary = orchestratorSkillsSnapshot.skills.map((skill) => ({
+      id: skill.id,
+      name: skill.name,
+      description: skill.description,
+      source: skill.source
+    }));
     let delegationCount = 0;
     let finalMessage = "";
     let lastExecution: ProviderExecutionResult & AgentProviderBinding = await this.buildSyntheticExecution(paths, DEFAULT_AGENT_ID);
     runLogger.info("Starting orchestration loop.", {
       maxSteps: MAX_ORCHESTRATION_STEPS,
-      maxDelegations: MAX_DELEGATION_STEPS
+      maxDelegations: MAX_DELEGATION_STEPS,
+      loadedSkills: orchestratorSkillsSummary.length
     });
 
     for (let step = 1; step <= MAX_ORCHESTRATION_STEPS; step += 1) {
@@ -277,7 +285,8 @@ export class OrchestrationService {
         sharedNotes: clampText(sharedNotes.join("\n\n"), SHARED_NOTES_MAX_CHARS),
         recentEvents,
         agents: manifests,
-        taskThreads: summarizeTaskThreads(taskThreads)
+        taskThreads: summarizeTaskThreads(taskThreads),
+        skills: orchestratorSkillsSummary
       });
       stepLogger.debug("Planner prompt payload.", {
         prompt: plannerPrompt
@@ -286,6 +295,7 @@ export class OrchestrationService {
       const plannerCall = await this.invokeAgentWithSession(paths, DEFAULT_AGENT_ID, {
         ...options,
         message: plannerPrompt,
+        skillsPromptOverride: orchestratorSkillsSnapshot.prompt,
         sessionRef: options.sessionRef,
         forceNewSession: step === 1 ? options.forceNewSession : false
       }, { silent: true });
@@ -341,6 +351,19 @@ export class OrchestrationService {
 
       if (plannerDecision.action.type === "delegate_to_agent") {
         delegationCount += 1;
+      }
+      if (
+        plannerDecision.action.type === "install_skill" &&
+        (normalizeAgentId(plannerDecision.action.targetAgentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID) ===
+          DEFAULT_AGENT_ID
+      ) {
+        orchestratorSkillsSnapshot = await this.skillService.buildSkillsPrompt(paths, DEFAULT_AGENT_ID);
+        orchestratorSkillsSummary = orchestratorSkillsSnapshot.skills.map((skill) => ({
+          id: skill.id,
+          name: skill.name,
+          description: skill.description,
+          source: skill.source
+        }));
       }
       if (delegationCount >= MAX_DELEGATION_STEPS) {
         stepLogger.warn("Delegation safety limit reached.");
@@ -444,6 +467,7 @@ export class OrchestrationService {
         skillName: action.skillName
       });
       const result = await this.skillService.installSkill(params.paths, {
+        scope: "agent",
         agentId: targetAgentId,
         skillName: action.skillName,
         sourcePath: action.sourcePath,
@@ -451,13 +475,14 @@ export class OrchestrationService {
         content: action.content
       });
 
-      params.stepLog.note = `Installed skill ${result.skillId} for ${result.agentId} (${result.source}).`;
+      const installedFor = result.agentId || targetAgentId;
+      params.stepLog.note = `Installed skill ${result.skillId} for ${installedFor} (${result.source}).`;
       params.sharedNotes.push(
-        `Skill installed: ${result.skillId} for ${result.agentId} from ${result.source} at ${result.installedPath}`
+        `Skill installed: ${result.skillId} for ${installedFor} from ${result.source} at ${result.installedPath}`
       );
       this.addRecentEvent(
         params.recentEvents,
-        `Installed skill ${result.skillId} for ${result.agentId} (${result.source})`
+        `Installed skill ${result.skillId} for ${installedFor} (${result.source})`
       );
       return {};
     }

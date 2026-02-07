@@ -200,6 +200,11 @@ export class OpenGoatService {
     return this.skillService.listSkills(paths, agentId);
   }
 
+  public async listGlobalSkills(): Promise<ResolvedSkill[]> {
+    const paths = this.pathsProvider.getPaths();
+    return this.skillService.listGlobalSkills(paths);
+  }
+
   public async installSkill(request: InstallSkillRequest): Promise<InstallSkillResult> {
     const paths = this.pathsProvider.getPaths();
     return this.skillService.installSkill(paths, request);

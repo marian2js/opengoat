@@ -10,10 +10,20 @@ describe("OrchestrationPlannerService", () => {
       maxSteps: 10,
       sharedNotes: "none",
       recentEvents: [],
-      agents: createManifests()
+      agents: createManifests(),
+      skills: [
+        {
+          id: "task-breakdown",
+          name: "Task Breakdown",
+          description: "Breaks product requests into actionable tasks.",
+          source: "managed"
+        }
+      ]
     });
 
     expect(prompt).toContain("Allowed agents:");
+    expect(prompt).toContain("Available orchestrator skills:");
+    expect(prompt).toContain("task-breakdown");
     expect(prompt).toContain("developer");
     expect(prompt).toContain("qa-agent");
   });

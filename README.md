@@ -149,7 +149,9 @@ opengoat session compact                   # compact session context
 # Providers & Skills
 opengoat provider list                     # list available providers
 opengoat skill list --agent <id>           # list skills for an agent
-opengoat skill install <skill>             # install a skill
+opengoat skill list --global               # list global managed skills
+opengoat skill install <skill>             # install a workspace skill
+opengoat skill install <skill> --global    # install a global skill
 
 # Plugins (OpenClaw-compatible)
 opengoat plugin list                       # list installed plugins

@@ -3,22 +3,23 @@ import type { CliCommand } from "../framework/command.js";
 
 export const skillInstallCommand: CliCommand = {
   path: ["skill", "install"],
-  description: "Install one skill into an agent workspace.",
+  description: "Install one skill into an agent workspace or global skills store.",
   async run(args, context): Promise<number> {
     const parsed = parseInstallArgs(args);
     if (!parsed.ok) {
       context.stderr.write(`${parsed.error}\n`);
       context.stderr.write(
-        "Usage: opengoat skill install <name> [--agent <id>] [--from <path>] [--description <text>] [--json]\n"
+        "Usage: opengoat skill install <name> [--agent <id> | --global] [--from <path>] [--description <text>] [--json]\n"
       );
       return 1;
     }
 
     const result = await context.service.installSkill({
-      agentId: parsed.agentId,
+      agentId: parsed.global ? undefined : parsed.agentId,
       skillName: parsed.skillName,
       sourcePath: parsed.sourcePath,
-      description: parsed.description
+      description: parsed.description,
+      scope: parsed.global ? "global" : "agent"
     });
 
     if (parsed.json) {
@@ -27,7 +28,10 @@ export const skillInstallCommand: CliCommand = {
     }
 
     context.stdout.write(`Installed skill: ${result.skillId}\n`);
-    context.stdout.write(`Agent: ${result.agentId}\n`);
+    context.stdout.write(`Scope: ${result.scope}\n`);
+    if (result.agentId) {
+      context.stdout.write(`Agent: ${result.agentId}\n`);
+    }
     context.stdout.write(`Source: ${result.source}\n`);
     context.stdout.write(`Path: ${result.installedPath}\n`);
     if (result.replaced) {
@@ -42,6 +46,7 @@ type ParsedArgs =
       ok: true;
       skillName: string;
       agentId: string;
+      global: boolean;
       sourcePath?: string;
       description?: string;
       json: boolean;
@@ -58,6 +63,7 @@ function parseInstallArgs(args: string[]): ParsedArgs {
   }
 
   let agentId = DEFAULT_AGENT_ID;
+  let global = false;
   let sourcePath: string | undefined;
   let description: string | undefined;
   let json = false;
@@ -69,12 +75,22 @@ function parseInstallArgs(args: string[]): ParsedArgs {
       continue;
     }
     if (token === "--agent") {
+      if (global) {
+        return { ok: false, error: "Use either --agent or --global, not both." };
+      }
       const value = args[index + 1]?.trim();
       if (!value) {
         return { ok: false, error: "Missing value for --agent." };
       }
       agentId = value.toLowerCase();
       index += 1;
+      continue;
+    }
+    if (token === "--global") {
+      if (agentId !== DEFAULT_AGENT_ID) {
+        return { ok: false, error: "Use either --agent or --global, not both." };
+      }
+      global = true;
       continue;
     }
     if (token === "--from") {
@@ -102,6 +118,7 @@ function parseInstallArgs(args: string[]): ParsedArgs {
     ok: true,
     skillName,
     agentId,
+    global,
     sourcePath,
     description,
     json
