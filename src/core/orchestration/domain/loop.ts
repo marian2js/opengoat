@@ -90,6 +90,14 @@ export interface OrchestrationStepLog {
     sessionKey?: string;
     sessionId?: string;
     providerSessionId?: string;
+    workingTreeEffect?: {
+      enabled: boolean;
+      workingPath?: string;
+      beforeEntries: number;
+      afterEntries: number;
+      touchedPaths: string[];
+      summary: string;
+    };
   };
   artifactIO?: {
     readPath?: string;

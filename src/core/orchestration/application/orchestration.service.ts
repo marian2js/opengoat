@@ -4,6 +4,7 @@ import type { AgentManifest, AgentManifestService } from "../../agents/index.js"
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
+import type { CommandRunnerPort } from "../../ports/command-runner.port.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import type { AgentProviderBinding, ProviderExecutionResult, ProviderInvokeOptions, ProviderService } from "../../providers/index.js";
@@ -25,6 +26,7 @@ interface OrchestrationServiceDeps {
   skillService: SkillService;
   agentManifestService: AgentManifestService;
   sessionService: SessionService;
+  commandRunner?: CommandRunnerPort;
   routingService?: RoutingService;
   plannerService?: OrchestrationPlannerService;
   fileSystem: FileSystemPort;
@@ -35,6 +37,7 @@ interface OrchestrationServiceDeps {
 
 interface AgentInvocationResult {
   execution: ProviderExecutionResult & AgentProviderBinding;
+  workingTreeEffect?: WorkingTreeEffect;
   session?: SessionRunInfo & {
     preRunCompactionApplied: boolean;
     postRunCompaction: SessionCompactionResult;
@@ -61,6 +64,26 @@ interface TaskThreadState {
   lastResponse?: string;
 }
 
+interface WorkingTreeStatusEntry {
+  path: string;
+  raw: string;
+}
+
+interface WorkingTreeSnapshot {
+  enabled: boolean;
+  workingPath: string;
+  entries: WorkingTreeStatusEntry[];
+}
+
+interface WorkingTreeEffect {
+  enabled: boolean;
+  workingPath?: string;
+  beforeEntries: number;
+  afterEntries: number;
+  touchedPaths: string[];
+  summary: string;
+}
+
 const MAX_ORCHESTRATION_STEPS = 12;
 const MAX_DELEGATION_STEPS = 8;
 const SHARED_NOTES_MAX_CHARS = 12_000;
@@ -71,6 +94,7 @@ export class OrchestrationService {
   private readonly skillService: SkillService;
   private readonly agentManifestService: AgentManifestService;
   private readonly sessionService: SessionService;
+  private readonly commandRunner?: CommandRunnerPort;
   private readonly routingService: RoutingService;
   private readonly plannerService: OrchestrationPlannerService;
   private readonly fileSystem: FileSystemPort;
@@ -83,6 +107,7 @@ export class OrchestrationService {
     this.skillService = deps.skillService;
     this.agentManifestService = deps.agentManifestService;
     this.sessionService = deps.sessionService;
+    this.commandRunner = deps.commandRunner;
     this.routingService = deps.routingService ?? new RoutingService();
     this.plannerService = deps.plannerService ?? new OrchestrationPlannerService();
     this.fileSystem = deps.fileSystem;
@@ -561,7 +586,8 @@ export class OrchestrationService {
       providerId: delegateCall.execution.providerId,
       sessionKey: delegateCall.session?.sessionKey,
       sessionId: delegateCall.session?.sessionId,
-      providerSessionId: delegateCall.execution.providerSessionId
+      providerSessionId: delegateCall.execution.providerSessionId,
+      workingTreeEffect: delegateCall.workingTreeEffect
     };
 
     addSessionNode(params.sessionGraph, targetAgentId, delegateCall.session, delegateCall.execution);
@@ -585,6 +611,11 @@ export class OrchestrationService {
     const note = `Delegated to ${targetAgentId} [task:${taskKey}]: ${summarizeText(responseText || "(no response)")}`;
     params.sharedNotes.push(clampText(note, 2000));
     this.addRecentEvent(params.recentEvents, note);
+    if (delegateCall.workingTreeEffect && delegateCall.workingTreeEffect.enabled) {
+      const effectNote = `Working tree effect (${targetAgentId}): ${delegateCall.workingTreeEffect.summary}`;
+      params.sharedNotes.push(clampText(effectNote, 1200));
+      this.addRecentEvent(params.recentEvents, effectNote);
+    }
 
     return {
       execution: delegateCall.execution
@@ -639,18 +670,24 @@ export class OrchestrationService {
       delete invokeOptions.onStdout;
       delete invokeOptions.onStderr;
     }
+    const workingPath = preparedSession.enabled ? preparedSession.info.workingPath : resolveInvocationWorkingPath(options.cwd);
+    const beforeSnapshot = await this.captureWorkingTreeSnapshot(workingPath);
     const execution = await this.providerService.invokeAgent(paths, agentId, invokeOptions);
+    const afterSnapshot = await this.captureWorkingTreeSnapshot(workingPath);
+    const workingTreeEffect = summarizeWorkingTreeEffect(beforeSnapshot, afterSnapshot);
     this.logger.debug("Agent invocation execution returned.", {
       agentId,
       providerId: execution.providerId,
       code: execution.code,
       stdout: execution.stdout,
       stderr: execution.stderr,
-      providerSessionId: execution.providerSessionId
+      providerSessionId: execution.providerSessionId,
+      workingTreeEffect: workingTreeEffect?.summary
     });
     if (!preparedSession.enabled) {
       return {
         execution,
+        workingTreeEffect,
         session: undefined
       };
     }
@@ -668,6 +705,7 @@ export class OrchestrationService {
 
     return {
       execution,
+      workingTreeEffect,
       session: {
         ...preparedSession.info,
         preRunCompactionApplied: preparedSession.compactionApplied,
@@ -721,6 +759,34 @@ export class OrchestrationService {
     return { tracePath, trace };
   }
 
+  private async captureWorkingTreeSnapshot(workingPath: string): Promise<WorkingTreeSnapshot | undefined> {
+    if (!this.commandRunner) {
+      return undefined;
+    }
+    if (!(await this.fileSystem.exists(workingPath))) {
+      return undefined;
+    }
+    try {
+      const result = await this.commandRunner.run({
+        command: "git",
+        args: ["status", "--porcelain=v1", "--untracked-files=all"],
+        cwd: workingPath
+      });
+      if (result.code !== 0) {
+        return undefined;
+      }
+
+      const entries = parsePorcelainEntries(result.stdout);
+      return {
+        enabled: true,
+        workingPath,
+        entries
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
   private async buildSyntheticExecution(
     paths: OpenGoatPaths,
     agentId: string
@@ -744,6 +810,71 @@ export class OrchestrationService {
 
 function generateRunId(): string {
   return randomUUID().toLowerCase();
+}
+
+function resolveInvocationWorkingPath(cwd: string | undefined): string {
+  const normalized = cwd?.trim();
+  if (normalized) {
+    return path.resolve(normalized);
+  }
+  return process.cwd();
+}
+
+function parsePorcelainEntries(stdout: string): WorkingTreeStatusEntry[] {
+  const lines = stdout
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(Boolean);
+
+  return lines.map((line) => {
+    const status = line.slice(0, 2);
+    const rawPath = line.length > 3 ? line.slice(3).trim() : "";
+    const finalPath = rawPath.includes(" -> ") ? rawPath.split(" -> ").at(-1)?.trim() || rawPath : rawPath;
+    return {
+      raw: `${status} ${finalPath}`.trim(),
+      path: finalPath
+    };
+  });
+}
+
+function summarizeWorkingTreeEffect(
+  beforeSnapshot: WorkingTreeSnapshot | undefined,
+  afterSnapshot: WorkingTreeSnapshot | undefined
+): WorkingTreeEffect | undefined {
+  if (!beforeSnapshot || !afterSnapshot || !beforeSnapshot.enabled || !afterSnapshot.enabled) {
+    return undefined;
+  }
+
+  const beforeMap = new Map(beforeSnapshot.entries.map((entry) => [entry.path, entry.raw]));
+  const afterMap = new Map(afterSnapshot.entries.map((entry) => [entry.path, entry.raw]));
+  const touched = new Set<string>();
+
+  for (const [path, raw] of afterMap.entries()) {
+    if (beforeMap.get(path) !== raw) {
+      touched.add(path);
+    }
+  }
+  for (const [path, raw] of beforeMap.entries()) {
+    if (afterMap.get(path) !== raw) {
+      touched.add(path);
+    }
+  }
+
+  const touchedPaths = [...touched].sort((left, right) => left.localeCompare(right));
+  const summary = touchedPaths.length === 0
+    ? "No tracked changes detected."
+    : `Touched ${touchedPaths.length} path(s): ${touchedPaths.slice(0, 8).join(", ")}${
+        touchedPaths.length > 8 ? ", ..." : ""
+      }`;
+
+  return {
+    enabled: true,
+    workingPath: afterSnapshot.workingPath,
+    beforeEntries: beforeSnapshot.entries.length,
+    afterEntries: afterSnapshot.entries.length,
+    touchedPaths,
+    summary
+  };
 }
 
 function resolveEntryAgentId(entryAgentId: string, manifests: Array<{ agentId: string }>): string {

@@ -155,6 +155,12 @@ Working path rule:
 - The same session id cannot switch working paths.
 - If a run targets the same session key but with a different working path, OpenGoat rotates to a new session id automatically.
 
+Git bootstrap on session setup:
+
+- During session preparation, OpenGoat checks whether the working path is a Git work tree.
+- If not, OpenGoat initializes a repository (`git init`) in that working path.
+- If Git tooling is unavailable, OpenGoat continues without failing session setup.
+
 Each agent has isolated session storage:
 
 - `~/.opengoat/agents/<agent-id>/sessions/sessions.json`
@@ -260,7 +266,14 @@ Trace includes:
 - session graph (nodes/edges)
 - provider session ids (when available)
 - task thread ledger (`taskThreads`)
+- per-invocation working tree side-effect summaries (when Git status is available)
 - final output
+
+Side-effect capture strategy:
+
+- OpenGoat captures `git status --porcelain` before and after each agent invocation in the session working path.
+- It computes a touched-path delta and records a compact summary in orchestration step logs.
+- These summaries are fed back into shared orchestration notes so the planner can reason about recent filesystem effects.
 
 ## Scenario Testing
 

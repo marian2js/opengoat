@@ -8,6 +8,7 @@ import {
   type ProviderExecutionResult,
   type ProviderInvokeOptions
 } from "../../src/index.js";
+import type { CommandRunnerPort } from "../../src/core/ports/command-runner.port.js";
 import { NodeFileSystem } from "../../src/platform/node/node-file-system.js";
 import { NodePathPort } from "../../src/platform/node/node-path.port.js";
 import { TestPathsProvider, createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
@@ -31,12 +32,14 @@ describe("orchestration task threads", () => {
     const threadedProvider = new ThreadedScriptedProvider();
     const registry = new ProviderRegistry();
     registry.register("threaded-scripted", () => threadedProvider);
+    const commandRunner = createGitTrackingRunner();
 
     const service = new OpenGoatService({
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
       pathsProvider: new TestPathsProvider(root),
       providerRegistry: registry,
+      commandRunner,
       nowIso: () => "2026-02-07T00:00:00.000Z"
     });
 
@@ -78,19 +81,51 @@ describe("orchestration task threads", () => {
             targetAgentId: string;
             taskKey?: string;
             providerSessionId?: string;
+            workingTreeEffect?: {
+              touchedPaths: string[];
+            };
           };
         }>;
       };
     };
     const developerStepCalls = (trace.orchestration?.steps ?? [])
       .map((step) => step.agentCall)
-      .filter((call): call is { targetAgentId: string; taskKey?: string; providerSessionId?: string } =>
+      .filter((call): call is {
+        targetAgentId: string;
+        taskKey?: string;
+        providerSessionId?: string;
+        workingTreeEffect?: { touchedPaths: string[] };
+      } =>
         Boolean(call && call.targetAgentId === "developer")
       );
     expect(developerStepCalls[1]?.taskKey).toBe("task-feature-1");
     expect(developerStepCalls[1]?.providerSessionId).toBe("developer-thread-1");
+    expect(developerStepCalls[0]?.workingTreeEffect?.touchedPaths).toContain("contributors.md");
   });
 });
+
+function createGitTrackingRunner(): CommandRunnerPort {
+  let statusCall = 0;
+  return {
+    async run(request) {
+      if (request.command !== "git") {
+        return { code: 0, stdout: "", stderr: "" };
+      }
+      if (request.args[0] === "rev-parse") {
+        return { code: 0, stdout: "true\n", stderr: "" };
+      }
+      if (request.args[0] === "init") {
+        return { code: 0, stdout: "", stderr: "" };
+      }
+      if (request.args[0] === "status") {
+        const output = statusCall === 3 ? "?? contributors.md\n" : statusCall > 3 ? "?? contributors.md\n" : "";
+        statusCall += 1;
+        return { code: 0, stdout: output, stderr: "" };
+      }
+      return { code: 0, stdout: "", stderr: "" };
+    }
+  };
+}
 
 async function writeAgentManifest(root: string, agentId: string, name: string, description: string): Promise<void> {
   const content =

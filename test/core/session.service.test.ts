@@ -1,6 +1,7 @@
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { OpenGoatPaths } from "../../src/core/domain/opengoat-paths.js";
+import type { CommandRunnerPort } from "../../src/core/ports/command-runner.port.js";
 import { SessionService } from "../../src/core/sessions/index.js";
 import { NodeFileSystem } from "../../src/platform/node/node-file-system.js";
 import { NodePathPort } from "../../src/platform/node/node-path.port.js";
@@ -186,12 +187,52 @@ describe("SessionService", () => {
     const sessions = await service.listSessions(paths, "orchestrator");
     expect(sessions[0]?.compactionCount).toBeGreaterThan(0);
   });
+
+  it("initializes git in working path during session setup when needed", async () => {
+    const root = await createTempDir("opengoat-session-");
+    roots.push(root);
+
+    const { fileSystem, paths } = await createPaths(root);
+    await seedAgentConfig(fileSystem, paths, "orchestrator", {});
+    const projectDir = path.join(root, "project");
+    await fileSystem.ensureDir(projectDir);
+
+    const commandCalls: Array<{ command: string; args: string[]; cwd?: string }> = [];
+    const commandRunner: CommandRunnerPort = {
+      async run(request) {
+        commandCalls.push({
+          command: request.command,
+          args: request.args,
+          cwd: request.cwd
+        });
+        if (request.args[0] === "rev-parse") {
+          return { code: 1, stdout: "", stderr: "not a git repository" };
+        }
+        if (request.args[0] === "init") {
+          return { code: 0, stdout: "", stderr: "" };
+        }
+        return { code: 0, stdout: "", stderr: "" };
+      }
+    };
+
+    const now = { value: Date.parse("2026-02-07T00:00:00.000Z") };
+    const service = createService(now, commandRunner);
+
+    const prepared = await service.prepareRunSession(paths, "orchestrator", {
+      workingPath: projectDir,
+      userMessage: "hello"
+    });
+    expect(prepared.enabled).toBe(true);
+    expect(commandCalls.some((call) => call.args.join(" ") === "rev-parse --is-inside-work-tree")).toBe(true);
+    expect(commandCalls.some((call) => call.args.join(" ") === "init --quiet")).toBe(true);
+  });
 });
 
-function createService(now: { value: number }): SessionService {
+function createService(now: { value: number }, commandRunner?: CommandRunnerPort): SessionService {
   return new SessionService({
     fileSystem: new NodeFileSystem(),
     pathPort: new NodePathPort(),
+    commandRunner,
     nowIso: () => new Date(now.value).toISOString(),
     nowMs: () => now.value
   });

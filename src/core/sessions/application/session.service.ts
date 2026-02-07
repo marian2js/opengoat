@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
+import type { CommandRunnerPort } from "../../ports/command-runner.port.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import {
@@ -29,6 +30,7 @@ import { SessionConfigParseError, SessionStoreParseError, SessionTranscriptParse
 interface SessionServiceDeps {
   fileSystem: FileSystemPort;
   pathPort: PathPort;
+  commandRunner?: CommandRunnerPort;
   nowIso?: () => string;
   nowMs?: () => number;
 }
@@ -77,12 +79,14 @@ export interface SessionCompactionResult {
 export class SessionService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
+  private readonly commandRunner?: CommandRunnerPort;
   private readonly nowIso: () => string;
   private readonly nowMs: () => number;
 
   public constructor(deps: SessionServiceDeps) {
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
+    this.commandRunner = deps.commandRunner;
     this.nowIso = deps.nowIso ?? (() => new Date().toISOString());
     this.nowMs = deps.nowMs ?? (() => Date.now());
   }
@@ -109,6 +113,9 @@ export class SessionService {
     });
 
     const existingEntry = store.sessions[sessionKey];
+    if (!existingEntry || existingEntry.workingPath !== workingPath) {
+      await this.ensureWorkingPathGitRepository(workingPath);
+    }
     const fresh = existingEntry ? isSessionFresh(existingEntry.updatedAt, config.reset, this.nowMs()) : false;
     const workingPathChanged = Boolean(existingEntry?.workingPath && existingEntry.workingPath !== workingPath);
     const isNewSession = request.forceNew || !existingEntry || !fresh || workingPathChanged;
@@ -715,6 +722,33 @@ export class SessionService {
 
     const sessionConfigRaw = (parsed as AgentConfigShape)?.runtime?.sessions;
     return mergeSessionConfig(DEFAULT_SESSION_CONFIG, sessionConfigRaw);
+  }
+
+  private async ensureWorkingPathGitRepository(workingPath: string): Promise<void> {
+    if (!this.commandRunner) {
+      return;
+    }
+    if (!(await this.fileSystem.exists(workingPath))) {
+      return;
+    }
+    try {
+      const probe = await this.commandRunner.run({
+        command: "git",
+        args: ["rev-parse", "--is-inside-work-tree"],
+        cwd: workingPath
+      });
+      if (probe.code === 0) {
+        return;
+      }
+
+      await this.commandRunner.run({
+        command: "git",
+        args: ["init", "--quiet"],
+        cwd: workingPath
+      });
+    } catch {
+      // Git tooling might not be installed; session setup remains functional without VCS bootstrap.
+    }
   }
 }
 

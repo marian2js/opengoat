@@ -112,6 +112,7 @@ export class OpenGoatService {
     this.sessionService = new SessionService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
+      commandRunner: deps.commandRunner,
       nowIso,
       nowMs: () => Date.now()
     });
@@ -120,6 +121,7 @@ export class OpenGoatService {
       skillService: this.skillService,
       agentManifestService: this.agentManifestService,
       sessionService: this.sessionService,
+      commandRunner: deps.commandRunner,
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       nowIso,
