@@ -778,6 +778,11 @@ async function promptTextOrBack(params: {
     let error = "";
     let renderedLines = 0;
     const originalRawMode = Boolean((stdin as NodeJS.ReadStream & { isRaw?: boolean }).isRaw);
+    const toVisualLines = (rawLines: string[]): string[] =>
+      rawLines.flatMap((line) => {
+        const parts = line.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+        return parts.length > 0 ? parts : [""];
+      });
 
     const clearRenderedLines = () => {
       if (renderedLines <= 0) {
@@ -816,13 +821,14 @@ async function promptTextOrBack(params: {
       const valueSuffix = `${displayValue}${caret}`;
       const inputPrefix = focus === "input" ? "›" : " ";
       const inputLabel = focus === "input" ? "Value" : "Value";
-      const lines = [
+      const logicalLines = [
         params.message,
         `${inputPrefix} ${inputLabel}: ${valueSuffix}`,
         `  ${helperText}`,
         `${focus === "back" ? "●" : "○"} ← Back to provider list`,
         ...(error ? [error] : [])
       ];
+      const lines = toVisualLines(logicalLines);
 
       if (renderedLines > 0) {
         stdout.write(`\x1B[${renderedLines}A`);
