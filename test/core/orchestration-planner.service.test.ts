@@ -32,6 +32,7 @@ describe("OrchestrationPlannerService", () => {
 
     expect(decision.action.targetAgentId).toBe("developer");
     expect(decision.action.mode).toBe("hybrid");
+    expect(decision.action.sessionPolicy).toBe("auto");
   });
 
   it("falls back to respond_user when output is not valid JSON", () => {
@@ -69,6 +70,31 @@ describe("OrchestrationPlannerService", () => {
     expect(decision.action.targetAgentId).toBe("developer");
     expect(decision.action.skillName).toBe("Code Review");
     expect(decision.action.mode).toBe("artifacts");
+  });
+
+  it("normalizes delegate task keys and session policy", () => {
+    const service = new OrchestrationPlannerService();
+    const decision = service.parseDecision(
+      JSON.stringify({
+        rationale: "Route follow-up to existing thread.",
+        action: {
+          type: "delegate_to_agent",
+          targetAgentId: "Developer",
+          message: "Apply QA feedback",
+          taskKey: "Task QA Feedback #12",
+          sessionPolicy: "reuse"
+        }
+      }),
+      "fallback"
+    );
+
+    expect(decision.action.type).toBe("delegate_to_agent");
+    if (decision.action.type !== "delegate_to_agent") {
+      throw new Error("Expected delegate_to_agent action");
+    }
+
+    expect(decision.action.taskKey).toBe("task-qa-feedback-12");
+    expect(decision.action.sessionPolicy).toBe("reuse");
   });
 });
 

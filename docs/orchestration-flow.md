@@ -120,6 +120,65 @@ Per run, OpenGoat:
 3. appends user/assistant messages to transcript
 4. applies compaction when thresholds are reached
 
+## Provider Sessions (New)
+
+OpenGoat now tracks two distinct session layers:
+
+- OpenGoat session:
+  - internal transcript/session state managed by OpenGoat
+  - key/id stored under `~/.opengoat/agents/<agent-id>/sessions/`
+- Provider session:
+  - provider-native conversation id (if provider supports it)
+  - examples:
+    - Cursor chat id (`--resume <chatId>`)
+    - OpenCode session id (`--session <id>`)
+
+Important:
+
+- Provider session support is optional per provider.
+- Providers that do not support provider sessions continue to work without changes.
+- OpenGoat never requires provider sessions globally.
+
+## Task Threads and Provider Session Routing
+
+Delegation actions can include task-thread metadata:
+
+- `taskKey`: stable thread id for related work
+- `sessionPolicy`:
+  - `new`: force a fresh task thread/session
+  - `reuse`: reuse existing thread/session for that task key
+  - `auto`: reuse when available, otherwise create new
+
+OpenGoat maintains a per-run task-thread ledger:
+
+- task key
+- delegated agent
+- provider id
+- provider session id (when available)
+- OpenGoat session key/id
+- created/updated step
+- last response summary
+
+This ledger is injected into the planner prompt as `Known task threads` so orchestrator AI can decide:
+
+- when to start new task threads
+- when to route follow-ups to existing task threads
+- which provider session id should receive a follow-up
+
+## Example: Multi-Task + QA Feedback
+
+1. Orchestrator delegates feature implementation task A to Developer with:
+   - `taskKey=task-a`
+   - `sessionPolicy=new`
+2. OpenGoat starts a new provider session for that developer task and records it in the thread ledger.
+3. QA reviews output and returns feedback.
+4. Orchestrator sends follow-up to Developer with:
+   - `taskKey=task-a`
+   - `sessionPolicy=reuse`
+5. OpenGoat routes that follow-up to the same provider session id that originally handled task A.
+
+This enables flexible AI-driven orchestration while preserving continuity for each task thread.
+
 ## Safety Limits
 
 Orchestration loop is bounded by:
@@ -145,6 +204,8 @@ Trace includes:
 - delegation calls
 - artifact reads/writes
 - session graph (nodes/edges)
+- provider session ids (when available)
+- task thread ledger (`taskThreads`)
 - final output
 
 ## Scenario Testing

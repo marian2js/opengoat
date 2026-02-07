@@ -1,5 +1,6 @@
-import type { ProviderAuthOptions, ProviderInvokeOptions } from "../../types.js";
 import { BaseCliProvider } from "../../cli-provider.js";
+import { attachProviderSessionId } from "../../provider-session.js";
+import type { ProviderAuthOptions, ProviderExecutionResult, ProviderInvokeOptions } from "../../types.js";
 
 export class OpenClawProvider extends BaseCliProvider {
   public constructor() {
@@ -25,6 +26,10 @@ export class OpenClawProvider extends BaseCliProvider {
       args.push(options.agent);
     }
 
+    if (options.providerSessionId?.trim()) {
+      args.push("--session-id", options.providerSessionId.trim());
+    }
+
     if (options.model) {
       args.push("--model", options.model);
     }
@@ -43,5 +48,11 @@ export class OpenClawProvider extends BaseCliProvider {
     }
 
     return ["onboard"];
+  }
+
+  public override async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
+    const sessionId = options.providerSessionId?.trim();
+    const result = await super.invoke(options);
+    return attachProviderSessionId(result, sessionId);
   }
 }

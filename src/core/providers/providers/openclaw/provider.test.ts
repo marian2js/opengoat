@@ -41,4 +41,14 @@ describe("openclaw provider", () => {
       "openai-codex"
     ]);
   });
+
+  it("passes provider session id through --session-id", () => {
+    const provider = new OpenClawProvider();
+    const invocation = provider.buildInvocation({
+      message: "continue",
+      providerSessionId: "claw-session-7"
+    });
+
+    expect(invocation.args).toEqual(["agent", "--session-id", "claw-session-7", "--message", "continue"]);
+  });
 });

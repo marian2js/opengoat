@@ -44,4 +44,22 @@ describe("cursor provider", () => {
       UnsupportedProviderOptionError
     );
   });
+
+  it("maps provider session id to --resume", () => {
+    const provider = new CursorProvider();
+    const wrapped = provider.buildInvocation({
+      message: "continue work",
+      providerSessionId: "chat-123"
+    });
+    expect(wrapped.args).toEqual(["agent", "--resume", "chat-123", "continue work"]);
+
+    const direct = provider.buildInvocation(
+      {
+        message: "continue work",
+        providerSessionId: "chat-123"
+      },
+      { ...process.env, CURSOR_CMD: "cursor-agent" }
+    );
+    expect(direct.args).toEqual(["--resume", "chat-123", "continue work"]);
+  });
 });

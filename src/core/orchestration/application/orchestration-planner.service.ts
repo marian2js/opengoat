@@ -1,6 +1,11 @@
 import type { AgentManifest } from "../../agents/index.js";
 import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
-import type { OrchestrationAction, OrchestrationAgentDescriptor, OrchestrationPlannerDecision } from "../domain/loop.js";
+import type {
+  OrchestrationAction,
+  OrchestrationAgentDescriptor,
+  OrchestrationPlannerDecision,
+  OrchestrationTaskSessionPolicy
+} from "../domain/loop.js";
 
 export interface OrchestrationPlannerInput {
   userMessage: string;
@@ -9,6 +14,14 @@ export interface OrchestrationPlannerInput {
   sharedNotes: string;
   recentEvents: string[];
   agents: AgentManifest[];
+  taskThreads?: Array<{
+    taskKey: string;
+    agentId: string;
+    providerId?: string;
+    providerSessionId?: string;
+    updatedStep: number;
+    lastResponse?: string;
+  }>;
 }
 
 export class OrchestrationPlannerService {
@@ -29,6 +42,8 @@ export class OrchestrationPlannerService {
       "- Use respond_user when you can directly answer with high confidence.",
       "- Use finish when the task is complete.",
       "- Prefer hybrid mode for important handoffs (direct + markdown artifact).",
+      "- For delegate_to_agent, use taskKey to keep related work on the same task thread.",
+      '- sessionPolicy controls thread behavior: "new" creates a new thread, "reuse" requires an existing thread, "auto" reuses when available or creates otherwise.',
       "",
       "Allowed agents:",
       ...agentDescriptors.map(
@@ -47,6 +62,13 @@ export class OrchestrationPlannerService {
       "Recent events:",
       ...(input.recentEvents.length > 0 ? input.recentEvents.map((entry) => `- ${entry}`) : ["- (none)"]),
       "",
+      "Known task threads:",
+      ...(input.taskThreads && input.taskThreads.length > 0
+        ? input.taskThreads.map((thread) =>
+            `- ${thread.taskKey}: agent=${thread.agentId}; provider=${thread.providerId ?? "unknown"}; providerSessionId=${thread.providerSessionId ?? "(none)"}; updatedStep=${thread.updatedStep}; lastResponse=${thread.lastResponse?.trim() || "(none)"}`
+          )
+        : ["- (none)"]),
+      "",
       "Return JSON with shape:",
       "{",
       '  "rationale": "short reason",',
@@ -57,6 +79,8 @@ export class OrchestrationPlannerService {
       '    "targetAgentId": "required for delegate_to_agent",',
       '    "message": "required for delegate_to_agent/respond_user/finish",',
       '    "expectedOutput": "optional for delegate_to_agent",',
+      '    "taskKey": "optional for delegate_to_agent (stable id like task-auth-fix)",',
+      '    "sessionPolicy": "optional for delegate_to_agent: auto|new|reuse",',
       '    "path": "required for read_workspace_file/write_workspace_file",',
       '    "content": "required for write_workspace_file; optional for install_skill to create inline skill content",',
       '    "skillName": "required for install_skill",',
@@ -165,6 +189,8 @@ function isAction(value: unknown): value is OrchestrationAction {
     mode?: unknown;
     targetAgentId?: unknown;
     message?: unknown;
+    taskKey?: unknown;
+    sessionPolicy?: unknown;
     path?: unknown;
     content?: unknown;
     skillName?: unknown;
@@ -179,9 +205,23 @@ function isAction(value: unknown): value is OrchestrationAction {
   ) {
     return false;
   }
+  if (
+    record.sessionPolicy !== undefined &&
+    record.sessionPolicy !== "auto" &&
+    record.sessionPolicy !== "new" &&
+    record.sessionPolicy !== "reuse"
+  ) {
+    return false;
+  }
 
   if (record.type === "delegate_to_agent") {
-    return typeof record.targetAgentId === "string" && typeof record.message === "string";
+    if (typeof record.targetAgentId !== "string" || typeof record.message !== "string") {
+      return false;
+    }
+    if (record.taskKey !== undefined && typeof record.taskKey !== "string") {
+      return false;
+    }
+    return true;
   }
   if (record.type === "read_workspace_file") {
     return typeof record.path === "string";
@@ -223,7 +263,9 @@ function sanitizeDecision(decision: OrchestrationPlannerDecision): Orchestration
         ...action,
         targetAgentId: action.targetAgentId.trim().toLowerCase(),
         message: action.message.trim(),
-        mode: action.mode ?? "hybrid"
+        mode: action.mode ?? "hybrid",
+        taskKey: normalizeTaskKey(action.taskKey),
+        sessionPolicy: normalizeSessionPolicy(action.sessionPolicy)
       }
     };
   }
@@ -274,4 +316,24 @@ function sanitizeDecision(decision: OrchestrationPlannerDecision): Orchestration
       mode: action.mode ?? "artifacts"
     }
   };
+}
+
+function normalizeTaskKey(raw: string | undefined): string | undefined {
+  const value = raw?.trim().toLowerCase();
+  if (!value) {
+    return undefined;
+  }
+  const normalized = value
+    .replace(/[^a-z0-9._:-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return normalized || undefined;
+}
+
+function normalizeSessionPolicy(raw: OrchestrationTaskSessionPolicy | undefined): OrchestrationTaskSessionPolicy {
+  if (raw === "new" || raw === "reuse" || raw === "auto") {
+    return raw;
+  }
+  return "auto";
 }

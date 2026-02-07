@@ -11,6 +11,7 @@ import type {
   ProviderInvokeOptions
 } from "../../types.js";
 import type { OpenClawCompatProviderSpec } from "./catalog.js";
+import { attachProviderSessionId } from "../../provider-session.js";
 
 interface CommandExecutionOptions {
   command: string;
@@ -75,7 +76,7 @@ export class OpenClawCompatProvider extends BaseProvider {
     const args = this.buildInvocationArgs(options, model);
 
     try {
-      return await this.execute({
+      const result = await this.execute({
         command,
         args,
         cwd: options.cwd,
@@ -83,6 +84,7 @@ export class OpenClawCompatProvider extends BaseProvider {
         onStdout: options.onStdout,
         onStderr: options.onStderr
       });
+      return attachProviderSessionId(result, options.providerSessionId?.trim());
     } catch (error) {
       if (isSpawnPermissionOrMissing(error)) {
         throw new ProviderCommandNotFoundError(this.id, command);
@@ -126,6 +128,10 @@ export class OpenClawCompatProvider extends BaseProvider {
 
     if (options.agent?.trim()) {
       args.push(options.agent.trim());
+    }
+
+    if (options.providerSessionId?.trim()) {
+      args.push("--session-id", options.providerSessionId.trim());
     }
 
     args.push("--model", model);
@@ -237,4 +243,3 @@ function isSpawnPermissionOrMissing(error: unknown): error is NodeJS.ErrnoExcept
       ((error as NodeJS.ErrnoException).code ?? "") === "EACCES")
   );
 }
-

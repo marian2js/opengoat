@@ -1,4 +1,5 @@
 export type OrchestrationCommunicationMode = "direct" | "artifacts" | "hybrid";
+export type OrchestrationTaskSessionPolicy = "auto" | "new" | "reuse";
 
 export interface OrchestrationAgentDescriptor {
   agentId: string;
@@ -26,6 +27,8 @@ export interface DelegateToAgentAction extends OrchestrationBaseAction {
   targetAgentId: string;
   message: string;
   expectedOutput?: string;
+  taskKey?: string;
+  sessionPolicy?: OrchestrationTaskSessionPolicy;
 }
 
 export interface ReadWorkspaceFileAction extends OrchestrationBaseAction {
@@ -78,12 +81,15 @@ export interface OrchestrationStepLog {
   plannerDecision: OrchestrationPlannerDecision;
   agentCall?: {
     targetAgentId: string;
+    taskKey?: string;
+    sessionPolicy?: OrchestrationTaskSessionPolicy;
     request: string;
     response: string;
     code: number;
     providerId: string;
     sessionKey?: string;
     sessionId?: string;
+    providerSessionId?: string;
   };
   artifactIO?: {
     readPath?: string;
@@ -104,8 +110,10 @@ export interface OrchestrationRunLedger {
   sessionGraph: {
     nodes: Array<{
       agentId: string;
+      providerId?: string;
       sessionKey?: string;
       sessionId?: string;
+      providerSessionId?: string;
     }>;
     edges: Array<{
       fromAgentId: string;
@@ -113,4 +121,15 @@ export interface OrchestrationRunLedger {
       reason?: string;
     }>;
   };
+  taskThreads?: Array<{
+    taskKey: string;
+    agentId: string;
+    providerId?: string;
+    providerSessionId?: string;
+    sessionKey?: string;
+    sessionId?: string;
+    createdStep: number;
+    updatedStep: number;
+    lastResponse?: string;
+  }>;
 }
