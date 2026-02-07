@@ -33,6 +33,8 @@ export interface SessionEntry {
   sessionId: string;
   updatedAt: number;
   transcriptFile?: string;
+  workspacePath?: string;
+  workingPath?: string;
   inputChars?: number;
   outputChars?: number;
   totalChars?: number;
@@ -50,6 +52,8 @@ export interface SessionRunInfo {
   sessionKey: string;
   sessionId: string;
   transcriptPath: string;
+  workspacePath: string;
+  workingPath: string;
   isNewSession: boolean;
 }
 
@@ -58,6 +62,8 @@ export interface SessionSummary {
   sessionId: string;
   updatedAt: number;
   transcriptPath: string;
+  workspacePath: string;
+  workingPath?: string;
   inputChars: number;
   outputChars: number;
   totalChars: number;

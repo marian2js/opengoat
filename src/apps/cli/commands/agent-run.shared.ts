@@ -23,7 +23,7 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
     result = await context.service.runAgent(request.agentId, {
       message: request.message,
       model: request.model,
-      cwd: request.cwd,
+      cwd: request.cwd || process.cwd(),
       sessionRef: request.sessionRef,
       forceNewSession: request.forceNewSession,
       disableSession: request.disableSession,

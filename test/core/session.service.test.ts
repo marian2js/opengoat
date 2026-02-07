@@ -96,6 +96,53 @@ describe("SessionService", () => {
     expect(second.info.sessionId).not.toBe(firstSessionId);
   });
 
+  it("enforces one working path per session by rotating session id when working path changes", async () => {
+    const root = await createTempDir("opengoat-session-");
+    roots.push(root);
+
+    const { fileSystem, paths } = await createPaths(root);
+    await seedAgentConfig(fileSystem, paths, "orchestrator", {});
+
+    const now = { value: Date.parse("2026-02-07T00:00:00.000Z") };
+    const service = createService(now);
+
+    const first = await service.prepareRunSession(paths, "orchestrator", {
+      workingPath: "/tmp/project-a",
+      userMessage: "first"
+    });
+    expect(first.enabled).toBe(true);
+    if (!first.enabled) {
+      throw new Error("Expected session-enabled run.");
+    }
+    const firstSessionId = first.info.sessionId;
+    expect(first.info.workingPath).toBe(path.resolve("/tmp/project-a"));
+    expect(first.info.workspacePath).toBe(path.join(paths.workspacesDir, "orchestrator"));
+
+    now.value += 1_000;
+    const second = await service.prepareRunSession(paths, "orchestrator", {
+      workingPath: "/tmp/project-a",
+      userMessage: "second"
+    });
+    expect(second.enabled).toBe(true);
+    if (!second.enabled) {
+      throw new Error("Expected session-enabled run.");
+    }
+    expect(second.info.sessionId).toBe(firstSessionId);
+
+    now.value += 1_000;
+    const third = await service.prepareRunSession(paths, "orchestrator", {
+      workingPath: "/tmp/project-b",
+      userMessage: "third"
+    });
+    expect(third.enabled).toBe(true);
+    if (!third.enabled) {
+      throw new Error("Expected session-enabled run.");
+    }
+    expect(third.info.isNewSession).toBe(true);
+    expect(third.info.sessionId).not.toBe(firstSessionId);
+    expect(third.info.workingPath).toBe(path.resolve("/tmp/project-b"));
+  });
+
   it("compacts transcript history and keeps recent messages", async () => {
     const root = await createTempDir("opengoat-session-");
     roots.push(root);

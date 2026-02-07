@@ -14,6 +14,16 @@ OpenGoat supports two runtime types for agent execution:
   - execute in the caller project directory (`process.cwd()`) by default
   - are intended for tool-style providers (OpenCode, Cursor, Gemini CLI, etc.)
 
+Path concepts:
+
+- Workspace path:
+  - durable agent-owned location under `~/.opengoat/workspaces/<agent-id>`
+  - used by OpenGoat for persistent agent context/state
+- Working path:
+  - project execution path where work happens
+  - defaults to the process cwd where `opengoat` is invoked (or explicit `--cwd`)
+  - tracked per OpenGoat session
+
 Resolution model:
 
 - `orchestrator` defaults to internal.
@@ -137,6 +147,13 @@ Run vs Session:
 - Session:
   - conversational continuity for an agent across runs
   - stored under `~/.opengoat/agents/<agent-id>/sessions/`
+  - bound to one working path for its lifetime
+
+Working path rule:
+
+- Different sessions may use different working paths.
+- The same session id cannot switch working paths.
+- If a run targets the same session key but with a different working path, OpenGoat rotates to a new session id automatically.
 
 Each agent has isolated session storage:
 
