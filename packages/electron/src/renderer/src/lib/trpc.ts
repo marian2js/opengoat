@@ -6,6 +6,7 @@ import {
 } from "@shared/workbench-contract";
 import type {
   WorkbenchBootstrap,
+  WorkbenchGuidedAuthResult,
   WorkbenchMessage,
   WorkbenchOnboarding,
   WorkbenchProject,
@@ -22,6 +23,7 @@ export interface WorkbenchApiClient {
   createSession: (input: { projectId: string; title?: string }) => Promise<WorkbenchSession>;
   getSessionMessages: (input: { projectId: string; sessionId: string }) => Promise<WorkbenchMessage[]>;
   getOnboardingStatus: () => Promise<WorkbenchOnboarding>;
+  runOnboardingGuidedAuth: (input: { providerId: string }) => Promise<WorkbenchGuidedAuthResult>;
   submitOnboarding: (input: { providerId: string; env: Record<string, string> }) => Promise<WorkbenchOnboarding>;
   sendChatMessage: (input: {
     projectId: string;
@@ -108,6 +110,11 @@ export function createWorkbenchApiClient(): WorkbenchApiClient {
       const trpc = getTrpcClient();
       await ensureContract(trpc);
       return (await trpc.query("onboarding.status")) as WorkbenchOnboarding;
+    },
+    runOnboardingGuidedAuth: async (input) => {
+      const trpc = getTrpcClient();
+      await ensureContract(trpc);
+      return (await trpc.mutation("onboarding.guidedAuth", input)) as WorkbenchGuidedAuthResult;
     },
     submitOnboarding: async (input) => {
       const trpc = getTrpcClient();

@@ -12,8 +12,11 @@ interface OnboardingPanelProps {
   error: string | null;
   canClose: boolean;
   isSubmitting: boolean;
+  isRunningGuidedAuth: boolean;
+  onboardingNotice: string | null;
   onSelectProvider: (providerId: string) => void;
   onEnvChange: (key: string, value: string) => void;
+  onRunGuidedAuth: (providerId: string) => void;
   onClose: () => void;
   onSubmit: () => void;
 }
@@ -42,6 +45,23 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
     () => splitEnvFields(selectedProvider?.envFields ?? []),
     [selectedProvider]
   );
+  const guidedHiddenRequiredKeySet = useMemo(() => {
+    if (!selectedProvider?.guidedAuth) {
+      return new Set<string>();
+    }
+    return new Set(
+      envPartition.required
+        .filter((field) => shouldHideGuidedAuthField(field))
+        .map((field) => field.key)
+    );
+  }, [envPartition.required, selectedProvider?.guidedAuth]);
+  const visibleRequiredFields = useMemo(
+    () =>
+      envPartition.required.filter(
+        (field) => !guidedHiddenRequiredKeySet.has(field.key)
+      ),
+    [envPartition.required, guidedHiddenRequiredKeySet]
+  );
 
   useEffect(() => {
     setShowAdvanced(false);
@@ -63,6 +83,23 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
       })
       .map((field) => field.key);
   }, [envPartition.required, props.env, selectedProvider]);
+  const visibleMissingRequiredKeys = useMemo(
+    () =>
+      missingRequiredKeys.filter(
+        (key) => !guidedHiddenRequiredKeySet.has(key)
+      ),
+    [guidedHiddenRequiredKeySet, missingRequiredKeys]
+  );
+  const needsGuidedAuth = useMemo(
+    () =>
+      Boolean(selectedProvider?.guidedAuth) &&
+      missingRequiredKeys.some((key) => guidedHiddenRequiredKeySet.has(key)),
+    [guidedHiddenRequiredKeySet, missingRequiredKeys, selectedProvider?.guidedAuth]
+  );
+  const missingStatusMessage = useMemo(
+    () => buildMissingStatusMessage(visibleMissingRequiredKeys, needsGuidedAuth),
+    [needsGuidedAuth, visibleMissingRequiredKeys]
+  );
 
   const canSubmit = Boolean(selectedProvider) && missingRequiredKeys.length === 0 && !props.isSubmitting;
   const totalProviderCount = providerFamilies.reduce((count, family) => count + family.providers.length, 0);
@@ -100,13 +137,16 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
             <SetupPane
               provider={selectedProvider}
               env={props.env}
-              requiredFields={envPartition.required}
+              requiredFields={visibleRequiredFields}
               optionalFields={envPartition.optional}
               showAdvanced={showAdvanced}
               missingRequiredKeys={missingRequiredKeys}
               disabled={props.isSubmitting}
+              isRunningGuidedAuth={props.isRunningGuidedAuth}
+              onboardingNotice={props.onboardingNotice}
               onToggleAdvanced={() => setShowAdvanced((value) => !value)}
               onEnvChange={props.onEnvChange}
+              onRunGuidedAuth={props.onRunGuidedAuth}
             />
           </div>
 
@@ -114,9 +154,9 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
             <div className="min-h-5 text-xs text-[var(--muted-foreground)]">
               {props.error ? (
                 <span className="text-red-300">{props.error}</span>
-              ) : missingRequiredKeys.length > 0 ? (
+              ) : missingStatusMessage ? (
                 <span className="text-amber-300">
-                  Missing required fields: {missingRequiredKeys.join(", ")}
+                  {missingStatusMessage}
                 </span>
               ) : selectedProvider ? (
                 `Selected provider: ${selectedProvider.displayName} (${selectedProvider.id})`
@@ -267,8 +307,11 @@ function SetupPane(props: {
   showAdvanced: boolean;
   missingRequiredKeys: string[];
   disabled: boolean;
+  isRunningGuidedAuth: boolean;
+  onboardingNotice: string | null;
   onToggleAdvanced: () => void;
   onEnvChange: (key: string, value: string) => void;
+  onRunGuidedAuth: (providerId: string) => void;
 }) {
   if (!props.provider) {
     return (
@@ -294,6 +337,27 @@ function SetupPane(props: {
         <p className="mt-1 text-sm text-[var(--muted-foreground)]">
           Fill the required fields first. Optional fields stay hidden until needed.
         </p>
+        {provider.guidedAuth ? (
+          <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+            <p className="text-sm font-medium">{provider.guidedAuth.title}</p>
+            <p className="mt-1 text-xs text-[var(--muted-foreground)]">{provider.guidedAuth.description}</p>
+            <div className="mt-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={props.disabled || props.isRunningGuidedAuth}
+                onClick={() => props.onRunGuidedAuth(provider.id)}
+              >
+                {props.isRunningGuidedAuth ? "Opening OAuth..." : "Sign in with OAuth"}
+              </Button>
+            </div>
+            {props.onboardingNotice ? (
+              <pre className="mt-2 max-h-28 overflow-y-auto whitespace-pre-wrap rounded-md border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,black)] p-2 text-xs text-[var(--muted-foreground)]">
+                {props.onboardingNotice}
+              </pre>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
@@ -304,7 +368,9 @@ function SetupPane(props: {
             </p>
             {!hasRequired ? (
               <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
-                No required credentials for this provider.
+                {provider.guidedAuth
+                  ? "Use OAuth sign-in above to populate required credentials."
+                  : "No required credentials for this provider."}
               </div>
             ) : (
               props.requiredFields.map((field) => {
@@ -511,4 +577,37 @@ function toHumanLabel(key: string): string {
     .filter(Boolean)
     .map((part) => part.toUpperCase())
     .join("_");
+}
+
+function shouldHideGuidedAuthField(field: {
+  key: string;
+  secret?: boolean;
+}): boolean {
+  if (field.secret !== true) {
+    return false;
+  }
+  const normalizedKey = field.key.trim().toUpperCase();
+  return (
+    normalizedKey.includes("OAUTH") ||
+    normalizedKey.includes("TOKEN") ||
+    normalizedKey.includes("REFRESH") ||
+    normalizedKey.includes("EXPIRES")
+  );
+}
+
+function buildMissingStatusMessage(
+  missingFields: string[],
+  needsGuidedAuth: boolean
+): string | null {
+  const parts: string[] = [];
+  if (needsGuidedAuth) {
+    parts.push("Complete OAuth sign-in to continue");
+  }
+  if (missingFields.length > 0) {
+    parts.push(`Missing required fields: ${missingFields.join(", ")}`);
+  }
+  if (parts.length === 0) {
+    return null;
+  }
+  return parts.join(" • ");
 }

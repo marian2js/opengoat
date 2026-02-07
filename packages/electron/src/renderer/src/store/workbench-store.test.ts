@@ -168,6 +168,31 @@ describe("workbench store", () => {
     expect(store.getState().onboardingState).toBe("editing");
   });
 
+  it("runs guided auth and merges env into onboarding draft", async () => {
+    const runOnboardingGuidedAuth = vi.fn(async () => ({
+      providerId: "qwen-portal",
+      env: {
+        QWEN_OAUTH_TOKEN: "qwen-token"
+      },
+      note: "Saved Qwen OAuth token.",
+      notes: ["Qwen OAuth complete."]
+    }));
+    const api = createApiMock({
+      runOnboardingGuidedAuth: runOnboardingGuidedAuth as WorkbenchApiClient["runOnboardingGuidedAuth"]
+    });
+    const store = createWorkbenchStore(api);
+
+    await store.getState().bootstrap();
+    await store.getState().runOnboardingGuidedAuth("qwen-portal");
+
+    expect(runOnboardingGuidedAuth).toHaveBeenCalledWith({
+      providerId: "qwen-portal"
+    });
+    expect(store.getState().onboardingGuidedAuthState).toBe("idle");
+    expect(store.getState().onboardingDraftEnv.QWEN_OAUTH_TOKEN).toBe("qwen-token");
+    expect(store.getState().onboardingNotice).toContain("Saved Qwen OAuth token.");
+  });
+
   it("surfaces contract mismatch during bootstrap", async () => {
     const api = createApiMock({
       validateContract: (vi.fn(async () => {
@@ -279,6 +304,13 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
     }),
     getSessionMessages: vi.fn(async () => []),
     getOnboardingStatus: vi.fn(async () => bootstrapOnboarding),
+    runOnboardingGuidedAuth: vi.fn(async () => ({
+      providerId: "openai",
+      env: {
+        OPENAI_API_KEY: "sk-test"
+      },
+      notes: ["Guided auth complete."]
+    })),
     submitOnboarding: vi.fn(async () => submittedOnboarding),
     sendChatMessage: vi.fn(async () => ({
       reply: assistantReply,

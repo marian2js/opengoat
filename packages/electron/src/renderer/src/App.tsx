@@ -11,8 +11,10 @@ export function App() {
     onboarding,
     showOnboarding,
     onboardingState,
+    onboardingGuidedAuthState,
     onboardingDraftProviderId,
     onboardingDraftEnv,
+    onboardingNotice,
     activeProjectId,
     activeSessionId,
     activeMessages,
@@ -26,6 +28,7 @@ export function App() {
     selectProject,
     selectSession,
     submitOnboarding,
+    runOnboardingGuidedAuth,
     setOnboardingDraftProvider,
     setOnboardingDraftField,
     openOnboarding,
@@ -78,8 +81,11 @@ export function App() {
         error={error}
         canClose={!onboarding.needsOnboarding}
         isSubmitting={onboardingState === "submitting"}
+        isRunningGuidedAuth={onboardingGuidedAuthState === "running"}
         onSelectProvider={setOnboardingDraftProvider}
         onEnvChange={setOnboardingDraftField}
+        onboardingNotice={onboardingNotice}
+        onRunGuidedAuth={(providerId) => void runOnboardingGuidedAuth(providerId)}
         onClose={closeOnboarding}
         onSubmit={() => void onSaveOnboarding()}
       />

@@ -43,6 +43,12 @@ export const workbenchOnboardingProviderSchema = z.object({
   id: z.string(),
   displayName: z.string(),
   kind: providerKindSchema,
+  guidedAuth: z
+    .object({
+      title: z.string(),
+      description: z.string()
+    })
+    .optional(),
   envFields: z.array(providerOnboardingFieldSchema),
   configuredEnvKeys: z.array(z.string()),
   configuredEnvValues: z.record(z.string(), z.string()),
@@ -106,3 +112,16 @@ export const submitOnboardingInputSchema = z.object({
   providerId: z.string().trim().min(1),
   env: z.record(z.string(), z.string()).default({})
 });
+
+export const runGuidedAuthInputSchema = z.object({
+  providerId: z.string().trim().min(1)
+});
+
+export const runGuidedAuthResultSchema = z.object({
+  providerId: z.string(),
+  env: z.record(z.string(), z.string()),
+  note: z.string().optional(),
+  notes: z.array(z.string())
+});
+
+export type WorkbenchGuidedAuthResult = z.infer<typeof runGuidedAuthResultSchema>;

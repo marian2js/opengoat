@@ -11,6 +11,7 @@ import {
 
 export type OnboardingFlowState = "hidden" | "loading" | "editing" | "submitting";
 export type ChatFlowState = "idle" | "sending";
+export type OnboardingGuidedAuthState = "idle" | "running";
 
 interface WorkbenchUiState {
   homeDir: string;
@@ -18,8 +19,10 @@ interface WorkbenchUiState {
   onboarding: WorkbenchOnboarding | null;
   showOnboarding: boolean;
   onboardingState: OnboardingFlowState;
+  onboardingGuidedAuthState: OnboardingGuidedAuthState;
   onboardingDraftProviderId: string;
   onboardingDraftEnv: Record<string, string>;
+  onboardingNotice: string | null;
   chatState: ChatFlowState;
   activeProjectId: string | null;
   activeSessionId: string | null;
@@ -34,6 +37,7 @@ interface WorkbenchUiState {
   createSession: (projectId: string, title?: string) => Promise<void>;
   selectSession: (projectId: string, sessionId: string) => Promise<void>;
   submitOnboarding: (providerId: string, env: Record<string, string>) => Promise<void>;
+  runOnboardingGuidedAuth: (providerId: string) => Promise<void>;
   setOnboardingDraftProvider: (providerId: string) => void;
   setOnboardingDraftField: (key: string, value: string) => void;
   openOnboarding: () => Promise<void>;
@@ -54,8 +58,10 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
     onboarding: null,
     showOnboarding: false,
     onboardingState: "hidden",
+    onboardingGuidedAuthState: "idle",
     onboardingDraftProviderId: "",
     onboardingDraftEnv: {},
+    onboardingNotice: null,
     chatState: "idle",
     activeProjectId: null,
     activeSessionId: null,
@@ -94,6 +100,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           onboardingState: showOnboarding ? "editing" : "hidden",
           onboardingDraftProviderId: onboardingDraft.providerId,
           onboardingDraftEnv: onboardingDraft.env,
+          onboardingNotice: null,
           activeProjectId: firstProject?.id ?? null,
           activeSessionId: firstSession?.id ?? null,
           activeMessages,
@@ -234,6 +241,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           onboardingState: showOnboarding ? "editing" : "hidden",
           onboardingDraftProviderId: onboardingDraft.providerId,
           onboardingDraftEnv: onboardingDraft.env,
+          onboardingNotice: null,
           isBusy: false
         });
       } catch (error) {
@@ -249,6 +257,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       set((state) => ({
         onboardingDraftProviderId: providerId.trim(),
         onboardingDraftEnv: getConfiguredOnboardingEnv(state.onboarding, providerId),
+        onboardingNotice: null,
         error: null
       }));
     },
@@ -263,8 +272,48 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           ...state.onboardingDraftEnv,
           [normalizedKey]: value
         },
+        onboardingNotice: null,
         error: null
       }));
+    },
+
+    runOnboardingGuidedAuth: async (providerId: string) => {
+      const normalizedProviderId = providerId.trim();
+      if (!normalizedProviderId) {
+        return;
+      }
+
+      set({
+        isBusy: true,
+        onboardingGuidedAuthState: "running",
+        onboardingNotice: null,
+        error: null
+      });
+      try {
+        const result = await api.runOnboardingGuidedAuth({
+          providerId: normalizedProviderId
+        });
+        const notes = [result.note, ...result.notes]
+          .filter((value): value is string => Boolean(value?.trim()))
+          .join("\n");
+        set((state) => ({
+          isBusy: false,
+          onboardingGuidedAuthState: "idle",
+          onboardingDraftEnv: {
+            ...state.onboardingDraftEnv,
+            ...result.env
+          },
+          onboardingNotice: notes || "Guided sign-in completed.",
+          error: null
+        }));
+      } catch (error) {
+        set({
+          isBusy: false,
+          onboardingGuidedAuthState: "idle",
+          onboardingNotice: null,
+          error: toErrorMessage(error)
+        });
+      }
     },
 
     openOnboarding: async () => {
@@ -286,6 +335,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           onboardingState: "editing",
           onboardingDraftProviderId: onboardingDraft.providerId,
           onboardingDraftEnv: onboardingDraft.env,
+          onboardingNotice: null,
           isBusy: false
         });
       } catch (error) {
@@ -305,6 +355,8 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       set({
         showOnboarding: false,
         onboardingState: "hidden",
+        onboardingGuidedAuthState: "idle",
+        onboardingNotice: null,
         error: null
       });
     },

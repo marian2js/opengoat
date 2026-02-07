@@ -23,8 +23,11 @@ describe("OnboardingPanel e2e", () => {
         error: null,
         canClose: true,
         isSubmitting: false,
+        isRunningGuidedAuth: false,
+        onboardingNotice: null,
         onSelectProvider: vi.fn(),
         onEnvChange: vi.fn(),
+        onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit: vi.fn()
       })
@@ -54,6 +57,8 @@ describe("OnboardingPanel e2e", () => {
         error: null,
         canClose: true,
         isSubmitting: false,
+        isRunningGuidedAuth: false,
+        onboardingNotice: null,
         onSelectProvider: setProviderId,
         onEnvChange: (key: string, value: string) => {
           setEnv((current) => ({
@@ -61,6 +66,7 @@ describe("OnboardingPanel e2e", () => {
             [key]: value
           }));
         },
+        onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit
       });
@@ -81,6 +87,37 @@ describe("OnboardingPanel e2e", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
+  it("hides manual token input for guided OAuth providers", async () => {
+    const user = userEvent.setup();
+    const onRunGuidedAuth = vi.fn();
+
+    render(
+      createElement(OnboardingPanel, {
+        onboarding: createOnboardingFixture(),
+        providerId: "qwen-portal",
+        env: {},
+        error: null,
+        canClose: true,
+        isSubmitting: false,
+        isRunningGuidedAuth: false,
+        onboardingNotice: null,
+        onSelectProvider: vi.fn(),
+        onEnvChange: vi.fn(),
+        onRunGuidedAuth,
+        onClose: vi.fn(),
+        onSubmit: vi.fn()
+      })
+    );
+
+    const oauthButton = screen.getByRole("button", { name: /sign in with oauth/i });
+    expect(oauthButton).toBeTruthy();
+    expect(screen.queryByPlaceholderText(/Qwen OAuth token/i)).toBeNull();
+    expect(screen.getByText(/Complete OAuth sign-in to continue/i)).toBeTruthy();
+
+    await user.click(oauthButton);
+    expect(onRunGuidedAuth).toHaveBeenCalledWith("qwen-portal");
+  });
+
   it("uses independent scroll areas for provider list and setup pane", () => {
     render(
       createElement(OnboardingPanel, {
@@ -90,8 +127,11 @@ describe("OnboardingPanel e2e", () => {
         error: null,
         canClose: true,
         isSubmitting: false,
+        isRunningGuidedAuth: false,
+        onboardingNotice: null,
         onSelectProvider: vi.fn(),
         onEnvChange: vi.fn(),
+        onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit: vi.fn()
       })
@@ -117,6 +157,11 @@ function createOnboardingFixture(): WorkbenchOnboarding {
         id: "openrouter",
         label: "OpenRouter",
         providerIds: ["openrouter"]
+      },
+      {
+        id: "qwen",
+        label: "Qwen",
+        providerIds: ["qwen-portal"]
       }
     ],
     providers: [
@@ -152,6 +197,27 @@ function createOnboardingFixture(): WorkbenchOnboarding {
         configuredEnvKeys: [],
         configuredEnvValues: {},
         missingRequiredEnv: ["OPENROUTER_API_KEY"],
+        hasConfig: false
+      },
+      {
+        id: "qwen-portal",
+        displayName: "Qwen Portal OAuth",
+        kind: "http",
+        guidedAuth: {
+          title: "Qwen OAuth",
+          description: "Open browser and approve access (recommended)."
+        },
+        envFields: [
+          {
+            key: "QWEN_OAUTH_TOKEN",
+            description: "Qwen OAuth token (use guided sign-in).",
+            required: true,
+            secret: true
+          }
+        ],
+        configuredEnvKeys: [],
+        configuredEnvValues: {},
+        missingRequiredEnv: ["QWEN_OAUTH_TOKEN"],
         hasConfig: false
       }
     ]
