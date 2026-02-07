@@ -60,6 +60,8 @@ describe("orchestration task threads", () => {
 
     const developerCalls = threadedProvider.calls.filter((call) => call.agentId === "developer");
     expect(developerCalls).toHaveLength(2);
+    expect(developerCalls[0]?.message).not.toContain("Coordination file:");
+    expect(developerCalls[1]?.message).not.toContain("Coordination file:");
     expect(developerCalls[0]?.forceNewProviderSession).toBe(true);
     expect(developerCalls[1]?.providerSessionId).toBe("developer-thread-1");
     expect(developerCalls[1]?.forceNewProviderSession).toBe(false);
@@ -116,6 +118,7 @@ async function writeAgentManifest(root: string, agentId: string, name: string, d
 class ThreadedScriptedProvider extends BaseProvider {
   public readonly calls: Array<{
     agentId: string;
+    message: string;
     sessionRef?: string;
     providerSessionId?: string;
     forceNewProviderSession?: boolean;
@@ -128,7 +131,7 @@ class ThreadedScriptedProvider extends BaseProvider {
     super({
       id: "threaded-scripted",
       displayName: "Threaded Scripted Provider",
-      kind: "http",
+      kind: "cli",
       capabilities: {
         agent: true,
         model: true,
@@ -144,6 +147,7 @@ class ThreadedScriptedProvider extends BaseProvider {
 
     this.calls.push({
       agentId,
+      message: options.message,
       sessionRef: options.sessionRef,
       providerSessionId: options.providerSessionId,
       forceNewProviderSession: options.forceNewProviderSession

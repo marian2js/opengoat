@@ -478,12 +478,11 @@ export class OrchestrationService {
       taskKey,
       sessionPolicy: effectiveSessionPolicy
     });
-    const handoffBaseDir = resolveDelegationHandoffBaseDir(
-      this.pathPort,
-      params.paths,
-      params.runId,
-      targetRuntime.workspaceAccess,
-      params.options.cwd
+    const handoffBaseDir = this.pathPort.join(
+      params.paths.workspacesDir,
+      DEFAULT_AGENT_ID,
+      "coordination",
+      params.runId
     );
     let outboundPath: string | undefined;
     if (mode === "artifacts" || mode === "hybrid") {
@@ -510,6 +509,7 @@ export class OrchestrationService {
       expectedOutput: action.expectedOutput,
       mode,
       outboundPath,
+      exposeArtifactPath: targetRuntime.workspaceAccess === "internal",
       sharedNotes: params.sharedNotes
     });
     params.logger.debug("Delegation message payload.", {
@@ -778,6 +778,7 @@ function renderDelegateMessage(params: {
   expectedOutput?: string;
   mode: "direct" | "artifacts" | "hybrid";
   outboundPath?: string;
+  exposeArtifactPath: boolean;
   sharedNotes: string[];
 }): string {
   const lines = [
@@ -796,8 +797,10 @@ function renderDelegateMessage(params: {
   if (params.sharedNotes.length > 0) {
     lines.push("Shared notes from previous steps:", clampText(params.sharedNotes.join("\n\n"), 4000), "");
   }
-  if ((params.mode === "artifacts" || params.mode === "hybrid") && params.outboundPath) {
+  if ((params.mode === "artifacts" || params.mode === "hybrid") && params.outboundPath && params.exposeArtifactPath) {
     lines.push(`Coordination file: ${params.outboundPath}`, "You may use this markdown artifact for durable handoff context.", "");
+  } else if (params.mode === "artifacts" || params.mode === "hybrid") {
+    lines.push("Coordination artifacts are managed internally by the orchestrator.", "");
   }
   lines.push("Return a concise result for the orchestrator.");
   return lines.join("\n");
@@ -923,19 +926,4 @@ function clampText(value: string, maxChars: number): string {
   const head = value.slice(0, Math.floor(maxChars * 0.7));
   const tail = value.slice(-(maxChars - head.length - 20));
   return `${head}\n...[truncated]...\n${tail}`;
-}
-
-function resolveDelegationHandoffBaseDir(
-  pathPort: PathPort,
-  paths: OpenGoatPaths,
-  runId: string,
-  workspaceAccess: "internal" | "external",
-  requestedCwd: string | undefined
-): string {
-  if (workspaceAccess === "external") {
-    const root = requestedCwd?.trim() || process.cwd();
-    return pathPort.join(root, ".opengoat", "coordination", runId);
-  }
-
-  return pathPort.join(paths.workspacesDir, DEFAULT_AGENT_ID, "coordination", runId);
 }
