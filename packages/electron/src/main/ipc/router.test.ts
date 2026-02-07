@@ -1,8 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
+import { DESKTOP_IPC_CONTRACT_VERSION } from "@shared/workbench-contract";
 import { createDesktopRouter } from "./router";
 import type { WorkbenchService } from "../state/workbench-service";
 
 describe("desktop IPC router", () => {
+  it("exposes contract metadata", async () => {
+    const service = createServiceStub();
+    const router = createDesktopRouter(service);
+    const caller = router.createCaller({});
+
+    const contract = await caller.meta.contract();
+
+    expect(contract.version).toBe(DESKTOP_IPC_CONTRACT_VERSION);
+  });
+
   it("executes bootstrap query and read procedures through the caller", async () => {
     const service = createServiceStub();
     const router = createDesktopRouter(service);
@@ -18,25 +29,6 @@ describe("desktop IPC router", () => {
     expect(service.bootstrap).toHaveBeenCalledTimes(1);
     expect(service.listProjects).toHaveBeenCalledTimes(1);
     expect(service.listMessages).toHaveBeenCalledWith("p1", "s1");
-  });
-
-  it("supports legacy mutate aliases for bootstrap/list/messages/status", async () => {
-    const service = createServiceStub();
-    const router = createDesktopRouter(service);
-    const caller = router.createCaller({});
-
-    await caller.bootstrapMutate();
-    await caller.projects.listMutate();
-    await caller.sessions.messagesMutate({
-      projectId: "p1",
-      sessionId: "s1"
-    });
-    await caller.onboarding.statusMutate();
-
-    expect(service.bootstrap).toHaveBeenCalledTimes(1);
-    expect(service.listProjects).toHaveBeenCalledTimes(1);
-    expect(service.listMessages).toHaveBeenCalledWith("p1", "s1");
-    expect(service.getOnboardingState).toHaveBeenCalledTimes(1);
   });
 
   it("executes onboarding submit via mutation and forwards payload", async () => {
@@ -57,6 +49,15 @@ describe("desktop IPC router", () => {
         OPENAI_API_KEY: "sk-test"
       }
     });
+  });
+
+  it("initializes router with a callable getErrorShape for Electron IPC transport", () => {
+    const service = createServiceStub();
+    const router = createDesktopRouter(service) as {
+      getErrorShape?: unknown;
+    };
+
+    expect(typeof router.getErrorShape).toBe("function");
   });
 });
 

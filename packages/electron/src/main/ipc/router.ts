@@ -1,4 +1,5 @@
 import type { WorkbenchService } from "@main/state/workbench-service";
+import { DESKTOP_IPC_CONTRACT_VERSION } from "@shared/workbench-contract";
 import {
   addProjectInputSchema,
   createSessionInputSchema,
@@ -14,17 +15,16 @@ const t = initTRPC.create({ transformer: superjson });
 
 export function createDesktopRouter(service: WorkbenchService) {
   const router = t.router({
-    bootstrap: t.procedure.query(async () => {
-      return service.bootstrap();
+    meta: t.router({
+      contract: t.procedure.query(async () => ({
+        version: DESKTOP_IPC_CONTRACT_VERSION
+      }))
     }),
-    bootstrapMutate: t.procedure.mutation(async () => {
+    bootstrap: t.procedure.query(async () => {
       return service.bootstrap();
     }),
     projects: t.router({
       list: t.procedure.query(async () => {
-        return service.listProjects();
-      }),
-      listMutate: t.procedure.mutation(async () => {
         return service.listProjects();
       }),
       add: t.procedure
@@ -52,17 +52,9 @@ export function createDesktopRouter(service: WorkbenchService) {
         .query(async ({ input }) => {
           return service.listMessages(input.projectId, input.sessionId);
         }),
-      messagesMutate: t.procedure
-        .input(sessionLookupInputSchema)
-        .mutation(async ({ input }) => {
-          return service.listMessages(input.projectId, input.sessionId);
-        }),
     }),
     onboarding: t.router({
       status: t.procedure.query(async () => {
-        return service.getOnboardingState();
-      }),
-      statusMutate: t.procedure.mutation(async () => {
         return service.getOnboardingState();
       }),
       submit: t.procedure

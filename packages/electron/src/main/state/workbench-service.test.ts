@@ -68,6 +68,62 @@ describe("WorkbenchService onboarding", () => {
     expect(onboarding.needsOnboarding).toBe(false);
     expect(onboarding.activeProviderId).toBe("openai");
   });
+
+  it("returns configured non-secret env values for onboarding drafts", async () => {
+    const providers = createProviderSummaries();
+    const opengoat = createOpenGoatStub({
+      providers,
+      activeProviderId: "openai",
+      onboardingByProvider: {
+        openai: {
+          env: [
+            {
+              key: "OPENAI_API_KEY",
+              description: "OpenAI API key",
+              required: true,
+              secret: true
+            },
+            {
+              key: "OPENAI_BASE_URL",
+              description: "Optional OpenAI-compatible base URL"
+            },
+            {
+              key: "OPENAI_ENDPOINT_PATH",
+              description: "Optional endpoint path"
+            }
+          ]
+        }
+      },
+      initialProviderConfigs: {
+        openai: {
+          schemaVersion: 1,
+          providerId: "openai",
+          env: {
+            OPENAI_API_KEY: "sk-live",
+            OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
+            OPENAI_ENDPOINT_PATH: "/chat/completions"
+          },
+          updatedAt: "2026-02-07T00:00:00.000Z"
+        }
+      }
+    });
+    const store = createStoreStub();
+    const service = new WorkbenchService({ opengoat, store });
+
+    const boot = await service.bootstrap();
+    const active = boot.onboarding.providers.find((provider) => provider.id === "openai");
+
+    expect(active?.configuredEnvKeys).toEqual([
+      "OPENAI_API_KEY",
+      "OPENAI_BASE_URL",
+      "OPENAI_ENDPOINT_PATH"
+    ]);
+    expect(active?.configuredEnvValues).toEqual({
+      OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
+      OPENAI_ENDPOINT_PATH: "/chat/completions"
+    });
+    expect(active?.missingRequiredEnv).toEqual([]);
+  });
 });
 
 describe("WorkbenchService sendMessage", () => {
@@ -222,12 +278,15 @@ function createOpenGoatStub(options: {
       env?: Array<{ key: string; description: string; required?: boolean; secret?: boolean }>;
     }
   >;
+  initialProviderConfigs?: Record<string, ProviderStoredConfig>;
   runAgent?: ReturnType<typeof vi.fn>;
 }): OpenGoatService & {
   setProviderConfig: ReturnType<typeof vi.fn>;
   setAgentProvider: ReturnType<typeof vi.fn>;
 } {
-  const providerConfigs = new Map<string, ProviderStoredConfig | null>();
+  const providerConfigs = new Map<string, ProviderStoredConfig | null>(
+    Object.entries(options.initialProviderConfigs ?? {})
+  );
   const activeProvider = { value: options.activeProviderId };
 
   const setProviderConfig = vi.fn(async (providerId: string, env: Record<string, string>) => {
