@@ -5,13 +5,14 @@ import {
   sendMessageInputSchema,
   sessionLookupInputSchema,
 } from "@shared/workbench";
-import { initTRPC } from "@trpc/server";
+import { getTRPCErrorFromUnknown, initTRPC, type AnyRouter } from "@trpc/server";
+import { getErrorShape } from "@trpc/server/shared";
 import superjson from "superjson";
 
 const t = initTRPC.create({ transformer: superjson });
 
 export function createDesktopRouter(service: WorkbenchService) {
-  return t.router({
+  const router = t.router({
     bootstrap: t.procedure.query(async () => {
       return service.bootstrap();
     }),
@@ -50,9 +51,37 @@ export function createDesktopRouter(service: WorkbenchService) {
         .input(sendMessageInputSchema)
         .mutation(async ({ input }) => {
           return service.sendMessage(input);
-        }),
+      }),
     }),
   });
+
+  return ensureRouterErrorShape(router);
 }
 
 export type AppRouter = ReturnType<typeof createDesktopRouter>;
+
+function ensureRouterErrorShape<TRouter extends AnyRouter>(router: TRouter): TRouter {
+  const mutableRouter = router as TRouter & {
+    getErrorShape?: (input: {
+      error: unknown;
+      type: "query" | "mutation" | "subscription";
+      path: string;
+      input: unknown;
+      ctx: unknown;
+    }) => unknown;
+  };
+
+  if (typeof mutableRouter.getErrorShape !== "function") {
+    mutableRouter.getErrorShape = ({ error, type, path, input, ctx }) =>
+      getErrorShape({
+        config: router._def._config,
+        error: getTRPCErrorFromUnknown(error),
+        type,
+        path,
+        input,
+        ctx,
+      });
+  }
+
+  return router;
+}
