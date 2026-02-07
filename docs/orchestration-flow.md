@@ -17,36 +17,42 @@ This document explains the current orchestration architecture in OpenGoat, inclu
 ## Core Components
 
 - Orchestration runtime:
-  - `/Users/marian2js/workspace/opengoat/src/core/orchestration/application/orchestration.service.ts`
+  - `./src/core/orchestration/application/orchestration.service.ts`
 - Planner prompt + decision parsing:
-  - `/Users/marian2js/workspace/opengoat/src/core/orchestration/application/orchestration-planner.service.ts`
+  - `./src/core/orchestration/application/orchestration-planner.service.ts`
 - Session lifecycle + transcripts:
-  - `/Users/marian2js/workspace/opengoat/src/core/sessions/application/session.service.ts`
+  - `./src/core/sessions/application/session.service.ts`
 - Provider invocation + system prompt build:
-  - `/Users/marian2js/workspace/opengoat/src/core/providers/application/provider.service.ts`
+  - `./src/core/providers/application/provider.service.ts`
 
 ## High-Level Runtime
 
 1. User sends a message to `orchestrator`.
 2. Orchestrator enters an AI decision loop (`max steps` + `max delegation` guards).
 3. On each loop step:
-  - Build planner prompt with:
-    - available agents from `AGENTS.md` metadata
-    - shared notes from prior steps
-    - recent events
-  - Ask orchestrator provider for next action.
-  - Parse strict JSON action.
+
+- Build planner prompt with:
+  - available agents from `AGENTS.md` metadata
+  - shared notes from prior steps
+  - recent events
+- Ask orchestrator provider for next action.
+- Parse strict JSON action.
+
 4. Supported action types:
-  - `delegate_to_agent`
-  - `read_workspace_file`
-  - `write_workspace_file`
-  - `install_skill`
-  - `respond_user`
-  - `finish`
+
+- `delegate_to_agent`
+- `read_workspace_file`
+- `write_workspace_file`
+- `install_skill`
+- `respond_user`
+- `finish`
+
 5. Delegation mode can be:
-  - `direct`
-  - `artifacts`
-  - `hybrid` (direct + artifacts)
+
+- `direct`
+- `artifacts`
+- `hybrid` (direct + artifacts)
+
 6. All steps are logged into a run trace and session graph.
 
 ## Communication Modes
@@ -145,11 +151,11 @@ Trace includes:
 
 Scenario model:
 
-- `/Users/marian2js/workspace/opengoat/src/core/scenarios/domain/scenario.ts`
+- `./src/core/scenarios/domain/scenario.ts`
 
 Runner:
 
-- `/Users/marian2js/workspace/opengoat/src/core/scenarios/application/scenario-runner.service.ts`
+- `./src/core/scenarios/application/scenario-runner.service.ts`
 
 CLI:
 
@@ -166,8 +172,8 @@ This allows fast deterministic tests and realistic integration tests with real p
 
 OpenGoat exposes its orchestration runtime through ACP so editor clients can drive sessions through a standard protocol.
 
-- ACP adapter: `/Users/marian2js/workspace/opengoat/src/core/acp/application/acp-agent.ts`
-- Node stdio server: `/Users/marian2js/workspace/opengoat/src/platform/node/acp-server.ts`
+- ACP adapter: `./src/core/acp/application/acp-agent.ts`
+- Node stdio server: `./src/platform/node/acp-server.ts`
 - CLI entrypoint: `opengoat acp`
 
 ACP prompt turns map to `OpenGoatService.runAgent(...)`, so the same orchestrator behavior is reused without a separate execution path.

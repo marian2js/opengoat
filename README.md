@@ -122,7 +122,7 @@ At `debug` level, OpenGoat logs orchestration planner prompts, delegated agent r
 
 Detailed orchestration flow and scenario strategy:
 
-- `/Users/marian2js/workspace/opengoat/docs/orchestration-flow.md`
+- `./docs/orchestration-flow.md`
 
 ## OpenAI Provider
 
@@ -208,7 +208,7 @@ Session metadata supported from ACP `_meta`:
 
 Implementation reference:
 
-- `/Users/marian2js/workspace/opengoat/docs/acp.md`
+- `./docs/acp.md`
 
 ## Grok Provider
 

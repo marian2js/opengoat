@@ -26,21 +26,21 @@ OpenGoat is an orchestrator that can route work across multiple agents and provi
 ### Core
 
 - ACP adapter:
-  - `/Users/marian2js/workspace/opengoat/src/core/acp/application/acp-agent.ts`
+  - `./src/core/acp/application/acp-agent.ts`
 - ACP session store:
-  - `/Users/marian2js/workspace/opengoat/src/core/acp/application/session-store.ts`
+  - `./src/core/acp/application/session-store.ts`
 - ACP metadata parsing:
-  - `/Users/marian2js/workspace/opengoat/src/core/acp/domain/meta.ts`
+  - `./src/core/acp/domain/meta.ts`
 
 ### Transport
 
 - Node stdio server wiring:
-  - `/Users/marian2js/workspace/opengoat/src/platform/node/acp-server.ts`
+  - `./src/platform/node/acp-server.ts`
 
 ### CLI
 
 - ACP entry command:
-  - `/Users/marian2js/workspace/opengoat/src/apps/cli/commands/acp.command.ts`
+  - `./src/apps/cli/commands/acp.command.ts`
 
 ## Supported Protocol Flow
 
