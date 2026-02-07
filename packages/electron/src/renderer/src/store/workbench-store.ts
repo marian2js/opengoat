@@ -38,7 +38,12 @@ interface WorkbenchUiState {
   setOnboardingDraftField: (key: string, value: string) => void;
   openOnboarding: () => Promise<void>;
   closeOnboarding: () => void;
-  sendMessage: (message: string) => Promise<void>;
+  sendMessage: (
+    message: string,
+    options?: {
+      rethrow?: boolean;
+    }
+  ) => Promise<WorkbenchMessage | null>;
   clearError: () => void;
 }
 
@@ -303,10 +308,15 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       });
     },
 
-    sendMessage: async (message: string) => {
+    sendMessage: async (
+      message: string,
+      options?: {
+        rethrow?: boolean;
+      }
+    ) => {
       const trimmed = message.trim();
       if (!trimmed) {
-        return;
+        return null;
       }
 
       const state = get();
@@ -314,7 +324,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       const sessionId = state.activeSessionId;
       if (!projectId || !sessionId) {
         set({ error: "Create a session before sending messages." });
-        return;
+        return null;
       }
 
       const optimistic: WorkbenchMessage = {
@@ -332,7 +342,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       });
 
       try {
-        await api.sendChatMessage({
+        const result = await api.sendChatMessage({
           projectId,
           sessionId,
           message: trimmed
@@ -349,6 +359,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           chatState: "idle",
           isBusy: false
         });
+        return result.reply;
       } catch (error) {
         const next: Partial<WorkbenchUiState> = {
           chatState: "idle",
@@ -375,6 +386,10 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         }
 
         set(next);
+        if (options?.rethrow) {
+          throw error;
+        }
+        return null;
       }
     },
 

@@ -35,7 +35,6 @@ export function App() {
   } = useWorkbenchStore();
 
   const [manualPath, setManualPath] = useState("");
-  const [draft, setDraft] = useState("");
 
   useEffect(() => {
     void bootstrap();
@@ -49,19 +48,10 @@ export function App() {
     () => activeProject?.sessions.find((session) => session.id === activeSessionId) ?? null,
     [activeProject, activeSessionId]
   );
-  const canSend = Boolean(
-    activeProject && activeSession && draft.trim().length > 0 && !isBusy
-  );
 
   const onManualAdd = async () => {
     await addProjectByPath(manualPath);
     setManualPath("");
-  };
-
-  const onSend = async () => {
-    const message = draft;
-    setDraft("");
-    await sendMessage(message);
   };
 
   const onSaveOnboarding = async () => {
@@ -113,16 +103,18 @@ export function App() {
           onSelectSession={(projectId, sessionId) => void selectSession(projectId, sessionId)}
         />
         <ChatPanel
+          key={`${activeProjectId ?? "none"}:${activeSessionId ?? "none"}`}
           homeDir={homeDir}
           activeProject={activeProject}
           activeSession={activeSession}
           messages={activeMessages}
           error={error}
-          draft={draft}
-          canSend={canSend}
           busy={isBusy}
-          onDraftChange={setDraft}
-          onSend={() => void onSend()}
+          onSubmitMessage={(message) =>
+            sendMessage(message, {
+              rethrow: true
+            })
+          }
           onOpenOnboarding={() => void openOnboarding()}
           onDismissError={clearError}
         />
