@@ -71,6 +71,24 @@ describe("workbench store", () => {
     expect(state.error).toContain("Orchestrator provider failed");
   });
 
+  it("rethrows send errors when requested for AI SDK transport", async () => {
+    const api = createApiMock({
+      sendChatMessage: vi.fn(async () => {
+        throw new Error("Orchestrator provider failed (openai, code 1). HTTP 401");
+      })
+    });
+    const store = createWorkbenchStore(api);
+
+    await store.getState().bootstrap();
+
+    await expect(
+      store.getState().sendMessage("hello", {
+        rethrow: true
+      })
+    ).rejects.toThrow("Orchestrator provider failed");
+    expect(store.getState().showOnboarding).toBe(true);
+  });
+
   it("submits onboarding for selected provider and refreshes draft values", async () => {
     const submitOnboardingMock = vi.fn(async (): Promise<WorkbenchOnboarding> => ({
       activeProviderId: "codex",

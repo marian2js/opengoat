@@ -8,6 +8,7 @@ This package introduces the first desktop app surface for OpenGoat:
 - UI stack: React + Tailwind + shadcn-style component primitives
 - State: Zustand
 - Main/Renderer transport: tRPC over Electron IPC (`electron-trpc`)
+- Chat interaction layer: AI SDK UI (`@ai-sdk/react` `useChat`) with a custom Electron `ChatTransport`
 
 The CLI remains intact and desktop uses the same core runtime wiring (`OpenGoatService`).
 
@@ -25,6 +26,12 @@ Shared runtime factory:
 - `packages/core/src/apps/runtime/create-opengoat-runtime.ts`
 
 Both CLI and desktop instantiate services through this factory. This avoids duplicated bootstrap/provider/session wiring and keeps behavior consistent across app surfaces.
+
+Desktop chat keeps the same core execution path and only changes the renderer interaction protocol:
+
+- UI conversation state + streaming semantics: AI SDK UI
+- transport adapter: renderer `ChatTransport` that calls Electron IPC
+- orchestration runtime: main process `WorkbenchService` -> core `OpenGoatService`
 
 ## Desktop Architecture
 
@@ -46,6 +53,8 @@ Both CLI and desktop instantiate services through this factory. This avoids dupl
 - `src/renderer/src/App.tsx`
   - Sidebar: projects + sessions
   - Main panel: chat timeline
+- `src/renderer/src/features/chat/electron-chat-transport.ts`
+  - AI SDK UI transport bridge to Electron IPC chat calls
 - `src/renderer/src/store/workbench-store.ts`
   - Zustand state/actions
 - `src/renderer/src/lib/trpc.ts`
@@ -96,7 +105,7 @@ Or directly:
 
 This setup intentionally ships a strong vertical slice first. Recommended follow-up phases:
 
-1. Streaming responses in desktop chat.
+1. Token-level streaming from provider output into AI SDK UI transport.
 2. Session metadata in UI (run id, provider id, timing, trace links).
 3. Project/workspace settings panel (provider overrides, default model, logging).
 4. E2E desktop smoke tests in CI.
