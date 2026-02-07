@@ -45,6 +45,7 @@ export const workbenchOnboardingProviderSchema = z.object({
   kind: providerKindSchema,
   envFields: z.array(providerOnboardingFieldSchema),
   configuredEnvKeys: z.array(z.string()),
+  configuredEnvValues: z.record(z.string(), z.string()),
   missingRequiredEnv: z.array(z.string()),
   hasConfig: z.boolean()
 });

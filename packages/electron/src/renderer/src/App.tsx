@@ -20,6 +20,9 @@ export function App() {
     homeDir,
     projects,
     onboarding,
+    showOnboarding,
+    onboardingDraftProviderId,
+    onboardingDraftEnv,
     activeProjectId,
     activeSessionId,
     activeMessages,
@@ -33,14 +36,16 @@ export function App() {
     selectProject,
     selectSession,
     submitOnboarding,
+    setOnboardingDraftProvider,
+    setOnboardingDraftField,
+    openOnboarding,
+    closeOnboarding,
     sendMessage,
     clearError,
   } = useWorkbenchStore();
 
   const [manualPath, setManualPath] = useState("");
   const [draft, setDraft] = useState("");
-  const [selectedProviderId, setSelectedProviderId] = useState("");
-  const [onboardingEnv, setOnboardingEnv] = useState<Record<string, string>>({});
 
   useEffect(() => {
     void bootstrap();
@@ -62,20 +67,9 @@ export function App() {
     activeProject && activeSession && draft.trim().length > 0 && !isBusy,
   );
   const selectedOnboardingProvider = useMemo(
-    () => resolveSelectedOnboardingProvider(onboarding, selectedProviderId),
-    [onboarding, selectedProviderId],
+    () => resolveSelectedOnboardingProvider(onboarding, onboardingDraftProviderId),
+    [onboarding, onboardingDraftProviderId],
   );
-
-  useEffect(() => {
-    if (!onboarding) {
-      return;
-    }
-    const nextProviderId = onboarding.activeProviderId || onboarding.providers[0]?.id || "";
-    if (nextProviderId && nextProviderId !== selectedProviderId) {
-      setSelectedProviderId(nextProviderId);
-      setOnboardingEnv({});
-    }
-  }, [onboarding, selectedProviderId]);
 
   const onManualAdd = async () => {
     await addProjectByPath(manualPath);
@@ -89,11 +83,10 @@ export function App() {
   };
 
   const onSaveOnboarding = async () => {
-    if (!selectedProviderId) {
+    if (!onboardingDraftProviderId) {
       return;
     }
-    await submitOnboarding(selectedProviderId, onboardingEnv);
-    setOnboardingEnv({});
+    await submitOnboarding(onboardingDraftProviderId, onboardingDraftEnv);
   };
 
   if (isBootstrapping) {
@@ -104,7 +97,7 @@ export function App() {
     );
   }
 
-  if (onboarding?.needsOnboarding) {
+  if (showOnboarding && onboarding) {
     return (
       <div className="flex h-screen items-center justify-center bg-[radial-gradient(1200px_500px_at_10%_-20%,_rgba(22,163,74,0.16),transparent_55%),radial-gradient(900px_450px_at_100%_0%,_rgba(245,158,11,0.15),transparent_55%),var(--background)] px-6 text-[var(--foreground)]">
         <div className="w-full max-w-2xl rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
@@ -119,10 +112,9 @@ export function App() {
             </label>
             <select
               id="provider-select"
-              value={selectedProviderId}
+              value={onboardingDraftProviderId}
               onChange={(event) => {
-                setSelectedProviderId(event.target.value);
-                setOnboardingEnv({});
+                setOnboardingDraftProvider(event.target.value);
               }}
               className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2 text-sm"
               disabled={isBusy}
@@ -143,7 +135,7 @@ export function App() {
                 </p>
               ) : (
                 selectedOnboardingProvider.envFields.map((field) => {
-                  const value = onboardingEnv[field.key] ?? "";
+                  const value = onboardingDraftEnv[field.key] ?? "";
                   const isConfigured = selectedOnboardingProvider.configuredEnvKeys.includes(field.key);
                   return (
                     <div key={field.key} className="space-y-1">
@@ -155,11 +147,7 @@ export function App() {
                         type={field.secret ? "password" : "text"}
                         value={value}
                         onChange={(event) => {
-                          const next = event.target.value;
-                          setOnboardingEnv((current) => ({
-                            ...current,
-                            [field.key]: next
-                          }));
+                          setOnboardingDraftField(field.key, event.target.value);
                         }}
                         placeholder={field.description}
                         disabled={isBusy}
@@ -182,9 +170,18 @@ export function App() {
           ) : null}
 
           <div className="mt-6 flex justify-end gap-2">
+            {!onboarding.needsOnboarding ? (
+              <Button
+                variant="outline"
+                onClick={closeOnboarding}
+                disabled={isBusy}
+              >
+                Close
+              </Button>
+            ) : null}
             <Button
               onClick={() => void onSaveOnboarding()}
-              disabled={isBusy || !selectedProviderId}
+              disabled={isBusy || !onboardingDraftProviderId}
             >
               {isBusy ? "Saving..." : "Continue"}
             </Button>
@@ -307,15 +304,24 @@ export function App() {
         </aside>
 
         <main className="flex min-w-0 flex-col">
-          <header className="border-b border-[var(--border)] bg-[var(--surface)] px-5 py-4">
-            <p className="font-heading text-lg">
-              {activeProject?.name ?? "No project selected"}
-            </p>
-            <p className="text-sm text-[var(--muted-foreground)]">
-              {activeSession
-                ? `Session: ${activeSession.title}`
-                : "Create a session to start chatting"}
-            </p>
+          <header className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-5 py-4">
+            <div>
+              <p className="font-heading text-lg">
+                {activeProject?.name ?? "No project selected"}
+              </p>
+              <p className="text-sm text-[var(--muted-foreground)]">
+                {activeSession
+                  ? `Session: ${activeSession.title}`
+                  : "Create a session to start chatting"}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => void openOnboarding()}
+              disabled={isBusy}
+            >
+              Provider Setup
+            </Button>
           </header>
 
           <div className="flex-1 overflow-y-auto px-5 py-4">

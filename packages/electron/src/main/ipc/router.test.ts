@@ -20,6 +20,25 @@ describe("desktop IPC router", () => {
     expect(service.listMessages).toHaveBeenCalledWith("p1", "s1");
   });
 
+  it("supports legacy mutate aliases for bootstrap/list/messages/status", async () => {
+    const service = createServiceStub();
+    const router = createDesktopRouter(service);
+    const caller = router.createCaller({});
+
+    await caller.bootstrapMutate();
+    await caller.projects.listMutate();
+    await caller.sessions.messagesMutate({
+      projectId: "p1",
+      sessionId: "s1"
+    });
+    await caller.onboarding.statusMutate();
+
+    expect(service.bootstrap).toHaveBeenCalledTimes(1);
+    expect(service.listProjects).toHaveBeenCalledTimes(1);
+    expect(service.listMessages).toHaveBeenCalledWith("p1", "s1");
+    expect(service.getOnboardingState).toHaveBeenCalledTimes(1);
+  });
+
   it("executes onboarding submit via mutation and forwards payload", async () => {
     const service = createServiceStub();
     const router = createDesktopRouter(service);

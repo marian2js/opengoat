@@ -1,7 +1,7 @@
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { dialog } from "electron";
-import type { OpenGoatService } from "@opengoat/core";
+import { loadDotEnv, type OpenGoatService } from "@opengoat/core";
 import type {
   WorkbenchBootstrap,
   WorkbenchMessage,
@@ -14,15 +14,18 @@ import { WorkbenchStore } from "./workbench-store";
 interface WorkbenchServiceDeps {
   opengoat: OpenGoatService;
   store: WorkbenchStore;
+  loadDotEnvFn?: typeof loadDotEnv;
 }
 
 export class WorkbenchService {
   private readonly opengoat: OpenGoatService;
   private readonly store: WorkbenchStore;
+  private readonly loadDotEnvFn: typeof loadDotEnv;
 
   public constructor(deps: WorkbenchServiceDeps) {
     this.opengoat = deps.opengoat;
     this.store = deps.store;
+    this.loadDotEnvFn = deps.loadDotEnvFn ?? loadDotEnv;
   }
 
   public async bootstrap(): Promise<WorkbenchBootstrap> {
@@ -47,6 +50,14 @@ export class WorkbenchService {
         const configuredEnvKeys = Object.keys(configuredEnv).sort((left, right) =>
           left.localeCompare(right)
         );
+        const nonSecretKeys = new Set(
+          envFields.filter((entry) => entry.secret !== true).map((entry) => entry.key)
+        );
+        const configuredEnvValues = Object.fromEntries(
+          Object.entries(configuredEnv)
+            .filter(([key, value]) => nonSecretKeys.has(key) && Boolean(value?.trim()))
+            .map(([key, value]) => [key, value.trim()])
+        );
         const missingRequiredEnv = envFields
           .filter((entry) => entry.required)
           .map((entry) => entry.key)
@@ -58,6 +69,7 @@ export class WorkbenchService {
           kind: provider.kind,
           envFields,
           configuredEnvKeys,
+          configuredEnvValues,
           missingRequiredEnv,
           hasConfig: config !== null
         };
@@ -149,8 +161,15 @@ export class WorkbenchService {
     const run = await this.opengoat.runAgent("orchestrator", {
       message,
       sessionRef: session.sessionKey,
-      cwd: project.rootPath
+      cwd: project.rootPath,
+      env: await this.buildInvocationEnv(project.rootPath)
     });
+    if (run.code !== 0) {
+      const details = (run.stderr || run.stdout || "No provider error details were returned.").trim();
+      throw new Error(
+        `Orchestrator provider failed (${run.providerId}, code ${run.code}). ${details}`
+      );
+    }
 
     const assistantContent = (run.stdout || run.stderr || "No response was returned.").trim();
     const reply = await this.store.appendMessage(project.id, session.id, {
@@ -170,6 +189,16 @@ export class WorkbenchService {
       tracePath: run.tracePath,
       providerId: run.providerId
     };
+  }
+
+  private async buildInvocationEnv(projectRootPath: string): Promise<NodeJS.ProcessEnv> {
+    const env: NodeJS.ProcessEnv = { ...process.env };
+
+    for (const cwd of collectDotEnvDirectories(projectRootPath)) {
+      await this.loadDotEnvFn({ cwd, env });
+    }
+
+    return env;
   }
 }
 
@@ -220,4 +249,27 @@ function normalizeSessionTitle(input?: string): string {
     return value;
   }
   return `${value.slice(0, 117)}...`;
+}
+
+function collectDotEnvDirectories(projectRootPath: string): string[] {
+  const cwd = process.cwd();
+  const candidates = [
+    projectRootPath,
+    cwd,
+    path.resolve(cwd, ".."),
+    path.resolve(cwd, "../..")
+  ];
+  const seen = new Set<string>();
+  const resolved: string[] = [];
+
+  for (const candidate of candidates) {
+    const normalized = path.resolve(candidate);
+    if (seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    resolved.push(normalized);
+  }
+
+  return resolved;
 }

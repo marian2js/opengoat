@@ -303,6 +303,44 @@ export class OrchestrationService {
       stepLogger.debug("Planner raw output payload.", {
         output: plannerRawOutput
       });
+      if (plannerCall.execution.code !== 0) {
+        const providerFailureMessage = renderPlannerProviderFailureMessage(
+          plannerCall.execution.providerId,
+          plannerCall.execution.code,
+          plannerCall.execution.stderr || plannerCall.execution.stdout
+        );
+        const plannerDecision: OrchestrationPlannerDecision = {
+          rationale: "Planner provider invocation failed.",
+          action: {
+            type: "respond_user",
+            mode: "direct",
+            reason: "planner_provider_failure",
+            message: providerFailureMessage
+          }
+        };
+        stepLogger.warn("Planner provider invocation failed.", {
+          providerId: plannerCall.execution.providerId,
+          code: plannerCall.execution.code,
+          stderr: plannerCall.execution.stderr,
+          stdout: plannerCall.execution.stdout
+        });
+        addSessionNode(sessionGraph, DEFAULT_AGENT_ID, plannerCall.session, plannerCall.execution);
+
+        const stepLog: OrchestrationStepLog = {
+          step,
+          timestamp: this.nowIso(),
+          plannerRawOutput,
+          plannerDecision,
+          note: `Planner provider ${plannerCall.execution.providerId} failed with code ${plannerCall.execution.code}.`
+        };
+        steps.push(stepLog);
+        finalMessage = providerFailureMessage;
+        lastExecution = {
+          ...plannerCall.execution,
+          stdout: ensureTrailingNewline(providerFailureMessage)
+        };
+        break;
+      }
       const plannerDecision = this.plannerService.parseDecision(
         plannerRawOutput,
         "I could not complete orchestration due to planner output parsing issues."
@@ -1069,6 +1107,21 @@ function summarizeText(value: string): string {
 
 function ensureTrailingNewline(value: string): string {
   return value.endsWith("\n") ? value : `${value}\n`;
+}
+
+function renderPlannerProviderFailureMessage(providerId: string, code: number, detailsRaw: string): string {
+  const details = detailsRaw.trim();
+  const summary = details
+    ? `\n\nProvider error details:\n${clampText(details, 1200)}`
+    : "";
+
+  return [
+    `The orchestrator provider (${providerId}) failed while planning (exit code ${code}).`,
+    "Open provider setup in the desktop app and verify credentials/model configuration.",
+    summary
+  ]
+    .join("\n")
+    .trim();
 }
 
 function clampText(value: string, maxChars: number): string {

@@ -70,6 +70,116 @@ describe("WorkbenchService onboarding", () => {
   });
 });
 
+describe("WorkbenchService sendMessage", () => {
+  it("loads project .env values and forwards them to runAgent", async () => {
+    const loadDotEnvFn = vi.fn(
+      async (params?: { cwd?: string; filename?: string; env?: NodeJS.ProcessEnv }) => {
+        const cwd = params?.cwd;
+        const env = params?.env;
+        if (!cwd || !env) {
+          return;
+        }
+        if (cwd === "/tmp/project") {
+          env.OPENAI_API_KEY = "nvapi-test";
+          env.OPENAI_BASE_URL = "https://integrate.api.nvidia.com/v1";
+          env.OPENAI_MODEL = "meta/llama-3.1-8b-instruct";
+        }
+      }
+    );
+    const runAgent = vi.fn(async (..._args: unknown[]) => ({
+      code: 0,
+      stdout: "completed",
+      stderr: "",
+      providerId: "openai",
+      tracePath: "/tmp/trace.json",
+      entryAgentId: "orchestrator",
+      routing: {
+        entryAgentId: "orchestrator",
+        targetAgentId: "orchestrator",
+        confidence: 1,
+        reason: "test",
+        rewrittenMessage: "hello",
+        candidates: []
+      }
+    }));
+    const opengoat = createOpenGoatStub({
+      providers: createProviderSummaries(),
+      activeProviderId: "openai",
+      onboardingByProvider: {},
+      runAgent
+    });
+    const appendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: []
+      })
+      .mockResolvedValueOnce({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: [
+          {
+            id: "m1",
+            role: "assistant",
+            content: "completed",
+            createdAt: "2026-02-07T00:00:00.000Z",
+            providerId: "openai",
+            tracePath: "/tmp/trace.json"
+          }
+        ]
+      });
+    const store = {
+      getProject: vi.fn(async () => ({
+        id: "p1",
+        name: "project",
+        rootPath: "/tmp/project",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        sessions: []
+      })),
+      getSession: vi.fn(async () => ({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: []
+      })),
+      appendMessage
+    } as unknown as WorkbenchStore;
+
+    const service = new WorkbenchService({
+      opengoat,
+      store,
+      loadDotEnvFn
+    });
+
+    await service.sendMessage({
+      projectId: "p1",
+      sessionId: "s1",
+      message: "hello"
+    });
+
+    expect(runAgent).toHaveBeenCalledTimes(1);
+    const runAgentCall = runAgent.mock.calls[0] as unknown[] | undefined;
+    const runAgentArgs = (runAgentCall?.[1] ?? {}) as { env?: NodeJS.ProcessEnv };
+    expect(runAgentArgs.env?.OPENAI_BASE_URL).toBe("https://integrate.api.nvidia.com/v1");
+    expect(runAgentArgs.env?.OPENAI_MODEL).toBe("meta/llama-3.1-8b-instruct");
+    expect(loadDotEnvFn).toHaveBeenCalled();
+    expect(appendMessage).toHaveBeenCalledTimes(2);
+  });
+});
+
 function createProviderSummaries(): ProviderSummary[] {
   return [
     {
@@ -112,6 +222,7 @@ function createOpenGoatStub(options: {
       env?: Array<{ key: string; description: string; required?: boolean; secret?: boolean }>;
     }
   >;
+  runAgent?: ReturnType<typeof vi.fn>;
 }): OpenGoatService & {
   setProviderConfig: ReturnType<typeof vi.fn>;
   setAgentProvider: ReturnType<typeof vi.fn>;
@@ -151,7 +262,25 @@ function createOpenGoatStub(options: {
     getProviderOnboarding: vi.fn(async (providerId: string) => options.onboardingByProvider[providerId]),
     getProviderConfig: vi.fn(async (providerId: string) => providerConfigs.get(providerId) ?? null),
     setProviderConfig,
-    setAgentProvider
+    setAgentProvider,
+    runAgent:
+      options.runAgent ??
+      vi.fn(async () => ({
+        code: 0,
+        stdout: "ok",
+        stderr: "",
+        providerId: "openai",
+        tracePath: "/tmp/trace.json",
+        entryAgentId: "orchestrator",
+        routing: {
+          entryAgentId: "orchestrator",
+          targetAgentId: "orchestrator",
+          confidence: 1,
+          reason: "test",
+          rewrittenMessage: "hello",
+          candidates: []
+        }
+      }))
   } as unknown as OpenGoatService & {
     setProviderConfig: ReturnType<typeof vi.fn>;
     setAgentProvider: ReturnType<typeof vi.fn>;
