@@ -1,6 +1,7 @@
 import { DEFAULT_AGENT_ID } from "../../../core/domain/agent-id.js";
 import type { OpenGoatService } from "../../../core/opengoat/index.js";
 import type { ProviderOnboardingSpec, ProviderSummary } from "../../../core/providers/index.js";
+import { resolveOpenClawCompatModelEnvVar } from "../../../core/providers/providers/openclaw-compat/index.js";
 import type { CliCommand } from "../framework/command.js";
 import {
   createCliPrompter,
@@ -13,7 +14,8 @@ const PROVIDER_MODEL_ENV_KEY: Record<string, string> = {
   opencode: "OPENCODE_MODEL",
   openai: "OPENAI_MODEL",
   openrouter: "OPENROUTER_MODEL",
-  grok: "GROK_MODEL"
+  grok: "GROK_MODEL",
+  openclaw: "OPENGOAT_OPENCLAW_MODEL"
 };
 
 export const onboardCommand: CliCommand = {
@@ -82,7 +84,7 @@ export const onboardCommand: CliCommand = {
         ...parsed.env
       };
 
-      const modelEnvKey = PROVIDER_MODEL_ENV_KEY[provider.id];
+      const modelEnvKey = resolveProviderModelEnvKey(provider.id);
       if (parsed.model && modelEnvKey) {
         envUpdates[modelEnvKey] = parsed.model;
       }
@@ -446,6 +448,18 @@ function parseEnvPair(raw: string): { key: string; value: string } | null {
   }
 
   return { key, value };
+}
+
+function resolveProviderModelEnvKey(providerId: string): string | undefined {
+  if (providerId.startsWith("openclaw-")) {
+    const provider = providerId.slice("openclaw-".length);
+    if (!provider) {
+      return "OPENGOAT_OPENCLAW_MODEL";
+    }
+    return resolveOpenClawCompatModelEnvVar(provider);
+  }
+
+  return PROVIDER_MODEL_ENV_KEY[providerId];
 }
 
 function printHelp(output: NodeJS.WritableStream): void {

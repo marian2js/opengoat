@@ -22,14 +22,33 @@ export async function loadProviderModules(registry: ProviderRegistry): Promise<v
 
     const imported = (await import(pathToFileURL(modulePath).href)) as {
       providerModule?: ProviderModule;
+      providerModules?: ProviderModule[];
     };
 
-    if (!imported.providerModule) {
+    const providerModules = resolveProviderModules(imported);
+    if (providerModules.length === 0) {
       continue;
     }
 
-    registry.register(imported.providerModule.id, imported.providerModule.create, imported.providerModule);
+    for (const providerModule of providerModules) {
+      registry.register(providerModule.id, providerModule.create, providerModule);
+    }
   }
+}
+
+function resolveProviderModules(imported: {
+  providerModule?: ProviderModule;
+  providerModules?: ProviderModule[];
+}): ProviderModule[] {
+  if (Array.isArray(imported.providerModules) && imported.providerModules.length > 0) {
+    return imported.providerModules;
+  }
+
+  if (imported.providerModule) {
+    return [imported.providerModule];
+  }
+
+  return [];
 }
 
 async function resolveModulePath(providerDir: string): Promise<string | null> {

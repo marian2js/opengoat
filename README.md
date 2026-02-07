@@ -66,6 +66,12 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
   - transcript compaction
 - Session context is injected into the system prompt on each run.
 - Built-in providers: `codex`, `claude`, `cursor`, `gemini`, `grok`, `openclaw`, `opencode`, `openai`, `openrouter`.
+- OpenClaw-compat provider set:
+  - `openclaw-<provider-id>` providers are auto-registered for OpenClaw model providers (for example `openclaw-openai`, `openclaw-openai-codex`, `openclaw-anthropic`, `openclaw-openrouter`, `openclaw-vercel-ai-gateway`, `openclaw-xai`, `openclaw-zai`).
+  - Compatibility providers invoke `openclaw agent --model <provider/model>` internally, so OpenGoat can use OpenClaw OAuth/auth-provider flows without adding provider-specific logic across the app.
+  - Model override env:
+    - global: `OPENGOAT_OPENCLAW_MODEL`
+    - provider-specific: `OPENGOAT_OPENCLAW_<PROVIDER_ID>_MODEL` (example: `OPENGOAT_OPENCLAW_OPENAI_MODEL`)
   - Each provider lives in its own folder with code + tests.
   - New providers are auto-discovered from provider folders (no central registration edits).
   - `onboard` uses provider-declared onboarding metadata to collect required credentials/settings.
