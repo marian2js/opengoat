@@ -21,7 +21,10 @@ import {
 interface ProviderServiceDeps {
   fileSystem: FileSystemPort;
   pathPort: PathPort;
-  providerRegistry: Promise<ProviderRegistry> | ProviderRegistry;
+  providerRegistry:
+    | Promise<ProviderRegistry>
+    | ProviderRegistry
+    | (() => Promise<ProviderRegistry> | ProviderRegistry);
   workspaceContextService: WorkspaceContextService;
   skillService: SkillService;
   nowIso: () => string;
@@ -53,7 +56,11 @@ export interface ProviderStoredConfig {
 export class ProviderService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
-  private readonly providerRegistry: Promise<ProviderRegistry>;
+  private readonly providerRegistryInput:
+    | Promise<ProviderRegistry>
+    | ProviderRegistry
+    | (() => Promise<ProviderRegistry> | ProviderRegistry);
+  private providerRegistryPromise?: Promise<ProviderRegistry>;
   private readonly workspaceContextService: WorkspaceContextService;
   private readonly skillService: SkillService;
   private readonly nowIso: () => string;
@@ -61,19 +68,19 @@ export class ProviderService {
   public constructor(deps: ProviderServiceDeps) {
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
-    this.providerRegistry = Promise.resolve(deps.providerRegistry);
+    this.providerRegistryInput = deps.providerRegistry;
     this.workspaceContextService = deps.workspaceContextService;
     this.skillService = deps.skillService;
     this.nowIso = deps.nowIso;
   }
 
   public async listProviders(): Promise<ProviderSummary[]> {
-    const registry = await this.providerRegistry;
+    const registry = await this.getProviderRegistry();
     return listProviderSummaries(registry);
   }
 
   public async getProviderOnboarding(providerId: string): Promise<ProviderOnboardingSpec | undefined> {
-    const registry = await this.providerRegistry;
+    const registry = await this.getProviderRegistry();
     return registry.getProviderOnboarding(providerId);
   }
 
@@ -82,7 +89,7 @@ export class ProviderService {
     providerId: string,
     options: ProviderAuthOptions = {}
   ): Promise<ProviderExecutionResult> {
-    const registry = await this.providerRegistry;
+    const registry = await this.getProviderRegistry();
     const provider = registry.create(providerId);
     const env = await this.resolveProviderEnv(paths, provider.id, options.env);
     return provider.invokeAuth?.({
@@ -125,7 +132,7 @@ export class ProviderService {
     providerId: string,
     env: Record<string, string>
   ): Promise<ProviderStoredConfig> {
-    const registry = await this.providerRegistry;
+    const registry = await this.getProviderRegistry();
     const provider = registry.create(providerId);
     const providerDir = this.pathPort.join(paths.providersDir, provider.id);
     const configPath = this.getProviderConfigPath(paths, provider.id);
@@ -153,7 +160,7 @@ export class ProviderService {
     agentId: string,
     configOverride?: AgentConfigShape
   ): Promise<AgentProviderBinding> {
-    const registry = await this.providerRegistry;
+    const registry = await this.getProviderRegistry();
     const config = configOverride ?? (await this.readAgentConfig(paths, agentId));
     const configuredProviderId = getConfiguredProviderId(config);
 
@@ -171,7 +178,7 @@ export class ProviderService {
     agentId: string,
     providerId: string
   ): Promise<AgentProviderBinding> {
-    const registry = await this.providerRegistry;
+    const registry = await this.getProviderRegistry();
     const provider = registry.create(providerId);
     const configPath = this.getAgentConfigPath(paths, agentId);
     const config = await this.readAgentConfig(paths, agentId);
@@ -194,7 +201,7 @@ export class ProviderService {
     agentId: string,
     options: ProviderInvokeOptions
   ): Promise<ProviderExecutionResult & AgentProviderBinding> {
-    const registry = await this.providerRegistry;
+    const registry = await this.getProviderRegistry();
     const config = await this.readAgentConfig(paths, agentId);
     const binding = await this.getAgentProvider(paths, agentId, config);
     const provider = registry.create(binding.providerId);
@@ -280,6 +287,27 @@ export class ProviderService {
       ...(config?.env ?? {}),
       ...(inputEnv ?? process.env)
     };
+  }
+
+  private getProviderRegistry(): Promise<ProviderRegistry> {
+    if (!this.providerRegistryPromise) {
+      this.providerRegistryPromise = this.resolveProviderRegistry(this.providerRegistryInput);
+    }
+
+    return this.providerRegistryPromise;
+  }
+
+  private resolveProviderRegistry(
+    input:
+      | Promise<ProviderRegistry>
+      | ProviderRegistry
+      | (() => Promise<ProviderRegistry> | ProviderRegistry)
+  ): Promise<ProviderRegistry> {
+    if (typeof input === "function") {
+      return Promise.resolve(input());
+    }
+
+    return Promise.resolve(input);
   }
 }
 

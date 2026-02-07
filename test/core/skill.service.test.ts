@@ -58,6 +58,27 @@ describe("SkillService", () => {
     expect(prompt.prompt).toContain("Self-install/update");
   });
 
+  it("loads plugin skills as part of merged skill context", async () => {
+    const pluginSkillRoots: string[] = [];
+    const { service, paths, fileSystem } = await createHarness({
+      pluginSkillDirsProvider: async () => pluginSkillRoots
+    });
+
+    const pluginRoot = path.join(paths.homeDir, "openclaw-compat", "extensions", "demo-plugin", "skills");
+    pluginSkillRoots.push(pluginRoot);
+    const pluginSkillDir = path.join(pluginRoot, "release-audit");
+    await fileSystem.ensureDir(pluginSkillDir);
+    await fileSystem.writeFile(
+      path.join(pluginSkillDir, "SKILL.md"),
+      ["---", "name: Release Audit", "description: Plugin skill", "---", "", "# Audit"].join("\n")
+    );
+
+    const skills = await service.listSkills(paths, "orchestrator");
+    expect(skills).toHaveLength(1);
+    expect(skills[0]?.source).toBe("plugin");
+    expect(skills[0]?.id).toBe("release-audit");
+  });
+
   it("installs from source path and preserves extra files", async () => {
     const { service, paths, fileSystem } = await createHarness();
     const sourceSkillDir = path.join(paths.homeDir, "tmp-source-skill");
@@ -96,6 +117,13 @@ describe("SkillService", () => {
 });
 
 async function createHarness(): Promise<{
+  service: SkillService;
+  paths: ReturnType<TestPathsProvider["getPaths"]>;
+  fileSystem: NodeFileSystem;
+}>;
+async function createHarness(options: {
+  pluginSkillDirsProvider?: (paths: ReturnType<TestPathsProvider["getPaths"]>) => Promise<string[]>;
+} = {}): Promise<{
   service: SkillService;
   paths: ReturnType<TestPathsProvider["getPaths"]>;
   fileSystem: NodeFileSystem;
@@ -139,7 +167,11 @@ async function createHarness(): Promise<{
   );
 
   return {
-    service: new SkillService({ fileSystem, pathPort }),
+    service: new SkillService({
+      fileSystem,
+      pathPort,
+      pluginSkillDirsProvider: options.pluginSkillDirsProvider
+    }),
     paths,
     fileSystem
   };

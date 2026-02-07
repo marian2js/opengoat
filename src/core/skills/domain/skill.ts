@@ -1,6 +1,6 @@
 import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
 
-export type SkillSource = "workspace" | "managed" | "extra";
+export type SkillSource = "workspace" | "managed" | "plugin" | "extra";
 
 export interface AgentSkillsLoadConfig {
   extraDirs?: string[];

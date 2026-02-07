@@ -2,6 +2,7 @@ import type { AgentCreationResult, AgentDescriptor } from "../../domain/agent.js
 import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
 import type { InitializationResult } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
+import type { CommandRunResult, CommandRunnerPort } from "../../ports/command-runner.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import type {
@@ -23,6 +24,13 @@ import { OrchestrationService, type OrchestrationRunResult, type RoutingDecision
 import { ProviderService } from "../../providers/application/provider.service.js";
 import { SkillService, type InstallSkillRequest, type InstallSkillResult, type ResolvedSkill } from "../../skills/index.js";
 import {
+  PluginService,
+  type OpenClawPluginInfoRecord,
+  type OpenClawPluginListReport,
+  type PluginInstallRequest,
+  type PluginInstallResult
+} from "../../plugins/index.js";
+import {
   SessionService,
   type SessionCompactionResult,
   type SessionHistoryResult,
@@ -36,6 +44,8 @@ interface OpenGoatServiceDeps {
   pathsProvider: OpenGoatPathsProvider;
   nowIso?: () => string;
   providerRegistry?: ProviderRegistry;
+  commandRunner?: CommandRunnerPort;
+  pluginService?: PluginService;
 }
 
 export class OpenGoatService {
@@ -44,15 +54,16 @@ export class OpenGoatService {
   private readonly agentManifestService: AgentManifestService;
   private readonly bootstrapService: BootstrapService;
   private readonly providerService: ProviderService;
+  private readonly pluginService: PluginService;
   private readonly skillService: SkillService;
   private readonly sessionService: SessionService;
   private readonly orchestrationService: OrchestrationService;
 
   public constructor(deps: OpenGoatServiceDeps) {
     const nowIso = deps.nowIso ?? (() => new Date().toISOString());
-    const providerRegistryPromise = deps.providerRegistry
-      ? Promise.resolve(deps.providerRegistry)
-      : createDefaultProviderRegistry();
+    const providerRegistryFactory = deps.providerRegistry
+      ? () => deps.providerRegistry as ProviderRegistry
+      : () => createDefaultProviderRegistry();
 
     this.pathsProvider = deps.pathsProvider;
     this.agentService = new AgentService({
@@ -74,14 +85,22 @@ export class OpenGoatService {
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort
     });
+    this.pluginService =
+      deps.pluginService ??
+      new PluginService({
+        fileSystem: deps.fileSystem,
+        pathPort: deps.pathPort,
+        commandRunner: deps.commandRunner
+      });
     this.skillService = new SkillService({
       fileSystem: deps.fileSystem,
-      pathPort: deps.pathPort
+      pathPort: deps.pathPort,
+      pluginSkillDirsProvider: (paths) => this.pluginService.resolvePluginSkillDirectories(paths)
     });
     this.providerService = new ProviderService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
-      providerRegistry: providerRegistryPromise,
+      providerRegistry: providerRegistryFactory,
       workspaceContextService,
       skillService: this.skillService,
       nowIso
@@ -177,6 +196,40 @@ export class OpenGoatService {
   public async installSkill(request: InstallSkillRequest): Promise<InstallSkillResult> {
     const paths = this.pathsProvider.getPaths();
     return this.skillService.installSkill(paths, request);
+  }
+
+  public async listPlugins(options: {
+    enabledOnly?: boolean;
+    verbose?: boolean;
+    includeBundled?: boolean;
+  } = {}): Promise<OpenClawPluginListReport> {
+    const paths = this.pathsProvider.getPaths();
+    return this.pluginService.listPlugins(paths, options);
+  }
+
+  public async getPluginInfo(pluginId: string): Promise<OpenClawPluginInfoRecord> {
+    const paths = this.pathsProvider.getPaths();
+    return this.pluginService.getPluginInfo(paths, pluginId);
+  }
+
+  public async installPlugin(request: PluginInstallRequest): Promise<PluginInstallResult> {
+    const paths = this.pathsProvider.getPaths();
+    return this.pluginService.installPlugin(paths, request);
+  }
+
+  public async enablePlugin(pluginId: string): Promise<void> {
+    const paths = this.pathsProvider.getPaths();
+    await this.pluginService.enablePlugin(paths, pluginId);
+  }
+
+  public async disablePlugin(pluginId: string): Promise<void> {
+    const paths = this.pathsProvider.getPaths();
+    await this.pluginService.disablePlugin(paths, pluginId);
+  }
+
+  public async pluginDoctor(): Promise<CommandRunResult> {
+    const paths = this.pathsProvider.getPaths();
+    return this.pluginService.doctor(paths);
   }
 
   public async listSessions(agentId = DEFAULT_AGENT_ID, options: { activeMinutes?: number } = {}): Promise<SessionSummary[]> {

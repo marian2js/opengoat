@@ -76,7 +76,8 @@ Skill directories:
 
 Precedence:
 
-- workspace skill overrides managed skill with the same id.
+- workspace skill overrides plugin/managed skill with the same id.
+- plugin skill overrides managed skill with the same id.
 
 Runtime behavior:
 
@@ -84,6 +85,13 @@ Runtime behavior:
 2. A bounded skills section is injected into the system prompt.
 3. Agents can self-install/update by creating `skills/<skill-id>/SKILL.md` in their workspace.
 4. Orchestrator can install skills via `install_skill` action during orchestration.
+
+Plugin sources:
+
+- OpenClaw-compatible plugins installed through `opengoat plugin ...` are stored in
+  `~/.opengoat/openclaw-compat`.
+- OpenGoat auto-detects plugin `skills` dirs from `openclaw.plugin.json` (or default `<plugin>/skills`).
+- These plugin skill dirs are injected into the same merged skill resolution path used by providers.
 
 ## Sessions
 

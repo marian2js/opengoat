@@ -9,6 +9,7 @@ The codebase is split into layers to keep product surfaces decoupled from orches
 - `src/core/agents`: agent lifecycle domain (`AgentService`).
 - `src/core/bootstrap`: filesystem bootstrap domain (`BootstrapService`).
 - `src/core/providers`: provider domain (`ProviderService`, registry, implementations).
+- `src/core/plugins`: OpenClaw-compatible plugin domain (`PluginService`).
 - `src/core/orchestration`: routing + orchestration runtime (`RoutingService`, `OrchestrationService`).
 - `src/core/sessions`: session store/transcript lifecycle (reset, pruning, compaction, history).
 - `src/core/opengoat`: orchestration facade used by app surfaces (`OpenGoatService`).
@@ -37,6 +38,7 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - Every agent has skill support:
   - managed skills: `~/.opengoat/skills/<skill-id>/SKILL.md`
   - workspace skills: `~/.opengoat/workspaces/<agent-id>/skills/<skill-id>/SKILL.md`
+  - plugin skills: auto-loaded from installed OpenClaw-compatible plugins
   - workspace skills override managed skills with the same id.
 - Agent metadata lives in front matter at `AGENTS.md` (`id`, `name`, `description`, `provider`, `tags`, `delegation`, `priority`) and is used for routing decisions.
 - On every `agent run`, OpenGoat loads configured workspace bootstrap files, injects them into a generated system prompt with missing-file markers + truncation protection, and runs the provider with the agent workspace as default `cwd`.
@@ -44,6 +46,10 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - Every agent run writes a trace JSON file at `~/.opengoat/runs/<run-id>.json` containing entry agent, routing decision, and provider execution output.
 - Orchestrator runs an AI-driven delegation loop with action types (`delegate_to_agent`, `read_workspace_file`, `write_workspace_file`, `respond_user`, `finish`) and configurable communication mode (`direct`, `artifacts`, `hybrid`).
 - Orchestrator can also execute `install_skill` actions to install skills for target agents during orchestration.
+- OpenClaw-compatible plugin runtime:
+  - Uses OpenClaw CLI under isolated state at `~/.opengoat/openclaw-compat`.
+  - Supports install/list/info/enable/disable/doctor through OpenGoat CLI.
+  - Plugin skill folders are auto-discovered and merged into agent skill context.
 - Sessions are persisted per agent under `~/.opengoat/agents/<agent-id>/sessions/`:
   - `sessions.json` (session store map keyed by session key)
   - `<session-id>.jsonl` (transcript events)
@@ -78,6 +84,12 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - `./bin/opengoat scenario run --file <scenario.json> [--mode live|scripted] [--json]`
 - `./bin/opengoat skill list [--agent <id>] [--json]`
 - `./bin/opengoat skill install <name> [--agent <id>] [--from <path>] [--description <text>] [--json]`
+- `./bin/opengoat plugin list [--enabled] [--verbose] [--all] [--json]`
+- `./bin/opengoat plugin install <spec> [--link] [--json]`
+- `./bin/opengoat plugin info <plugin-id> [--json]`
+- `./bin/opengoat plugin enable <plugin-id>`
+- `./bin/opengoat plugin disable <plugin-id>`
+- `./bin/opengoat plugin doctor [--json]`
 - `./bin/opengoat agent provider get <agent-id>`
 - `./bin/opengoat agent provider set <agent-id> <provider-id>`
 - `./bin/opengoat agent run <agent-id> --message <text> [--session <key|id>] [--new-session|--no-session] [--model <model>] [-- <provider-args>]`
@@ -127,6 +139,20 @@ Detailed orchestration flow and scenario strategy:
 - Install by asking the orchestrator:
   - `./bin/opengoat agent --message "Install skill release-checklist for developer"`
   - The orchestrator can use `install_skill` actions to materialize the skill under the target agent workspace.
+
+## Plugins (OpenClaw Compatible)
+
+OpenGoat executes OpenClaw plugins through the OpenClaw CLI to preserve plugin runtime compatibility.
+
+- Compatibility state root: `~/.opengoat/openclaw-compat`
+- Plugin installs:
+  - copied installs: `~/.opengoat/openclaw-compat/extensions`
+  - linked installs: tracked in `~/.opengoat/openclaw-compat/openclaw.json`
+- Command override:
+  - default command: `openclaw`
+  - optional override: `OPENGOAT_OPENCLAW_CMD`
+
+Plugin-declared `skills` directories (and default `<plugin>/skills`) are automatically folded into the agent skills prompt.
 
 ## Grok Provider
 

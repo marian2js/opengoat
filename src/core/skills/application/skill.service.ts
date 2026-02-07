@@ -16,6 +16,7 @@ import {
 interface SkillServiceDeps {
   fileSystem: FileSystemPort;
   pathPort: PathPort;
+  pluginSkillDirsProvider?: (paths: OpenGoatPaths) => Promise<string[]>;
 }
 
 interface AgentConfigShape {
@@ -27,10 +28,12 @@ interface AgentConfigShape {
 export class SkillService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
+  private readonly pluginSkillDirsProvider?: (paths: OpenGoatPaths) => Promise<string[]>;
 
   public constructor(deps: SkillServiceDeps) {
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
+    this.pluginSkillDirsProvider = deps.pluginSkillDirsProvider;
   }
 
   public async listSkills(
@@ -200,9 +203,11 @@ export class SkillService {
     config: ReturnType<typeof resolveSkillsConfig>
   ): Promise<ResolvedSkill[]> {
     const workspaceSkillsDir = this.pathPort.join(paths.workspacesDir, agentId, "skills");
+    const pluginDirs = await this.resolvePluginSkillDirs(paths);
     const extraDirs = config.load.extraDirs.map(resolveUserPath);
     const sources: Array<{ source: ResolvedSkill["source"]; dir: string; enabled: boolean }> = [
       { source: "managed", dir: paths.skillsDir, enabled: config.includeManaged },
+      ...pluginDirs.map((dir) => ({ source: "plugin" as const, dir, enabled: true })),
       ...extraDirs.map((dir) => ({ source: "extra" as const, dir, enabled: true })),
       { source: "workspace", dir: workspaceSkillsDir, enabled: config.includeWorkspace }
     ];
@@ -277,6 +282,19 @@ export class SkillService {
       return parsed.runtime?.skills;
     } catch {
       return undefined;
+    }
+  }
+
+  private async resolvePluginSkillDirs(paths: OpenGoatPaths): Promise<string[]> {
+    if (!this.pluginSkillDirsProvider) {
+      return [];
+    }
+
+    try {
+      const loaded = await this.pluginSkillDirsProvider(paths);
+      return loaded.map((entry) => entry.trim()).filter(Boolean);
+    } catch {
+      return [];
     }
   }
 }
