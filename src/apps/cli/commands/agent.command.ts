@@ -28,6 +28,9 @@ type AgentArgsResult =
       agentId: string;
       message: string;
       model?: string;
+      sessionRef?: string;
+      forceNewSession: boolean;
+      disableSession: boolean;
       passthroughArgs: string[];
       stream: boolean;
     }
@@ -52,6 +55,9 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
 
   let message: string | undefined;
   let model: string | undefined;
+  let sessionRef: string | undefined;
+  let forceNewSession = false;
+  let disableSession = false;
   let stream = true;
 
   for (let index = 0; index < known.length; index += 1) {
@@ -72,6 +78,26 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
       continue;
     }
 
+    if (token === "--session") {
+      const value = known[index + 1];
+      if (!value) {
+        return { ok: false, error: "Missing value for --session." };
+      }
+      sessionRef = value.trim();
+      index += 1;
+      continue;
+    }
+
+    if (token === "--new-session") {
+      forceNewSession = true;
+      continue;
+    }
+
+    if (token === "--no-session") {
+      disableSession = true;
+      continue;
+    }
+
     if (token === "--model") {
       const value = known[index + 1];
       if (!value) {
@@ -88,12 +114,18 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
   if (!message?.trim()) {
     return { ok: false, error: "--message is required." };
   }
+  if (forceNewSession && disableSession) {
+    return { ok: false, error: "Use either --new-session or --no-session, not both." };
+  }
 
   return {
     ok: true,
     agentId,
     message: message.trim(),
     model,
+    sessionRef,
+    forceNewSession,
+    disableSession,
     passthroughArgs,
     stream
   };
@@ -115,7 +147,10 @@ function isHelpRequest(args: string[]): boolean {
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write(
-    "  opengoat agent [agent-id] --message <text> [--model <model>] [--no-stream] [-- <provider-args>]\n"
+    "  opengoat agent [agent-id] --message <text> [--session <key|id>] [--new-session|--no-session]\n"
+  );
+  output.write(
+    "                [--model <model>] [--no-stream] [-- <provider-args>]\n"
   );
   output.write("\n");
   output.write("Defaults:\n");

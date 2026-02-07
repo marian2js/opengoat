@@ -10,7 +10,10 @@ export const agentRunCommand: CliCommand = {
     if (!parsed.ok) {
       context.stderr.write(`${parsed.error}\n`);
       context.stderr.write(
-        "Usage: opengoat agent run <agent-id> --message <text> [--model <model>] [--no-stream] [-- <provider-args>]\n"
+        "Usage: opengoat agent run <agent-id> --message <text> [--session <key|id>] [--new-session|--no-session]\n"
+      );
+      context.stderr.write(
+        "       [--model <model>] [--no-stream] [-- <provider-args>]\n"
       );
       return 1;
     }
@@ -25,6 +28,9 @@ type RunArgsResult =
       agentId: string;
       message: string;
       model?: string;
+      sessionRef?: string;
+      forceNewSession: boolean;
+      disableSession: boolean;
       passthroughArgs: string[];
       stream: boolean;
     }
@@ -46,6 +52,9 @@ function parseRunArgs(args: string[]): RunArgsResult {
 
   let message: string | undefined;
   let model: string | undefined;
+  let sessionRef: string | undefined;
+  let forceNewSession = false;
+  let disableSession = false;
   let stream = true;
 
   for (let index = 0; index < known.length; index += 1) {
@@ -66,6 +75,26 @@ function parseRunArgs(args: string[]): RunArgsResult {
       continue;
     }
 
+    if (token === "--session") {
+      const value = known[index + 1];
+      if (!value) {
+        return { ok: false, error: "Missing value for --session." };
+      }
+      sessionRef = value.trim();
+      index += 1;
+      continue;
+    }
+
+    if (token === "--new-session") {
+      forceNewSession = true;
+      continue;
+    }
+
+    if (token === "--no-session") {
+      disableSession = true;
+      continue;
+    }
+
     if (token === "--model") {
       const value = known[index + 1];
       if (!value) {
@@ -82,12 +111,18 @@ function parseRunArgs(args: string[]): RunArgsResult {
   if (!message?.trim()) {
     return { ok: false, error: "--message is required." };
   }
+  if (forceNewSession && disableSession) {
+    return { ok: false, error: "Use either --new-session or --no-session, not both." };
+  }
 
   return {
     ok: true,
     agentId,
     message: message.trim(),
     model,
+    sessionRef,
+    forceNewSession,
+    disableSession,
     passthroughArgs,
     stream
   };

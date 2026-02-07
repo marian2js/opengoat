@@ -1,4 +1,5 @@
 import type { AgentProviderBinding, ProviderExecutionResult } from "../../providers/types.js";
+import type { SessionCompactionResult, SessionRunInfo } from "../../sessions/index.js";
 
 export interface RoutingCandidate {
   agentId: string;
@@ -25,6 +26,11 @@ export interface AgentRunTrace {
   entryAgentId: string;
   userMessage: string;
   routing: RoutingDecision;
+  session?: SessionRunInfo & {
+    preRunCompactionApplied: boolean;
+    postRunCompactionApplied: boolean;
+    postRunCompactionSummary?: string;
+  };
   execution: AgentProviderBinding &
     ProviderExecutionResult & {
       durationMs: number;
@@ -36,4 +42,8 @@ export type OrchestrationRunResult = ProviderExecutionResult &
     entryAgentId: string;
     routing: RoutingDecision;
     tracePath: string;
+    session?: SessionRunInfo & {
+      preRunCompactionApplied: boolean;
+      postRunCompaction: SessionCompactionResult;
+    };
   };

@@ -168,7 +168,28 @@ export function renderInternalAgentConfig(agent: AgentIdentity): Record<string, 
     runtime: {
       mode: "orchestrated",
       contextBudgetTokens: 128_000,
-      bootstrapMaxChars: 20_000
+      bootstrapMaxChars: 20_000,
+      sessions: {
+        mainKey: "main",
+        contextMaxChars: 12_000,
+        reset: {
+          mode: "daily",
+          atHour: 4
+        },
+        pruning: {
+          enabled: true,
+          maxMessages: 40,
+          maxChars: 16_000,
+          keepRecentMessages: 12
+        },
+        compaction: {
+          enabled: true,
+          triggerMessageCount: 80,
+          triggerChars: 32_000,
+          keepRecentMessages: 20,
+          summaryMaxChars: 4_000
+        }
+      }
     },
     prompt: {
       bootstrapFiles: [

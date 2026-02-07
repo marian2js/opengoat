@@ -1,4 +1,5 @@
 import type { AgentCreationResult, AgentDescriptor } from "../../domain/agent.js";
+import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
 import type { InitializationResult } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
@@ -20,6 +21,13 @@ import { WorkspaceContextService } from "../../agents/application/workspace-cont
 import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
 import { OrchestrationService, type RoutingDecision } from "../../orchestration/index.js";
 import { ProviderService } from "../../providers/application/provider.service.js";
+import {
+  SessionService,
+  type SessionCompactionResult,
+  type SessionHistoryResult,
+  type SessionRunInfo,
+  type SessionSummary
+} from "../../sessions/index.js";
 
 interface OpenGoatServiceDeps {
   fileSystem: FileSystemPort;
@@ -35,6 +43,7 @@ export class OpenGoatService {
   private readonly agentManifestService: AgentManifestService;
   private readonly bootstrapService: BootstrapService;
   private readonly providerService: ProviderService;
+  private readonly sessionService: SessionService;
   private readonly orchestrationService: OrchestrationService;
 
   public constructor(deps: OpenGoatServiceDeps) {
@@ -70,9 +79,16 @@ export class OpenGoatService {
       workspaceContextService,
       nowIso
     });
+    this.sessionService = new SessionService({
+      fileSystem: deps.fileSystem,
+      pathPort: deps.pathPort,
+      nowIso,
+      nowMs: () => Date.now()
+    });
     this.orchestrationService = new OrchestrationService({
       providerService: this.providerService,
       agentManifestService: this.agentManifestService,
+      sessionService: this.sessionService,
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       nowIso
@@ -150,6 +166,29 @@ export class OpenGoatService {
   > {
     const paths = this.pathsProvider.getPaths();
     return this.orchestrationService.runAgent(paths, agentId, options);
+  }
+
+  public async listSessions(agentId = DEFAULT_AGENT_ID, options: { activeMinutes?: number } = {}): Promise<SessionSummary[]> {
+    const paths = this.pathsProvider.getPaths();
+    return this.sessionService.listSessions(paths, agentId, options);
+  }
+
+  public async getSessionHistory(
+    agentId = DEFAULT_AGENT_ID,
+    options: { sessionRef?: string; limit?: number; includeCompaction?: boolean } = {}
+  ): Promise<SessionHistoryResult> {
+    const paths = this.pathsProvider.getPaths();
+    return this.sessionService.getSessionHistory(paths, agentId, options);
+  }
+
+  public async resetSession(agentId = DEFAULT_AGENT_ID, sessionRef?: string): Promise<SessionRunInfo> {
+    const paths = this.pathsProvider.getPaths();
+    return this.sessionService.resetSession(paths, agentId, sessionRef);
+  }
+
+  public async compactSession(agentId = DEFAULT_AGENT_ID, sessionRef?: string): Promise<SessionCompactionResult> {
+    const paths = this.pathsProvider.getPaths();
+    return this.sessionService.compactSession(paths, agentId, sessionRef);
   }
 
   public getHomeDir(): string {

@@ -61,12 +61,14 @@ export class AgentService {
   ): Promise<AgentCreationResult> {
     const workspaceDir = this.pathPort.join(paths.workspacesDir, identity.id);
     const internalConfigDir = this.pathPort.join(paths.agentsDir, identity.id);
+    const sessionsDir = this.pathPort.join(internalConfigDir, "sessions");
 
     const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
 
     await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
     await this.ensureDirectory(internalConfigDir, createdPaths, skippedPaths);
+    await this.ensureDirectory(sessionsDir, createdPaths, skippedPaths);
 
     const shouldCreateBootstrapFile = await this.isBrandNewWorkspace(workspaceDir);
 
@@ -142,6 +144,15 @@ export class AgentService {
     await this.writeMarkdownIfMissing(
       this.pathPort.join(internalConfigDir, "memory.md"),
       renderInternalAgentMemoryMarkdown(identity),
+      createdPaths,
+      skippedPaths
+    );
+    await this.writeJsonIfMissing(
+      this.pathPort.join(sessionsDir, "sessions.json"),
+      {
+        schemaVersion: 1,
+        sessions: {}
+      },
       createdPaths,
       skippedPaths
     );

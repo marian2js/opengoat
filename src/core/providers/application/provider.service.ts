@@ -209,10 +209,14 @@ export class ProviderService {
       nowIso: this.nowIso(),
       contextFiles
     });
+    const sessionContext = options.sessionContext?.trim();
+    const mergedSystemPrompt = sessionContext
+      ? [systemPrompt, "## Session Context", sessionContext].join("\n\n")
+      : systemPrompt;
 
     const invokeOptions: ProviderInvokeOptions = {
       ...options,
-      systemPrompt,
+      systemPrompt: mergedSystemPrompt,
       cwd: options.cwd || workspaceDir,
       env: await this.resolveProviderEnv(paths, provider.id, options.env),
       agent: provider.capabilities.agent ? options.agent || agentId : options.agent

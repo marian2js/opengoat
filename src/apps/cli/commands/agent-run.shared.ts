@@ -4,6 +4,9 @@ export interface AgentRunRequest {
   agentId: string;
   message: string;
   model?: string;
+  sessionRef?: string;
+  forceNewSession?: boolean;
+  disableSession?: boolean;
   passthroughArgs: string[];
   stream: boolean;
 }
@@ -19,6 +22,9 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
     result = await context.service.runAgent(request.agentId, {
       message: request.message,
       model: request.model,
+      sessionRef: request.sessionRef,
+      forceNewSession: request.forceNewSession,
+      disableSession: request.disableSession,
       passthroughArgs: request.passthroughArgs,
       env: process.env,
       onStdout: request.stream
@@ -57,6 +63,9 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
     context.stderr.write(
       `Routed ${result.entryAgentId} -> ${result.routing.targetAgentId} (confidence ${result.routing.confidence}).\n`
     );
+  }
+  if (hasSessionInfo(result)) {
+    context.stderr.write(`Session: ${result.session.sessionKey} (${result.session.sessionId})\n`);
   }
 
   if (!request.stream) {
@@ -114,4 +123,20 @@ function hasRoutingDetails(
     typeof record.routing?.targetAgentId === "string" &&
     typeof record.routing?.confidence === "number"
   );
+}
+
+function hasSessionInfo(
+  value: unknown
+): value is {
+  session: { sessionKey: string; sessionId: string };
+} {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const record = value as {
+    session?: { sessionKey?: unknown; sessionId?: unknown };
+  };
+
+  return typeof record.session?.sessionKey === "string" && typeof record.session?.sessionId === "string";
 }

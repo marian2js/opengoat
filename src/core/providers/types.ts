@@ -10,6 +10,10 @@ export interface ProviderCapabilities {
 export interface ProviderInvokeOptions {
   message: string;
   systemPrompt?: string;
+  sessionRef?: string;
+  forceNewSession?: boolean;
+  disableSession?: boolean;
+  sessionContext?: string;
   agent?: string;
   model?: string;
   passthroughArgs?: string[];

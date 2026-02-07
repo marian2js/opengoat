@@ -10,6 +10,7 @@ The codebase is split into layers to keep product surfaces decoupled from orches
 - `src/core/bootstrap`: filesystem bootstrap domain (`BootstrapService`).
 - `src/core/providers`: provider domain (`ProviderService`, registry, implementations).
 - `src/core/orchestration`: routing + orchestration runtime (`RoutingService`, `OrchestrationService`).
+- `src/core/sessions`: session store/transcript lifecycle (reset, pruning, compaction, history).
 - `src/core/opengoat`: orchestration facade used by app surfaces (`OpenGoatService`).
 - `src/core/domain`, `src/core/templates`, `src/core/ports`: shared contracts and rendering helpers.
 - `src/core/providers/providers/<provider-id>`: self-contained provider modules and tests.
@@ -36,6 +37,15 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - Agent metadata lives in front matter at `AGENTS.md` (`id`, `name`, `description`, `provider`, `tags`, `delegation`, `priority`) and is used for routing decisions.
 - On every `agent run`, OpenGoat loads configured workspace bootstrap files, injects them into a generated system prompt with missing-file markers + truncation protection, and runs the provider with the agent workspace as default `cwd`.
 - Every agent run writes a trace JSON file at `~/.opengoat/runs/<run-id>.json` containing entry agent, routing decision, and provider execution output.
+- Sessions are persisted per agent under `~/.opengoat/agents/<agent-id>/sessions/`:
+  - `sessions.json` (session store map keyed by session key)
+  - `<session-id>.jsonl` (transcript events)
+- Main direct-chat key defaults to `agent:<agent-id>:main`.
+- Agent runtime session config lives in `~/.opengoat/agents/<agent-id>/config.json` (`runtime.sessions`):
+  - reset policy (`daily`/`idle`)
+  - context pruning
+  - transcript compaction
+- Session context is injected into the system prompt on each run.
 - Built-in providers: `codex`, `claude`, `cursor`, `gemini`, `grok`, `openclaw`, `openai`, `openrouter`.
   - Each provider lives in its own folder with code + tests.
   - New providers are auto-discovered from provider folders (no central registration edits).
@@ -48,13 +58,19 @@ This keeps the core reusable for a future HTTP server, desktop shell, or other r
 - `./bin/opengoat onboard`
 - `./bin/opengoat agent --message "<text>"` (defaults to `orchestrator`)
 - `./bin/opengoat agent <agent-id> --message "<text>"`
+- `./bin/opengoat agent --message "<text>" --session <key|id>`
+- `./bin/opengoat agent --message "<text>" --new-session`
 - `./bin/opengoat agent create <name>`
 - `./bin/opengoat agent list`
 - `./bin/opengoat provider list`
 - `./bin/opengoat route --message "<text>" [--agent <id>] [--json]`
+- `./bin/opengoat session list [--agent <id>] [--active-minutes <n>] [--json]`
+- `./bin/opengoat session history [--agent <id>] [--session <key|id>] [--limit <n>] [--include-compaction]`
+- `./bin/opengoat session reset [--agent <id>] [--session <key|id>]`
+- `./bin/opengoat session compact [--agent <id>] [--session <key|id>]`
 - `./bin/opengoat agent provider get <agent-id>`
 - `./bin/opengoat agent provider set <agent-id> <provider-id>`
-- `./bin/opengoat agent run <agent-id> --message <text> [--model <model>] [-- <provider-args>]`
+- `./bin/opengoat agent run <agent-id> --message <text> [--session <key|id>] [--new-session|--no-session] [--model <model>] [-- <provider-args>]`
 
 ## OpenAI Provider
 

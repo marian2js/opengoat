@@ -5,12 +5,14 @@ import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import type { ProviderInvokeOptions, ProviderService } from "../../providers/index.js";
+import { SessionService } from "../../sessions/index.js";
 import type { AgentRunTrace, OrchestrationRunResult, RoutingDecision } from "../domain/routing.js";
 import { RoutingService } from "./routing.service.js";
 
 interface OrchestrationServiceDeps {
   providerService: ProviderService;
   agentManifestService: AgentManifestService;
+  sessionService: SessionService;
   routingService?: RoutingService;
   fileSystem: FileSystemPort;
   pathPort: PathPort;
@@ -20,6 +22,7 @@ interface OrchestrationServiceDeps {
 export class OrchestrationService {
   private readonly providerService: ProviderService;
   private readonly agentManifestService: AgentManifestService;
+  private readonly sessionService: SessionService;
   private readonly routingService: RoutingService;
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
@@ -28,6 +31,7 @@ export class OrchestrationService {
   public constructor(deps: OrchestrationServiceDeps) {
     this.providerService = deps.providerService;
     this.agentManifestService = deps.agentManifestService;
+    this.sessionService = deps.sessionService;
     this.routingService = deps.routingService ?? new RoutingService();
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
@@ -57,16 +61,31 @@ export class OrchestrationService {
     const startedAt = this.nowIso();
     const routing = await this.routeMessage(paths, entryAgentId, options.message);
     const targetAgentId = routing.targetAgentId;
-    const runtimeOptions: ProviderInvokeOptions = {
+    const preparedSession = await this.sessionService.prepareRunSession(paths, targetAgentId, {
+      sessionRef: options.sessionRef,
+      forceNew: options.forceNewSession,
+      disableSession: options.disableSession,
+      userMessage: routing.rewrittenMessage
+    });
+    const runtimeOptions = sanitizeProviderInvokeOptions({
       ...options,
-      message: routing.rewrittenMessage
-    };
+      message: routing.rewrittenMessage,
+      sessionContext: preparedSession.enabled ? preparedSession.contextPrompt : undefined
+    });
 
     const startTime = Date.now();
     const execution = await this.providerService.invokeAgent(paths, targetAgentId, runtimeOptions);
     const durationMs = Date.now() - startTime;
     const completedAt = this.nowIso();
     const runId = generateRunId();
+    const assistantContent =
+      execution.stdout.trim() ||
+      (execution.stderr.trim()
+        ? `[Provider error code ${execution.code}] ${execution.stderr.trim()}`
+        : `[Provider exited with code ${execution.code}]`);
+    const postRunCompaction = preparedSession.enabled
+      ? await this.sessionService.recordAssistantReply(paths, preparedSession.info, assistantContent)
+      : undefined;
 
     const trace: AgentRunTrace = {
       schemaVersion: 1,
@@ -76,6 +95,14 @@ export class OrchestrationService {
       entryAgentId: routing.entryAgentId,
       userMessage: options.message,
       routing,
+      session: preparedSession.enabled
+        ? {
+            ...preparedSession.info,
+            preRunCompactionApplied: preparedSession.compactionApplied,
+            postRunCompactionApplied: postRunCompaction?.applied ?? false,
+            postRunCompactionSummary: postRunCompaction?.summary
+          }
+        : undefined,
       execution: {
         agentId: execution.agentId,
         providerId: execution.providerId,
@@ -92,7 +119,15 @@ export class OrchestrationService {
       ...execution,
       entryAgentId: routing.entryAgentId,
       routing,
-      tracePath
+      tracePath,
+      session:
+        preparedSession.enabled && postRunCompaction
+          ? {
+              ...preparedSession.info,
+              preRunCompactionApplied: preparedSession.compactionApplied,
+              postRunCompaction
+            }
+          : undefined
     };
   }
 
@@ -119,4 +154,12 @@ function resolveEntryAgentId(entryAgentId: string, manifests: Array<{ agentId: s
   }
 
   return manifests[0]?.agentId || normalizedEntryAgentId;
+}
+
+function sanitizeProviderInvokeOptions(options: ProviderInvokeOptions): ProviderInvokeOptions {
+  const sanitized: ProviderInvokeOptions = { ...options };
+  delete sanitized.sessionRef;
+  delete sanitized.forceNewSession;
+  delete sanitized.disableSession;
+  return sanitized;
 }
