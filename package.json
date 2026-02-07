@@ -25,6 +25,10 @@
     "node": ">=20.11.0"
   },
   "pnpm": {
+    "overrides": {
+      "@trpc/client": "10.45.4",
+      "@trpc/server": "10.45.4"
+    },
     "onlyBuiltDependencies": [
       "electron",
       "electron-winstaller",

@@ -5,7 +5,7 @@ import type {
   WorkbenchOnboarding,
   WorkbenchProject
 } from "@shared/workbench";
-import { getTrpcClient } from "@renderer/lib/trpc";
+import { getTrpcClient, getTrpcUntypedClient } from "@renderer/lib/trpc";
 
 interface WorkbenchUiState {
   homeDir: string;
@@ -247,12 +247,26 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
 
 async function requestBootstrap(): Promise<WorkbenchBootstrap> {
   const trpc = getTrpcClient();
-  return trpc.bootstrap.query();
+  const trpcUntyped = getTrpcUntypedClient();
+
+  return callWithProcedureFallback<WorkbenchBootstrap>([
+    () => trpc.bootstrap.query(),
+    () => trpc.bootstrapMutate.mutate(),
+    () => trpcUntyped.mutation("bootstrap") as Promise<WorkbenchBootstrap>,
+    () => trpcUntyped.query("bootstrapMutate") as Promise<WorkbenchBootstrap>
+  ]);
 }
 
 async function requestProjectsList(): Promise<WorkbenchProject[]> {
   const trpc = getTrpcClient();
-  return trpc.projects.list.query();
+  const trpcUntyped = getTrpcUntypedClient();
+
+  return callWithProcedureFallback<WorkbenchProject[]>([
+    () => trpc.projects.list.query(),
+    () => trpc.projects.listMutate.mutate(),
+    () => trpcUntyped.mutation("projects.list") as Promise<WorkbenchProject[]>,
+    () => trpcUntyped.query("projects.listMutate") as Promise<WorkbenchProject[]>
+  ]);
 }
 
 async function requestSessionMessages(input: {
@@ -260,7 +274,14 @@ async function requestSessionMessages(input: {
   sessionId: string;
 }): Promise<WorkbenchMessage[]> {
   const trpc = getTrpcClient();
-  return trpc.sessions.messages.query(input);
+  const trpcUntyped = getTrpcUntypedClient();
+
+  return callWithProcedureFallback<WorkbenchMessage[]>([
+    () => trpc.sessions.messages.query(input),
+    () => trpc.sessions.messagesMutate.mutate(input),
+    () => trpcUntyped.mutation("sessions.messages", input) as Promise<WorkbenchMessage[]>,
+    () => trpcUntyped.query("sessions.messagesMutate", input) as Promise<WorkbenchMessage[]>
+  ]);
 }
 
 export function getActiveProject(
@@ -280,3 +301,30 @@ function toErrorMessage(error: unknown): string {
   return "Unexpected error.";
 }
 
+export function isMissingProcedureError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return error.message.includes("-procedure on path");
+}
+
+export async function callWithProcedureFallback<T>(attempts: Array<() => Promise<T>>): Promise<T> {
+  let lastProcedureError: unknown;
+
+  for (const attempt of attempts) {
+    try {
+      return await attempt();
+    } catch (error) {
+      if (!isMissingProcedureError(error)) {
+        throw error;
+      }
+      lastProcedureError = error;
+    }
+  }
+
+  if (lastProcedureError instanceof Error) {
+    throw lastProcedureError;
+  }
+
+  throw new Error("Procedure call failed.");
+}

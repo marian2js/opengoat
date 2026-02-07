@@ -1,25 +1,32 @@
-import type { AppRouter } from "@main/ipc/router";
-import {
-  createTRPCProxyClient,
-  type TRPCLink
-} from "@trpc/client";
+import { createTRPCProxyClient, createTRPCUntypedClient } from "@trpc/client";
 import { ipcLink } from "electron-trpc/renderer";
 import superjson from "superjson";
 
-const transformerLink: TRPCLink<AppRouter> = (runtime) => {
-  return ipcLink<AppRouter>()({
-    ...runtime,
-    transformer: superjson
-  });
-};
+function createLinks(): unknown[] {
+  const createIpcLink = ipcLink as unknown as () => (runtime: unknown) => unknown;
+  const link = createIpcLink();
+  return [
+    ((runtime: unknown) =>
+      link({
+        ...(runtime as Record<string, unknown>),
+        transformer: superjson
+      })) as unknown
+  ];
+}
 
-let proxyClient: ReturnType<typeof createTRPCProxyClient<AppRouter>> | null = null;
+let proxyClient: unknown | null = null;
+let untypedClient: unknown | null = null;
 
-export function getTrpcClient(): ReturnType<typeof createTRPCProxyClient<AppRouter>> {
+export function getTrpcClient(): any {
   if (!proxyClient) {
-    proxyClient = createTRPCProxyClient<AppRouter>({
-      links: [transformerLink]
-    });
+    proxyClient = createTRPCProxyClient({ links: createLinks() as never } as never);
   }
   return proxyClient;
+}
+
+export function getTrpcUntypedClient(): any {
+  if (!untypedClient) {
+    untypedClient = createTRPCUntypedClient({ links: createLinks() as never } as never);
+  }
+  return untypedClient;
 }

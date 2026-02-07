@@ -4,6 +4,10 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@trpc/client': 10.45.4
+  '@trpc/server': 10.45.4
+
 importers:
 
   .:
@@ -1531,8 +1535,8 @@ packages:
   electron-trpc@0.7.1:
     resolution: {integrity: sha512-aWjZ5pLeVhrX9A9d8O8YgR8N+q4IXXzc76CJT1PwtDijIw+y5I+c75IAAtZ4JayYLeR3ll95PNGl5RTBu2qePw==}
     peerDependencies:
-      '@trpc/client': '>10.0.0'
-      '@trpc/server': '>10.0.0'
+      '@trpc/client': 10.45.4
+      '@trpc/server': 10.45.4
       electron: '>19.0.0'
 
   electron-winstaller@5.4.0:
