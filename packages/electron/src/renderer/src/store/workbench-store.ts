@@ -1,10 +1,16 @@
 import { create } from "zustand";
-import type { WorkbenchMessage, WorkbenchProject } from "@shared/workbench";
+import type {
+  WorkbenchBootstrap,
+  WorkbenchMessage,
+  WorkbenchOnboarding,
+  WorkbenchProject
+} from "@shared/workbench";
 import { trpc } from "@renderer/lib/trpc";
 
 interface WorkbenchUiState {
   homeDir: string;
   projects: WorkbenchProject[];
+  onboarding: WorkbenchOnboarding | null;
   activeProjectId: string | null;
   activeSessionId: string | null;
   activeMessages: WorkbenchMessage[];
@@ -17,6 +23,7 @@ interface WorkbenchUiState {
   selectProject: (projectId: string) => Promise<void>;
   createSession: (projectId: string, title?: string) => Promise<void>;
   selectSession: (projectId: string, sessionId: string) => Promise<void>;
+  submitOnboarding: (providerId: string, env: Record<string, string>) => Promise<void>;
   sendMessage: (message: string) => Promise<void>;
   clearError: () => void;
 }
@@ -24,6 +31,7 @@ interface WorkbenchUiState {
 export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
   homeDir: "",
   projects: [],
+  onboarding: null,
   activeProjectId: null,
   activeSessionId: null,
   activeMessages: [],
@@ -34,13 +42,13 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
   bootstrap: async () => {
     set({ isBootstrapping: true, error: null });
     try {
-      const boot = await trpc.bootstrap.query();
+      const boot = await requestBootstrap();
       const projects = boot.projects;
       const firstProject = projects[0] ?? null;
       const firstSession = firstProject?.sessions[0] ?? null;
       const activeMessages =
         firstProject && firstSession
-          ? await trpc.sessions.messages.query({
+          ? await requestSessionMessages({
               projectId: firstProject.id,
               sessionId: firstSession.id
             })
@@ -49,6 +57,7 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
       set({
         homeDir: boot.homeDir,
         projects,
+        onboarding: boot.onboarding,
         activeProjectId: firstProject?.id ?? null,
         activeSessionId: firstSession?.id ?? null,
         activeMessages,
@@ -71,7 +80,7 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
         return;
       }
 
-      const projects = await trpc.projects.list.query();
+      const projects = await requestProjectsList();
       set({
         projects,
         activeProjectId: project.id,
@@ -93,7 +102,7 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
     set({ isBusy: true, error: null });
     try {
       const project = await trpc.projects.add.mutate({ rootPath: normalized });
-      const projects = await trpc.projects.list.query();
+      const projects = await requestProjectsList();
       set({
         projects,
         activeProjectId: project.id,
@@ -117,7 +126,7 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
     const activeMessages =
       firstSession === null
         ? []
-        : await trpc.sessions.messages.query({
+        : await requestSessionMessages({
             projectId,
             sessionId: firstSession.id
           });
@@ -136,7 +145,7 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
         projectId,
         title
       });
-      const projects = await trpc.projects.list.query();
+      const projects = await requestProjectsList();
       set({
         projects,
         activeProjectId: projectId,
@@ -152,11 +161,27 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
   selectSession: async (projectId: string, sessionId: string) => {
     set({ isBusy: true, error: null });
     try {
-      const messages = await trpc.sessions.messages.query({ projectId, sessionId });
+      const messages = await requestSessionMessages({ projectId, sessionId });
       set({
         activeProjectId: projectId,
         activeSessionId: sessionId,
         activeMessages: messages,
+        isBusy: false
+      });
+    } catch (error) {
+      set({ isBusy: false, error: toErrorMessage(error) });
+    }
+  },
+
+  submitOnboarding: async (providerId: string, env: Record<string, string>) => {
+    set({ isBusy: true, error: null });
+    try {
+      const onboarding = await trpc.onboarding.submit.mutate({
+        providerId,
+        env
+      });
+      set({
+        onboarding,
         isBusy: false
       });
     } catch (error) {
@@ -198,8 +223,8 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
         message: trimmed
       });
 
-      const projects = await trpc.projects.list.query();
-      const messages = await trpc.sessions.messages.query({ projectId, sessionId });
+      const projects = await requestProjectsList();
+      const messages = await requestSessionMessages({ projectId, sessionId });
       set({
         projects,
         activeMessages: messages,
@@ -214,6 +239,42 @@ export const useWorkbenchStore = create<WorkbenchUiState>((set, get) => ({
     set({ error: null });
   }
 }));
+
+async function requestBootstrap(): Promise<WorkbenchBootstrap> {
+  try {
+    return await trpc.bootstrap.query();
+  } catch (error) {
+    if (isMissingQueryProcedureError(error)) {
+      return trpc.bootstrapMutate.mutate();
+    }
+    throw error;
+  }
+}
+
+async function requestProjectsList(): Promise<WorkbenchProject[]> {
+  try {
+    return await trpc.projects.list.query();
+  } catch (error) {
+    if (isMissingQueryProcedureError(error)) {
+      return trpc.projects.listMutate.mutate();
+    }
+    throw error;
+  }
+}
+
+async function requestSessionMessages(input: {
+  projectId: string;
+  sessionId: string;
+}): Promise<WorkbenchMessage[]> {
+  try {
+    return await trpc.sessions.messages.query(input);
+  } catch (error) {
+    if (isMissingQueryProcedureError(error)) {
+      return trpc.sessions.messagesMutate.mutate(input);
+    }
+    throw error;
+  }
+}
 
 export function getActiveProject(
   projects: WorkbenchProject[],
@@ -230,4 +291,11 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return "Unexpected error.";
+}
+
+function isMissingQueryProcedureError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return error.message.includes('No "query"-procedure on path');
 }

@@ -1,6 +1,7 @@
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
 import { Textarea } from "@renderer/components/ui/textarea";
+import type { WorkbenchOnboarding } from "@shared/workbench";
 import {
   getActiveProject,
   useWorkbenchStore,
@@ -18,6 +19,7 @@ export function App() {
   const {
     homeDir,
     projects,
+    onboarding,
     activeProjectId,
     activeSessionId,
     activeMessages,
@@ -30,12 +32,15 @@ export function App() {
     createSession,
     selectProject,
     selectSession,
+    submitOnboarding,
     sendMessage,
     clearError,
   } = useWorkbenchStore();
 
   const [manualPath, setManualPath] = useState("");
   const [draft, setDraft] = useState("");
+  const [selectedProviderId, setSelectedProviderId] = useState("");
+  const [onboardingEnv, setOnboardingEnv] = useState<Record<string, string>>({});
 
   useEffect(() => {
     void bootstrap();
@@ -56,6 +61,21 @@ export function App() {
   const canSend = Boolean(
     activeProject && activeSession && draft.trim().length > 0 && !isBusy,
   );
+  const selectedOnboardingProvider = useMemo(
+    () => resolveSelectedOnboardingProvider(onboarding, selectedProviderId),
+    [onboarding, selectedProviderId],
+  );
+
+  useEffect(() => {
+    if (!onboarding) {
+      return;
+    }
+    const nextProviderId = onboarding.activeProviderId || onboarding.providers[0]?.id || "";
+    if (nextProviderId && nextProviderId !== selectedProviderId) {
+      setSelectedProviderId(nextProviderId);
+      setOnboardingEnv({});
+    }
+  }, [onboarding, selectedProviderId]);
 
   const onManualAdd = async () => {
     await addProjectByPath(manualPath);
@@ -68,10 +88,108 @@ export function App() {
     await sendMessage(message);
   };
 
+  const onSaveOnboarding = async () => {
+    if (!selectedProviderId) {
+      return;
+    }
+    await submitOnboarding(selectedProviderId, onboardingEnv);
+    setOnboardingEnv({});
+  };
+
   if (isBootstrapping) {
     return (
       <div className="flex h-screen items-center justify-center text-sm text-[var(--muted-foreground)]">
         Loading OpenGoat desktop...
+      </div>
+    );
+  }
+
+  if (onboarding?.needsOnboarding) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[radial-gradient(1200px_500px_at_10%_-20%,_rgba(22,163,74,0.16),transparent_55%),radial-gradient(900px_450px_at_100%_0%,_rgba(245,158,11,0.15),transparent_55%),var(--background)] px-6 text-[var(--foreground)]">
+        <div className="w-full max-w-2xl rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
+          <p className="font-heading text-2xl">Finish Provider Setup</p>
+          <p className="mt-2 text-sm text-[var(--muted-foreground)]">
+            Configure the orchestrator provider directly in the desktop app.
+          </p>
+
+          <div className="mt-5 space-y-3">
+            <label className="block text-sm text-[var(--muted-foreground)]" htmlFor="provider-select">
+              Provider
+            </label>
+            <select
+              id="provider-select"
+              value={selectedProviderId}
+              onChange={(event) => {
+                setSelectedProviderId(event.target.value);
+                setOnboardingEnv({});
+              }}
+              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2 text-sm"
+              disabled={isBusy}
+            >
+              {onboarding.providers.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.displayName} ({provider.id})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedOnboardingProvider ? (
+            <div className="mt-5 space-y-3">
+              {selectedOnboardingProvider.envFields.length === 0 ? (
+                <p className="rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
+                  This provider has no environment fields. Click Continue to save selection.
+                </p>
+              ) : (
+                selectedOnboardingProvider.envFields.map((field) => {
+                  const value = onboardingEnv[field.key] ?? "";
+                  const isConfigured = selectedOnboardingProvider.configuredEnvKeys.includes(field.key);
+                  return (
+                    <div key={field.key} className="space-y-1">
+                      <p className="text-sm font-medium">
+                        {field.key}
+                        {field.required ? " *" : ""}
+                      </p>
+                      <Input
+                        type={field.secret ? "password" : "text"}
+                        value={value}
+                        onChange={(event) => {
+                          const next = event.target.value;
+                          setOnboardingEnv((current) => ({
+                            ...current,
+                            [field.key]: next
+                          }));
+                        }}
+                        placeholder={field.description}
+                        disabled={isBusy}
+                      />
+                      <p className="text-xs text-[var(--muted-foreground)]">
+                        {field.description}
+                        {isConfigured && !value ? " (currently configured)" : ""}
+                      </p>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="mt-4 rounded-md border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="mt-6 flex justify-end gap-2">
+            <Button
+              onClick={() => void onSaveOnboarding()}
+              disabled={isBusy || !selectedProviderId}
+            >
+              {isBusy ? "Saving..." : "Continue"}
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -281,5 +399,22 @@ export function App() {
         </main>
       </div>
     </div>
+  );
+}
+
+function resolveSelectedOnboardingProvider(
+  onboarding: WorkbenchOnboarding | null,
+  selectedProviderId: string,
+) {
+  if (!onboarding) {
+    return null;
+  }
+  if (!selectedProviderId) {
+    return onboarding.providers[0] ?? null;
+  }
+  return (
+    onboarding.providers.find((provider) => provider.id === selectedProviderId) ??
+    onboarding.providers[0] ??
+    null
   );
 }
