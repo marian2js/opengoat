@@ -1,3 +1,4 @@
+import { emitKeypressEvents } from "node:readline";
 import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { OpenGoatService } from "@opengoat/core";
 import type { ProviderOnboardingSpec, ProviderSummary } from "@opengoat/core";
@@ -68,77 +69,98 @@ export const onboardCommand: CliCommand = {
     }
 
     try {
-      const providerId = await resolveProviderId({
-        service: context.service,
-        providers: selectableProviders,
-        agentId,
-        requestedProviderId: parsed.providerId,
-        nonInteractive: parsed.nonInteractive,
-        prompter
-      });
-      if (!providerId) {
-        return 1;
-      }
+      let selectedProvider: ProviderSummary | null = null;
+      let selectedEnvUpdates: Record<string, string> = {};
+      let selectedShouldRunAuth = false;
+      let preferredProviderId: string | undefined;
 
-      const provider = selectableProviders.find((entry) => entry.id === providerId);
-      if (!provider) {
-        if (
-          isDefaultAgent(agentId) &&
-          providers.some((entry) => entry.id === providerId) &&
-          !selectableProviders.some((entry) => entry.id === providerId)
-        ) {
-          context.stderr.write(
-            `Provider "${providerId}" is not supported for orchestrator onboarding. ` +
-              "Choose an internal provider or an OpenClaw compatibility provider.\n"
-          );
+      while (!selectedProvider) {
+        const providerId = await resolveProviderId({
+          service: context.service,
+          providers: selectableProviders,
+          agentId,
+          requestedProviderId: parsed.providerId,
+          nonInteractive: parsed.nonInteractive,
+          prompter,
+          preferredProviderId
+        });
+        if (!providerId) {
           return 1;
         }
-        context.stderr.write(`Unknown provider: ${providerId}\n`);
-        return 1;
-      }
 
-      await context.service.setAgentProvider(agentId, provider.id);
-
-      const onboarding = (await context.service.getProviderOnboarding(provider.id)) ?? {};
-      const existingConfig = await context.service.getProviderConfig(provider.id);
-      const envUpdates = {
-        ...(existingConfig?.env ?? {}),
-        ...parsed.env
-      };
-
-      const modelEnvKey = resolveProviderModelEnvKey(provider.id);
-      if (parsed.model && modelEnvKey) {
-        envUpdates[modelEnvKey] = parsed.model;
-      }
-
-      if (parsed.nonInteractive) {
-        const missing = findMissingRequiredEnv(envUpdates, onboarding, process.env);
-        if (missing.length > 0) {
-          context.stderr.write(
-            `Missing required provider settings for ${provider.id}: ${missing.join(", ")}\n`
-          );
-          context.stderr.write("Provide values with --env KEY=VALUE or provider-specific key flags.\n");
+        const provider = selectableProviders.find((entry) => entry.id === providerId);
+        if (!provider) {
+          if (
+            isDefaultAgent(agentId) &&
+            providers.some((entry) => entry.id === providerId) &&
+            !selectableProviders.some((entry) => entry.id === providerId)
+          ) {
+            context.stderr.write(
+              `Provider "${providerId}" is not supported for orchestrator onboarding. ` +
+                "Choose an internal provider or an OpenClaw compatibility provider.\n"
+            );
+            return 1;
+          }
+          context.stderr.write(`Unknown provider: ${providerId}\n`);
           return 1;
         }
-      } else {
-        await promptForEnvValues({
+        preferredProviderId = provider.id;
+
+        const onboarding = (await context.service.getProviderOnboarding(provider.id)) ?? {};
+        const existingConfig = await context.service.getProviderConfig(provider.id);
+        const envUpdates = {
+          ...(existingConfig?.env ?? {}),
+          ...parsed.env
+        };
+
+        const modelEnvKey = resolveProviderModelEnvKey(provider.id);
+        if (parsed.model && modelEnvKey) {
+          envUpdates[modelEnvKey] = parsed.model;
+        }
+
+        if (parsed.nonInteractive) {
+          const missing = findMissingRequiredEnv(envUpdates, onboarding, process.env);
+          if (missing.length > 0) {
+            context.stderr.write(
+              `Missing required provider settings for ${provider.id}: ${missing.join(", ")}\n`
+            );
+            context.stderr.write("Provide values with --env KEY=VALUE or provider-specific key flags.\n");
+            return 1;
+          }
+        } else {
+          const envAction = await promptForEnvValues({
+            provider,
+            onboarding,
+            env: envUpdates,
+            prompter,
+            allowBack: !parsed.providerId
+          });
+          if (envAction === "back") {
+            continue;
+          }
+        }
+
+        const shouldRunAuth = await resolveRunAuth({
+          parsed,
           provider,
           onboarding,
-          env: envUpdates,
           prompter
         });
+
+        selectedProvider = provider;
+        selectedEnvUpdates = envUpdates;
+        selectedShouldRunAuth = shouldRunAuth;
       }
+
+      const provider = selectedProvider;
+      const envUpdates = selectedEnvUpdates;
+      const shouldRunAuth = selectedShouldRunAuth;
+
+      await context.service.setAgentProvider(agentId, provider.id);
 
       if (Object.keys(envUpdates).length > 0) {
         await context.service.setProviderConfig(provider.id, envUpdates);
       }
-
-      const shouldRunAuth = await resolveRunAuth({
-        parsed,
-        provider,
-        onboarding,
-        prompter
-      });
 
       if (shouldRunAuth) {
         const authResult = await context.service.authenticateProvider(provider.id, {
@@ -334,6 +356,7 @@ async function resolveProviderId(params: {
   requestedProviderId?: string;
   nonInteractive: boolean;
   prompter: CliPrompter;
+  preferredProviderId?: string;
 }): Promise<string | null> {
   if (params.requestedProviderId) {
     return params.requestedProviderId;
@@ -355,7 +378,9 @@ async function resolveProviderId(params: {
   }
 
   const defaultProvider =
-    currentProviderId && params.providers.some((provider) => provider.id === currentProviderId)
+    params.preferredProviderId && params.providers.some((provider) => provider.id === params.preferredProviderId)
+      ? params.preferredProviderId
+      : currentProviderId && params.providers.some((provider) => provider.id === currentProviderId)
       ? currentProviderId
       : params.providers[0]?.id;
 
@@ -376,44 +401,51 @@ async function promptForEnvValues(params: {
   onboarding: ProviderOnboardingSpec;
   env: Record<string, string>;
   prompter: CliPrompter;
-}): Promise<void> {
-  const fields = params.onboarding.env ?? [];
+  allowBack: boolean;
+}): Promise<"continue" | "back"> {
+  const fields = (params.onboarding.env ?? []).filter((field) => Boolean(field.required));
   if (fields.length === 0) {
-    return;
+    return "continue";
   }
 
-  await params.prompter.note(`Configure settings for provider "${params.provider.id}".`, "Provider Setup");
+  await params.prompter.note(
+    `Configure required settings for provider "${params.provider.id}".`,
+    "Provider Setup"
+  );
 
   for (const field of fields) {
     const existing = params.env[field.key] ?? process.env[field.key]?.trim();
     if (existing) {
-      const keepExisting = await params.prompter.confirm({
-        message: `Keep existing ${field.key}?`,
-        initialValue: true
+      params.env[field.key] = existing;
+      continue;
+    }
+
+    if (params.allowBack) {
+      const response = await promptTextOrBack({
+        prompter: params.prompter,
+        message: `${field.description} (${field.key})`,
+        initialValue: field.secret ? undefined : existing,
+        existingValue: existing,
+        required: true,
+        secret: Boolean(field.secret)
       });
-      if (keepExisting) {
-        params.env[field.key] = existing;
-        continue;
+      if (response.action === "back") {
+        return "back";
       }
+      params.env[field.key] = response.value;
+      continue;
     }
 
     const value = await params.prompter.text({
       message: `${field.description} (${field.key})`,
       initialValue: field.secret ? undefined : existing,
-      placeholder: field.required ? undefined : "Leave empty to skip",
-      required: Boolean(field.required),
+      required: true,
       secret: Boolean(field.secret)
     });
-
-    if (value) {
-      params.env[field.key] = value;
-      continue;
-    }
-
-    if (!field.required) {
-      delete params.env[field.key];
-    }
+    params.env[field.key] = value;
   }
+
+  return "continue";
 }
 
 async function resolveRunAuth(params: {
@@ -524,6 +556,180 @@ function formatProviderDisplayName(provider: ProviderSummary): string {
     return provider.displayName.replace(/\s+\(OpenClaw Compat\)\s*$/i, "").trim();
   }
   return provider.displayName;
+}
+
+function isBackCommand(value: string): boolean {
+  return value.trim().toLowerCase() === ":back";
+}
+
+async function promptTextOrBack(params: {
+  prompter: CliPrompter;
+  message: string;
+  initialValue?: string;
+  existingValue?: string;
+  required: boolean;
+  secret: boolean;
+}): Promise<{ action: "submit"; value: string } | { action: "back" }> {
+  const stdin = process.stdin as NodeJS.ReadStream & { isTTY?: boolean; setRawMode?: (mode: boolean) => void };
+  const stdout = process.stdout as NodeJS.WriteStream & { isTTY?: boolean };
+  if (!stdin.isTTY || !stdout.isTTY || typeof stdin.setRawMode !== "function") {
+    const fallbackValue = await params.prompter.text({
+      message: `${params.message} [type :back to provider list]`,
+      initialValue: params.initialValue,
+      required: params.required,
+      secret: params.secret
+    });
+    if (isBackCommand(fallbackValue)) {
+      return { action: "back" };
+    }
+    return { action: "submit", value: fallbackValue.trim() };
+  }
+
+  return await new Promise<{ action: "submit"; value: string } | { action: "back" }>((resolve, reject) => {
+    type Focus = "input" | "back";
+    const existingValue = params.existingValue?.trim() || "";
+    const preserveExistingOnEmpty = existingValue.length > 0;
+    let value = params.initialValue ?? "";
+    let focus: Focus = "input";
+    let error = "";
+    let renderedLines = 0;
+    const originalRawMode = Boolean((stdin as NodeJS.ReadStream & { isRaw?: boolean }).isRaw);
+
+    const clearRenderedLines = () => {
+      if (renderedLines <= 0) {
+        return;
+      }
+      stdout.write(`\x1B[${renderedLines}A`);
+      for (let index = 0; index < renderedLines; index += 1) {
+        stdout.write("\x1B[2K\r");
+        if (index < renderedLines - 1) {
+          stdout.write("\x1B[1B");
+        }
+      }
+      if (renderedLines > 1) {
+        stdout.write(`\x1B[${renderedLines - 1}A`);
+      }
+      stdout.write("\r");
+      renderedLines = 0;
+    };
+
+    const cleanup = () => {
+      stdin.off("keypress", onKeypress);
+      stdin.setRawMode?.(originalRawMode);
+      stdout.write("\x1B[?25h");
+      clearRenderedLines();
+    };
+
+    const render = () => {
+      const displayValue = params.secret ? "•".repeat(value.length) : value;
+      const hasExistingValue = preserveExistingOnEmpty;
+      const keepCurrentHint = hasExistingValue ? "Press Enter to keep current value." : "";
+      const inputHint = params.required
+        ? "Type a value and press Enter."
+        : "Type a value and press Enter, or leave empty to skip.";
+      const helperText = [inputHint, keepCurrentHint].filter(Boolean).join(" ");
+      const caret = focus === "input" ? "█" : "";
+      const valueSuffix = `${displayValue}${caret}`;
+      const inputPrefix = focus === "input" ? "›" : " ";
+      const inputLabel = focus === "input" ? "Value" : "Value";
+      const lines = [
+        params.message,
+        `${inputPrefix} ${inputLabel}: ${valueSuffix}`,
+        `  ${helperText}`,
+        `${focus === "back" ? "●" : "○"} ← Back to provider list`,
+        ...(error ? [error] : [])
+      ];
+
+      if (renderedLines > 0) {
+        stdout.write(`\x1B[${renderedLines}A`);
+      }
+
+      const totalLines = Math.max(renderedLines, lines.length);
+      for (let index = 0; index < totalLines; index += 1) {
+        const line = lines[index] ?? "";
+        stdout.write("\x1B[2K\r");
+        stdout.write(line);
+        stdout.write("\n");
+      }
+      renderedLines = lines.length;
+    };
+
+    const submitInput = () => {
+      const trimmed = value.trim();
+      if (!trimmed && preserveExistingOnEmpty) {
+        cleanup();
+        resolve({ action: "submit", value: existingValue });
+        return;
+      }
+      if (params.required && !trimmed) {
+        error = "Value is required.";
+        render();
+        return;
+      }
+      cleanup();
+      resolve({ action: "submit", value: trimmed });
+    };
+
+    const onKeypress = (chunk: string, key: { name?: string; ctrl?: boolean; meta?: boolean; sequence?: string }) => {
+      if (key.ctrl && key.name === "c") {
+        cleanup();
+        reject(new PromptCancelledError());
+        return;
+      }
+
+      if (key.name === "down") {
+        focus = "back";
+        error = "";
+        render();
+        return;
+      }
+
+      if (key.name === "up") {
+        focus = "input";
+        error = "";
+        render();
+        return;
+      }
+
+      if (key.name === "return" || key.name === "enter") {
+        if (focus === "back") {
+          cleanup();
+          resolve({ action: "back" });
+          return;
+        }
+        submitInput();
+        return;
+      }
+
+      if (focus !== "input") {
+        return;
+      }
+
+      if (key.name === "backspace" || key.name === "delete") {
+        value = value.slice(0, -1);
+        error = "";
+        render();
+        return;
+      }
+
+      const sequence = key.sequence ?? chunk;
+      if (!sequence || key.ctrl || key.meta) {
+        return;
+      }
+      if (sequence.length === 1 && sequence >= " ") {
+        value += sequence;
+        error = "";
+        render();
+      }
+    };
+
+    emitKeypressEvents(stdin);
+    stdin.setRawMode?.(true);
+    stdin.resume();
+    stdout.write("\x1B[?25l");
+    stdin.on("keypress", onKeypress);
+    render();
+  });
 }
 
 function resolveProviderModelEnvKey(providerId: string): string | undefined {
