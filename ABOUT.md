@@ -24,6 +24,10 @@ The architecture is modular so the same core can support:
 - desktop app (now bootstrapped in monorepo),
 - server/API (future).
 
+Repository/workspace tooling:
+
+- `pnpm` workspace monorepo (`pnpm-workspace.yaml`, `packages/*`).
+
 ## 2) Product Purpose
 
 OpenGoat exists to coordinate many agents and providers in one unified runtime.

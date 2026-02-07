@@ -15,13 +15,13 @@ Electron desktop app for OpenGoat.
 From repo root:
 
 ```bash
-npm install
-npm run desktop:dev
+pnpm install
+pnpm desktop:dev
 ```
 
 ## Package
 
 ```bash
-npm run desktop:package
-npm run desktop:make
+pnpm desktop:package
+pnpm desktop:make
 ```

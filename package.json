@@ -3,13 +3,11 @@
   "version": "0.1.0",
   "description": "OpenGoat agent orchestrator CLI",
   "type": "module",
+  "packageManager": "pnpm@10.18.2",
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js"
   },
-  "workspaces": [
-    "packages/*"
-  ],
   "publishConfig": {
     "access": "public"
   },
@@ -26,9 +24,10 @@
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist coverage",
     "dev": "tsx src/apps/cli/index.ts",
-    "desktop:dev": "npm run start -w @opengoat/desktop",
-    "desktop:package": "npm run package -w @opengoat/desktop",
-    "desktop:make": "npm run make -w @opengoat/desktop",
+    "desktop:dev": "pnpm --filter @opengoat/desktop start",
+    "desktop:lint": "pnpm --filter @opengoat/desktop lint",
+    "desktop:package": "pnpm --filter @opengoat/desktop package",
+    "desktop:make": "pnpm --filter @opengoat/desktop make",
     "start": "node bin/opengoat",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -39,6 +38,13 @@
   },
   "engines": {
     "node": ">=20.11.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller",
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",

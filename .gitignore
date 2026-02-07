@@ -1,8 +1,10 @@
 node_modules
 packages/*/node_modules
+.pnpm-store
 coverage
 dist
 packages/electron/.vite
+packages/electron/src/renderer/.vite
 packages/electron/out
 packages/electron/make
 .DS_Store
