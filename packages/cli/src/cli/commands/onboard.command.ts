@@ -48,7 +48,7 @@ export const onboardCommand: CliCommand = {
       context.stderr.write("No providers discovered.\n");
       return 1;
     }
-    const selectableProviders = filterProvidersForOnboarding(agentId, providers);
+    const selectableProviders = sortProvidersForOnboarding(filterProvidersForOnboarding(agentId, providers));
     if (selectableProviders.length === 0) {
       context.stderr.write(`No eligible providers available for agent "${agentId}".\n`);
       return 1;
@@ -363,8 +363,7 @@ async function resolveProviderId(params: {
     "Choose a provider",
     params.providers.map((provider) => ({
       value: provider.id,
-      label: `${provider.displayName} (${provider.id})`,
-      hint: provider.id === currentProviderId ? "current" : provider.kind
+      label: `${formatProviderDisplayName(provider)} (${provider.id})`
     })),
     defaultProvider
   );
@@ -497,6 +496,12 @@ function filterProvidersForOnboarding(agentId: string, providers: ProviderSummar
   });
 }
 
+function sortProvidersForOnboarding(providers: ProviderSummary[]): ProviderSummary[] {
+  const nativeProviders = providers.filter((provider) => !isOpenClawCompatProvider(provider.id));
+  const compatProviders = providers.filter((provider) => isOpenClawCompatProvider(provider.id));
+  return [...nativeProviders, ...compatProviders];
+}
+
 function isDefaultAgent(agentId: string): boolean {
   return agentId.trim().toLowerCase() === DEFAULT_AGENT_ID;
 }
@@ -512,6 +517,13 @@ function resolveProviderDedupKey(providerId: string): string {
   }
   const compatProviderId = normalized.slice(OPENCLAW_COMPAT_PROVIDER_PREFIX.length);
   return ORCHESTRATOR_COMPAT_NATIVE_PROVIDER_ALIASES[compatProviderId] ?? compatProviderId;
+}
+
+function formatProviderDisplayName(provider: ProviderSummary): string {
+  if (isOpenClawCompatProvider(provider.id)) {
+    return provider.displayName.replace(/\s+\(OpenClaw Compat\)\s*$/i, "").trim();
+  }
+  return provider.displayName;
 }
 
 function resolveProviderModelEnvKey(providerId: string): string | undefined {

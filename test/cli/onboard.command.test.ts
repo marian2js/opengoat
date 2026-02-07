@@ -270,4 +270,39 @@ describe("onboard command", () => {
     expect(stderr.output()).toContain("not supported for orchestrator onboarding");
     expect(service.setAgentProvider).not.toHaveBeenCalled();
   });
+
+  it("lists native providers before OpenClaw compatibility providers", async () => {
+    const service = {
+      initialize: vi.fn(async () => ({})),
+      listProviders: vi.fn(async () => [
+        {
+          id: "openclaw-anthropic",
+          displayName: "Anthropic (OpenClaw Compat)",
+          kind: "cli",
+          capabilities: { agent: true, model: true, auth: true, passthrough: true }
+        },
+        {
+          id: "openai",
+          displayName: "OpenAI",
+          kind: "http",
+          capabilities: { agent: false, model: true, auth: false, passthrough: false }
+        }
+      ]),
+      getAgentProvider: vi.fn(async () => {
+        throw new Error("no current provider");
+      }),
+      setAgentProvider: vi.fn(async () => ({ agentId: "developer", providerId: "openai" })),
+      getProviderOnboarding: vi.fn(async () => ({})),
+      getProviderConfig: vi.fn(async () => null),
+      setProviderConfig: vi.fn(),
+      authenticateProvider: vi.fn(),
+      getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
+    };
+
+    const { context } = createContext(service);
+    const code = await onboardCommand.run(["--non-interactive", "--agent", "developer"], context);
+
+    expect(code).toBe(0);
+    expect(service.setAgentProvider).toHaveBeenCalledWith("developer", "openai");
+  });
 });
