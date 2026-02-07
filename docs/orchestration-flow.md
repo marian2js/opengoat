@@ -162,6 +162,16 @@ Modes:
 
 This allows fast deterministic tests and realistic integration tests with real providers.
 
+## ACP Integration
+
+OpenGoat exposes its orchestration runtime through ACP so editor clients can drive sessions through a standard protocol.
+
+- ACP adapter: `/Users/marian2js/workspace/opengoat/src/core/acp/application/acp-agent.ts`
+- Node stdio server: `/Users/marian2js/workspace/opengoat/src/platform/node/acp-server.ts`
+- CLI entrypoint: `opengoat acp`
+
+ACP prompt turns map to `OpenGoatService.runAgent(...)`, so the same orchestrator behavior is reused without a separate execution path.
+
 ## Recommended Contributor Workflow
 
 1. Add or update agent metadata in `AGENTS.md`.

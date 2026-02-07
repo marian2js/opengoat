@@ -55,4 +55,13 @@ describe("runCli", () => {
     const code = await runCli(["agent", "--help"]);
     expect(code).toBe(0);
   });
+
+  it("supports acp --help", async () => {
+    const root = await createTempDir("opengoat-runcli-");
+    roots.push(root);
+    process.env.OPENGOAT_HOME = root;
+
+    const code = await runCli(["acp", "--help"]);
+    expect(code).toBe(0);
+  });
 });
