@@ -430,7 +430,7 @@ Built-ins include:
 
 - codex, claude, cursor, gemini, grok, openai, openrouter, opencode, openclaw
 
-Also includes many OpenClaw-compat providers via catalog-generated modules (OpenAI family, Anthropic family, OpenRouter, xAI, etc.).
+Also includes a broad native HTTP provider catalog (Anthropic, Bedrock, Groq, Mistral, Moonshot, MiniMax, Qwen, Vercel AI Gateway, and others).
 
 Provider onboarding metadata defines:
 

@@ -12,6 +12,7 @@
     "start": "pnpm --filter @opengoat/cli start",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:providers:live": "vitest run test/live/provider-smoke.live.test.ts",
     "typecheck": "pnpm --filter @opengoat/core typecheck && pnpm --filter @opengoat/cli typecheck",
     "desktop:dev": "pnpm --filter @opengoat/desktop start",
     "desktop:lint": "pnpm --filter @opengoat/desktop lint",

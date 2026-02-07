@@ -10,9 +10,10 @@ describe("provider registry", () => {
 
     const providerIds = registry.listProviderIds();
     expect(providerIds).toEqual(expect.arrayContaining(["claude", "codex", "openai", "openclaw", "openrouter"]));
-    expect(providerIds).toContain("openclaw-openai");
-    expect(providerIds).toContain("openclaw-openai-codex");
-    expect(providerIds).toContain("openclaw-openrouter");
+    expect(providerIds.some((id) => id.startsWith("openclaw-"))).toBe(false);
+    expect(providerIds).toContain("anthropic");
+    expect(providerIds).toContain("moonshot");
+    expect(providerIds).toContain("vercel-ai-gateway");
     expect(providerIds.length).toBeGreaterThanOrEqual(20);
 
     expect(registry.getProviderOnboarding("openai")?.env?.some((field) => field.key === "OPENAI_API_KEY")).toBe(
@@ -22,11 +23,9 @@ describe("provider registry", () => {
     expect(registry.getProviderOnboarding("opencode")?.env?.some((field) => field.key === "OPENCODE_CMD")).toBe(
       true
     );
-    expect(
-      registry
-        .getProviderOnboarding("openclaw-openai")
-        ?.env?.some((field) => field.key === "OPENGOAT_OPENCLAW_OPENAI_MODEL")
-    ).toBe(true);
+    expect(registry.getProviderOnboarding("anthropic")?.env?.some((field) => field.key === "ANTHROPIC_API_KEY")).toBe(
+      true
+    );
   });
 
   it("supports custom registration", async () => {

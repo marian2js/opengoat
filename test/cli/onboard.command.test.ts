@@ -154,27 +154,30 @@ describe("onboard command", () => {
     expect(stdout.output()).toContain("Provider auth flow completed.");
   });
 
-  it("maps --model to OpenClaw compatibility model env var", async () => {
+  it("maps --model to provider model env var discovered from onboarding metadata", async () => {
     const service = {
       initialize: vi.fn(async () => ({})),
       listProviders: vi.fn(async () => [
         {
-          id: "openclaw-openai",
-          displayName: "OpenAI (OpenClaw Compat)",
-          kind: "cli",
-          capabilities: { agent: true, model: true, auth: true, passthrough: true }
+          id: "anthropic",
+          displayName: "Anthropic",
+          kind: "http",
+          capabilities: { agent: false, model: true, auth: false, passthrough: false }
         }
       ]),
-      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openclaw-openai" })),
-      setAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openclaw-openai" })),
+      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "anthropic" })),
+      setAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "anthropic" })),
       getProviderOnboarding: vi.fn(async () => ({
-        env: [{ key: "OPENAI_API_KEY", description: "OpenAI key", required: false, secret: true }],
-        auth: { supported: true, description: "Runs openclaw onboard" }
+        env: [
+          { key: "ANTHROPIC_API_KEY", description: "Anthropic key", required: true, secret: true },
+          { key: "ANTHROPIC_MODEL", description: "Optional model id", required: false, secret: false }
+        ],
+        auth: { supported: false, description: "API key only" }
       })),
       getProviderConfig: vi.fn(async () => null),
       setProviderConfig: vi.fn(async () => ({
-        providerId: "openclaw-openai",
-        env: { OPENGOAT_OPENCLAW_OPENAI_MODEL: "openai/gpt-5.1-codex" }
+        providerId: "anthropic",
+        env: { ANTHROPIC_API_KEY: "ant-test", ANTHROPIC_MODEL: "claude-opus-4-5" }
       })),
       authenticateProvider: vi.fn(),
       getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
@@ -182,34 +185,42 @@ describe("onboard command", () => {
 
     const { context } = createContext(service);
     const code = await onboardCommand.run(
-      ["--non-interactive", "--provider", "openclaw-openai", "--model", "openai/gpt-5.1-codex"],
+      [
+        "--non-interactive",
+        "--provider",
+        "anthropic",
+        "--model",
+        "claude-opus-4-5",
+        "--env",
+        "ANTHROPIC_API_KEY=ant-test"
+      ],
       context
     );
 
     expect(code).toBe(0);
     expect(service.setProviderConfig).toHaveBeenCalledWith(
-      "openclaw-openai",
+      "anthropic",
       expect.objectContaining({
-        OPENGOAT_OPENCLAW_OPENAI_MODEL: "openai/gpt-5.1-codex"
+        ANTHROPIC_MODEL: "claude-opus-4-5"
       })
     );
   });
 
-  it("defaults orchestrator to eligible providers and deduplicates compat/native overlaps", async () => {
+  it("defaults orchestrator to OpenGoat-priority internal providers", async () => {
     const service = {
       initialize: vi.fn(async () => ({})),
       listProviders: vi.fn(async () => [
-        {
-          id: "openclaw-openai",
-          displayName: "OpenAI (OpenClaw Compat)",
-          kind: "cli",
-          capabilities: { agent: true, model: true, auth: true, passthrough: true }
-        },
         {
           id: "codex",
           displayName: "Codex CLI",
           kind: "cli",
           capabilities: { agent: false, model: true, auth: true, passthrough: true }
+        },
+        {
+          id: "anthropic",
+          displayName: "Anthropic",
+          kind: "http",
+          capabilities: { agent: false, model: true, auth: false, passthrough: false }
         },
         {
           id: "openai",
@@ -271,19 +282,19 @@ describe("onboard command", () => {
     expect(service.setAgentProvider).not.toHaveBeenCalled();
   });
 
-  it("lists native providers before OpenClaw compatibility providers", async () => {
+  it("sorts internal providers before external providers", async () => {
     const service = {
       initialize: vi.fn(async () => ({})),
       listProviders: vi.fn(async () => [
         {
-          id: "openclaw-anthropic",
-          displayName: "Anthropic (OpenClaw Compat)",
+          id: "codex",
+          displayName: "Codex CLI",
           kind: "cli",
-          capabilities: { agent: true, model: true, auth: true, passthrough: true }
+          capabilities: { agent: false, model: true, auth: true, passthrough: true }
         },
         {
-          id: "openai",
-          displayName: "OpenAI",
+          id: "anthropic",
+          displayName: "Anthropic",
           kind: "http",
           capabilities: { agent: false, model: true, auth: false, passthrough: false }
         }
@@ -303,6 +314,6 @@ describe("onboard command", () => {
     const code = await onboardCommand.run(["--non-interactive", "--agent", "developer"], context);
 
     expect(code).toBe(0);
-    expect(service.setAgentProvider).toHaveBeenCalledWith("developer", "openai");
+    expect(service.setAgentProvider).toHaveBeenCalledWith("developer", "anthropic");
   });
 });

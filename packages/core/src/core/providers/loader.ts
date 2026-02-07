@@ -10,7 +10,7 @@ import { providerModule as geminiProviderModule } from "./providers/gemini/index
 import { providerModule as grokProviderModule } from "./providers/grok/index.js";
 import { providerModule as openaiProviderModule } from "./providers/openai/index.js";
 import { providerModule as openclawProviderModule } from "./providers/openclaw/index.js";
-import { providerModules as openclawCompatProviderModules } from "./providers/openclaw-compat/index.js";
+import { providerModules as extendedHttpProviderModules } from "./providers/extended-http/index.js";
 import { providerModule as opencodeProviderModule } from "./providers/opencode/index.js";
 import { providerModule as openrouterProviderModule } from "./providers/openrouter/index.js";
 
@@ -25,7 +25,7 @@ const staticProviderModules: ProviderModule[] = [
   openclawProviderModule,
   opencodeProviderModule,
   openrouterProviderModule,
-  ...openclawCompatProviderModules
+  ...extendedHttpProviderModules
 ];
 
 export async function loadProviderModules(registry: ProviderRegistry): Promise<void> {

@@ -23,6 +23,7 @@ describe("provider loader", () => {
     const ids = registry.listProviderIds();
     expect(ids).toContain("codex");
     expect(ids).toContain("openai");
-    expect(ids).toContain("openclaw-openai");
+    expect(ids).toContain("anthropic");
+    expect(ids).toContain("vercel-ai-gateway");
   });
 });

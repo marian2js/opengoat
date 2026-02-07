@@ -7,7 +7,7 @@ export * from "./core/ports/paths-provider.port.js";
 export * from "./core/agents/index.js";
 export * from "./core/bootstrap/index.js";
 export * from "./core/providers/index.js";
-export * from "./core/providers/providers/openclaw-compat/index.js";
+export * from "./core/providers/providers/extended-http/index.js";
 export * from "./core/opengoat/index.js";
 export * from "./core/orchestration/index.js";
 export * from "./core/sessions/index.js";
