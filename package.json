@@ -39,6 +39,8 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.14.1",
-    "@clack/prompts": "^1.0.0"
+    "@ai-sdk/openai": "^3.0.26",
+    "@clack/prompts": "^1.0.0",
+    "ai": "^6.0.77"
   }
 }

@@ -55,6 +55,8 @@ Resolution model:
   - `./src/core/sessions/application/session.service.ts`
 - Provider invocation + system prompt build:
   - `./src/core/providers/application/provider.service.ts`
+- Internal HTTP LLM runtime (Vercel AI SDK):
+  - `./src/core/llm/application/vercel-ai-text-runtime.ts`
 
 ## High-Level Runtime
 

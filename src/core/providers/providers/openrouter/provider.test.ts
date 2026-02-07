@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { OpenAiCompatibleTextRequest, OpenAiCompatibleTextRuntime } from "../../../llm/index.js";
 import {
   ProviderAuthenticationError,
   UnsupportedProviderActionError
@@ -6,80 +7,69 @@ import {
 import { OpenRouterProvider } from "./provider.js";
 
 describe("openrouter provider", () => {
-  it("parses string content response", async () => {
-    const provider = new OpenRouterProvider();
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          choices: [{ message: { content: "hello from openrouter" } }]
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        }
-      )
-    );
+  it("parses runtime content output", async () => {
+    const runtime = createRuntime(async () => ({ text: "hello from openrouter\n" }));
+    const provider = new OpenRouterProvider({ runtime });
 
-    await withFetchMock(fetchMock, async () => {
-      const result = await provider.invoke({
-        message: "hello",
-        env: { OPENROUTER_API_KEY: "test-key" }
-      });
-
-      expect(result.code).toBe(0);
-      expect(result.stdout).toBe("hello from openrouter\n");
-    });
-  });
-
-  it("parses content arrays and forwards optional headers", async () => {
-    const provider = new OpenRouterProvider();
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          choices: [
-            {
-              message: {
-                content: [{ type: "text", text: "hello from array content" }]
-              }
-            }
-          ]
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        }
-      )
-    );
-
-    await withFetchMock(fetchMock, async () => {
-      const result = await provider.invoke({
-        message: "hello",
-        systemPrompt: "System rules.",
-        env: {
-          OPENROUTER_API_KEY: "test-key",
-          OPENROUTER_HTTP_REFERER: "https://example.test",
-          OPENROUTER_X_TITLE: "OpenGoat"
-        }
-      });
-
-      expect(result.code).toBe(0);
-      expect(result.stdout).toBe("hello from array content\n");
+    const result = await provider.invoke({
+      message: "hello",
+      env: { OPENROUTER_API_KEY: "test-key" }
     });
 
-    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(String(requestInit.body))).toEqual({
-      model: "openai/gpt-4o-mini",
-      messages: [
-        { role: "system", content: "System rules." },
-        { role: "user", content: "hello" }
-      ]
-    });
-    expect(requestInit.headers).toEqual(
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe("hello from openrouter\n");
+    expect(runtime.generateText).toHaveBeenCalledWith(
       expect.objectContaining({
-        "HTTP-Referer": "https://example.test",
-        "X-Title": "OpenGoat"
+        providerName: "openrouter",
+        baseURL: "https://openrouter.ai/api/v1",
+        style: "chat",
+        model: "openai/gpt-4o-mini"
       })
     );
+  });
+
+  it("forwards system prompt and optional headers", async () => {
+    const runtime = createRuntime(async () => ({ text: "hello from array content\n" }));
+    const provider = new OpenRouterProvider({ runtime });
+
+    const result = await provider.invoke({
+      message: "hello",
+      systemPrompt: "System rules.",
+      env: {
+        OPENROUTER_API_KEY: "test-key",
+        OPENROUTER_HTTP_REFERER: "https://example.test",
+        OPENROUTER_X_TITLE: "OpenGoat"
+      }
+    });
+
+    expect(result.code).toBe(0);
+    expect(runtime.generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "hello",
+        systemPrompt: "System rules.",
+        headers: {
+          "HTTP-Referer": "https://example.test",
+          "X-Title": "OpenGoat"
+        }
+      })
+    );
+  });
+
+  it("returns non-zero result when runtime request fails", async () => {
+    const runtime = createRuntime(async () => ({ text: "unused\n" }));
+    runtime.generateText.mockRejectedValueOnce({
+      statusCode: 401,
+      responseBody: "{\"error\":\"invalid_api_key\"}"
+    });
+    const provider = new OpenRouterProvider({ runtime });
+
+    const result = await provider.invoke({
+      message: "hello",
+      env: { OPENROUTER_API_KEY: "test-key" }
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("HTTP 401");
   });
 
   it("requires API key and does not support auth action", async () => {
@@ -92,13 +82,11 @@ describe("openrouter provider", () => {
   });
 });
 
-async function withFetchMock<T>(mock: typeof fetch, run: () => Promise<T>): Promise<T> {
-  const originalFetch = globalThis.fetch;
-  (globalThis as { fetch: typeof fetch }).fetch = mock;
-
-  try {
-    return await run();
-  } finally {
-    (globalThis as { fetch: typeof fetch }).fetch = originalFetch;
-  }
+function createRuntime(
+  implementation: (request: OpenAiCompatibleTextRequest) => Promise<{ text: string; providerSessionId?: string }>
+): OpenAiCompatibleTextRuntime & { generateText: ReturnType<typeof vi.fn> } {
+  const generateText = vi.fn(implementation);
+  return {
+    generateText
+  };
 }

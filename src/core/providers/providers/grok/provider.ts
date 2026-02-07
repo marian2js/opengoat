@@ -1,3 +1,4 @@
+import { VercelAiTextRuntime, parseLlmRuntimeError, type OpenAiCompatibleTextRuntime } from "../../../llm/index.js";
 import {
   ProviderAuthenticationError,
   ProviderRuntimeError,
@@ -10,8 +11,14 @@ const DEFAULT_GROK_BASE_URL = "https://api.x.ai/v1";
 const DEFAULT_GROK_ENDPOINT_PATH = "/responses";
 const DEFAULT_GROK_MODEL = "grok-4";
 
+interface GrokProviderDeps {
+  runtime?: OpenAiCompatibleTextRuntime;
+}
+
 export class GrokProvider extends BaseProvider {
-  public constructor() {
+  private readonly runtime: OpenAiCompatibleTextRuntime;
+
+  public constructor(deps: GrokProviderDeps = {}) {
     super({
       id: "grok",
       displayName: "Grok",
@@ -23,6 +30,7 @@ export class GrokProvider extends BaseProvider {
         passthrough: false
       }
     });
+    this.runtime = deps.runtime ?? new VercelAiTextRuntime();
   }
 
   public async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
@@ -35,35 +43,40 @@ export class GrokProvider extends BaseProvider {
     }
 
     const endpoint = resolveGrokEndpoint(env);
-    const model = options.model || env.GROK_MODEL || DEFAULT_GROK_MODEL;
     const style = resolveApiStyle(env, endpoint);
+    const model = options.model || env.GROK_MODEL || DEFAULT_GROK_MODEL;
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(buildRequestPayload(style, model, options.message, options.systemPrompt))
-    });
+    try {
+      const result = await this.runtime.generateText({
+        providerName: this.id,
+        apiKey,
+        baseURL: resolveBaseUrl(env),
+        endpointOverride: env.GROK_ENDPOINT?.trim(),
+        endpointPathOverride: env.GROK_ENDPOINT_PATH?.trim(),
+        style,
+        model,
+        message: options.message,
+        systemPrompt: options.systemPrompt
+      });
 
-    const responseText = await response.text();
-    if (!response.ok) {
+      options.onStdout?.(result.text);
+      return {
+        code: 0,
+        stdout: result.text,
+        stderr: "",
+        providerSessionId: result.providerSessionId
+      };
+    } catch (error) {
+      if (error instanceof ProviderRuntimeError) {
+        throw error;
+      }
+      const details = parseLlmRuntimeError(error);
       return {
         code: 1,
         stdout: "",
-        stderr: formatHttpError(response.status, responseText)
+        stderr: ensureTrailingNewline(details.message)
       };
     }
-
-    const output = extractGrokResponseText(responseText, style);
-    options.onStdout?.(output);
-
-    return {
-      code: 0,
-      stdout: output,
-      stderr: ""
-    };
   }
 
   public override invokeAuth(): Promise<ProviderExecutionResult> {
@@ -77,7 +90,7 @@ function resolveGrokEndpoint(env: NodeJS.ProcessEnv): string {
     return endpointOverride;
   }
 
-  const baseUrl = (env.GROK_BASE_URL?.trim() || DEFAULT_GROK_BASE_URL).replace(/\/+$/, "");
+  const baseUrl = resolveBaseUrl(env).replace(/\/+$/, "");
   const endpointPath = env.GROK_ENDPOINT_PATH?.trim() || DEFAULT_GROK_ENDPOINT_PATH;
 
   return `${baseUrl}${endpointPath.startsWith("/") ? "" : "/"}${endpointPath}`;
@@ -96,124 +109,10 @@ function resolveApiStyle(env: NodeJS.ProcessEnv, endpoint: string): "responses" 
   return "responses";
 }
 
-function buildRequestPayload(
-  style: "responses" | "chat",
-  model: string,
-  message: string,
-  systemPrompt?: string
-): Record<string, unknown> {
-  const trimmedSystemPrompt = systemPrompt?.trim();
-
-  if (style === "chat") {
-    const messages: Array<{ role: "system" | "user"; content: string }> = [];
-
-    if (trimmedSystemPrompt) {
-      messages.push({ role: "system", content: trimmedSystemPrompt });
-    }
-
-    messages.push({ role: "user", content: message });
-
-    return {
-      model,
-      messages
-    };
-  }
-
-  if (trimmedSystemPrompt) {
-    return {
-      model,
-      input: [
-        { role: "system", content: trimmedSystemPrompt },
-        { role: "user", content: message }
-      ]
-    };
-  }
-
-  return {
-    model,
-    input: message
-  };
-}
-
-function extractGrokResponseText(raw: string, style: "responses" | "chat"): string {
-  let payload: unknown;
-
-  try {
-    payload = JSON.parse(raw);
-  } catch {
-    throw new ProviderRuntimeError("grok", "received non-JSON response");
-  }
-
-  if (typeof payload !== "object" || payload === null) {
-    throw new ProviderRuntimeError("grok", "received invalid response payload");
-  }
-
-  if (style === "chat") {
-    return extractGrokChatText(payload);
-  }
-
-  return extractGrokResponsesText(payload);
-}
-
-function extractGrokResponsesText(payload: unknown): string {
-  const record = payload as {
-    output_text?: unknown;
-    output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
-  };
-  if (typeof record.output_text === "string" && record.output_text.length > 0) {
-    return ensureTrailingNewline(record.output_text);
-  }
-
-  const textBlocks = (record.output ?? [])
-    .flatMap((entry) => entry.content ?? [])
-    .filter((entry) => entry.type === "output_text" && typeof entry.text === "string")
-    .map((entry) => entry.text as string)
-    .join("\n");
-
-  if (!textBlocks) {
-    throw new ProviderRuntimeError("grok", "no textual output found in response");
-  }
-
-  return ensureTrailingNewline(textBlocks);
-}
-
-function extractGrokChatText(payload: unknown): string {
-  const record = payload as {
-    choices?: Array<{
-      message?: {
-        content?: string | Array<{ type?: string; text?: string }>;
-      };
-    }>;
-  };
-
-  const content = record.choices?.[0]?.message?.content;
-  if (typeof content === "string" && content.length > 0) {
-    return ensureTrailingNewline(content);
-  }
-
-  if (Array.isArray(content)) {
-    const text = content
-      .filter((entry) => entry.type === "text" && typeof entry.text === "string")
-      .map((entry) => entry.text as string)
-      .join("\n");
-
-    if (text) {
-      return ensureTrailingNewline(text);
-    }
-  }
-
-  throw new ProviderRuntimeError("grok", "no textual output found in response");
+function resolveBaseUrl(env: NodeJS.ProcessEnv): string {
+  return env.GROK_BASE_URL?.trim() || DEFAULT_GROK_BASE_URL;
 }
 
 function ensureTrailingNewline(value: string): string {
   return value.endsWith("\n") ? value : `${value}\n`;
-}
-
-function formatHttpError(status: number, body: string): string {
-  const content = body.trim();
-  if (!content) {
-    return `HTTP ${status}\n`;
-  }
-
-  return `HTTP ${status}: ${content}\n`;
 }

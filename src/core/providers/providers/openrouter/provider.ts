@@ -1,13 +1,22 @@
+import { VercelAiTextRuntime, parseLlmRuntimeError, type OpenAiCompatibleTextRuntime } from "../../../llm/index.js";
 import {
   ProviderAuthenticationError,
-  ProviderRuntimeError,
   UnsupportedProviderActionError
 } from "../../errors.js";
 import { BaseProvider } from "../../base-provider.js";
 import type { ProviderExecutionResult, ProviderInvokeOptions } from "../../types.js";
 
+const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini";
+
+interface OpenRouterProviderDeps {
+  runtime?: OpenAiCompatibleTextRuntime;
+}
+
 export class OpenRouterProvider extends BaseProvider {
-  public constructor() {
+  private readonly runtime: OpenAiCompatibleTextRuntime;
+
+  public constructor(deps: OpenRouterProviderDeps = {}) {
     super({
       id: "openrouter",
       displayName: "OpenRouter",
@@ -19,6 +28,7 @@ export class OpenRouterProvider extends BaseProvider {
         passthrough: false
       }
     });
+    this.runtime = deps.runtime ?? new VercelAiTextRuntime();
   }
 
   public async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
@@ -30,51 +40,37 @@ export class OpenRouterProvider extends BaseProvider {
       throw new ProviderAuthenticationError(this.id, "set OPENROUTER_API_KEY");
     }
 
-    const endpoint =
-      env.OPENROUTER_ENDPOINT?.trim() || "https://openrouter.ai/api/v1/chat/completions";
-    const model = options.model || env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
+    const model = options.model || env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
+    const headers = resolveHeaders(env);
 
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    };
-
-    const referer = env.OPENROUTER_HTTP_REFERER?.trim();
-    if (referer) {
-      headers["HTTP-Referer"] = referer;
-    }
-
-    const title = env.OPENROUTER_X_TITLE?.trim();
-    if (title) {
-      headers["X-Title"] = title;
-    }
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
+    try {
+      const result = await this.runtime.generateText({
+        providerName: this.id,
+        apiKey,
+        baseURL: DEFAULT_OPENROUTER_BASE_URL,
+        endpointOverride: env.OPENROUTER_ENDPOINT?.trim(),
+        style: "chat",
         model,
-        messages: buildMessages(options.message, options.systemPrompt)
-      })
-    });
+        message: options.message,
+        systemPrompt: options.systemPrompt,
+        headers
+      });
 
-    const responseText = await response.text();
-    if (!response.ok) {
+      options.onStdout?.(result.text);
+      return {
+        code: 0,
+        stdout: result.text,
+        stderr: "",
+        providerSessionId: result.providerSessionId
+      };
+    } catch (error) {
+      const details = parseLlmRuntimeError(error);
       return {
         code: 1,
         stdout: "",
-        stderr: formatHttpError(response.status, responseText)
+        stderr: ensureTrailingNewline(details.message)
       };
     }
-
-    const output = extractOpenRouterResponseText(responseText);
-    options.onStdout?.(output);
-
-    return {
-      code: 0,
-      stdout: output,
-      stderr: ""
-    };
   }
 
   public override invokeAuth(): Promise<ProviderExecutionResult> {
@@ -82,70 +78,22 @@ export class OpenRouterProvider extends BaseProvider {
   }
 }
 
-function extractOpenRouterResponseText(raw: string): string {
-  let payload: unknown;
+function resolveHeaders(env: NodeJS.ProcessEnv): Record<string, string> {
+  const headers: Record<string, string> = {};
 
-  try {
-    payload = JSON.parse(raw);
-  } catch {
-    throw new ProviderRuntimeError("openrouter", "received non-JSON response");
+  const referer = env.OPENROUTER_HTTP_REFERER?.trim();
+  if (referer) {
+    headers["HTTP-Referer"] = referer;
   }
 
-  if (typeof payload !== "object" || payload === null) {
-    throw new ProviderRuntimeError("openrouter", "received invalid response payload");
+  const title = env.OPENROUTER_X_TITLE?.trim();
+  if (title) {
+    headers["X-Title"] = title;
   }
 
-  const record = payload as {
-    choices?: Array<{
-      message?: {
-        content?: string | Array<{ type?: string; text?: string }>;
-      };
-    }>;
-  };
-
-  const first = record.choices?.[0]?.message?.content;
-  if (typeof first === "string" && first.length > 0) {
-    return ensureTrailingNewline(first);
-  }
-
-  if (Array.isArray(first)) {
-    const text = first
-      .filter((entry) => entry.type === "text" && typeof entry.text === "string")
-      .map((entry) => entry.text as string)
-      .join("\n");
-
-    if (text) {
-      return ensureTrailingNewline(text);
-    }
-  }
-
-  throw new ProviderRuntimeError("openrouter", "no textual output found in response");
+  return headers;
 }
 
 function ensureTrailingNewline(value: string): string {
   return value.endsWith("\n") ? value : `${value}\n`;
-}
-
-function formatHttpError(status: number, body: string): string {
-  const content = body.trim();
-  if (!content) {
-    return `HTTP ${status}\n`;
-  }
-
-  return `HTTP ${status}: ${content}\n`;
-}
-
-function buildMessages(
-  message: string,
-  systemPrompt?: string
-): Array<{ role: "system" | "user"; content: string }> {
-  const trimmedSystemPrompt = systemPrompt?.trim();
-  if (!trimmedSystemPrompt) {
-    return [{ role: "user", content: message }];
-  }
-
-  return [
-    { role: "system", content: trimmedSystemPrompt },
-    { role: "user", content: message }
-  ];
 }
