@@ -53,6 +53,7 @@ describe("onboard command", () => {
     );
 
     expect(code).toBe(0);
+    expect(service.initialize).toHaveBeenCalledOnce();
     expect(service.setAgentProvider).toHaveBeenCalledWith("orchestrator", "openai");
     expect(service.setProviderConfig).toHaveBeenCalledWith(
       "openai",

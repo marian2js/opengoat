@@ -94,7 +94,7 @@ describe("CLI commands", () => {
     const firstCode = await agentListCommand.run([], first.context);
 
     expect(firstCode).toBe(0);
-    expect(first.stdout.output()).toContain("No agents found. Run: opengoat init");
+    expect(first.stdout.output()).toContain("No agents found. Run: opengoat onboard");
 
     const second = createContext({ listAgents });
     const secondCode = await agentListCommand.run([], second.context);

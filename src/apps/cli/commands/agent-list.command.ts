@@ -7,7 +7,7 @@ export const agentListCommand: CliCommand = {
     const agents = await context.service.listAgents();
 
     if (agents.length === 0) {
-      context.stdout.write("No agents found. Run: opengoat init\n");
+      context.stdout.write("No agents found. Run: opengoat onboard\n");
       return 0;
     }
 

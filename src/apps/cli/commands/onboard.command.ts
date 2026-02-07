@@ -471,6 +471,7 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("                  [--openai-api-key <key>] [--openrouter-api-key <key>] [--xai-api-key <key>]\n");
   output.write("\n");
   output.write("Notes:\n");
+  output.write("  - On first run, this bootstraps ~/.opengoat automatically.\n");
   output.write("  - Providers are auto-discovered from provider folders.\n");
   output.write("  - Interactive mode supports arrow-key selection.\n");
   output.write(`  - Agent defaults to ${DEFAULT_AGENT_ID}.\n`);
