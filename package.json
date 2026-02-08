@@ -28,8 +28,7 @@
   "pnpm": {
     "overrides": {
       "@trpc/client": "10.45.4",
-      "@trpc/server": "10.45.4",
-      "@electron/rebuild>@electron/node-gyp": "10.2.0-electron.1"
+      "@trpc/server": "10.45.4"
     },
     "onlyBuiltDependencies": [
       "electron",

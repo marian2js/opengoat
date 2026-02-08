@@ -20,7 +20,7 @@ export type AgentProps = ComponentProps<"div">;
 
 export const Agent = memo(({ className, ...props }: AgentProps) => (
   <div
-    className={cn("not-prose w-full rounded-md border", className)}
+    className={cn("not-prose w-full rounded-2xl border border-border/70 bg-[color-mix(in_oklab,var(--surface)_82%,transparent)]", className)}
     {...props}
   />
 ));
@@ -34,16 +34,18 @@ export const AgentHeader = memo(
   ({ className, name, model, ...props }: AgentHeaderProps) => (
     <div
       className={cn(
-        "flex w-full items-center justify-between gap-4 p-3",
+        "flex w-full items-center justify-between gap-4 border-b border-border/65 p-4",
         className
       )}
       {...props}
     >
       <div className="flex items-center gap-2">
-        <BotIcon className="size-4 text-muted-foreground" />
-        <span className="font-medium text-sm">{name}</span>
+        <div className="grid size-6 place-items-center rounded-md border border-border/70 bg-[color-mix(in_oklab,var(--surface)_90%,transparent)]">
+          <BotIcon className="size-3.5 text-muted-foreground" />
+        </div>
+        <span className="text-sm font-medium">{name}</span>
         {model && (
-          <Badge className="font-mono text-xs" variant="secondary">
+          <Badge className="font-mono text-[11px]" variant="secondary">
             {model}
           </Badge>
         )}
@@ -56,7 +58,7 @@ export type AgentContentProps = ComponentProps<"div">;
 
 export const AgentContent = memo(
   ({ className, ...props }: AgentContentProps) => (
-    <div className={cn("space-y-4 p-4 pt-0", className)} {...props} />
+    <div className={cn("space-y-4 p-4", className)} {...props} />
   )
 );
 
@@ -67,10 +69,10 @@ export type AgentInstructionsProps = ComponentProps<"div"> & {
 export const AgentInstructions = memo(
   ({ className, children, ...props }: AgentInstructionsProps) => (
     <div className={cn("space-y-2", className)} {...props}>
-      <span className="font-medium text-muted-foreground text-sm">
+      <span className="text-sm font-medium text-muted-foreground">
         Instructions
       </span>
-      <div className="rounded-md bg-muted/50 p-3 text-muted-foreground text-sm">
+      <div className="rounded-xl border border-border/65 bg-[color-mix(in_oklab,var(--surface-soft)_88%,transparent)] p-3 text-sm text-muted-foreground">
         <p>{children}</p>
       </div>
     </div>
@@ -81,8 +83,8 @@ export type AgentToolsProps = ComponentProps<typeof Accordion>;
 
 export const AgentTools = memo(({ className, ...props }: AgentToolsProps) => (
   <div className={cn("space-y-2", className)}>
-    <span className="font-medium text-muted-foreground text-sm">Tools</span>
-    <Accordion className="rounded-md border" {...props} />
+    <span className="text-sm font-medium text-muted-foreground">Tools</span>
+    <Accordion className="rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-soft)_88%,transparent)]" {...props} />
   </div>
 ));
 
@@ -99,7 +101,7 @@ export const AgentTool = memo(
 
     return (
       <AccordionItem
-        className={cn("border-b last:border-b-0", className)}
+        className={cn("border-b border-border/65 last:border-b-0", className)}
         value={value}
         {...props}
       >
@@ -107,7 +109,7 @@ export const AgentTool = memo(
           {tool.description ?? "No description"}
         </AccordionTrigger>
         <AccordionContent className="px-3 pb-3">
-          <div className="rounded-md bg-muted/50">
+          <div className="rounded-lg border border-border/60 bg-[color-mix(in_oklab,var(--surface)_92%,transparent)]">
             <CodeBlock code={JSON.stringify(schema, null, 2)} language="json" />
           </div>
         </AccordionContent>
@@ -123,10 +125,10 @@ export type AgentOutputProps = ComponentProps<"div"> & {
 export const AgentOutput = memo(
   ({ className, schema, ...props }: AgentOutputProps) => (
     <div className={cn("space-y-2", className)} {...props}>
-      <span className="font-medium text-muted-foreground text-sm">
+      <span className="text-sm font-medium text-muted-foreground">
         Output Schema
       </span>
-      <div className="rounded-md bg-muted/50">
+      <div className="rounded-xl border border-border/65 bg-[color-mix(in_oklab,var(--surface-soft)_88%,transparent)]">
         <CodeBlock code={schema} language="typescript" />
       </div>
     </div>
