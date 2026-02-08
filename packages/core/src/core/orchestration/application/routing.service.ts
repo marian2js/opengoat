@@ -1,4 +1,4 @@
-import type { AgentManifest } from "../../agents/index.js";
+import { isDiscoverableByOrchestrator, type AgentManifest } from "../../agents/index.js";
 import { DEFAULT_AGENT_ID, isDefaultAgentId } from "../../domain/agent-id.js";
 import type { RoutingCandidate, RoutingDecision } from "../domain/routing.js";
 
@@ -37,7 +37,7 @@ export class RoutingService {
 
     const candidates = input.manifests
       .filter((manifest) => !isDefaultAgentId(manifest.agentId))
-      .filter((manifest) => manifest.metadata.delegation.canReceive)
+      .filter((manifest) => isDiscoverableByOrchestrator(manifest))
       .map((manifest) => scoreCandidate(message, manifest))
       .sort((left, right) => right.score - left.score);
 

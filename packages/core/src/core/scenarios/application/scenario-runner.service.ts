@@ -128,6 +128,7 @@ export class ScenarioRunnerService {
         `name: ${name}`,
         `description: ${description}`,
         "provider: scenario-scripted",
+        "discoverable: true",
         "tags: [scenario, scripted]",
         "delegation:",
         "  canReceive: true",

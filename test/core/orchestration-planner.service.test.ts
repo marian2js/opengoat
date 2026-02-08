@@ -28,6 +28,33 @@ describe("OrchestrationPlannerService", () => {
     expect(prompt).toContain("qa-agent");
   });
 
+  it("excludes non-discoverable agents from allowed orchestrator agents", () => {
+    const service = new OrchestrationPlannerService();
+    const hiddenManifests = createManifests().map((manifest) =>
+      manifest.agentId === "qa-agent"
+        ? {
+            ...manifest,
+            metadata: {
+              ...manifest.metadata,
+              discoverable: false
+            }
+          }
+        : manifest
+    );
+
+    const prompt = service.buildPlannerPrompt({
+      userMessage: "Ship feature X",
+      step: 1,
+      maxSteps: 10,
+      sharedNotes: "none",
+      recentEvents: [],
+      agents: hiddenManifests
+    });
+
+    expect(prompt).toContain("developer");
+    expect(prompt).not.toContain("qa-agent");
+  });
+
   it("parses fenced JSON decisions and sanitizes defaults", () => {
     const service = new OrchestrationPlannerService();
     const decision = service.parseDecision(
@@ -119,6 +146,7 @@ function createManifests(): AgentManifest[] {
         name: "Orchestrator",
         description: "Routes work",
         provider: "openai",
+        discoverable: true,
         tags: ["orchestration"],
         delegation: { canReceive: true, canDelegate: true },
         priority: 100
@@ -135,6 +163,7 @@ function createManifests(): AgentManifest[] {
         name: "Developer",
         description: "Implements tasks",
         provider: "cursor",
+        discoverable: true,
         tags: ["implementation"],
         delegation: { canReceive: true, canDelegate: false },
         priority: 80
@@ -151,6 +180,7 @@ function createManifests(): AgentManifest[] {
         name: "QA",
         description: "Verifies output",
         provider: "openai",
+        discoverable: true,
         tags: ["qa"],
         delegation: { canReceive: true, canDelegate: false },
         priority: 80

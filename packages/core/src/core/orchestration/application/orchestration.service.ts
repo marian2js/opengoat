@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import type { AgentManifest, AgentManifestService } from "../../agents/index.js";
+import { isDiscoverableByOrchestrator, type AgentManifest, type AgentManifestService } from "../../agents/index.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
@@ -527,8 +527,8 @@ export class OrchestrationService {
 
     const targetAgentId = normalizeAgentId(action.targetAgentId);
     const targetManifest = params.manifests.find((manifest) => manifest.agentId === targetAgentId);
-    if (!targetManifest || !targetManifest.metadata.delegation.canReceive) {
-      const note = `Invalid delegation target "${action.targetAgentId}".`;
+    if (!targetManifest || !isDiscoverableByOrchestrator(targetManifest)) {
+      const note = `Invalid delegation target "${action.targetAgentId}" (missing, non-receivable, or non-discoverable).`;
       params.logger.warn("Invalid delegation target.", {
         requestedTargetAgentId: action.targetAgentId
       });

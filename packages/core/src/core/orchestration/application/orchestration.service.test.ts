@@ -159,6 +159,119 @@ describe("OrchestrationService integration flow", () => {
     expect(result.orchestration?.finalMessage).not.toContain("planner output parsing issues");
     expect(providerService.invokeAgent).toHaveBeenCalledTimes(1);
   });
+
+  it("does not delegate to non-discoverable agents even if planner targets them", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-hidden-agent-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const providerService = createProviderService({
+      plannerExecutions: [
+        okExecution(
+          JSON.stringify({
+            rationale: "Try delegating to hidden agent.",
+            action: {
+              type: "delegate_to_agent",
+              mode: "direct",
+              targetAgentId: "writer",
+              message: "Draft docs"
+            }
+          })
+        ),
+        okExecution(
+          JSON.stringify({
+            rationale: "Fallback after invalid target.",
+            action: {
+              type: "finish",
+              mode: "direct",
+              message: "Finished without delegation."
+            }
+          })
+        )
+      ],
+      delegatedExecution: {
+        code: 0,
+        stdout: "unexpected",
+        stderr: ""
+      }
+    });
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      skillService: createSkillServiceStub() as unknown as SkillService,
+      agentManifestService: createManifestServiceStub([
+        createManifest("orchestrator", {
+          canReceive: true,
+          canDelegate: true,
+          provider: "openai"
+        }),
+        createManifest("writer", {
+          canReceive: true,
+          canDelegate: false,
+          provider: "codex",
+          discoverable: false
+        })
+      ]) as unknown as AgentManifestService,
+      sessionService: createSessionServiceStub() as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-07T17:10:00.000Z"
+    });
+
+    const result = await service.runAgent(paths, "orchestrator", {
+      message: "Please draft docs",
+      cwd: tempDir
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.stdout.trim()).toBe("Finished without delegation.");
+    expect(result.orchestration?.steps[0]?.agentCall).toBeUndefined();
+    expect(result.orchestration?.steps[0]?.note).toContain("non-discoverable");
+    expect(providerService.invokeAgent).toHaveBeenCalledTimes(2);
+  });
+
+  it("allows direct invocation of non-discoverable agents", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-direct-hidden-agent-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const providerService = createProviderService({
+      plannerExecutions: [okExecution("unused")],
+      delegatedExecution: {
+        code: 0,
+        stdout: "Writer handled request.",
+        stderr: ""
+      }
+    });
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      skillService: createSkillServiceStub() as unknown as SkillService,
+      agentManifestService: createManifestServiceStub([
+        createManifest("orchestrator", {
+          canReceive: true,
+          canDelegate: true,
+          provider: "openai"
+        }),
+        createManifest("writer", {
+          canReceive: true,
+          canDelegate: false,
+          provider: "codex",
+          discoverable: false
+        })
+      ]) as unknown as AgentManifestService,
+      sessionService: createSessionServiceStub() as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-07T17:15:00.000Z"
+    });
+
+    const result = await service.runAgent(paths, "writer", {
+      message: "Draft docs",
+      cwd: tempDir
+    });
+
+    expect(result.entryAgentId).toBe("writer");
+    expect(result.stdout.trim()).toBe("Writer handled request.");
+    expect(result.routing.targetAgentId).toBe("writer");
+    expect(providerService.invokeAgent).toHaveBeenCalledTimes(1);
+  });
 });
 
 function createPaths(homeDir: string): OpenGoatPaths {
@@ -266,6 +379,7 @@ function createManifest(
     canReceive: boolean;
     canDelegate: boolean;
     provider: string;
+    discoverable?: boolean;
   }
 ): AgentManifest {
   return {
@@ -279,6 +393,7 @@ function createManifest(
       name: agentId,
       description: `${agentId} agent`,
       provider: options.provider,
+      discoverable: options.discoverable ?? true,
       tags: [],
       delegation: {
         canReceive: options.canReceive,

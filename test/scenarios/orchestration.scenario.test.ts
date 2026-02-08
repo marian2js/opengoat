@@ -142,6 +142,7 @@ async function writeAgentManifest(
       `name: ${metadata.name}`,
       `description: ${metadata.description}`,
       "provider: scripted",
+      "discoverable: true",
       `tags: [${metadata.tags.join(", ")}]`,
       "delegation:",
       "  canReceive: true",

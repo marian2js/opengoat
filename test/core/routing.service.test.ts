@@ -31,6 +31,29 @@ describe("RoutingService", () => {
     expect(decision.targetAgentId).toBe("writer");
     expect(decision.reason).toContain("Direct invocation");
   });
+
+  it("does not route orchestrator traffic to non-discoverable agents", () => {
+    const service = new RoutingService();
+    const manifests = createManifests().map((manifest) =>
+      manifest.agentId === "researcher"
+        ? {
+            ...manifest,
+            metadata: {
+              ...manifest.metadata,
+              discoverable: false
+            }
+          }
+        : manifest
+    );
+
+    const decision = service.decide({
+      entryAgentId: "orchestrator",
+      message: "Please research API docs and summarize findings.",
+      manifests
+    });
+
+    expect(decision.targetAgentId).toBe("orchestrator");
+  });
 });
 
 function createManifests(): AgentManifest[] {
@@ -46,6 +69,7 @@ function createManifests(): AgentManifest[] {
         name: "Orchestrator",
         description: "Routes tasks to specialists",
         provider: "openai",
+        discoverable: true,
         tags: ["orchestration", "routing"],
         delegation: { canReceive: true, canDelegate: true },
         priority: 100
@@ -62,6 +86,7 @@ function createManifests(): AgentManifest[] {
         name: "Research Agent",
         description: "Researches documentation and technical topics",
         provider: "openai",
+        discoverable: true,
         tags: ["research", "docs"],
         delegation: { canReceive: true, canDelegate: false },
         priority: 70
@@ -78,6 +103,7 @@ function createManifests(): AgentManifest[] {
         name: "Writer Agent",
         description: "Creates polished written content",
         provider: "openai",
+        discoverable: true,
         tags: ["writing", "content"],
         delegation: { canReceive: true, canDelegate: false },
         priority: 60

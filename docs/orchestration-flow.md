@@ -39,6 +39,7 @@ Resolution model:
   - `name`
   - `description`
   - `provider`
+  - optional `discoverable` (default `true`)
 - Let the orchestrator decide the flow dynamically with AI.
 - Support both:
   - direct agent-to-agent communication
@@ -65,7 +66,7 @@ Resolution model:
 3. On each loop step:
 
 - Build planner prompt with:
-  - available agents from `AGENTS.md` metadata
+  - available agents from `AGENTS.md` metadata (`discoverable: true` and `delegation.canReceive: true`)
   - shared notes from prior steps
   - recent events
 - Ask orchestrator provider for next action.

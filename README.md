@@ -149,7 +149,7 @@ OPENGOAT_LIVE_TEST=1 OPENGOAT_LIVE_REQUIRE_CONFIG=1 pnpm test:providers:live
 
 **Orchestrator** &mdash; The default entry agent. Every user message goes here first. An AI planner loop decides whether to answer, delegate, read/write artifacts, install skills, or finish.
 
-**Agents** &mdash; Specialized workers defined in `AGENTS.md` front matter. Each agent has exactly one provider binding, metadata (tags, priority, delegation rules), and its own workspace.
+**Agents** &mdash; Specialized workers defined in `AGENTS.md` front matter. Each agent has exactly one provider binding, metadata (tags, priority, delegation rules, optional `discoverable: false`), and its own workspace. Non-discoverable agents can be invoked directly by users but are hidden from orchestrator routing/delegation.
 
 **Sessions** &mdash; Continuity across runs. Transcripts are stored as JSONL, with automatic pruning and compaction. Sessions are bound to a working path &mdash; OpenGoat auto-rotates if the path changes.
 

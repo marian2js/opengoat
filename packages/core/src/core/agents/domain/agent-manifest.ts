@@ -11,6 +11,7 @@ export interface AgentManifestMetadata {
   name: string;
   description: string;
   provider: string;
+  discoverable: boolean;
   tags: string[];
   delegation: AgentDelegationMetadata;
   priority: number;
@@ -23,6 +24,10 @@ export interface AgentManifest {
   metadata: AgentManifestMetadata;
   body: string;
   source: "frontmatter" | "derived";
+}
+
+export function isDiscoverableByOrchestrator(manifest: AgentManifest): boolean {
+  return manifest.metadata.discoverable && manifest.metadata.delegation.canReceive;
 }
 
 interface ParsedFrontMatter {
@@ -97,6 +102,11 @@ export function parseAgentManifestMarkdown(markdown: string): ParsedFrontMatter 
       continue;
     }
 
+    if (key === "discoverable") {
+      data.discoverable = parseBoolean(rawValue, true);
+      continue;
+    }
+
     if (key === "id") {
       data.id = normalizeAgentId(unquote(rawValue));
       continue;
@@ -140,6 +150,7 @@ export function normalizeAgentManifestMetadata(params: {
     metadata.description?.trim() || (isDefaultAgentId(agentId) ? "Primary orchestration agent." : `Agent ${name}.`);
   const provider =
     sanitizeId(metadata.provider ?? params.providerId) || sanitizeId(params.providerId) || DEFAULT_PROVIDER_ID;
+  const discoverable = metadata.discoverable ?? true;
   const tags = dedupeTags(metadata.tags ?? []);
   const delegation = {
     canReceive: metadata.delegation?.canReceive ?? true,
@@ -153,6 +164,7 @@ export function normalizeAgentManifestMetadata(params: {
     name,
     description,
     provider,
+    discoverable,
     tags,
     delegation,
     priority
@@ -169,6 +181,7 @@ export function formatAgentManifestMarkdown(metadata: AgentManifestMetadata, bod
     `name: ${metadata.name}`,
     `description: ${metadata.description}`,
     `provider: ${metadata.provider}`,
+    `discoverable: ${metadata.discoverable}`,
     `tags: [${tagsValue}]`,
     "delegation:",
     `  canReceive: ${metadata.delegation.canReceive}`,

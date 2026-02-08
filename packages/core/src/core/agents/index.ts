@@ -3,6 +3,7 @@ export { AgentManifestService } from "./application/agent-manifest.service.js";
 export { WorkspaceContextService } from "./application/workspace-context.service.js";
 export type { AgentManifest, AgentManifestMetadata } from "./domain/agent-manifest.js";
 export {
+  isDiscoverableByOrchestrator,
   parseAgentManifestMarkdown,
   normalizeAgentManifestMetadata,
   formatAgentManifestMarkdown
