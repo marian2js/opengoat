@@ -43,6 +43,31 @@ export function App() {
     void bootstrap();
   }, [bootstrap]);
 
+  useEffect(() => {
+    const desktopApi = window.opengoatDesktop;
+    if (!desktopApi?.onMenuAction) {
+      return;
+    }
+
+    return desktopApi.onMenuAction((action) => {
+      if (action === "open-project") {
+        void addProjectFromDialog();
+        return;
+      }
+
+      if (action === "new-session") {
+        if (activeProjectId) {
+          void createSession(activeProjectId);
+        }
+        return;
+      }
+
+      if (action === "open-provider-settings") {
+        void openOnboarding();
+      }
+    });
+  }, [activeProjectId, addProjectFromDialog, createSession, openOnboarding]);
+
   const activeProject = useMemo(
     () => getActiveProject(projects, activeProjectId),
     [projects, activeProjectId]

@@ -7,7 +7,8 @@ import type { ForgeConfig } from "@electron-forge/shared-types";
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true
+    asar: true,
+    name: "OpenGoat"
   },
   makers: [
     new MakerSquirrel({}),
