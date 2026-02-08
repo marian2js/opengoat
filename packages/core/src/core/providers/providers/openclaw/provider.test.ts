@@ -8,7 +8,7 @@ describe("openclaw provider", () => {
       message: "ship",
       agent: "builder",
       model: "gpt-5",
-      passthroughArgs: ["--full-auto"]
+      passthroughArgs: ["--full-auto"],
     });
 
     expect(invocation.command).toBe("openclaw");
@@ -19,7 +19,7 @@ describe("openclaw provider", () => {
       "gpt-5",
       "--full-auto",
       "--message",
-      "ship"
+      "ship",
     ]);
   });
 
@@ -31,14 +31,14 @@ describe("openclaw provider", () => {
     expect(defaultInvocation.args).toEqual(["onboard"]);
 
     const passthroughInvocation = provider.buildAuthInvocation({
-      passthroughArgs: ["--provider", "openai-codex"]
+      passthroughArgs: ["--provider", "openai-codex"],
     });
     expect(passthroughInvocation.args).toEqual([
       "models",
       "auth",
       "login",
       "--provider",
-      "openai-codex"
+      "openai-codex",
     ]);
   });
 
@@ -46,10 +46,16 @@ describe("openclaw provider", () => {
     const provider = new OpenClawProvider();
     const invocation = provider.buildInvocation({
       message: "continue",
-      providerSessionId: "claw-session-7"
+      providerSessionId: "claw-session-7",
     });
 
-    expect(invocation.args).toEqual(["agent", "--session-id", "claw-session-7", "--message", "continue"]);
+    expect(invocation.args).toEqual([
+      "agent",
+      "--session-id",
+      "claw-session-7",
+      "--message",
+      "continue",
+    ]);
   });
 
   it("maps external agent creation invocation to top-level agents add command", () => {
@@ -58,7 +64,7 @@ describe("openclaw provider", () => {
       agentId: "research-analyst",
       displayName: "Research Analyst",
       workspaceDir: "/tmp/workspaces/research-analyst",
-      internalConfigDir: "/tmp/agents/research-analyst"
+      internalConfigDir: "/tmp/agents/research-analyst",
     });
 
     expect(provider.capabilities.agentCreate).toBe(true);
@@ -72,7 +78,7 @@ describe("openclaw provider", () => {
       "/tmp/workspaces/research-analyst",
       "--agent-dir",
       "/tmp/agents/research-analyst",
-      "--non-interactive"
+      "--non-interactive",
     ]);
   });
 
@@ -84,8 +90,8 @@ describe("openclaw provider", () => {
       workspaceDir: "/tmp/workspaces/research-analyst",
       internalConfigDir: "/tmp/agents/research-analyst",
       env: {
-        OPENGOAT_OPENCLAW_MODEL: "openai-codex"
-      }
+        OPENGOAT_OPENCLAW_MODEL: "openai-codex",
+      },
     });
 
     expect(invocation.args).toEqual([
@@ -98,17 +104,42 @@ describe("openclaw provider", () => {
       "/tmp/agents/research-analyst",
       "--non-interactive",
       "--model",
-      "openai-codex"
+      "openai-codex",
     ]);
   });
 
   it("maps external agent deletion invocation to top-level agents delete command", () => {
     const provider = new OpenClawProvider();
     const invocation = provider.buildDeleteAgentInvocation({
-      agentId: "research-analyst"
+      agentId: "research-analyst",
     });
 
     expect(invocation.command).toBe("openclaw");
-    expect(invocation.args).toEqual(["agents", "delete", "research-analyst", "--force"]);
+    expect(invocation.args).toEqual([
+      "agents",
+      "delete",
+      "research-analyst",
+      "--force",
+    ]);
+  });
+
+  it("injects extra arguments from OPENCLAW_ARGUMENTS env var", () => {
+    const provider = new OpenClawProvider();
+    const invocation = provider.buildInvocation({
+      message: "hello remote",
+      env: {
+        OPENCLAW_ARGUMENTS: "--remote ws://localhost:18789 --token secret",
+      },
+    });
+
+    expect(invocation.args).toEqual([
+      "agent",
+      "--message",
+      "hello remote",
+      "--remote",
+      "ws://localhost:18789",
+      "--token",
+      "secret",
+    ]);
   });
 });

@@ -8,14 +8,28 @@ export const providerModule: ProviderModule = {
     env: [
       {
         key: "OPENCLAW_CMD",
-        description: "Optional openclaw binary path override"
-      }
+        description: "Optional openclaw binary path override",
+      },
+      {
+        key: "OPENCLAW_GATEWAY_URL",
+        description:
+          "Optional remote gateway URL (e.g. ws://remote-host:18789)",
+      },
+      {
+        key: "OPENCLAW_GATEWAY_PASSWORD",
+        description: "Optional remote gateway password/token",
+      },
+      {
+        key: "OPENCLAW_ARGUMENTS",
+        description:
+          "Optional extra arguments to pass to openclaw (e.g. --remote)",
+      },
     ],
     auth: {
       supported: true,
-      description: "Runs `openclaw onboard` by default."
-    }
-  }
+      description: "Runs `openclaw onboard` by default.",
+    },
+  },
 };
 
 export { OpenClawProvider };

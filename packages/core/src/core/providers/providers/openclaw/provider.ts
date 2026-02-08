@@ -5,7 +5,7 @@ import type {
   ProviderCreateAgentOptions,
   ProviderDeleteAgentOptions,
   ProviderExecutionResult,
-  ProviderInvokeOptions
+  ProviderInvokeOptions,
 } from "../../types.js";
 
 export class OpenClawProvider extends BaseCliProvider {
@@ -22,8 +22,8 @@ export class OpenClawProvider extends BaseCliProvider {
         auth: true,
         passthrough: true,
         agentCreate: true,
-        agentDelete: true
-      }
+        agentDelete: true,
+      },
     });
   }
 
@@ -45,10 +45,20 @@ export class OpenClawProvider extends BaseCliProvider {
     args.push(...(options.passthroughArgs ?? []));
     args.push("--message", options.message);
 
+    // Inject extra arguments from env if present
+    const extraArgs = options.env?.OPENCLAW_ARGUMENTS?.trim();
+    if (extraArgs) {
+      // Simple splitting by space - for more complex cases user should use shell script wrapper
+      // or we might need a proper argv parser, but this suffices for simple flags like --remote
+      args.push(...extraArgs.split(" ").filter((arg) => arg.trim().length > 0));
+    }
+
     return args;
   }
 
-  protected override buildAuthInvocationArgs(options: ProviderAuthOptions): string[] {
+  protected override buildAuthInvocationArgs(
+    options: ProviderAuthOptions,
+  ): string[] {
     const passthrough = options.passthroughArgs ?? [];
 
     if (passthrough.length > 0) {
@@ -58,7 +68,9 @@ export class OpenClawProvider extends BaseCliProvider {
     return ["onboard"];
   }
 
-  protected override buildCreateAgentInvocationArgs(options: ProviderCreateAgentOptions): string[] {
+  protected override buildCreateAgentInvocationArgs(
+    options: ProviderCreateAgentOptions,
+  ): string[] {
     const args = [
       "agents",
       "add",
@@ -67,7 +79,7 @@ export class OpenClawProvider extends BaseCliProvider {
       options.workspaceDir,
       "--agent-dir",
       options.internalConfigDir,
-      "--non-interactive"
+      "--non-interactive",
     ];
 
     const model = options.env?.OPENGOAT_OPENCLAW_MODEL?.trim();
@@ -78,11 +90,15 @@ export class OpenClawProvider extends BaseCliProvider {
     return args;
   }
 
-  protected override buildDeleteAgentInvocationArgs(options: ProviderDeleteAgentOptions): string[] {
+  protected override buildDeleteAgentInvocationArgs(
+    options: ProviderDeleteAgentOptions,
+  ): string[] {
     return ["agents", "delete", options.agentId, "--force"];
   }
 
-  public override async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
+  public override async invoke(
+    options: ProviderInvokeOptions,
+  ): Promise<ProviderExecutionResult> {
     const sessionId = options.providerSessionId?.trim();
     const result = await super.invoke(options);
     return attachProviderSessionId(result, sessionId);
