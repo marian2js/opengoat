@@ -6,7 +6,7 @@ import {
 } from "@shared/workbench-contract";
 import type {
   WorkbenchBootstrap,
-  WorkbenchGatewayMode,
+  WorkbenchGatewayStatus,
   WorkbenchGuidedAuthResult,
   WorkbenchMessage,
   WorkbenchOnboarding,
@@ -27,16 +27,14 @@ export interface WorkbenchApiClient {
   getSessionMessages: (input: { projectId: string; sessionId: string }) => Promise<WorkbenchMessage[]>;
   getOnboardingStatus: () => Promise<WorkbenchOnboarding>;
   runOnboardingGuidedAuth: (input: { providerId: string }) => Promise<WorkbenchGuidedAuthResult>;
-  submitOnboarding: (input: {
-    providerId: string;
-    env: Record<string, string>;
-    gateway?: {
-      mode: WorkbenchGatewayMode;
-      remoteUrl?: string;
-      remoteToken?: string;
-      timeoutMs?: number;
-    };
-  }) => Promise<WorkbenchOnboarding>;
+  submitOnboarding: (input: { providerId: string; env: Record<string, string> }) => Promise<WorkbenchOnboarding>;
+  getGatewayStatus: () => Promise<WorkbenchGatewayStatus>;
+  updateGatewaySettings: (input: {
+    mode: "local" | "remote";
+    remoteUrl?: string;
+    remoteToken?: string;
+    timeoutMs?: number;
+  }) => Promise<WorkbenchGatewayStatus>;
   sendChatMessage: (input: {
     projectId: string;
     sessionId: string;
@@ -142,6 +140,16 @@ export function createWorkbenchApiClient(): WorkbenchApiClient {
       const trpc = getTrpcClient();
       await ensureContract(trpc);
       return (await trpc.mutation("onboarding.submit", input)) as WorkbenchOnboarding;
+    },
+    getGatewayStatus: async () => {
+      const trpc = getTrpcClient();
+      await ensureContract(trpc);
+      return (await trpc.query("gateway.status")) as WorkbenchGatewayStatus;
+    },
+    updateGatewaySettings: async (input) => {
+      const trpc = getTrpcClient();
+      await ensureContract(trpc);
+      return (await trpc.mutation("gateway.update", input)) as WorkbenchGatewayStatus;
     },
     sendChatMessage: async (input) => {
       const trpc = getTrpcClient();

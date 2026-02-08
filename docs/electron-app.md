@@ -89,7 +89,7 @@ Desktop onboarding is now a guided first-run flow aligned with CLI intent:
 - Step 2: complete only required fields in "Quick Setup"
 - Advanced options stay collapsed by default and include:
   - optional provider env fields
-  - optional remote gateway connection settings (URL/token/timeout) for remote-host deployments
+- Runtime connection (local vs optional remote OpenGoat) is configured separately from provider credentials through a subtle runtime control in setup header.
 
 Behavior rules:
 

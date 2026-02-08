@@ -24,11 +24,13 @@ describe("OnboardingPanel e2e", () => {
         error: null,
         canClose: true,
         isSubmitting: false,
+        isSavingGateway: false,
         isRunningGuidedAuth: false,
         onboardingNotice: null,
         onSelectProvider: vi.fn(),
         onEnvChange: vi.fn(),
         onGatewayChange: vi.fn(),
+        onSaveGateway: vi.fn(),
         onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit: vi.fn()
@@ -60,6 +62,7 @@ describe("OnboardingPanel e2e", () => {
         error: null,
         canClose: true,
         isSubmitting: false,
+        isSavingGateway: false,
         isRunningGuidedAuth: false,
         onboardingNotice: null,
         onSelectProvider: setProviderId,
@@ -70,6 +73,7 @@ describe("OnboardingPanel e2e", () => {
           }));
         },
         onGatewayChange: vi.fn(),
+        onSaveGateway: vi.fn(),
         onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit
@@ -104,11 +108,13 @@ describe("OnboardingPanel e2e", () => {
         error: null,
         canClose: true,
         isSubmitting: false,
+        isSavingGateway: false,
         isRunningGuidedAuth: false,
         onboardingNotice: null,
         onSelectProvider: vi.fn(),
         onEnvChange: vi.fn(),
         onGatewayChange: vi.fn(),
+        onSaveGateway: vi.fn(),
         onRunGuidedAuth,
         onClose: vi.fn(),
         onSubmit: vi.fn()
@@ -126,6 +132,7 @@ describe("OnboardingPanel e2e", () => {
 
   it("requires URL when remote gateway mode is enabled", async () => {
     const user = userEvent.setup();
+    const onSaveGateway = vi.fn();
 
     function StatefulHarness() {
       const [gateway, setGateway] = useState(createGatewayDraft());
@@ -139,6 +146,7 @@ describe("OnboardingPanel e2e", () => {
         error: null,
         canClose: true,
         isSubmitting: false,
+        isSavingGateway: false,
         isRunningGuidedAuth: false,
         onboardingNotice: null,
         onSelectProvider: vi.fn(),
@@ -148,6 +156,7 @@ describe("OnboardingPanel e2e", () => {
             ...current,
             ...patch
           })),
+        onSaveGateway,
         onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit: vi.fn()
@@ -156,18 +165,18 @@ describe("OnboardingPanel e2e", () => {
 
     render(createElement(StatefulHarness));
 
-    const saveButton = screen.getByRole("button", { name: /save and start/i });
-    expect(saveButton.hasAttribute("disabled")).toBe(false);
-
-    await user.click(screen.getByRole("button", { name: /show advanced options/i }));
-    await user.click(screen.getByLabelText(/use remote opengoat server/i));
-    expect(saveButton.hasAttribute("disabled")).toBe(true);
+    await user.click(screen.getByRole("button", { name: /runtime:/i }));
+    await user.click(screen.getByLabelText(/connect to remote opengoat/i));
+    const saveConnectionButton = screen.getByRole("button", { name: /save connection/i });
+    expect(saveConnectionButton.hasAttribute("disabled")).toBe(true);
 
     await user.type(
       screen.getByPlaceholderText("ws://remote-host:18789/gateway"),
       "ws://remote-host:18789/gateway"
     );
-    expect(saveButton.hasAttribute("disabled")).toBe(false);
+    expect(saveConnectionButton.hasAttribute("disabled")).toBe(false);
+    await user.click(saveConnectionButton);
+    expect(onSaveGateway).toHaveBeenCalledTimes(1);
   });
 
   it("uses independent scroll areas for provider list and setup pane", () => {
@@ -180,11 +189,13 @@ describe("OnboardingPanel e2e", () => {
         error: null,
         canClose: true,
         isSubmitting: false,
+        isSavingGateway: false,
         isRunningGuidedAuth: false,
         onboardingNotice: null,
         onSelectProvider: vi.fn(),
         onEnvChange: vi.fn(),
         onGatewayChange: vi.fn(),
+        onSaveGateway: vi.fn(),
         onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit: vi.fn()

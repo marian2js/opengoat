@@ -71,10 +71,6 @@ describe("WorkbenchService onboarding", () => {
       providerId: "openai",
       env: {
         OPENAI_API_KEY: "sk-live"
-      },
-      gateway: {
-        mode: "local",
-        timeoutMs: 10_000
       }
     });
 

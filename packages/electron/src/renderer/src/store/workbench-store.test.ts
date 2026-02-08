@@ -120,18 +120,13 @@ describe("workbench store", () => {
     store.getState().setOnboardingDraftField("OPENROUTER_API_KEY", "abc123");
     await store.getState().submitOnboarding(
       store.getState().onboardingDraftProviderId,
-      store.getState().onboardingDraftEnv,
-      store.getState().onboardingDraftGateway
+      store.getState().onboardingDraftEnv
     );
 
     expect(submitOnboardingMock).toHaveBeenCalledWith({
       providerId: "openrouter",
       env: {
         OPENROUTER_API_KEY: "abc123"
-      },
-      gateway: {
-        mode: "local",
-        timeoutMs: 10_000
       }
     });
     expect(store.getState().onboardingState).toBe("hidden");
@@ -170,7 +165,7 @@ describe("workbench store", () => {
     const store = createWorkbenchStore(api);
 
     await store.getState().bootstrap();
-    await store.getState().submitOnboarding("openai", {}, createGatewayDraft());
+    await store.getState().submitOnboarding("openai", {});
 
     expect(store.getState().showOnboarding).toBe(true);
     expect(store.getState().onboardingState).toBe("editing");
@@ -396,6 +391,8 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
       notes: ["Guided auth complete."]
     })),
     submitOnboarding: vi.fn(async () => submittedOnboarding),
+    getGatewayStatus: vi.fn(async () => createGatewayStatus()),
+    updateGatewaySettings: vi.fn(async () => createGatewayStatus()),
     sendChatMessage: vi.fn(async () => ({
       reply: assistantReply,
       providerId: "openai"
@@ -413,14 +410,5 @@ function createGatewayStatus() {
     mode: "local" as const,
     timeoutMs: 10_000,
     hasAuthToken: false
-  };
-}
-
-function createGatewayDraft() {
-  return {
-    mode: "local" as const,
-    remoteUrl: "",
-    remoteToken: "",
-    timeoutMs: 10_000
   };
 }

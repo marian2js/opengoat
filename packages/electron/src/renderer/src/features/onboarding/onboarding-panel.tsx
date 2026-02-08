@@ -19,6 +19,7 @@ interface OnboardingPanelProps {
   error: string | null;
   canClose: boolean;
   isSubmitting: boolean;
+  isSavingGateway: boolean;
   isRunningGuidedAuth: boolean;
   onboardingNotice: string | null;
   onSelectProvider: (providerId: string) => void;
@@ -31,6 +32,7 @@ interface OnboardingPanelProps {
       timeoutMs: number;
     }>
   ) => void;
+  onSaveGateway: () => void;
   onRunGuidedAuth: (providerId: string) => void;
   onClose: () => void;
   onSubmit: () => void;
@@ -46,6 +48,7 @@ type ProviderFamilyView = {
 
 export function OnboardingPanel(props: OnboardingPanelProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showConnectionPanel, setShowConnectionPanel] = useState(false);
   const [providerQuery, setProviderQuery] = useState("");
   const selectedProvider = resolveSelectedOnboardingProvider(
     props.onboarding,
@@ -127,7 +130,6 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
   const canSubmit =
     Boolean(selectedProvider) &&
     missingRequiredKeys.length === 0 &&
-    (props.gateway.mode !== "remote" || Boolean(props.gateway.remoteUrl.trim())) &&
     !props.isSubmitting;
   const totalProviderCount = providerFamilies.reduce(
     (count, family) => count + family.providers.length,
@@ -159,14 +161,36 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
                   orchestrator session.
                 </p>
               </div>
-              <Badge
-                variant="outline"
-                className="border-primary/30 bg-[color-mix(in_oklab,var(--surface)_92%,black)] text-[11px] uppercase tracking-wide text-[var(--muted-foreground)]"
-              >
-                {totalProviderCount} providers
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  onClick={() => setShowConnectionPanel((value) => !value)}
+                  disabled={props.isSubmitting}
+                >
+                  Runtime: {props.gateway.mode === "remote" ? "Remote" : "Local"}
+                </Button>
+                <Badge
+                  variant="outline"
+                  className="border-primary/30 bg-[color-mix(in_oklab,var(--surface)_92%,black)] text-[11px] uppercase tracking-wide text-[var(--muted-foreground)]"
+                >
+                  {totalProviderCount} providers
+                </Badge>
+              </div>
             </div>
           </motion.header>
+
+          {showConnectionPanel ? (
+            <ConnectionSettingsPane
+              gateway={props.gateway}
+              disabled={props.isSubmitting || props.isSavingGateway}
+              isSaving={props.isSavingGateway}
+              onGatewayChange={props.onGatewayChange}
+              onSave={props.onSaveGateway}
+              onClose={() => setShowConnectionPanel(false)}
+            />
+          ) : null}
 
           <div className="grid min-h-0 flex-1 md:grid-cols-[320px_minmax(0,1fr)]">
             <ProviderListPane
@@ -182,7 +206,6 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
               env={props.env}
               requiredFields={visibleRequiredFields}
               optionalFields={envPartition.optional}
-              gateway={props.gateway}
               showAdvanced={showAdvanced}
               missingRequiredKeys={missingRequiredKeys}
               disabled={props.isSubmitting}
@@ -190,7 +213,6 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
               onboardingNotice={props.onboardingNotice}
               onToggleAdvanced={() => setShowAdvanced((value) => !value)}
               onEnvChange={props.onEnvChange}
-              onGatewayChange={props.onGatewayChange}
               onRunGuidedAuth={props.onRunGuidedAuth}
             />
           </div>
@@ -210,10 +232,6 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
                 >
                   {props.error}
                 </motion.span>
-              ) : props.gateway.mode === "remote" && !props.gateway.remoteUrl.trim() ? (
-                <span className="text-amber-300">
-                  Remote gateway URL is required when remote mode is enabled.
-                </span>
               ) : missingStatusMessage ? (
                 <span className="text-amber-300">{missingStatusMessage}</span>
               ) : selectedProvider ? (
@@ -374,12 +392,6 @@ function ProviderListItem(props: {
 function SetupPane(props: {
   provider: OnboardingProvider | null;
   env: Record<string, string>;
-  gateway: {
-    mode: WorkbenchGatewayMode;
-    remoteUrl: string;
-    remoteToken: string;
-    timeoutMs: number;
-  };
   requiredFields: Array<{
     key: string;
     description: string;
@@ -399,14 +411,6 @@ function SetupPane(props: {
   onboardingNotice: string | null;
   onToggleAdvanced: () => void;
   onEnvChange: (key: string, value: string) => void;
-  onGatewayChange: (
-    patch: Partial<{
-      mode: WorkbenchGatewayMode;
-      remoteUrl: string;
-      remoteToken: string;
-      timeoutMs: number;
-    }>
-  ) => void;
   onRunGuidedAuth: (providerId: string) => void;
 }) {
   if (!props.provider) {
@@ -505,9 +509,6 @@ function SetupPane(props: {
                 ? "Hide Advanced Options"
                 : "Show Advanced Options"}
             </button>
-            <p className="px-1 text-xs text-[var(--muted-foreground)]">
-              Advanced includes an optional remote OpenGoat connection.
-            </p>
             {props.showAdvanced ? (
               <div className="space-y-4 rounded-lg border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_95%,black)] p-3">
                 <div className="space-y-3">
@@ -538,14 +539,6 @@ function SetupPane(props: {
                     </div>
                   )}
                 </div>
-
-                <div className="h-px bg-[var(--border)]" />
-
-                <RemoteGatewaySettings
-                  gateway={props.gateway}
-                  disabled={props.disabled}
-                  onGatewayChange={props.onGatewayChange}
-                />
               </div>
             ) : null}
           </section>
@@ -555,7 +548,7 @@ function SetupPane(props: {
   );
 }
 
-function RemoteGatewaySettings(props: {
+function ConnectionSettingsPane(props: {
   gateway: {
     mode: WorkbenchGatewayMode;
     remoteUrl: string;
@@ -563,6 +556,7 @@ function RemoteGatewaySettings(props: {
     timeoutMs: number;
   };
   disabled: boolean;
+  isSaving: boolean;
   onGatewayChange: (
     patch: Partial<{
       mode: WorkbenchGatewayMode;
@@ -571,97 +565,127 @@ function RemoteGatewaySettings(props: {
       timeoutMs: number;
     }>
   ) => void;
+  onSave: () => void;
+  onClose: () => void;
 }) {
   const isRemote = props.gateway.mode === "remote";
+  const canSave = !props.disabled && (!isRemote || Boolean(props.gateway.remoteUrl.trim()));
 
   return (
-    <section className="space-y-3">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-          Remote OpenGoat (Optional)
-        </p>
-        <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-          Use this only when your app needs to control OpenGoat on another machine.
-        </p>
-      </div>
-
-      <label className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-        <input
-          type="checkbox"
-          className="size-4"
-          checked={isRemote}
-          disabled={props.disabled}
-          onChange={(event) =>
-            props.onGatewayChange({
-              mode: event.currentTarget.checked ? "remote" : "local"
-            })
-          }
-        />
-        <span>Use remote OpenGoat server</span>
-        <span className="ml-auto rounded-full border border-[var(--border)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
-          {isRemote ? "Enabled" : "Local default"}
-        </span>
-      </label>
-
-      {isRemote ? (
-        <div className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-[var(--foreground)]">
-              Remote gateway URL
+    <section className="border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_96%,black)] px-5 py-3 md:px-6">
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-sm font-medium text-[var(--foreground)]">
+              OpenGoat Runtime Connection
             </p>
-            <Input
-              value={props.gateway.remoteUrl}
+            <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
+              Optional. Keep local unless OpenGoat runs on a different machine.
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs text-[var(--muted-foreground)]"
+            onClick={props.onClose}
+          >
+            Close
+          </Button>
+        </div>
+
+        <div className="mt-3 space-y-3">
+          <label className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_95%,black)] px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              className="size-4"
+              checked={isRemote}
+              disabled={props.disabled}
               onChange={(event) =>
                 props.onGatewayChange({
-                  remoteUrl: event.target.value
+                  mode: event.currentTarget.checked ? "remote" : "local"
                 })
               }
-              placeholder="ws://remote-host:18789/gateway"
-              disabled={props.disabled}
             />
-          </div>
+            <span>Connect to remote OpenGoat</span>
+            <span className="ml-auto rounded-full border border-[var(--border)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
+              {isRemote ? "Remote" : "Local"}
+            </span>
+          </label>
 
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-[var(--foreground)]">
-              Auth token (optional)
-            </p>
-            <Input
-              type="password"
-              value={props.gateway.remoteToken}
-              onChange={(event) =>
-                props.onGatewayChange({
-                  remoteToken: event.target.value
-                })
-              }
-              placeholder="Leave blank to keep current session token"
-              disabled={props.disabled}
-            />
-          </div>
+          {isRemote ? (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-[var(--foreground)]">
+                  Remote gateway URL
+                </p>
+                <Input
+                  value={props.gateway.remoteUrl}
+                  onChange={(event) =>
+                    props.onGatewayChange({
+                      remoteUrl: event.target.value
+                    })
+                  }
+                  placeholder="ws://remote-host:18789/gateway"
+                  disabled={props.disabled}
+                />
+              </div>
 
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-[var(--foreground)]">
-              Request timeout (ms)
-            </p>
-            <Input
-              type="number"
-              min={1000}
-              max={120000}
-              step={500}
-              value={String(props.gateway.timeoutMs)}
-              onChange={(event) => {
-                const parsed = Number(event.target.value);
-                if (!Number.isFinite(parsed)) {
-                  return;
-                }
-                props.onGatewayChange({
-                  timeoutMs: clampGatewayTimeout(parsed)
-                });
-              }}
-              disabled={props.disabled}
-            />
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-[var(--foreground)]">
+                    Auth token (optional)
+                  </p>
+                  <Input
+                    type="password"
+                    value={props.gateway.remoteToken}
+                    onChange={(event) =>
+                      props.onGatewayChange({
+                        remoteToken: event.target.value
+                      })
+                    }
+                    placeholder="Keep empty to leave token unchanged"
+                    disabled={props.disabled}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-[var(--foreground)]">
+                    Timeout (ms)
+                  </p>
+                  <Input
+                    type="number"
+                    min={1000}
+                    max={120000}
+                    step={500}
+                    value={String(props.gateway.timeoutMs)}
+                    onChange={(event) => {
+                      const parsed = Number(event.target.value);
+                      if (!Number.isFinite(parsed)) {
+                        return;
+                      }
+                      props.onGatewayChange({
+                        timeoutMs: clampGatewayTimeout(parsed)
+                      });
+                    }}
+                    disabled={props.disabled}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex items-center justify-end">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={props.onSave}
+              disabled={!canSave}
+            >
+              {props.isSaving ? "Saving Connection..." : "Save Connection"}
+            </Button>
           </div>
         </div>
-      ) : null}
+      </div>
     </section>
   );
 }

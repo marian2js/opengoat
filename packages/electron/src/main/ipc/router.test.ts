@@ -76,6 +76,24 @@ describe("desktop IPC router", () => {
     });
   });
 
+  it("executes gateway update via mutation and forwards payload", async () => {
+    const service = createServiceStub();
+    const router = createDesktopRouter(service);
+    const caller = router.createCaller({});
+
+    await caller.gateway.update({
+      mode: "remote",
+      remoteUrl: "ws://remote-host:18789/gateway",
+      timeoutMs: 9000
+    });
+
+    expect(service.updateGateway).toHaveBeenCalledWith({
+      mode: "remote",
+      remoteUrl: "ws://remote-host:18789/gateway",
+      timeoutMs: 9000
+    });
+  });
+
   it("initializes router with a callable getErrorShape for Electron IPC transport", () => {
     const service = createServiceStub();
     const router = createDesktopRouter(service) as {
@@ -165,6 +183,16 @@ function createServiceStub(): WorkbenchService {
         "Qwen OAuth: Open https://chat.qwen.ai/authorize",
         "Qwen OAuth complete."
       ]
+    })),
+    getGatewayStatus: vi.fn(async () => ({
+      mode: "local",
+      timeoutMs: 10_000,
+      hasAuthToken: false
+    })),
+    updateGateway: vi.fn(async () => ({
+      mode: "local",
+      timeoutMs: 10_000,
+      hasAuthToken: false
     })),
     sendMessage: vi.fn(async () => ({
       reply: {

@@ -7,6 +7,7 @@ import {
   runGuidedAuthInputSchema,
   sendMessageInputSchema,
   sessionLookupInputSchema,
+  updateGatewayInputSchema,
   submitOnboardingInputSchema,
 } from "@shared/workbench";
 import { getTRPCErrorFromUnknown, initTRPC, type AnyRouter } from "@trpc/server";
@@ -78,6 +79,16 @@ export function createDesktopRouter(service: WorkbenchService) {
         .input(submitOnboardingInputSchema)
         .mutation(async ({ input }) => {
           return service.submitOnboarding(input);
+        }),
+    }),
+    gateway: t.router({
+      status: t.procedure.query(async () => {
+        return service.getGatewayStatus();
+      }),
+      update: t.procedure
+        .input(updateGatewayInputSchema)
+        .mutation(async ({ input }) => {
+          return service.updateGateway(input);
         }),
     }),
     chat: t.router({

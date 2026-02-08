@@ -12,6 +12,7 @@ export function App() {
     showOnboarding,
     onboardingState,
     onboardingGuidedAuthState,
+    gatewayState,
     onboardingDraftProviderId,
     onboardingDraftEnv,
     onboardingDraftGateway,
@@ -31,6 +32,7 @@ export function App() {
     selectProject,
     selectSession,
     submitOnboarding,
+    saveOnboardingGateway,
     runOnboardingGuidedAuth,
     setOnboardingDraftProvider,
     setOnboardingDraftField,
@@ -95,9 +97,12 @@ export function App() {
     }
     await submitOnboarding(
       onboardingDraftProviderId,
-      onboardingDraftEnv,
-      onboardingDraftGateway
+      onboardingDraftEnv
     );
+  };
+
+  const onSaveGateway = async () => {
+    await saveOnboardingGateway(onboardingDraftGateway);
   };
 
   if (isBootstrapping) {
@@ -118,10 +123,12 @@ export function App() {
         error={error}
         canClose={!onboarding.needsOnboarding}
         isSubmitting={onboardingState === "submitting"}
+        isSavingGateway={gatewayState === "saving"}
         isRunningGuidedAuth={onboardingGuidedAuthState === "running"}
         onSelectProvider={setOnboardingDraftProvider}
         onEnvChange={setOnboardingDraftField}
         onGatewayChange={setOnboardingDraftGateway}
+        onSaveGateway={() => void onSaveGateway()}
         onboardingNotice={onboardingNotice}
         onRunGuidedAuth={(providerId) => void runOnboardingGuidedAuth(providerId)}
         onClose={closeOnboarding}

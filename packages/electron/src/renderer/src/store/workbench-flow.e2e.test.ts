@@ -17,8 +17,7 @@ describe("workbench flow e2e", () => {
     store.getState().setOnboardingDraftField("OPENROUTER_API_KEY", "openrouter-key");
     await store.getState().submitOnboarding(
       store.getState().onboardingDraftProviderId,
-      store.getState().onboardingDraftEnv,
-      store.getState().onboardingDraftGateway
+      store.getState().onboardingDraftEnv
     );
     expect(store.getState().onboardingDraftProviderId).toBe("openrouter");
     expect(store.getState().showOnboarding).toBe(false);
@@ -132,6 +131,23 @@ function createStatefulApiMock(): WorkbenchApiClient {
         )
       };
       return onboarding;
+    }),
+    getGatewayStatus: vi.fn(async () => onboarding.gateway),
+    updateGatewaySettings: vi.fn(async (input: {
+      mode: "local" | "remote";
+      remoteUrl?: string;
+      timeoutMs?: number;
+    }) => {
+      onboarding = {
+        ...onboarding,
+        gateway: {
+          mode: input.mode,
+          remoteUrl: input.remoteUrl,
+          timeoutMs: input.timeoutMs ?? 10_000,
+          hasAuthToken: false
+        }
+      };
+      return onboarding.gateway;
     }),
     sendChatMessage
   };

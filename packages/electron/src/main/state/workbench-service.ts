@@ -17,6 +17,7 @@ import {
 import type {
   WorkbenchBootstrap,
   WorkbenchGatewayMode,
+  WorkbenchGatewayStatus,
   WorkbenchGuidedAuthResult,
   WorkbenchMessage,
   WorkbenchOnboarding,
@@ -130,17 +131,30 @@ export class WorkbenchService {
   public async submitOnboarding(input: {
     providerId: string;
     env: Record<string, string>;
-    gateway?: {
-      mode: WorkbenchGatewayMode;
-      remoteUrl?: string;
-      remoteToken?: string;
-      timeoutMs?: number;
-    };
   }): Promise<WorkbenchOnboarding> {
-    await this.applyGatewaySettings(input.gateway);
     await this.opengoat.setProviderConfig(input.providerId, input.env);
     await this.opengoat.setAgentProvider(DEFAULT_AGENT_ID, input.providerId);
     return this.getOnboardingState();
+  }
+
+  public async getGatewayStatus(): Promise<WorkbenchGatewayStatus> {
+    const gatewaySettings = await this.store.getGatewaySettings();
+    return {
+      mode: gatewaySettings.mode,
+      remoteUrl: gatewaySettings.remoteUrl,
+      timeoutMs: gatewaySettings.timeoutMs,
+      hasAuthToken: Boolean(this.remoteGatewayToken)
+    };
+  }
+
+  public async updateGateway(input: {
+    mode: WorkbenchGatewayMode;
+    remoteUrl?: string;
+    remoteToken?: string;
+    timeoutMs?: number;
+  }): Promise<WorkbenchGatewayStatus> {
+    await this.applyGatewaySettings(input);
+    return this.getGatewayStatus();
   }
 
   public async runOnboardingGuidedAuth(input: {

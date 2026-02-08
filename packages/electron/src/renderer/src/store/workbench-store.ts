@@ -14,6 +14,7 @@ import {
 export type OnboardingFlowState = "hidden" | "loading" | "editing" | "submitting";
 export type ChatFlowState = "idle" | "sending";
 export type OnboardingGuidedAuthState = "idle" | "running";
+export type GatewayFlowState = "idle" | "saving";
 
 export interface OnboardingGatewayDraft {
   mode: WorkbenchGatewayMode;
@@ -32,6 +33,7 @@ interface WorkbenchUiState {
   onboardingDraftProviderId: string;
   onboardingDraftEnv: Record<string, string>;
   onboardingDraftGateway: OnboardingGatewayDraft;
+  gatewayState: GatewayFlowState;
   onboardingNotice: string | null;
   chatState: ChatFlowState;
   activeProjectId: string | null;
@@ -50,9 +52,9 @@ interface WorkbenchUiState {
   selectSession: (projectId: string, sessionId: string) => Promise<void>;
   submitOnboarding: (
     providerId: string,
-    env: Record<string, string>,
-    gateway: OnboardingGatewayDraft
+    env: Record<string, string>
   ) => Promise<void>;
+  saveOnboardingGateway: (gateway: OnboardingGatewayDraft) => Promise<void>;
   runOnboardingGuidedAuth: (providerId: string) => Promise<void>;
   setOnboardingDraftProvider: (providerId: string) => void;
   setOnboardingDraftField: (key: string, value: string) => void;
@@ -79,6 +81,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
     onboardingDraftProviderId: "",
     onboardingDraftEnv: {},
     onboardingDraftGateway: createDefaultGatewayDraft(),
+    gatewayState: "idle",
     onboardingNotice: null,
     chatState: "idle",
     activeProjectId: null,
@@ -300,11 +303,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       }
     },
 
-    submitOnboarding: async (
-      providerId: string,
-      env: Record<string, string>,
-      gateway: OnboardingGatewayDraft
-    ) => {
+    submitOnboarding: async (providerId: string, env: Record<string, string>) => {
       set({
         isBusy: true,
         onboardingState: "submitting",
@@ -313,14 +312,13 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       try {
         const onboarding = await api.submitOnboarding({
           providerId,
-          env,
-          gateway: toGatewaySubmitInput(gateway)
+          env
         });
         const onboardingDraft = resolveOnboardingDraftState(
           onboarding,
           onboarding.activeProviderId,
           undefined,
-          gateway
+          get().onboardingDraftGateway
         );
         const showOnboarding = onboarding.needsOnboarding;
 
@@ -338,6 +336,41 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         set({
           isBusy: false,
           onboardingState: "editing",
+          error: toErrorMessage(error)
+        });
+      }
+    },
+
+    saveOnboardingGateway: async (gateway: OnboardingGatewayDraft) => {
+      set({
+        isBusy: true,
+        gatewayState: "saving",
+        error: null
+      });
+      try {
+        const updated = await api.updateGatewaySettings(toGatewayUpdateInput(gateway));
+        set((state) => ({
+          isBusy: false,
+          gatewayState: "idle",
+          onboarding: state.onboarding
+            ? {
+                ...state.onboarding,
+                gateway: updated
+              }
+            : state.onboarding,
+          onboardingDraftGateway: {
+            mode: updated.mode,
+            remoteUrl: updated.remoteUrl ?? "",
+            timeoutMs: updated.timeoutMs,
+            remoteToken: state.onboardingDraftGateway.remoteToken
+          },
+          onboardingNotice: null,
+          error: null
+        }));
+      } catch (error) {
+        set({
+          isBusy: false,
+          gatewayState: "idle",
           error: toErrorMessage(error)
         });
       }
@@ -660,16 +693,14 @@ function createDefaultGatewayDraft(): OnboardingGatewayDraft {
   };
 }
 
-function toGatewaySubmitInput(
+function toGatewayUpdateInput(
   gateway: OnboardingGatewayDraft
-):
-  | {
-      mode: WorkbenchGatewayMode;
-      remoteUrl?: string;
-      remoteToken?: string;
-      timeoutMs: number;
-    }
-  | undefined {
+): {
+  mode: WorkbenchGatewayMode;
+  remoteUrl?: string;
+  remoteToken?: string;
+  timeoutMs: number;
+} {
   const mode = gateway.mode === "remote" ? "remote" : "local";
   const timeoutMs = Number.isFinite(gateway.timeoutMs)
     ? Math.max(1000, Math.min(120_000, Math.floor(gateway.timeoutMs)))

@@ -149,15 +149,14 @@ export const sendMessageInputSchema = sessionLookupInputSchema.extend({
 
 export const submitOnboardingInputSchema = z.object({
   providerId: z.string().trim().min(1),
-  env: z.record(z.string(), z.string()).default({}),
-  gateway: z
-    .object({
-      mode: workbenchGatewayModeSchema,
-      remoteUrl: z.string().trim().max(1024).optional(),
-      remoteToken: z.string().trim().max(2048).optional(),
-      timeoutMs: z.number().int().min(1000).max(120_000).optional()
-    })
-    .optional()
+  env: z.record(z.string(), z.string()).default({})
+});
+
+export const updateGatewayInputSchema = z.object({
+  mode: workbenchGatewayModeSchema,
+  remoteUrl: z.string().trim().max(1024).optional(),
+  remoteToken: z.string().trim().max(2048).optional(),
+  timeoutMs: z.number().int().min(1000).max(120_000).optional()
 });
 
 export const runGuidedAuthInputSchema = z.object({
