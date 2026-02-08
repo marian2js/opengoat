@@ -3,11 +3,11 @@ import type {
   WorkbenchAgent,
   WorkbenchAgentCreationResult,
   WorkbenchAgentDeletionResult,
+  WorkbenchAgentProvider,
   WorkbenchGatewayMode,
   WorkbenchMessage,
   WorkbenchOnboarding,
   WorkbenchProject,
-  WorkbenchProviderSummary,
   WorkbenchSession
 } from "@shared/workbench";
 import { WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS } from "@shared/workbench";
@@ -44,7 +44,7 @@ interface WorkbenchUiState {
   onboardingNotice: string | null;
   chatState: ChatFlowState;
   agents: WorkbenchAgent[];
-  agentProviders: WorkbenchProviderSummary[];
+  agentProviders: WorkbenchAgentProvider[];
   agentsState: AgentsFlowState;
   agentsNotice: string | null;
   activeProjectId: string | null;
@@ -64,6 +64,7 @@ interface WorkbenchUiState {
   removeSession: (projectId: string, sessionId: string) => Promise<void>;
   selectSession: (projectId: string, sessionId: string) => Promise<void>;
   loadAgents: () => Promise<void>;
+  saveAgentProviderConfig: (input: { providerId: string; env: Record<string, string> }) => Promise<void>;
   createAgent: (input: {
     name: string;
     providerId?: string;
@@ -383,6 +384,29 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           agentsState: "idle",
           error: toErrorMessage(error)
         });
+      }
+    },
+
+    saveAgentProviderConfig: async (input) => {
+      const providerId = input.providerId.trim();
+      if (!providerId) {
+        set({ error: "Provider id cannot be empty." });
+        return;
+      }
+
+      set({ agentsState: "saving", agentsNotice: null, error: null });
+      try {
+        const result = await api.saveAgentProviderConfig({
+          providerId,
+          env: input.env
+        });
+        set((state) => ({
+          agentProviders: upsertAgentProvider(state.agentProviders, result),
+          agentsState: "idle",
+          agentsNotice: `Saved ${result.displayName} settings.`
+        }));
+      } catch (error) {
+        set({ agentsState: "idle", error: toErrorMessage(error) });
       }
     },
 
@@ -833,6 +857,20 @@ function upsertAgent(agents: WorkbenchAgent[], agent: WorkbenchAgent): Workbench
 
   return agents
     .map((entry) => (entry.id === agent.id ? agent : entry))
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function upsertAgentProvider(
+  providers: WorkbenchAgentProvider[],
+  provider: WorkbenchAgentProvider
+): WorkbenchAgentProvider[] {
+  const existingIndex = providers.findIndex((entry) => entry.id === provider.id);
+  if (existingIndex === -1) {
+    return [...providers, provider].sort((left, right) => left.id.localeCompare(right.id));
+  }
+
+  return providers
+    .map((entry) => (entry.id === provider.id ? provider : entry))
     .sort((left, right) => left.id.localeCompare(right.id));
 }
 

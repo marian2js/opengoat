@@ -11,13 +11,13 @@ import {
   DialogHeader,
   DialogTitle
 } from "@renderer/components/ai-elements/dialog";
-import type { WorkbenchAgent, WorkbenchProviderSummary } from "@shared/workbench";
+import type { WorkbenchAgent, WorkbenchAgentProvider } from "@shared/workbench";
 import { cn } from "@renderer/lib/utils";
 import { Trash2 } from "lucide-react";
 
 interface AgentsPanelProps {
   agents: WorkbenchAgent[];
-  providers: WorkbenchProviderSummary[];
+  providers: WorkbenchAgentProvider[];
   loading: boolean;
   busy: boolean;
   error: string | null;
@@ -33,6 +33,11 @@ interface AgentsPanelProps {
     providerId?: string;
     deleteExternalAgent?: boolean;
   }) => Promise<void> | void;
+  onSaveProviderConfig: (input: {
+    providerId: string;
+    env: Record<string, string>;
+  }) => Promise<void> | void;
+  providerConfigAvailable: boolean;
   onDismissNotice: () => void;
   onDismissError: () => void;
 }
@@ -45,6 +50,7 @@ interface DeleteTarget {
 export function AgentsPanel(props: AgentsPanelProps) {
   const [name, setName] = useState("");
   const [providerId, setProviderId] = useState("");
+  const [providerEnvDrafts, setProviderEnvDrafts] = useState<Record<string, Record<string, string>>>({});
   const [createExternal, setCreateExternal] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -52,9 +58,19 @@ export function AgentsPanel(props: AgentsPanelProps) {
   const [deleteExternal, setDeleteExternal] = useState(false);
 
   const providerOptions = useMemo(
-    () => props.providers.map((provider) => provider.id),
+    () => props.providers.map((provider) => ({
+      id: provider.id,
+      label: provider.displayName
+    })),
     [props.providers]
   );
+  const normalizedProviderId = providerId.trim().toLowerCase();
+  const selectedProvider =
+    props.providers.find((provider) => provider.id === normalizedProviderId) ?? null;
+  const providerEnv =
+    (normalizedProviderId && providerEnvDrafts[normalizedProviderId]) ??
+    selectedProvider?.configuredEnvValues ??
+    {};
   const datalistId = "agent-provider-options";
   const deleteDatalistId = "agent-provider-options-delete";
 
@@ -64,6 +80,21 @@ export function AgentsPanel(props: AgentsPanelProps) {
       setDeleteExternal(false);
     }
   }, [deleteTarget]);
+
+  useEffect(() => {
+    if (!normalizedProviderId) {
+      return;
+    }
+    if (providerEnvDrafts[normalizedProviderId]) {
+      return;
+    }
+    if (selectedProvider) {
+      setProviderEnvDrafts((drafts) => ({
+        ...drafts,
+        [normalizedProviderId]: { ...selectedProvider.configuredEnvValues }
+      }));
+    }
+  }, [normalizedProviderId, providerEnvDrafts, selectedProvider]);
 
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -101,6 +132,32 @@ export function AgentsPanel(props: AgentsPanelProps) {
       deleteExternalAgent: deleteExternal
     });
     setDeleteTarget(null);
+  };
+
+  const handleProviderFieldChange = (key: string, value: string) => {
+    if (!normalizedProviderId) {
+      return;
+    }
+    setProviderEnvDrafts((drafts) => ({
+      ...drafts,
+      [normalizedProviderId]: {
+        ...(drafts[normalizedProviderId] ?? {}),
+        [key]: value
+      }
+    }));
+  };
+
+  const handleSaveProviderConfig = async () => {
+    if (!normalizedProviderId) {
+      setFormError("Select an agent provider to configure settings.");
+      return;
+    }
+
+    setFormError(null);
+    await props.onSaveProviderConfig({
+      providerId: normalizedProviderId,
+      env: providerEnv
+    });
   };
 
   return (
@@ -186,7 +243,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-foreground">Provider id (`--provider`)</p>
+                  <p className="text-xs font-medium text-foreground">Agent Provider (`--provider`)</p>
                   <Input
                     value={providerId}
                     onChange={(event) => {
@@ -195,13 +252,13 @@ export function AgentsPanel(props: AgentsPanelProps) {
                         setFormError(null);
                       }
                     }}
-                    placeholder="openai"
+                    placeholder="openclaw"
                     list={datalistId}
                     disabled={props.busy}
                   />
                   <datalist id={datalistId}>
-                    {providerOptions.map((id) => (
-                      <option key={id} value={id} />
+                    {providerOptions.map((provider) => (
+                      <option key={provider.id} value={provider.id} label={provider.label} />
                     ))}
                   </datalist>
                 </div>
@@ -217,7 +274,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
                 />
                 <span>Create external agent (`--create-external`)</span>
                 <span className="ml-auto text-[11px] text-muted-foreground">
-                  Requires provider id
+                  Requires agent provider
                 </span>
               </label>
 
@@ -231,6 +288,62 @@ export function AgentsPanel(props: AgentsPanelProps) {
                 </Button>
               </div>
             </form>
+          </section>
+
+          <section className="rounded-xl border border-[#2E2F31] bg-[#141416] px-4 py-4">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Agent Provider setup</h2>
+                <p className="text-xs text-muted-foreground">
+                  Configure external provider settings (OpenClaw, Cursor, Claude Code, Codex, Gemini CLI, OpenCode).
+                </p>
+              </div>
+            </div>
+            {!props.providerConfigAvailable ? (
+              <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3 text-sm text-muted-foreground">
+                Agent provider setup requires a newer desktop runtime.
+              </div>
+            ) : !selectedProvider ? (
+              <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3 text-sm text-muted-foreground">
+                Select an external agent provider to configure its settings.
+              </div>
+            ) : selectedProvider.envFields.length === 0 ? (
+              <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3 text-sm text-muted-foreground">
+                {selectedProvider.displayName} does not expose additional settings.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <Badge variant="outline">{selectedProvider.displayName}</Badge>
+                  <span>{selectedProvider.id}</span>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {selectedProvider.envFields.map((field) => (
+                    <div key={field.key} className="space-y-1">
+                      <p className="text-xs font-medium text-foreground">{field.key}</p>
+                      <p className="text-[11px] text-muted-foreground">{field.description}</p>
+                      <Input
+                        type={field.secret ? "password" : "text"}
+                        value={providerEnv[field.key] ?? ""}
+                        onChange={(event) => handleProviderFieldChange(field.key, event.target.value)}
+                        placeholder={field.secret ? "Enter secret" : "Enter value"}
+                        disabled={props.busy}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleSaveProviderConfig()}
+                    disabled={props.busy}
+                  >
+                    Save provider settings
+                  </Button>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="space-y-2">
@@ -322,17 +435,17 @@ export function AgentsPanel(props: AgentsPanelProps) {
             </div>
 
             <div className="space-y-1">
-              <p className="text-xs font-medium text-foreground">Provider id (`--provider`)</p>
+              <p className="text-xs font-medium text-foreground">Agent Provider (`--provider`)</p>
               <Input
                 value={deleteProviderId}
                 onChange={(event) => setDeleteProviderId(event.target.value)}
-                placeholder="openai"
+                placeholder="openclaw"
                 list={deleteDatalistId}
                 disabled={props.busy}
               />
               <datalist id={deleteDatalistId}>
-                {providerOptions.map((id) => (
-                  <option key={id} value={id} />
+                {providerOptions.map((provider) => (
+                  <option key={provider.id} value={provider.id} label={provider.label} />
                 ))}
               </datalist>
             </div>

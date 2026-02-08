@@ -106,6 +106,15 @@ function createStatefulApiMock(): WorkbenchApiClient {
     removeProject: vi.fn(async () => undefined),
     listAgents: vi.fn(async () => []),
     listAgentProviders: vi.fn(async () => []),
+    saveAgentProviderConfig: vi.fn(async (input: { providerId: string; env: Record<string, string> }) => ({
+      id: input.providerId,
+      displayName: input.providerId,
+      kind: "cli",
+      envFields: [],
+      configuredEnvKeys: Object.keys(input.env),
+      configuredEnvValues: { ...input.env },
+      hasConfig: Object.keys(input.env).length > 0
+    })),
     createAgent: vi.fn(async () => ({
       agent: {
         id: "writer",

@@ -12,6 +12,7 @@ import {
   sendMessageInputSchema,
   sessionLookupInputSchema,
   updateGatewayInputSchema,
+  updateAgentProviderConfigInputSchema,
   submitOnboardingInputSchema,
 } from "@shared/workbench";
 import { getTRPCErrorFromUnknown, initTRPC, type AnyRouter } from "@trpc/server";
@@ -60,6 +61,11 @@ export function createDesktopRouter(service: WorkbenchService) {
       providers: t.procedure.query(async () => {
         return service.listAgentProviders();
       }),
+      saveProviderConfig: t.procedure
+        .input(updateAgentProviderConfigInputSchema)
+        .mutation(async ({ input }) => {
+          return service.saveAgentProviderConfig(input);
+        }),
       create: t.procedure
         .input(createAgentInputSchema)
         .mutation(async ({ input }) => {

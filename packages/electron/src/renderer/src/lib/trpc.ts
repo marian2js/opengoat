@@ -9,13 +9,13 @@ import type {
   WorkbenchAgent,
   WorkbenchAgentCreationResult,
   WorkbenchAgentDeletionResult,
+  WorkbenchAgentProvider,
   WorkbenchBootstrap,
   WorkbenchGatewayStatus,
   WorkbenchGuidedAuthResult,
   WorkbenchMessage,
   WorkbenchOnboarding,
   WorkbenchProject,
-  WorkbenchProviderSummary,
   WorkbenchSendMessageResult,
   WorkbenchSession
 } from "@shared/workbench";
@@ -30,7 +30,11 @@ export interface WorkbenchApiClient {
   renameProject: (input: { projectId: string; name: string }) => Promise<WorkbenchProject>;
   removeProject: (input: { projectId: string }) => Promise<void>;
   listAgents: () => Promise<WorkbenchAgent[]>;
-  listAgentProviders: () => Promise<WorkbenchProviderSummary[]>;
+  listAgentProviders: () => Promise<WorkbenchAgentProvider[]>;
+  saveAgentProviderConfig: (input: {
+    providerId: string;
+    env: Record<string, string>;
+  }) => Promise<WorkbenchAgentProvider>;
   createAgent: (input: {
     name: string;
     providerId?: string;
@@ -143,7 +147,12 @@ export function createWorkbenchApiClient(): WorkbenchApiClient {
     listAgentProviders: async () => {
       const trpc = getTrpcClient();
       await ensureContract(trpc);
-      return (await trpc.query("agents.providers")) as WorkbenchProviderSummary[];
+      return (await trpc.query("agents.providers")) as WorkbenchAgentProvider[];
+    },
+    saveAgentProviderConfig: async (input) => {
+      const trpc = getTrpcClient();
+      await ensureContract(trpc);
+      return (await trpc.mutation("agents.saveProviderConfig", input)) as WorkbenchAgentProvider;
     },
     createAgent: async (input) => {
       const trpc = getTrpcClient();

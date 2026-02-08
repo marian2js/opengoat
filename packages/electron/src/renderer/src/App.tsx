@@ -41,6 +41,7 @@ export function App() {
     selectProject,
     selectSession,
     loadAgents,
+    saveAgentProviderConfig,
     createAgent,
     deleteAgent,
     clearAgentsNotice,
@@ -71,6 +72,8 @@ export function App() {
 
   const supportsAgents =
     (ipcContractVersion ?? 0) >= DESKTOP_IPC_CONTRACT_FEATURES.agents;
+  const supportsAgentProviderConfig =
+    (ipcContractVersion ?? 0) >= DESKTOP_IPC_CONTRACT_FEATURES.agentProviderConfig;
 
   useEffect(() => {
     if (activeView === "agents" && supportsAgents) {
@@ -270,6 +273,8 @@ export function App() {
                   onRefresh={() => void loadAgents()}
                   onCreate={(input) => void createAgent(input)}
                   onDelete={(input) => void deleteAgent(input)}
+                  onSaveProviderConfig={(input) => void saveAgentProviderConfig(input)}
+                  providerConfigAvailable={supportsAgentProviderConfig}
                   onDismissNotice={clearAgentsNotice}
                   onDismissError={clearError}
                 />

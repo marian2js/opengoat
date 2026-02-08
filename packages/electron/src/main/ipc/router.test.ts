@@ -30,6 +30,12 @@ describe("desktop IPC router", () => {
     });
     await caller.agents.list();
     await caller.agents.providers();
+    await caller.agents.saveProviderConfig({
+      providerId: "openclaw",
+      env: {
+        OPENCLAW_CMD: "/usr/local/bin/openclaw"
+      }
+    });
     await caller.agents.create({
       name: "writer"
     });
@@ -56,6 +62,12 @@ describe("desktop IPC router", () => {
     expect(service.removeProject).toHaveBeenCalledWith("p1");
     expect(service.listAgents).toHaveBeenCalledTimes(1);
     expect(service.listAgentProviders).toHaveBeenCalledTimes(1);
+    expect(service.saveAgentProviderConfig).toHaveBeenCalledWith({
+      providerId: "openclaw",
+      env: {
+        OPENCLAW_CMD: "/usr/local/bin/openclaw"
+      }
+    });
     expect(service.createAgent).toHaveBeenCalledWith({
       name: "writer"
     });
@@ -167,6 +179,17 @@ function createServiceStub(): WorkbenchService {
     pickAndAddProject: vi.fn(async () => null),
     listAgents: vi.fn(async () => []),
     listAgentProviders: vi.fn(async () => []),
+    saveAgentProviderConfig: vi.fn(async () => ({
+      id: "openclaw",
+      displayName: "OpenClaw",
+      kind: "cli",
+      envFields: [],
+      configuredEnvKeys: ["OPENCLAW_CMD"],
+      configuredEnvValues: {
+        OPENCLAW_CMD: "/usr/local/bin/openclaw"
+      },
+      hasConfig: true
+    })),
     createAgent: vi.fn(async () => ({
       agent: {
         id: "writer",

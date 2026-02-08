@@ -22,6 +22,7 @@ import type {
   WorkbenchAgent,
   WorkbenchAgentCreationResult,
   WorkbenchAgentDeletionResult,
+  WorkbenchAgentProvider,
   WorkbenchProviderSummary,
   WorkbenchGuidedAuthResult,
   WorkbenchMessage,
@@ -214,14 +215,36 @@ export class WorkbenchService {
     return withProviders;
   }
 
-  public async listAgentProviders(): Promise<WorkbenchProviderSummary[]> {
+  public async listAgentProviders(): Promise<WorkbenchAgentProvider[]> {
     await this.ensureInitialized();
     const providers = await this.opengoat.listProviders();
-    return providers.map((provider) => ({
-      id: provider.id,
-      displayName: provider.displayName,
-      kind: provider.kind
-    }));
+    const cliProviders = providers.filter((provider) => provider.kind === "cli");
+    return Promise.all(
+      cliProviders.map(async (provider) => this.buildAgentProviderSummary(provider.id, provider))
+    );
+  }
+
+  public async saveAgentProviderConfig(input: {
+    providerId: string;
+    env: Record<string, string>;
+  }): Promise<WorkbenchAgentProvider> {
+    await this.ensureInitialized();
+    const providerId = input.providerId.trim();
+    if (!providerId) {
+      throw new Error("Provider id cannot be empty.");
+    }
+
+    const providers = await this.opengoat.listProviders();
+    const provider = providers.find((entry) => entry.id === providerId.toLowerCase());
+    if (!provider) {
+      throw new Error(`Unknown provider: ${providerId}`);
+    }
+    if (provider.kind !== "cli") {
+      throw new Error(`Provider "${provider.id}" is not supported for agent setup.`);
+    }
+
+    await this.opengoat.setProviderConfig(provider.id, input.env);
+    return this.buildAgentProviderSummary(provider.id, provider);
   }
 
   public async createAgent(input: {
@@ -247,6 +270,34 @@ export class WorkbenchService {
         ...created.agent,
         providerId: binding.providerId
       }
+    };
+  }
+
+  private async buildAgentProviderSummary(
+    providerId: string,
+    providerSummary?: WorkbenchProviderSummary
+  ): Promise<WorkbenchAgentProvider> {
+    const summary =
+      providerSummary ??
+      (await this.opengoat
+        .listProviders()
+        .then((providers) => providers.find((provider) => provider.id === providerId)));
+    if (!summary) {
+      throw new Error(`Unknown provider: ${providerId}`);
+    }
+
+    const onboarding = await this.opengoat.getProviderOnboarding(summary.id);
+    const config = await this.opengoat.getProviderConfig(summary.id);
+    const env = config?.env ?? {};
+
+    return {
+      id: summary.id,
+      displayName: summary.displayName,
+      kind: summary.kind,
+      envFields: onboarding?.env ?? [],
+      configuredEnvKeys: Object.keys(env),
+      configuredEnvValues: { ...env },
+      hasConfig: Boolean(config)
     };
   }
 

@@ -62,19 +62,26 @@ export const workbenchProviderSummarySchema = z.object({
   kind: providerKindSchema
 });
 
+export const providerOnboardingFieldSchema = z.object({
+  key: z.string(),
+  description: z.string(),
+  required: z.boolean().optional(),
+  secret: z.boolean().optional()
+});
+
+export const workbenchAgentProviderSchema = workbenchProviderSummarySchema.extend({
+  envFields: z.array(providerOnboardingFieldSchema),
+  configuredEnvKeys: z.array(z.string()),
+  configuredEnvValues: z.record(z.string(), z.string()),
+  hasConfig: z.boolean()
+});
+
 export const workbenchAgentSchema = z.object({
   id: z.string(),
   displayName: z.string(),
   workspaceDir: z.string(),
   internalConfigDir: z.string(),
   providerId: z.string().optional()
-});
-
-export const providerOnboardingFieldSchema = z.object({
-  key: z.string(),
-  description: z.string(),
-  required: z.boolean().optional(),
-  secret: z.boolean().optional()
 });
 
 export const workbenchOnboardingProviderSchema = z.object({
@@ -150,6 +157,7 @@ export type WorkbenchGatewayMode = z.infer<typeof workbenchGatewayModeSchema>;
 export type WorkbenchGatewaySettings = z.infer<typeof workbenchGatewaySettingsSchema>;
 export type WorkbenchGatewayStatus = z.infer<typeof workbenchGatewayStatusSchema>;
 export type WorkbenchProviderSummary = z.infer<typeof workbenchProviderSummarySchema>;
+export type WorkbenchAgentProvider = z.infer<typeof workbenchAgentProviderSchema>;
 export type WorkbenchAgent = z.infer<typeof workbenchAgentSchema>;
 
 export const addProjectInputSchema = z.object({
@@ -201,6 +209,11 @@ export const deleteAgentInputSchema = z.object({
   agentId: z.string().trim().min(1),
   providerId: z.string().trim().min(1).optional(),
   deleteExternalAgent: z.boolean().optional()
+});
+
+export const updateAgentProviderConfigInputSchema = z.object({
+  providerId: z.string().trim().min(1),
+  env: z.record(z.string(), z.string()).default({})
 });
 
 export const agentCreationResultSchema = z.object({
