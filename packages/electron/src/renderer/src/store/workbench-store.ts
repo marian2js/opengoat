@@ -285,6 +285,10 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
     },
 
     submitOnboarding: async (providerId: string, env: Record<string, string>) => {
+      const previousDraftEnv = {
+        ...get().onboardingDraftEnv,
+        ...env
+      };
       set({
         isBusy: true,
         onboardingState: "submitting",
@@ -298,7 +302,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         const onboardingDraft = resolveOnboardingDraftState(
           onboarding,
           onboarding.activeProviderId,
-          undefined,
+          onboarding.needsOnboarding ? previousDraftEnv : undefined,
           get().onboardingDraftGateway
         );
         const showOnboarding = onboarding.needsOnboarding;
@@ -311,6 +315,9 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           onboardingDraftEnv: onboardingDraft.env,
           onboardingDraftGateway: onboardingDraft.gateway,
           onboardingNotice: null,
+          error: showOnboarding
+            ? buildOnboardingIncompleteError(onboarding, onboardingDraft.providerId)
+            : null,
           isBusy: false
         });
       } catch (error) {
@@ -725,6 +732,25 @@ function resolveOnboardingDraftState(
     env: getConfiguredOnboardingEnv(onboarding, providerId),
     gateway
   };
+}
+
+function buildOnboardingIncompleteError(
+  onboarding: WorkbenchOnboarding,
+  providerId: string
+): string {
+  const provider = onboarding.providers.find((entry) => entry.id === providerId);
+  if (!provider) {
+    return "Provider setup is still incomplete.";
+  }
+
+  const missingCount = provider.missingRequiredEnv.length;
+  if (missingCount === 0) {
+    return "Provider setup is still incomplete.";
+  }
+
+  return missingCount === 1
+    ? "Provider setup is still incomplete. 1 required field is missing."
+    : `Provider setup is still incomplete. ${missingCount} required fields are missing.`;
 }
 
 function resolveGatewayDraftState(

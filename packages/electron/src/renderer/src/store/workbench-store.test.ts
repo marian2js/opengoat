@@ -165,10 +165,16 @@ describe("workbench store", () => {
     const store = createWorkbenchStore(api);
 
     await store.getState().bootstrap();
-    await store.getState().submitOnboarding("openai", {});
+    await store.getState().submitOnboarding("openai", {
+      OPENAI_API_KEY: "sk-test"
+    });
 
     expect(store.getState().showOnboarding).toBe(true);
     expect(store.getState().onboardingState).toBe("editing");
+    expect(store.getState().onboardingDraftEnv.OPENAI_API_KEY).toBe("sk-test");
+    expect(store.getState().error).toBe(
+      "Provider setup is still incomplete. 1 required field is missing."
+    );
   });
 
   it("runs guided auth and merges env into onboarding draft", async () => {
