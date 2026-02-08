@@ -41,6 +41,39 @@ describe("workbench store", () => {
     expect(providerId).toBe("openrouter");
   });
 
+  it("falls back to the first onboarding provider when active provider is not in onboarding list", () => {
+    const providerId = resolveOnboardingDraftProviderId({
+      activeProviderId: "codex",
+      needsOnboarding: true,
+      gateway: createGatewayStatus(),
+      families: [],
+      providers: [
+        {
+          id: "openai",
+          displayName: "OpenAI",
+          kind: "http",
+          envFields: [],
+          configuredEnvKeys: [],
+          configuredEnvValues: {},
+          missingRequiredEnv: ["OPENAI_API_KEY"],
+          hasConfig: false
+        },
+        {
+          id: "openrouter",
+          displayName: "OpenRouter",
+          kind: "http",
+          envFields: [],
+          configuredEnvKeys: [],
+          configuredEnvValues: {},
+          missingRequiredEnv: [],
+          hasConfig: false
+        }
+      ]
+    });
+
+    expect(providerId).toBe("openai");
+  });
+
   it("retains onboarding draft provider across refreshes", async () => {
     const api = createApiMock();
     const store = createWorkbenchStore(api);
@@ -132,6 +165,85 @@ describe("workbench store", () => {
     expect(store.getState().onboardingState).toBe("hidden");
     expect(store.getState().showOnboarding).toBe(false);
     expect(store.getState().onboardingDraftProviderId).toBe("openrouter");
+  });
+
+  it("submits the visible HTTP provider on first-run when active provider is a filtered CLI provider", async () => {
+    const submitOnboardingMock = vi.fn(async (): Promise<WorkbenchOnboarding> => ({
+      activeProviderId: "openai",
+      needsOnboarding: false,
+      gateway: createGatewayStatus(),
+      families: [],
+      providers: [
+        {
+          id: "openai",
+          displayName: "OpenAI",
+          kind: "http",
+          envFields: [
+            {
+              key: "OPENAI_API_KEY",
+              description: "OpenAI API key",
+              required: true,
+              secret: true
+            }
+          ],
+          configuredEnvKeys: ["OPENAI_API_KEY"],
+          configuredEnvValues: {},
+          missingRequiredEnv: [],
+          hasConfig: true
+        }
+      ]
+    }));
+    const api = createApiMock({
+      bootstrap: vi.fn(async () => ({
+        homeDir: "/tmp/home",
+        providerSetupCompleted: false,
+        projects: [],
+        onboarding: {
+          activeProviderId: "codex",
+          needsOnboarding: true,
+          gateway: createGatewayStatus(),
+          families: [],
+          providers: [
+            {
+              id: "openai",
+              displayName: "OpenAI",
+              kind: "http",
+              envFields: [
+                {
+                  key: "OPENAI_API_KEY",
+                  description: "OpenAI API key",
+                  required: true,
+                  secret: true
+                }
+              ],
+              configuredEnvKeys: [],
+              configuredEnvValues: {},
+              missingRequiredEnv: ["OPENAI_API_KEY"],
+              hasConfig: false
+            }
+          ]
+        }
+      })),
+      submitOnboarding: submitOnboardingMock as WorkbenchApiClient["submitOnboarding"]
+    });
+    const store = createWorkbenchStore(api);
+
+    await store.getState().bootstrap();
+    expect(store.getState().onboardingDraftProviderId).toBe("openai");
+    store.getState().setOnboardingDraftField("OPENAI_API_KEY", "sk-test");
+
+    await store.getState().submitOnboarding(
+      store.getState().onboardingDraftProviderId,
+      store.getState().onboardingDraftEnv
+    );
+
+    expect(submitOnboardingMock).toHaveBeenCalledWith({
+      providerId: "openai",
+      env: {
+        OPENAI_API_KEY: "sk-test"
+      }
+    });
+    expect(store.getState().showOnboarding).toBe(false);
   });
 
   it("keeps onboarding open when submit result still requires setup", async () => {

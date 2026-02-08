@@ -51,6 +51,7 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
     props.onboarding,
     props.providerId,
   );
+  const selectedProviderId = selectedProvider?.id ?? props.providerId;
   const providerFamilies = useMemo(
     () => resolveProviderFamilies(props.onboarding),
     [props.onboarding],
@@ -186,7 +187,7 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
 
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 md:p-4 lg:grid-cols-[330px_minmax(0,1fr)] lg:gap-4">
           <ProviderListPane
-            providerId={props.providerId}
+            providerId={selectedProviderId}
             families={filteredFamilies}
             query={providerQuery}
             disabled={props.isSubmitting}

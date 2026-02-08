@@ -744,7 +744,13 @@ export function resolveOnboardingDraftProviderId(
   if (preferred && onboarding.providers.some((provider) => provider.id === preferred)) {
     return preferred;
   }
-  return onboarding.activeProviderId || onboarding.providers[0]?.id || "";
+
+  const active = onboarding.activeProviderId?.trim();
+  if (active && onboarding.providers.some((provider) => provider.id === active)) {
+    return active;
+  }
+
+  return onboarding.providers[0]?.id || active || "";
 }
 
 function getConfiguredOnboardingEnv(
