@@ -140,14 +140,14 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
     !props.isSubmitting;
 
   return (
-    <div className="h-screen overflow-hidden bg-[radial-gradient(1300px_620px_at_-10%_-16%,hsl(162_78%_49%_/_0.18),transparent_58%),radial-gradient(1100px_520px_at_120%_-10%,hsl(194_86%_54%_/_0.14),transparent_60%),linear-gradient(180deg,hsl(220_42%_8%),hsl(221_38%_6%))] text-[var(--foreground)]">
+    <div className="h-screen overflow-hidden bg-[linear-gradient(180deg,hsl(222_32%_9%),hsl(223_30%_8%))] text-[var(--foreground)]">
       <motion.div
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: [0.2, 0, 0, 1] }}
         className="flex h-full w-full min-h-0 flex-col"
       >
-        <header className="border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_86%,black)]">
+        <header className="border-b border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_86%,black)]">
           <div className="titlebar-drag-region flex h-11 items-center gap-3 px-4 md:px-6">
             {isMac ? <div className="h-full w-[76px] shrink-0" /> : null}
             <div className="flex-1" />
@@ -155,7 +155,7 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 rounded-full border border-[var(--border)] bg-[var(--surface)]/85 px-3 text-xs text-[var(--muted-foreground)] transition hover:border-[var(--accent)]/70 hover:text-[var(--foreground)]"
+                className="h-8 rounded-full border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_90%,black)] px-3 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                 onClick={() => setShowConnectionPanel((value) => !value)}
                 disabled={props.isSubmitting}
               >
@@ -168,31 +168,26 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
           <div
             className={
               isMac
-                ? "space-y-3 pb-5 pl-[92px] pr-4 md:pb-6 md:pr-6"
-                : "space-y-3 px-4 pb-5 md:px-6 md:pb-6"
+                ? "space-y-3 pb-4 pl-[92px] pr-4 md:space-y-4 md:pb-5 md:pr-6"
+                : "space-y-3 px-4 pb-4 md:space-y-4 md:px-6 md:pb-5"
             }
           >
-            <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-200/85">
-                OpenGoat Setup
-              </p>
-              <h1 className="font-heading text-[clamp(1.65rem,2.8vw,2.35rem)] font-semibold leading-tight tracking-[-0.02em] text-[var(--foreground)]">
-                Setup the Orchestrator Agent
-              </h1>
-              <p className="max-w-2xl text-sm text-[var(--muted-foreground)]">
-                Set a provider for the Orchestrator. This agent is in charge of the coordination between all your agents.
-              </p>
-            </div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+              OpenGoat Setup
+            </p>
+            <h1 className="font-heading text-[clamp(1.95rem,3vw,2.55rem)] font-semibold leading-tight tracking-[-0.02em] text-[var(--foreground)]">
+              Set up your provider
+            </h1>
+            <p className="max-w-3xl text-base text-[var(--muted-foreground)]">
+              Choose one provider, add required credentials, and start your first orchestrator session.
+            </p>
             <ol className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted-foreground)]">
               {ONBOARDING_STEPS.map((step, index) => (
                 <li
                   key={step}
-                  className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)]/95 px-2.5 py-1"
+                  className="rounded-full border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_92%,black)] px-3 py-1.5"
                 >
-                  <span className="inline-flex size-4 items-center justify-center rounded-full bg-[color-mix(in_oklab,var(--accent)_55%,var(--surface))] text-[10px] font-semibold text-[var(--foreground)]">
-                    {index + 1}
-                  </span>
-                  <span>{step}</span>
+                  {index + 1}. {step}
                 </li>
               ))}
             </ol>
@@ -210,7 +205,7 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
           />
         ) : null}
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 border-b border-[var(--border)] lg:grid-cols-[340px_minmax(0,1fr)]">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 md:p-4 lg:grid-cols-[330px_minmax(0,1fr)] lg:gap-4">
           <ProviderListPane
             providerId={props.providerId}
             families={filteredFamilies}
@@ -235,41 +230,44 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
           />
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 bg-[color-mix(in_oklab,var(--surface)_92%,black)] px-5 py-3 md:px-8">
-          <div className="min-h-5 text-xs text-[var(--muted-foreground)]">
-            {props.error ? (
-              <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-red-300"
-              >
-                {props.error}
-              </motion.span>
-            ) : missingStatusMessage ? (
-              <span className="text-amber-300">{missingStatusMessage}</span>
-            ) : selectedProvider ? (
-              `Selected provider: ${selectedProvider.displayName} (${selectedProvider.id})`
-            ) : (
-              "Select a provider to continue"
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {props.canClose ? (
+        <footer className="border-t border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_88%,black)] px-4 py-3 md:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-h-5 text-xs text-[var(--muted-foreground)]">
+              {props.error ? (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-red-300"
+                >
+                  {props.error}
+                </motion.span>
+              ) : missingStatusMessage ? (
+                <span className="text-amber-300">{missingStatusMessage}</span>
+              ) : selectedProvider ? (
+                `Selected provider: ${selectedProvider.displayName} (${selectedProvider.id})`
+              ) : (
+                "Select a provider to continue"
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {props.canClose ? (
+                <Button
+                  variant="outline"
+                  onClick={props.onClose}
+                  disabled={props.isSubmitting}
+                >
+                  Close
+                </Button>
+              ) : null}
               <Button
-                variant="outline"
-                onClick={props.onClose}
-                disabled={props.isSubmitting}
+                variant="glow"
+                className="min-w-[132px]"
+                onClick={props.onSubmit}
+                disabled={!canSubmit}
               >
-                Close
+                {props.isSubmitting ? "Saving..." : "Save and Start"}
               </Button>
-            ) : null}
-            <Button
-              variant="glow"
-              onClick={props.onSubmit}
-              disabled={!canSubmit}
-            >
-              {props.isSubmitting ? "Saving..." : "Save and Start"}
-            </Button>
+            </div>
           </div>
         </footer>
       </motion.div>
@@ -296,14 +294,14 @@ function ProviderListPane(props: {
   onSelectProvider: (providerId: string) => void;
 }) {
   return (
-    <aside className="flex min-h-0 flex-col border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,black)] lg:border-r lg:border-b-0">
-      <div className="space-y-3 border-b border-[var(--border)] px-4 py-4 md:px-5">
+    <aside className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_90%,black)]">
+      <div className="space-y-3 border-b border-[var(--border)]/80 px-4 py-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
             Provider List
           </p>
           <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-            Compact view. Pick one provider.
+            Pick one provider to continue.
           </p>
         </div>
         <Input
@@ -324,7 +322,7 @@ function ProviderListPane(props: {
             props.families.map((family) => (
               <section key={family.id} className="space-y-2">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
                     {family.label}
                   </p>
                   {family.hint ? (
@@ -359,20 +357,16 @@ function ProviderListItem(props: {
   disabled: boolean;
   onSelect: () => void;
 }) {
-  const requiredCount = props.provider.envFields.filter(
-    (field) => field.required,
-  ).length;
-  const missingCount = props.provider.missingRequiredEnv.length;
-
   return (
     <button
       type="button"
       onClick={props.onSelect}
       disabled={props.disabled}
-      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${props.selected
-        ? "border-[var(--accent-strong)] bg-[color-mix(in_oklab,var(--accent)_24%,transparent)] shadow-[inset_0_0_0_1px_hsl(162_72%_39%_/_0.22)]"
-        : "border-transparent hover:border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--surface)_88%,black)]"
-        }`}
+      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition ${
+        props.selected
+          ? "border-[var(--accent-strong)] bg-[color-mix(in_oklab,var(--accent)_18%,var(--surface))]"
+          : "border-transparent hover:border-[var(--border)]/90 hover:bg-[color-mix(in_oklab,var(--surface)_86%,black)]"
+      }`}
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[var(--foreground)]">
@@ -385,20 +379,10 @@ function ProviderListItem(props: {
       <div className="flex items-center gap-1.5">
         <Badge
           variant="outline"
-          className="border-[var(--border)] text-[10px] uppercase"
+          className="border-[var(--border)]/90 text-[10px] uppercase"
         >
           {props.provider.kind}
         </Badge>
-        {requiredCount > 0 ? (
-          <span
-            className={`rounded-full px-1.5 py-0.5 text-[10px] ${missingCount > 0
-              ? "bg-amber-500/20 text-amber-200"
-              : "bg-emerald-500/20 text-emerald-200"
-              }`}
-          >
-            {missingCount > 0 ? `${missingCount} missing` : "ready"}
-          </span>
-        ) : null}
       </div>
     </button>
   );
@@ -430,8 +414,8 @@ function SetupPane(props: {
 }) {
   if (!props.provider) {
     return (
-      <div className="flex min-h-0 flex-col bg-[color-mix(in_oklab,var(--surface)_88%,black)]">
-        <div className="border-b border-[var(--border)] p-5 md:px-7">
+      <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_90%,black)]">
+        <div className="p-5">
           <p className="font-heading text-xl">Provider Setup</p>
           <p className="mt-1 text-sm text-[var(--muted-foreground)]">
             Choose a provider from the list to continue.
@@ -444,17 +428,26 @@ function SetupPane(props: {
   const hasRequired = props.requiredFields.length > 0;
   const hasOptional = props.optionalFields.length > 0;
   const provider = props.provider;
+  const missingCount = props.missingRequiredKeys.length;
 
   return (
-    <section className="flex min-h-0 flex-col bg-[color-mix(in_oklab,var(--surface)_88%,black)]">
-      <div className="border-b border-[var(--border)] p-5 md:px-7">
-        <p className="font-heading text-xl">{provider.displayName}</p>
-        <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-          Fill the required fields first. Optional fields stay hidden until
-          needed.
-        </p>
+    <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_90%,black)]">
+      <div className="border-b border-[var(--border)]/80 p-5">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="font-heading text-[1.9rem] leading-tight tracking-[-0.02em] text-[var(--foreground)]">
+              {provider.displayName}
+            </p>
+            <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+              Add credentials to continue.
+            </p>
+          </div>
+          <Badge variant="outline" className="border-[var(--border)] text-[10px] uppercase">
+            {provider.kind}
+          </Badge>
+        </div>
         {provider.guidedAuth ? (
-          <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+          <div className="mt-4 rounded-lg border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_94%,black)] p-3">
             <p className="text-sm font-medium">{provider.guidedAuth.title}</p>
             <p className="mt-1 text-xs text-[var(--muted-foreground)]">
               {provider.guidedAuth.description}
@@ -472,7 +465,7 @@ function SetupPane(props: {
               </Button>
             </div>
             {props.onboardingNotice ? (
-              <pre className="mt-2 max-h-28 overflow-y-auto whitespace-pre-wrap rounded-md border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,black)] p-2 text-xs text-[var(--muted-foreground)]">
+              <pre className="mt-2 max-h-28 overflow-y-auto whitespace-pre-wrap rounded-md border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_96%,black)] p-2 text-xs text-[var(--muted-foreground)]">
                 {props.onboardingNotice}
               </pre>
             ) : null}
@@ -481,36 +474,43 @@ function SetupPane(props: {
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="space-y-5 p-5 md:px-7">
+        <div className="space-y-5 p-5">
           <section className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
-              Required
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.11em] text-[var(--muted-foreground)]">
+                Credentials
+              </p>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                {missingCount > 0 ? `${missingCount} required fields remaining` : "All required fields complete"}
+              </p>
+            </div>
             {!hasRequired ? (
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
+              <div className="rounded-xl border border-[var(--border)]/80 bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
                 {provider.guidedAuth
                   ? "Use OAuth sign-in above to populate required credentials."
                   : "No required credentials for this provider."}
               </div>
             ) : (
-              props.requiredFields.map((field) => {
-                const configured = provider.configuredEnvKeys.includes(
-                  field.key,
-                );
-                const value = props.env[field.key] ?? "";
-                const missing = props.missingRequiredKeys.includes(field.key);
-                return (
-                  <EnvFieldInput
-                    key={field.key}
-                    field={field}
-                    value={value}
-                    configured={configured}
-                    missing={missing}
-                    disabled={props.disabled}
-                    onChange={props.onEnvChange}
-                  />
-                );
-              })
+              <div className="space-y-3">
+                {props.requiredFields.map((field) => {
+                  const configured = provider.configuredEnvKeys.includes(
+                    field.key,
+                  );
+                  const value = props.env[field.key] ?? "";
+                  const missing = props.missingRequiredKeys.includes(field.key);
+                  return (
+                    <EnvFieldInput
+                      key={field.key}
+                      field={field}
+                      value={value}
+                      configured={configured}
+                      missing={missing}
+                      disabled={props.disabled}
+                      onChange={props.onEnvChange}
+                    />
+                  );
+                })}
+              </div>
             )}
           </section>
 
@@ -518,38 +518,40 @@ function SetupPane(props: {
             <button
               type="button"
               onClick={props.onToggleAdvanced}
-              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] transition hover:border-[var(--accent)]/60 hover:bg-[color-mix(in_oklab,var(--surface-strong)_82%,black)]"
+              className="w-full rounded-lg border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_92%,black)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[color-mix(in_oklab,var(--surface)_96%,black)]"
             >
               {props.showAdvanced
                 ? "Hide Advanced Options"
                 : "Show Advanced Options"}
             </button>
             {props.showAdvanced ? (
-              <div className="space-y-4 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_95%,black)] p-3">
+              <div className="space-y-4 rounded-lg border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_94%,black)] p-3">
                 <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.11em] text-[var(--muted-foreground)]">
                     Optional Provider Fields
                   </p>
                   {hasOptional ? (
-                    props.optionalFields.map((field) => {
-                      const configured = provider.configuredEnvKeys.includes(
-                        field.key,
-                      );
-                      const value = props.env[field.key] ?? "";
-                      return (
-                        <EnvFieldInput
-                          key={field.key}
-                          field={field}
-                          value={value}
-                          configured={configured}
-                          missing={false}
-                          disabled={props.disabled}
-                          onChange={props.onEnvChange}
-                        />
-                      );
-                    })
+                    <div className="space-y-3">
+                      {props.optionalFields.map((field) => {
+                        const configured = provider.configuredEnvKeys.includes(
+                          field.key,
+                        );
+                        const value = props.env[field.key] ?? "";
+                        return (
+                          <EnvFieldInput
+                            key={field.key}
+                            field={field}
+                            value={value}
+                            configured={configured}
+                            missing={false}
+                            disabled={props.disabled}
+                            onChange={props.onEnvChange}
+                          />
+                        );
+                      })}
+                    </div>
                   ) : (
-                    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
+                    <div className="rounded-lg border border-[var(--border)]/80 bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
                       No optional provider fields for this provider.
                     </div>
                   )}
@@ -587,8 +589,8 @@ function ConnectionSettingsPane(props: {
   const canSave = !props.disabled && (!isRemote || Boolean(props.gateway.remoteUrl.trim()));
 
   return (
-    <section className="border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_94%,black)] px-5 py-3 md:px-8">
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+    <section className="px-3 pb-1 pt-0 md:px-4">
+      <div className="rounded-xl border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_90%,black)] p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <p className="text-sm font-medium text-[var(--foreground)]">
@@ -609,7 +611,7 @@ function ConnectionSettingsPane(props: {
         </div>
 
         <div className="mt-3 space-y-3">
-          <label className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_95%,black)] px-3 py-2 text-sm">
+          <label className="flex items-center gap-2 rounded-lg border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_95%,black)] px-3 py-2 text-sm">
             <input
               type="checkbox"
               className="size-4"
@@ -622,7 +624,7 @@ function ConnectionSettingsPane(props: {
               }
             />
             <span>Connect to remote OpenGoat</span>
-            <span className="ml-auto rounded-full border border-[var(--border)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
+            <span className="ml-auto rounded-full border border-[var(--border)]/80 px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
               {isRemote ? "Remote" : "Local"}
             </span>
           </label>
@@ -718,43 +720,32 @@ function EnvFieldInput(props: {
   disabled: boolean;
   onChange: (key: string, value: string) => void;
 }) {
+  const label = toHumanLabel(props.field.key);
+  const normalizedLabel = label.trim().toLowerCase();
+  const normalizedDescription = props.field.description.trim().toLowerCase();
+  const showDescription = normalizedLabel !== normalizedDescription;
+  const placeholder = resolveFieldPlaceholder(props.field);
+
   return (
-    <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-[var(--foreground)]">
-            {toHumanLabel(props.field.key)}
-          </p>
-          <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
-            {props.field.description}
-          </p>
-        </div>
-        {props.field.required ? (
-          <Badge
-            variant="outline"
-            className="border-amber-400/50 bg-amber-400/10 text-[10px] text-amber-200"
-          >
-            Required
-          </Badge>
-        ) : null}
-      </div>
+    <div className="space-y-2">
+      <p className="truncate text-sm font-medium text-[var(--foreground)]">
+        {label}
+      </p>
+      {showDescription ? (
+        <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
+          {props.field.description}
+        </p>
+      ) : null}
       <Input
         type={props.field.secret ? "password" : "text"}
         value={props.value}
         onChange={(event) => {
           props.onChange(props.field.key, event.target.value);
         }}
-        placeholder={props.field.description}
+        aria-label={label}
+        placeholder={placeholder}
         disabled={props.disabled}
       />
-      {props.configured && !props.value ? (
-        <p
-          className={`text-xs ${props.missing ? "text-amber-300" : "text-[var(--muted-foreground)]"
-            }`}
-        >
-          Currently configured.
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -869,12 +860,48 @@ function isFieldSatisfied(params: {
   return params.configured || Boolean(params.value.trim());
 }
 
+function resolveFieldPlaceholder(field: {
+  key: string;
+  secret?: boolean;
+}): string {
+  const normalizedKey = field.key.trim().toUpperCase();
+  if (normalizedKey.includes("URL") || normalizedKey.includes("ENDPOINT")) {
+    return "https://...";
+  }
+  if (field.secret) {
+    return "Enter secret";
+  }
+  return "Enter value";
+}
+
 function toHumanLabel(key: string): string {
+  const replacements: Record<string, string> = {
+    api: "API",
+    url: "URL",
+    id: "ID",
+    oauth: "OAuth",
+    http: "HTTP",
+    https: "HTTPS",
+    aws: "AWS",
+    gcp: "GCP",
+    azure: "Azure",
+    openai: "OpenAI",
+    openrouter: "OpenRouter",
+    qwen: "Qwen",
+  };
+
   return key
     .split("_")
     .filter(Boolean)
-    .map((part) => part.toUpperCase())
-    .join("_");
+    .map((part) => {
+      const normalized = part.toLowerCase();
+      const replacement = replacements[normalized];
+      if (replacement) {
+        return replacement;
+      }
+      return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    })
+    .join(" ");
 }
 
 function shouldHideGuidedAuthField(field: {
@@ -894,20 +921,13 @@ function shouldHideGuidedAuthField(field: {
 }
 
 function buildMissingStatusMessage(
-  missingFields: string[],
+  _missingFields: string[],
   needsGuidedAuth: boolean,
 ): string | null {
-  const parts: string[] = [];
   if (needsGuidedAuth) {
-    parts.push("Complete OAuth sign-in to continue");
+    return "Complete OAuth sign-in to continue";
   }
-  if (missingFields.length > 0) {
-    parts.push(`Missing required fields: ${missingFields.join(", ")}`);
-  }
-  if (parts.length === 0) {
-    return null;
-  }
-  return parts.join(" • ");
+  return null;
 }
 
 function clampGatewayTimeout(value: number): number {

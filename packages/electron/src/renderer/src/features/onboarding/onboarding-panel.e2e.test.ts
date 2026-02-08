@@ -86,9 +86,9 @@ describe("OnboardingPanel e2e", () => {
     expect(saveButton.hasAttribute("disabled")).toBe(true);
 
     await user.click(screen.getByRole("button", { name: /openrouter/i }));
-    expect(screen.getByPlaceholderText("OpenRouter API key")).toBeTruthy();
+    expect(screen.getByLabelText(/openrouter api key/i)).toBeTruthy();
 
-    await user.type(screen.getByPlaceholderText("OpenRouter API key"), "or-test-key");
+    await user.type(screen.getByLabelText(/openrouter api key/i), "or-test-key");
     expect(saveButton.hasAttribute("disabled")).toBe(false);
 
     await user.click(saveButton);
