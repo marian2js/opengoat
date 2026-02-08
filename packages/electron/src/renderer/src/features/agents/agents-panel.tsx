@@ -408,15 +408,8 @@ export function AgentsPanel(props: AgentsPanelProps) {
                   <Badge variant="outline">{selectedProvider.displayName}</Badge>
                   <span className="text-muted-foreground">Provider settings</span>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Set the model first. Advanced settings include optional provider-specific details.
-                </p>
-                {providerSettings.primary.length === 0 ? (
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    No required settings for this provider.
-                  </p>
-                ) : (
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                {providerSettings.primary.length > 0 ? (
+                  <div className="mt-3 space-y-3">
                     {providerSettings.primary.map((field) => (
                       <ProviderEnvFieldInput
                         key={field.key}
@@ -427,7 +420,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
                       />
                     ))}
                   </div>
-                )}
+                ) : null}
                 {providerSettings.advanced.length > 0 ? (
                   <div className="mt-3">
                     <Button
@@ -439,7 +432,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
                     >
                       {showAdvancedProviderSettings
                         ? "Hide advanced settings"
-                        : `Show advanced settings (${providerSettings.advanced.length})`}
+                        : "Advanced settings"}
                       <ChevronDown
                         className={cn(
                           "ml-1.5 size-3.5 transition-transform",
@@ -448,7 +441,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
                       />
                     </Button>
                     {showAdvancedProviderSettings ? (
-                      <div className="mt-2 grid gap-3 md:grid-cols-2">
+                      <div className="mt-2 space-y-3">
                         {providerSettings.advanced.map((field) => (
                           <ProviderEnvFieldInput
                             key={field.key}
@@ -462,16 +455,18 @@ export function AgentsPanel(props: AgentsPanelProps) {
                     ) : null}
                   </div>
                 ) : null}
-                <div className="mt-3 flex justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void handleSaveProviderConfig()}
-                    disabled={props.busy || selectedProvider.envFields.length === 0}
-                  >
-                    Save provider settings
-                  </Button>
-                </div>
+                {selectedProvider.envFields.length > 0 ? (
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void handleSaveProviderConfig()}
+                      disabled={props.busy}
+                    >
+                      Save provider settings
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
