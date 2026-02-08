@@ -1,3 +1,6 @@
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { OpenCodeProvider } from "./provider.js";
 
@@ -70,5 +73,45 @@ describe("opencode provider", () => {
     });
 
     expect(invocation.args).toEqual(["run", "--session", "oc-session-123", "continue this task"]);
+  });
+
+  it("creates provider-managed OpenCode agent files idempotently", async () => {
+    const provider = new OpenCodeProvider();
+    const root = await mkdtemp(path.join(os.tmpdir(), "opengoat-opencode-provider-"));
+    try {
+      const configDir = path.join(root, "opencode-config");
+      const first = await provider.createAgent({
+        agentId: "research-analyst",
+        displayName: "Research Analyst",
+        workspaceDir: "/unused/workspace",
+        internalConfigDir: "/unused/config",
+        env: {
+          OPENCODE_CONFIG_DIR: configDir
+        }
+      });
+
+      expect(provider.capabilities.agentCreate).toBe(true);
+      expect(first.code).toBe(0);
+      expect(first.stdout).toContain("Created OpenCode agent");
+
+      const agentPath = path.join(configDir, "agent", "research-analyst.md");
+      const contents = await readFile(agentPath, "utf-8");
+      expect(contents).toContain("mode: subagent");
+      expect(contents).toContain("You are Research Analyst");
+
+      const second = await provider.createAgent({
+        agentId: "research-analyst",
+        displayName: "Research Analyst",
+        workspaceDir: "/unused/workspace",
+        internalConfigDir: "/unused/config",
+        env: {
+          OPENCODE_CONFIG_DIR: configDir
+        }
+      });
+      expect(second.code).toBe(0);
+      expect(second.stdout).toContain("already exists");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
