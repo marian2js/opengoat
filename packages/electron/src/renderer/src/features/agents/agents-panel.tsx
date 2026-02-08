@@ -60,6 +60,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
   const [providerEnvDrafts, setProviderEnvDrafts] = useState<Record<string, Record<string, string>>>({});
   const [createExternal, setCreateExternal] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteProviderId, setDeleteProviderId] = useState("");
   const [deleteExternal, setDeleteExternal] = useState(false);
@@ -78,6 +79,13 @@ export function AgentsPanel(props: AgentsPanelProps) {
     (normalizedProviderId && providerEnvDrafts[normalizedProviderId]) ??
     selectedProvider?.configuredEnvValues ??
     {};
+
+  const resetCreateForm = () => {
+    setName("");
+    setProviderId("");
+    setCreateExternal(false);
+    setFormError(null);
+  };
 
   useEffect(() => {
     if (!deleteTarget) {
@@ -121,9 +129,8 @@ export function AgentsPanel(props: AgentsPanelProps) {
       providerId: trimmedProvider || undefined,
       createExternalAgent: createExternal
     });
-    setName("");
-    setProviderId("");
-    setCreateExternal(false);
+    resetCreateForm();
+    setCreateOpen(false);
   };
 
   const handleDelete = async () => {
@@ -181,6 +188,15 @@ export function AgentsPanel(props: AgentsPanelProps) {
             <Button
               variant="outline"
               size="sm"
+              className="h-8 gap-2 rounded-lg border border-[#2E2F31] bg-[#202124] px-3 text-foreground/95 hover:bg-[#2A2B2F]"
+              onClick={() => setCreateOpen(true)}
+              disabled={props.busy || props.loading}
+            >
+              Create agent
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               className="h-8 gap-2 rounded-lg border border-[#2E2F31] bg-[#161617] px-3 text-foreground/95 hover:bg-[#1D1D1F]"
               onClick={props.onRefresh}
               disabled={props.busy || props.loading}
@@ -221,133 +237,6 @@ export function AgentsPanel(props: AgentsPanelProps) {
               </Button>
             </div>
           ) : null}
-
-          <section className="rounded-xl border border-[#2E2F31] bg-[#141416] px-4 py-4">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Create agent</h2>
-                <p className="text-xs text-muted-foreground">
-                  Create a new agent workspace with an external provider binding.
-                </p>
-              </div>
-            </div>
-            <form className="space-y-4" onSubmit={handleCreate}>
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-foreground">Agent name</p>
-                  <Input
-                    value={name}
-                    onChange={(event) => {
-                      setName(event.target.value);
-                      if (formError) {
-                        setFormError(null);
-                      }
-                    }}
-                    placeholder="Writer"
-                    disabled={props.busy}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-foreground">Agent Provider</p>
-                  <Select
-                    value={normalizedProviderId || undefined}
-                    onValueChange={(value) => {
-                      setProviderId(value);
-                      if (formError) {
-                        setFormError(null);
-                      }
-                    }}
-                    disabled={props.busy}
-                  >
-                    <SelectTrigger
-                      className="h-11 w-full rounded-xl border border-[#2E2F31] bg-[#0E1117] text-foreground hover:bg-[#151922]"
-                    >
-                      <SelectValue placeholder="Select provider" />
-                    </SelectTrigger>
-                    <SelectContent
-                      align="start"
-                      className="border-[#2E2F31] bg-[#0E1117]"
-                    >
-                      {providerOptions.map((provider) => (
-                        <SelectItem key={provider.id} value={provider.id}>
-                          {provider.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <label className="flex items-center gap-2 rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4"
-                  checked={createExternal}
-                  onChange={(event) => setCreateExternal(event.currentTarget.checked)}
-                  disabled={props.busy}
-                />
-                <span>Create external agent</span>
-                <span className="ml-auto text-[11px] text-muted-foreground">
-                  Requires agent provider
-                </span>
-              </label>
-
-              {selectedProvider && !props.providerConfigAvailable ? (
-                <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3 text-sm text-muted-foreground">
-                  Provider settings require a newer desktop runtime.
-                </div>
-              ) : null}
-              {props.providerConfigAvailable && selectedProvider ? (
-                <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <Badge variant="outline">{selectedProvider.displayName}</Badge>
-                    <span>Provider settings</span>
-                  </div>
-                  {selectedProvider.envFields.length === 0 ? (
-                    <div className="mt-2 text-sm text-muted-foreground">
-                      No additional settings for this provider.
-                    </div>
-                  ) : (
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      {selectedProvider.envFields.map((field) => (
-                        <div key={field.key} className="space-y-1">
-                          <p className="text-xs font-medium text-foreground">{field.key}</p>
-                          <p className="text-[11px] text-muted-foreground">{field.description}</p>
-                          <Input
-                            type={field.secret ? "password" : "text"}
-                            value={providerEnv[field.key] ?? ""}
-                            onChange={(event) => handleProviderFieldChange(field.key, event.target.value)}
-                            placeholder={field.secret ? "Enter secret" : "Enter value"}
-                            disabled={props.busy}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-3 flex justify-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void handleSaveProviderConfig()}
-                      disabled={props.busy || selectedProvider.envFields.length === 0}
-                    >
-                      Save provider settings
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-
-              {formError ? (
-                <p className="text-xs text-red-200">{formError}</p>
-              ) : null}
-
-              <div className="flex justify-end">
-                <Button type="submit" variant="outline" disabled={props.busy}>
-                  Create agent
-                </Button>
-              </div>
-            </form>
-          </section>
 
           <section className="space-y-2">
             <div className="flex items-center justify-between">
@@ -419,6 +308,150 @@ export function AgentsPanel(props: AgentsPanelProps) {
           </section>
         </div>
       </section>
+
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open);
+          if (!open) {
+            resetCreateForm();
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_92%,black)]">
+          <DialogHeader>
+            <DialogTitle>Create agent</DialogTitle>
+            <DialogDescription>
+              Create a new agent workspace with an external provider binding.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-4" onSubmit={handleCreate}>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-foreground">Agent name</p>
+                <Input
+                  value={name}
+                  onChange={(event) => {
+                    setName(event.target.value);
+                    if (formError) {
+                      setFormError(null);
+                    }
+                  }}
+                  placeholder="Writer"
+                  disabled={props.busy}
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-foreground">Agent Provider</p>
+                <Select
+                  value={normalizedProviderId || undefined}
+                  onValueChange={(value) => {
+                    setProviderId(value);
+                    if (formError) {
+                      setFormError(null);
+                    }
+                  }}
+                  disabled={props.busy}
+                >
+                  <SelectTrigger
+                    className="h-11 w-full rounded-xl border border-[#2E2F31] bg-[#0E1117] text-foreground hover:bg-[#151922]"
+                  >
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent
+                    align="start"
+                    className="border-[#2E2F31] bg-[#0E1117]"
+                  >
+                    {providerOptions.map((provider) => (
+                      <SelectItem key={provider.id} value={provider.id}>
+                        {provider.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                className="size-4"
+                checked={createExternal}
+                onChange={(event) => setCreateExternal(event.currentTarget.checked)}
+                disabled={props.busy}
+              />
+              <span>Create external agent</span>
+              <span className="ml-auto text-[11px] text-muted-foreground">
+                Requires agent provider
+              </span>
+            </label>
+
+            {selectedProvider && !props.providerConfigAvailable ? (
+              <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3 text-sm text-muted-foreground">
+                Provider settings require a newer desktop runtime.
+              </div>
+            ) : null}
+            {props.providerConfigAvailable && selectedProvider ? (
+              <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <Badge variant="outline">{selectedProvider.displayName}</Badge>
+                  <span>Provider settings</span>
+                </div>
+                {selectedProvider.envFields.length === 0 ? (
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    No additional settings for this provider.
+                  </div>
+                ) : (
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    {selectedProvider.envFields.map((field) => (
+                      <div key={field.key} className="space-y-1">
+                        <p className="text-xs font-medium text-foreground">{field.key}</p>
+                        <p className="text-[11px] text-muted-foreground">{field.description}</p>
+                        <Input
+                          type={field.secret ? "password" : "text"}
+                          value={providerEnv[field.key] ?? ""}
+                          onChange={(event) => handleProviderFieldChange(field.key, event.target.value)}
+                          placeholder={field.secret ? "Enter secret" : "Enter value"}
+                          disabled={props.busy}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleSaveProviderConfig()}
+                    disabled={props.busy || selectedProvider.envFields.length === 0}
+                  >
+                    Save provider settings
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {formError ? (
+              <p className="text-xs text-red-200">{formError}</p>
+            ) : null}
+
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setCreateOpen(false)}
+                disabled={props.busy}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="outline" disabled={props.busy}>
+                Create agent
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent className="max-w-lg border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_92%,black)]">
