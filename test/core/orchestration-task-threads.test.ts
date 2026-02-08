@@ -135,6 +135,7 @@ async function writeAgentManifest(root: string, agentId: string, name: string, d
       `name: ${name}`,
       `description: ${description}`,
       "provider: threaded-scripted",
+      "discoverable: true",
       "tags: [specialized, delegated]",
       "delegation:",
       "  canReceive: true",

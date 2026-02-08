@@ -31,6 +31,7 @@ describe("AgentManifestService", () => {
         "name: Researcher",
         "description: Handles research tasks",
         "provider: openai",
+        "discoverable: false",
         "tags: [research, docs]",
         "delegation:",
         "  canReceive: true",
@@ -47,6 +48,7 @@ describe("AgentManifestService", () => {
 
     expect(manifest.metadata.name).toBe("Researcher");
     expect(manifest.metadata.provider).toBe("openai");
+    expect(manifest.metadata.discoverable).toBe(false);
     expect(manifest.metadata.tags).toEqual(["research", "docs"]);
     expect(manifest.metadata.priority).toBe(80);
     expect(manifest.source).toBe("frontmatter");
@@ -79,6 +81,7 @@ describe("AgentManifestService", () => {
     const updated = await readFile(path.join(paths.workspacesDir, "researcher", "AGENTS.md"), "utf8");
 
     expect(updated).toContain("provider: openrouter");
+    expect(updated).toContain("discoverable: true");
     expect(updated).toContain("# Research Agent");
   });
 });

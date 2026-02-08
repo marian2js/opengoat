@@ -43,7 +43,7 @@ It is designed for:
 
 1. `orchestrator` is always the default inbound agent.
 2. Every agent has exactly one provider binding.
-3. Agent metadata is minimal and markdown-driven (`AGENTS.md` front matter).
+3. Agent metadata is minimal and markdown-driven (`AGENTS.md` front matter), including discoverability controls.
 4. Workspace state is markdown/json-first.
 5. External providers should not require or receive internal workspace paths.
 6. Runs and sessions are distinct concepts.
@@ -177,6 +177,7 @@ Agent metadata source of truth is `AGENTS.md` front matter:
 - `name`
 - `description`
 - `provider`
+- `discoverable` (default `true`; when `false`, hidden from orchestrator discovery/delegation)
 - `tags`
 - `delegation.canReceive`
 - `delegation.canDelegate`
@@ -186,6 +187,7 @@ Default behavior:
 
 - `orchestrator` can delegate.
 - other agents default to delegated specialists.
+- agents are discoverable by orchestrator unless `discoverable: false` is set.
 
 ## 8) Provider Model
 

@@ -56,6 +56,7 @@ export function renderWorkspaceAgentsMarkdown(agent: AgentIdentity, providerId =
     `name: ${agent.displayName}`,
     `description: ${description}`,
     `provider: ${providerId}`,
+    "discoverable: true",
     `tags: [${tags}]`,
     "delegation:",
     "  canReceive: true",

@@ -1,4 +1,4 @@
-import type { AgentManifest } from "../../agents/index.js";
+import { isDiscoverableByOrchestrator, type AgentManifest } from "../../agents/index.js";
 import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
 import type {
   OrchestrationAction,
@@ -33,8 +33,9 @@ export interface OrchestrationPlannerInput {
 export class OrchestrationPlannerService {
   public buildPlannerPrompt(input: OrchestrationPlannerInput): string {
     const agentDescriptors = input.agents
-      .map(toAgentDescriptor)
-      .filter((agent) => agent.agentId !== DEFAULT_AGENT_ID && agent.canReceive);
+      .filter((manifest) => manifest.agentId !== DEFAULT_AGENT_ID)
+      .filter((manifest) => isDiscoverableByOrchestrator(manifest))
+      .map(toAgentDescriptor);
 
     const lines: string[] = [
       "You are the OpenGoat orchestrator decision engine.",
