@@ -3,6 +3,8 @@ import { DESKTOP_IPC_CONTRACT_VERSION } from "@shared/workbench-contract";
 import {
   addProjectInputSchema,
   createSessionInputSchema,
+  createAgentInputSchema,
+  deleteAgentInputSchema,
   removeProjectInputSchema,
   renameProjectInputSchema,
   renameSessionInputSchema,
@@ -50,6 +52,24 @@ export function createDesktopRouter(service: WorkbenchService) {
       pick: t.procedure.mutation(async () => {
         return service.pickAndAddProject();
       }),
+    }),
+    agents: t.router({
+      list: t.procedure.query(async () => {
+        return service.listAgents();
+      }),
+      providers: t.procedure.query(async () => {
+        return service.listAgentProviders();
+      }),
+      create: t.procedure
+        .input(createAgentInputSchema)
+        .mutation(async ({ input }) => {
+          return service.createAgent(input);
+        }),
+      delete: t.procedure
+        .input(deleteAgentInputSchema)
+        .mutation(async ({ input }) => {
+          return service.deleteAgent(input);
+        }),
     }),
     sessions: t.router({
       list: t.procedure

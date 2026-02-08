@@ -600,6 +600,14 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
     removeProject: vi.fn(async () => {
       throw new Error("not used");
     }),
+    listAgents: vi.fn(async () => []),
+    listAgentProviders: vi.fn(async () => []),
+    createAgent: vi.fn(async () => {
+      throw new Error("not used");
+    }),
+    deleteAgent: vi.fn(async () => {
+      throw new Error("not used");
+    }),
     createSession: vi.fn(async () => {
       throw new Error("not used");
     }),

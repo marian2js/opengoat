@@ -3,6 +3,7 @@ import { OnboardingPanel } from "@renderer/features/onboarding/onboarding-panel"
 import { RuntimeSettingsModal } from "@renderer/features/runtime/runtime-settings-modal";
 import { ProjectsSidebar } from "@renderer/features/projects/projects-sidebar";
 import { ChatPanel } from "@renderer/features/chat/chat-panel";
+import { AgentsPanel } from "@renderer/features/agents/agents-panel";
 import { getActiveProject, useWorkbenchStore } from "@renderer/store/workbench-store";
 
 export function App() {
@@ -21,6 +22,10 @@ export function App() {
     activeProjectId,
     activeSessionId,
     activeMessages,
+    agents,
+    agentProviders,
+    agentsState,
+    agentsNotice,
     isBootstrapping,
     isBusy,
     error,
@@ -33,6 +38,10 @@ export function App() {
     removeSession,
     selectProject,
     selectSession,
+    loadAgents,
+    createAgent,
+    deleteAgent,
+    clearAgentsNotice,
     submitOnboarding,
     saveOnboardingGateway,
     runOnboardingGuidedAuth,
@@ -47,6 +56,7 @@ export function App() {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showRuntimeSettings, setShowRuntimeSettings] = useState(false);
+  const [activeView, setActiveView] = useState<"chat" | "agents">("chat");
   const [windowChrome, setWindowChrome] = useState<OpenGoatDesktopWindowChrome>({
     isMac: false,
     isMaximized: false,
@@ -56,6 +66,12 @@ export function App() {
   useEffect(() => {
     void bootstrap();
   }, [bootstrap]);
+
+  useEffect(() => {
+    if (activeView === "agents") {
+      void loadAgents();
+    }
+  }, [activeView, loadAgents]);
 
   useEffect(() => {
     const desktopApi = window.opengoatDesktop;
@@ -133,6 +149,7 @@ export function App() {
     () => activeProject?.sessions.find((session) => session.id === activeSessionId) ?? null,
     [activeProject, activeSessionId]
   );
+  const isAgentsView = activeView === "agents";
 
   const onSaveOnboarding = async () => {
     if (!onboardingDraftProviderId) {
@@ -211,38 +228,65 @@ export function App() {
               activeSessionId={activeSessionId}
               busy={isBusy}
               collapsed={sidebarCollapsed}
+              agentsActive={isAgentsView}
               onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
               onAddProjectDialog={() => void addProjectFromDialog()}
+              onOpenAgents={() => setActiveView("agents")}
               onRenameProject={(projectId, name) => void renameProject(projectId, name)}
               onRemoveProject={(projectId) => void removeProject(projectId)}
-              onCreateSession={(projectId) => void createSession(projectId)}
+              onCreateSession={(projectId) => {
+                setActiveView("chat");
+                void createSession(projectId);
+              }}
               onRenameSession={(projectId, sessionId, title) =>
                 void renameSession(projectId, sessionId, title)
               }
               onRemoveSession={(projectId, sessionId) =>
                 void removeSession(projectId, sessionId)
               }
-              onSelectProject={(projectId) => void selectProject(projectId)}
-              onSelectSession={(projectId, sessionId) => void selectSession(projectId, sessionId)}
+              onSelectProject={(projectId) => {
+                setActiveView("chat");
+                void selectProject(projectId);
+              }}
+              onSelectSession={(projectId, sessionId) => {
+                setActiveView("chat");
+                void selectSession(projectId, sessionId);
+              }}
             />
-            <ChatPanel
-              key={`${activeProjectId ?? "none"}:${activeSessionId ?? "none"}`}
-              homeDir={homeDir}
-              activeProject={activeProject}
-              activeSession={activeSession}
-              messages={activeMessages}
-              gateway={onboarding?.gateway}
-              error={error}
-              busy={isBusy}
-              onSubmitMessage={(message) =>
-                sendMessage(message, {
-                  rethrow: true
-                })
-              }
-              onOpenRuntimeSettings={() => setShowRuntimeSettings(true)}
-              onOpenOnboarding={() => void openOnboarding()}
-              onDismissError={clearError}
-            />
+            {isAgentsView ? (
+              <AgentsPanel
+                agents={agents}
+                providers={agentProviders}
+                loading={agentsState === "loading"}
+                busy={isBusy || agentsState === "saving"}
+                error={error}
+                notice={agentsNotice}
+                onRefresh={() => void loadAgents()}
+                onCreate={(input) => createAgent(input)}
+                onDelete={(input) => deleteAgent(input)}
+                onDismissNotice={clearAgentsNotice}
+                onDismissError={clearError}
+              />
+            ) : (
+              <ChatPanel
+                key={`${activeProjectId ?? "none"}:${activeSessionId ?? "none"}`}
+                homeDir={homeDir}
+                activeProject={activeProject}
+                activeSession={activeSession}
+                messages={activeMessages}
+                gateway={onboarding?.gateway}
+                error={error}
+                busy={isBusy}
+                onSubmitMessage={(message) =>
+                  sendMessage(message, {
+                    rethrow: true
+                  })
+                }
+                onOpenRuntimeSettings={() => setShowRuntimeSettings(true)}
+                onOpenOnboarding={() => void openOnboarding()}
+                onDismissError={clearError}
+              />
+            )}
           </div>
         </div>
       </div>

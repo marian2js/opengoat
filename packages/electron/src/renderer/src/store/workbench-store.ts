@@ -1,9 +1,13 @@
 import { create } from "zustand";
 import type {
+  WorkbenchAgent,
+  WorkbenchAgentCreationResult,
+  WorkbenchAgentDeletionResult,
   WorkbenchGatewayMode,
   WorkbenchMessage,
   WorkbenchOnboarding,
   WorkbenchProject,
+  WorkbenchProviderSummary,
   WorkbenchSession
 } from "@shared/workbench";
 import { WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS } from "@shared/workbench";
@@ -16,6 +20,7 @@ export type OnboardingFlowState = "hidden" | "loading" | "editing" | "submitting
 export type ChatFlowState = "idle" | "sending";
 export type OnboardingGuidedAuthState = "idle" | "running";
 export type GatewayFlowState = "idle" | "saving";
+export type AgentsFlowState = "idle" | "loading" | "saving";
 
 export interface OnboardingGatewayDraft {
   mode: WorkbenchGatewayMode;
@@ -37,6 +42,10 @@ interface WorkbenchUiState {
   gatewayState: GatewayFlowState;
   onboardingNotice: string | null;
   chatState: ChatFlowState;
+  agents: WorkbenchAgent[];
+  agentProviders: WorkbenchProviderSummary[];
+  agentsState: AgentsFlowState;
+  agentsNotice: string | null;
   activeProjectId: string | null;
   activeSessionId: string | null;
   activeMessages: WorkbenchMessage[];
@@ -53,6 +62,18 @@ interface WorkbenchUiState {
   renameSession: (projectId: string, sessionId: string, title: string) => Promise<void>;
   removeSession: (projectId: string, sessionId: string) => Promise<void>;
   selectSession: (projectId: string, sessionId: string) => Promise<void>;
+  loadAgents: () => Promise<void>;
+  createAgent: (input: {
+    name: string;
+    providerId?: string;
+    createExternalAgent?: boolean;
+  }) => Promise<void>;
+  deleteAgent: (input: {
+    agentId: string;
+    providerId?: string;
+    deleteExternalAgent?: boolean;
+  }) => Promise<void>;
+  clearAgentsNotice: () => void;
   submitOnboarding: (
     providerId: string,
     env: Record<string, string>
@@ -87,6 +108,10 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
     gatewayState: "idle",
     onboardingNotice: null,
     chatState: "idle",
+    agents: [],
+    agentProviders: [],
+    agentsState: "idle",
+    agentsNotice: null,
     activeProjectId: null,
     activeSessionId: null,
     activeMessages: [],
@@ -336,6 +361,86 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         activeSessionId: sessionId,
         activeMessages: messages
       });
+    },
+
+    loadAgents: async () => {
+      set({ agentsState: "loading", agentsNotice: null, error: null });
+      try {
+        const [agents, providers] = await Promise.all([
+          api.listAgents(),
+          api.listAgentProviders()
+        ]);
+        set({
+          agents,
+          agentProviders: providers,
+          agentsState: "idle"
+        });
+      } catch (error) {
+        set({
+          agentsState: "idle",
+          error: toErrorMessage(error)
+        });
+      }
+    },
+
+    createAgent: async (input) => {
+      const name = input.name.trim();
+      if (!name) {
+        set({ error: "Agent name cannot be empty." });
+        return;
+      }
+
+      set({ agentsState: "saving", agentsNotice: null, error: null });
+      try {
+        const result = await api.createAgent({
+          name,
+          providerId: input.providerId?.trim() || undefined,
+          createExternalAgent: Boolean(input.createExternalAgent)
+        });
+        set((state) => ({
+          agents: upsertAgent(state.agents, result.agent),
+          agentsState: "idle",
+          agentsNotice: buildAgentNotice(result)
+        }));
+        const externalFailure = buildExternalAgentFailure(result);
+        if (externalFailure) {
+          set({ error: externalFailure });
+        }
+      } catch (error) {
+        set({ agentsState: "idle", error: toErrorMessage(error) });
+      }
+    },
+
+    deleteAgent: async (input) => {
+      const agentId = input.agentId.trim();
+      if (!agentId) {
+        set({ error: "Agent id cannot be empty." });
+        return;
+      }
+
+      set({ agentsState: "saving", agentsNotice: null, error: null });
+      try {
+        const result = await api.deleteAgent({
+          agentId,
+          providerId: input.providerId?.trim() || undefined,
+          deleteExternalAgent: Boolean(input.deleteExternalAgent)
+        });
+        set((state) => ({
+          agents: state.agents.filter((agent) => agent.id !== agentId),
+          agentsState: "idle",
+          agentsNotice: buildAgentNotice(result)
+        }));
+        const externalFailure = buildExternalAgentFailure(result);
+        if (externalFailure) {
+          set({ error: externalFailure });
+        }
+      } catch (error) {
+        set({ agentsState: "idle", error: toErrorMessage(error) });
+      }
+    },
+
+    clearAgentsNotice: () => {
+      set({ agentsNotice: null });
     },
 
     submitOnboarding: async (providerId: string, env: Record<string, string>) => {
@@ -715,6 +820,53 @@ function getProjectSessionMessages(
 
   const session = project.sessions.find((candidate) => candidate.id === sessionId);
   return session?.messages ?? null;
+}
+
+function upsertAgent(agents: WorkbenchAgent[], agent: WorkbenchAgent): WorkbenchAgent[] {
+  const existingIndex = agents.findIndex((entry) => entry.id === agent.id);
+  if (existingIndex === -1) {
+    return [...agents, agent].sort((left, right) => left.id.localeCompare(right.id));
+  }
+
+  return agents
+    .map((entry) => (entry.id === agent.id ? agent : entry))
+    .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function buildAgentNotice(
+  result: WorkbenchAgentCreationResult | WorkbenchAgentDeletionResult
+): string | null {
+  if ("agent" in result) {
+    if (result.externalAgentCreation) {
+      return `Agent created. External creation (${result.externalAgentCreation.providerId}) returned code ${result.externalAgentCreation.code}.`;
+    }
+    return `Agent created: ${result.agent.displayName}.`;
+  }
+
+  if (result.externalAgentDeletion) {
+    return `Agent removed locally. External deletion (${result.externalAgentDeletion.providerId}) returned code ${result.externalAgentDeletion.code}.`;
+  }
+  return result.existed ? `Agent deleted locally: ${result.agentId}.` : `Agent not found locally: ${result.agentId}.`;
+}
+
+function buildExternalAgentFailure(
+  result: WorkbenchAgentCreationResult | WorkbenchAgentDeletionResult
+): string | null {
+  if ("agent" in result) {
+    const external = result.externalAgentCreation;
+    if (external && external.code !== 0) {
+      const details = external.stderr.trim() || external.stdout.trim();
+      return `Local agent was created, but external provider agent creation failed (code ${external.code}). ${details || ""}`.trim();
+    }
+    return null;
+  }
+
+  const external = result.externalAgentDeletion;
+  if (external && external.code !== 0) {
+    const details = external.stderr.trim() || external.stdout.trim();
+    return `Local agent was deleted, but external provider agent deletion failed (code ${external.code}). ${details || ""}`.trim();
+  }
+  return null;
 }
 
 function toErrorMessage(error: unknown): string {

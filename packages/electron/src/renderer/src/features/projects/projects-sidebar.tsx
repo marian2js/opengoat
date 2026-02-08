@@ -36,8 +36,10 @@ interface ProjectsSidebarProps {
   activeSessionId: string | null;
   busy: boolean;
   collapsed: boolean;
+  agentsActive: boolean;
   onToggleCollapsed: () => void;
   onAddProjectDialog: () => void;
+  onOpenAgents: () => void;
   onRenameProject: (projectId: string, name: string) => void;
   onRemoveProject: (projectId: string) => void;
   onCreateSession: (projectId: string) => void;
@@ -193,7 +195,9 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
             icon={<Users className="size-4" />}
             label="Agents"
             collapsed={props.collapsed}
-            disabled
+            disabled={props.busy}
+            selected={props.agentsActive}
+            onClick={props.onOpenAgents}
           />
         </div>
 
@@ -457,6 +461,7 @@ function SidebarAction(props: {
   label: string;
   collapsed: boolean;
   disabled?: boolean;
+  selected?: boolean;
   onClick?: () => void;
 }) {
   if (props.collapsed) {
@@ -467,6 +472,7 @@ function SidebarAction(props: {
         title={props.label}
         disabled={props.disabled}
         onClick={props.onClick}
+        className={props.selected ? "bg-muted text-foreground" : ""}
       >
         {props.icon}
       </Button>
@@ -476,7 +482,7 @@ function SidebarAction(props: {
   return (
     <Button
       variant="ghost"
-      className="justify-start gap-2 px-2 text-sm"
+      className={`justify-start gap-2 px-2 text-sm ${props.selected ? "bg-muted text-foreground" : ""}`}
       disabled={props.disabled}
       onClick={props.onClick}
     >

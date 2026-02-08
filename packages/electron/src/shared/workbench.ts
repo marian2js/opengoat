@@ -56,6 +56,20 @@ export const workbenchGatewayStatusSchema = workbenchGatewaySettingsSchema.exten
   hasAuthToken: z.boolean().default(false)
 });
 
+export const workbenchProviderSummarySchema = z.object({
+  id: z.string(),
+  displayName: z.string(),
+  kind: providerKindSchema
+});
+
+export const workbenchAgentSchema = z.object({
+  id: z.string(),
+  displayName: z.string(),
+  workspaceDir: z.string(),
+  internalConfigDir: z.string(),
+  providerId: z.string().optional()
+});
+
 export const providerOnboardingFieldSchema = z.object({
   key: z.string(),
   description: z.string(),
@@ -135,6 +149,8 @@ export type WorkbenchBootstrap = z.infer<typeof workbenchBootstrapSchema>;
 export type WorkbenchGatewayMode = z.infer<typeof workbenchGatewayModeSchema>;
 export type WorkbenchGatewaySettings = z.infer<typeof workbenchGatewaySettingsSchema>;
 export type WorkbenchGatewayStatus = z.infer<typeof workbenchGatewayStatusSchema>;
+export type WorkbenchProviderSummary = z.infer<typeof workbenchProviderSummarySchema>;
+export type WorkbenchAgent = z.infer<typeof workbenchAgentSchema>;
 
 export const addProjectInputSchema = z.object({
   rootPath: z.string().min(1)
@@ -175,6 +191,47 @@ export const sendMessageResultSchema = z.object({
   providerId: z.string()
 });
 
+export const createAgentInputSchema = z.object({
+  name: z.string().trim().min(1),
+  providerId: z.string().trim().min(1).optional(),
+  createExternalAgent: z.boolean().optional()
+});
+
+export const deleteAgentInputSchema = z.object({
+  agentId: z.string().trim().min(1),
+  providerId: z.string().trim().min(1).optional(),
+  deleteExternalAgent: z.boolean().optional()
+});
+
+export const agentCreationResultSchema = z.object({
+  agent: workbenchAgentSchema,
+  createdPaths: z.array(z.string()),
+  skippedPaths: z.array(z.string()),
+  externalAgentCreation: z
+    .object({
+      providerId: z.string(),
+      code: z.number(),
+      stdout: z.string(),
+      stderr: z.string()
+    })
+    .optional()
+});
+
+export const agentDeletionResultSchema = z.object({
+  agentId: z.string(),
+  existed: z.boolean(),
+  removedPaths: z.array(z.string()),
+  skippedPaths: z.array(z.string()),
+  externalAgentDeletion: z
+    .object({
+      providerId: z.string(),
+      code: z.number(),
+      stdout: z.string(),
+      stderr: z.string()
+    })
+    .optional()
+});
+
 export const submitOnboardingInputSchema = z.object({
   providerId: z.string().trim().min(1),
   env: z.record(z.string(), z.string()).default({})
@@ -200,3 +257,5 @@ export const runGuidedAuthResultSchema = z.object({
 
 export type WorkbenchGuidedAuthResult = z.infer<typeof runGuidedAuthResultSchema>;
 export type WorkbenchSendMessageResult = z.infer<typeof sendMessageResultSchema>;
+export type WorkbenchAgentCreationResult = z.infer<typeof agentCreationResultSchema>;
+export type WorkbenchAgentDeletionResult = z.infer<typeof agentDeletionResultSchema>;

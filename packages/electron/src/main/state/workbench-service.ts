@@ -8,6 +8,7 @@ import {
 } from "@cli/onboard-guided-auth";
 import {
   DEFAULT_AGENT_ID,
+  normalizeAgentId,
   buildProviderFamilies,
   callOpenGoatGateway,
   loadDotEnv,
@@ -18,6 +19,10 @@ import type {
   WorkbenchBootstrap,
   WorkbenchGatewayMode,
   WorkbenchGatewayStatus,
+  WorkbenchAgent,
+  WorkbenchAgentCreationResult,
+  WorkbenchAgentDeletionResult,
+  WorkbenchProviderSummary,
   WorkbenchGuidedAuthResult,
   WorkbenchMessage,
   WorkbenchOnboarding,
@@ -188,6 +193,81 @@ export class WorkbenchService {
       note: result.note,
       notes
     };
+  }
+
+  public async listAgents(): Promise<WorkbenchAgent[]> {
+    await this.ensureInitialized();
+    const agents = await this.opengoat.listAgents();
+    const withProviders = await Promise.all(
+      agents.map(async (agent) => {
+        try {
+          const binding = await this.opengoat.getAgentProvider(agent.id);
+          return {
+            ...agent,
+            providerId: binding.providerId
+          };
+        } catch {
+          return { ...agent };
+        }
+      })
+    );
+    return withProviders;
+  }
+
+  public async listAgentProviders(): Promise<WorkbenchProviderSummary[]> {
+    await this.ensureInitialized();
+    const providers = await this.opengoat.listProviders();
+    return providers.map((provider) => ({
+      id: provider.id,
+      displayName: provider.displayName,
+      kind: provider.kind
+    }));
+  }
+
+  public async createAgent(input: {
+    name: string;
+    providerId?: string;
+    createExternalAgent?: boolean;
+  }): Promise<WorkbenchAgentCreationResult> {
+    await this.ensureInitialized();
+    const providerId = input.providerId?.trim();
+    const createExternalAgent = Boolean(input.createExternalAgent);
+    if (createExternalAgent && !providerId) {
+      throw new Error("`--create-external` requires `--provider <id>`.");
+    }
+
+    const created = await this.opengoat.createAgent(input.name, {
+      providerId,
+      createExternalAgent
+    });
+    const binding = await this.opengoat.getAgentProvider(created.agent.id);
+    return {
+      ...created,
+      agent: {
+        ...created.agent,
+        providerId: binding.providerId
+      }
+    };
+  }
+
+  public async deleteAgent(input: {
+    agentId: string;
+    providerId?: string;
+    deleteExternalAgent?: boolean;
+  }): Promise<WorkbenchAgentDeletionResult> {
+    await this.ensureInitialized();
+    const agentId = normalizeAgentId(input.agentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+    if (agentId === DEFAULT_AGENT_ID) {
+      throw new Error("Cannot delete orchestrator. It is the immutable default entry agent.");
+    }
+
+    return this.opengoat.deleteAgent(agentId, {
+      providerId: input.providerId?.trim() || undefined,
+      deleteExternalAgent: Boolean(input.deleteExternalAgent)
+    });
   }
 
   public listProjects(): Promise<WorkbenchProject[]> {

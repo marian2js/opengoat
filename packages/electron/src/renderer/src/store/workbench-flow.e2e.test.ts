@@ -104,6 +104,24 @@ function createStatefulApiMock(): WorkbenchApiClient {
     addProject: vi.fn(async () => project),
     renameProject: vi.fn(async () => project),
     removeProject: vi.fn(async () => undefined),
+    listAgents: vi.fn(async () => []),
+    listAgentProviders: vi.fn(async () => []),
+    createAgent: vi.fn(async () => ({
+      agent: {
+        id: "writer",
+        displayName: "Writer",
+        workspaceDir: "/tmp/workspaces/writer",
+        internalConfigDir: "/tmp/agents/writer"
+      },
+      createdPaths: [],
+      skippedPaths: []
+    })),
+    deleteAgent: vi.fn(async () => ({
+      agentId: "writer",
+      existed: true,
+      removedPaths: [],
+      skippedPaths: []
+    })),
     createSession: vi.fn(async () => project.sessions[0]!),
     renameSession: vi.fn(async () => project.sessions[0]!),
     removeSession: vi.fn(async () => undefined),
