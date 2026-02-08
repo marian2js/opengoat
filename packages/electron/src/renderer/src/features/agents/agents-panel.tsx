@@ -11,6 +11,13 @@ import {
   DialogHeader,
   DialogTitle
 } from "@renderer/components/ai-elements/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@renderer/components/ai-elements/select";
 import type { WorkbenchAgent, WorkbenchAgentProvider } from "@shared/workbench";
 import { cn } from "@renderer/lib/utils";
 import { Trash2 } from "lucide-react";
@@ -56,6 +63,8 @@ export function AgentsPanel(props: AgentsPanelProps) {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteProviderId, setDeleteProviderId] = useState("");
   const [deleteExternal, setDeleteExternal] = useState(false);
+  const [providerSelectOpen, setProviderSelectOpen] = useState(false);
+  const [deleteSelectOpen, setDeleteSelectOpen] = useState(false);
 
   const providerOptions = useMemo(
     () => props.providers.map((provider) => ({
@@ -71,8 +80,6 @@ export function AgentsPanel(props: AgentsPanelProps) {
     (normalizedProviderId && providerEnvDrafts[normalizedProviderId]) ??
     selectedProvider?.configuredEnvValues ??
     {};
-  const datalistId = "agent-provider-options";
-  const deleteDatalistId = "agent-provider-options-delete";
 
   useEffect(() => {
     if (!deleteTarget) {
@@ -106,7 +113,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
       return;
     }
     if (createExternal && !trimmedProvider) {
-      setFormError("`--create-external` requires `--provider <id>`.");
+      setFormError("External agent creation requires an agent provider.");
       return;
     }
 
@@ -222,7 +229,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Create agent</h2>
                 <p className="text-xs text-muted-foreground">
-                  Mirrors `opengoat agent create` options.
+                  Create a new agent workspace with an external provider binding.
                 </p>
               </div>
             </div>
@@ -243,24 +250,35 @@ export function AgentsPanel(props: AgentsPanelProps) {
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-foreground">Agent Provider (`--provider`)</p>
-                  <Input
-                    value={providerId}
-                    onChange={(event) => {
-                      setProviderId(event.target.value);
+                  <p className="text-xs font-medium text-foreground">Agent Provider</p>
+                  <Select
+                    value={normalizedProviderId || undefined}
+                    onValueChange={(value) => {
+                      setProviderId(value);
                       if (formError) {
                         setFormError(null);
                       }
                     }}
-                    placeholder="openclaw"
-                    list={datalistId}
+                    open={providerSelectOpen}
+                    onOpenChange={setProviderSelectOpen}
                     disabled={props.busy}
-                  />
-                  <datalist id={datalistId}>
-                    {providerOptions.map((provider) => (
-                      <option key={provider.id} value={provider.id} label={provider.label} />
-                    ))}
-                  </datalist>
+                  >
+                    <SelectTrigger
+                      className="h-11 w-full rounded-xl border border-[#2E2F31] bg-[#0E1117] text-foreground hover:bg-[#151922]"
+                    >
+                      <SelectValue placeholder="Select provider" />
+                    </SelectTrigger>
+                    <SelectContent
+                      align="start"
+                      className="border-[#2E2F31] bg-[#0E1117]"
+                    >
+                      {providerOptions.map((provider) => (
+                        <SelectItem key={provider.id} value={provider.id}>
+                          {provider.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -272,7 +290,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
                   onChange={(event) => setCreateExternal(event.currentTarget.checked)}
                   disabled={props.busy}
                 />
-                <span>Create external agent (`--create-external`)</span>
+                <span>Create external agent</span>
                 <span className="ml-auto text-[11px] text-muted-foreground">
                   Requires agent provider
                 </span>
@@ -315,7 +333,6 @@ export function AgentsPanel(props: AgentsPanelProps) {
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <Badge variant="outline">{selectedProvider.displayName}</Badge>
-                  <span>{selectedProvider.id}</span>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   {selectedProvider.envFields.map((field) => (
@@ -422,7 +439,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
           <DialogHeader>
             <DialogTitle>Delete agent</DialogTitle>
             <DialogDescription>
-              This mirrors `opengoat agent delete` options.
+              Remove an agent and optionally delete its external provider entry.
             </DialogDescription>
           </DialogHeader>
 
@@ -435,19 +452,25 @@ export function AgentsPanel(props: AgentsPanelProps) {
             </div>
 
             <div className="space-y-1">
-              <p className="text-xs font-medium text-foreground">Agent Provider (`--provider`)</p>
-              <Input
-                value={deleteProviderId}
-                onChange={(event) => setDeleteProviderId(event.target.value)}
-                placeholder="openclaw"
-                list={deleteDatalistId}
+              <p className="text-xs font-medium text-foreground">Agent Provider</p>
+                  <Select
+                value={deleteProviderId || undefined}
+                onValueChange={setDeleteProviderId}
+                open={deleteSelectOpen}
+                onOpenChange={setDeleteSelectOpen}
                 disabled={props.busy}
-              />
-              <datalist id={deleteDatalistId}>
-                {providerOptions.map((provider) => (
-                  <option key={provider.id} value={provider.id} label={provider.label} />
-                ))}
-              </datalist>
+              >
+                <SelectTrigger className="h-10 w-full rounded-lg border border-[#2E2F31] bg-[#0E1117] text-foreground hover:bg-[#151922]">
+                  <SelectValue placeholder="Select provider" />
+                </SelectTrigger>
+                <SelectContent align="start" className="border-[#2E2F31] bg-[#0E1117]">
+                  {providerOptions.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      {provider.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <label className="flex items-center gap-2 rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-2 text-sm">
@@ -458,7 +481,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
                 onChange={(event) => setDeleteExternal(event.currentTarget.checked)}
                 disabled={props.busy}
               />
-              <span>Delete external agent (`--delete-external`)</span>
+              <span>Delete external agent</span>
             </label>
           </div>
 

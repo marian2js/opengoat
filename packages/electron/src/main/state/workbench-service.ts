@@ -256,7 +256,7 @@ export class WorkbenchService {
     const providerId = input.providerId?.trim();
     const createExternalAgent = Boolean(input.createExternalAgent);
     if (createExternalAgent && !providerId) {
-      throw new Error("`--create-external` requires `--provider <id>`.");
+      throw new Error("External agent creation requires an agent provider.");
     }
 
     const created = await this.opengoat.createAgent(input.name, {
