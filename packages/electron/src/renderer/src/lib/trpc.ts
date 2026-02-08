@@ -114,7 +114,16 @@ export function createWorkbenchApiClient(): WorkbenchApiClient {
     removeProject: async (input) => {
       const trpc = getTrpcClient();
       await ensureContract(trpc);
-      await trpc.mutation("projects.remove", input);
+      try {
+        await trpc.mutation("projects.remove", input);
+      } catch (error) {
+        if (isMissingProcedureError(error, "projects.remove")) {
+          throw new Error(
+            "Desktop runtime is outdated for project removal. Restart OpenGoat and try again."
+          );
+        }
+        throw error;
+      }
     },
     createSession: async (input) => {
       const trpc = getTrpcClient();
@@ -186,4 +195,11 @@ async function ensureContract(client: TrpcClient): Promise<void> {
     );
   }
   contractValidated = true;
+}
+
+function isMissingProcedureError(error: unknown, path: string): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return error.message.includes(`No "mutation"-procedure on path "${path}"`);
 }

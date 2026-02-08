@@ -144,6 +144,8 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
     onCloseRenameDialog();
   };
 
+  const canCreateSessionFromHeader = Boolean(props.activeProjectId) && !props.busy;
+
   return (
     <>
       <aside className="border-border/70 flex min-h-0 flex-col border-r bg-[hsl(224_16%_7%)]">
@@ -174,7 +176,13 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
             icon={<Plus className="size-4" />}
             label="New session"
             collapsed={props.collapsed}
-            disabled
+            disabled={!canCreateSessionFromHeader}
+            onClick={() => {
+              if (!props.activeProjectId) {
+                return;
+              }
+              props.onCreateSession(props.activeProjectId);
+            }}
           />
           <SidebarAction
             icon={<Users className="size-4" />}
