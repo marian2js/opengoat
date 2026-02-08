@@ -10,7 +10,10 @@ import type {
   WorkbenchProject,
   WorkbenchSession
 } from "@shared/workbench";
-import { WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS } from "@shared/workbench";
+import {
+  WORKBENCH_CHAT_ERROR_PROVIDER_ID,
+  WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS
+} from "@shared/workbench";
 import {
   createWorkbenchApiClient,
   type WorkbenchApiClient
@@ -726,36 +729,25 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         }));
         return result.reply;
       } catch (error) {
-        const next: Partial<WorkbenchUiState> = {
-          chatState: "idle",
-          isBusy: false,
-          error: toErrorMessage(error),
-          activeMessages: get().activeMessages.filter((message) => message.id !== optimistic.id)
-        };
-
-        if (isProviderFailureError(error)) {
-          try {
-            const onboarding = await api.getOnboardingStatus();
-            const onboardingDraft = resolveOnboardingDraftState(
-              onboarding,
-              get().onboardingDraftProviderId,
-              get().onboardingDraftEnv
-            );
-            next.onboarding = onboarding;
-            next.showOnboarding = true;
-            next.onboardingState = "editing";
-            next.onboardingDraftProviderId = onboardingDraft.providerId;
-            next.onboardingDraftEnv = onboardingDraft.env;
-          } catch {
-            // keep original error
-          }
-        }
-
-        set(next);
+        const currentMessages = get().activeMessages;
         if (options?.rethrow) {
+          set({
+            chatState: "idle",
+            isBusy: false,
+            error: toErrorMessage(error),
+            activeMessages: currentMessages.filter((entry) => entry.id !== optimistic.id)
+          });
           throw error;
         }
-        return null;
+
+        const errorMessage = buildChatErrorMessage(error);
+        set({
+          chatState: "idle",
+          isBusy: false,
+          error: null,
+          activeMessages: [...currentMessages, errorMessage]
+        });
+        return errorMessage;
       }
     },
 
@@ -919,16 +911,109 @@ function toErrorMessage(error: unknown): string {
   return "Unexpected error.";
 }
 
-function isProviderFailureError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
+function buildChatErrorMessage(error: unknown): WorkbenchMessage {
+  return {
+    id: `error-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    role: "assistant",
+    providerId: WORKBENCH_CHAT_ERROR_PROVIDER_ID,
+    content: summarizeChatError(error),
+    createdAt: new Date().toISOString()
+  };
+}
+
+function summarizeChatError(error: unknown): string {
+  const raw = toErrorMessage(error).replace(/\s+/g, " ").trim();
+  const lower = raw.toLowerCase();
+
+  if (
+    lower.includes("quota exceeded") ||
+    lower.includes("resource_exhausted") ||
+    lower.includes("rate limit")
+  ) {
+    return "The provider quota or rate limit was exceeded. Check your plan and limits, then try again.";
   }
-  const message = error.message.toLowerCase();
-  return (
-    message.includes("orchestrator provider failed") ||
-    message.includes("provider failed") ||
-    message.includes("remote gateway")
+
+  if (
+    lower.includes("invalid_api_key") ||
+    lower.includes("unauthorized") ||
+    lower.includes("authentication") ||
+    lower.includes("http 401")
+  ) {
+    return "The provider rejected your credentials. Update provider settings and try again.";
+  }
+
+  if (lower.includes("timed out")) {
+    return "The provider request timed out. Please retry in a moment.";
+  }
+
+  const structuredDetail = extractStructuredErrorDetail(raw);
+  if (structuredDetail) {
+    return structuredDetail;
+  }
+
+  return clampText(raw, 240);
+}
+
+function extractStructuredErrorDetail(raw: string): string | null {
+  const providerFailureMatch = raw.match(
+    /orchestrator provider failed \(([^,]+), code (\d+)\)\.\s*(.*)$/i
   );
+  if (!providerFailureMatch) {
+    return null;
+  }
+
+  const providerId = providerFailureMatch[1]?.trim();
+  const details = providerFailureMatch[3]?.trim();
+  const parsed = parseJsonErrorMessage(details) ?? clampText(details, 180);
+  if (!parsed) {
+    return providerId
+      ? `The ${providerId} provider request failed.`
+      : "The provider request failed.";
+  }
+
+  return providerId
+    ? `${capitalize(providerId)} provider error: ${parsed}`
+    : `Provider error: ${parsed}`;
+}
+
+function parseJsonErrorMessage(value?: string): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const jsonStart = value.indexOf("{");
+  if (jsonStart === -1) {
+    return clampText(value, 180);
+  }
+
+  const candidate = value.slice(jsonStart).trim();
+  try {
+    const parsed = JSON.parse(candidate) as
+      | { error?: { message?: string }; message?: string }
+      | undefined;
+    const message = parsed?.error?.message?.trim() || parsed?.message?.trim();
+    return message ? clampText(message, 180) : clampText(value.slice(0, jsonStart).trim(), 180);
+  } catch {
+    return clampText(value, 180);
+  }
+}
+
+function clampText(value: string, maxLength: number): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, maxLength - 1)}…`;
+}
+
+function capitalize(value: string): string {
+  if (!value) {
+    return value;
+  }
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }
 
 export function resolveOnboardingDraftProviderId(

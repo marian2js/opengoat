@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { WorkbenchApiClient } from "@renderer/lib/trpc";
 import { DESKTOP_IPC_CONTRACT_VERSION, type DesktopContractInfo } from "@shared/workbench-contract";
 import type { WorkbenchOnboarding, WorkbenchProject } from "@shared/workbench";
+import { WORKBENCH_CHAT_ERROR_PROVIDER_ID } from "@shared/workbench";
 import { createWorkbenchStore } from "./workbench-store";
 
 describe("workbench flow e2e", () => {
-  it("handles provider switch, onboarding submit, and provider failure reopen flow", async () => {
+  it("keeps chat active and appends an inline error message when provider run fails", async () => {
     const api = createStatefulApiMock();
     const store = createWorkbenchStore(api);
 
@@ -24,9 +25,13 @@ describe("workbench flow e2e", () => {
     expect(store.getState().onboardingState).toBe("hidden");
 
     await store.getState().sendMessage("hello");
-    expect(store.getState().showOnboarding).toBe(true);
-    expect(store.getState().onboardingState).toBe("editing");
-    expect(store.getState().error).toContain("Orchestrator provider failed");
+    expect(store.getState().showOnboarding).toBe(false);
+    expect(store.getState().onboardingState).toBe("hidden");
+    expect(store.getState().error).toBeNull();
+    const messages = store.getState().activeMessages;
+    expect(messages[messages.length - 1]?.providerId).toBe(
+      WORKBENCH_CHAT_ERROR_PROVIDER_ID
+    );
   });
 });
 

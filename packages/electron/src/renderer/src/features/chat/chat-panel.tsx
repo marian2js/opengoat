@@ -15,6 +15,7 @@ import type {
   WorkbenchProject,
   WorkbenchSession,
 } from "@shared/workbench";
+import { WORKBENCH_CHAT_ERROR_PROVIDER_ID } from "@shared/workbench";
 import { ChevronDown, Loader2, Settings2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -41,9 +42,8 @@ interface ChatPanelProps {
 export function ChatPanel(props: ChatPanelProps) {
   const gatewayMode = props.gateway?.mode ?? "local";
   const gatewayHost = resolveGatewayHost(props.gateway?.remoteUrl);
-  const chatId = `${props.activeProject?.id ?? "none"}:${
-    props.activeSession?.id ?? "none"
-  }`;
+  const chatId = `${props.activeProject?.id ?? "none"}:${props.activeSession?.id ?? "none"
+    }`;
   const initialMessages = useMemo(
     () => toElectronUiMessages(props.messages),
     [props.messages],
@@ -78,9 +78,9 @@ export function ChatPanel(props: ChatPanelProps) {
   const isSubmitting = status === "submitted" || status === "streaming";
   const canSend = Boolean(
     props.activeSession &&
-      input.trim().length > 0 &&
-      !isSubmitting &&
-      !props.busy,
+    input.trim().length > 0 &&
+    !isSubmitting &&
+    !props.busy,
   );
   const resolvedError = chatError?.message ?? props.error;
 
@@ -148,8 +148,10 @@ export function ChatPanel(props: ChatPanelProps) {
           ) : (
             messages.map((message, index) => {
               const content = getTextContent(message).trim();
+              const isError =
+                message.metadata?.providerId === WORKBENCH_CHAT_ERROR_PROVIDER_ID;
               const isUser = message.role === "user";
-              const isAssistant = message.role === "assistant";
+              const isAssistant = message.role === "assistant" && !isError;
               const isStreamingAssistant =
                 isAssistant && index === messages.length - 1 && isSubmitting;
               if (!content && !isStreamingAssistant) {
@@ -169,14 +171,21 @@ export function ChatPanel(props: ChatPanelProps) {
                       "w-full max-w-[min(72ch,100%)] rounded-xl border px-4 py-3",
                       isUser
                         ? "border-[#30415F] bg-[#1C2638]"
-                        : "border-[#2E2F31] bg-[#141416]",
+                        : isError
+                          ? "border-[#5B2A2E] bg-[#2A1417]"
+                          : "border-[#2E2F31] bg-[#141416]"
                     )}
                   >
                     <p className="mb-1 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                      {isUser ? "You" : isAssistant ? "Assistant" : "System"}
+                      {isUser ? "You" : isError ? "Error" : isAssistant ? "Assistant" : "System"}
                     </p>
                     {content ? (
-                      <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground/95">
+                      <p
+                        className={cn(
+                          "whitespace-pre-wrap break-words text-sm leading-6",
+                          isError ? "text-red-200" : "text-foreground/95"
+                        )}
+                      >
                         {content}
                       </p>
                     ) : null}

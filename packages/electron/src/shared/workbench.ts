@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const messageRoleSchema = z.enum(["user", "assistant"]);
+export const WORKBENCH_CHAT_ERROR_PROVIDER_ID = "__opengoat_error__";
 
 export const workbenchMessageSchema = z.object({
   id: z.string(),
