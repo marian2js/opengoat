@@ -44,6 +44,7 @@ export type {
   Provider,
   ProviderAuthOptions,
   ProviderCreateAgentOptions,
+  ProviderDeleteAgentOptions,
   ProviderCapabilities,
   ProviderExecutionResult,
   ProviderInvokeOptions,

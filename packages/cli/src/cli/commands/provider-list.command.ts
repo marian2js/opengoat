@@ -13,7 +13,7 @@ export const providerListCommand: CliCommand = {
 
     for (const provider of providers) {
       context.stdout.write(
-        `${provider.id}\t${provider.kind}\tagent=${provider.capabilities.agent} model=${provider.capabilities.model} auth=${provider.capabilities.auth} agentCreate=${provider.capabilities.agentCreate ?? false}\n`
+        `${provider.id}\t${provider.kind}\tagent=${provider.capabilities.agent} model=${provider.capabilities.model} auth=${provider.capabilities.auth} agentCreate=${provider.capabilities.agentCreate ?? false} agentDelete=${provider.capabilities.agentDelete ?? false}\n`
       );
     }
 

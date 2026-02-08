@@ -1,4 +1,5 @@
 import type {
+  AgentDeletionResult,
   AgentCreationResult,
   AgentDescriptor,
   AgentIdentity
@@ -205,6 +206,51 @@ export class AgentService {
     }
 
     return descriptors.sort((left, right) => left.id.localeCompare(right.id));
+  }
+
+  public async removeAgent(paths: OpenGoatPaths, rawAgentId: string): Promise<AgentDeletionResult> {
+    const agentId = normalizeAgentId(rawAgentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+    if (isDefaultAgentId(agentId)) {
+      throw new Error("Cannot delete orchestrator. It is the immutable default entry agent.");
+    }
+
+    const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
+    const internalConfigDir = this.pathPort.join(paths.agentsDir, agentId);
+    const removedPaths: string[] = [];
+    const skippedPaths: string[] = [];
+
+    const workspaceExists = await this.fileSystem.exists(workspaceDir);
+    if (workspaceExists) {
+      await this.fileSystem.removeDir(workspaceDir);
+      removedPaths.push(workspaceDir);
+    } else {
+      skippedPaths.push(workspaceDir);
+    }
+
+    const internalConfigExists = await this.fileSystem.exists(internalConfigDir);
+    if (internalConfigExists) {
+      await this.fileSystem.removeDir(internalConfigDir);
+      removedPaths.push(internalConfigDir);
+    } else {
+      skippedPaths.push(internalConfigDir);
+    }
+
+    const index = await this.readJsonIfPresent<AgentsIndex>(paths.agentsIndexJsonPath);
+    if (index) {
+      const filtered = dedupe(index.agents.filter((id) => id !== agentId));
+      const nextIndex = renderAgentsIndex(this.nowIso(), filtered);
+      await this.fileSystem.writeFile(paths.agentsIndexJsonPath, toJson(nextIndex));
+    }
+
+    return {
+      agentId,
+      existed: workspaceExists || internalConfigExists,
+      removedPaths,
+      skippedPaths
+    };
   }
 
   private async isBrandNewWorkspace(workspaceDir: string): Promise<boolean> {

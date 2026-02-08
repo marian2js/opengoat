@@ -3,6 +3,7 @@ import { attachProviderSessionId } from "../../provider-session.js";
 import type {
   ProviderAuthOptions,
   ProviderCreateAgentOptions,
+  ProviderDeleteAgentOptions,
   ProviderExecutionResult,
   ProviderInvokeOptions
 } from "../../types.js";
@@ -20,7 +21,8 @@ export class OpenClawProvider extends BaseCliProvider {
         model: true,
         auth: true,
         passthrough: true,
-        agentCreate: true
+        agentCreate: true,
+        agentDelete: true
       }
     });
   }
@@ -74,6 +76,10 @@ export class OpenClawProvider extends BaseCliProvider {
     }
 
     return args;
+  }
+
+  protected override buildDeleteAgentInvocationArgs(options: ProviderDeleteAgentOptions): string[] {
+    return ["agents", "delete", options.agentId, "--force"];
   }
 
   public override async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {

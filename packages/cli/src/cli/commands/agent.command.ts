@@ -171,6 +171,7 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("\n");
   output.write("Subcommands:\n");
   output.write("  agent create        Create an agent workspace and internal config.\n");
+  output.write("  agent delete        Delete an agent workspace and internal config.\n");
   output.write("  agent list          List known agents.\n");
   output.write("  agent provider get  Show which provider is assigned to an agent.\n");
   output.write("  agent provider set  Assign one provider to an agent.\n");

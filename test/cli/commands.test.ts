@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { agentCommand } from "../../packages/cli/src/cli/commands/agent.command.js";
 import { agentCreateCommand } from "../../packages/cli/src/cli/commands/agent-create.command.js";
+import { agentDeleteCommand } from "../../packages/cli/src/cli/commands/agent-delete.command.js";
 import { agentListCommand } from "../../packages/cli/src/cli/commands/agent-list.command.js";
 import { initCommand } from "../../packages/cli/src/cli/commands/init.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
@@ -125,6 +126,46 @@ describe("CLI commands", () => {
     expect(code).toBe(1);
     expect(createAgent).not.toHaveBeenCalled();
     expect(stderr.output()).toContain("Orchestrator is always the default agent");
+  });
+
+  it("agent delete validates usage", async () => {
+    const deleteAgent = vi.fn();
+    const { context, stderr } = createContext({ deleteAgent });
+
+    const code = await agentDeleteCommand.run([], context);
+
+    expect(code).toBe(1);
+    expect(deleteAgent).not.toHaveBeenCalled();
+    expect(stderr.output()).toContain("Usage: opengoat agent delete");
+  });
+
+  it("agent delete passes options to service and supports external deletion", async () => {
+    const deleteAgent = vi.fn(async () => ({
+      agentId: "research-analyst",
+      existed: true,
+      removedPaths: ["/tmp/workspaces/research-analyst", "/tmp/agents/research-analyst"],
+      skippedPaths: [],
+      externalAgentDeletion: {
+        providerId: "openclaw",
+        code: 0,
+        stdout: "deleted",
+        stderr: ""
+      }
+    }));
+    const { context, stdout } = createContext({ deleteAgent });
+
+    const code = await agentDeleteCommand.run(
+      ["research-analyst", "--delete-external", "--provider", "openclaw"],
+      context
+    );
+
+    expect(code).toBe(0);
+    expect(deleteAgent).toHaveBeenCalledWith("research-analyst", {
+      providerId: "openclaw",
+      deleteExternalAgent: true
+    });
+    expect(stdout.output()).toContain("Agent deleted locally: research-analyst");
+    expect(stdout.output()).toContain("External agent deletion (openclaw): code 0");
   });
 
   it("agent list prints empty state and non-empty rows", async () => {

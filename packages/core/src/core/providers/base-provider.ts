@@ -8,6 +8,7 @@ import type {
   Provider,
   ProviderAuthOptions,
   ProviderCreateAgentOptions,
+  ProviderDeleteAgentOptions,
   ProviderCapabilities,
   ProviderExecutionResult,
   ProviderInvokeOptions,
@@ -68,5 +69,9 @@ export abstract class BaseProvider implements Provider {
 
   public createAgent(_options: ProviderCreateAgentOptions): Promise<ProviderExecutionResult> {
     throw new UnsupportedProviderActionError(this.id, "create_agent");
+  }
+
+  public deleteAgent(_options: ProviderDeleteAgentOptions): Promise<ProviderExecutionResult> {
+    throw new UnsupportedProviderActionError(this.id, "delete_agent");
   }
 }

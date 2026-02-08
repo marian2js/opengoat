@@ -171,6 +171,9 @@ opengoat agent <id> --message "<text>"     # talk to a specific agent
 opengoat agent create "<name>"             # create a new local agent
 opengoat agent create "<name>" --provider openclaw --create-external
                                            # also create the provider-side agent (if supported)
+opengoat agent delete "<id>"               # delete a local agent
+opengoat agent delete "<id>" --delete-external
+                                           # also delete provider-side agent (if supported)
 opengoat agent list                        # list all agents
 opengoat route --message "<text>"          # preview routing decision
 

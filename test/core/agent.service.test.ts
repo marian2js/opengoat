@@ -189,6 +189,31 @@ describe("AgentService", () => {
     const bootstrapPath = path.join(workspaceDir, "BOOTSTRAP.md");
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });
+
+  it("removes a non-default agent workspace and internal config", async () => {
+    const { service, paths, fileSystem } = await createAgentServiceWithPaths();
+    await service.ensureAgent(paths, { id: "developer", displayName: "Developer" });
+
+    const deletion = await service.removeAgent(paths, "developer");
+
+    expect(deletion.agentId).toBe("developer");
+    expect(deletion.existed).toBe(true);
+    expect(deletion.removedPaths).toEqual([
+      path.join(paths.workspacesDir, "developer"),
+      path.join(paths.agentsDir, "developer")
+    ]);
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "developer"))).toBe(false);
+    expect(await fileSystem.exists(path.join(paths.agentsDir, "developer"))).toBe(false);
+  });
+
+  it("prevents deleting orchestrator", async () => {
+    const { service, paths } = await createAgentServiceWithPaths();
+    await service.ensureAgent(paths, { id: "orchestrator", displayName: "Orchestrator" });
+
+    await expect(service.removeAgent(paths, "orchestrator")).rejects.toThrow(
+      "Cannot delete orchestrator"
+    );
+  });
 });
 
 function createAgentService(): AgentService {

@@ -15,6 +15,7 @@ import {
   type AgentProviderBinding,
   type ProviderAuthOptions,
   type ProviderCreateAgentOptions,
+  type ProviderDeleteAgentOptions,
   type ProviderExecutionResult,
   type ProviderOnboardingSpec,
   type ProviderInvokeOptions,
@@ -332,6 +333,48 @@ export class ProviderService {
     });
 
     this.logger.info("Provider-side agent creation completed.", {
+      agentId,
+      providerId: provider.id,
+      code: result.code
+    });
+
+    return {
+      ...result,
+      ...binding
+    };
+  }
+
+  public async deleteProviderAgent(
+    paths: OpenGoatPaths,
+    agentId: string,
+    options: Omit<ProviderDeleteAgentOptions, "agentId"> & { providerId?: string }
+  ): Promise<ProviderExecutionResult & AgentProviderBinding> {
+    const registry = await this.getProviderRegistry();
+    const binding = options.providerId
+      ? {
+          agentId,
+          providerId: registry.create(options.providerId).id
+        }
+      : await this.getAgentProvider(paths, agentId);
+    const provider = registry.create(binding.providerId);
+    this.logger.info("Deleting provider-side agent.", {
+      agentId,
+      providerId: provider.id
+    });
+
+    if (!provider.capabilities.agentDelete || !provider.deleteAgent) {
+      throw new UnsupportedProviderActionError(provider.id, "delete_agent");
+    }
+
+    const result = await provider.deleteAgent({
+      agentId,
+      cwd: options.cwd,
+      env: await this.resolveProviderEnv(paths, provider.id, options.env),
+      onStdout: options.onStdout,
+      onStderr: options.onStderr
+    });
+
+    this.logger.info("Provider-side agent deletion completed.", {
       agentId,
       providerId: provider.id,
       code: result.code

@@ -4,6 +4,7 @@ import { BaseProvider, type BaseProviderConfig } from "./base-provider.js";
 import type {
   ProviderAuthOptions,
   ProviderCreateAgentOptions,
+  ProviderDeleteAgentOptions,
   ProviderExecutionResult,
   ProviderInvocation,
   ProviderInvokeOptions
@@ -46,6 +47,13 @@ export abstract class BaseCliProvider extends BaseProvider {
     throw new UnsupportedProviderActionError(this.id, "create_agent");
   }
 
+  protected buildDeleteAgentInvocationArgs(
+    _options: ProviderDeleteAgentOptions,
+    _command: string
+  ): string[] {
+    throw new UnsupportedProviderActionError(this.id, "delete_agent");
+  }
+
   public buildInvocation(options: ProviderInvokeOptions, env: NodeJS.ProcessEnv = process.env): ProviderInvocation {
     this.validateInvokeOptions(options);
     const command = this.resolveCommand(env);
@@ -70,6 +78,15 @@ export abstract class BaseCliProvider extends BaseProvider {
   ): ProviderInvocation {
     const command = this.resolveCommand(env);
     const args = this.buildCreateAgentInvocationArgs(options, command);
+    return { command, args };
+  }
+
+  public buildDeleteAgentInvocation(
+    options: ProviderDeleteAgentOptions,
+    env: NodeJS.ProcessEnv = process.env
+  ): ProviderInvocation {
+    const command = this.resolveCommand(env);
+    const args = this.buildDeleteAgentInvocationArgs(options, command);
     return { command, args };
   }
 
@@ -120,6 +137,28 @@ export abstract class BaseCliProvider extends BaseProvider {
   public override async createAgent(options: ProviderCreateAgentOptions): Promise<ProviderExecutionResult> {
     const env = options.env ?? process.env;
     const invocation = this.buildCreateAgentInvocation(options, env);
+
+    try {
+      return await executeCommand({
+        command: invocation.command,
+        args: invocation.args,
+        cwd: options.cwd,
+        env,
+        onStdout: options.onStdout,
+        onStderr: options.onStderr
+      });
+    } catch (error) {
+      if (isSpawnPermissionOrMissing(error)) {
+        throw new ProviderCommandNotFoundError(this.id, invocation.command);
+      }
+
+      throw error;
+    }
+  }
+
+  public override async deleteAgent(options: ProviderDeleteAgentOptions): Promise<ProviderExecutionResult> {
+    const env = options.env ?? process.env;
+    const invocation = this.buildDeleteAgentInvocation(options, env);
 
     try {
       return await executeCommand({

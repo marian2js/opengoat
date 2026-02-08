@@ -62,6 +62,7 @@ describe("openclaw provider", () => {
     });
 
     expect(provider.capabilities.agentCreate).toBe(true);
+    expect(provider.capabilities.agentDelete).toBe(true);
     expect(invocation.command).toBe("openclaw");
     expect(invocation.args).toEqual([
       "agents",
@@ -99,5 +100,15 @@ describe("openclaw provider", () => {
       "--model",
       "openai-codex"
     ]);
+  });
+
+  it("maps external agent deletion invocation to top-level agents delete command", () => {
+    const provider = new OpenClawProvider();
+    const invocation = provider.buildDeleteAgentInvocation({
+      agentId: "research-analyst"
+    });
+
+    expect(invocation.command).toBe("openclaw");
+    expect(invocation.args).toEqual(["agents", "delete", "research-analyst", "--force"]);
   });
 });

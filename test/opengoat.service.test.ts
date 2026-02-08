@@ -6,6 +6,7 @@ import {
   OpenGoatService,
   ProviderRegistry,
   type ProviderCreateAgentOptions,
+  type ProviderDeleteAgentOptions,
   type ProviderInvokeOptions
 } from "../packages/core/src/index.js";
 import { NodeFileSystem } from "../packages/core/src/platform/node/node-file-system.js";
@@ -92,6 +93,28 @@ describe("OpenGoatService", () => {
     expect(created.externalAgentCreation?.code).toBe(0);
     expect(provider.createdAgents[0]?.agentId).toBe("research-analyst");
   });
+
+  it("deletes local and external provider agent when requested", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const provider = new AgentCreateProvider();
+    const registry = new ProviderRegistry();
+    registry.register("agent-create-provider", () => provider);
+    const service = createService(root, registry);
+    await service.initialize();
+    await service.createAgent("Research Analyst", { providerId: "agent-create-provider" });
+
+    const deleted = await service.deleteAgent("research-analyst", {
+      deleteExternalAgent: true
+    });
+
+    expect(deleted.agentId).toBe("research-analyst");
+    expect(deleted.existed).toBe(true);
+    expect(deleted.externalAgentDeletion?.providerId).toBe("agent-create-provider");
+    expect(deleted.externalAgentDeletion?.code).toBe(0);
+    expect(provider.deletedAgents[0]?.agentId).toBe("research-analyst");
+  });
 });
 
 function createService(root: string, registry?: ProviderRegistry): OpenGoatService {
@@ -106,6 +129,7 @@ function createService(root: string, registry?: ProviderRegistry): OpenGoatServi
 
 class AgentCreateProvider extends BaseProvider {
   public readonly createdAgents: ProviderCreateAgentOptions[] = [];
+  public readonly deletedAgents: Array<{ agentId: string }> = [];
 
   public constructor() {
     super({
@@ -117,7 +141,8 @@ class AgentCreateProvider extends BaseProvider {
         model: true,
         auth: false,
         passthrough: false,
-        agentCreate: true
+        agentCreate: true,
+        agentDelete: true
       }
     });
   }
@@ -135,6 +160,15 @@ class AgentCreateProvider extends BaseProvider {
     return {
       code: 0,
       stdout: "created\n",
+      stderr: ""
+    };
+  }
+
+  public override async deleteAgent(options: ProviderDeleteAgentOptions) {
+    this.deletedAgents.push({ agentId: options.agentId });
+    return {
+      code: 0,
+      stdout: "deleted\n",
       stderr: ""
     };
   }

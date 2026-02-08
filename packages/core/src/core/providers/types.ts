@@ -6,6 +6,7 @@ export interface ProviderCapabilities {
   auth: boolean;
   passthrough: boolean;
   agentCreate?: boolean;
+  agentDelete?: boolean;
 }
 
 export interface ProviderInvokeOptions {
@@ -46,6 +47,14 @@ export interface ProviderCreateAgentOptions {
   onStderr?: (chunk: string) => void;
 }
 
+export interface ProviderDeleteAgentOptions {
+  agentId: string;
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  onStdout?: (chunk: string) => void;
+  onStderr?: (chunk: string) => void;
+}
+
 export interface ProviderExecutionResult {
   code: number;
   stdout: string;
@@ -67,6 +76,7 @@ export interface Provider {
   invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult>;
   invokeAuth?(options?: ProviderAuthOptions): Promise<ProviderExecutionResult>;
   createAgent?(options: ProviderCreateAgentOptions): Promise<ProviderExecutionResult>;
+  deleteAgent?(options: ProviderDeleteAgentOptions): Promise<ProviderExecutionResult>;
 }
 
 export interface ProviderSummary {

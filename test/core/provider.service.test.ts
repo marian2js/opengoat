@@ -12,6 +12,7 @@ import { ProviderRegistry } from "../../packages/core/src/core/providers/registr
 import type {
   Provider,
   ProviderCreateAgentOptions,
+  ProviderDeleteAgentOptions,
   ProviderInvokeOptions
 } from "../../packages/core/src/core/providers/types.js";
 import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
@@ -439,6 +440,71 @@ describe("ProviderService", () => {
       })
     ).rejects.toThrow('Provider "unsupported-provider" does not support action "create_agent".');
   });
+
+  it("deletes provider-managed external agent when provider supports agentDelete", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+
+    const { paths, fileSystem } = await createPaths(root);
+    await seedAgent(fileSystem, paths, {
+      agentId: "research",
+      providerId: "external-provider",
+      bootstrapFiles: ["AGENTS.md"]
+    });
+
+    const captured: ProviderDeleteAgentOptions[] = [];
+    const provider = createProvider({
+      id: "external-provider",
+      kind: "cli",
+      capabilities: {
+        agent: true,
+        model: true,
+        auth: false,
+        passthrough: false,
+        agentCreate: true,
+        agentDelete: true
+      },
+      onInvoke: () => undefined,
+      onDeleteAgent: (options) => captured.push(options)
+    });
+
+    const registry = new ProviderRegistry();
+    registry.register("external-provider", () => provider);
+
+    const service = createProviderService(fileSystem, registry);
+    const result = await service.deleteProviderAgent(paths, "research", {});
+
+    expect(result.providerId).toBe("external-provider");
+    expect(result.code).toBe(0);
+    expect(captured[0]?.agentId).toBe("research");
+  });
+
+  it("throws when provider does not support external agent deletion", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+
+    const { paths, fileSystem } = await createPaths(root);
+    await seedAgent(fileSystem, paths, {
+      agentId: "research",
+      providerId: "unsupported-provider",
+      bootstrapFiles: ["AGENTS.md"]
+    });
+
+    const registry = new ProviderRegistry();
+    registry.register("unsupported-provider", () =>
+      createProvider({
+        id: "unsupported-provider",
+        kind: "cli",
+        capabilities: { agent: true, model: true, auth: false, passthrough: false },
+        onInvoke: () => undefined
+      })
+    );
+
+    const service = createProviderService(fileSystem, registry);
+    await expect(service.deleteProviderAgent(paths, "research", {})).rejects.toThrow(
+      'Provider "unsupported-provider" does not support action "delete_agent".'
+    );
+  });
 });
 
 function createProvider(params: {
@@ -447,6 +513,7 @@ function createProvider(params: {
   capabilities: Provider["capabilities"];
   onInvoke: (options: ProviderInvokeOptions) => void;
   onCreateAgent?: (options: ProviderCreateAgentOptions) => void;
+  onDeleteAgent?: (options: ProviderDeleteAgentOptions) => void;
 }): Provider {
   return {
     id: params.id,
@@ -466,6 +533,14 @@ function createProvider(params: {
       return {
         code: 0,
         stdout: "created\n",
+        stderr: ""
+      };
+    },
+    async deleteAgent(options) {
+      params.onDeleteAgent?.(options);
+      return {
+        code: 0,
+        stdout: "deleted\n",
         stderr: ""
       };
     }

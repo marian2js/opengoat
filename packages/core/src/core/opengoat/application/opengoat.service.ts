@@ -1,5 +1,11 @@
-import type { AgentCreationResult, AgentDescriptor, CreateAgentOptions } from "../../domain/agent.js";
-import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
+import type {
+  AgentCreationResult,
+  AgentDeletionResult,
+  AgentDescriptor,
+  CreateAgentOptions,
+  DeleteAgentOptions
+} from "../../domain/agent.js";
+import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { InitializationResult } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
@@ -162,6 +168,39 @@ export class OpenGoatService {
         code: externalAgentCreation.code,
         stdout: externalAgentCreation.stdout,
         stderr: externalAgentCreation.stderr
+      }
+    };
+  }
+
+  public async deleteAgent(rawAgentId: string, options: DeleteAgentOptions = {}): Promise<AgentDeletionResult> {
+    const paths = this.pathsProvider.getPaths();
+    const agentId = normalizeAgentId(rawAgentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    let externalProviderId = options.providerId?.trim().toLowerCase();
+    if (options.deleteExternalAgent && !externalProviderId) {
+      const binding = await this.providerService.getAgentProvider(paths, agentId);
+      externalProviderId = binding.providerId;
+    }
+
+    const removed = await this.agentService.removeAgent(paths, agentId);
+    if (!options.deleteExternalAgent) {
+      return removed;
+    }
+
+    const externalAgentDeletion = await this.providerService.deleteProviderAgent(paths, agentId, {
+      providerId: externalProviderId
+    });
+
+    return {
+      ...removed,
+      externalAgentDeletion: {
+        providerId: externalAgentDeletion.providerId,
+        code: externalAgentDeletion.code,
+        stdout: externalAgentDeletion.stdout,
+        stderr: externalAgentDeletion.stderr
       }
     };
   }
