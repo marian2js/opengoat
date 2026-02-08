@@ -46,7 +46,7 @@ export function ChatPanel(props: ChatPanelProps) {
   }`;
   const initialMessages = useMemo(
     () => toElectronUiMessages(props.messages),
-    [props.messages]
+    [props.messages],
   );
   const transport = useMemo(
     () =>
@@ -54,7 +54,7 @@ export function ChatPanel(props: ChatPanelProps) {
         submitMessage: async (message: string) =>
           props.onSubmitMessage(message),
       }),
-    [props.onSubmitMessage]
+    [props.onSubmitMessage],
   );
   const {
     messages,
@@ -80,7 +80,7 @@ export function ChatPanel(props: ChatPanelProps) {
     props.activeSession &&
       input.trim().length > 0 &&
       !isSubmitting &&
-      !props.busy
+      !props.busy,
   );
   const resolvedError = chatError?.message ?? props.error;
 
@@ -161,7 +161,7 @@ export function ChatPanel(props: ChatPanelProps) {
                   key={message.id}
                   className={cn(
                     "flex",
-                    isUser ? "justify-end" : "justify-start"
+                    isUser ? "justify-end" : "justify-start",
                   )}
                 >
                   <div
@@ -169,7 +169,7 @@ export function ChatPanel(props: ChatPanelProps) {
                       "w-full max-w-[min(72ch,100%)] rounded-xl border px-4 py-3",
                       isUser
                         ? "border-[#30415F] bg-[#1C2638]"
-                        : "border-[#2E2F31] bg-[#141416]"
+                        : "border-[#2E2F31] bg-[#141416]",
                     )}
                   >
                     <p className="mb-1 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
@@ -193,7 +193,7 @@ export function ChatPanel(props: ChatPanelProps) {
           )}
         </div>
       </section>
-      <footer className="titlebar-no-drag flex-none border-t border-[#2E2F31] bg-[#1B1B1D]/95 px-4 py-3 backdrop-blur md:px-5">
+      <footer className="titlebar-no-drag flex-none border-t border-[#2E2F31] bg-transparent px-4 py-3 backdrop-blur md:px-5">
         <div className="mx-auto w-full max-w-4xl">
           {resolvedError ? (
             <div className="mb-3 flex items-center justify-between rounded-lg border border-destructive/35 bg-destructive/12 px-3 py-2 text-sm text-red-200">
