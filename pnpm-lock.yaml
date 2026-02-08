@@ -67,6 +67,9 @@ importers:
       ai:
         specifier: ^6.0.77
         version: 6.0.77(zod@4.3.6)
+      ws:
+        specifier: ^8.18.3
+        version: 8.19.0
     devDependencies:
       '@types/node':
         specifier: ^22.13.4

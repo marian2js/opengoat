@@ -132,9 +132,13 @@ Code is domain-organized:
 
   - Agent Client Protocol integration.
 
+- `packages/core/src/core/gateway`:
+
+  - Optional remote Gateway protocol contracts and validation.
+
 - `packages/core/src/platform/node`:
 
-  - Node adapters (filesystem, paths, command runner, logger, ACP server transport).
+  - Node adapters (filesystem, paths, command runner, logger, ACP server transport, optional Gateway transport).
 
 - `packages/cli/src/cli`:
   - CLI commands + routing + formatting only.
@@ -407,6 +411,7 @@ Main commands:
 - `opengoat onboard`
 - `opengoat scenario run ...`
 - `opengoat acp ...`
+- `opengoat gateway ...` (optional, for remote app control)
 
 Global log controls:
 

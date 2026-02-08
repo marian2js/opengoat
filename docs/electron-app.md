@@ -12,6 +12,8 @@ This package introduces the first desktop app surface for OpenGoat:
 
 The CLI remains intact and desktop uses the same core runtime wiring (`OpenGoatService`).
 
+For remote-host deployments, OpenGoat also supports an optional Gateway (`opengoat gateway`) so the desktop app can connect securely to a machine where OpenGoat is running remotely.
+
 ## Monorepo Layout
 
 - Root package: OpenGoat core + CLI (`opengoat`)

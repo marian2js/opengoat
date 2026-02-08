@@ -54,6 +54,19 @@ Most AI coding tools lock you into one model, one interface, one workflow. OpenG
 4. Side effects are captured via `git status` diffs and fed back into the planner for subsequent decisions.
 5. Everything is traced: routing decisions, delegation calls, artifact I/O, session history.
 
+## Optional Gateway (Remote Control)
+
+OpenGoat includes an optional Gateway for remote desktop scenarios. Unlike OpenClaw, it is completely optional, and not required when using the app locally.
+
+- Use it when OpenGoat runs on a remote machine and your Electron app connects over network/tunnel.
+- Do not use it for normal local usage.
+- Default posture is secure by design: loopback bind, auth enabled, strict handshake/protocol validation.
+
+```bash
+opengoat gateway --help
+opengoat gateway --token "replace-with-strong-token"
+```
+
 ## Quick start
 
 ```bash
@@ -159,6 +172,8 @@ OPENGOAT_LIVE_TEST=1 OPENGOAT_LIVE_REQUIRE_CONFIG=1 pnpm test:providers:live
 
 **ACP** &mdash; Agent Client Protocol over stdio for IDE/editor integration. Supports initialize, new, load, resume, list, prompt, and cancel flows.
 
+**Gateway** &mdash; Optional WebSocket gateway for remote app control when OpenGoat is not running locally. Includes challenge handshake, auth, rate limiting, idempotency for side-effect calls, and strict frame validation.
+
 ## CLI reference
 
 ```bash
@@ -198,6 +213,7 @@ opengoat plugin doctor                     # check plugin health
 
 # Advanced
 opengoat acp                               # start ACP server (stdio)
+opengoat gateway                           # start optional remote-control gateway
 opengoat scenario run <name>               # run a test scenario
 ```
 
@@ -226,6 +242,7 @@ packages/
 | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
 | [`docs/orchestration-flow.md`](docs/orchestration-flow.md) | Deep dive into the orchestration runtime, agent types, and delegation modes |
 | [`docs/acp.md`](docs/acp.md)                               | Agent Client Protocol integration details                                   |
+| [`docs/gateway.md`](docs/gateway.md)                       | Optional Gateway protocol, security defaults, and remote usage              |
 | [`ABOUT.md`](ABOUT.md)                                     | Full project context, architecture spec, and rebuild blueprint              |
 
 ## Contributing
