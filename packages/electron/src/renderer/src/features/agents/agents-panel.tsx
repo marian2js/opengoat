@@ -12,12 +12,6 @@ import {
   DialogTitle
 } from "@renderer/components/ai-elements/dialog";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger
-} from "@renderer/components/ai-elements/accordion";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -26,7 +20,7 @@ import {
 } from "@renderer/components/ai-elements/select";
 import type { WorkbenchAgent, WorkbenchAgentProvider } from "@shared/workbench";
 import { cn } from "@renderer/lib/utils";
-import { Trash2 } from "lucide-react";
+import { ChevronDown, Trash2 } from "lucide-react";
 
 interface AgentsPanelProps {
   agents: WorkbenchAgent[];
@@ -65,6 +59,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
   const [providerId, setProviderId] = useState("");
   const [providerEnvDrafts, setProviderEnvDrafts] = useState<Record<string, Record<string, string>>>({});
   const [createExternal, setCreateExternal] = useState(false);
+  const [showAdvancedProviderSettings, setShowAdvancedProviderSettings] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -85,36 +80,18 @@ export function AgentsPanel(props: AgentsPanelProps) {
     (normalizedProviderId && providerEnvDrafts[normalizedProviderId]) ??
     selectedProvider?.configuredEnvValues ??
     {};
-  const modelField =
-    selectedProvider?.envFields.find((field) => /(^|_)MODEL(_|$)/i.test(field.key)) ??
-    selectedProvider?.envFields.find((field) => field.key.toLowerCase().includes("model")) ??
-    null;
-  const requiredFields =
-    selectedProvider?.envFields.filter(
-      (field) => field.required && field.key !== modelField?.key
-    ) ?? [];
-  const optionalFields =
-    selectedProvider?.envFields.filter(
-      (field) => !field.required && field.key !== modelField?.key
-    ) ?? [];
+  const providerSettings = useMemo(
+    () => partitionProviderSettingsFields(selectedProvider?.envFields ?? []),
+    [selectedProvider?.envFields]
+  );
 
   const resetCreateForm = () => {
     setName("");
     setProviderId("");
     setCreateExternal(false);
+    setShowAdvancedProviderSettings(false);
     setFormError(null);
   };
-
-  const formatEnvLabel = (key: string) =>
-    key
-      .toLowerCase()
-      .split("_")
-      .filter(Boolean)
-      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-      .join(" ");
-
-  const formatEnvDescription = (description: string) =>
-    description.replace(/^Optional\s+/i, "").trim();
 
   useEffect(() => {
     if (!deleteTarget) {
@@ -137,6 +114,10 @@ export function AgentsPanel(props: AgentsPanelProps) {
       }));
     }
   }, [normalizedProviderId, providerEnvDrafts, selectedProvider]);
+
+  useEffect(() => {
+    setShowAdvancedProviderSettings(false);
+  }, [normalizedProviderId]);
 
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -423,118 +404,74 @@ export function AgentsPanel(props: AgentsPanelProps) {
             ) : null}
             {props.providerConfigAvailable && selectedProvider ? (
               <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
                   <Badge variant="outline">{selectedProvider.displayName}</Badge>
-                  <span>Provider settings</span>
+                  <span className="text-muted-foreground">Provider settings</span>
                 </div>
-                {modelField ? (
-                  <div className="mt-3 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-xs font-medium text-foreground">Default model</p>
-                      <span className="text-[11px] text-muted-foreground">Optional</span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Choose the model this agent should use by default.
-                    </p>
-                    <Input
-                      value={providerEnv[modelField.key] ?? ""}
-                      onChange={(event) =>
-                        handleProviderFieldChange(modelField.key, event.target.value)
-                      }
-                      placeholder="Enter model id"
-                      disabled={props.busy}
-                    />
-                  </div>
-                ) : null}
-
-                {requiredFields.length > 0 ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Set the model first. Advanced settings include optional provider-specific details.
+                </p>
+                {providerSettings.primary.length === 0 ? (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    No required settings for this provider.
+                  </p>
+                ) : (
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    {requiredFields.map((field) => (
-                      <div key={field.key} className="space-y-1">
-                        <p className="text-xs font-medium text-foreground">
-                          {formatEnvLabel(field.key)}
-                        </p>
-                        {field.description ? (
-                          <p className="text-[11px] text-muted-foreground">
-                            {formatEnvDescription(field.description)}
-                          </p>
-                        ) : null}
-                        <Input
-                          type={field.secret ? "password" : "text"}
-                          value={providerEnv[field.key] ?? ""}
-                          onChange={(event) =>
-                            handleProviderFieldChange(field.key, event.target.value)
-                          }
-                          placeholder={field.secret ? "Enter secret" : "Enter value"}
-                          disabled={props.busy}
-                        />
-                      </div>
+                    {providerSettings.primary.map((field) => (
+                      <ProviderEnvFieldInput
+                        key={field.key}
+                        field={field}
+                        value={providerEnv[field.key] ?? ""}
+                        disabled={props.busy}
+                        onChange={handleProviderFieldChange}
+                      />
                     ))}
                   </div>
-                ) : null}
-
-                {optionalFields.length > 0 ? (
+                )}
+                {providerSettings.advanced.length > 0 ? (
                   <div className="mt-3">
-                    <Accordion
-                      type="single"
-                      collapsible
-                      className="rounded-lg border border-[#2E2F31] bg-[#0E1117]/40 px-3"
-                    >
-                      <AccordionItem value="advanced" className="border-0">
-                        <AccordionTrigger className="py-2 text-xs hover:no-underline">
-                          <div className="flex items-center gap-2">
-                            <span>Advanced settings</span>
-                            <span className="text-[11px] text-muted-foreground">
-                              {optionalFields.length} optional
-                            </span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="pb-3">
-                          <div className="grid gap-3 md:grid-cols-2">
-                            {optionalFields.map((field) => (
-                              <div key={field.key} className="space-y-1">
-                                <p className="text-xs font-medium text-foreground">
-                                  {formatEnvLabel(field.key)}
-                                </p>
-                                {field.description ? (
-                                  <p className="text-[11px] text-muted-foreground">
-                                    {formatEnvDescription(field.description)}
-                                  </p>
-                                ) : null}
-                                <Input
-                                  type={field.secret ? "password" : "text"}
-                                  value={providerEnv[field.key] ?? ""}
-                                  onChange={(event) =>
-                                    handleProviderFieldChange(field.key, event.target.value)
-                                  }
-                                  placeholder={field.secret ? "Enter secret" : "Enter value"}
-                                  disabled={props.busy}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  </div>
-                ) : null}
-
-                {modelField || requiredFields.length > 0 || optionalFields.length > 0 ? (
-                  <div className="mt-3 flex justify-end">
                     <Button
                       type="button"
-                      variant="outline"
-                      onClick={() => void handleSaveProviderConfig()}
+                      variant="ghost"
+                      className="h-8 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowAdvancedProviderSettings((current) => !current)}
                       disabled={props.busy}
                     >
-                      Save settings
+                      {showAdvancedProviderSettings
+                        ? "Hide advanced settings"
+                        : `Show advanced settings (${providerSettings.advanced.length})`}
+                      <ChevronDown
+                        className={cn(
+                          "ml-1.5 size-3.5 transition-transform",
+                          showAdvancedProviderSettings ? "rotate-180" : ""
+                        )}
+                      />
                     </Button>
+                    {showAdvancedProviderSettings ? (
+                      <div className="mt-2 grid gap-3 md:grid-cols-2">
+                        {providerSettings.advanced.map((field) => (
+                          <ProviderEnvFieldInput
+                            key={field.key}
+                            field={field}
+                            value={providerEnv[field.key] ?? ""}
+                            disabled={props.busy}
+                            onChange={handleProviderFieldChange}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-                ) : (
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    No provider settings available.
-                  </div>
-                )}
+                ) : null}
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleSaveProviderConfig()}
+                    disabled={props.busy || selectedProvider.envFields.length === 0}
+                  >
+                    Save provider settings
+                  </Button>
+                </div>
               </div>
             ) : null}
 
@@ -629,4 +566,166 @@ export function AgentsPanel(props: AgentsPanelProps) {
       </Dialog>
     </main>
   );
+}
+
+function ProviderEnvFieldInput(props: {
+  field: {
+    key: string;
+    description: string;
+    required?: boolean;
+    secret?: boolean;
+  };
+  value: string;
+  disabled: boolean;
+  onChange: (key: string, value: string) => void;
+}) {
+  const label = resolveProviderFieldLabel(props.field.key);
+  const helperText = resolveProviderFieldHelperText(props.field);
+  const placeholder = resolveProviderFieldPlaceholder(props.field);
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium text-foreground">{label}</p>
+      {helperText ? (
+        <p className="text-[11px] text-muted-foreground">{helperText}</p>
+      ) : null}
+      <Input
+        type={props.field.secret ? "password" : "text"}
+        value={props.value}
+        onChange={(event) => props.onChange(props.field.key, event.target.value)}
+        placeholder={placeholder}
+        disabled={props.disabled}
+      />
+    </div>
+  );
+}
+
+function partitionProviderSettingsFields(
+  fields: Array<{
+    key: string;
+    description: string;
+    required?: boolean;
+    secret?: boolean;
+  }>
+): {
+  primary: Array<{
+    key: string;
+    description: string;
+    required?: boolean;
+    secret?: boolean;
+  }>;
+  advanced: Array<{
+    key: string;
+    description: string;
+    required?: boolean;
+    secret?: boolean;
+  }>;
+} {
+  const primary: typeof fields = [];
+  const advanced: typeof fields = [];
+
+  for (const field of fields) {
+    if (field.required || isModelFieldKey(field.key)) {
+      primary.push(field);
+      continue;
+    }
+    advanced.push(field);
+  }
+
+  primary.sort((left, right) => {
+    const leftModel = isModelFieldKey(left.key);
+    const rightModel = isModelFieldKey(right.key);
+    if (leftModel && !rightModel) {
+      return -1;
+    }
+    if (!leftModel && rightModel) {
+      return 1;
+    }
+    return left.key.localeCompare(right.key);
+  });
+
+  return {
+    primary,
+    advanced,
+  };
+}
+
+function isModelFieldKey(key: string): boolean {
+  return key.trim().toUpperCase().includes("MODEL");
+}
+
+function resolveProviderFieldLabel(key: string): string {
+  if (isModelFieldKey(key)) {
+    return "Model";
+  }
+  return toHumanLabel(key);
+}
+
+function resolveProviderFieldHelperText(field: {
+  key: string;
+  description: string;
+  required?: boolean;
+}): string | null {
+  if (isModelFieldKey(field.key)) {
+    return "Model to use for this provider.";
+  }
+
+  const normalizedLabel = toHumanLabel(field.key).trim().toLowerCase();
+  const normalizedDescription = field.description.trim().toLowerCase();
+  if (!field.description.trim() || normalizedLabel === normalizedDescription) {
+    return field.required ? "Required" : null;
+  }
+
+  if (field.required && !normalizedDescription.startsWith("required")) {
+    return `Required. ${field.description}`;
+  }
+
+  return field.description;
+}
+
+function resolveProviderFieldPlaceholder(field: {
+  key: string;
+  secret?: boolean;
+}): string {
+  const normalizedKey = field.key.trim().toUpperCase();
+  if (isModelFieldKey(field.key)) {
+    return "e.g. gpt-4.1-mini";
+  }
+  if (normalizedKey.includes("URL") || normalizedKey.includes("ENDPOINT")) {
+    return "https://...";
+  }
+  if (field.secret) {
+    return "Enter secret";
+  }
+  return "Enter value";
+}
+
+function toHumanLabel(key: string): string {
+  const replacements: Record<string, string> = {
+    api: "API",
+    url: "URL",
+    id: "ID",
+    oauth: "OAuth",
+    http: "HTTP",
+    https: "HTTPS",
+    aws: "AWS",
+    gcp: "GCP",
+    azure: "Azure",
+    openai: "OpenAI",
+    openrouter: "OpenRouter",
+    qwen: "Qwen",
+  };
+
+  return key
+    .split("_")
+    .filter(Boolean)
+    .map((part) => {
+      const normalized = part.toLowerCase();
+      const replacement = replacements[normalized];
+      if (replacement) {
+        return replacement;
+      }
+      return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    })
+    .join(" ");
 }
