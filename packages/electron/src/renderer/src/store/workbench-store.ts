@@ -46,6 +46,8 @@ interface WorkbenchUiState {
   bootstrap: () => Promise<void>;
   addProjectFromDialog: () => Promise<void>;
   addProjectByPath: (rootPath: string) => Promise<void>;
+  renameProject: (projectId: string, name: string) => Promise<void>;
+  removeProject: (projectId: string) => Promise<void>;
   selectProject: (projectId: string) => Promise<void>;
   createSession: (projectId: string, title?: string) => Promise<void>;
   renameSession: (projectId: string, sessionId: string, title: string) => Promise<void>;
@@ -143,11 +145,12 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           return;
         }
 
+        const firstSession = project.sessions[0] ?? null;
         set((state) => ({
           projects: upsertProject(state.projects, project),
           activeProjectId: project.id,
-          activeSessionId: null,
-          activeMessages: [],
+          activeSessionId: firstSession?.id ?? null,
+          activeMessages: firstSession?.messages ?? [],
           isBusy: false
         }));
       } catch (error) {
@@ -164,13 +167,64 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       set({ isBusy: true, error: null });
       try {
         const project = await api.addProject({ rootPath: normalized });
+        const firstSession = project.sessions[0] ?? null;
         set((state) => ({
           projects: upsertProject(state.projects, project),
           activeProjectId: project.id,
-          activeSessionId: null,
-          activeMessages: [],
+          activeSessionId: firstSession?.id ?? null,
+          activeMessages: firstSession?.messages ?? [],
           isBusy: false
         }));
+      } catch (error) {
+        set({ isBusy: false, error: toErrorMessage(error) });
+      }
+    },
+
+    renameProject: async (projectId: string, name: string) => {
+      const normalizedName = name.trim();
+      if (!normalizedName) {
+        set({ error: "Project name cannot be empty." });
+        return;
+      }
+
+      set({ isBusy: true, error: null });
+      try {
+        const project = await api.renameProject({
+          projectId,
+          name: normalizedName
+        });
+        set((state) => ({
+          projects: upsertProject(state.projects, project),
+          isBusy: false
+        }));
+      } catch (error) {
+        set({ isBusy: false, error: toErrorMessage(error) });
+      }
+    },
+
+    removeProject: async (projectId: string) => {
+      set({ isBusy: true, error: null });
+      try {
+        await api.removeProject({ projectId });
+        set((state) => {
+          const projects = state.projects.filter((project) => project.id !== projectId);
+          if (state.activeProjectId !== projectId) {
+            return {
+              projects,
+              isBusy: false
+            };
+          }
+
+          const fallbackProject = projects[0] ?? null;
+          const fallbackSession = fallbackProject?.sessions[0] ?? null;
+          return {
+            projects,
+            activeProjectId: fallbackProject?.id ?? null,
+            activeSessionId: fallbackSession?.id ?? null,
+            activeMessages: fallbackSession?.messages ?? [],
+            isBusy: false
+          };
+        });
       } catch (error) {
         set({ isBusy: false, error: toErrorMessage(error) });
       }

@@ -241,6 +241,109 @@ describe("workbench store", () => {
     expect(store.getState().projects[0]?.sessions[0]?.title).toBe("Roadmap");
   });
 
+  it("renames a project and keeps active selection", async () => {
+    const renamedProject = {
+      id: "p1",
+      name: "Workspace",
+      rootPath: "/tmp/project",
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+      sessions: [
+        {
+          id: "s1",
+          title: "Session",
+          agentId: "orchestrator" as const,
+          sessionKey: "desktop:p1:s1",
+          createdAt: "2026-02-07T00:00:00.000Z",
+          updatedAt: "2026-02-07T00:00:00.000Z",
+          messages: []
+        }
+      ]
+    };
+    const renameProject = vi.fn(async () => renamedProject);
+    const api = createApiMock({
+      renameProject: renameProject as WorkbenchApiClient["renameProject"]
+    });
+    const store = createWorkbenchStore(api);
+
+    await store.getState().bootstrap();
+    await store.getState().renameProject("p1", "Workspace");
+
+    expect(renameProject).toHaveBeenCalledWith({
+      projectId: "p1",
+      name: "Workspace"
+    });
+    expect(store.getState().projects[0]?.name).toBe("Workspace");
+    expect(store.getState().activeProjectId).toBe("p1");
+  });
+
+  it("removes active project and falls back to remaining project", async () => {
+    const base = createApiMock();
+    const fallbackProject = {
+      id: "home",
+      name: "Home",
+      rootPath: "/tmp/home",
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+      sessions: [
+        {
+          id: "home-s1",
+          title: "New Session",
+          agentId: "orchestrator" as const,
+          sessionKey: "desktop:home:home-s1",
+          createdAt: "2026-02-07T00:00:00.000Z",
+          updatedAt: "2026-02-07T00:00:00.000Z",
+          messages: []
+        }
+      ]
+    };
+    const primaryProject = {
+      id: "p1",
+      name: "project",
+      rootPath: "/tmp/project",
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+      sessions: [
+        {
+          id: "s1",
+          title: "Session",
+          agentId: "orchestrator" as const,
+          sessionKey: "desktop:p1:s1",
+          createdAt: "2026-02-07T00:00:00.000Z",
+          updatedAt: "2026-02-07T00:00:00.000Z",
+          messages: []
+        }
+      ]
+    };
+    base.bootstrap = vi.fn(async () => ({
+      homeDir: "/tmp/home",
+      onboarding: {
+        activeProviderId: "openai",
+        needsOnboarding: true,
+        gateway: createGatewayStatus(),
+        families: [],
+        providers: []
+      },
+      providerSetupCompleted: false,
+      projects: [primaryProject, fallbackProject]
+    }));
+    const removeProject = vi.fn(async () => undefined);
+    const api = {
+      ...base,
+      removeProject
+    };
+    const store = createWorkbenchStore(api);
+
+    await store.getState().bootstrap();
+    await store.getState().removeProject("p1");
+
+    expect(removeProject).toHaveBeenCalledWith({
+      projectId: "p1"
+    });
+    expect(store.getState().activeProjectId).toBe("home");
+    expect(store.getState().activeSessionId).toBe("home-s1");
+  });
+
   it("removes active session and clears selection when none remain", async () => {
     const remainingProjects = [
       {
@@ -377,6 +480,12 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
     listProjects: vi.fn(async () => []),
     pickProject: vi.fn(async () => null),
     addProject: vi.fn(async () => {
+      throw new Error("not used");
+    }),
+    renameProject: vi.fn(async () => {
+      throw new Error("not used");
+    }),
+    removeProject: vi.fn(async () => {
       throw new Error("not used");
     }),
     createSession: vi.fn(async () => {

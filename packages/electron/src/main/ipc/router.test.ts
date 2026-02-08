@@ -21,6 +21,13 @@ describe("desktop IPC router", () => {
 
     await caller.bootstrap();
     await caller.projects.list();
+    await caller.projects.rename({
+      projectId: "p1",
+      name: "Workspace"
+    });
+    await caller.projects.remove({
+      projectId: "p1"
+    });
     await caller.sessions.rename({
       projectId: "p1",
       sessionId: "s1",
@@ -37,6 +44,8 @@ describe("desktop IPC router", () => {
 
     expect(service.bootstrap).toHaveBeenCalledTimes(1);
     expect(service.listProjects).toHaveBeenCalledTimes(1);
+    expect(service.renameProject).toHaveBeenCalledWith("p1", "Workspace");
+    expect(service.removeProject).toHaveBeenCalledWith("p1");
     expect(service.renameSession).toHaveBeenCalledWith("p1", "s1", "Renamed");
     expect(service.removeSession).toHaveBeenCalledWith("p1", "s1");
     expect(service.listMessages).toHaveBeenCalledWith("p1", "s1");
@@ -130,6 +139,15 @@ function createServiceStub(): WorkbenchService {
       updatedAt: "2026-02-07T00:00:00.000Z",
       sessions: []
     })),
+    renameProject: vi.fn(async () => ({
+      id: "p1",
+      name: "Workspace",
+      rootPath: "/tmp/project",
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+      sessions: []
+    })),
+    removeProject: vi.fn(async () => undefined),
     pickAndAddProject: vi.fn(async () => null),
     listSessions: vi.fn(async () => []),
     createSession: vi.fn(async () => ({

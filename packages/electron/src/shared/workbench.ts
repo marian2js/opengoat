@@ -140,6 +140,16 @@ export const addProjectInputSchema = z.object({
   rootPath: z.string().min(1)
 });
 
+export const projectLookupInputSchema = z.object({
+  projectId: z.string().min(1)
+});
+
+export const renameProjectInputSchema = projectLookupInputSchema.extend({
+  name: z.string().trim().min(1).max(120)
+});
+
+export const removeProjectInputSchema = projectLookupInputSchema;
+
 export const createSessionInputSchema = z.object({
   projectId: z.string().min(1),
   title: z.string().trim().max(120).optional()

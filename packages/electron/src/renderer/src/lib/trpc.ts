@@ -22,6 +22,8 @@ export interface WorkbenchApiClient {
   listProjects: () => Promise<WorkbenchProject[]>;
   pickProject: () => Promise<WorkbenchProject | null>;
   addProject: (input: { rootPath: string }) => Promise<WorkbenchProject>;
+  renameProject: (input: { projectId: string; name: string }) => Promise<WorkbenchProject>;
+  removeProject: (input: { projectId: string }) => Promise<void>;
   createSession: (input: { projectId: string; title?: string }) => Promise<WorkbenchSession>;
   renameSession: (input: { projectId: string; sessionId: string; title: string }) => Promise<WorkbenchSession>;
   removeSession: (input: { projectId: string; sessionId: string }) => Promise<void>;
@@ -103,6 +105,16 @@ export function createWorkbenchApiClient(): WorkbenchApiClient {
       const trpc = getTrpcClient();
       await ensureContract(trpc);
       return (await trpc.mutation("projects.add", input)) as WorkbenchProject;
+    },
+    renameProject: async (input) => {
+      const trpc = getTrpcClient();
+      await ensureContract(trpc);
+      return (await trpc.mutation("projects.rename", input)) as WorkbenchProject;
+    },
+    removeProject: async (input) => {
+      const trpc = getTrpcClient();
+      await ensureContract(trpc);
+      await trpc.mutation("projects.remove", input);
     },
     createSession: async (input) => {
       const trpc = getTrpcClient();

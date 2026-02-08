@@ -3,6 +3,8 @@ import { DESKTOP_IPC_CONTRACT_VERSION } from "@shared/workbench-contract";
 import {
   addProjectInputSchema,
   createSessionInputSchema,
+  removeProjectInputSchema,
+  renameProjectInputSchema,
   renameSessionInputSchema,
   runGuidedAuthInputSchema,
   sendMessageInputSchema,
@@ -34,6 +36,16 @@ export function createDesktopRouter(service: WorkbenchService) {
         .input(addProjectInputSchema)
         .mutation(async ({ input }) => {
           return service.addProject(input.rootPath);
+        }),
+      rename: t.procedure
+        .input(renameProjectInputSchema)
+        .mutation(async ({ input }) => {
+          return service.renameProject(input.projectId, input.name);
+        }),
+      remove: t.procedure
+        .input(removeProjectInputSchema)
+        .mutation(async ({ input }) => {
+          return service.removeProject(input.projectId);
         }),
       pick: t.procedure.mutation(async () => {
         return service.pickAndAddProject();

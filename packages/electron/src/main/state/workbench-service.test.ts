@@ -460,6 +460,36 @@ describe("WorkbenchService session management", () => {
   });
 });
 
+describe("WorkbenchService project management", () => {
+  it("renames and removes projects through the store", async () => {
+    const opengoat = createOpenGoatStub({
+      providers: createProviderSummaries(),
+      activeProviderId: "openai",
+      onboardingByProvider: {}
+    });
+    const renameProject = vi.fn(async () => ({
+      id: "p1",
+      name: "Workspace",
+      rootPath: "/tmp/workspace",
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+      sessions: []
+    }));
+    const removeProject = vi.fn(async () => undefined);
+    const store = {
+      renameProject,
+      removeProject
+    } as unknown as WorkbenchStore;
+    const service = new WorkbenchService({ opengoat, store });
+
+    await service.renameProject("p1", "Workspace");
+    await service.removeProject("p1");
+
+    expect(renameProject).toHaveBeenCalledWith("p1", "Workspace");
+    expect(removeProject).toHaveBeenCalledWith("p1");
+  });
+});
+
 function createProviderSummaries(): ProviderSummary[] {
   return [
     {

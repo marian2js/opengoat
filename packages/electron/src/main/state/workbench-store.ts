@@ -47,13 +47,14 @@ export class WorkbenchStore {
 
       const now = this.nowIso();
       const homeRootPath = resolveHomeProjectRootPath();
+      const projectId = randomUUID();
       const project: WorkbenchProject = {
-        id: randomUUID(),
+        id: projectId,
         name: pathsAreEquivalent(rootPath, homeRootPath) ? "Home" : path.basename(rootPath) || rootPath,
         rootPath,
         createdAt: now,
         updatedAt: now,
-        sessions: []
+        sessions: [createDefaultSession(projectId, now)]
       };
 
       return {
@@ -63,6 +64,53 @@ export class WorkbenchStore {
           projects: [...state.projects, project]
         },
         result: project
+      };
+    });
+  }
+
+  public async renameProject(projectId: string, name: string): Promise<WorkbenchProject> {
+    return this.writeTransaction((state) => {
+      const project = requireProject(state, projectId);
+      if (isHomeProject(project)) {
+        throw new Error("The Home project cannot be renamed.");
+      }
+
+      const now = this.nowIso();
+      const nextProject: WorkbenchProject = {
+        ...project,
+        name: normalizeProjectName(name),
+        updatedAt: now
+      };
+      const nextProjects = state.projects.map((candidate) =>
+        candidate.id === project.id ? nextProject : candidate
+      );
+
+      return {
+        next: {
+          ...state,
+          updatedAt: now,
+          projects: nextProjects
+        },
+        result: nextProject
+      };
+    });
+  }
+
+  public async removeProject(projectId: string): Promise<void> {
+    return this.writeTransaction((state) => {
+      const project = requireProject(state, projectId);
+      if (isHomeProject(project)) {
+        throw new Error("The Home project cannot be removed.");
+      }
+
+      const now = this.nowIso();
+      return {
+        next: {
+          ...state,
+          updatedAt: now,
+          projects: state.projects.filter((candidate) => candidate.id !== project.id)
+        },
+        result: undefined
       };
     });
   }
@@ -405,6 +453,29 @@ function normalizeSessionTitle(input: string): string {
   return `${value.slice(0, 117)}...`;
 }
 
+function normalizeProjectName(input: string): string {
+  const value = input.trim();
+  if (!value) {
+    throw new Error("Project name cannot be empty.");
+  }
+  if (value.length <= 120) {
+    return value;
+  }
+  return `${value.slice(0, 117)}...`;
+}
+
+function createDefaultSession(projectId: string, now: string): WorkbenchSession {
+  return {
+    id: randomUUID(),
+    title: "New Session",
+    agentId: "orchestrator",
+    sessionKey: `desktop:${projectId}:${randomUUID()}`,
+    createdAt: now,
+    updatedAt: now,
+    messages: []
+  };
+}
+
 function normalizeGatewaySettings(input: WorkbenchGatewaySettings): WorkbenchGatewaySettings {
   const timeoutMs = Number.isFinite(input.timeoutMs)
     ? Math.max(1000, Math.min(120_000, Math.floor(input.timeoutMs)))
@@ -451,6 +522,10 @@ function ensureHomeProject(state: WorkbenchState): WorkbenchState {
 
 function resolveHomeProjectRootPath(): string {
   return path.resolve(os.homedir());
+}
+
+function isHomeProject(project: WorkbenchProject): boolean {
+  return pathsAreEquivalent(project.rootPath, resolveHomeProjectRootPath());
 }
 
 function pathsAreEquivalent(left: string, right: string): boolean {
