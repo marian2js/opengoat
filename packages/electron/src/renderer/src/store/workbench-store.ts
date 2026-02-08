@@ -69,6 +69,7 @@ interface WorkbenchUiState {
     name: string;
     providerId?: string;
     createExternalAgent?: boolean;
+    env?: Record<string, string>;
   }) => Promise<void>;
   deleteAgent: (input: {
     agentId: string;
@@ -422,7 +423,8 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         const result = await api.createAgent({
           name,
           providerId: input.providerId?.trim() || undefined,
-          createExternalAgent: Boolean(input.createExternalAgent)
+          createExternalAgent: Boolean(input.createExternalAgent),
+          env: input.env
         });
         set((state) => ({
           agents: upsertAgent(state.agents, result.agent),

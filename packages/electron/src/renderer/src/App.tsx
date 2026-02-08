@@ -41,7 +41,6 @@ export function App() {
     selectProject,
     selectSession,
     loadAgents,
-    saveAgentProviderConfig,
     createAgent,
     deleteAgent,
     clearAgentsNotice,
@@ -273,7 +272,6 @@ export function App() {
                   onRefresh={() => void loadAgents()}
                   onCreate={(input) => void createAgent(input)}
                   onDelete={(input) => void deleteAgent(input)}
-                  onSaveProviderConfig={(input) => void saveAgentProviderConfig(input)}
                   providerConfigAvailable={supportsAgentProviderConfig}
                   onDismissNotice={clearAgentsNotice}
                   onDismissError={clearError}
