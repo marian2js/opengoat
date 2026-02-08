@@ -46,11 +46,17 @@ type ProviderFamilyView = {
   hint?: string;
   providers: OnboardingProvider[];
 };
+const ONBOARDING_STEPS = [
+  "Select provider",
+  "Add credentials",
+  "Save and start",
+] as const;
 
 export function OnboardingPanel(props: OnboardingPanelProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showConnectionPanel, setShowConnectionPanel] = useState(false);
   const [providerQuery, setProviderQuery] = useState("");
+  const isMac = useMemo(() => detectMacPlatform(), []);
   const selectedProvider = resolveSelectedOnboardingProvider(
     props.onboarding,
     props.providerId,
@@ -141,33 +147,15 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
         transition={{ duration: 0.35, ease: [0.2, 0, 0, 1] }}
         className="flex h-full w-full min-h-0 flex-col"
       >
-        <header className="border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_88%,black)] px-5 py-4 md:px-8">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="space-y-2">
-              <p className="font-heading text-3xl font-semibold tracking-tight text-[var(--foreground)]">
-                OpenGoat Setup
-              </p>
-              <p className="max-w-2xl text-sm text-[var(--muted-foreground)]">
-                Configure one provider and optional runtime settings to start your first
-                orchestrator session.
-              </p>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted-foreground)]">
-                <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1">
-                  1. Select provider
-                </span>
-                <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1">
-                  2. Add credentials
-                </span>
-                <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1">
-                  3. Save and start
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
+        <header className="border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_86%,black)]">
+          <div className="titlebar-drag-region flex h-11 items-center gap-3 px-4 md:px-6">
+            {isMac ? <div className="h-full w-[76px] shrink-0" /> : null}
+            <div className="flex-1" />
+            <div className="titlebar-no-drag flex items-center">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 rounded-full border border-[var(--border)] px-3 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                className="h-8 rounded-full border border-[var(--border)] bg-[var(--surface)]/85 px-3 text-xs text-[var(--muted-foreground)] transition hover:border-[var(--accent)]/70 hover:text-[var(--foreground)]"
                 onClick={() => setShowConnectionPanel((value) => !value)}
                 disabled={props.isSubmitting}
               >
@@ -175,6 +163,39 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
                 <ChevronDown className="size-3.5 opacity-80" aria-hidden="true" />
               </Button>
             </div>
+          </div>
+
+          <div
+            className={
+              isMac
+                ? "space-y-3 pb-5 pl-[92px] pr-4 md:pb-6 md:pr-6"
+                : "space-y-3 px-4 pb-5 md:px-6 md:pb-6"
+            }
+          >
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-200/85">
+                OpenGoat Setup
+              </p>
+              <h1 className="font-heading text-[clamp(1.65rem,2.8vw,2.35rem)] font-semibold leading-tight tracking-[-0.02em] text-[var(--foreground)]">
+                Setup the Orchestrator Agent
+              </h1>
+              <p className="max-w-2xl text-sm text-[var(--muted-foreground)]">
+                Set a provider for the Orchestrator. This agent is in charge of the coordination between all your agents.
+              </p>
+            </div>
+            <ol className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted-foreground)]">
+              {ONBOARDING_STEPS.map((step, index) => (
+                <li
+                  key={step}
+                  className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)]/95 px-2.5 py-1"
+                >
+                  <span className="inline-flex size-4 items-center justify-center rounded-full bg-[color-mix(in_oklab,var(--accent)_55%,var(--surface))] text-[10px] font-semibold text-[var(--foreground)]">
+                    {index + 1}
+                  </span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
           </div>
         </header>
 
@@ -254,6 +275,16 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
       </motion.div>
     </div>
   );
+}
+
+function detectMacPlatform(): boolean {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  const platform = navigator.platform ?? "";
+  const userAgent = navigator.userAgent ?? "";
+  return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X/i.test(userAgent);
 }
 
 function ProviderListPane(props: {
@@ -338,11 +369,10 @@ function ProviderListItem(props: {
       type="button"
       onClick={props.onSelect}
       disabled={props.disabled}
-      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
-        props.selected
-          ? "border-[var(--accent-strong)] bg-[color-mix(in_oklab,var(--accent)_24%,transparent)] shadow-[inset_0_0_0_1px_hsl(162_72%_39%_/_0.22)]"
-          : "border-transparent hover:border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--surface)_88%,black)]"
-      }`}
+      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${props.selected
+        ? "border-[var(--accent-strong)] bg-[color-mix(in_oklab,var(--accent)_24%,transparent)] shadow-[inset_0_0_0_1px_hsl(162_72%_39%_/_0.22)]"
+        : "border-transparent hover:border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--surface)_88%,black)]"
+        }`}
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[var(--foreground)]">
@@ -361,11 +391,10 @@ function ProviderListItem(props: {
         </Badge>
         {requiredCount > 0 ? (
           <span
-            className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-              missingCount > 0
-                ? "bg-amber-500/20 text-amber-200"
-                : "bg-emerald-500/20 text-emerald-200"
-            }`}
+            className={`rounded-full px-1.5 py-0.5 text-[10px] ${missingCount > 0
+              ? "bg-amber-500/20 text-amber-200"
+              : "bg-emerald-500/20 text-emerald-200"
+              }`}
           >
             {missingCount > 0 ? `${missingCount} missing` : "ready"}
           </span>
@@ -720,9 +749,8 @@ function EnvFieldInput(props: {
       />
       {props.configured && !props.value ? (
         <p
-          className={`text-xs ${
-            props.missing ? "text-amber-300" : "text-[var(--muted-foreground)]"
-          }`}
+          className={`text-xs ${props.missing ? "text-amber-300" : "text-[var(--muted-foreground)]"
+            }`}
         >
           Currently configured.
         </p>
