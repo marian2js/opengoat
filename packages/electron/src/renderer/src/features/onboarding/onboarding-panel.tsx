@@ -514,23 +514,23 @@ function SetupPane(props: {
             )}
           </section>
 
-          <section className="space-y-3">
-            <button
-              type="button"
-              onClick={props.onToggleAdvanced}
-              className="w-full rounded-lg border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_92%,black)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[color-mix(in_oklab,var(--surface)_96%,black)]"
-            >
-              {props.showAdvanced
-                ? "Hide Advanced Options"
-                : "Show Advanced Options"}
-            </button>
-            {props.showAdvanced ? (
-              <div className="space-y-4 rounded-lg border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_94%,black)] p-3">
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.11em] text-[var(--muted-foreground)]">
-                    Optional Provider Fields
-                  </p>
-                  {hasOptional ? (
+          {hasOptional ? (
+            <section className="space-y-3">
+              <button
+                type="button"
+                onClick={props.onToggleAdvanced}
+                className="w-full rounded-lg border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_92%,black)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[color-mix(in_oklab,var(--surface)_96%,black)]"
+              >
+                {props.showAdvanced
+                  ? "Hide Advanced Options"
+                  : "Show Advanced Options"}
+              </button>
+              {props.showAdvanced ? (
+                <div className="space-y-4 rounded-lg border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_94%,black)] p-3">
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.11em] text-[var(--muted-foreground)]">
+                      Optional Provider Fields
+                    </p>
                     <div className="space-y-3">
                       {props.optionalFields.map((field) => {
                         const configured = provider.configuredEnvKeys.includes(
@@ -550,15 +550,11 @@ function SetupPane(props: {
                         );
                       })}
                     </div>
-                  ) : (
-                    <div className="rounded-lg border border-[var(--border)]/80 bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
-                      No optional provider fields for this provider.
-                    </div>
-                  )}
+                  </div>
                 </div>
-              </div>
-            ) : null}
-          </section>
+              ) : null}
+            </section>
+          ) : null}
         </div>
       </ScrollArea>
     </section>
