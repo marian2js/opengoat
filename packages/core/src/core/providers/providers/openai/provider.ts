@@ -17,6 +17,8 @@ import type {
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_ENDPOINT_PATH = "/responses";
 const DEFAULT_OPENAI_MODEL = "gpt-4.1-mini";
+const DEFAULT_OPENAI_REQUEST_TIMEOUT_MS = 120_000;
+const DEFAULT_OPENAI_COMPAT_REQUEST_TIMEOUT_MS = 300_000;
 
 interface OpenAIProviderDeps {
   runtime?: OpenAiCompatibleTextRuntime;
@@ -75,6 +77,7 @@ export class OpenAIProvider extends BaseProvider {
         endpointOverride: resolveEndpointOverride(env),
         endpointPathOverride: resolveEndpointPathOverride(env),
         style,
+        requestTimeoutMs: resolveRequestTimeoutMs(env),
         model,
         message: options.message,
         systemPrompt: options.systemPrompt,
@@ -133,6 +136,7 @@ export class OpenAIProvider extends BaseProvider {
         baseURL: resolveBaseUrl(env),
         endpointPathOverride: "/chat/completions",
         style: "chat",
+        requestTimeoutMs: resolveRequestTimeoutMs(env),
         model,
         message: options.message,
         systemPrompt: options.systemPrompt,
@@ -183,6 +187,14 @@ function resolveApiStyle(
     return explicit;
   }
 
+  if (
+    !resolveEndpointOverride(env) &&
+    !resolveEndpointPathOverride(env) &&
+    !isDefaultOpenAIBaseUrl(resolveBaseUrl(env))
+  ) {
+    return "chat";
+  }
+
   if (endpoint.toLowerCase().includes("/chat/completions")) {
     return "chat";
   }
@@ -206,6 +218,26 @@ function resolveApiStyleOverride(env: NodeJS.ProcessEnv): string | undefined {
 
 function resolveBaseUrl(env: NodeJS.ProcessEnv): string {
   return env.OPENAI_BASE_URL?.trim() || DEFAULT_OPENAI_BASE_URL;
+}
+
+function isDefaultOpenAIBaseUrl(value: string): boolean {
+  return value.replace(/\/+$/, "") === DEFAULT_OPENAI_BASE_URL;
+}
+
+function resolveRequestTimeoutMs(env: NodeJS.ProcessEnv): number {
+  const explicitTimeout = env.OPENAI_REQUEST_TIMEOUT_MS?.trim();
+  if (explicitTimeout) {
+    const parsed = Number(explicitTimeout);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return Math.floor(parsed);
+    }
+  }
+
+  if (!isDefaultOpenAIBaseUrl(resolveBaseUrl(env))) {
+    return DEFAULT_OPENAI_COMPAT_REQUEST_TIMEOUT_MS;
+  }
+
+  return DEFAULT_OPENAI_REQUEST_TIMEOUT_MS;
 }
 
 function resolveModel(
@@ -234,7 +266,7 @@ function shouldUseDefaultOpenAIModel(env: NodeJS.ProcessEnv): boolean {
   }
 
   const baseUrl = resolveBaseUrl(env).replace(/\/+$/, "");
-  return baseUrl === DEFAULT_OPENAI_BASE_URL;
+  return isDefaultOpenAIBaseUrl(baseUrl);
 }
 
 function ensureTrailingNewline(value: string): string {

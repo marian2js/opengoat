@@ -24,7 +24,7 @@ export interface LlmRuntimeErrorDetails {
   message: string;
 }
 
-const DEFAULT_REQUEST_TIMEOUT_MS = 20_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_RETRIES = 0;
 
 export class VercelAiTextRuntime implements OpenAiCompatibleTextRuntime {
@@ -86,6 +86,10 @@ export class VercelAiTextRuntime implements OpenAiCompatibleTextRuntime {
   ): OpenAIProviderSettings["fetch"] {
     const endpointOverride = request.endpointOverride?.trim();
     const endpointPathOverride = request.endpointPathOverride?.trim();
+    const requestTimeoutMs = normalizePositiveInt(
+      request.requestTimeoutMs,
+      this.requestTimeoutMs
+    );
 
     return async (input, init) => {
       const nextUrl = endpointOverride
@@ -93,7 +97,7 @@ export class VercelAiTextRuntime implements OpenAiCompatibleTextRuntime {
         : endpointPathOverride
         ? rewriteEndpointPath(input, endpointPathOverride, request.baseURL)
         : toUrlString(input);
-      return fetchWithTimeout(fetchFn, nextUrl, init, this.requestTimeoutMs);
+      return fetchWithTimeout(fetchFn, nextUrl, init, requestTimeoutMs);
     };
   }
 }

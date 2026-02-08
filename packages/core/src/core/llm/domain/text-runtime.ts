@@ -8,6 +8,7 @@ export interface OpenAiCompatibleTextRequest {
   systemPrompt?: string;
   baseURL: string;
   style: OpenAiCompatibleApiStyle;
+  requestTimeoutMs?: number;
   endpointOverride?: string;
   endpointPathOverride?: string;
   headers?: Record<string, string>;

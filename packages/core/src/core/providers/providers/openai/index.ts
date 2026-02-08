@@ -18,7 +18,8 @@ export const providerModule: ProviderModule = {
       },
       {
         key: "OPENAI_ENDPOINT_PATH",
-        description: "Optional endpoint path (default: /responses)"
+        description:
+          "Optional endpoint path override (for example: /responses or /chat/completions)"
       },
       {
         key: "OPENAI_ENDPOINT",
@@ -29,8 +30,14 @@ export const providerModule: ProviderModule = {
         description: "Optional default model id"
       },
       {
+        key: "OPENAI_REQUEST_TIMEOUT_MS",
+        description:
+          "Optional request timeout in milliseconds (default: 120000 for api.openai.com, 300000 for compatible base URLs)"
+      },
+      {
         key: "OPENAI_API_STYLE",
-        description: "Optional API style override: responses or chat"
+        description:
+          "Optional API style override: responses or chat (default: responses for api.openai.com, chat for compatible base URLs)"
       }
     ],
     auth: {

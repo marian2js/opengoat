@@ -34,6 +34,7 @@ describe("openai provider", () => {
         providerName: "openai",
         baseURL: "https://api.openai.com/v1",
         style: "responses",
+        requestTimeoutMs: 120_000,
         model: "gpt-4.1-mini",
       })
     );
@@ -62,6 +63,7 @@ describe("openai provider", () => {
         baseURL: "https://compatible.example/v1/",
         endpointPathOverride: "/chat/completions",
         style: "chat",
+        requestTimeoutMs: 300_000,
         model: "compatible-model",
         message: "hello",
         systemPrompt: "You are OpenGoat.",
@@ -91,6 +93,7 @@ describe("openai provider", () => {
         baseURL: "https://ignored.example/v1",
         endpointOverride: "https://override.example/custom/responses",
         style: "responses",
+        requestTimeoutMs: 300_000,
         model: "custom-model",
       })
     );
@@ -112,8 +115,6 @@ describe("openai provider", () => {
       message: "hello",
       env: {
         OPENAI_API_KEY: "test-key",
-        OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
-        OPENAI_MODEL: "meta/llama-3.1-8b-instruct",
       },
     });
 
@@ -124,7 +125,7 @@ describe("openai provider", () => {
     const firstCall = runtime.generateText.mock
       .calls[0]?.[0] as OpenAiCompatibleTextRequest;
     expect(firstCall.style).toBe("responses");
-    expect(firstCall.baseURL).toBe("https://integrate.api.nvidia.com/v1");
+    expect(firstCall.baseURL).toBe("https://api.openai.com/v1");
     expect(firstCall.endpointPathOverride).toBeUndefined();
 
     const secondCall = runtime.generateText.mock
@@ -150,8 +151,6 @@ describe("openai provider", () => {
       message: "hello",
       env: {
         OPENAI_API_KEY: "test-key",
-        OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
-        OPENAI_MODEL: "meta/llama-3.1-8b-instruct",
       },
     });
 
@@ -186,7 +185,31 @@ describe("openai provider", () => {
     expect(runtime.generateText).toHaveBeenCalledWith(
       expect.objectContaining({
         baseURL: "https://gateway.example/v1/",
+        style: "chat",
+        requestTimeoutMs: 300_000,
         model: "gateway-model",
+      })
+    );
+  });
+
+  it("honors OPENAI_REQUEST_TIMEOUT_MS override", async () => {
+    const runtime = createRuntime(async () => ({ text: "custom timeout\n" }));
+    const provider = new OpenAIProvider({ runtime });
+
+    const result = await provider.invoke({
+      message: "hello",
+      env: {
+        OPENAI_API_KEY: "test-key",
+        OPENAI_BASE_URL: "https://gateway.example/v1/",
+        OPENAI_MODEL: "gateway-model",
+        OPENAI_REQUEST_TIMEOUT_MS: "45000",
+      },
+    });
+
+    expect(result.code).toBe(0);
+    expect(runtime.generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestTimeoutMs: 45_000,
       })
     );
   });
