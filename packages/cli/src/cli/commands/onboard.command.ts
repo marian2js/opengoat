@@ -98,7 +98,7 @@ export const onboardCommand: CliCommand = {
           ) {
             context.stderr.write(
               `Provider "${providerId}" is not supported for orchestrator onboarding. ` +
-                "Choose an internal provider.\n"
+              "Choose an internal provider.\n"
             );
             return 1;
           }
@@ -228,20 +228,20 @@ export const onboardCommand: CliCommand = {
 
 type ParsedOnboardArgs =
   | {
-      ok: true;
-      help: boolean;
-      nonInteractive: boolean;
-      runAuth?: boolean;
-      skipAuth?: boolean;
-      providerId?: string;
-      agentId?: string;
-      model?: string;
-      env: Record<string, string>;
-    }
+    ok: true;
+    help: boolean;
+    nonInteractive: boolean;
+    runAuth?: boolean;
+    skipAuth?: boolean;
+    providerId?: string;
+    agentId?: string;
+    model?: string;
+    env: Record<string, string>;
+  }
   | {
-      ok: false;
-      error: string;
-    };
+    ok: false;
+    error: string;
+  };
 
 function parseOnboardArgs(args: string[]): ParsedOnboardArgs {
   let nonInteractive = false;
@@ -255,6 +255,9 @@ function parseOnboardArgs(args: string[]): ParsedOnboardArgs {
 
   for (let index = 0; index < args.length; index += 1) {
     const rawToken = args[index];
+    if (!rawToken) {
+      continue;
+    }
     const assignment = parseInlineOptionAssignment(rawToken);
     const token = assignment?.token ?? rawToken;
     const inlineValue = assignment?.value;
@@ -551,8 +554,8 @@ async function resolveProviderId(params: {
     params.preferredProviderId && params.providers.some((provider) => provider.id === params.preferredProviderId)
       ? params.preferredProviderId
       : currentProviderId && params.providers.some((provider) => provider.id === currentProviderId)
-      ? currentProviderId
-      : params.providers[0]?.id;
+        ? currentProviderId
+        : params.providers[0]?.id;
   const families = buildProviderFamilies(params.providers);
   const defaultFamilyId = resolveDefaultFamilyId(defaultProvider, families);
 
