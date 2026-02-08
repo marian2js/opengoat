@@ -18,6 +18,7 @@ import type { WorkbenchProject } from "@shared/workbench";
 import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import {
   Folder,
+  FolderOpen,
   FolderPlus,
   MoreHorizontal,
   PanelLeftClose,
@@ -46,6 +47,7 @@ interface ProjectsSidebarProps {
 }
 
 export function ProjectsSidebar(props: ProjectsSidebarProps) {
+  const isMac = useMemo(() => detectMacPlatform(), []);
   const [renameTarget, setRenameTarget] = useState<
     | {
         kind: "project";
@@ -150,6 +152,7 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
     <>
       <aside className="border-border/70 flex min-h-0 flex-col border-r bg-[hsl(224_16%_7%)]">
         <div className="titlebar-drag-region flex h-11 items-center px-2">
+          {isMac ? <div className="h-full w-[76px] shrink-0" /> : null}
           <button
             type="button"
             className="titlebar-no-drag text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-md"
@@ -205,7 +208,11 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
                     className={`text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-md ${selected ? "bg-muted text-foreground" : ""}`}
                     onClick={() => props.onSelectProject(project.id)}
                   >
-                    <Folder className="size-4" />
+                    {selected ? (
+                      <FolderOpen className="size-4" />
+                    ) : (
+                      <Folder className="size-4" />
+                    )}
                   </button>
                 );
               })}
@@ -228,7 +235,11 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
                           className={`hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 pr-16 text-left text-sm ${projectSelected ? "bg-muted text-foreground" : "text-muted-foreground"}`}
                           onClick={() => props.onSelectProject(project.id)}
                         >
-                          <Folder className="size-4 shrink-0" />
+                          {projectSelected ? (
+                            <FolderOpen className="size-4 shrink-0" />
+                          ) : (
+                            <Folder className="size-4 shrink-0" />
+                          )}
                           <span className="truncate">{project.name}</span>
                         </button>
                         <div
@@ -471,4 +482,14 @@ function SidebarAction(props: {
       {props.label}
     </Button>
   );
+}
+
+function detectMacPlatform(): boolean {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  const platform = navigator.platform ?? "";
+  const userAgent = navigator.userAgent ?? "";
+  return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X/i.test(userAgent);
 }
