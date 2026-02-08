@@ -34,15 +34,12 @@ interface AgentsPanelProps {
     name: string;
     providerId?: string;
     createExternalAgent?: boolean;
+    env?: Record<string, string>;
   }) => Promise<void> | void;
   onDelete: (input: {
     agentId: string;
     providerId?: string;
     deleteExternalAgent?: boolean;
-  }) => Promise<void> | void;
-  onSaveProviderConfig: (input: {
-    providerId: string;
-    env: Record<string, string>;
   }) => Promise<void> | void;
   providerConfigAvailable: boolean;
   onDismissNotice: () => void;
@@ -84,6 +81,8 @@ export function AgentsPanel(props: AgentsPanelProps) {
     () => partitionProviderSettingsFields(selectedProvider?.envFields ?? []),
     [selectedProvider?.envFields]
   );
+  const supportsExternalAgentCreation = Boolean(selectedProvider?.supportsExternalAgentCreation);
+  const hasAdvancedOptions = providerSettings.advanced.length > 0 || supportsExternalAgentCreation;
 
   const resetCreateForm = () => {
     setName("");
@@ -119,6 +118,12 @@ export function AgentsPanel(props: AgentsPanelProps) {
     setShowAdvancedProviderSettings(false);
   }, [normalizedProviderId]);
 
+  useEffect(() => {
+    if (!supportsExternalAgentCreation && createExternal) {
+      setCreateExternal(false);
+    }
+  }, [supportsExternalAgentCreation, createExternal]);
+
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedName = name.trim();
@@ -137,7 +142,8 @@ export function AgentsPanel(props: AgentsPanelProps) {
     await props.onCreate({
       name: trimmedName,
       providerId: trimmedProvider || undefined,
-      createExternalAgent: createExternal
+      createExternalAgent: supportsExternalAgentCreation ? createExternal : false,
+      env: trimmedProvider ? sanitizeProviderEnv(providerEnv) : undefined
     });
     resetCreateForm();
     setCreateOpen(false);
@@ -167,19 +173,6 @@ export function AgentsPanel(props: AgentsPanelProps) {
         [key]: value
       }
     }));
-  };
-
-  const handleSaveProviderConfig = async () => {
-    if (!normalizedProviderId) {
-      setFormError("Select an agent provider to configure settings.");
-      return;
-    }
-
-    setFormError(null);
-    await props.onSaveProviderConfig({
-      providerId: normalizedProviderId,
-      env: providerEnv
-    });
   };
 
   return (
@@ -383,20 +376,6 @@ export function AgentsPanel(props: AgentsPanelProps) {
               </div>
             </div>
 
-            <label className="flex items-center gap-2 rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-2 text-sm">
-              <input
-                type="checkbox"
-                className="size-4"
-                checked={createExternal}
-                onChange={(event) => setCreateExternal(event.currentTarget.checked)}
-                disabled={props.busy}
-              />
-              <span>Create external agent</span>
-              <span className="ml-auto text-[11px] text-muted-foreground">
-                Requires agent provider
-              </span>
-            </label>
-
             {selectedProvider && !props.providerConfigAvailable ? (
               <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3 text-sm text-muted-foreground">
                 Provider settings require a newer desktop runtime.
@@ -421,7 +400,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
                     ))}
                   </div>
                 ) : null}
-                {providerSettings.advanced.length > 0 ? (
+                {hasAdvancedOptions ? (
                   <div className="mt-3">
                     <Button
                       type="button"
@@ -442,6 +421,18 @@ export function AgentsPanel(props: AgentsPanelProps) {
                     </Button>
                     {showAdvancedProviderSettings ? (
                       <div className="mt-2 space-y-3">
+                        {supportsExternalAgentCreation ? (
+                          <label className="flex items-center gap-2 rounded-lg border border-[#2E2F31] bg-[#0E1117] px-3 py-2 text-sm">
+                            <input
+                              type="checkbox"
+                              className="size-4"
+                              checked={createExternal}
+                              onChange={(event) => setCreateExternal(event.currentTarget.checked)}
+                              disabled={props.busy}
+                            />
+                            <span>Create agent if not exists</span>
+                          </label>
+                        ) : null}
                         {providerSettings.advanced.map((field) => (
                           <ProviderEnvFieldInput
                             key={field.key}
@@ -453,18 +444,6 @@ export function AgentsPanel(props: AgentsPanelProps) {
                         ))}
                       </div>
                     ) : null}
-                  </div>
-                ) : null}
-                {selectedProvider.envFields.length > 0 ? (
-                  <div className="mt-3 flex justify-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void handleSaveProviderConfig()}
-                      disabled={props.busy}
-                    >
-                      Save provider settings
-                    </Button>
                   </div>
                 ) : null}
               </div>
@@ -560,6 +539,14 @@ export function AgentsPanel(props: AgentsPanelProps) {
         </DialogContent>
       </Dialog>
     </main>
+  );
+}
+
+function sanitizeProviderEnv(env: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(env)
+      .map(([key, value]) => [key, value.trim()])
+      .filter(([, value]) => value.length > 0)
   );
 }
 

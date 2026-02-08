@@ -39,6 +39,7 @@ export interface WorkbenchApiClient {
     name: string;
     providerId?: string;
     createExternalAgent?: boolean;
+    env?: Record<string, string>;
   }) => Promise<WorkbenchAgentCreationResult>;
   deleteAgent: (input: {
     agentId: string;

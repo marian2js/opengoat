@@ -73,7 +73,8 @@ export const workbenchAgentProviderSchema = workbenchProviderSummarySchema.exten
   envFields: z.array(providerOnboardingFieldSchema),
   configuredEnvKeys: z.array(z.string()),
   configuredEnvValues: z.record(z.string(), z.string()),
-  hasConfig: z.boolean()
+  hasConfig: z.boolean(),
+  supportsExternalAgentCreation: z.boolean().optional()
 });
 
 export const workbenchAgentSchema = z.object({
@@ -202,7 +203,8 @@ export const sendMessageResultSchema = z.object({
 export const createAgentInputSchema = z.object({
   name: z.string().trim().min(1),
   providerId: z.string().trim().min(1).optional(),
-  createExternalAgent: z.boolean().optional()
+  createExternalAgent: z.boolean().optional(),
+  env: z.record(z.string(), z.string()).optional()
 });
 
 export const deleteAgentInputSchema = z.object({
