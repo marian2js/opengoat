@@ -252,6 +252,8 @@ describe("WorkbenchService sendMessage", () => {
           env.OPENAI_API_KEY = "nvapi-test";
           env.OPENAI_BASE_URL = "https://integrate.api.nvidia.com/v1";
           env.OPENAI_MODEL = "meta/llama-3.1-8b-instruct";
+          env.OPENAI_API_STYLE = "responses";
+          env.OPENAI_ENDPOINT_PATH = "/responses";
           env.PROJECT_FEATURE_FLAG = "enabled";
         }
       }
@@ -275,7 +277,17 @@ describe("WorkbenchService sendMessage", () => {
     const opengoat = createOpenGoatStub({
       providers: createProviderSummaries(),
       activeProviderId: "openai",
-      onboardingByProvider: {},
+      onboardingByProvider: {
+        openai: {
+          env: [
+            { key: "OPENAI_API_KEY", description: "OpenAI API key", required: true, secret: true },
+            { key: "OPENAI_BASE_URL", description: "Optional OpenAI-compatible base URL" },
+            { key: "OPENAI_MODEL", description: "Optional default model id" },
+            { key: "OPENAI_API_STYLE", description: "Optional API style override" },
+            { key: "OPENAI_ENDPOINT_PATH", description: "Optional endpoint path override" }
+          ]
+        }
+      },
       initialProviderConfigs: {
         openai: {
           schemaVersion: 1,
@@ -362,6 +374,8 @@ describe("WorkbenchService sendMessage", () => {
     expect(runAgentArgs.env?.OPENAI_API_KEY).toBeUndefined();
     expect(runAgentArgs.env?.OPENAI_BASE_URL).toBeUndefined();
     expect(runAgentArgs.env?.OPENAI_MODEL).toBeUndefined();
+    expect(runAgentArgs.env?.OPENAI_API_STYLE).toBeUndefined();
+    expect(runAgentArgs.env?.OPENAI_ENDPOINT_PATH).toBeUndefined();
     expect(runAgentArgs.env?.PROJECT_FEATURE_FLAG).toBe("enabled");
     expect(loadDotEnvFn).toHaveBeenCalled();
     expect(appendMessage).toHaveBeenCalledTimes(2);

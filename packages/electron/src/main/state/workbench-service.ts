@@ -444,12 +444,20 @@ export class WorkbenchService {
     if (gatewaySettings.mode !== "remote") {
       const providerBinding = await this.opengoat.getAgentProvider(DEFAULT_AGENT_ID);
       const providerConfig = await this.opengoat.getProviderConfig(providerBinding.providerId);
-      const providerConfigKeys = Object.keys(providerConfig?.env ?? {});
+      const providerOnboarding = await this.opengoat.getProviderOnboarding(
+        providerBinding.providerId
+      );
+      const providerEnvKeys = [
+        ...new Set([
+          ...Object.keys(providerConfig?.env ?? {}),
+          ...(providerOnboarding?.env ?? []).map((entry) => entry.key),
+        ]),
+      ];
       const run = await this.opengoat.runAgent("orchestrator", {
         message: input.message,
         sessionRef: input.sessionRef,
         cwd: input.cwd,
-        env: await this.buildInvocationEnv(input.cwd, providerConfigKeys)
+        env: await this.buildInvocationEnv(input.cwd, providerEnvKeys)
       });
       return {
         code: run.code,
