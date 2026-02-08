@@ -212,10 +212,10 @@ export function ChatPanel(props: ChatPanelProps) {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.32, ease: [0.4, 0, 0.2, 1] }}
-        className="titlebar-drag-region border-b border-border/70 bg-[linear-gradient(180deg,hsl(221_32%_13%),hsl(221_34%_11%))] px-4 md:px-5"
+        className="titlebar-drag-region sticky top-0 z-30 border-0 bg-[#1F1F1F] px-4 shadow-[0_10px_24px_rgba(0,0,0,0.42)] md:px-5"
       >
-        <div className="flex h-16 items-center justify-between gap-3">
-          <div className="min-w-0 truncate text-lg leading-none tracking-tight">
+        <div className="flex h-12 items-center justify-between gap-3">
+          <div className="min-w-0 truncate text-base leading-none tracking-tight">
             <span className="truncate font-heading font-semibold text-foreground">
               {props.activeSession?.title ?? "No session"}
             </span>
@@ -229,8 +229,8 @@ export function ChatPanel(props: ChatPanelProps) {
               size="sm"
               className={
                 gatewayMode === "remote"
-                  ? "h-8 gap-1 rounded-lg border border-amber-400/35 bg-amber-400/10 px-3 text-amber-100 hover:bg-amber-400/16"
-                  : "h-8 gap-1 rounded-lg border border-emerald-400/35 bg-emerald-400/10 px-3 text-emerald-100 hover:bg-emerald-400/16"
+                  ? "h-8 gap-1 rounded-lg border border-[#2E2F31] bg-[#161617] px-3 text-amber-100 hover:bg-[#1D1D1F]"
+                  : "h-8 gap-1 rounded-lg border border-[#2E2F31] bg-[#161617] px-3 text-emerald-100 hover:bg-[#1D1D1F]"
               }
               onClick={props.onOpenRuntimeSettings}
               disabled={
@@ -244,7 +244,7 @@ export function ChatPanel(props: ChatPanelProps) {
             </Button>
             <Button
               variant="outline"
-              className="h-8 gap-2 rounded-lg border-border/75 bg-[hsl(221_28%_13%)] px-3 text-foreground/95 hover:bg-[hsl(221_26%_15%)]"
+              className="h-8 gap-2 rounded-lg border border-[#2E2F31] bg-[#161617] px-3 text-foreground/95 hover:bg-[#1D1D1F]"
               onClick={props.onOpenOnboarding}
               disabled={
                 props.busy || status === "submitted" || status === "streaming"
