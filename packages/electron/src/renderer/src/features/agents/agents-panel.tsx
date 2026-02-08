@@ -12,6 +12,12 @@ import {
   DialogTitle
 } from "@renderer/components/ai-elements/dialog";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from "@renderer/components/ai-elements/accordion";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -79,6 +85,18 @@ export function AgentsPanel(props: AgentsPanelProps) {
     (normalizedProviderId && providerEnvDrafts[normalizedProviderId]) ??
     selectedProvider?.configuredEnvValues ??
     {};
+  const modelField =
+    selectedProvider?.envFields.find((field) => /(^|_)MODEL(_|$)/i.test(field.key)) ??
+    selectedProvider?.envFields.find((field) => field.key.toLowerCase().includes("model")) ??
+    null;
+  const requiredFields =
+    selectedProvider?.envFields.filter(
+      (field) => field.required && field.key !== modelField?.key
+    ) ?? [];
+  const optionalFields =
+    selectedProvider?.envFields.filter(
+      (field) => !field.required && field.key !== modelField?.key
+    ) ?? [];
 
   const resetCreateForm = () => {
     setName("");
@@ -86,6 +104,17 @@ export function AgentsPanel(props: AgentsPanelProps) {
     setCreateExternal(false);
     setFormError(null);
   };
+
+  const formatEnvLabel = (key: string) =>
+    key
+      .toLowerCase()
+      .split("_")
+      .filter(Boolean)
+      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+      .join(" ");
+
+  const formatEnvDescription = (description: string) =>
+    description.replace(/^Optional\s+/i, "").trim();
 
   useEffect(() => {
     if (!deleteTarget) {
@@ -398,37 +427,114 @@ export function AgentsPanel(props: AgentsPanelProps) {
                   <Badge variant="outline">{selectedProvider.displayName}</Badge>
                   <span>Provider settings</span>
                 </div>
-                {selectedProvider.envFields.length === 0 ? (
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    No additional settings for this provider.
+                {modelField ? (
+                  <div className="mt-3 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs font-medium text-foreground">Default model</p>
+                      <span className="text-[11px] text-muted-foreground">Optional</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Choose the model this agent should use by default.
+                    </p>
+                    <Input
+                      value={providerEnv[modelField.key] ?? ""}
+                      onChange={(event) =>
+                        handleProviderFieldChange(modelField.key, event.target.value)
+                      }
+                      placeholder="Enter model id"
+                      disabled={props.busy}
+                    />
                   </div>
-                ) : (
+                ) : null}
+
+                {requiredFields.length > 0 ? (
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    {selectedProvider.envFields.map((field) => (
+                    {requiredFields.map((field) => (
                       <div key={field.key} className="space-y-1">
-                        <p className="text-xs font-medium text-foreground">{field.key}</p>
-                        <p className="text-[11px] text-muted-foreground">{field.description}</p>
+                        <p className="text-xs font-medium text-foreground">
+                          {formatEnvLabel(field.key)}
+                        </p>
+                        {field.description ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            {formatEnvDescription(field.description)}
+                          </p>
+                        ) : null}
                         <Input
                           type={field.secret ? "password" : "text"}
                           value={providerEnv[field.key] ?? ""}
-                          onChange={(event) => handleProviderFieldChange(field.key, event.target.value)}
+                          onChange={(event) =>
+                            handleProviderFieldChange(field.key, event.target.value)
+                          }
                           placeholder={field.secret ? "Enter secret" : "Enter value"}
                           disabled={props.busy}
                         />
                       </div>
                     ))}
                   </div>
+                ) : null}
+
+                {optionalFields.length > 0 ? (
+                  <div className="mt-3">
+                    <Accordion
+                      type="single"
+                      collapsible
+                      className="rounded-lg border border-[#2E2F31] bg-[#0E1117]/40 px-3"
+                    >
+                      <AccordionItem value="advanced" className="border-0">
+                        <AccordionTrigger className="py-2 text-xs hover:no-underline">
+                          <div className="flex items-center gap-2">
+                            <span>Advanced settings</span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {optionalFields.length} optional
+                            </span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pb-3">
+                          <div className="grid gap-3 md:grid-cols-2">
+                            {optionalFields.map((field) => (
+                              <div key={field.key} className="space-y-1">
+                                <p className="text-xs font-medium text-foreground">
+                                  {formatEnvLabel(field.key)}
+                                </p>
+                                {field.description ? (
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {formatEnvDescription(field.description)}
+                                  </p>
+                                ) : null}
+                                <Input
+                                  type={field.secret ? "password" : "text"}
+                                  value={providerEnv[field.key] ?? ""}
+                                  onChange={(event) =>
+                                    handleProviderFieldChange(field.key, event.target.value)
+                                  }
+                                  placeholder={field.secret ? "Enter secret" : "Enter value"}
+                                  disabled={props.busy}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </div>
+                ) : null}
+
+                {modelField || requiredFields.length > 0 || optionalFields.length > 0 ? (
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void handleSaveProviderConfig()}
+                      disabled={props.busy}
+                    >
+                      Save settings
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    No provider settings available.
+                  </div>
                 )}
-                <div className="mt-3 flex justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void handleSaveProviderConfig()}
-                    disabled={props.busy || selectedProvider.envFields.length === 0}
-                  >
-                    Save provider settings
-                  </Button>
-                </div>
               </div>
             ) : null}
 
