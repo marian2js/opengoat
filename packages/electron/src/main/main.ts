@@ -5,6 +5,7 @@ import { createOpenGoatRuntime } from "@opengoat/core";
 import {
   app,
   BrowserWindow,
+  ipcMain,
   Menu,
   shell,
   type MenuItemConstructorOptions,
@@ -15,12 +16,27 @@ import path from "node:path";
 
 const APP_NAME = "OpenGoat";
 const MENU_ACTION_CHANNEL = "opengoat:menu-action";
+const WINDOW_MODE_CHANNEL = "opengoat:window-mode";
+
+const WINDOW_SIZE = {
+  workspace: {
+    minWidth: 1024,
+    minHeight: 700,
+  },
+  onboarding: {
+    width: 1180,
+    height: 820,
+    minWidth: 960,
+    minHeight: 680,
+  },
+} as const;
 
 type MenuAction =
   | "open-project"
   | "new-session"
   | "open-provider-settings"
   | "open-connection-settings";
+type WindowMode = "workspace" | "onboarding";
 
 if (started) {
   app.quit();
@@ -47,6 +63,31 @@ const workbenchService = new WorkbenchService({
 });
 
 const router = createDesktopRouter(workbenchService);
+
+function applyWindowMode(targetWindow: BrowserWindow, mode: WindowMode): void {
+  const minimumSize = WINDOW_SIZE[mode];
+  targetWindow.setMinimumSize(minimumSize.minWidth, minimumSize.minHeight);
+
+  if (targetWindow.isMaximized() || targetWindow.isFullScreen()) {
+    return;
+  }
+
+  if (mode === "onboarding") {
+    targetWindow.setSize(WINDOW_SIZE.onboarding.width, WINDOW_SIZE.onboarding.height);
+    targetWindow.center();
+    return;
+  }
+
+  const [
+    currentWidth = WINDOW_SIZE.workspace.minWidth,
+    currentHeight = WINDOW_SIZE.workspace.minHeight,
+  ] = targetWindow.getSize();
+  const nextWidth = Math.max(currentWidth, WINDOW_SIZE.workspace.minWidth);
+  const nextHeight = Math.max(currentHeight, WINDOW_SIZE.workspace.minHeight);
+  if (nextWidth !== currentWidth || nextHeight !== currentHeight) {
+    targetWindow.setSize(nextWidth, nextHeight);
+  }
+}
 
 function dispatchMenuAction(action: MenuAction): void {
   const target =
@@ -209,10 +250,10 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
   const isMac = process.platform === "darwin";
 
   const mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 960,
-    minWidth: 1024,
-    minHeight: 700,
+    width: WINDOW_SIZE.onboarding.width,
+    height: WINDOW_SIZE.onboarding.height,
+    minWidth: WINDOW_SIZE.workspace.minWidth,
+    minHeight: WINDOW_SIZE.workspace.minHeight,
     title: "OpenGoat",
     // macOS-specific: integrate traffic light buttons into content area
     ...(isMac && {
@@ -241,6 +282,17 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
 app.whenReady().then(async () => {
   await runtime.service.initialize();
   Menu.setApplicationMenu(buildApplicationMenu());
+
+  ipcMain.on(WINDOW_MODE_CHANNEL, (event, mode: WindowMode) => {
+    if (mode !== "workspace" && mode !== "onboarding") {
+      return;
+    }
+    const targetWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!targetWindow || targetWindow.isDestroyed()) {
+      return;
+    }
+    applyWindowMode(targetWindow, mode);
+  });
 
   const ipcHandler = createIPCHandler({ router: router as never, windows: [] });
 

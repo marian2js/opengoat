@@ -77,6 +77,12 @@ export function App() {
     });
   }, [activeProjectId, addProjectFromDialog, createSession, openOnboarding]);
 
+  useEffect(() => {
+    window.opengoatDesktop?.setWindowMode(
+      showOnboarding ? "onboarding" : "workspace",
+    );
+  }, [showOnboarding]);
+
   const activeProject = useMemo(
     () => getActiveProject(projects, activeProjectId),
     [projects, activeProjectId]

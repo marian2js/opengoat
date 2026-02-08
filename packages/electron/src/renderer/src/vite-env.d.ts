@@ -5,9 +5,11 @@ type OpenGoatDesktopMenuAction =
   | "new-session"
   | "open-provider-settings"
   | "open-connection-settings";
+type OpenGoatDesktopWindowMode = "workspace" | "onboarding";
 
 interface OpenGoatDesktopApi {
   onMenuAction: (listener: (action: OpenGoatDesktopMenuAction) => void) => () => void;
+  setWindowMode: (mode: OpenGoatDesktopWindowMode) => void;
 }
 
 declare global {

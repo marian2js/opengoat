@@ -3,6 +3,7 @@ import { ScrollArea } from "@renderer/components/ai-elements/scroll-area";
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
 import type { WorkbenchGatewayMode, WorkbenchOnboarding } from "@shared/workbench";
+import { ChevronDown } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -131,141 +132,126 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
     Boolean(selectedProvider) &&
     missingRequiredKeys.length === 0 &&
     !props.isSubmitting;
-  const totalProviderCount = providerFamilies.reduce(
-    (count, family) => count + family.providers.length,
-    0,
-  );
 
   return (
-    <div className="h-screen overflow-hidden bg-[radial-gradient(1200px_520px_at_14%_-18%,rgba(21,128,61,0.18),transparent_58%),radial-gradient(820px_440px_at_98%_0%,rgba(56,189,248,0.14),transparent_62%),linear-gradient(180deg,hsl(220_43%_8%),hsl(220_41%_6%))] text-[var(--foreground)]">
-      <div className="mx-auto flex h-full w-full max-w-6xl px-3 py-3 md:px-6 md:py-5">
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-          className="flex min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-[color-mix(in_oklab,var(--border)_85%,#0b1220)] bg-[color-mix(in_oklab,var(--surface)_93%,black)] shadow-[0_30px_120px_rgba(0,0,0,0.46)]"
-        >
-          <motion.header
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="border-b border-[var(--border)] px-5 py-4 md:px-6"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-heading text-2xl font-bold tracking-tight text-gradient-animated">
-                  OpenGoat Setup
-                </p>
-                <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                  Select a provider, add credentials, and start your first
-                  orchestrator session.
-                </p>
+    <div className="h-screen overflow-hidden bg-[radial-gradient(1300px_620px_at_-10%_-16%,hsl(162_78%_49%_/_0.18),transparent_58%),radial-gradient(1100px_520px_at_120%_-10%,hsl(194_86%_54%_/_0.14),transparent_60%),linear-gradient(180deg,hsl(220_42%_8%),hsl(221_38%_6%))] text-[var(--foreground)]">
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: [0.2, 0, 0, 1] }}
+        className="flex h-full w-full min-h-0 flex-col"
+      >
+        <header className="border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_88%,black)] px-5 py-4 md:px-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2">
+              <p className="font-heading text-3xl font-semibold tracking-tight text-[var(--foreground)]">
+                OpenGoat Setup
+              </p>
+              <p className="max-w-2xl text-sm text-[var(--muted-foreground)]">
+                Configure one provider and optional runtime settings to start your first
+                orchestrator session.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted-foreground)]">
+                <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1">
+                  1. Select provider
+                </span>
+                <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1">
+                  2. Add credentials
+                </span>
+                <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1">
+                  3. Save and start
+                </span>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                  onClick={() => setShowConnectionPanel((value) => !value)}
-                  disabled={props.isSubmitting}
-                >
-                  Runtime: {props.gateway.mode === "remote" ? "Remote" : "Local"}
-                </Button>
-                <Badge
-                  variant="outline"
-                  className="border-primary/30 bg-[color-mix(in_oklab,var(--surface)_92%,black)] text-[11px] uppercase tracking-wide text-[var(--muted-foreground)]"
-                >
-                  {totalProviderCount} providers
-                </Badge>
-              </div>
-            </div>
-          </motion.header>
-
-          {showConnectionPanel ? (
-            <ConnectionSettingsPane
-              gateway={props.gateway}
-              disabled={props.isSubmitting || props.isSavingGateway}
-              isSaving={props.isSavingGateway}
-              onGatewayChange={props.onGatewayChange}
-              onSave={props.onSaveGateway}
-              onClose={() => setShowConnectionPanel(false)}
-            />
-          ) : null}
-
-          <div className="grid min-h-0 flex-1 md:grid-cols-[320px_minmax(0,1fr)]">
-            <ProviderListPane
-              providerId={props.providerId}
-              families={filteredFamilies}
-              query={providerQuery}
-              disabled={props.isSubmitting}
-              onQueryChange={setProviderQuery}
-              onSelectProvider={props.onSelectProvider}
-            />
-            <SetupPane
-              provider={selectedProvider}
-              env={props.env}
-              requiredFields={visibleRequiredFields}
-              optionalFields={envPartition.optional}
-              showAdvanced={showAdvanced}
-              missingRequiredKeys={missingRequiredKeys}
-              disabled={props.isSubmitting}
-              isRunningGuidedAuth={props.isRunningGuidedAuth}
-              onboardingNotice={props.onboardingNotice}
-              onToggleAdvanced={() => setShowAdvanced((value) => !value)}
-              onEnvChange={props.onEnvChange}
-              onRunGuidedAuth={props.onRunGuidedAuth}
-            />
-          </div>
-
-          <motion.footer
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.2 }}
-            className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_95%,black)] px-5 py-3 md:px-6"
-          >
-            <div className="min-h-5 text-xs text-[var(--muted-foreground)]">
-              {props.error ? (
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-red-300"
-                >
-                  {props.error}
-                </motion.span>
-              ) : missingStatusMessage ? (
-                <span className="text-amber-300">{missingStatusMessage}</span>
-              ) : selectedProvider ? (
-                `Selected provider: ${selectedProvider.displayName} (${selectedProvider.id})`
-              ) : (
-                "Select a provider to continue"
-              )}
             </div>
             <div className="flex items-center gap-2">
-              {props.canClose ? (
-                <Button
-                  variant="outline"
-                  onClick={props.onClose}
-                  disabled={props.isSubmitting}
-                >
-                  Close
-                </Button>
-              ) : null}
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 rounded-full border border-[var(--border)] px-3 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                onClick={() => setShowConnectionPanel((value) => !value)}
+                disabled={props.isSubmitting}
               >
-                <Button
-                  className="btn-glow"
-                  onClick={props.onSubmit}
-                  disabled={!canSubmit}
-                >
-                  {props.isSubmitting ? "Saving..." : "Save and Start"}
-                </Button>
-              </motion.div>
+                Runtime: {props.gateway.mode === "remote" ? "Remote" : "Local"}
+                <ChevronDown className="size-3.5 opacity-80" aria-hidden="true" />
+              </Button>
             </div>
-          </motion.footer>
-        </motion.div>
-      </div>
+          </div>
+        </header>
+
+        {showConnectionPanel ? (
+          <ConnectionSettingsPane
+            gateway={props.gateway}
+            disabled={props.isSubmitting || props.isSavingGateway}
+            isSaving={props.isSavingGateway}
+            onGatewayChange={props.onGatewayChange}
+            onSave={props.onSaveGateway}
+            onClose={() => setShowConnectionPanel(false)}
+          />
+        ) : null}
+
+        <div className="grid min-h-0 flex-1 grid-cols-1 border-b border-[var(--border)] lg:grid-cols-[340px_minmax(0,1fr)]">
+          <ProviderListPane
+            providerId={props.providerId}
+            families={filteredFamilies}
+            query={providerQuery}
+            disabled={props.isSubmitting}
+            onQueryChange={setProviderQuery}
+            onSelectProvider={props.onSelectProvider}
+          />
+          <SetupPane
+            provider={selectedProvider}
+            env={props.env}
+            requiredFields={visibleRequiredFields}
+            optionalFields={envPartition.optional}
+            showAdvanced={showAdvanced}
+            missingRequiredKeys={missingRequiredKeys}
+            disabled={props.isSubmitting}
+            isRunningGuidedAuth={props.isRunningGuidedAuth}
+            onboardingNotice={props.onboardingNotice}
+            onToggleAdvanced={() => setShowAdvanced((value) => !value)}
+            onEnvChange={props.onEnvChange}
+            onRunGuidedAuth={props.onRunGuidedAuth}
+          />
+        </div>
+
+        <footer className="flex flex-wrap items-center justify-between gap-3 bg-[color-mix(in_oklab,var(--surface)_92%,black)] px-5 py-3 md:px-8">
+          <div className="min-h-5 text-xs text-[var(--muted-foreground)]">
+            {props.error ? (
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-red-300"
+              >
+                {props.error}
+              </motion.span>
+            ) : missingStatusMessage ? (
+              <span className="text-amber-300">{missingStatusMessage}</span>
+            ) : selectedProvider ? (
+              `Selected provider: ${selectedProvider.displayName} (${selectedProvider.id})`
+            ) : (
+              "Select a provider to continue"
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {props.canClose ? (
+              <Button
+                variant="outline"
+                onClick={props.onClose}
+                disabled={props.isSubmitting}
+              >
+                Close
+              </Button>
+            ) : null}
+            <Button
+              variant="glow"
+              onClick={props.onSubmit}
+              disabled={!canSubmit}
+            >
+              {props.isSubmitting ? "Saving..." : "Save and Start"}
+            </Button>
+          </div>
+        </footer>
+      </motion.div>
     </div>
   );
 }
@@ -279,8 +265,8 @@ function ProviderListPane(props: {
   onSelectProvider: (providerId: string) => void;
 }) {
   return (
-    <aside className="flex min-h-0 flex-col border-b border-[var(--border)] md:border-r md:border-b-0">
-      <div className="space-y-3 border-b border-[var(--border)] p-4">
+    <aside className="flex min-h-0 flex-col border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,black)] lg:border-r lg:border-b-0">
+      <div className="space-y-3 border-b border-[var(--border)] px-4 py-4 md:px-5">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
             Provider List
@@ -298,9 +284,9 @@ function ProviderListPane(props: {
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="space-y-4 p-3">
+        <div className="space-y-4 p-3 md:p-4">
           {props.families.length === 0 ? (
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
               No providers match this search.
             </div>
           ) : (
@@ -352,10 +338,10 @@ function ProviderListItem(props: {
       type="button"
       onClick={props.onSelect}
       disabled={props.disabled}
-      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition ${
+      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
         props.selected
-          ? "border-[var(--accent-strong)] bg-[color-mix(in_oklab,var(--accent)_24%,transparent)]"
-          : "border-transparent hover:border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--surface)_92%,black)]"
+          ? "border-[var(--accent-strong)] bg-[color-mix(in_oklab,var(--accent)_24%,transparent)] shadow-[inset_0_0_0_1px_hsl(162_72%_39%_/_0.22)]"
+          : "border-transparent hover:border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--surface)_88%,black)]"
       }`}
     >
       <div className="min-w-0 flex-1">
@@ -415,8 +401,8 @@ function SetupPane(props: {
 }) {
   if (!props.provider) {
     return (
-      <div className="flex min-h-0 flex-col">
-        <div className="border-b border-[var(--border)] p-5">
+      <div className="flex min-h-0 flex-col bg-[color-mix(in_oklab,var(--surface)_88%,black)]">
+        <div className="border-b border-[var(--border)] p-5 md:px-7">
           <p className="font-heading text-xl">Provider Setup</p>
           <p className="mt-1 text-sm text-[var(--muted-foreground)]">
             Choose a provider from the list to continue.
@@ -431,15 +417,15 @@ function SetupPane(props: {
   const provider = props.provider;
 
   return (
-    <section className="flex min-h-0 flex-col">
-      <div className="border-b border-[var(--border)] p-5">
+    <section className="flex min-h-0 flex-col bg-[color-mix(in_oklab,var(--surface)_88%,black)]">
+      <div className="border-b border-[var(--border)] p-5 md:px-7">
         <p className="font-heading text-xl">{provider.displayName}</p>
         <p className="mt-1 text-sm text-[var(--muted-foreground)]">
           Fill the required fields first. Optional fields stay hidden until
           needed.
         </p>
         {provider.guidedAuth ? (
-          <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+          <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
             <p className="text-sm font-medium">{provider.guidedAuth.title}</p>
             <p className="mt-1 text-xs text-[var(--muted-foreground)]">
               {provider.guidedAuth.description}
@@ -466,13 +452,13 @@ function SetupPane(props: {
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="space-y-5 p-5">
+        <div className="space-y-5 p-5 md:px-7">
           <section className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
               Required
             </p>
             {!hasRequired ? (
-              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
                 {provider.guidedAuth
                   ? "Use OAuth sign-in above to populate required credentials."
                   : "No required credentials for this provider."}
@@ -503,14 +489,14 @@ function SetupPane(props: {
             <button
               type="button"
               onClick={props.onToggleAdvanced}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] transition hover:border-[var(--accent)]/60 hover:bg-[color-mix(in_oklab,var(--surface-strong)_82%,black)]"
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] transition hover:border-[var(--accent)]/60 hover:bg-[color-mix(in_oklab,var(--surface-strong)_82%,black)]"
             >
               {props.showAdvanced
                 ? "Hide Advanced Options"
                 : "Show Advanced Options"}
             </button>
             {props.showAdvanced ? (
-              <div className="space-y-4 rounded-lg border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_95%,black)] p-3">
+              <div className="space-y-4 rounded-xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_95%,black)] p-3">
                 <div className="space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
                     Optional Provider Fields
@@ -534,7 +520,7 @@ function SetupPane(props: {
                       );
                     })
                   ) : (
-                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
                       No optional provider fields for this provider.
                     </div>
                   )}
@@ -572,8 +558,8 @@ function ConnectionSettingsPane(props: {
   const canSave = !props.disabled && (!isRemote || Boolean(props.gateway.remoteUrl.trim()));
 
   return (
-    <section className="border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_96%,black)] px-5 py-3 md:px-6">
-      <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+    <section className="border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_94%,black)] px-5 py-3 md:px-8">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <p className="text-sm font-medium text-[var(--foreground)]">
@@ -594,7 +580,7 @@ function ConnectionSettingsPane(props: {
         </div>
 
         <div className="mt-3 space-y-3">
-          <label className="flex items-center gap-2 rounded-md border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_95%,black)] px-3 py-2 text-sm">
+          <label className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_95%,black)] px-3 py-2 text-sm">
             <input
               type="checkbox"
               className="size-4"
@@ -704,7 +690,7 @@ function EnvFieldInput(props: {
   onChange: (key: string, value: string) => void;
 }) {
   return (
-    <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+    <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-[var(--foreground)]">
