@@ -69,7 +69,7 @@ describe("CLI commands", () => {
     expect(code).toBe(0);
     expect(createAgent).toHaveBeenCalledWith("Research Analyst", {
       providerId: undefined,
-      createExternalAgent: false
+      createExternalAgent: undefined
     });
     expect(stdout.output()).toContain("Agent created: Research Analyst (research-analyst)");
   });
@@ -106,15 +106,43 @@ describe("CLI commands", () => {
     expect(stdout.output()).toContain("External agent creation (openclaw): code 0");
   });
 
-  it("agent create requires --provider when --create-external is set", async () => {
+  it("agent create supports disabling provider-side creation", async () => {
+    const createAgent = vi.fn(async () => ({
+      agent: {
+        id: "research-analyst",
+        displayName: "Research Analyst",
+        workspaceDir: "/tmp/workspaces/research-analyst",
+        internalConfigDir: "/tmp/agents/research-analyst"
+      },
+      createdPaths: ["a", "b"],
+      skippedPaths: []
+    }));
+    const { context } = createContext({ createAgent });
+
+    const code = await agentCreateCommand.run(
+      ["Research", "Analyst", "--provider", "openclaw", "--no-create-external"],
+      context
+    );
+
+    expect(code).toBe(0);
+    expect(createAgent).toHaveBeenCalledWith("Research Analyst", {
+      providerId: "openclaw",
+      createExternalAgent: false
+    });
+  });
+
+  it("agent create rejects conflicting external-create flags", async () => {
     const createAgent = vi.fn();
     const { context, stderr } = createContext({ createAgent });
 
-    const code = await agentCreateCommand.run(["Research", "--create-external"], context);
+    const code = await agentCreateCommand.run(
+      ["Research", "--create-external", "--no-create-external"],
+      context
+    );
 
     expect(code).toBe(1);
     expect(createAgent).not.toHaveBeenCalled();
-    expect(stderr.output()).toContain("--create-external");
+    expect(stderr.output()).toContain("Cannot combine --create-external with --no-create-external");
   });
 
   it("agent create rejects --set-default because orchestrator is always default", async () => {

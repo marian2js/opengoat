@@ -423,7 +423,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         const result = await api.createAgent({
           name,
           providerId: input.providerId?.trim() || undefined,
-          createExternalAgent: Boolean(input.createExternalAgent),
+          createExternalAgent: input.createExternalAgent,
           env: input.env
         });
         set((state) => ({

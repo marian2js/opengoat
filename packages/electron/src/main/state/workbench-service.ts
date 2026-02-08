@@ -13,7 +13,8 @@ import {
   callOpenGoatGateway,
   loadDotEnv,
   selectProvidersForOnboarding,
-  type OpenGoatService
+  type OpenGoatService,
+  type ProviderSummary as CoreProviderSummary
 } from "@opengoat/core";
 import type {
   WorkbenchBootstrap,
@@ -23,7 +24,6 @@ import type {
   WorkbenchAgentCreationResult,
   WorkbenchAgentDeletionResult,
   WorkbenchAgentProvider,
-  WorkbenchProviderSummary,
   WorkbenchGuidedAuthResult,
   WorkbenchMessage,
   WorkbenchOnboarding,
@@ -255,17 +255,10 @@ export class WorkbenchService {
   }): Promise<WorkbenchAgentCreationResult> {
     await this.ensureInitialized();
     const providerId = input.providerId?.trim();
-    const createExternalAgent = Boolean(input.createExternalAgent);
     const env = input.env ?? {};
-    if (createExternalAgent && !providerId) {
-      throw new Error("External agent creation requires an agent provider.");
-    }
-    if (createExternalAgent && providerId) {
-      const providers = await this.opengoat.listProviders();
-      const provider = providers.find((entry) => entry.id === providerId.toLowerCase());
-      if (!provider?.capabilities.agentCreate) {
-        throw new Error(`Provider "${providerId}" does not support external agent creation.`);
-      }
+    const createExternalAgent = input.createExternalAgent;
+    if (!providerId && Object.keys(env).length > 0) {
+      throw new Error("Provider settings require selecting an agent provider.");
     }
     if (providerId && Object.keys(env).length > 0) {
       await this.opengoat.setProviderConfig(providerId, env);
@@ -287,7 +280,7 @@ export class WorkbenchService {
 
   private async buildAgentProviderSummary(
     providerId: string,
-    providerSummary?: WorkbenchProviderSummary
+    providerSummary?: CoreProviderSummary
   ): Promise<WorkbenchAgentProvider> {
     const summary =
       providerSummary ??
@@ -310,9 +303,7 @@ export class WorkbenchService {
       configuredEnvKeys: Object.keys(env),
       configuredEnvValues: { ...env },
       hasConfig: Boolean(config),
-      supportsExternalAgentCreation: Boolean(
-        (summary as { capabilities?: { agentCreate?: boolean } }).capabilities?.agentCreate
-      )
+      supportsExternalAgentCreation: Boolean(summary.capabilities.agentCreate)
     };
   }
 

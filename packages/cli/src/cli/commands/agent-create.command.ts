@@ -12,22 +12,26 @@ export const agentCreateCommand: CliCommand = {
     const parsed = parseAgentCreateArgs(args);
     if (!parsed.ok) {
       context.stderr.write(`${parsed.error}\n`);
-      context.stderr.write("Usage: opengoat agent create <name> [--provider <id>] [--create-external]\n");
+      context.stderr.write(
+        "Usage: opengoat agent create <name> [--provider <id>] [--create-external | --no-create-external]\n"
+      );
       return 1;
     }
 
     if (parsed.help) {
-      context.stdout.write("Usage: opengoat agent create <name> [--provider <id>] [--create-external]\n");
+      context.stdout.write(
+        "Usage: opengoat agent create <name> [--provider <id>] [--create-external | --no-create-external]\n"
+      );
       context.stdout.write("\n");
       context.stdout.write("Options:\n");
       context.stdout.write("  --provider <id>       Set the agent provider after creation.\n");
-      context.stdout.write("  --create-external     Also create the agent in the configured external provider.\n");
+      context.stdout.write(
+        "  --create-external     Force provider-side creation when supported.\n"
+      );
+      context.stdout.write(
+        "  --no-create-external  Disable provider-side creation (enabled by default when supported).\n"
+      );
       return 0;
-    }
-
-    if (parsed.createExternal && !parsed.providerId) {
-      context.stderr.write("`--create-external` requires `--provider <id>`.\n");
-      return 1;
     }
 
     const name = parsed.name;
@@ -83,13 +87,13 @@ interface ParsedAgentCreateArgs {
   help?: boolean;
   name: string;
   providerId?: string;
-  createExternal: boolean;
+  createExternal?: boolean;
 }
 
 function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
   const nameParts: string[] = [];
   let providerId: string | undefined;
-  let createExternal = false;
+  let createExternal: boolean | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index];
@@ -102,12 +106,33 @@ function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
         ok: true,
         help: true,
         name: "",
-        createExternal: false
+        createExternal: undefined
       };
     }
 
     if (token === "--create-external") {
+      if (createExternal === false) {
+        return {
+          ok: false,
+          error: "Cannot combine --create-external with --no-create-external.",
+          name: "",
+          createExternal: undefined
+        };
+      }
       createExternal = true;
+      continue;
+    }
+
+    if (token === "--no-create-external") {
+      if (createExternal === true) {
+        return {
+          ok: false,
+          error: "Cannot combine --create-external with --no-create-external.",
+          name: "",
+          createExternal: undefined
+        };
+      }
+      createExternal = false;
       continue;
     }
 
@@ -118,7 +143,7 @@ function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
           ok: false,
           error: "Missing value for --provider.",
           name: "",
-          createExternal: false
+          createExternal: undefined
         };
       }
       providerId = value;
@@ -133,7 +158,7 @@ function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
           ok: false,
           error: "Missing value for --provider.",
           name: "",
-          createExternal: false
+          createExternal: undefined
         };
       }
       providerId = value;
@@ -145,7 +170,7 @@ function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
         ok: false,
         error: `Unknown option: ${token}`,
         name: "",
-        createExternal: false
+        createExternal: undefined
       };
     }
 
