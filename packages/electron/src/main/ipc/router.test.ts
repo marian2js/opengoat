@@ -28,6 +28,14 @@ describe("desktop IPC router", () => {
     await caller.projects.remove({
       projectId: "p1"
     });
+    await caller.agents.list();
+    await caller.agents.providers();
+    await caller.agents.create({
+      name: "writer"
+    });
+    await caller.agents.delete({
+      agentId: "writer"
+    });
     await caller.sessions.rename({
       projectId: "p1",
       sessionId: "s1",
@@ -46,6 +54,14 @@ describe("desktop IPC router", () => {
     expect(service.listProjects).toHaveBeenCalledTimes(1);
     expect(service.renameProject).toHaveBeenCalledWith("p1", "Workspace");
     expect(service.removeProject).toHaveBeenCalledWith("p1");
+    expect(service.listAgents).toHaveBeenCalledTimes(1);
+    expect(service.listAgentProviders).toHaveBeenCalledTimes(1);
+    expect(service.createAgent).toHaveBeenCalledWith({
+      name: "writer"
+    });
+    expect(service.deleteAgent).toHaveBeenCalledWith({
+      agentId: "writer"
+    });
     expect(service.renameSession).toHaveBeenCalledWith("p1", "s1", "Renamed");
     expect(service.removeSession).toHaveBeenCalledWith("p1", "s1");
     expect(service.listMessages).toHaveBeenCalledWith("p1", "s1");
@@ -149,6 +165,25 @@ function createServiceStub(): WorkbenchService {
     })),
     removeProject: vi.fn(async () => undefined),
     pickAndAddProject: vi.fn(async () => null),
+    listAgents: vi.fn(async () => []),
+    listAgentProviders: vi.fn(async () => []),
+    createAgent: vi.fn(async () => ({
+      agent: {
+        id: "writer",
+        displayName: "Writer",
+        workspaceDir: "/tmp/workspaces/writer",
+        internalConfigDir: "/tmp/agents/writer",
+        providerId: "codex"
+      },
+      createdPaths: [],
+      skippedPaths: []
+    })),
+    deleteAgent: vi.fn(async () => ({
+      agentId: "writer",
+      existed: true,
+      removedPaths: [],
+      skippedPaths: []
+    })),
     listSessions: vi.fn(async () => []),
     createSession: vi.fn(async () => ({
       id: "s1",
