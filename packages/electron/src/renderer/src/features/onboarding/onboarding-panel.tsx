@@ -20,20 +20,11 @@ interface OnboardingPanelProps {
   error: string | null;
   canClose: boolean;
   isSubmitting: boolean;
-  isSavingGateway: boolean;
   isRunningGuidedAuth: boolean;
   onboardingNotice: string | null;
   onSelectProvider: (providerId: string) => void;
   onEnvChange: (key: string, value: string) => void;
-  onGatewayChange: (
-    patch: Partial<{
-      mode: WorkbenchGatewayMode;
-      remoteUrl: string;
-      remoteToken: string;
-      timeoutMs: number;
-    }>
-  ) => void;
-  onSaveGateway: () => void;
+  onOpenRuntimeSettings: () => void;
   onRunGuidedAuth: (providerId: string) => void;
   onClose: () => void;
   onSubmit: () => void;
@@ -54,7 +45,6 @@ const ONBOARDING_STEPS = [
 
 export function OnboardingPanel(props: OnboardingPanelProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showConnectionPanel, setShowConnectionPanel] = useState(false);
   const [providerQuery, setProviderQuery] = useState("");
   const isMac = useMemo(() => detectMacPlatform(), []);
   const selectedProvider = resolveSelectedOnboardingProvider(
@@ -156,7 +146,7 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
                 variant="ghost"
                 size="sm"
                 className="h-8 rounded-full border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_90%,black)] px-3 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                onClick={() => setShowConnectionPanel((value) => !value)}
+                onClick={props.onOpenRuntimeSettings}
                 disabled={props.isSubmitting}
               >
                 Runtime: {props.gateway.mode === "remote" ? "Remote" : "Local"}
@@ -193,17 +183,6 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
             </ol>
           </div>
         </header>
-
-        {showConnectionPanel ? (
-          <ConnectionSettingsPane
-            gateway={props.gateway}
-            disabled={props.isSubmitting || props.isSavingGateway}
-            isSaving={props.isSavingGateway}
-            onGatewayChange={props.onGatewayChange}
-            onSave={props.onSaveGateway}
-            onClose={() => setShowConnectionPanel(false)}
-          />
-        ) : null}
 
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 md:p-4 lg:grid-cols-[330px_minmax(0,1fr)] lg:gap-4">
           <ProviderListPane
@@ -560,148 +539,6 @@ function SetupPane(props: {
   );
 }
 
-function ConnectionSettingsPane(props: {
-  gateway: {
-    mode: WorkbenchGatewayMode;
-    remoteUrl: string;
-    remoteToken: string;
-    timeoutMs: number;
-  };
-  disabled: boolean;
-  isSaving: boolean;
-  onGatewayChange: (
-    patch: Partial<{
-      mode: WorkbenchGatewayMode;
-      remoteUrl: string;
-      remoteToken: string;
-      timeoutMs: number;
-    }>
-  ) => void;
-  onSave: () => void;
-  onClose: () => void;
-}) {
-  const isRemote = props.gateway.mode === "remote";
-  const canSave = !props.disabled && (!isRemote || Boolean(props.gateway.remoteUrl.trim()));
-
-  return (
-    <section className="px-3 pb-1 pt-0 md:px-4">
-      <div className="rounded-xl border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_90%,black)] p-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <p className="text-sm font-medium text-[var(--foreground)]">
-              OpenGoat Runtime Connection
-            </p>
-            <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
-              Optional. Keep local unless OpenGoat runs on a different machine.
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs text-[var(--muted-foreground)]"
-            onClick={props.onClose}
-          >
-            Close
-          </Button>
-        </div>
-
-        <div className="mt-3 space-y-3">
-          <label className="flex items-center gap-2 rounded-lg border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_95%,black)] px-3 py-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4"
-              checked={isRemote}
-              disabled={props.disabled}
-              onChange={(event) =>
-                props.onGatewayChange({
-                  mode: event.currentTarget.checked ? "remote" : "local"
-                })
-              }
-            />
-            <span>Connect to remote OpenGoat</span>
-            <span className="ml-auto rounded-full border border-[var(--border)]/80 px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
-              {isRemote ? "Remote" : "Local"}
-            </span>
-          </label>
-
-          {isRemote ? (
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-[var(--foreground)]">
-                  Remote gateway URL
-                </p>
-                <Input
-                  value={props.gateway.remoteUrl}
-                  onChange={(event) =>
-                    props.onGatewayChange({
-                      remoteUrl: event.target.value
-                    })
-                  }
-                  placeholder="ws://remote-host:18789/gateway"
-                  disabled={props.disabled}
-                />
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-[var(--foreground)]">
-                    Auth token (optional)
-                  </p>
-                  <Input
-                    type="password"
-                    value={props.gateway.remoteToken}
-                    onChange={(event) =>
-                      props.onGatewayChange({
-                        remoteToken: event.target.value
-                      })
-                    }
-                    placeholder="Keep empty to leave token unchanged"
-                    disabled={props.disabled}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-[var(--foreground)]">
-                    Timeout (ms)
-                  </p>
-                  <Input
-                    type="number"
-                    min={1000}
-                    max={120000}
-                    step={500}
-                    value={String(props.gateway.timeoutMs)}
-                    onChange={(event) => {
-                      const parsed = Number(event.target.value);
-                      if (!Number.isFinite(parsed)) {
-                        return;
-                      }
-                      props.onGatewayChange({
-                        timeoutMs: clampGatewayTimeout(parsed)
-                      });
-                    }}
-                    disabled={props.disabled}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="flex items-center justify-end">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={props.onSave}
-              disabled={!canSave}
-            >
-              {props.isSaving ? "Saving Connection..." : "Save Connection"}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function EnvFieldInput(props: {
   field: {
     key: string;
@@ -923,11 +760,4 @@ function buildMissingStatusMessage(
     return "Complete OAuth sign-in to continue";
   }
   return null;
-}
-
-function clampGatewayTimeout(value: number): number {
-  if (!Number.isFinite(value)) {
-    return 10_000;
-  }
-  return Math.max(1000, Math.min(120_000, Math.floor(value)));
 }

@@ -24,13 +24,11 @@ describe("OnboardingPanel e2e", () => {
         error: null,
         canClose: true,
         isSubmitting: false,
-        isSavingGateway: false,
         isRunningGuidedAuth: false,
         onboardingNotice: null,
         onSelectProvider: vi.fn(),
         onEnvChange: vi.fn(),
-        onGatewayChange: vi.fn(),
-        onSaveGateway: vi.fn(),
+        onOpenRuntimeSettings: vi.fn(),
         onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit: vi.fn()
@@ -62,7 +60,6 @@ describe("OnboardingPanel e2e", () => {
         error: null,
         canClose: true,
         isSubmitting: false,
-        isSavingGateway: false,
         isRunningGuidedAuth: false,
         onboardingNotice: null,
         onSelectProvider: setProviderId,
@@ -72,8 +69,7 @@ describe("OnboardingPanel e2e", () => {
             [key]: value
           }));
         },
-        onGatewayChange: vi.fn(),
-        onSaveGateway: vi.fn(),
+        onOpenRuntimeSettings: vi.fn(),
         onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit
@@ -108,13 +104,11 @@ describe("OnboardingPanel e2e", () => {
         error: null,
         canClose: true,
         isSubmitting: false,
-        isSavingGateway: false,
         isRunningGuidedAuth: false,
         onboardingNotice: null,
         onSelectProvider: vi.fn(),
         onEnvChange: vi.fn(),
-        onGatewayChange: vi.fn(),
-        onSaveGateway: vi.fn(),
+        onOpenRuntimeSettings: vi.fn(),
         onRunGuidedAuth,
         onClose: vi.fn(),
         onSubmit: vi.fn()
@@ -130,53 +124,34 @@ describe("OnboardingPanel e2e", () => {
     expect(onRunGuidedAuth).toHaveBeenCalledWith("qwen-portal");
   });
 
-  it("requires URL when remote gateway mode is enabled", async () => {
+  it("routes runtime chip interactions through callback", async () => {
     const user = userEvent.setup();
-    const onSaveGateway = vi.fn();
+    const onOpenRuntimeSettings = vi.fn();
 
-    function StatefulHarness() {
-      const [gateway, setGateway] = useState(createGatewayDraft());
-      return createElement(OnboardingPanel, {
+    render(
+      createElement(OnboardingPanel, {
         onboarding: createOnboardingFixture(),
         providerId: "openrouter",
         env: {
           OPENROUTER_API_KEY: "or-test-key"
         },
-        gateway,
+        gateway: createGatewayDraft(),
         error: null,
         canClose: true,
         isSubmitting: false,
-        isSavingGateway: false,
         isRunningGuidedAuth: false,
         onboardingNotice: null,
         onSelectProvider: vi.fn(),
         onEnvChange: vi.fn(),
-        onGatewayChange: (patch) =>
-          setGateway((current) => ({
-            ...current,
-            ...patch
-          })),
-        onSaveGateway,
+        onOpenRuntimeSettings,
         onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit: vi.fn()
-      });
-    }
-
-    render(createElement(StatefulHarness));
+      })
+    );
 
     await user.click(screen.getByRole("button", { name: /runtime:/i }));
-    await user.click(screen.getByLabelText(/connect to remote opengoat/i));
-    const saveConnectionButton = screen.getByRole("button", { name: /save connection/i });
-    expect(saveConnectionButton.hasAttribute("disabled")).toBe(true);
-
-    await user.type(
-      screen.getByPlaceholderText("ws://remote-host:18789/gateway"),
-      "ws://remote-host:18789/gateway"
-    );
-    expect(saveConnectionButton.hasAttribute("disabled")).toBe(false);
-    await user.click(saveConnectionButton);
-    expect(onSaveGateway).toHaveBeenCalledTimes(1);
+    expect(onOpenRuntimeSettings).toHaveBeenCalledTimes(1);
   });
 
   it("uses independent scroll areas for provider list and setup pane", () => {
@@ -189,13 +164,11 @@ describe("OnboardingPanel e2e", () => {
         error: null,
         canClose: true,
         isSubmitting: false,
-        isSavingGateway: false,
         isRunningGuidedAuth: false,
         onboardingNotice: null,
         onSelectProvider: vi.fn(),
         onEnvChange: vi.fn(),
-        onGatewayChange: vi.fn(),
-        onSaveGateway: vi.fn(),
+        onOpenRuntimeSettings: vi.fn(),
         onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit: vi.fn()

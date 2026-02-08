@@ -80,6 +80,7 @@ interface ChatPanelProps {
   error: string | null;
   busy: boolean;
   onSubmitMessage: (message: string) => Promise<WorkbenchMessage | null>;
+  onOpenRuntimeSettings: () => void;
   onOpenOnboarding: () => void;
   onDismissError: () => void;
 }
@@ -232,7 +233,7 @@ export function ChatPanel(props: ChatPanelProps) {
                 ? "h-8 gap-1 rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 text-amber-200 hover:bg-amber-400/20"
                 : "h-8 gap-1 rounded-full border border-emerald-400/35 bg-emerald-400/10 px-2.5 text-emerald-200 hover:bg-emerald-400/20"
             }
-            onClick={props.onOpenOnboarding}
+            onClick={props.onOpenRuntimeSettings}
             disabled={
               props.busy || status === "submitted" || status === "streaming"
             }
