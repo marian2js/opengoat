@@ -176,10 +176,10 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
               OpenGoat Setup
             </p>
             <h1 className="font-heading text-[clamp(1.95rem,3vw,2.55rem)] font-semibold leading-tight tracking-[-0.02em] text-[var(--foreground)]">
-              Set up your provider
+              Setup the Orchestrator Agent
             </h1>
             <p className="max-w-3xl text-base text-[var(--muted-foreground)]">
-              Choose one provider, add required credentials, and start your first orchestrator session.
+              Set a provider for the Orchestrator. This agent is in charge of the coordination between all your agents.
             </p>
             <ol className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted-foreground)]">
               {ONBOARDING_STEPS.map((step, index) => (
@@ -362,11 +362,10 @@ function ProviderListItem(props: {
       type="button"
       onClick={props.onSelect}
       disabled={props.disabled}
-      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition ${
-        props.selected
+      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition ${props.selected
           ? "border-[var(--accent-strong)] bg-[color-mix(in_oklab,var(--accent)_18%,var(--surface))]"
           : "border-transparent hover:border-[var(--border)]/90 hover:bg-[color-mix(in_oklab,var(--surface)_86%,black)]"
-      }`}
+        }`}
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[var(--foreground)]">
