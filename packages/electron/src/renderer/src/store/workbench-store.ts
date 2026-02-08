@@ -31,6 +31,7 @@ export interface OnboardingGatewayDraft {
 
 interface WorkbenchUiState {
   homeDir: string;
+  ipcContractVersion: number | null;
   projects: WorkbenchProject[];
   onboarding: WorkbenchOnboarding | null;
   showOnboarding: boolean;
@@ -97,6 +98,7 @@ interface WorkbenchUiState {
 export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchApiClient()) {
   return create<WorkbenchUiState>((set, get) => ({
     homeDir: "",
+    ipcContractVersion: null,
     projects: [],
     onboarding: null,
     showOnboarding: false,
@@ -122,7 +124,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
     bootstrap: async () => {
       set({ isBootstrapping: true, isBusy: true, error: null });
       try {
-        await api.validateContract();
+        const contract = await api.validateContract();
         const boot = await api.bootstrap();
         const projects = boot.projects;
         const firstProject = projects[0] ?? null;
@@ -138,6 +140,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
 
         set({
           homeDir: boot.homeDir,
+          ipcContractVersion: contract.version,
           projects,
           onboarding: boot.onboarding,
           showOnboarding,

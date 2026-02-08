@@ -1,6 +1,7 @@
 import { createTRPCUntypedClient } from "@trpc/client";
 import { ipcLink } from "electron-trpc/renderer";
 import {
+  MIN_DESKTOP_IPC_CONTRACT_VERSION,
   DESKTOP_IPC_CONTRACT_VERSION,
   type DesktopContractInfo
 } from "@shared/workbench-contract";
@@ -88,19 +89,31 @@ function getTrpcClient(): TrpcClient {
 }
 
 let contractValidated = false;
+function assertContractVersion(contract: DesktopContractInfo): void {
+  if (contract.version > DESKTOP_IPC_CONTRACT_VERSION) {
+    throw new Error(
+      `Desktop IPC contract mismatch. Renderer expects v${DESKTOP_IPC_CONTRACT_VERSION}, main exposes v${contract.version}.`
+    );
+  }
+  if (contract.version < MIN_DESKTOP_IPC_CONTRACT_VERSION) {
+    throw new Error(
+      `Desktop IPC contract mismatch. Renderer expects v${MIN_DESKTOP_IPC_CONTRACT_VERSION}+ but main exposes v${contract.version}.`
+    );
+  }
+}
+
+function recordContract(contract: DesktopContractInfo): DesktopContractInfo {
+  assertContractVersion(contract);
+  contractValidated = true;
+  return contract;
+}
 
 export function createWorkbenchApiClient(): WorkbenchApiClient {
   return {
     validateContract: async () => {
       const trpc = getTrpcClient();
       const contract = (await trpc.query("meta.contract")) as DesktopContractInfo;
-      if (contract.version !== DESKTOP_IPC_CONTRACT_VERSION) {
-        throw new Error(
-          `Desktop IPC contract mismatch. Renderer expects v${DESKTOP_IPC_CONTRACT_VERSION}, main exposes v${contract.version}.`
-        );
-      }
-      contractValidated = true;
-      return contract;
+      return recordContract(contract);
     },
     bootstrap: async () => {
       const trpc = getTrpcClient();
@@ -225,12 +238,7 @@ async function ensureContract(client: TrpcClient): Promise<void> {
   }
 
   const contract = (await client.query("meta.contract")) as DesktopContractInfo;
-  if (contract.version !== DESKTOP_IPC_CONTRACT_VERSION) {
-    throw new Error(
-      `Desktop IPC contract mismatch. Renderer expects v${DESKTOP_IPC_CONTRACT_VERSION}, main exposes v${contract.version}.`
-    );
-  }
-  contractValidated = true;
+  recordContract(contract);
 }
 
 function isMissingProcedureError(error: unknown, path: string): boolean {

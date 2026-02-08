@@ -5,10 +5,12 @@ import { ProjectsSidebar } from "@renderer/features/projects/projects-sidebar";
 import { ChatPanel } from "@renderer/features/chat/chat-panel";
 import { AgentsPanel } from "@renderer/features/agents/agents-panel";
 import { getActiveProject, useWorkbenchStore } from "@renderer/store/workbench-store";
+import { DESKTOP_IPC_CONTRACT_FEATURES } from "@shared/workbench-contract";
 
 export function App() {
   const {
     homeDir,
+    ipcContractVersion,
     projects,
     onboarding,
     showOnboarding,
@@ -67,11 +69,14 @@ export function App() {
     void bootstrap();
   }, [bootstrap]);
 
+  const supportsAgents =
+    (ipcContractVersion ?? 0) >= DESKTOP_IPC_CONTRACT_FEATURES.agents;
+
   useEffect(() => {
-    if (activeView === "agents") {
+    if (activeView === "agents" && supportsAgents) {
       void loadAgents();
     }
-  }, [activeView, loadAgents]);
+  }, [activeView, loadAgents, supportsAgents]);
 
   useEffect(() => {
     const desktopApi = window.opengoatDesktop;
@@ -254,19 +259,39 @@ export function App() {
               }}
             />
             {isAgentsView ? (
-              <AgentsPanel
-                agents={agents}
-                providers={agentProviders}
-                loading={agentsState === "loading"}
-                busy={isBusy || agentsState === "saving"}
-                error={error}
-                notice={agentsNotice}
-                onRefresh={() => void loadAgents()}
-                onCreate={(input) => createAgent(input)}
-                onDelete={(input) => deleteAgent(input)}
-                onDismissNotice={clearAgentsNotice}
-                onDismissError={clearError}
-              />
+              supportsAgents ? (
+                <AgentsPanel
+                  agents={agents}
+                  providers={agentProviders}
+                  loading={agentsState === "loading"}
+                  busy={isBusy || agentsState === "saving"}
+                  error={error}
+                  notice={agentsNotice}
+                  onRefresh={() => void loadAgents()}
+                  onCreate={(input) => void createAgent(input)}
+                  onDelete={(input) => void deleteAgent(input)}
+                  onDismissNotice={clearAgentsNotice}
+                  onDismissError={clearError}
+                />
+              ) : (
+                <main className="flex h-full min-h-0 min-w-0 flex-col bg-transparent">
+                  <header className="titlebar-drag-region sticky top-0 z-30 border-0 bg-[#1F1F1F] px-4 shadow-[0_10px_24px_rgba(0,0,0,0.42)] md:px-5">
+                    <div className="flex h-12 items-center justify-between gap-3">
+                      <div className="min-w-0 truncate text-base leading-none tracking-tight">
+                        <span className="truncate font-heading font-semibold text-foreground">
+                          Agents
+                        </span>
+                      </div>
+                    </div>
+                  </header>
+                  <section className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-5">
+                    <div className="mx-auto w-full max-w-3xl rounded-xl border border-[#2E2F31] bg-[#141416] px-4 py-6 text-sm text-muted-foreground">
+                      Agents require Desktop IPC contract v{DESKTOP_IPC_CONTRACT_FEATURES.agents} or
+                      newer. Restart OpenGoat after updating the desktop runtime.
+                    </div>
+                  </section>
+                </main>
+              )
             ) : (
               <ChatPanel
                 key={`${activeProjectId ?? "none"}:${activeSessionId ?? "none"}`}
