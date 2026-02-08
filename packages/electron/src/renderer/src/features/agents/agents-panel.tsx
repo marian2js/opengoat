@@ -63,8 +63,6 @@ export function AgentsPanel(props: AgentsPanelProps) {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteProviderId, setDeleteProviderId] = useState("");
   const [deleteExternal, setDeleteExternal] = useState(false);
-  const [providerSelectOpen, setProviderSelectOpen] = useState(false);
-  const [deleteSelectOpen, setDeleteSelectOpen] = useState(false);
 
   const providerOptions = useMemo(
     () => props.providers.map((provider) => ({
@@ -259,8 +257,6 @@ export function AgentsPanel(props: AgentsPanelProps) {
                         setFormError(null);
                       }
                     }}
-                    open={providerSelectOpen}
-                    onOpenChange={setProviderSelectOpen}
                     disabled={props.busy}
                   >
                     <SelectTrigger
@@ -296,6 +292,51 @@ export function AgentsPanel(props: AgentsPanelProps) {
                 </span>
               </label>
 
+              {selectedProvider && !props.providerConfigAvailable ? (
+                <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3 text-sm text-muted-foreground">
+                  Provider settings require a newer desktop runtime.
+                </div>
+              ) : null}
+              {props.providerConfigAvailable && selectedProvider ? (
+                <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <Badge variant="outline">{selectedProvider.displayName}</Badge>
+                    <span>Provider settings</span>
+                  </div>
+                  {selectedProvider.envFields.length === 0 ? (
+                    <div className="mt-2 text-sm text-muted-foreground">
+                      No additional settings for this provider.
+                    </div>
+                  ) : (
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      {selectedProvider.envFields.map((field) => (
+                        <div key={field.key} className="space-y-1">
+                          <p className="text-xs font-medium text-foreground">{field.key}</p>
+                          <p className="text-[11px] text-muted-foreground">{field.description}</p>
+                          <Input
+                            type={field.secret ? "password" : "text"}
+                            value={providerEnv[field.key] ?? ""}
+                            onChange={(event) => handleProviderFieldChange(field.key, event.target.value)}
+                            placeholder={field.secret ? "Enter secret" : "Enter value"}
+                            disabled={props.busy}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void handleSaveProviderConfig()}
+                      disabled={props.busy || selectedProvider.envFields.length === 0}
+                    >
+                      Save provider settings
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
               {formError ? (
                 <p className="text-xs text-red-200">{formError}</p>
               ) : null}
@@ -306,61 +347,6 @@ export function AgentsPanel(props: AgentsPanelProps) {
                 </Button>
               </div>
             </form>
-          </section>
-
-          <section className="rounded-xl border border-[#2E2F31] bg-[#141416] px-4 py-4">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Agent Provider setup</h2>
-                <p className="text-xs text-muted-foreground">
-                  Configure external provider settings (OpenClaw, Cursor, Claude Code, Codex, Gemini CLI, OpenCode).
-                </p>
-              </div>
-            </div>
-            {!props.providerConfigAvailable ? (
-              <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3 text-sm text-muted-foreground">
-                Agent provider setup requires a newer desktop runtime.
-              </div>
-            ) : !selectedProvider ? (
-              <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3 text-sm text-muted-foreground">
-                Select an external agent provider to configure its settings.
-              </div>
-            ) : selectedProvider.envFields.length === 0 ? (
-              <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3 text-sm text-muted-foreground">
-                {selectedProvider.displayName} does not expose additional settings.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="outline">{selectedProvider.displayName}</Badge>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {selectedProvider.envFields.map((field) => (
-                    <div key={field.key} className="space-y-1">
-                      <p className="text-xs font-medium text-foreground">{field.key}</p>
-                      <p className="text-[11px] text-muted-foreground">{field.description}</p>
-                      <Input
-                        type={field.secret ? "password" : "text"}
-                        value={providerEnv[field.key] ?? ""}
-                        onChange={(event) => handleProviderFieldChange(field.key, event.target.value)}
-                        placeholder={field.secret ? "Enter secret" : "Enter value"}
-                        disabled={props.busy}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void handleSaveProviderConfig()}
-                    disabled={props.busy}
-                  >
-                    Save provider settings
-                  </Button>
-                </div>
-              </div>
-            )}
           </section>
 
           <section className="space-y-2">
@@ -453,11 +439,9 @@ export function AgentsPanel(props: AgentsPanelProps) {
 
             <div className="space-y-1">
               <p className="text-xs font-medium text-foreground">Agent Provider</p>
-                  <Select
+              <Select
                 value={deleteProviderId || undefined}
                 onValueChange={setDeleteProviderId}
-                open={deleteSelectOpen}
-                onOpenChange={setDeleteSelectOpen}
                 disabled={props.busy}
               >
                 <SelectTrigger className="h-10 w-full rounded-lg border border-[#2E2F31] bg-[#0E1117] text-foreground hover:bg-[#151922]">
