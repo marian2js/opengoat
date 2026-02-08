@@ -45,6 +45,7 @@ export class WorkbenchService {
   private readonly runGuidedAuthFn: typeof runCliGuidedAuth;
   private readonly callGatewayFn: typeof callOpenGoatGateway;
   private remoteGatewayToken: string | undefined;
+  private initializationPromise: Promise<void> | undefined;
 
   public constructor(deps: WorkbenchServiceDeps) {
     this.opengoat = deps.opengoat;
@@ -56,7 +57,7 @@ export class WorkbenchService {
   }
 
   public async bootstrap(): Promise<WorkbenchBootstrap> {
-    await this.opengoat.initialize();
+    await this.ensureInitialized();
     const projects = await this.listProjectsEnsuringHome();
     return {
       homeDir: this.opengoat.getHomeDir(),
@@ -67,6 +68,7 @@ export class WorkbenchService {
   }
 
   public async getOnboardingState(): Promise<WorkbenchOnboarding> {
+    await this.ensureInitialized();
     const activeProvider = await this.opengoat.getAgentProvider(DEFAULT_AGENT_ID);
     const allProviders = await this.opengoat.listProviders();
     const providers = selectProvidersForOnboarding(DEFAULT_AGENT_ID, allProviders);
@@ -135,6 +137,7 @@ export class WorkbenchService {
     providerId: string;
     env: Record<string, string>;
   }): Promise<WorkbenchOnboarding> {
+    await this.ensureInitialized();
     await this.opengoat.setProviderConfig(input.providerId, input.env);
     await this.opengoat.setAgentProvider(DEFAULT_AGENT_ID, input.providerId);
     await this.store.setProviderSetupCompleted(true);
@@ -397,6 +400,7 @@ export class WorkbenchService {
   }
 
   private async listProjectsEnsuringHome(): Promise<WorkbenchProject[]> {
+    await this.ensureInitialized();
     const projects = await this.store.listProjects();
     const homeDir = this.opengoat.getHomeDir();
     if (projects.some((project) => pathsAreEquivalent(project.rootPath, homeDir))) {
@@ -410,6 +414,19 @@ export class WorkbenchService {
         !pathsAreEquivalent(project.rootPath, homeProject.rootPath)
     );
     return [homeProject, ...remaining];
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    if (!this.initializationPromise) {
+      this.initializationPromise = this.opengoat.initialize().then(() => undefined);
+    }
+
+    try {
+      await this.initializationPromise;
+    } catch (error) {
+      this.initializationPromise = undefined;
+      throw error;
+    }
   }
 }
 

@@ -44,6 +44,7 @@ describe("WorkbenchService onboarding", () => {
       }
     ]);
     expect(active?.missingRequiredEnv).toEqual(["OPENAI_API_KEY"]);
+    expect(opengoat.initialize).toHaveBeenCalledTimes(1);
   });
 
   it("does not require onboarding when active provider has no required fields", async () => {
@@ -108,6 +109,35 @@ describe("WorkbenchService onboarding", () => {
     expect(store.setProviderSetupCompleted).toHaveBeenCalledWith(true);
     expect(onboarding.needsOnboarding).toBe(false);
     expect(onboarding.activeProviderId).toBe("openai");
+    expect(opengoat.initialize).toHaveBeenCalledTimes(1);
+  });
+
+  it("initializes OpenGoat when onboarding status is requested before bootstrap", async () => {
+    const providers = createProviderSummaries();
+    const opengoat = createOpenGoatStub({
+      providers,
+      activeProviderId: "openai",
+      onboardingByProvider: {
+        openai: {
+          env: [
+            {
+              key: "OPENAI_API_KEY",
+              description: "OpenAI API key",
+              required: true,
+              secret: true
+            }
+          ]
+        }
+      }
+    });
+    const store = createStoreStub();
+    const service = new WorkbenchService({ opengoat, store });
+
+    const onboarding = await service.getOnboardingState();
+
+    expect(onboarding.activeProviderId).toBe("openai");
+    expect(onboarding.needsOnboarding).toBe(true);
+    expect(opengoat.initialize).toHaveBeenCalledTimes(1);
   });
 
   it("returns configured non-secret env values for onboarding drafts", async () => {
