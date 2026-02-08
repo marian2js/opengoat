@@ -18,7 +18,7 @@ const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_ENDPOINT_PATH = "/responses";
 const DEFAULT_OPENAI_MODEL = "gpt-4.1-mini";
 const DEFAULT_OPENAI_REQUEST_TIMEOUT_MS = 120_000;
-const DEFAULT_OPENAI_COMPAT_REQUEST_TIMEOUT_MS = 300_000;
+const DEFAULT_OPENAI_COMPAT_REQUEST_TIMEOUT_MS = 60_000;
 
 interface OpenAIProviderDeps {
   runtime?: OpenAiCompatibleTextRuntime;

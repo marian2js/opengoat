@@ -63,7 +63,7 @@ describe("openai provider", () => {
         baseURL: "https://compatible.example/v1/",
         endpointPathOverride: "/chat/completions",
         style: "chat",
-        requestTimeoutMs: 300_000,
+        requestTimeoutMs: 60_000,
         model: "compatible-model",
         message: "hello",
         systemPrompt: "You are OpenGoat.",
@@ -93,7 +93,7 @@ describe("openai provider", () => {
         baseURL: "https://ignored.example/v1",
         endpointOverride: "https://override.example/custom/responses",
         style: "responses",
-        requestTimeoutMs: 300_000,
+        requestTimeoutMs: 60_000,
         model: "custom-model",
       })
     );
@@ -186,7 +186,7 @@ describe("openai provider", () => {
       expect.objectContaining({
         baseURL: "https://gateway.example/v1/",
         style: "chat",
-        requestTimeoutMs: 300_000,
+        requestTimeoutMs: 60_000,
         model: "gateway-model",
       })
     );

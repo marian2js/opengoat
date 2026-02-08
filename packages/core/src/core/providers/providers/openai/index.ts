@@ -32,7 +32,7 @@ export const providerModule: ProviderModule = {
       {
         key: "OPENAI_REQUEST_TIMEOUT_MS",
         description:
-          "Optional request timeout in milliseconds (default: 120000 for api.openai.com, 300000 for compatible base URLs)"
+          "Optional request timeout in milliseconds (default: 120000 for api.openai.com, 60000 for compatible base URLs)"
       },
       {
         key: "OPENAI_API_STYLE",
