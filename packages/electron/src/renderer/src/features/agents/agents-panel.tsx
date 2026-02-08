@@ -55,7 +55,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
   const [name, setName] = useState("");
   const [providerId, setProviderId] = useState("");
   const [providerEnvDrafts, setProviderEnvDrafts] = useState<Record<string, Record<string, string>>>({});
-  const [createExternal, setCreateExternal] = useState(false);
+  const [createExternal, setCreateExternal] = useState(true);
   const [showAdvancedProviderSettings, setShowAdvancedProviderSettings] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -87,7 +87,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
   const resetCreateForm = () => {
     setName("");
     setProviderId("");
-    setCreateExternal(false);
+    setCreateExternal(true);
     setShowAdvancedProviderSettings(false);
     setFormError(null);
   };
@@ -116,6 +116,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
 
   useEffect(() => {
     setShowAdvancedProviderSettings(false);
+    setCreateExternal(true);
   }, [normalizedProviderId]);
 
   useEffect(() => {
@@ -142,7 +143,7 @@ export function AgentsPanel(props: AgentsPanelProps) {
     await props.onCreate({
       name: trimmedName,
       providerId: trimmedProvider || undefined,
-      createExternalAgent: supportsExternalAgentCreation ? createExternal : false,
+      createExternalAgent: supportsExternalAgentCreation ? createExternal : undefined,
       env: trimmedProvider ? sanitizeProviderEnv(providerEnv) : undefined
     });
     resetCreateForm();

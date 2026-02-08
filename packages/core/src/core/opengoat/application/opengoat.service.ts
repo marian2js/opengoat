@@ -141,21 +141,53 @@ export class OpenGoatService {
   }
 
   public async createAgent(rawName: string, options: CreateAgentOptions = {}): Promise<AgentCreationResult> {
+    const requestedProviderId = options.providerId?.trim();
+    if (requestedProviderId && options.createExternalAgent === true) {
+      const supportsRequestedProvider = await this.providerSupportsExternalAgentCreation(
+        requestedProviderId
+      );
+      if (!supportsRequestedProvider) {
+        throw new Error(
+          `Provider "${requestedProviderId}" does not support external agent creation.`
+        );
+      }
+    }
+
     const identity = this.agentService.normalizeAgentName(rawName);
     const paths = this.pathsProvider.getPaths();
     const created = await this.agentService.ensureAgent(paths, identity);
+    let binding: AgentProviderBinding | undefined;
 
-    if (options.providerId?.trim()) {
-      await this.providerService.setAgentProvider(paths, created.agent.id, options.providerId);
-      await this.agentManifestService.syncManifestProvider(paths, created.agent.id, options.providerId);
+    if (requestedProviderId) {
+      binding = await this.providerService.setAgentProvider(paths, created.agent.id, requestedProviderId);
+      await this.agentManifestService.syncManifestProvider(paths, created.agent.id, binding.providerId);
     }
 
-    if (!options.createExternalAgent) {
+    const shouldCreateExternalAgentByDefault = Boolean(requestedProviderId)
+      ? options.createExternalAgent !== false
+      : false;
+    const shouldCreateExternalAgentExplicitlyWithoutProvider =
+      !requestedProviderId && options.createExternalAgent === true;
+    if (!shouldCreateExternalAgentByDefault && !shouldCreateExternalAgentExplicitlyWithoutProvider) {
+      return created;
+    }
+
+    const resolvedBinding =
+      binding ?? (await this.providerService.getAgentProvider(paths, created.agent.id));
+    const supportsExternalAgentCreation = await this.providerSupportsExternalAgentCreation(
+      resolvedBinding.providerId
+    );
+    if (options.createExternalAgent === true && !supportsExternalAgentCreation) {
+      throw new Error(
+        `Provider "${resolvedBinding.providerId}" does not support external agent creation.`
+      );
+    }
+    if (!supportsExternalAgentCreation) {
       return created;
     }
 
     const externalAgentCreation = await this.providerService.createProviderAgent(paths, created.agent.id, {
-      providerId: options.providerId,
+      providerId: resolvedBinding.providerId,
       displayName: created.agent.displayName,
       workspaceDir: created.agent.workspaceDir,
       internalConfigDir: created.agent.internalConfigDir
@@ -170,6 +202,12 @@ export class OpenGoatService {
         stderr: externalAgentCreation.stderr
       }
     };
+  }
+
+  private async providerSupportsExternalAgentCreation(providerId: string): Promise<boolean> {
+    const providers = await this.providerService.listProviders();
+    const provider = providers.find((entry) => entry.id === providerId);
+    return Boolean(provider?.capabilities.agentCreate);
   }
 
   public async deleteAgent(rawAgentId: string, options: DeleteAgentOptions = {}): Promise<AgentDeletionResult> {

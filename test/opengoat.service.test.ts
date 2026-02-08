@@ -74,7 +74,26 @@ describe("OpenGoatService", () => {
     expect(after.providerId).toBe("claude");
   });
 
-  it("creates an external provider agent when requested during agent creation", async () => {
+  it("creates an external provider agent by default when provider supports it", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const provider = new AgentCreateProvider();
+    const registry = new ProviderRegistry();
+    registry.register("agent-create-provider", () => provider);
+    const service = createService(root, registry);
+    await service.initialize();
+
+    const created = await service.createAgent("Research Analyst", {
+      providerId: "agent-create-provider"
+    });
+
+    expect(created.externalAgentCreation?.providerId).toBe("agent-create-provider");
+    expect(created.externalAgentCreation?.code).toBe(0);
+    expect(provider.createdAgents[0]?.agentId).toBe("research-analyst");
+  });
+
+  it("allows disabling external provider creation explicitly", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -86,12 +105,45 @@ describe("OpenGoatService", () => {
 
     const created = await service.createAgent("Research Analyst", {
       providerId: "agent-create-provider",
-      createExternalAgent: true
+      createExternalAgent: false
     });
 
-    expect(created.externalAgentCreation?.providerId).toBe("agent-create-provider");
-    expect(created.externalAgentCreation?.code).toBe(0);
-    expect(provider.createdAgents[0]?.agentId).toBe("research-analyst");
+    expect(created.externalAgentCreation).toBeUndefined();
+    expect(provider.createdAgents).toHaveLength(0);
+  });
+
+  it("throws when external provider creation is forced for unsupported providers", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const registry = new ProviderRegistry();
+    registry.register("no-agent-create-provider", () => new NoAgentCreateProvider());
+    const service = createService(root, registry);
+    await service.initialize();
+
+    await expect(
+      service.createAgent("Research Analyst", {
+        providerId: "no-agent-create-provider",
+        createExternalAgent: true
+      })
+    ).rejects.toThrow('Provider "no-agent-create-provider" does not support external agent creation.');
+  });
+
+  it("skips provider-side create by default when provider does not support it", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const registry = new ProviderRegistry();
+    registry.register("no-agent-create-provider", () => new NoAgentCreateProvider());
+    const service = createService(root, registry);
+    await service.initialize();
+
+    const created = await service.createAgent("Research Analyst", {
+      providerId: "no-agent-create-provider"
+    });
+
+    expect(created.agent.id).toBe("research-analyst");
+    expect(created.externalAgentCreation).toBeUndefined();
   });
 
   it("deletes local and external provider agent when requested", async () => {
@@ -169,6 +221,32 @@ class AgentCreateProvider extends BaseProvider {
     return {
       code: 0,
       stdout: "deleted\n",
+      stderr: ""
+    };
+  }
+}
+
+class NoAgentCreateProvider extends BaseProvider {
+  public constructor() {
+    super({
+      id: "no-agent-create-provider",
+      displayName: "No Agent Create Provider",
+      kind: "cli",
+      capabilities: {
+        agent: true,
+        model: true,
+        auth: false,
+        passthrough: false,
+        agentCreate: false,
+        agentDelete: false
+      }
+    });
+  }
+
+  public async invoke(_options: ProviderInvokeOptions) {
+    return {
+      code: 0,
+      stdout: "ok\n",
       stderr: ""
     };
   }
