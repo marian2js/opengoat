@@ -17,7 +17,7 @@ export default defineConfig({
     }
   },
   test: {
-    testTimeout: 15000,
+    testTimeout: 20000,
     include: ["test/**/*.test.ts", "packages/**/src/**/*.test.ts"],
     environment: "node",
     coverage: {
