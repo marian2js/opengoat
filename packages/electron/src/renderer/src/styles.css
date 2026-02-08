@@ -394,3 +394,19 @@ body {
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
   border: 1px solid hsl(220 24% 22% / 0.6);
 }
+
+/* ========================================
+   macOS Titlebar Integration
+   ======================================== */
+
+/* Draggable region for window movement on macOS */
+.titlebar-drag-region {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+/* Prevent child elements from blocking drag */
+.titlebar-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}

@@ -2,7 +2,13 @@ import { createDesktopRouter } from "@main/ipc/router";
 import { WorkbenchService } from "@main/state/workbench-service";
 import { WorkbenchStore } from "@main/state/workbench-store";
 import { createOpenGoatRuntime } from "@opengoat/core";
-import { app, BrowserWindow, Menu, shell, type MenuItemConstructorOptions } from "electron";
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  shell,
+  type MenuItemConstructorOptions,
+} from "electron";
 import started from "electron-squirrel-startup";
 import { createIPCHandler } from "electron-trpc/main";
 import path from "node:path";
@@ -43,7 +49,10 @@ const workbenchService = new WorkbenchService({
 const router = createDesktopRouter(workbenchService);
 
 function dispatchMenuAction(action: MenuAction): void {
-  const target = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
+  const target =
+    BrowserWindow.getFocusedWindow() ??
+    BrowserWindow.getAllWindows()[0] ??
+    null;
   if (!target || target.isDestroyed()) {
     return;
   }
@@ -132,12 +141,23 @@ function buildApplicationMenu(): Menu {
       { role: "stopSpeaking" },
     );
   } else {
-    editMenu.push({ role: "delete" }, { type: "separator" }, { role: "selectAll" });
+    editMenu.push(
+      { role: "delete" },
+      { type: "separator" },
+      { role: "selectAll" },
+    );
   }
 
-  const windowMenu: MenuItemConstructorOptions[] = [{ role: "minimize" }, { role: "zoom" }];
+  const windowMenu: MenuItemConstructorOptions[] = [
+    { role: "minimize" },
+    { role: "zoom" },
+  ];
   if (isMac) {
-    windowMenu.push({ type: "separator" }, { role: "front" }, { role: "window" });
+    windowMenu.push(
+      { type: "separator" },
+      { role: "front" },
+      { role: "window" },
+    );
   } else {
     windowMenu.push({ role: "close" });
   }
@@ -186,12 +206,19 @@ function buildApplicationMenu(): Menu {
 }
 
 const createMainWindow = async (): Promise<BrowserWindow> => {
+  const isMac = process.platform === "darwin";
+
   const mainWindow = new BrowserWindow({
     width: 1440,
     height: 960,
     minWidth: 1024,
     minHeight: 700,
     title: "OpenGoat",
+    // macOS-specific: integrate traffic light buttons into content area
+    ...(isMac && {
+      titleBarStyle: "hiddenInset",
+      trafficLightPosition: { x: 16, y: 18 },
+    }),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
