@@ -122,7 +122,7 @@ describe("VercelAiTextRuntime", () => {
       | undefined;
     expect(secondFetch).toBeTypeOf("function");
     await secondFetch?.("https://api.openai.com/v1/responses?x=1");
-    expect(fetchFn).toHaveBeenLastCalledWith("https://api.openai.com/chat/completions?x=1", undefined);
+    expect(fetchFn).toHaveBeenLastCalledWith("https://api.openai.com/v1/chat/completions?x=1", undefined);
   });
 });
 

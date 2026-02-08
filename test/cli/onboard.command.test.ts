@@ -62,6 +62,62 @@ describe("onboard command", () => {
     expect(stdout.output()).toContain("Onboarding complete.");
   });
 
+  it("accepts dynamic provider env flags with inline assignment syntax", async () => {
+    const service = {
+      initialize: vi.fn(async () => ({
+        defaultAgent: "orchestrator"
+      })),
+      listProviders: vi.fn(async () => [
+        {
+          id: "openai",
+          displayName: "OpenAI",
+          kind: "http",
+          capabilities: { agent: false, model: true, auth: false, passthrough: false }
+        }
+      ]),
+      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openai" })),
+      setAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openai" })),
+      getProviderOnboarding: vi.fn(async () => ({
+        env: [{ key: "OPENAI_API_KEY", description: "OpenAI key", required: true, secret: true }],
+        auth: { supported: false, description: "API key only" }
+      })),
+      getProviderConfig: vi.fn(async () => null),
+      setProviderConfig: vi.fn(async () => ({
+        providerId: "openai",
+        env: {
+          OPENAI_API_KEY: "sk-test",
+          OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
+          OPENAI_MODEL: "moonshotai/kimi-k2.5"
+        }
+      })),
+      authenticateProvider: vi.fn(),
+      getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
+    };
+
+    const { context } = createContext(service);
+    const code = await onboardCommand.run(
+      [
+        "--non-interactive",
+        "--provider",
+        "openai",
+        "--openai-api-key=sk-test",
+        "--openai-base-url=https://integrate.api.nvidia.com/v1",
+        "--openai-model=moonshotai/kimi-k2.5"
+      ],
+      context
+    );
+
+    expect(code).toBe(0);
+    expect(service.setProviderConfig).toHaveBeenCalledWith(
+      "openai",
+      expect.objectContaining({
+        OPENAI_API_KEY: "sk-test",
+        OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
+        OPENAI_MODEL: "moonshotai/kimi-k2.5"
+      })
+    );
+  });
+
   it("fails when required provider keys are missing in non-interactive mode", async () => {
     const service = {
       initialize: vi.fn(async () => ({})),

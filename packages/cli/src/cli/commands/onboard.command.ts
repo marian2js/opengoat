@@ -254,99 +254,180 @@ function parseOnboardArgs(args: string[]): ParsedOnboardArgs {
   const env: Record<string, string> = {};
 
   for (let index = 0; index < args.length; index += 1) {
-    const token = args[index];
+    const rawToken = args[index];
+    const assignment = parseInlineOptionAssignment(rawToken);
+    const token = assignment?.token ?? rawToken;
+    const inlineValue = assignment?.value;
 
     if (token === "--help" || token === "-h" || token === "help") {
+      if (inlineValue !== undefined) {
+        return { ok: false, error: `${token} does not accept a value.` };
+      }
       help = true;
       continue;
     }
 
     if (token === "--non-interactive") {
+      if (inlineValue !== undefined) {
+        return { ok: false, error: `${token} does not accept a value.` };
+      }
       nonInteractive = true;
       continue;
     }
 
     if (token === "--run-auth") {
+      if (inlineValue !== undefined) {
+        return { ok: false, error: `${token} does not accept a value.` };
+      }
       runAuth = true;
       continue;
     }
 
     if (token === "--skip-auth") {
+      if (inlineValue !== undefined) {
+        return { ok: false, error: `${token} does not accept a value.` };
+      }
       skipAuth = true;
       continue;
     }
 
     if (token === "--provider") {
-      const value = args[index + 1]?.trim();
-      if (!value) {
-        return { ok: false, error: "Missing value for --provider." };
+      const value = resolveOptionValue({
+        args,
+        index,
+        inlineValue,
+        missingMessage: "Missing value for --provider."
+      });
+      if (!value.ok) {
+        return { ok: false, error: value.error };
       }
-      providerId = value.toLowerCase();
-      index += 1;
+      providerId = value.value.toLowerCase();
+      if (value.consumedNextArg) {
+        index += 1;
+      }
       continue;
     }
 
     if (token === "--agent") {
-      const value = args[index + 1]?.trim();
-      if (!value) {
-        return { ok: false, error: "Missing value for --agent." };
+      const value = resolveOptionValue({
+        args,
+        index,
+        inlineValue,
+        missingMessage: "Missing value for --agent."
+      });
+      if (!value.ok) {
+        return { ok: false, error: value.error };
       }
-      agentId = value.toLowerCase();
-      index += 1;
+      agentId = value.value.toLowerCase();
+      if (value.consumedNextArg) {
+        index += 1;
+      }
       continue;
     }
 
     if (token === "--model") {
-      const value = args[index + 1]?.trim();
-      if (!value) {
-        return { ok: false, error: "Missing value for --model." };
+      const value = resolveOptionValue({
+        args,
+        index,
+        inlineValue,
+        missingMessage: "Missing value for --model."
+      });
+      if (!value.ok) {
+        return { ok: false, error: value.error };
       }
-      model = value;
-      index += 1;
+      model = value.value;
+      if (value.consumedNextArg) {
+        index += 1;
+      }
       continue;
     }
 
     if (token === "--openai-api-key") {
-      const value = args[index + 1]?.trim();
-      if (!value) {
-        return { ok: false, error: "Missing value for --openai-api-key." };
+      const value = resolveOptionValue({
+        args,
+        index,
+        inlineValue,
+        missingMessage: "Missing value for --openai-api-key."
+      });
+      if (!value.ok) {
+        return { ok: false, error: value.error };
       }
-      env.OPENAI_API_KEY = value;
-      index += 1;
+      env.OPENAI_API_KEY = value.value;
+      if (value.consumedNextArg) {
+        index += 1;
+      }
       continue;
     }
 
     if (token === "--openrouter-api-key") {
-      const value = args[index + 1]?.trim();
-      if (!value) {
-        return { ok: false, error: "Missing value for --openrouter-api-key." };
+      const value = resolveOptionValue({
+        args,
+        index,
+        inlineValue,
+        missingMessage: "Missing value for --openrouter-api-key."
+      });
+      if (!value.ok) {
+        return { ok: false, error: value.error };
       }
-      env.OPENROUTER_API_KEY = value;
-      index += 1;
+      env.OPENROUTER_API_KEY = value.value;
+      if (value.consumedNextArg) {
+        index += 1;
+      }
       continue;
     }
 
     if (token === "--xai-api-key") {
-      const value = args[index + 1]?.trim();
-      if (!value) {
-        return { ok: false, error: "Missing value for --xai-api-key." };
+      const value = resolveOptionValue({
+        args,
+        index,
+        inlineValue,
+        missingMessage: "Missing value for --xai-api-key."
+      });
+      if (!value.ok) {
+        return { ok: false, error: value.error };
       }
-      env.XAI_API_KEY = value;
-      index += 1;
+      env.XAI_API_KEY = value.value;
+      if (value.consumedNextArg) {
+        index += 1;
+      }
       continue;
     }
 
     if (token === "--env") {
-      const value = args[index + 1]?.trim();
-      if (!value) {
-        return { ok: false, error: "Missing value for --env." };
+      const value = resolveOptionValue({
+        args,
+        index,
+        inlineValue,
+        missingMessage: "Missing value for --env."
+      });
+      if (!value.ok) {
+        return { ok: false, error: value.error };
       }
-      const parsed = parseEnvPair(value);
+      const parsed = parseEnvPair(value.value);
       if (!parsed) {
-        return { ok: false, error: `Invalid --env entry: ${value}` };
+        return { ok: false, error: `Invalid --env entry: ${value.value}` };
       }
       env[parsed.key] = parsed.value;
-      index += 1;
+      if (value.consumedNextArg) {
+        index += 1;
+      }
+      continue;
+    }
+
+    if (isDynamicEnvOption(token)) {
+      const value = resolveOptionValue({
+        args,
+        index,
+        inlineValue,
+        missingMessage: `Missing value for ${token}.`
+      });
+      if (!value.ok) {
+        return { ok: false, error: value.error };
+      }
+      env[dynamicOptionToEnvKey(token)] = value.value;
+      if (value.consumedNextArg) {
+        index += 1;
+      }
       continue;
     }
 
@@ -368,6 +449,74 @@ function parseOnboardArgs(args: string[]): ParsedOnboardArgs {
     model,
     env
   };
+}
+
+function parseInlineOptionAssignment(
+  rawToken: string | undefined
+): { token: string; value: string } | null {
+  if (!rawToken?.startsWith("--")) {
+    return null;
+  }
+
+  const separator = rawToken.indexOf("=");
+  if (separator <= 2) {
+    return null;
+  }
+
+  return {
+    token: rawToken.slice(0, separator),
+    value: rawToken.slice(separator + 1)
+  };
+}
+
+function resolveOptionValue(params: {
+  args: string[];
+  index: number;
+  inlineValue: string | undefined;
+  missingMessage: string;
+}):
+  | { ok: true; value: string; consumedNextArg: boolean }
+  | { ok: false; error: string } {
+  const fromInline = params.inlineValue?.trim();
+  if (fromInline !== undefined) {
+    if (!fromInline) {
+      return { ok: false, error: params.missingMessage };
+    }
+    return {
+      ok: true,
+      value: fromInline,
+      consumedNextArg: false
+    };
+  }
+
+  const fromNextArg = params.args[params.index + 1]?.trim();
+  if (!fromNextArg) {
+    return { ok: false, error: params.missingMessage };
+  }
+
+  return {
+    ok: true,
+    value: fromNextArg,
+    consumedNextArg: true
+  };
+}
+
+function isDynamicEnvOption(token: string): boolean {
+  if (!token.startsWith("--")) {
+    return false;
+  }
+
+  const optionName = token.slice(2);
+  return /^[a-z0-9][a-z0-9-]*-[a-z0-9-]+$/.test(optionName);
+}
+
+function dynamicOptionToEnvKey(token: string): string {
+  return token
+    .slice(2)
+    .split("-")
+    .filter(Boolean)
+    .map((segment) => segment.toUpperCase())
+    .join("_");
 }
 
 async function resolveProviderId(params: {
@@ -785,6 +934,9 @@ function printHelp(output: NodeJS.WritableStream): void {
   );
   output.write("                  [--model <id>] [--env KEY=VALUE]...\n");
   output.write("                  [--openai-api-key <key>] [--openrouter-api-key <key>] [--xai-api-key <key>]\n");
+  output.write(
+    "                  [--<provider>-<field> <value>] [--<provider>-<field>=<value>]\n"
+  );
   output.write("\n");
   output.write("Notes:\n");
   output.write("  - On first run, this bootstraps ~/.opengoat automatically.\n");
@@ -792,5 +944,8 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("  - Orchestrator onboarding only allows internal providers.\n");
   output.write("  - Interactive mode supports arrow-key selection.\n");
   output.write(`  - Agent defaults to ${DEFAULT_AGENT_ID}.\n`);
+  output.write(
+    "  - Dynamic provider flags map to env keys (example: --openai-base-url => OPENAI_BASE_URL).\n"
+  );
   output.write("  - Provider settings are stored in ~/.opengoat/providers/<provider>/config.json.\n");
 }

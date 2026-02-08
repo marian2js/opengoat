@@ -75,7 +75,7 @@ export class VercelAiTextRuntime implements OpenAiCompatibleTextRuntime {
         return fetchFn(endpointOverride, init);
       }
 
-      const nextUrl = rewriteEndpointPath(input, endpointPathOverride ?? "");
+      const nextUrl = rewriteEndpointPath(input, endpointPathOverride ?? "", request.baseURL);
       return fetchFn(nextUrl, init);
     };
   }
@@ -89,11 +89,11 @@ function resolveModel(provider: OpenAIProvider, style: OpenAiCompatibleTextReque
   return provider.responses(model);
 }
 
-function rewriteEndpointPath(input: Parameters<typeof fetch>[0], pathValue: string): string {
+function rewriteEndpointPath(input: Parameters<typeof fetch>[0], pathValue: string, baseURL: string): string {
   const normalizedPath = normalizePath(pathValue);
   const originalUrl = toUrlString(input);
   const url = new URL(originalUrl);
-  url.pathname = normalizedPath;
+  url.pathname = joinEndpointPath(resolveBasePathPrefix(baseURL), normalizedPath);
   return url.toString();
 }
 
@@ -104,6 +104,26 @@ function normalizePath(value: string): string {
   }
 
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+}
+
+function resolveBasePathPrefix(baseURL: string): string {
+  const pathname = new URL(baseURL).pathname.trim();
+  if (!pathname || pathname === "/") {
+    return "";
+  }
+  return pathname.replace(/\/+$/, "");
+}
+
+function joinEndpointPath(basePathPrefix: string, endpointPath: string): string {
+  if (!basePathPrefix) {
+    return endpointPath;
+  }
+
+  if (endpointPath === basePathPrefix || endpointPath.startsWith(`${basePathPrefix}/`)) {
+    return endpointPath;
+  }
+
+  return `${basePathPrefix}${endpointPath}`;
 }
 
 function toUrlString(value: Parameters<typeof fetch>[0]): string {

@@ -45,6 +45,36 @@ describe("onboard command e2e", () => {
     expect(providerConfig.env?.OPENAI_API_KEY).toBe("sk-test");
   });
 
+  it("supports dynamic provider flags for env assignment", async () => {
+    const root = await createTempDir("opengoat-onboard-e2e-");
+    roots.push(root);
+
+    const result = await runBinary(
+      [
+        "onboard",
+        "--non-interactive",
+        "--provider",
+        "openai",
+        "--openai-api-key=sk-test",
+        "--openai-base-url=https://integrate.api.nvidia.com/v1",
+        "--openai-model=moonshotai/kimi-k2.5"
+      ],
+      root
+    );
+
+    expect(result.code).toBe(0);
+    const providerConfig = JSON.parse(await readFile(path.join(root, "providers", "openai", "config.json"), "utf-8")) as {
+      env?: Record<string, string>;
+    };
+    expect(providerConfig.env).toEqual(
+      expect.objectContaining({
+        OPENAI_API_KEY: "sk-test",
+        OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
+        OPENAI_MODEL: "moonshotai/kimi-k2.5"
+      })
+    );
+  });
+
   it("fails with a clear error when required provider settings are missing", async () => {
     const root = await createTempDir("opengoat-onboard-e2e-");
     roots.push(root);

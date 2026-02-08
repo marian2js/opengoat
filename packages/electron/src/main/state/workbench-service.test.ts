@@ -46,6 +46,33 @@ describe("WorkbenchService onboarding", () => {
     expect(active?.missingRequiredEnv).toEqual(["OPENAI_API_KEY"]);
   });
 
+  it("does not require onboarding when active provider has no required fields", async () => {
+    const providers = createProviderSummaries();
+    const opengoat = createOpenGoatStub({
+      providers,
+      activeProviderId: "openai",
+      onboardingByProvider: {
+        openai: {
+          env: [
+            {
+              key: "OPENAI_BASE_URL",
+              description: "Optional OpenAI-compatible base URL"
+            }
+          ]
+        }
+      }
+    });
+    const store = createStoreStub();
+    const service = new WorkbenchService({ opengoat, store });
+
+    const boot = await service.bootstrap();
+    const active = boot.onboarding.providers.find((provider) => provider.id === "openai");
+
+    expect(active?.hasConfig).toBe(false);
+    expect(active?.missingRequiredEnv).toEqual([]);
+    expect(boot.onboarding.needsOnboarding).toBe(false);
+  });
+
   it("submits onboarding config and clears onboarding requirement", async () => {
     const providers = createProviderSummaries();
     const opengoat = createOpenGoatStub({

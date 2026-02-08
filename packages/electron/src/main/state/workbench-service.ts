@@ -114,7 +114,7 @@ export class WorkbenchService {
     );
 
     const active = withOnboarding.find((provider) => provider.id === activeProvider.providerId);
-    const needsOnboarding = !active || !active.hasConfig || active.missingRequiredEnv.length > 0;
+    const needsOnboarding = !active || active.missingRequiredEnv.length > 0;
 
     return {
       activeProviderId: activeProvider.providerId,
