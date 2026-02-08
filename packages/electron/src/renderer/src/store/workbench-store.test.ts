@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { WorkbenchApiClient } from "@renderer/lib/trpc";
 import { DESKTOP_IPC_CONTRACT_VERSION, type DesktopContractInfo } from "@shared/workbench-contract";
 import type { WorkbenchBootstrap, WorkbenchOnboarding } from "@shared/workbench";
+import { WORKBENCH_CHAT_ERROR_PROVIDER_ID } from "@shared/workbench";
 import { createWorkbenchStore, resolveOnboardingDraftProviderId } from "./workbench-store";
 
 describe("workbench store", () => {
@@ -88,10 +89,41 @@ describe("workbench store", () => {
     expect(state.onboardingDraftProviderId).toBe("openrouter");
   });
 
-  it("opens onboarding when send fails with provider error", async () => {
+  it("renders provider failures as inline chat errors without reopening onboarding", async () => {
     const api = createApiMock({
+      bootstrap: vi.fn(async () => ({
+        homeDir: "/tmp/home",
+        onboarding: {
+          activeProviderId: "openai",
+          needsOnboarding: false,
+          gateway: createGatewayStatus(),
+          families: [],
+          providers: []
+        },
+        providerSetupCompleted: true,
+        projects: [
+          {
+            id: "p1",
+            name: "project",
+            rootPath: "/tmp/project",
+            createdAt: "2026-02-07T00:00:00.000Z",
+            updatedAt: "2026-02-07T00:00:00.000Z",
+            sessions: [
+              {
+                id: "s1",
+                title: "Session",
+                agentId: "orchestrator",
+                sessionKey: "desktop:p1:s1",
+                createdAt: "2026-02-07T00:00:00.000Z",
+                updatedAt: "2026-02-07T00:00:00.000Z",
+                messages: []
+              }
+            ]
+          }
+        ]
+      })) as WorkbenchApiClient["bootstrap"],
       sendChatMessage: vi.fn(async () => {
-        throw new Error("Orchestrator provider failed (openai, code 1). HTTP 401");
+        throw new Error("Orchestrator provider failed (openai, code 1). HTTP 429: quota exceeded");
       })
     });
     const store = createWorkbenchStore(api);
@@ -101,13 +133,49 @@ describe("workbench store", () => {
 
     const state = store.getState();
     expect(state.chatState).toBe("idle");
-    expect(state.showOnboarding).toBe(true);
-    expect(state.onboardingState).toBe("editing");
-    expect(state.error).toContain("Orchestrator provider failed");
+    expect(state.showOnboarding).toBe(false);
+    expect(state.onboardingState).toBe("hidden");
+    expect(state.error).toBeNull();
+    expect(state.activeMessages).toHaveLength(2);
+    expect(state.activeMessages[0]?.role).toBe("user");
+    expect(state.activeMessages[1]?.role).toBe("assistant");
+    expect(state.activeMessages[1]?.providerId).toBe(WORKBENCH_CHAT_ERROR_PROVIDER_ID);
+    expect(state.activeMessages[1]?.content.toLowerCase()).toContain("quota");
   });
 
   it("rethrows send errors when requested for AI SDK transport", async () => {
     const api = createApiMock({
+      bootstrap: vi.fn(async () => ({
+        homeDir: "/tmp/home",
+        onboarding: {
+          activeProviderId: "openai",
+          needsOnboarding: false,
+          gateway: createGatewayStatus(),
+          families: [],
+          providers: []
+        },
+        providerSetupCompleted: true,
+        projects: [
+          {
+            id: "p1",
+            name: "project",
+            rootPath: "/tmp/project",
+            createdAt: "2026-02-07T00:00:00.000Z",
+            updatedAt: "2026-02-07T00:00:00.000Z",
+            sessions: [
+              {
+                id: "s1",
+                title: "Session",
+                agentId: "orchestrator",
+                sessionKey: "desktop:p1:s1",
+                createdAt: "2026-02-07T00:00:00.000Z",
+                updatedAt: "2026-02-07T00:00:00.000Z",
+                messages: []
+              }
+            ]
+          }
+        ]
+      })) as WorkbenchApiClient["bootstrap"],
       sendChatMessage: vi.fn(async () => {
         throw new Error("Orchestrator provider failed (openai, code 1). HTTP 401");
       })
@@ -121,7 +189,8 @@ describe("workbench store", () => {
         rethrow: true
       })
     ).rejects.toThrow("Orchestrator provider failed");
-    expect(store.getState().showOnboarding).toBe(true);
+    expect(store.getState().showOnboarding).toBe(false);
+    expect(store.getState().activeMessages).toHaveLength(0);
   });
 
   it("submits onboarding for selected provider and refreshes draft values", async () => {
