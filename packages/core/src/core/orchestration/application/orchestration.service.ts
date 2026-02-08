@@ -150,10 +150,11 @@ export class OrchestrationService {
       runLogger.info("Running direct non-orchestrator invocation.", {
         targetAgentId: resolvedEntryAgentId
       });
+      const sessionAgentId = options.directAgentSession ? resolvedEntryAgentId : DEFAULT_AGENT_ID;
       const direct = await this.invokeAgentWithSession(paths, resolvedEntryAgentId, {
         ...options,
         message: options.message
-      });
+      }, { sessionAgentId });
       const completedAt = this.nowIso();
       const routing: RoutingDecision = {
         entryAgentId: resolvedEntryAgentId,
@@ -707,10 +708,12 @@ export class OrchestrationService {
     paths: OpenGoatPaths,
     agentId: string,
     options: ProviderInvokeOptions,
-    behavior: { silent?: boolean } = {}
+    behavior: { silent?: boolean; sessionAgentId?: string } = {}
   ): Promise<AgentInvocationResult> {
+    const sessionAgentId = normalizeAgentId(behavior.sessionAgentId ?? agentId) || DEFAULT_AGENT_ID;
     this.logger.debug("Preparing agent invocation with session context.", {
       agentId,
+      sessionAgentId,
       message: options.message,
       sessionRef: options.sessionRef,
       forceNewSession: options.forceNewSession,
@@ -718,7 +721,7 @@ export class OrchestrationService {
       providerSessionId: options.providerSessionId,
       forceNewProviderSession: options.forceNewProviderSession
     });
-    const preparedSession = await this.sessionService.prepareRunSession(paths, agentId, {
+    const preparedSession = await this.sessionService.prepareRunSession(paths, sessionAgentId, {
       sessionRef: options.sessionRef,
       forceNew: options.forceNewSession,
       disableSession: options.disableSession,
@@ -740,6 +743,7 @@ export class OrchestrationService {
     const workingTreeEffect = summarizeWorkingTreeEffect(beforeSnapshot, afterSnapshot);
     this.logger.debug("Agent invocation execution returned.", {
       agentId,
+      sessionAgentId,
       providerId: execution.providerId,
       code: execution.code,
       stdout: execution.stdout,
@@ -958,6 +962,7 @@ function sanitizeProviderInvokeOptions(options: ProviderInvokeOptions): Provider
   delete sanitized.sessionRef;
   delete sanitized.forceNewSession;
   delete sanitized.disableSession;
+  delete sanitized.directAgentSession;
   return sanitized;
 }
 

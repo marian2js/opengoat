@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentManifest, AgentManifestService } from "../../agents/index.js";
+import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { ProviderExecutionResult, ProviderService, ProviderInvokeOptions } from "../../providers/index.js";
 import type { SessionService } from "../../sessions/index.js";
@@ -272,6 +273,105 @@ describe("OrchestrationService integration flow", () => {
     expect(result.routing.targetAgentId).toBe("writer");
     expect(providerService.invokeAgent).toHaveBeenCalledTimes(1);
   });
+
+  it("uses orchestrator sessions by default for direct agent runs", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-direct-session-default-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const providerService = createProviderService({
+      plannerExecutions: [okExecution("unused")],
+      delegatedExecution: {
+        code: 0,
+        stdout: "Writer handled request.",
+        stderr: ""
+      }
+    });
+    const sessionService = createSessionServiceSpy();
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      skillService: createSkillServiceStub() as unknown as SkillService,
+      agentManifestService: createManifestServiceStub([
+        createManifest("orchestrator", {
+          canReceive: true,
+          canDelegate: true,
+          provider: "openai"
+        }),
+        createManifest("writer", {
+          canReceive: true,
+          canDelegate: false,
+          provider: "codex",
+          discoverable: false
+        })
+      ]) as unknown as AgentManifestService,
+      sessionService: sessionService as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-07T17:20:00.000Z"
+    });
+
+    await service.runAgent(paths, "writer", {
+      message: "Draft docs",
+      cwd: tempDir
+    });
+
+    expect(sessionService.prepareRunSession).toHaveBeenCalledWith(
+      paths,
+      DEFAULT_AGENT_ID,
+      expect.objectContaining({
+        userMessage: "Draft docs"
+      })
+    );
+  });
+
+  it("uses direct agent sessions when explicitly requested", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-direct-session-agent-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const providerService = createProviderService({
+      plannerExecutions: [okExecution("unused")],
+      delegatedExecution: {
+        code: 0,
+        stdout: "Writer handled request.",
+        stderr: ""
+      }
+    });
+    const sessionService = createSessionServiceSpy();
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      skillService: createSkillServiceStub() as unknown as SkillService,
+      agentManifestService: createManifestServiceStub([
+        createManifest("orchestrator", {
+          canReceive: true,
+          canDelegate: true,
+          provider: "openai"
+        }),
+        createManifest("writer", {
+          canReceive: true,
+          canDelegate: false,
+          provider: "codex",
+          discoverable: false
+        })
+      ]) as unknown as AgentManifestService,
+      sessionService: sessionService as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-07T17:25:00.000Z"
+    });
+
+    await service.runAgent(paths, "writer", {
+      message: "Draft docs",
+      cwd: tempDir,
+      directAgentSession: true
+    });
+
+    expect(sessionService.prepareRunSession).toHaveBeenCalledWith(
+      paths,
+      "writer",
+      expect.objectContaining({
+        userMessage: "Draft docs"
+      })
+    );
+  });
 });
 
 function createPaths(homeDir: string): OpenGoatPaths {
@@ -361,6 +461,21 @@ function createManifestServiceStub(manifests: AgentManifest[]): Pick<AgentManife
 }
 
 function createSessionServiceStub(): Pick<SessionService, "prepareRunSession" | "recordAssistantReply"> {
+  return {
+    prepareRunSession: vi.fn(async () => ({ enabled: false })),
+    recordAssistantReply: vi.fn(async () => ({
+      sessionKey: "unused",
+      sessionId: "unused",
+      transcriptPath: "/tmp/unused.jsonl",
+      applied: false,
+      compactedMessages: 0
+    }))
+  };
+}
+
+function createSessionServiceSpy(): Pick<SessionService, "prepareRunSession" | "recordAssistantReply"> & {
+  prepareRunSession: ReturnType<typeof vi.fn>;
+} {
   return {
     prepareRunSession: vi.fn(async () => ({ enabled: false })),
     recordAssistantReply: vi.fn(async () => ({

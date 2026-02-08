@@ -8,6 +8,7 @@ export interface AgentRunRequest {
   sessionRef?: string;
   forceNewSession?: boolean;
   disableSession?: boolean;
+  directAgentSession?: boolean;
   passthroughArgs: string[];
   stream: boolean;
 }
@@ -27,6 +28,7 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
       sessionRef: request.sessionRef,
       forceNewSession: request.forceNewSession,
       disableSession: request.disableSession,
+      directAgentSession: request.directAgentSession,
       passthroughArgs: request.passthroughArgs,
       env: process.env,
       onStdout: request.stream

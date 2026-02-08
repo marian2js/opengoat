@@ -32,6 +32,7 @@ type AgentArgsResult =
       sessionRef?: string;
       forceNewSession: boolean;
       disableSession: boolean;
+      directAgentSession: boolean;
       passthroughArgs: string[];
       stream: boolean;
     }
@@ -60,6 +61,7 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
   let sessionRef: string | undefined;
   let forceNewSession = false;
   let disableSession = false;
+  let directAgentSession = false;
   let stream = true;
 
   for (let index = 0; index < known.length; index += 1) {
@@ -100,6 +102,11 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
       continue;
     }
 
+    if (token === "--direct-session") {
+      directAgentSession = true;
+      continue;
+    }
+
     if (token === "--model") {
       const value = known[index + 1];
       if (!value) {
@@ -129,6 +136,9 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
   if (forceNewSession && disableSession) {
     return { ok: false, error: "Use either --new-session or --no-session, not both." };
   }
+  if (disableSession && directAgentSession) {
+    return { ok: false, error: "Use either --direct-session or --no-session, not both." };
+  }
 
   return {
     ok: true,
@@ -139,6 +149,7 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
     sessionRef,
     forceNewSession,
     disableSession,
+    directAgentSession,
     passthroughArgs,
     stream
   };
@@ -163,7 +174,7 @@ function printHelp(output: NodeJS.WritableStream): void {
     "  opengoat agent [agent-id] --message <text> [--session <key|id>] [--new-session|--no-session]\n"
   );
   output.write(
-    "                [--model <model>] [--cwd <path>] [--no-stream] [-- <provider-args>]\n"
+    "                [--direct-session] [--model <model>] [--cwd <path>] [--no-stream] [-- <provider-args>]\n"
   );
   output.write("\n");
   output.write("Defaults:\n");

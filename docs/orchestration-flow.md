@@ -196,6 +196,10 @@ Session config is read from:
   - `runtime.sessions.pruning`
   - `runtime.sessions.compaction`
 
+Direct agent runs:
+- When invoking a non-orchestrator agent directly, sessions default to the orchestrator store.
+- Use `opengoat agent <id> --direct-session` (or `opengoat agent run <id> --direct-session`) to store session history under the direct agent instead.
+
 Per run, OpenGoat:
 
 1. resolves session key/id

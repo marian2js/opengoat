@@ -13,7 +13,7 @@ export const agentRunCommand: CliCommand = {
         "Usage: opengoat agent run <agent-id> --message <text> [--session <key|id>] [--new-session|--no-session]\n"
       );
       context.stderr.write(
-        "       [--model <model>] [--cwd <path>] [--no-stream] [-- <provider-args>]\n"
+        "       [--direct-session] [--model <model>] [--cwd <path>] [--no-stream] [-- <provider-args>]\n"
       );
       return 1;
     }
@@ -32,6 +32,7 @@ type RunArgsResult =
       sessionRef?: string;
       forceNewSession: boolean;
       disableSession: boolean;
+      directAgentSession: boolean;
       passthroughArgs: string[];
       stream: boolean;
     }
@@ -57,6 +58,7 @@ function parseRunArgs(args: string[]): RunArgsResult {
   let sessionRef: string | undefined;
   let forceNewSession = false;
   let disableSession = false;
+  let directAgentSession = false;
   let stream = true;
 
   for (let index = 0; index < known.length; index += 1) {
@@ -97,6 +99,11 @@ function parseRunArgs(args: string[]): RunArgsResult {
       continue;
     }
 
+    if (token === "--direct-session") {
+      directAgentSession = true;
+      continue;
+    }
+
     if (token === "--model") {
       const value = known[index + 1];
       if (!value) {
@@ -126,6 +133,9 @@ function parseRunArgs(args: string[]): RunArgsResult {
   if (forceNewSession && disableSession) {
     return { ok: false, error: "Use either --new-session or --no-session, not both." };
   }
+  if (disableSession && directAgentSession) {
+    return { ok: false, error: "Use either --direct-session or --no-session, not both." };
+  }
 
   return {
     ok: true,
@@ -136,6 +146,7 @@ function parseRunArgs(args: string[]): RunArgsResult {
     sessionRef,
     forceNewSession,
     disableSession,
+    directAgentSession,
     passthroughArgs,
     stream
   };
