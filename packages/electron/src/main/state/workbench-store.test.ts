@@ -78,5 +78,52 @@ describe("WorkbenchStore", () => {
     const persisted = JSON.parse(await readFile(stateFilePath, "utf-8")) as WorkbenchState;
     expect(persisted.projects.some((project) => project.name === "Home")).toBe(false);
   });
-});
 
+  it("creates an initial session when a project is added", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "opengoat-desktop-store-"));
+    tempRoots.push(root);
+    const stateFilePath = path.join(root, "state.json");
+    const store = new WorkbenchStore({
+      stateFilePath,
+      nowIso: () => "2026-02-08T00:00:00.000Z"
+    });
+
+    const project = await store.addProject("/tmp/workspace-alpha");
+
+    expect(project.sessions).toHaveLength(1);
+    expect(project.sessions[0]?.title).toBe("New Session");
+  });
+
+  it("renames and removes non-home projects", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "opengoat-desktop-store-"));
+    tempRoots.push(root);
+    const stateFilePath = path.join(root, "state.json");
+    const store = new WorkbenchStore({
+      stateFilePath,
+      nowIso: () => "2026-02-08T00:00:00.000Z"
+    });
+
+    const project = await store.addProject("/tmp/workspace-alpha");
+    const renamed = await store.renameProject(project.id, "alpha");
+    await store.removeProject(project.id);
+    const projects = await store.listProjects();
+
+    expect(renamed.name).toBe("alpha");
+    expect(projects.some((candidate) => candidate.id === project.id)).toBe(false);
+  });
+
+  it("does not allow removing the Home project", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "opengoat-desktop-store-"));
+    tempRoots.push(root);
+    const stateFilePath = path.join(root, "state.json");
+    const store = new WorkbenchStore({
+      stateFilePath,
+      nowIso: () => "2026-02-08T00:00:00.000Z"
+    });
+
+    const projects = await store.listProjects();
+    const home = projects.find((project) => project.name === "Home");
+
+    await expect(store.removeProject(home!.id)).rejects.toThrow("cannot be removed");
+  });
+});

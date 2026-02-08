@@ -196,6 +196,14 @@ export class WorkbenchService {
     return this.store.addProject(normalized);
   }
 
+  public renameProject(projectId: string, name: string): Promise<WorkbenchProject> {
+    return this.store.renameProject(projectId, name);
+  }
+
+  public removeProject(projectId: string): Promise<void> {
+    return this.store.removeProject(projectId);
+  }
+
   public async pickAndAddProject(): Promise<WorkbenchProject | null> {
     const selection = await dialog.showOpenDialog({
       properties: ["openDirectory", "createDirectory"],

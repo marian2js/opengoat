@@ -26,6 +26,8 @@ export function App() {
     error,
     bootstrap,
     addProjectFromDialog,
+    renameProject,
+    removeProject,
     createSession,
     selectProject,
     selectSession,
@@ -172,6 +174,9 @@ export function App() {
               collapsed={sidebarCollapsed}
               onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
               onAddProjectDialog={() => void addProjectFromDialog()}
+              onRenameProject={(projectId, name) => void renameProject(projectId, name)}
+              onRemoveProject={(projectId) => void removeProject(projectId)}
+              onCreateSession={(projectId) => void createSession(projectId)}
               onSelectProject={(projectId) => void selectProject(projectId)}
               onSelectSession={(projectId, sessionId) => void selectSession(projectId, sessionId)}
             />
