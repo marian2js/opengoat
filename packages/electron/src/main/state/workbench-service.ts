@@ -57,9 +57,10 @@ export class WorkbenchService {
 
   public async bootstrap(): Promise<WorkbenchBootstrap> {
     await this.opengoat.initialize();
+    const projects = await this.listProjectsEnsuringHome();
     return {
       homeDir: this.opengoat.getHomeDir(),
-      projects: await this.store.listProjects(),
+      projects,
       onboarding: await this.getOnboardingState(),
       providerSetupCompleted: await this.store.getProviderSetupCompleted()
     };
@@ -187,7 +188,7 @@ export class WorkbenchService {
   }
 
   public listProjects(): Promise<WorkbenchProject[]> {
-    return this.store.listProjects();
+    return this.listProjectsEnsuringHome();
   }
 
   public async addProject(rawPath: string): Promise<WorkbenchProject> {
@@ -394,6 +395,22 @@ export class WorkbenchService {
 
     return env;
   }
+
+  private async listProjectsEnsuringHome(): Promise<WorkbenchProject[]> {
+    const projects = await this.store.listProjects();
+    const homeDir = this.opengoat.getHomeDir();
+    if (projects.some((project) => pathsAreEquivalent(project.rootPath, homeDir))) {
+      return projects;
+    }
+
+    const homeProject = await this.store.addProject(homeDir);
+    const remaining = projects.filter(
+      (project) =>
+        project.id !== homeProject.id &&
+        !pathsAreEquivalent(project.rootPath, homeProject.rootPath)
+    );
+    return [homeProject, ...remaining];
+  }
 }
 
 async function assertDirectory(targetPath: string): Promise<void> {
@@ -412,6 +429,15 @@ function normalizeSessionTitle(input?: string): string {
     return value;
   }
   return `${value.slice(0, 117)}...`;
+}
+
+function pathsAreEquivalent(left: string, right: string): boolean {
+  const normalizedLeft = path.resolve(left);
+  const normalizedRight = path.resolve(right);
+  if (process.platform === "win32") {
+    return normalizedLeft.toLowerCase() === normalizedRight.toLowerCase();
+  }
+  return normalizedLeft === normalizedRight;
 }
 
 function collectDotEnvDirectories(projectRootPath: string): string[] {

@@ -488,6 +488,45 @@ describe("WorkbenchService project management", () => {
     expect(renameProject).toHaveBeenCalledWith("p1", "Workspace");
     expect(removeProject).toHaveBeenCalledWith("p1");
   });
+
+  it("ensures Home project exists when listing projects", async () => {
+    const opengoat = createOpenGoatStub({
+      providers: createProviderSummaries(),
+      activeProviderId: "openai",
+      onboardingByProvider: {}
+    });
+    const listProjects = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "home",
+          name: "Home",
+          rootPath: "/tmp/home",
+          createdAt: "2026-02-07T00:00:00.000Z",
+          updatedAt: "2026-02-07T00:00:00.000Z",
+          sessions: []
+        }
+      ]);
+    const addProject = vi.fn(async () => ({
+      id: "home",
+      name: "Home",
+      rootPath: "/tmp/home",
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+      sessions: []
+    }));
+    const store = {
+      listProjects,
+      addProject
+    } as unknown as WorkbenchStore;
+    const service = new WorkbenchService({ opengoat, store });
+
+    const projects = await service.listProjects();
+
+    expect(addProject).toHaveBeenCalledWith("/tmp/home");
+    expect(projects[0]?.name).toBe("Home");
+  });
 });
 
 function createProviderSummaries(): ProviderSummary[] {
@@ -520,6 +559,14 @@ function createProviderSummaries(): ProviderSummary[] {
 function createStoreStub(): WorkbenchStore {
   return {
     listProjects: vi.fn(async () => []),
+    addProject: vi.fn(async (rootPath: string) => ({
+      id: "home",
+      name: "Home",
+      rootPath,
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+      sessions: []
+    })),
     getGatewaySettings: vi.fn(async () => ({
       mode: "local",
       timeoutMs: 10_000
