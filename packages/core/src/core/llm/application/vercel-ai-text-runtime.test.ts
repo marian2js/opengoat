@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   VercelAiTextRuntime,
-  parseLlmRuntimeError
+  parseLlmRuntimeError,
 } from "./vercel-ai-text-runtime.js";
 
 describe("VercelAiTextRuntime", () => {
@@ -10,20 +10,20 @@ describe("VercelAiTextRuntime", () => {
     const chatModel = { id: "chat-model" };
     const provider = {
       responses: vi.fn(() => responsesModel),
-      chat: vi.fn(() => chatModel)
+      chat: vi.fn(() => chatModel),
     };
     const createOpenAIProvider = vi.fn(() => provider);
     const generateTextFn = vi.fn(async () => ({
       text: "hello",
       providerMetadata: {
         openai: {
-          responseId: "resp_1"
-        }
-      }
+          responseId: "resp_1",
+        },
+      },
     }));
     const runtime = new VercelAiTextRuntime({
       createOpenAIProvider: createOpenAIProvider as never,
-      generateTextFn: generateTextFn as never
+      generateTextFn: generateTextFn as never,
     });
 
     const result = await runtime.generateText({
@@ -32,7 +32,7 @@ describe("VercelAiTextRuntime", () => {
       model: "gpt-5",
       message: "hello",
       baseURL: "https://api.openai.com/v1",
-      style: "responses"
+      style: "responses",
     });
 
     expect(provider.responses).toHaveBeenCalledWith("gpt-5");
@@ -40,12 +40,13 @@ describe("VercelAiTextRuntime", () => {
     expect(generateTextFn).toHaveBeenCalledWith(
       expect.objectContaining({
         model: responsesModel,
-        prompt: "hello"
+        prompt: "hello",
+        maxRetries: 0,
       })
     );
     expect(result).toEqual({
       text: "hello\n",
-      providerSessionId: "resp_1"
+      providerSessionId: "resp_1",
     });
   });
 
@@ -54,11 +55,11 @@ describe("VercelAiTextRuntime", () => {
     const chatModel = { id: "chat-model" };
     const provider = {
       responses: vi.fn(() => responsesModel),
-      chat: vi.fn(() => chatModel)
+      chat: vi.fn(() => chatModel),
     };
     const runtime = new VercelAiTextRuntime({
       createOpenAIProvider: vi.fn(() => provider) as never,
-      generateTextFn: vi.fn(async () => ({ text: "chat output" })) as never
+      generateTextFn: vi.fn(async () => ({ text: "chat output" })) as never,
     });
 
     const result = await runtime.generateText({
@@ -67,7 +68,7 @@ describe("VercelAiTextRuntime", () => {
       model: "openai/gpt-4o-mini",
       message: "hi",
       baseURL: "https://openrouter.ai/api/v1",
-      style: "chat"
+      style: "chat",
     });
 
     expect(provider.chat).toHaveBeenCalledWith("openai/gpt-4o-mini");
@@ -78,7 +79,7 @@ describe("VercelAiTextRuntime", () => {
   it("builds fetch middleware for endpoint override and path rewrite", async () => {
     const provider = {
       responses: vi.fn(() => ({ id: "responses-model" })),
-      chat: vi.fn(() => ({ id: "chat-model" }))
+      chat: vi.fn(() => ({ id: "chat-model" })),
     };
     const createOpenAIProvider = vi.fn(() => provider);
     const generateTextFn = vi.fn(async () => ({ text: "ok" }));
@@ -87,7 +88,7 @@ describe("VercelAiTextRuntime", () => {
     const runtime = new VercelAiTextRuntime({
       createOpenAIProvider: createOpenAIProvider as never,
       generateTextFn: generateTextFn as never,
-      fetchFn: fetchFn as never
+      fetchFn: fetchFn as never,
     });
 
     await runtime.generateText({
@@ -97,7 +98,7 @@ describe("VercelAiTextRuntime", () => {
       message: "hello",
       baseURL: "https://api.openai.com/v1",
       style: "responses",
-      endpointOverride: "https://override.example/custom/responses"
+      endpointOverride: "https://override.example/custom/responses",
     });
 
     const firstFetch = createOpenAIProvider.mock.calls[0]?.[0]?.fetch as
@@ -105,7 +106,12 @@ describe("VercelAiTextRuntime", () => {
       | undefined;
     expect(firstFetch).toBeTypeOf("function");
     await firstFetch?.("https://api.openai.com/v1/responses");
-    expect(fetchFn).toHaveBeenLastCalledWith("https://override.example/custom/responses", undefined);
+    expect(fetchFn).toHaveBeenLastCalledWith(
+      "https://override.example/custom/responses",
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      })
+    );
 
     await runtime.generateText({
       providerName: "openai",
@@ -114,7 +120,7 @@ describe("VercelAiTextRuntime", () => {
       message: "hello",
       baseURL: "https://api.openai.com/v1",
       style: "responses",
-      endpointPathOverride: "/chat/completions"
+      endpointPathOverride: "/chat/completions",
     });
 
     const secondFetch = createOpenAIProvider.mock.calls[1]?.[0]?.fetch as
@@ -122,7 +128,48 @@ describe("VercelAiTextRuntime", () => {
       | undefined;
     expect(secondFetch).toBeTypeOf("function");
     await secondFetch?.("https://api.openai.com/v1/responses?x=1");
-    expect(fetchFn).toHaveBeenLastCalledWith("https://api.openai.com/v1/chat/completions?x=1", undefined);
+    expect(fetchFn).toHaveBeenLastCalledWith(
+      "https://api.openai.com/v1/chat/completions?x=1",
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      })
+    );
+  });
+
+  it("times out stalled fetch requests", async () => {
+    const provider = {
+      responses: vi.fn(() => ({ id: "responses-model" })),
+      chat: vi.fn(() => ({ id: "chat-model" })),
+    };
+    const createOpenAIProvider = vi.fn(() => provider);
+    const fetchFn = vi.fn(() => new Promise<Response>(() => {}));
+    const runtime = new VercelAiTextRuntime({
+      createOpenAIProvider: createOpenAIProvider as never,
+      generateTextFn: vi.fn(async () => ({ text: "ok" })) as never,
+      fetchFn: fetchFn as never,
+      requestTimeoutMs: 5,
+    });
+
+    await runtime.generateText({
+      providerName: "openai",
+      apiKey: "sk-test",
+      model: "gpt-5",
+      message: "hello",
+      baseURL: "https://api.openai.com/v1",
+      style: "responses",
+    });
+
+    const middlewareFetch = createOpenAIProvider.mock.calls[0]?.[0]?.fetch as
+      | ((input: string, init?: RequestInit) => Promise<Response>)
+      | undefined;
+    expect(middlewareFetch).toBeTypeOf("function");
+    if (!middlewareFetch) {
+      throw new Error("Expected runtime fetch middleware.");
+    }
+
+    await expect(
+      middlewareFetch("https://api.openai.com/v1/responses")
+    ).rejects.toThrow("Request timed out after 5ms");
   });
 });
 
@@ -130,12 +177,12 @@ describe("parseLlmRuntimeError", () => {
   it("formats status and response body", () => {
     const details = parseLlmRuntimeError({
       statusCode: 400,
-      responseBody: '{"error":"bad_request"}'
+      responseBody: '{"error":"bad_request"}',
     });
 
     expect(details).toEqual({
       statusCode: 400,
-      message: 'HTTP 400: {"error":"bad_request"}'
+      message: 'HTTP 400: {"error":"bad_request"}',
     });
   });
 
