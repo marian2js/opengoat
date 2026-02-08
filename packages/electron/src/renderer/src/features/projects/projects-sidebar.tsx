@@ -482,7 +482,7 @@ function SidebarAction(props: {
   return (
     <Button
       variant="ghost"
-      className={`justify-start gap-2 px-2 text-sm ${props.selected ? "bg-muted text-foreground" : ""}`}
+      className={`w-full justify-start gap-2 px-2 text-sm ${props.selected ? "bg-muted text-foreground" : ""}`}
       disabled={props.disabled}
       onClick={props.onClick}
     >
