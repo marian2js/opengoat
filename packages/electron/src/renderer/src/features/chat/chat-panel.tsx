@@ -208,56 +208,64 @@ export function ChatPanel(props: ChatPanelProps) {
 
   return (
     <main className="flex min-w-0 flex-col bg-transparent">
-      <motion.header
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-        className="titlebar-drag-region border-border/50 flex items-center justify-between border-b glass px-4 pb-4 pt-[52px] md:px-5"
-      >
-        <div className="min-w-0">
-          <p className="truncate font-heading text-[1.58rem] font-bold tracking-tight">
-            {props.activeProject?.name ?? "No project selected"}
-          </p>
-          <p className="text-muted-foreground truncate text-sm">
-            {props.activeSession
-              ? `Session: ${props.activeSession.title}`
-              : "Create a session to start chatting"}
-          </p>
+      <header className="border-b border-border/70 bg-[hsl(221_43%_10%)]">
+        <div className="titlebar-drag-region border-b border-border/60 bg-[hsl(222_26%_12%)]">
+          <div className="flex h-9 items-center justify-between px-4 md:px-5">
+            <p className="truncate text-sm font-semibold text-foreground/95">
+              OpenGoat Workspace
+            </p>
+            <p className="text-muted-foreground truncate text-xs">
+              {props.activeProject?.name ?? "No project"}
+            </p>
+          </div>
         </div>
-        <div className="titlebar-no-drag flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={
-              gatewayMode === "remote"
-                ? "h-8 gap-1 rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 text-amber-200 hover:bg-amber-400/20"
-                : "h-8 gap-1 rounded-full border border-emerald-400/35 bg-emerald-400/10 px-2.5 text-emerald-200 hover:bg-emerald-400/20"
-            }
-            onClick={props.onOpenRuntimeSettings}
-            disabled={
-              props.busy || status === "submitted" || status === "streaming"
-            }
-          >
-            {gatewayMode === "remote"
-              ? `Remote${gatewayHost ? `: ${gatewayHost}` : " Gateway"}`
-              : "Local Runtime"}
-            <ChevronDown className="size-3.5 opacity-80" />
-          </Button>
-          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            <Button
-              variant="outline"
-              className="btn-glow gap-2"
-              onClick={props.onOpenOnboarding}
-              disabled={
-                props.busy || status === "submitted" || status === "streaming"
-              }
-            >
-              <Settings2 className="size-4" />
-              Provider Setup
-            </Button>
-          </motion.div>
+
+        <div className="titlebar-drag-region bg-[linear-gradient(180deg,hsl(221_45%_12%),hsl(221_44%_10%))] px-4 py-5 md:px-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate font-heading text-[1.85rem] font-semibold tracking-tight">
+                {props.activeProject?.name ?? "No project selected"}
+              </p>
+              <p className="text-muted-foreground truncate text-sm">
+                {props.activeSession
+                  ? `Session: ${props.activeSession.title}`
+                  : "Create a session to start chatting"}
+              </p>
+            </div>
+            <div className="titlebar-no-drag flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={
+                  gatewayMode === "remote"
+                    ? "h-9 gap-1 rounded-full border border-amber-400/35 bg-amber-400/8 px-3 text-amber-100 hover:bg-amber-400/14"
+                    : "h-9 gap-1 rounded-full border border-emerald-400/35 bg-emerald-400/10 px-3 text-emerald-100 hover:bg-emerald-400/14"
+                }
+                onClick={props.onOpenRuntimeSettings}
+                disabled={
+                  props.busy || status === "submitted" || status === "streaming"
+                }
+              >
+                {gatewayMode === "remote"
+                  ? `Remote${gatewayHost ? `: ${gatewayHost}` : " Gateway"}`
+                  : "Local Runtime"}
+                <ChevronDown className="size-3.5 opacity-80" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-9 gap-2 rounded-full border-border/80 bg-[hsl(221_30%_12%)] px-3 text-foreground hover:bg-[hsl(221_28%_14%)]"
+                onClick={props.onOpenOnboarding}
+                disabled={
+                  props.busy || status === "submitted" || status === "streaming"
+                }
+              >
+                <Settings2 className="size-4" />
+                Provider Setup
+              </Button>
+            </div>
+          </div>
         </div>
-      </motion.header>
+      </header>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 md:px-5">
         <motion.div
