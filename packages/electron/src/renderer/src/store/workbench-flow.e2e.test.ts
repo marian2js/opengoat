@@ -97,6 +97,8 @@ function createStatefulApiMock(): WorkbenchApiClient {
     pickProject: vi.fn(async () => null),
     addProject: vi.fn(async () => project),
     createSession: vi.fn(async () => project.sessions[0]!),
+    renameSession: vi.fn(async () => project.sessions[0]!),
+    removeSession: vi.fn(async () => undefined),
     getSessionMessages: vi.fn(async () => []),
     getOnboardingStatus: vi.fn(async () => onboarding),
     runOnboardingGuidedAuth: vi.fn(async () => ({

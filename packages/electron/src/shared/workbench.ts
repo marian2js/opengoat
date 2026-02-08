@@ -104,6 +104,10 @@ export const sessionLookupInputSchema = z.object({
   sessionId: z.string().min(1)
 });
 
+export const renameSessionInputSchema = sessionLookupInputSchema.extend({
+  title: z.string().trim().min(1).max(120)
+});
+
 export const sendMessageInputSchema = sessionLookupInputSchema.extend({
   message: z.string().trim().min(1)
 });

@@ -10,6 +10,7 @@ export type {
   SessionConfig,
   SessionEntry,
   SessionHistoryItem,
+  SessionRemoveResult,
   SessionPruningConfig,
   SessionResetMode,
   SessionResetPolicy,

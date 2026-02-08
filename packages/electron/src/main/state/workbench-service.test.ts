@@ -286,6 +286,37 @@ describe("WorkbenchService sendMessage", () => {
   });
 });
 
+describe("WorkbenchService session management", () => {
+  it("renames and removes sessions through the store", async () => {
+    const opengoat = createOpenGoatStub({
+      providers: createProviderSummaries(),
+      activeProviderId: "openai",
+      onboardingByProvider: {}
+    });
+    const renameSession = vi.fn(async () => ({
+      id: "s1",
+      title: "Roadmap",
+      agentId: "orchestrator",
+      sessionKey: "desktop:p1:s1",
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+      messages: []
+    }));
+    const removeSession = vi.fn(async () => undefined);
+    const store = {
+      renameSession,
+      removeSession
+    } as unknown as WorkbenchStore;
+    const service = new WorkbenchService({ opengoat, store });
+
+    await service.renameSession("p1", "s1", "Roadmap");
+    await service.removeSession("p1", "s1");
+
+    expect(renameSession).toHaveBeenCalledWith("p1", "s1", "Roadmap");
+    expect(removeSession).toHaveBeenCalledWith("p1", "s1");
+  });
+});
+
 function createProviderSummaries(): ProviderSummary[] {
   return [
     {

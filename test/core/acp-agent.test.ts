@@ -152,6 +152,7 @@ describe("OpenGoatAcpAgent", () => {
         {
           sessionKey: "main",
           sessionId: "s-main",
+          title: "Main",
           updatedAt: 100,
           transcriptPath: "/tmp/s-main.jsonl",
           inputChars: 1,

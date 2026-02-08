@@ -1,3 +1,18 @@
+import { useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@renderer/components/ai-elements/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@renderer/components/ai-elements/dialog";
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
 import { Suggestion, Suggestions } from "@renderer/components/ai-elements/suggestion";
@@ -6,8 +21,11 @@ import {
   FolderPlus,
   FolderTree,
   MessageSquare,
+  MoreHorizontal,
+  Pencil,
   Plus,
-  TerminalSquare
+  TerminalSquare,
+  Trash2
 } from "lucide-react";
 
 interface ProjectsSidebarProps {
@@ -21,11 +39,35 @@ interface ProjectsSidebarProps {
   onAddProjectPath: () => void;
   onSelectProject: (projectId: string) => void;
   onCreateSession: (projectId: string) => void;
+  onRenameSession: (projectId: string, sessionId: string, title: string) => void;
+  onRemoveSession: (projectId: string, sessionId: string) => void;
   onSelectSession: (projectId: string, sessionId: string) => void;
 }
 
 export function ProjectsSidebar(props: ProjectsSidebarProps) {
   const activeProject = props.projects.find((project) => project.id === props.activeProjectId) ?? null;
+  const [renameDialog, setRenameDialog] = useState<{
+    projectId: string;
+    sessionId: string;
+    originalTitle: string;
+    nextTitle: string;
+  } | null>(null);
+
+  const handleRenameSubmit = () => {
+    const payload = renameDialog;
+    if (!payload) {
+      return;
+    }
+
+    const normalized = payload.nextTitle.trim();
+    if (!normalized || normalized === payload.originalTitle.trim()) {
+      setRenameDialog(null);
+      return;
+    }
+
+    props.onRenameSession(payload.projectId, payload.sessionId, normalized);
+    setRenameDialog(null);
+  };
 
   return (
     <aside className="border-border/60 border-r bg-background/55 backdrop-blur-xl">
@@ -124,19 +166,72 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
                           props.activeProjectId === project.id &&
                           props.activeSessionId === session.id;
                         return (
-                          <button
+                          <div
                             key={session.id}
-                            type="button"
-                            onClick={() => props.onSelectSession(project.id, session.id)}
-                            className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors ${
+                            className={`group flex items-center gap-1 rounded-md px-1 py-0.5 transition-colors ${
                               isActiveSession
                                 ? "bg-primary text-primary-foreground"
                                 : "text-foreground/85 hover:bg-accent/65 hover:text-accent-foreground"
                             }`}
                           >
-                            <MessageSquare className="size-3.5" />
-                            <span className="truncate">{session.title}</span>
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => props.onSelectSession(project.id, session.id)}
+                              className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm"
+                            >
+                              <MessageSquare className="size-3.5" />
+                              <span className="truncate">{session.title}</span>
+                            </button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                  }}
+                                >
+                                  <MoreHorizontal className="size-3.5" />
+                                  <span className="sr-only">Session actions</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="end"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                }}
+                              >
+                                <DropdownMenuItem
+                                  onSelect={() => {
+                                    setRenameDialog({
+                                      projectId: project.id,
+                                      sessionId: session.id,
+                                      originalTitle: session.title,
+                                      nextTitle: session.title
+                                    });
+                                  }}
+                                >
+                                  <Pencil className="size-4" />
+                                  Rename
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onSelect={() => {
+                                    const confirmed = window.confirm(
+                                      `Remove session "${session.title}"?`
+                                    );
+                                    if (confirmed) {
+                                      props.onRemoveSession(project.id, session.id);
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="size-4" />
+                                  Remove
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         );
                       })
                     )}
@@ -147,6 +242,60 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
           )}
         </div>
       </div>
+      <Dialog
+        open={renameDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRenameDialog(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Session</DialogTitle>
+            <DialogDescription>Choose a new title for this session.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={renameDialog?.nextTitle ?? ""}
+            autoFocus
+            maxLength={120}
+            onChange={(event) => {
+              const value = event.target.value;
+              setRenameDialog((current) =>
+                current
+                  ? {
+                      ...current,
+                      nextTitle: value
+                    }
+                  : null
+              );
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                handleRenameSubmit();
+              }
+            }}
+            placeholder="Session title"
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRenameDialog(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRenameSubmit}
+              disabled={!renameDialog?.nextTitle.trim()}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }

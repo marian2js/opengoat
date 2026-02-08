@@ -21,6 +21,15 @@ describe("desktop IPC router", () => {
 
     await caller.bootstrap();
     await caller.projects.list();
+    await caller.sessions.rename({
+      projectId: "p1",
+      sessionId: "s1",
+      title: "Renamed"
+    });
+    await caller.sessions.remove({
+      projectId: "p1",
+      sessionId: "s1"
+    });
     await caller.sessions.messages({
       projectId: "p1",
       sessionId: "s1"
@@ -28,6 +37,8 @@ describe("desktop IPC router", () => {
 
     expect(service.bootstrap).toHaveBeenCalledTimes(1);
     expect(service.listProjects).toHaveBeenCalledTimes(1);
+    expect(service.renameSession).toHaveBeenCalledWith("p1", "s1", "Renamed");
+    expect(service.removeSession).toHaveBeenCalledWith("p1", "s1");
     expect(service.listMessages).toHaveBeenCalledWith("p1", "s1");
   });
 
@@ -107,6 +118,16 @@ function createServiceStub(): WorkbenchService {
       updatedAt: "2026-02-07T00:00:00.000Z",
       messages: []
     })),
+    renameSession: vi.fn(async () => ({
+      id: "s1",
+      title: "Renamed",
+      agentId: "orchestrator",
+      sessionKey: "desktop:p1:s1",
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+      messages: []
+    })),
+    removeSession: vi.fn(async () => undefined),
     listMessages: vi.fn(async () => []),
     getOnboardingState: vi.fn(async () => ({
       activeProviderId: "codex",

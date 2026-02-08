@@ -28,6 +28,8 @@ import { sessionCommand } from "./commands/session.command.js";
 import { sessionCompactCommand } from "./commands/session-compact.command.js";
 import { sessionHistoryCommand } from "./commands/session-history.command.js";
 import { sessionListCommand } from "./commands/session-list.command.js";
+import { sessionRemoveCommand } from "./commands/session-remove.command.js";
+import { sessionRenameCommand } from "./commands/session-rename.command.js";
 import { sessionResetCommand } from "./commands/session-reset.command.js";
 import { CommandRouter } from "./framework/router.js";
 
@@ -66,6 +68,8 @@ export async function runCli(argv: string[]): Promise<number> {
       sessionHistoryCommand,
       sessionResetCommand,
       sessionCompactCommand,
+      sessionRenameCommand,
+      sessionRemoveCommand,
       agentCommand,
       agentCreateCommand,
       agentListCommand,

@@ -101,6 +101,69 @@ export class WorkbenchStore {
     return project.sessions;
   }
 
+  public async renameSession(projectId: string, sessionId: string, title: string): Promise<WorkbenchSession> {
+    return this.writeTransaction((state) => {
+      const project = requireProject(state, projectId);
+      const session = requireSession(project, sessionId);
+      const now = this.nowIso();
+      const normalizedTitle = normalizeSessionTitle(title);
+      const nextSession: WorkbenchSession = {
+        ...session,
+        title: normalizedTitle,
+        updatedAt: now
+      };
+
+      const nextProjects = state.projects.map((candidate) => {
+        if (candidate.id !== project.id) {
+          return candidate;
+        }
+        return {
+          ...candidate,
+          updatedAt: now,
+          sessions: candidate.sessions.map((candidateSession) =>
+            candidateSession.id === session.id ? nextSession : candidateSession
+          )
+        };
+      });
+
+      return {
+        next: {
+          ...state,
+          updatedAt: now,
+          projects: nextProjects
+        },
+        result: nextSession
+      };
+    });
+  }
+
+  public async removeSession(projectId: string, sessionId: string): Promise<void> {
+    return this.writeTransaction((state) => {
+      const project = requireProject(state, projectId);
+      const _session = requireSession(project, sessionId);
+      const now = this.nowIso();
+      const nextProjects = state.projects.map((candidate) => {
+        if (candidate.id !== project.id) {
+          return candidate;
+        }
+        return {
+          ...candidate,
+          updatedAt: now,
+          sessions: candidate.sessions.filter((candidateSession) => candidateSession.id !== sessionId)
+        };
+      });
+
+      return {
+        next: {
+          ...state,
+          updatedAt: now,
+          projects: nextProjects
+        },
+        result: undefined
+      };
+    });
+  }
+
   public async listMessages(projectId: string, sessionId: string): Promise<WorkbenchMessage[]> {
     const state = await this.readState();
     const session = requireSession(requireProject(state, projectId), sessionId);
@@ -248,4 +311,15 @@ function deriveSessionTitle(
   }
 
   return compact.length > 60 ? `${compact.slice(0, 57)}...` : compact;
+}
+
+function normalizeSessionTitle(input: string): string {
+  const value = input.trim();
+  if (!value) {
+    throw new Error("Session title cannot be empty.");
+  }
+  if (value.length <= 120) {
+    return value;
+  }
+  return `${value.slice(0, 117)}...`;
 }

@@ -1,9 +1,9 @@
 import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
 
-export const sessionListCommand: CliCommand = {
-  path: ["session", "list"],
-  description: "List sessions for an agent.",
+export const sessionRenameCommand: CliCommand = {
+  path: ["session", "rename"],
+  description: "Rename one session.",
   async run(args, context): Promise<number> {
     const parsed = parseArgs(args);
     if (!parsed.ok) {
@@ -17,39 +17,29 @@ export const sessionListCommand: CliCommand = {
       return 0;
     }
 
-    const sessions = await context.service.listSessions(parsed.agentId, {
-      activeMinutes: parsed.activeMinutes
-    });
-
+    const result = await context.service.renameSession(parsed.agentId, parsed.title, parsed.sessionRef);
     if (parsed.json) {
-      context.stdout.write(`${JSON.stringify(sessions, null, 2)}\n`);
+      context.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
       return 0;
     }
 
-    if (sessions.length === 0) {
-      context.stdout.write("No sessions found.\n");
-      return 0;
-    }
-
-    for (const session of sessions) {
-      context.stdout.write(
-        `${session.sessionKey}\t${session.sessionId}\t${session.title}\t${new Date(session.updatedAt).toISOString()}\tcompactions=${session.compactionCount}\n`
-      );
-    }
-
+    context.stdout.write(`Renamed session ${result.sessionKey}\n`);
+    context.stdout.write(`Session id: ${result.sessionId}\n`);
+    context.stdout.write(`Title: ${result.title}\n`);
     return 0;
   }
 };
 
 type Parsed =
-  | { ok: true; help: boolean; json: boolean; agentId: string; activeMinutes?: number }
+  | { ok: true; help: boolean; json: boolean; agentId: string; sessionRef?: string; title: string }
   | { ok: false; error: string };
 
 function parseArgs(args: string[]): Parsed {
   let help = false;
   let json = false;
   let agentId = DEFAULT_AGENT_ID;
-  let activeMinutes: number | undefined;
+  let sessionRef: string | undefined;
+  let title = "";
 
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index];
@@ -71,16 +61,21 @@ function parseArgs(args: string[]): Parsed {
       index += 1;
       continue;
     }
-    if (token === "--active-minutes") {
+    if (token === "--session") {
       const value = args[index + 1]?.trim();
       if (!value) {
-        return { ok: false, error: "Missing value for --active-minutes." };
+        return { ok: false, error: "Missing value for --session." };
       }
-      const parsed = Number.parseInt(value, 10);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        return { ok: false, error: "--active-minutes must be a positive integer." };
+      sessionRef = value;
+      index += 1;
+      continue;
+    }
+    if (token === "--title") {
+      const value = args[index + 1];
+      if (!value?.trim()) {
+        return { ok: false, error: "Missing value for --title." };
       }
-      activeMinutes = parsed;
+      title = value.trim();
       index += 1;
       continue;
     }
@@ -88,18 +83,23 @@ function parseArgs(args: string[]): Parsed {
     return { ok: false, error: `Unknown option: ${token}` };
   }
 
+  if (!help && !title) {
+    return { ok: false, error: "Missing required option: --title <text>." };
+  }
+
   return {
     ok: true,
     help,
     json,
     agentId,
-    activeMinutes
+    sessionRef,
+    title
   };
 }
 
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
-  output.write("  opengoat session list [--agent <id>] [--active-minutes <n>] [--json]\n");
+  output.write("  opengoat session rename --title <text> [--agent <id>] [--session <key|id>] [--json]\n");
   output.write("\n");
-  output.write(`Defaults: agent-id=${DEFAULT_AGENT_ID}\n`);
+  output.write(`Defaults: agent-id=${DEFAULT_AGENT_ID}, session=main\n`);
 }

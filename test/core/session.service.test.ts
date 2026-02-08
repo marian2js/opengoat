@@ -188,6 +188,36 @@ describe("SessionService", () => {
     expect(sessions[0]?.compactionCount).toBeGreaterThan(0);
   });
 
+  it("renames and removes a session", async () => {
+    const root = await createTempDir("opengoat-session-");
+    roots.push(root);
+
+    const { fileSystem, paths } = await createPaths(root);
+    await seedAgentConfig(fileSystem, paths, "orchestrator", {});
+
+    const now = { value: Date.parse("2026-02-07T00:00:00.000Z") };
+    const service = createService(now);
+
+    const prepared = await service.prepareRunSession(paths, "orchestrator", {
+      userMessage: "hello"
+    });
+    if (!prepared.enabled) {
+      throw new Error("Expected session-enabled run.");
+    }
+
+    const renamed = await service.renameSession(paths, "orchestrator", "Roadmap Draft");
+    expect(renamed.title).toBe("Roadmap Draft");
+
+    const listed = await service.listSessions(paths, "orchestrator");
+    expect(listed[0]?.title).toBe("Roadmap Draft");
+
+    const removed = await service.removeSession(paths, "orchestrator");
+    expect(removed.title).toBe("Roadmap Draft");
+
+    const remaining = await service.listSessions(paths, "orchestrator");
+    expect(remaining).toHaveLength(0);
+  });
+
   it("initializes git in working path during session setup when needed", async () => {
     const root = await createTempDir("opengoat-session-");
     roots.push(root);

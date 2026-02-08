@@ -3,7 +3,7 @@ import type { CliCommand } from "../framework/command.js";
 
 export const sessionCommand: CliCommand = {
   path: ["session"],
-  description: "Session commands (list/history/reset/compact).",
+  description: "Session commands (list/history/reset/compact/rename/remove).",
   async run(args, context): Promise<number> {
     if (args.length === 0 || (args[0] && isHelpToken(args[0]))) {
       printHelp(context.stdout);
@@ -29,6 +29,8 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("  session history   Show transcript history for one session.\n");
   output.write("  session reset     Start a fresh session id for one session key.\n");
   output.write("  session compact   Force transcript compaction for one session.\n");
+  output.write("  session rename    Rename one session.\n");
+  output.write("  session remove    Remove one session.\n");
 }
 
 function isHelpToken(value: string): boolean {

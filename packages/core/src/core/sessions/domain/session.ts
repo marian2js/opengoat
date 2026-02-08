@@ -32,6 +32,7 @@ export interface SessionConfig {
 export interface SessionEntry {
   sessionId: string;
   updatedAt: number;
+  title?: string;
   transcriptFile?: string;
   workspacePath?: string;
   workingPath?: string;
@@ -60,6 +61,7 @@ export interface SessionRunInfo {
 export interface SessionSummary {
   sessionKey: string;
   sessionId: string;
+  title: string;
   updatedAt: number;
   transcriptPath: string;
   workspacePath: string;
@@ -75,6 +77,13 @@ export interface SessionHistoryItem {
   role?: "user" | "assistant" | "system";
   content: string;
   timestamp: number;
+}
+
+export interface SessionRemoveResult {
+  sessionKey: string;
+  sessionId: string;
+  title: string;
+  transcriptPath: string;
 }
 
 export const SESSION_STORE_SCHEMA_VERSION = 1 as const;

@@ -3,6 +3,8 @@ import { sessionCommand } from "../../packages/cli/src/cli/commands/session.comm
 import { sessionCompactCommand } from "../../packages/cli/src/cli/commands/session-compact.command.js";
 import { sessionHistoryCommand } from "../../packages/cli/src/cli/commands/session-history.command.js";
 import { sessionListCommand } from "../../packages/cli/src/cli/commands/session-list.command.js";
+import { sessionRemoveCommand } from "../../packages/cli/src/cli/commands/session-remove.command.js";
+import { sessionRenameCommand } from "../../packages/cli/src/cli/commands/session-rename.command.js";
 import { sessionResetCommand } from "../../packages/cli/src/cli/commands/session-reset.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
@@ -37,6 +39,7 @@ describe("session CLI commands", () => {
         {
           sessionKey: "agent:orchestrator:main",
           sessionId: "abc",
+          title: "Main",
           updatedAt: Date.parse("2026-02-07T00:00:00.000Z"),
           transcriptPath: "/tmp/abc.jsonl",
           inputChars: 10,
@@ -117,5 +120,46 @@ describe("session CLI commands", () => {
     expect(compactCode).toBe(0);
     expect(compactSession).toHaveBeenCalledWith("orchestrator", undefined);
     expect(compactCtx.stdout.output()).toContain("Compaction applied: true");
+  });
+
+  it("session rename validates args and calls service", async () => {
+    const renameSession = vi.fn(async () => ({
+      sessionKey: "agent:orchestrator:main",
+      sessionId: "abc",
+      title: "Roadmap Work",
+      updatedAt: Date.parse("2026-02-07T00:00:00.000Z"),
+      transcriptPath: "/tmp/abc.jsonl",
+      workspacePath: "/tmp/workspaces/orchestrator",
+      inputChars: 0,
+      outputChars: 0,
+      totalChars: 0,
+      compactionCount: 0
+    }));
+
+    const invalid = createContext({ renameSession });
+    const invalidCode = await sessionRenameCommand.run([], invalid.context);
+    expect(invalidCode).toBe(1);
+    expect(invalid.stderr.output()).toContain("Missing required option: --title");
+
+    const valid = createContext({ renameSession });
+    const validCode = await sessionRenameCommand.run(["--title", "Roadmap Work"], valid.context);
+    expect(validCode).toBe(0);
+    expect(renameSession).toHaveBeenCalledWith("orchestrator", "Roadmap Work", undefined);
+    expect(valid.stdout.output()).toContain("Renamed session");
+  });
+
+  it("session remove calls service", async () => {
+    const removeSession = vi.fn(async () => ({
+      sessionKey: "agent:orchestrator:main",
+      sessionId: "abc",
+      title: "Main",
+      transcriptPath: "/tmp/abc.jsonl"
+    }));
+
+    const { context, stdout } = createContext({ removeSession });
+    const code = await sessionRemoveCommand.run([], context);
+    expect(code).toBe(0);
+    expect(removeSession).toHaveBeenCalledWith("orchestrator", undefined);
+    expect(stdout.output()).toContain("Removed session");
   });
 });

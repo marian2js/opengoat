@@ -35,6 +35,8 @@ interface WorkbenchUiState {
   addProjectByPath: (rootPath: string) => Promise<void>;
   selectProject: (projectId: string) => Promise<void>;
   createSession: (projectId: string, title?: string) => Promise<void>;
+  renameSession: (projectId: string, sessionId: string, title: string) => Promise<void>;
+  removeSession: (projectId: string, sessionId: string) => Promise<void>;
   selectSession: (projectId: string, sessionId: string) => Promise<void>;
   submitOnboarding: (providerId: string, env: Record<string, string>) => Promise<void>;
   runOnboardingGuidedAuth: (providerId: string) => Promise<void>;
@@ -196,6 +198,68 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           activeProjectId: projectId,
           activeSessionId: session.id,
           activeMessages: [],
+          isBusy: false
+        });
+      } catch (error) {
+        set({ isBusy: false, error: toErrorMessage(error) });
+      }
+    },
+
+    renameSession: async (projectId: string, sessionId: string, title: string) => {
+      const normalizedTitle = title.trim();
+      if (!normalizedTitle) {
+        set({ error: "Session title cannot be empty." });
+        return;
+      }
+
+      set({ isBusy: true, error: null });
+      try {
+        await api.renameSession({
+          projectId,
+          sessionId,
+          title: normalizedTitle
+        });
+        const projects = await api.listProjects();
+        set({
+          projects,
+          isBusy: false
+        });
+      } catch (error) {
+        set({ isBusy: false, error: toErrorMessage(error) });
+      }
+    },
+
+    removeSession: async (projectId: string, sessionId: string) => {
+      const state = get();
+      const wasActive = state.activeProjectId === projectId && state.activeSessionId === sessionId;
+
+      set({ isBusy: true, error: null });
+      try {
+        await api.removeSession({ projectId, sessionId });
+        const projects = await api.listProjects();
+
+        if (!wasActive) {
+          set({
+            projects,
+            isBusy: false
+          });
+          return;
+        }
+
+        const project = projects.find((candidate) => candidate.id === projectId) ?? null;
+        const fallbackSession = project?.sessions[0] ?? null;
+        const activeMessages = fallbackSession
+          ? await api.getSessionMessages({
+              projectId,
+              sessionId: fallbackSession.id
+            })
+          : [];
+
+        set({
+          projects,
+          activeProjectId: project?.id ?? null,
+          activeSessionId: fallbackSession?.id ?? null,
+          activeMessages,
           isBusy: false
         });
       } catch (error) {

@@ -25,6 +25,8 @@ export function App() {
     addProjectFromDialog,
     addProjectByPath,
     createSession,
+    renameSession,
+    removeSession,
     selectProject,
     selectSession,
     submitOnboarding,
@@ -133,6 +135,12 @@ export function App() {
             onAddProjectPath={() => void onManualAdd()}
             onSelectProject={(projectId) => void selectProject(projectId)}
             onCreateSession={(projectId) => void createSession(projectId)}
+            onRenameSession={(projectId, sessionId, title) =>
+              void renameSession(projectId, sessionId, title)
+            }
+            onRemoveSession={(projectId, sessionId) =>
+              void removeSession(projectId, sessionId)
+            }
             onSelectSession={(projectId, sessionId) => void selectSession(projectId, sessionId)}
           />
           <ChatPanel

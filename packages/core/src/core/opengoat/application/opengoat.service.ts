@@ -35,6 +35,7 @@ import {
   SessionService,
   type SessionCompactionResult,
   type SessionHistoryResult,
+  type SessionRemoveResult,
   type SessionRunInfo,
   type SessionSummary
 } from "../../sessions/index.js";
@@ -265,6 +266,20 @@ export class OpenGoatService {
   public async compactSession(agentId = DEFAULT_AGENT_ID, sessionRef?: string): Promise<SessionCompactionResult> {
     const paths = this.pathsProvider.getPaths();
     return this.sessionService.compactSession(paths, agentId, sessionRef);
+  }
+
+  public async renameSession(
+    agentId = DEFAULT_AGENT_ID,
+    title = "",
+    sessionRef?: string
+  ): Promise<SessionSummary> {
+    const paths = this.pathsProvider.getPaths();
+    return this.sessionService.renameSession(paths, agentId, title, sessionRef);
+  }
+
+  public async removeSession(agentId = DEFAULT_AGENT_ID, sessionRef?: string): Promise<SessionRemoveResult> {
+    const paths = this.pathsProvider.getPaths();
+    return this.sessionService.removeSession(paths, agentId, sessionRef);
   }
 
   public getHomeDir(): string {

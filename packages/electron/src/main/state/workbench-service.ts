@@ -180,6 +180,14 @@ export class WorkbenchService {
     return this.store.listSessions(projectId);
   }
 
+  public renameSession(projectId: string, sessionId: string, title: string): Promise<WorkbenchSession> {
+    return this.store.renameSession(projectId, sessionId, normalizeSessionTitle(title));
+  }
+
+  public removeSession(projectId: string, sessionId: string): Promise<void> {
+    return this.store.removeSession(projectId, sessionId);
+  }
+
   public listMessages(projectId: string, sessionId: string): Promise<WorkbenchMessage[]> {
     return this.store.listMessages(projectId, sessionId);
   }

@@ -12,6 +12,7 @@ import {
   type SessionConfig,
   type SessionEntry,
   type SessionHistoryItem,
+  type SessionRemoveResult,
   type SessionRunInfo,
   type SessionStoreShape,
   type SessionSummary
@@ -229,22 +230,15 @@ export class SessionService {
         : undefined;
 
     const summaries = Object.entries(store.sessions)
-      .map(([sessionKey, entry]): SessionSummary => {
-        return {
+      .map(([sessionKey, entry]): SessionSummary =>
+        toSessionSummary({
+          paths,
+          pathPort: this.pathPort,
+          agentId: normalizedAgentId,
           sessionKey,
-          sessionId: entry.sessionId,
-          updatedAt: entry.updatedAt,
-          transcriptPath:
-            entry.transcriptFile?.trim() ||
-            this.pathPort.join(resolveSessionsDir(paths, normalizedAgentId), `${entry.sessionId}.jsonl`),
-          workspacePath: entry.workspacePath?.trim() || this.pathPort.join(paths.workspacesDir, normalizedAgentId),
-          workingPath: entry.workingPath?.trim() || undefined,
-          inputChars: entry.inputChars ?? 0,
-          outputChars: entry.outputChars ?? 0,
-          totalChars: entry.totalChars ?? 0,
-          compactionCount: entry.compactionCount ?? 0
-        };
-      })
+          entry
+        })
+      )
       .filter((entry) => {
         if (!activeWindowMs) {
           return true;
@@ -254,6 +248,76 @@ export class SessionService {
       .sort((left, right) => right.updatedAt - left.updatedAt);
 
     return summaries;
+  }
+
+  public async renameSession(
+    paths: OpenGoatPaths,
+    agentId: string,
+    title: string,
+    sessionRef?: string
+  ): Promise<SessionSummary> {
+    const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
+    const config = await this.readSessionConfig(paths, normalizedAgentId);
+    const store = await this.readStore(paths, normalizedAgentId);
+    const sessionKey = resolveSessionKey({
+      agentId: normalizedAgentId,
+      mainKey: config.mainKey,
+      sessions: store.sessions,
+      reference: sessionRef
+    });
+    const entry = store.sessions[sessionKey];
+    if (!entry) {
+      throw new Error(`Session not found: ${sessionRef ?? sessionKey}`);
+    }
+
+    const updatedAt = this.nowMs();
+    const nextEntry: SessionEntry = {
+      ...entry,
+      title: normalizeSessionTitle(title),
+      updatedAt
+    };
+    store.sessions[sessionKey] = nextEntry;
+    await this.persistStore(paths, normalizedAgentId, store);
+
+    return toSessionSummary({
+      paths,
+      pathPort: this.pathPort,
+      agentId: normalizedAgentId,
+      sessionKey,
+      entry: nextEntry
+    });
+  }
+
+  public async removeSession(
+    paths: OpenGoatPaths,
+    agentId: string,
+    sessionRef?: string
+  ): Promise<SessionRemoveResult> {
+    const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
+    const config = await this.readSessionConfig(paths, normalizedAgentId);
+    const store = await this.readStore(paths, normalizedAgentId);
+    const sessionKey = resolveSessionKey({
+      agentId: normalizedAgentId,
+      mainKey: config.mainKey,
+      sessions: store.sessions,
+      reference: sessionRef
+    });
+    const entry = store.sessions[sessionKey];
+    if (!entry) {
+      throw new Error(`Session not found: ${sessionRef ?? sessionKey}`);
+    }
+
+    delete store.sessions[sessionKey];
+    await this.persistStore(paths, normalizedAgentId, store);
+
+    return {
+      sessionKey,
+      sessionId: entry.sessionId,
+      title: resolveSessionTitle(sessionKey, entry.title),
+      transcriptPath:
+        entry.transcriptFile?.trim() ||
+        this.pathPort.join(resolveSessionsDir(paths, normalizedAgentId), `${entry.sessionId}.jsonl`)
+    };
   }
 
   public async getSessionHistory(
@@ -1072,6 +1136,57 @@ function resolveWorkingPath(input: string | undefined): string {
   return process.cwd();
 }
 
+function normalizeSessionTitle(input: string): string {
+  const value = input.trim();
+  if (!value) {
+    throw new Error("Session title cannot be empty.");
+  }
+  if (value.length <= 120) {
+    return value;
+  }
+  return `${value.slice(0, 117)}...`;
+}
+
+function resolveSessionTitle(sessionKey: string, title?: string): string {
+  const explicit = title?.trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const segment = sessionKey.split(":").at(-1)?.trim() || "session";
+  const normalized = segment.replace(/[-_]+/g, " ").trim();
+  if (!normalized) {
+    return "Session";
+  }
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function toSessionSummary(params: {
+  paths: OpenGoatPaths;
+  pathPort: PathPort;
+  agentId: string;
+  sessionKey: string;
+  entry: SessionEntry;
+}): SessionSummary {
+  return {
+    sessionKey: params.sessionKey,
+    sessionId: params.entry.sessionId,
+    title: resolveSessionTitle(params.sessionKey, params.entry.title),
+    updatedAt: params.entry.updatedAt,
+    transcriptPath:
+      params.entry.transcriptFile?.trim() ||
+      params.pathPort.join(resolveSessionsDir(params.paths, params.agentId), `${params.entry.sessionId}.jsonl`),
+    workspacePath:
+      params.entry.workspacePath?.trim() ||
+      params.pathPort.join(params.paths.workspacesDir, params.agentId),
+    workingPath: params.entry.workingPath?.trim() || undefined,
+    inputChars: params.entry.inputChars ?? 0,
+    outputChars: params.entry.outputChars ?? 0,
+    totalChars: params.entry.totalChars ?? 0,
+    compactionCount: params.entry.compactionCount ?? 0
+  };
+}
+
 function isSessionEntryMap(value: unknown): value is Record<string, SessionEntry> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
@@ -1085,6 +1200,7 @@ function isSessionEntryMap(value: unknown): value is Record<string, SessionEntry
     const record = entry as {
       sessionId?: unknown;
       updatedAt?: unknown;
+      title?: unknown;
       workspacePath?: unknown;
       workingPath?: unknown;
     };
@@ -1096,6 +1212,9 @@ function isSessionEntryMap(value: unknown): value is Record<string, SessionEntry
       return false;
     }
     if (record.workingPath !== undefined && typeof record.workingPath !== "string") {
+      return false;
+    }
+    if (record.title !== undefined && typeof record.title !== "string") {
       return false;
     }
     return true;

@@ -193,6 +193,74 @@ describe("workbench store", () => {
     expect(store.getState().onboardingNotice).toContain("Saved Qwen OAuth token.");
   });
 
+  it("renames a session and refreshes project list", async () => {
+    const renamedProjects = [
+      {
+        id: "p1",
+        name: "project",
+        rootPath: "/tmp/project",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        sessions: [
+          {
+            id: "s1",
+            title: "Roadmap",
+            agentId: "orchestrator" as const,
+            sessionKey: "desktop:p1:s1",
+            createdAt: "2026-02-07T00:00:00.000Z",
+            updatedAt: "2026-02-07T00:00:00.000Z",
+            messages: []
+          }
+        ]
+      }
+    ];
+    const renameSession = vi.fn(async () => renamedProjects[0]!.sessions[0]!);
+    const api = createApiMock({
+      renameSession: renameSession as WorkbenchApiClient["renameSession"],
+      listProjects: vi.fn(async () => renamedProjects) as WorkbenchApiClient["listProjects"]
+    });
+    const store = createWorkbenchStore(api);
+
+    await store.getState().bootstrap();
+    await store.getState().renameSession("p1", "s1", "Roadmap");
+
+    expect(renameSession).toHaveBeenCalledWith({
+      projectId: "p1",
+      sessionId: "s1",
+      title: "Roadmap"
+    });
+    expect(store.getState().projects[0]?.sessions[0]?.title).toBe("Roadmap");
+  });
+
+  it("removes active session and clears selection when none remain", async () => {
+    const remainingProjects = [
+      {
+        id: "p1",
+        name: "project",
+        rootPath: "/tmp/project",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        sessions: []
+      }
+    ];
+    const removeSession = vi.fn(async () => undefined);
+    const api = createApiMock({
+      removeSession: removeSession as WorkbenchApiClient["removeSession"],
+      listProjects: vi.fn(async () => remainingProjects) as WorkbenchApiClient["listProjects"]
+    });
+    const store = createWorkbenchStore(api);
+
+    await store.getState().bootstrap();
+    await store.getState().removeSession("p1", "s1");
+
+    expect(removeSession).toHaveBeenCalledWith({
+      projectId: "p1",
+      sessionId: "s1"
+    });
+    expect(store.getState().activeSessionId).toBeNull();
+    expect(store.getState().activeMessages).toEqual([]);
+  });
+
   it("surfaces contract mismatch during bootstrap", async () => {
     const api = createApiMock({
       validateContract: (vi.fn(async () => {
@@ -300,6 +368,12 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
       throw new Error("not used");
     }),
     createSession: vi.fn(async () => {
+      throw new Error("not used");
+    }),
+    renameSession: vi.fn(async () => {
+      throw new Error("not used");
+    }),
+    removeSession: vi.fn(async () => {
       throw new Error("not used");
     }),
     getSessionMessages: vi.fn(async () => []),
