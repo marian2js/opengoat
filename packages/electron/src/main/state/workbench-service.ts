@@ -58,7 +58,7 @@ export class WorkbenchService {
 
   public async bootstrap(): Promise<WorkbenchBootstrap> {
     await this.ensureInitialized();
-    const projects = await this.listProjectsEnsuringHome();
+    const projects = await this.store.listProjects();
     return {
       homeDir: this.opengoat.getHomeDir(),
       projects,
@@ -191,7 +191,7 @@ export class WorkbenchService {
   }
 
   public listProjects(): Promise<WorkbenchProject[]> {
-    return this.listProjectsEnsuringHome();
+    return this.ensureInitialized().then(() => this.store.listProjects());
   }
 
   public async addProject(rawPath: string): Promise<WorkbenchProject> {
@@ -399,23 +399,6 @@ export class WorkbenchService {
     return env;
   }
 
-  private async listProjectsEnsuringHome(): Promise<WorkbenchProject[]> {
-    await this.ensureInitialized();
-    const projects = await this.store.listProjects();
-    const homeDir = this.opengoat.getHomeDir();
-    if (projects.some((project) => pathsAreEquivalent(project.rootPath, homeDir))) {
-      return projects;
-    }
-
-    const homeProject = await this.store.addProject(homeDir);
-    const remaining = projects.filter(
-      (project) =>
-        project.id !== homeProject.id &&
-        !pathsAreEquivalent(project.rootPath, homeProject.rootPath)
-    );
-    return [homeProject, ...remaining];
-  }
-
   private async ensureInitialized(): Promise<void> {
     if (!this.initializationPromise) {
       this.initializationPromise = this.opengoat.initialize().then(() => undefined);
@@ -446,15 +429,6 @@ function normalizeSessionTitle(input?: string): string {
     return value;
   }
   return `${value.slice(0, 117)}...`;
-}
-
-function pathsAreEquivalent(left: string, right: string): boolean {
-  const normalizedLeft = path.resolve(left);
-  const normalizedRight = path.resolve(right);
-  if (process.platform === "win32") {
-    return normalizedLeft.toLowerCase() === normalizedRight.toLowerCase();
-  }
-  return normalizedLeft === normalizedRight;
 }
 
 function collectDotEnvDirectories(projectRootPath: string): string[] {

@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 
 interface ProjectsSidebarProps {
-  homeDir: string;
   projects: WorkbenchProject[];
   activeProjectId: string | null;
   activeSessionId: string | null;
@@ -219,7 +218,7 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
               <div className="space-y-3">
                 {props.projects.map((project) => {
                   const projectSelected = project.id === props.activeProjectId;
-                  const isHomeProject = pathsAreEquivalent(project.rootPath, props.homeDir);
+                  const isHomeProject = project.name === "Home";
                   const showActions = openMenuProjectId === project.id;
                   return (
                     <section key={project.id} className="space-y-1">
@@ -438,12 +437,6 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
       </Dialog>
     </>
   );
-}
-
-function pathsAreEquivalent(left: string, right: string): boolean {
-  const normalizedLeft = left.trim().toLowerCase().replace(/\/+$/, "");
-  const normalizedRight = right.trim().toLowerCase().replace(/\/+$/, "");
-  return normalizedLeft === normalizedRight;
 }
 
 function SidebarAction(props: {

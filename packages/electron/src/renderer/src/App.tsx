@@ -169,7 +169,6 @@ export function App() {
             className={`relative grid h-full grid-cols-1 ${sidebarCollapsed ? "md:grid-cols-[74px_1fr]" : "md:grid-cols-[280px_1fr]"}`}
           >
             <ProjectsSidebar
-              homeDir={homeDir}
               projects={projects}
               activeProjectId={activeProjectId}
               activeSessionId={activeSessionId}

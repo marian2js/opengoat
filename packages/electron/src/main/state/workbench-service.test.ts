@@ -519,29 +519,26 @@ describe("WorkbenchService project management", () => {
     expect(removeProject).toHaveBeenCalledWith("p1");
   });
 
-  it("ensures Home project exists when listing projects", async () => {
+  it("lists projects without auto-creating runtime home as a project", async () => {
     const opengoat = createOpenGoatStub({
       providers: createProviderSummaries(),
       activeProviderId: "openai",
       onboardingByProvider: {}
     });
-    const listProjects = vi
-      .fn()
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          id: "home",
-          name: "Home",
-          rootPath: "/tmp/home",
-          createdAt: "2026-02-07T00:00:00.000Z",
-          updatedAt: "2026-02-07T00:00:00.000Z",
-          sessions: []
-        }
-      ]);
+    const listProjects = vi.fn(async () => [
+      {
+        id: "home",
+        name: "Home",
+        rootPath: "/Users/tester",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        sessions: []
+      }
+    ]);
     const addProject = vi.fn(async () => ({
-      id: "home",
-      name: "Home",
-      rootPath: "/tmp/home",
+      id: "project-1",
+      name: ".opengoat",
+      rootPath: "/Users/tester/.opengoat",
       createdAt: "2026-02-07T00:00:00.000Z",
       updatedAt: "2026-02-07T00:00:00.000Z",
       sessions: []
@@ -554,7 +551,7 @@ describe("WorkbenchService project management", () => {
 
     const projects = await service.listProjects();
 
-    expect(addProject).toHaveBeenCalledWith("/tmp/home");
+    expect(addProject).not.toHaveBeenCalled();
     expect(projects[0]?.name).toBe("Home");
   });
 });
@@ -589,14 +586,6 @@ function createProviderSummaries(): ProviderSummary[] {
 function createStoreStub(): WorkbenchStore {
   return {
     listProjects: vi.fn(async () => []),
-    addProject: vi.fn(async (rootPath: string) => ({
-      id: "home",
-      name: "Home",
-      rootPath,
-      createdAt: "2026-02-07T00:00:00.000Z",
-      updatedAt: "2026-02-07T00:00:00.000Z",
-      sessions: []
-    })),
     getGatewaySettings: vi.fn(async () => ({
       mode: "local",
       timeoutMs: 10_000

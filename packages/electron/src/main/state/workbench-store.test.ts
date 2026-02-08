@@ -32,6 +32,7 @@ describe("WorkbenchStore", () => {
     expect(home).toBeTruthy();
     expect(home?.rootPath).toBe(path.resolve(os.homedir()));
     expect(projects[0]?.name).toBe("Home");
+    expect(home?.sessions[0]?.title).toBe("New Session");
   });
 
   it("injects Home project into existing desktop state files", async () => {
@@ -74,6 +75,8 @@ describe("WorkbenchStore", () => {
     const projects = await store.listProjects();
     expect(projects.some((project) => project.name === "Home")).toBe(true);
     expect(projects.some((project) => project.id === "project-1")).toBe(true);
+    const home = projects.find((project) => project.name === "Home");
+    expect(home?.sessions[0]?.title).toBe("New Session");
 
     const persisted = JSON.parse(await readFile(stateFilePath, "utf-8")) as WorkbenchState;
     expect(persisted.projects.some((project) => project.name === "Home")).toBe(false);
@@ -92,6 +95,48 @@ describe("WorkbenchStore", () => {
 
     expect(project.sessions).toHaveLength(1);
     expect(project.sessions[0]?.title).toBe("New Session");
+  });
+
+  it("backfills a default Home session for legacy states with empty Home", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "opengoat-desktop-store-"));
+    tempRoots.push(root);
+    const stateFilePath = path.join(root, "state.json");
+
+    const existingState: WorkbenchState = {
+      schemaVersion: 1,
+      createdAt: "2026-02-08T00:00:00.000Z",
+      updatedAt: "2026-02-08T00:00:00.000Z",
+      projects: [
+        {
+          id: "home",
+          name: "Home",
+          rootPath: path.resolve(os.homedir()),
+          createdAt: "2026-02-08T00:00:00.000Z",
+          updatedAt: "2026-02-08T00:00:00.000Z",
+          sessions: []
+        }
+      ],
+      settings: {
+        gateway: {
+          mode: "local",
+          timeoutMs: 10_000
+        },
+        onboarding: {
+          providerSetupCompleted: false
+        }
+      }
+    };
+
+    await writeFile(stateFilePath, `${JSON.stringify(existingState, null, 2)}\n`, "utf-8");
+
+    const store = new WorkbenchStore({
+      stateFilePath,
+      nowIso: () => "2026-02-08T00:00:00.000Z"
+    });
+
+    const projects = await store.listProjects();
+    const home = projects.find((project) => project.name === "Home");
+    expect(home?.sessions[0]?.title).toBe("New Session");
   });
 
   it("renames and removes non-home projects", async () => {

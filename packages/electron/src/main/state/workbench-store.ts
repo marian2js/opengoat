@@ -494,7 +494,17 @@ function ensureHomeProject(state: WorkbenchState): WorkbenchState {
     pathsAreEquivalent(project.rootPath, homeRootPath)
   );
   if (existingHome) {
-    const normalizedHome = existingHome.name === "Home" ? existingHome : { ...existingHome, name: "Home" };
+    const normalizedHome =
+      existingHome.name === "Home" && existingHome.sessions.length > 0
+        ? existingHome
+        : {
+            ...existingHome,
+            name: "Home",
+            sessions:
+              existingHome.sessions.length > 0
+                ? existingHome.sessions
+                : [createDefaultSession(existingHome.id, state.updatedAt)]
+          };
     const rest = state.projects.filter((project) => project.id !== existingHome.id);
     if (rest.length === state.projects.length - 1 && state.projects[0]?.id === existingHome.id && normalizedHome === existingHome) {
       return state;
@@ -505,13 +515,17 @@ function ensureHomeProject(state: WorkbenchState): WorkbenchState {
     };
   }
 
+  const homeProjectId = state.projects.some((project) => project.id === "home")
+    ? randomUUID()
+    : "home";
+
   const homeProject: WorkbenchProject = {
-    id: state.projects.some((project) => project.id === "home") ? randomUUID() : "home",
+    id: homeProjectId,
     name: "Home",
     rootPath: homeRootPath,
     createdAt: state.createdAt,
     updatedAt: state.updatedAt,
-    sessions: []
+    sessions: [createDefaultSession(homeProjectId, state.updatedAt)]
   };
 
   return {

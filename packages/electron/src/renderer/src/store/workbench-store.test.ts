@@ -223,7 +223,7 @@ describe("workbench store", () => {
             }
           ]
         }
-      })),
+      })) as WorkbenchApiClient["bootstrap"],
       submitOnboarding: submitOnboardingMock as WorkbenchApiClient["submitOnboarding"]
     });
     const store = createWorkbenchStore(api);
