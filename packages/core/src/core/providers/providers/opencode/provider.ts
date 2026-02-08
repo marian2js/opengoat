@@ -1,7 +1,15 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { executeCommand } from "../../command-executor.js";
 import { BaseCliProvider } from "../../cli-provider.js";
 import { attachProviderSessionId } from "../../provider-session.js";
-import type { ProviderAuthOptions, ProviderExecutionResult, ProviderInvokeOptions } from "../../types.js";
+import type {
+  ProviderAuthOptions,
+  ProviderCreateAgentOptions,
+  ProviderExecutionResult,
+  ProviderInvokeOptions
+} from "../../types.js";
 
 export class OpenCodeProvider extends BaseCliProvider {
   public constructor() {
@@ -15,7 +23,8 @@ export class OpenCodeProvider extends BaseCliProvider {
         agent: false,
         model: true,
         auth: true,
-        passthrough: true
+        passthrough: true,
+        agentCreate: true
       }
     });
   }
@@ -39,6 +48,38 @@ export class OpenCodeProvider extends BaseCliProvider {
 
   protected override buildAuthInvocationArgs(options: ProviderAuthOptions): string[] {
     return ["auth", "login", ...(options.passthroughArgs ?? [])];
+  }
+
+  public override async createAgent(
+    options: ProviderCreateAgentOptions
+  ): Promise<ProviderExecutionResult> {
+    const env = options.env ?? process.env;
+    const agentFilePath = resolveOpenCodeAgentFilePath(options.agentId, env);
+
+    try {
+      await mkdir(path.dirname(agentFilePath), { recursive: true });
+      const definition = renderOpenCodeAgentDefinition(options.displayName);
+      await writeFile(agentFilePath, definition, { encoding: "utf-8", flag: "wx" });
+      return {
+        code: 0,
+        stdout: `Created OpenCode agent '${options.agentId}' at ${agentFilePath}\n`,
+        stderr: ""
+      };
+    } catch (error) {
+      if (isAlreadyExistsError(error)) {
+        return {
+          code: 0,
+          stdout: `OpenCode agent '${options.agentId}' already exists at ${agentFilePath}\n`,
+          stderr: ""
+        };
+      }
+
+      return {
+        code: 1,
+        stdout: "",
+        stderr: `Failed to create OpenCode agent '${options.agentId}': ${formatErrorMessage(error)}\n`
+      };
+    }
   }
 
   public override buildInvocation(
@@ -85,6 +126,65 @@ export class OpenCodeProvider extends BaseCliProvider {
       return [];
     }
   }
+}
+
+function resolveOpenCodeAgentFilePath(agentId: string, env: NodeJS.ProcessEnv): string {
+  const configDir = resolveOpenCodeConfigDir(env);
+  return path.join(configDir, "agent", `${agentId}.md`);
+}
+
+function resolveOpenCodeConfigDir(env: NodeJS.ProcessEnv): string {
+  const explicitConfigDir = env.OPENCODE_CONFIG_DIR?.trim();
+  if (explicitConfigDir) {
+    return explicitConfigDir;
+  }
+
+  if (process.platform === "win32") {
+    const appDataDir = env.APPDATA?.trim();
+    if (appDataDir) {
+      return path.join(appDataDir, "opencode");
+    }
+  }
+
+  const xdgConfigHome = env.XDG_CONFIG_HOME?.trim();
+  if (xdgConfigHome) {
+    return path.join(xdgConfigHome, "opencode");
+  }
+
+  return path.join(resolveHomeDir(env), ".config", "opencode");
+}
+
+function resolveHomeDir(env: NodeJS.ProcessEnv): string {
+  return env.HOME?.trim() || env.USERPROFILE?.trim() || os.homedir();
+}
+
+function renderOpenCodeAgentDefinition(displayName: string): string {
+  const safeDescription = JSON.stringify(`${displayName} agent managed by OpenGoat`);
+  return [
+    "---",
+    `description: ${safeDescription}`,
+    "mode: subagent",
+    "---",
+    "",
+    `You are ${displayName}, an agent managed by OpenGoat.`,
+    "Follow instructions from OpenGoat and the user."
+  ].join("\n");
+}
+
+function isAlreadyExistsError(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as NodeJS.ErrnoException).code === "EEXIST"
+  );
+}
+
+function formatErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  return "unknown error";
 }
 
 function inferNewSessionId(before: string[], after: string[]): string | undefined {
