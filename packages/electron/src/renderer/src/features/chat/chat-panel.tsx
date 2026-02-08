@@ -8,6 +8,7 @@ import {
   AgentTool,
   AgentTools,
 } from "@renderer/components/ai-elements/agent";
+import { Badge } from "@renderer/components/ai-elements/badge";
 import {
   Conversation,
   ConversationContent,
@@ -45,7 +46,6 @@ import {
   Suggestion,
   Suggestions,
 } from "@renderer/components/ai-elements/suggestion";
-import { Badge } from "@renderer/components/ai-elements/badge";
 import {
   Tool,
   ToolContent,
@@ -212,7 +212,7 @@ export function ChatPanel(props: ChatPanelProps) {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-        className="border-border/50 flex items-center justify-between border-b glass px-4 py-4 md:px-5"
+        className="titlebar-drag-region border-border/50 flex items-center justify-between border-b glass px-4 pb-4 pt-[52px] md:px-5"
       >
         <div className="min-w-0">
           <p className="truncate font-heading text-[1.58rem] font-bold tracking-tight">
@@ -224,7 +224,7 @@ export function ChatPanel(props: ChatPanelProps) {
               : "Create a session to start chatting"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="titlebar-no-drag flex items-center gap-2">
           <Badge
             variant="outline"
             className={
@@ -262,7 +262,9 @@ export function ChatPanel(props: ChatPanelProps) {
           <Agent className="card-glow rounded-2xl border border-border/70 bg-[linear-gradient(180deg,hsl(221_42%_10%_/_0.86),hsl(223_40%_8%_/_0.84))] shadow-[0_18px_46px_hsl(226_80%_2%_/_0.32)]">
             <AgentHeader
               name="OpenGoat Orchestrator"
-              model={gatewayMode === "remote" ? "remote gateway" : "local runtime"}
+              model={
+                gatewayMode === "remote" ? "remote gateway" : "local runtime"
+              }
             />
             <AgentContent className="space-y-3">
               <AgentInstructions>

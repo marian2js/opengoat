@@ -81,7 +81,9 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
 
   return (
     <aside className="border-border/45 border-b glass-strong md:border-r md:border-b-0">
-      <div className="flex h-full flex-col gap-3 p-3 md:gap-4 md:p-4">
+      {/* macOS titlebar drag region - allows window dragging from sidebar top */}
+      <div className="titlebar-drag-region h-[52px] shrink-0" />
+      <div className="flex h-[calc(100%-52px)] flex-col gap-3 p-3 pt-0 md:gap-4 md:p-4 md:pt-0">
         <motion.header
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
