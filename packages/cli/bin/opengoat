@@ -9,9 +9,16 @@ const projectRoot = resolve(binDir, "..");
 const distEntrypoint = resolve(projectRoot, "dist/index.js");
 const srcEntrypoint = resolve(projectRoot, "src/index.ts");
 
-if (existsSync(distEntrypoint)) {
+const hasDist = existsSync(distEntrypoint);
+const hasSrc = existsSync(srcEntrypoint);
+const envForcesSrc = process.env.OPENGOAT_USE_SRC === "1";
+const envForcesDist = process.env.OPENGOAT_USE_DIST === "1";
+
+const preferSrc = envForcesSrc || (hasSrc && !envForcesDist);
+
+if (hasDist && !preferSrc) {
   await import(pathToFileURL(distEntrypoint).href);
-} else {
+} else if (hasSrc) {
   const child = spawn(process.execPath, ["--import", "tsx", srcEntrypoint, ...process.argv.slice(2)], {
     stdio: "inherit",
     env: process.env,
@@ -26,4 +33,6 @@ if (existsSync(distEntrypoint)) {
 
     process.exit(code ?? 1);
   });
+} else {
+  throw new Error(`Missing CLI entrypoints. dist=${distEntrypoint} src=${srcEntrypoint}`);
 }
