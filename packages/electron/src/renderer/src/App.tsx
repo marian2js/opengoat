@@ -29,6 +29,8 @@ export function App() {
     renameProject,
     removeProject,
     createSession,
+    renameSession,
+    removeSession,
     selectProject,
     selectSession,
     submitOnboarding,
@@ -177,6 +179,12 @@ export function App() {
               onRenameProject={(projectId, name) => void renameProject(projectId, name)}
               onRemoveProject={(projectId) => void removeProject(projectId)}
               onCreateSession={(projectId) => void createSession(projectId)}
+              onRenameSession={(projectId, sessionId, title) =>
+                void renameSession(projectId, sessionId, title)
+              }
+              onRemoveSession={(projectId, sessionId) =>
+                void removeSession(projectId, sessionId)
+              }
               onSelectProject={(projectId) => void selectProject(projectId)}
               onSelectSession={(projectId, sessionId) => void selectSession(projectId, sessionId)}
             />

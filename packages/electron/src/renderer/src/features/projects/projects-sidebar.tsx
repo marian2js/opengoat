@@ -39,46 +39,108 @@ interface ProjectsSidebarProps {
   onRenameProject: (projectId: string, name: string) => void;
   onRemoveProject: (projectId: string) => void;
   onCreateSession: (projectId: string) => void;
+  onRenameSession: (projectId: string, sessionId: string, title: string) => void;
+  onRemoveSession: (projectId: string, sessionId: string) => void;
   onSelectProject: (projectId: string) => void;
   onSelectSession: (projectId: string, sessionId: string) => void;
 }
 
 export function ProjectsSidebar(props: ProjectsSidebarProps) {
-  const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
+  const [renameTarget, setRenameTarget] = useState<
+    | {
+        kind: "project";
+        projectId: string;
+      }
+    | {
+        kind: "session";
+        projectId: string;
+        sessionId: string;
+      }
+    | null
+  >(null);
   const [renameValue, setRenameValue] = useState("");
   const [openMenuProjectId, setOpenMenuProjectId] = useState<string | null>(null);
+  const [openMenuSessionKey, setOpenMenuSessionKey] = useState<string | null>(null);
 
-  const renameProject = useMemo(
-    () =>
-      renameProjectId
-        ? props.projects.find((project) => project.id === renameProjectId) ?? null
-        : null,
-    [props.projects, renameProjectId]
+  const renameEntity = useMemo(
+    () => {
+      if (!renameTarget) {
+        return null;
+      }
+
+      if (renameTarget.kind === "project") {
+        const project =
+          props.projects.find((candidate) => candidate.id === renameTarget.projectId) ?? null;
+        return project
+          ? {
+              kind: "project" as const,
+              projectId: project.id,
+              value: project.name
+            }
+          : null;
+      }
+
+      const project =
+        props.projects.find((candidate) => candidate.id === renameTarget.projectId) ?? null;
+      const session =
+        project?.sessions.find((candidate) => candidate.id === renameTarget.sessionId) ?? null;
+      if (!project || !session) {
+        return null;
+      }
+
+      return {
+        kind: "session" as const,
+        projectId: project.id,
+        sessionId: session.id,
+        value: session.title
+      };
+    },
+    [props.projects, renameTarget]
   );
 
   const onOpenRenameDialog = (project: WorkbenchProject) => {
-    setRenameProjectId(project.id);
+    setRenameTarget({
+      kind: "project",
+      projectId: project.id
+    });
     setRenameValue(project.name);
   };
 
+  const onOpenRenameSessionDialog = (
+    projectId: string,
+    sessionId: string,
+    title: string
+  ) => {
+    setRenameTarget({
+      kind: "session",
+      projectId,
+      sessionId
+    });
+    setRenameValue(title);
+  };
+
   const onCloseRenameDialog = () => {
-    setRenameProjectId(null);
+    setRenameTarget(null);
     setRenameValue("");
   };
 
   const onSubmitRename = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!renameProject) {
+    if (!renameEntity) {
       return;
     }
 
     const nextName = renameValue.trim();
-    if (!nextName || nextName === renameProject.name) {
+    if (!nextName || nextName === renameEntity.value) {
       onCloseRenameDialog();
       return;
     }
 
-    props.onRenameProject(renameProject.id, nextName);
+    if (renameEntity.kind === "project") {
+      props.onRenameProject(renameEntity.projectId, nextName);
+    } else {
+      props.onRenameSession(renameEntity.projectId, renameEntity.sessionId, nextName);
+    }
     onCloseRenameDialog();
   };
 
@@ -239,15 +301,75 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
                               const selected =
                                 project.id === props.activeProjectId &&
                                 session.id === props.activeSessionId;
+                              const sessionMenuKey = `${project.id}:${session.id}`;
+                              const showSessionActions = openMenuSessionKey === sessionMenuKey;
                               return (
-                                <button
-                                  key={session.id}
-                                  type="button"
-                                  className={`hover:bg-muted w-full rounded-md px-2 py-1 text-left text-sm ${selected ? "bg-muted text-foreground" : "text-muted-foreground"}`}
-                                  onClick={() => props.onSelectSession(project.id, session.id)}
-                                >
-                                  <span className="truncate">{session.title}</span>
-                                </button>
+                                <div key={session.id} className="group/session relative">
+                                  <button
+                                    type="button"
+                                    className={`hover:bg-muted w-full rounded-md px-2 py-1 pr-10 text-left text-sm ${selected ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                                    onClick={() => props.onSelectSession(project.id, session.id)}
+                                  >
+                                    <span className="truncate">{session.title}</span>
+                                  </button>
+                                  <div
+                                    className={`absolute top-1/2 right-0.5 flex -translate-y-1/2 items-center transition-opacity group-hover/session:opacity-100 group-focus-within/session:opacity-100 ${showSessionActions ? "opacity-100" : "opacity-0"}`}
+                                  >
+                                    <DropdownMenu
+                                      open={openMenuSessionKey === sessionMenuKey}
+                                      onOpenChange={(open) => {
+                                        setOpenMenuSessionKey(open ? sessionMenuKey : null);
+                                      }}
+                                    >
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon-xs"
+                                          className="text-muted-foreground hover:text-foreground"
+                                          aria-label={`${session.title} settings`}
+                                          title="Session settings"
+                                          onClick={(event) => event.stopPropagation()}
+                                        >
+                                          <MoreHorizontal className="size-3.5" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem
+                                          disabled={props.busy}
+                                          onClick={(event) => {
+                                            event.preventDefault();
+                                            onOpenRenameSessionDialog(
+                                              project.id,
+                                              session.id,
+                                              session.title
+                                            );
+                                          }}
+                                        >
+                                          <PencilLine className="size-4" />
+                                          Rename
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          variant="destructive"
+                                          disabled={props.busy}
+                                          onClick={(event) => {
+                                            event.preventDefault();
+                                            if (
+                                              window.confirm(
+                                                `Delete session "${session.title}"?`
+                                              )
+                                            ) {
+                                              props.onRemoveSession(project.id, session.id);
+                                            }
+                                          }}
+                                        >
+                                          <Trash2 className="size-4" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </div>
                               );
                             })}
                           </div>
@@ -263,7 +385,7 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
       </aside>
 
       <Dialog
-        open={Boolean(renameProject)}
+        open={Boolean(renameEntity)}
         onOpenChange={(open) => {
           if (!open) {
             onCloseRenameDialog();
@@ -273,15 +395,19 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
         <DialogContent className="max-w-sm">
           <form onSubmit={onSubmitRename} className="space-y-4">
             <DialogHeader>
-              <DialogTitle>Rename Project</DialogTitle>
+              <DialogTitle>
+                {renameEntity?.kind === "session" ? "Rename Session" : "Rename Project"}
+              </DialogTitle>
               <DialogDescription>
-                Choose a new name for this project.
+                {renameEntity?.kind === "session"
+                  ? "Choose a new name for this session."
+                  : "Choose a new name for this project."}
               </DialogDescription>
             </DialogHeader>
             <Input
               value={renameValue}
               onChange={(event) => setRenameValue(event.target.value)}
-              placeholder="Project name"
+              placeholder={renameEntity?.kind === "session" ? "Session name" : "Project name"}
               maxLength={120}
               autoFocus
             />
