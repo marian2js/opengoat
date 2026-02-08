@@ -3,6 +3,8 @@ import { exposeElectronTRPC } from "electron-trpc/main";
 
 const MENU_ACTION_CHANNEL = "opengoat:menu-action";
 const WINDOW_MODE_CHANNEL = "opengoat:window-mode";
+const WINDOW_CHROME_CHANNEL = "opengoat:window-chrome";
+const WINDOW_CHROME_GET_CHANNEL = "opengoat:window-chrome:get";
 
 type MenuAction =
   | "open-project"
@@ -10,6 +12,11 @@ type MenuAction =
   | "open-provider-settings"
   | "open-connection-settings";
 type WindowMode = "workspace" | "onboarding";
+type WindowChromeState = {
+  isMac: boolean;
+  isMaximized: boolean;
+  isFullScreen: boolean;
+};
 
 process.once("loaded", () => {
   exposeElectronTRPC();
@@ -26,6 +33,22 @@ process.once("loaded", () => {
     },
     setWindowMode: (mode: WindowMode) => {
       ipcRenderer.send(WINDOW_MODE_CHANNEL, mode);
+    },
+    onWindowChrome: (listener: (state: WindowChromeState) => void) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        state: WindowChromeState,
+      ) => {
+        listener(state);
+      };
+
+      ipcRenderer.on(WINDOW_CHROME_CHANNEL, wrapped);
+      return () => {
+        ipcRenderer.removeListener(WINDOW_CHROME_CHANNEL, wrapped);
+      };
+    },
+    getWindowChrome: async (): Promise<WindowChromeState> => {
+      return ipcRenderer.invoke(WINDOW_CHROME_GET_CHANNEL);
     },
   });
 });

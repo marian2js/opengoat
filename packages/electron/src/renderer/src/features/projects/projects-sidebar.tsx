@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 
 interface ProjectsSidebarProps {
+  showTrafficLightInset: boolean;
   projects: WorkbenchProject[];
   activeProjectId: string | null;
   activeSessionId: string | null;
@@ -47,7 +48,6 @@ interface ProjectsSidebarProps {
 }
 
 export function ProjectsSidebar(props: ProjectsSidebarProps) {
-  const isMac = useMemo(() => detectMacPlatform(), []);
   const [renameTarget, setRenameTarget] = useState<
     | {
         kind: "project";
@@ -152,7 +152,9 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
     <>
       <aside className="border-border/70 flex min-h-0 flex-col border-r bg-[hsl(224_16%_7%)]">
         <div className="titlebar-drag-region flex h-11 items-center px-2">
-          {isMac ? <div className="h-full w-[76px] shrink-0" /> : null}
+          {props.showTrafficLightInset ? (
+            <div className="h-full w-[76px] shrink-0" />
+          ) : null}
           <button
             type="button"
             className="titlebar-no-drag text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-md"
@@ -482,14 +484,4 @@ function SidebarAction(props: {
       {props.label}
     </Button>
   );
-}
-
-function detectMacPlatform(): boolean {
-  if (typeof navigator === "undefined") {
-    return false;
-  }
-
-  const platform = navigator.platform ?? "";
-  const userAgent = navigator.userAgent ?? "";
-  return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X/i.test(userAgent);
 }

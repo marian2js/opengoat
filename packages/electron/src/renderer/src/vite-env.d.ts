@@ -6,10 +6,17 @@ type OpenGoatDesktopMenuAction =
   | "open-provider-settings"
   | "open-connection-settings";
 type OpenGoatDesktopWindowMode = "workspace" | "onboarding";
+type OpenGoatDesktopWindowChrome = {
+  isMac: boolean;
+  isMaximized: boolean;
+  isFullScreen: boolean;
+};
 
 interface OpenGoatDesktopApi {
   onMenuAction: (listener: (action: OpenGoatDesktopMenuAction) => void) => () => void;
   setWindowMode: (mode: OpenGoatDesktopWindowMode) => void;
+  onWindowChrome: (listener: (state: OpenGoatDesktopWindowChrome) => void) => () => void;
+  getWindowChrome: () => Promise<OpenGoatDesktopWindowChrome>;
 }
 
 declare global {

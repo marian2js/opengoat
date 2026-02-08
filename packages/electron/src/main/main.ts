@@ -17,6 +17,8 @@ import path from "node:path";
 const APP_NAME = "OpenGoat";
 const MENU_ACTION_CHANNEL = "opengoat:menu-action";
 const WINDOW_MODE_CHANNEL = "opengoat:window-mode";
+const WINDOW_CHROME_CHANNEL = "opengoat:window-chrome";
+const WINDOW_CHROME_GET_CHANNEL = "opengoat:window-chrome:get";
 
 const WINDOW_SIZE = {
   workspace: {
@@ -37,6 +39,11 @@ type MenuAction =
   | "open-provider-settings"
   | "open-connection-settings";
 type WindowMode = "workspace" | "onboarding";
+type WindowChromeState = {
+  isMac: boolean;
+  isMaximized: boolean;
+  isFullScreen: boolean;
+};
 
 if (started) {
   app.quit();
@@ -98,6 +105,33 @@ function dispatchMenuAction(action: MenuAction): void {
     return;
   }
   target.webContents.send(MENU_ACTION_CHANNEL, action);
+}
+
+function getWindowChromeState(targetWindow: BrowserWindow): WindowChromeState {
+  return {
+    isMac: process.platform === "darwin",
+    isMaximized: targetWindow.isMaximized(),
+    isFullScreen: targetWindow.isFullScreen(),
+  };
+}
+
+function emitWindowChromeState(targetWindow: BrowserWindow): void {
+  if (targetWindow.isDestroyed()) {
+    return;
+  }
+  targetWindow.webContents.send(
+    WINDOW_CHROME_CHANNEL,
+    getWindowChromeState(targetWindow),
+  );
+}
+
+function attachWindowChromeTracking(targetWindow: BrowserWindow): void {
+  const publish = () => emitWindowChromeState(targetWindow);
+  targetWindow.on("maximize", publish);
+  targetWindow.on("unmaximize", publish);
+  targetWindow.on("enter-full-screen", publish);
+  targetWindow.on("leave-full-screen", publish);
+  targetWindow.webContents.on("did-finish-load", publish);
 }
 
 function buildApplicationMenu(): Menu {
@@ -292,17 +326,34 @@ app.whenReady().then(async () => {
       return;
     }
     applyWindowMode(targetWindow, mode);
+    emitWindowChromeState(targetWindow);
+  });
+
+  ipcMain.handle(WINDOW_CHROME_GET_CHANNEL, (event) => {
+    const targetWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!targetWindow || targetWindow.isDestroyed()) {
+      return {
+        isMac: process.platform === "darwin",
+        isMaximized: false,
+        isFullScreen: false,
+      } satisfies WindowChromeState;
+    }
+    return getWindowChromeState(targetWindow);
   });
 
   const ipcHandler = createIPCHandler({ router: router as never, windows: [] });
 
   const window = await createMainWindow();
   ipcHandler.attachWindow(window);
+  attachWindowChromeTracking(window);
+  emitWindowChromeState(window);
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       const newWindow = await createMainWindow();
       ipcHandler.attachWindow(newWindow);
+      attachWindowChromeTracking(newWindow);
+      emitWindowChromeState(newWindow);
     }
   });
 });

@@ -47,6 +47,11 @@ export function App() {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showRuntimeSettings, setShowRuntimeSettings] = useState(false);
+  const [windowChrome, setWindowChrome] = useState<OpenGoatDesktopWindowChrome>({
+    isMac: false,
+    isMaximized: false,
+    isFullScreen: false,
+  });
 
   useEffect(() => {
     void bootstrap();
@@ -93,6 +98,32 @@ export function App() {
       showOnboarding ? "onboarding" : "workspace",
     );
   }, [showOnboarding]);
+
+  useEffect(() => {
+    const desktopApi = window.opengoatDesktop;
+    if (!desktopApi?.onWindowChrome || !desktopApi.getWindowChrome) {
+      return;
+    }
+
+    let disposed = false;
+    void desktopApi
+      .getWindowChrome()
+      .then((state) => {
+        if (!disposed) {
+          setWindowChrome(state);
+        }
+      })
+      .catch(() => undefined);
+
+    const unsubscribe = desktopApi.onWindowChrome((state) => {
+      setWindowChrome(state);
+    });
+
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, []);
 
   const activeProject = useMemo(
     () => getActiveProject(projects, activeProjectId),
@@ -169,6 +200,12 @@ export function App() {
             className={`relative grid h-full grid-cols-1 ${sidebarCollapsed ? "md:grid-cols-[74px_1fr]" : "md:grid-cols-[280px_1fr]"}`}
           >
             <ProjectsSidebar
+              showTrafficLightInset={
+                windowChrome.isMac &&
+                !windowChrome.isMaximized &&
+                !windowChrome.isFullScreen &&
+                !sidebarCollapsed
+              }
               projects={projects}
               activeProjectId={activeProjectId}
               activeSessionId={activeSessionId}
