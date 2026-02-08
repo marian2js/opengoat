@@ -212,7 +212,8 @@ export function ChatPanel(props: ChatPanelProps) {
           ) : null}
 
           <PromptInput
-            className="rounded-xl border border-[#2E2F31] bg-[#161617] p-1"
+            className="w-full"
+            inputGroupClassName="rounded-lg border border-[#2F3032] bg-[#19191A] shadow-none"
             onSubmit={handlePromptSubmit}
           >
             <PromptInputBody>
@@ -228,7 +229,7 @@ export function ChatPanel(props: ChatPanelProps) {
                 }
               />
             </PromptInputBody>
-            <PromptInputFooter className="justify-end border-t border-[#2E2F31] px-2 pb-2 pt-2">
+            <PromptInputFooter className="justify-end px-2 pb-2 pt-2">
               <PromptInputSubmit
                 className="size-8 rounded-lg"
                 disabled={!canSend}
