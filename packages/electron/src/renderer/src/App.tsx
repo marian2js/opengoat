@@ -26,10 +26,7 @@ export function App() {
     error,
     bootstrap,
     addProjectFromDialog,
-    addProjectByPath,
     createSession,
-    renameSession,
-    removeSession,
     selectProject,
     selectSession,
     submitOnboarding,
@@ -44,7 +41,7 @@ export function App() {
     clearError
   } = useWorkbenchStore();
 
-  const [manualPath, setManualPath] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showRuntimeSettings, setShowRuntimeSettings] = useState(false);
 
   useEffect(() => {
@@ -64,8 +61,12 @@ export function App() {
       }
 
       if (action === "new-session") {
-        if (activeProjectId) {
-          void createSession(activeProjectId);
+        const targetProjectId =
+          activeProjectId ??
+          projects.find((project) => project.name === "Home")?.id ??
+          projects[0]?.id;
+        if (targetProjectId) {
+          void createSession(targetProjectId);
         }
         return;
       }
@@ -81,7 +82,7 @@ export function App() {
         setShowRuntimeSettings(true);
       }
     });
-  }, [activeProjectId, addProjectFromDialog, createSession, openOnboarding]);
+  }, [activeProjectId, addProjectFromDialog, createSession, openOnboarding, projects]);
 
   useEffect(() => {
     window.opengoatDesktop?.setWindowMode(
@@ -97,11 +98,6 @@ export function App() {
     () => activeProject?.sessions.find((session) => session.id === activeSessionId) ?? null,
     [activeProject, activeSessionId]
   );
-
-  const onManualAdd = async () => {
-    await addProjectByPath(manualPath);
-    setManualPath("");
-  };
 
   const onSaveOnboarding = async () => {
     if (!onboardingDraftProviderId) {
@@ -165,24 +161,18 @@ export function App() {
         <div className="relative h-full overflow-hidden">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_520px_at_-4%_-12%,hsl(163_82%_49%_/_0.22),transparent_56%),radial-gradient(860px_420px_at_108%_-8%,hsl(192_94%_54%_/_0.16),transparent_58%),linear-gradient(180deg,hsl(222_53%_6%),hsl(224_52%_4%))]" />
           <div className="pointer-events-none absolute inset-0 opacity-[0.12] [background-image:linear-gradient(hsl(215_24%_64%_/_0.28)_1px,transparent_1px),linear-gradient(90deg,hsl(215_24%_64%_/_0.28)_1px,transparent_1px)] [background-size:22px_22px]" />
-          <div className="relative grid h-full grid-cols-1 md:grid-cols-[350px_1fr]">
+          <div
+            className={`relative grid h-full grid-cols-1 ${sidebarCollapsed ? "md:grid-cols-[74px_1fr]" : "md:grid-cols-[280px_1fr]"}`}
+          >
             <ProjectsSidebar
               projects={projects}
               activeProjectId={activeProjectId}
               activeSessionId={activeSessionId}
-              manualPath={manualPath}
               busy={isBusy}
-              onManualPathChange={setManualPath}
+              collapsed={sidebarCollapsed}
+              onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
               onAddProjectDialog={() => void addProjectFromDialog()}
-              onAddProjectPath={() => void onManualAdd()}
               onSelectProject={(projectId) => void selectProject(projectId)}
-              onCreateSession={(projectId) => void createSession(projectId)}
-              onRenameSession={(projectId, sessionId, title) =>
-                void renameSession(projectId, sessionId, title)
-              }
-              onRemoveSession={(projectId, sessionId) =>
-                void removeSession(projectId, sessionId)
-              }
               onSelectSession={(projectId, sessionId) => void selectSession(projectId, sessionId)}
             />
             <ChatPanel

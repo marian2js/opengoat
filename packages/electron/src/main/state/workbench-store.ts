@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import {
   WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS,
@@ -34,7 +35,9 @@ export class WorkbenchStore {
 
   public async addProject(rootPath: string): Promise<WorkbenchProject> {
     return this.writeTransaction((state) => {
-      const existing = state.projects.find((project) => project.rootPath === rootPath);
+      const existing = state.projects.find((project) =>
+        pathsAreEquivalent(project.rootPath, rootPath)
+      );
       if (existing) {
         return {
           next: state,
@@ -43,9 +46,10 @@ export class WorkbenchStore {
       }
 
       const now = this.nowIso();
+      const homeRootPath = resolveHomeProjectRootPath();
       const project: WorkbenchProject = {
         id: randomUUID(),
-        name: path.basename(rootPath) || rootPath,
+        name: pathsAreEquivalent(rootPath, homeRootPath) ? "Home" : path.basename(rootPath) || rootPath,
         rootPath,
         createdAt: now,
         updatedAt: now,
@@ -296,7 +300,7 @@ export class WorkbenchStore {
       if (!validated.success) {
         return this.createDefaultState();
       }
-      return validated.data;
+      return ensureHomeProject(validated.data);
     } catch {
       return this.createDefaultState();
     }
@@ -304,7 +308,7 @@ export class WorkbenchStore {
 
   private createDefaultState(): WorkbenchState {
     const now = this.nowIso();
-    return {
+    return ensureHomeProject({
       schemaVersion: 1,
       createdAt: now,
       updatedAt: now,
@@ -318,7 +322,7 @@ export class WorkbenchStore {
           providerSetupCompleted: false
         }
       }
-    };
+    });
   }
 
   private async writeTransaction<T>(
@@ -327,8 +331,9 @@ export class WorkbenchStore {
     return this.enqueue(async () => {
       const state = await this.readState();
       const { next, result } = operation(state);
-      await this.persist(next);
-      this.stateCache = next;
+      const normalized = ensureHomeProject(next);
+      await this.persist(normalized);
+      this.stateCache = normalized;
       return this.cloneData(result);
     });
   }
@@ -410,4 +415,49 @@ function normalizeGatewaySettings(input: WorkbenchGatewaySettings): WorkbenchGat
     remoteUrl: remoteUrl || undefined,
     timeoutMs
   };
+}
+
+function ensureHomeProject(state: WorkbenchState): WorkbenchState {
+  const homeRootPath = resolveHomeProjectRootPath();
+  const existingHome = state.projects.find((project) =>
+    pathsAreEquivalent(project.rootPath, homeRootPath)
+  );
+  if (existingHome) {
+    const normalizedHome = existingHome.name === "Home" ? existingHome : { ...existingHome, name: "Home" };
+    const rest = state.projects.filter((project) => project.id !== existingHome.id);
+    if (rest.length === state.projects.length - 1 && state.projects[0]?.id === existingHome.id && normalizedHome === existingHome) {
+      return state;
+    }
+    return {
+      ...state,
+      projects: [normalizedHome, ...rest]
+    };
+  }
+
+  const homeProject: WorkbenchProject = {
+    id: state.projects.some((project) => project.id === "home") ? randomUUID() : "home",
+    name: "Home",
+    rootPath: homeRootPath,
+    createdAt: state.createdAt,
+    updatedAt: state.updatedAt,
+    sessions: []
+  };
+
+  return {
+    ...state,
+    projects: [homeProject, ...state.projects]
+  };
+}
+
+function resolveHomeProjectRootPath(): string {
+  return path.resolve(os.homedir());
+}
+
+function pathsAreEquivalent(left: string, right: string): boolean {
+  const normalizedLeft = path.resolve(left);
+  const normalizedRight = path.resolve(right);
+  if (process.platform === "win32") {
+    return normalizedLeft.toLowerCase() === normalizedRight.toLowerCase();
+  }
+  return normalizedLeft === normalizedRight;
 }
