@@ -3,7 +3,8 @@ import type {
   WorkbenchGatewayMode,
   WorkbenchMessage,
   WorkbenchOnboarding,
-  WorkbenchProject
+  WorkbenchProject,
+  WorkbenchSession
 } from "@shared/workbench";
 import { WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS } from "@shared/workbench";
 import {
@@ -99,13 +100,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         const projects = boot.projects;
         const firstProject = projects[0] ?? null;
         const firstSession = firstProject?.sessions[0] ?? null;
-        const activeMessages =
-          firstProject && firstSession
-            ? await api.getSessionMessages({
-                projectId: firstProject.id,
-                sessionId: firstSession.id
-              })
-            : [];
+        const activeMessages = firstSession?.messages ?? [];
         const onboardingDraft = resolveOnboardingDraftState(
           boot.onboarding,
           get().onboardingDraftProviderId,
@@ -148,14 +143,13 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           return;
         }
 
-        const projects = await api.listProjects();
-        set({
-          projects,
+        set((state) => ({
+          projects: upsertProject(state.projects, project),
           activeProjectId: project.id,
           activeSessionId: null,
           activeMessages: [],
           isBusy: false
-        });
+        }));
       } catch (error) {
         set({ isBusy: false, error: toErrorMessage(error) });
       }
@@ -170,14 +164,13 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       set({ isBusy: true, error: null });
       try {
         const project = await api.addProject({ rootPath: normalized });
-        const projects = await api.listProjects();
-        set({
-          projects,
+        set((state) => ({
+          projects: upsertProject(state.projects, project),
           activeProjectId: project.id,
           activeSessionId: null,
           activeMessages: [],
           isBusy: false
-        });
+        }));
       } catch (error) {
         set({ isBusy: false, error: toErrorMessage(error) });
       }
@@ -191,13 +184,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       }
 
       const firstSession = project.sessions[0] ?? null;
-      const activeMessages =
-        firstSession === null
-          ? []
-          : await api.getSessionMessages({
-              projectId,
-              sessionId: firstSession.id
-            });
+      const activeMessages = firstSession?.messages ?? [];
 
       set({
         activeProjectId: projectId,
@@ -213,14 +200,15 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           projectId,
           title
         });
-        const projects = await api.listProjects();
-        set({
-          projects,
+        set((state) => ({
+          projects: upsertProjectSession(state.projects, projectId, session, {
+            prepend: true
+          }),
           activeProjectId: projectId,
           activeSessionId: session.id,
-          activeMessages: [],
+          activeMessages: session.messages,
           isBusy: false
-        });
+        }));
       } catch (error) {
         set({ isBusy: false, error: toErrorMessage(error) });
       }
@@ -235,53 +223,44 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
 
       set({ isBusy: true, error: null });
       try {
-        await api.renameSession({
+        const session = await api.renameSession({
           projectId,
           sessionId,
           title: normalizedTitle
         });
-        const projects = await api.listProjects();
-        set({
-          projects,
+        set((state) => ({
+          projects: upsertProjectSession(state.projects, projectId, session),
           isBusy: false
-        });
+        }));
       } catch (error) {
         set({ isBusy: false, error: toErrorMessage(error) });
       }
     },
 
     removeSession: async (projectId: string, sessionId: string) => {
-      const state = get();
-      const wasActive = state.activeProjectId === projectId && state.activeSessionId === sessionId;
-
       set({ isBusy: true, error: null });
       try {
         await api.removeSession({ projectId, sessionId });
-        const projects = await api.listProjects();
+        set((state) => {
+          const wasActive =
+            state.activeProjectId === projectId && state.activeSessionId === sessionId;
+          const projects = removeProjectSession(state.projects, projectId, sessionId);
+          if (!wasActive) {
+            return {
+              projects,
+              isBusy: false
+            };
+          }
 
-        if (!wasActive) {
-          set({
+          const project = projects.find((candidate) => candidate.id === projectId) ?? null;
+          const fallbackSession = project?.sessions[0] ?? null;
+          return {
             projects,
+            activeProjectId: project?.id ?? null,
+            activeSessionId: fallbackSession?.id ?? null,
+            activeMessages: fallbackSession?.messages ?? [],
             isBusy: false
-          });
-          return;
-        }
-
-        const project = projects.find((candidate) => candidate.id === projectId) ?? null;
-        const fallbackSession = project?.sessions[0] ?? null;
-        const activeMessages = fallbackSession
-          ? await api.getSessionMessages({
-              projectId,
-              sessionId: fallbackSession.id
-            })
-          : [];
-
-        set({
-          projects,
-          activeProjectId: project?.id ?? null,
-          activeSessionId: fallbackSession?.id ?? null,
-          activeMessages,
-          isBusy: false
+          };
         });
       } catch (error) {
         set({ isBusy: false, error: toErrorMessage(error) });
@@ -289,18 +268,20 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
     },
 
     selectSession: async (projectId: string, sessionId: string) => {
-      set({ isBusy: true, error: null });
-      try {
-        const messages = await api.getSessionMessages({ projectId, sessionId });
+      const messages = getProjectSessionMessages(get().projects, projectId, sessionId);
+      if (!messages) {
         set({
-          activeProjectId: projectId,
-          activeSessionId: sessionId,
-          activeMessages: messages,
-          isBusy: false
+          error: `Session not found: ${sessionId}`
         });
-      } catch (error) {
-        set({ isBusy: false, error: toErrorMessage(error) });
+        return;
       }
+
+      set({
+        error: null,
+        activeProjectId: projectId,
+        activeSessionId: sessionId,
+        activeMessages: messages
+      });
     },
 
     submitOnboarding: async (providerId: string, env: Record<string, string>) => {
@@ -542,23 +523,19 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           message: trimmed
         });
 
-        const [projects, messages] = await Promise.all([
-          api.listProjects(),
-          api.getSessionMessages({ projectId, sessionId })
-        ]);
-
-        set({
-          projects,
-          activeMessages: messages,
+        set((current) => ({
+          projects: upsertProjectSession(current.projects, projectId, result.session),
+          activeMessages: result.session.messages,
           chatState: "idle",
           isBusy: false
-        });
+        }));
         return result.reply;
       } catch (error) {
         const next: Partial<WorkbenchUiState> = {
           chatState: "idle",
           isBusy: false,
-          error: toErrorMessage(error)
+          error: toErrorMessage(error),
+          activeMessages: get().activeMessages.filter((message) => message.id !== optimistic.id)
         };
 
         if (isProviderFailureError(error)) {
@@ -603,6 +580,80 @@ export function getActiveProject(
     return null;
   }
   return projects.find((project) => project.id === activeProjectId) ?? null;
+}
+
+function upsertProject(
+  projects: WorkbenchProject[],
+  project: WorkbenchProject
+): WorkbenchProject[] {
+  const index = projects.findIndex((candidate) => candidate.id === project.id);
+  if (index === -1) {
+    return [...projects, project];
+  }
+
+  const next = projects.slice();
+  next[index] = project;
+  return next;
+}
+
+function upsertProjectSession(
+  projects: WorkbenchProject[],
+  projectId: string,
+  session: WorkbenchSession,
+  options?: {
+    prepend?: boolean;
+  }
+): WorkbenchProject[] {
+  return projects.map((project) => {
+    if (project.id !== projectId) {
+      return project;
+    }
+
+    const existingIndex = project.sessions.findIndex((candidate) => candidate.id === session.id);
+    if (existingIndex === -1) {
+      return {
+        ...project,
+        sessions: options?.prepend ? [session, ...project.sessions] : [...project.sessions, session]
+      };
+    }
+
+    const sessions = project.sessions.slice();
+    sessions[existingIndex] = session;
+    return {
+      ...project,
+      sessions
+    };
+  });
+}
+
+function removeProjectSession(
+  projects: WorkbenchProject[],
+  projectId: string,
+  sessionId: string
+): WorkbenchProject[] {
+  return projects.map((project) => {
+    if (project.id !== projectId) {
+      return project;
+    }
+    return {
+      ...project,
+      sessions: project.sessions.filter((session) => session.id !== sessionId)
+    };
+  });
+}
+
+function getProjectSessionMessages(
+  projects: WorkbenchProject[],
+  projectId: string,
+  sessionId: string
+): WorkbenchMessage[] | null {
+  const project = projects.find((candidate) => candidate.id === projectId);
+  if (!project) {
+    return null;
+  }
+
+  const session = project.sessions.find((candidate) => candidate.id === sessionId);
+  return session?.messages ?? null;
 }
 
 function toErrorMessage(error: unknown): string {

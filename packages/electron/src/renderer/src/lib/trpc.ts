@@ -11,6 +11,7 @@ import type {
   WorkbenchMessage,
   WorkbenchOnboarding,
   WorkbenchProject,
+  WorkbenchSendMessageResult,
   WorkbenchSession
 } from "@shared/workbench";
 import superjson from "superjson";
@@ -40,11 +41,7 @@ export interface WorkbenchApiClient {
     projectId: string;
     sessionId: string;
     message: string;
-  }) => Promise<{
-    reply: WorkbenchMessage;
-    tracePath?: string;
-    providerId: string;
-  }>;
+  }) => Promise<WorkbenchSendMessageResult>;
 }
 
 function createLinks() {
@@ -160,11 +157,7 @@ export function createWorkbenchApiClient(): WorkbenchApiClient {
     sendChatMessage: async (input) => {
       const trpc = getTrpcClient();
       await ensureContract(trpc);
-      return (await trpc.mutation("chat.send", input)) as {
-        reply: WorkbenchMessage;
-        tracePath?: string;
-        providerId: string;
-      };
+      return (await trpc.mutation("chat.send", input)) as WorkbenchSendMessageResult;
     }
   };
 }

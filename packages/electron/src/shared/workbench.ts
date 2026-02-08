@@ -158,6 +158,13 @@ export const sendMessageInputSchema = sessionLookupInputSchema.extend({
   message: z.string().trim().min(1)
 });
 
+export const sendMessageResultSchema = z.object({
+  session: workbenchSessionSchema,
+  reply: workbenchMessageSchema,
+  tracePath: z.string().optional(),
+  providerId: z.string()
+});
+
 export const submitOnboardingInputSchema = z.object({
   providerId: z.string().trim().min(1),
   env: z.record(z.string(), z.string()).default({})
@@ -182,3 +189,4 @@ export const runGuidedAuthResultSchema = z.object({
 });
 
 export type WorkbenchGuidedAuthResult = z.infer<typeof runGuidedAuthResultSchema>;
+export type WorkbenchSendMessageResult = z.infer<typeof sendMessageResultSchema>;

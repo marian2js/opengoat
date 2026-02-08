@@ -20,6 +20,7 @@ export class WorkbenchStore {
   private readonly stateFilePath: string;
   private readonly nowIso: () => string;
   private pending: Promise<unknown> = Promise.resolve();
+  private stateCache: WorkbenchState | null = null;
 
   public constructor(deps: WorkbenchStoreDeps) {
     this.stateFilePath = deps.stateFilePath;
@@ -28,7 +29,7 @@ export class WorkbenchStore {
 
   public async listProjects(): Promise<WorkbenchProject[]> {
     const state = await this.readState();
-    return state.projects;
+    return this.cloneData(state.projects);
   }
 
   public async addProject(rootPath: string): Promise<WorkbenchProject> {
@@ -100,7 +101,7 @@ export class WorkbenchStore {
   public async listSessions(projectId: string): Promise<WorkbenchSession[]> {
     const state = await this.readState();
     const project = requireProject(state, projectId);
-    return project.sessions;
+    return this.cloneData(project.sessions);
   }
 
   public async renameSession(projectId: string, sessionId: string, title: string): Promise<WorkbenchSession> {
@@ -169,7 +170,7 @@ export class WorkbenchStore {
   public async listMessages(projectId: string, sessionId: string): Promise<WorkbenchMessage[]> {
     const state = await this.readState();
     const session = requireSession(requireProject(state, projectId), sessionId);
-    return session.messages;
+    return this.cloneData(session.messages);
   }
 
   public async appendMessage(
@@ -220,17 +221,17 @@ export class WorkbenchStore {
 
   public async getProject(projectId: string): Promise<WorkbenchProject> {
     const state = await this.readState();
-    return requireProject(state, projectId);
+    return this.cloneData(requireProject(state, projectId));
   }
 
   public async getSession(projectId: string, sessionId: string): Promise<WorkbenchSession> {
     const state = await this.readState();
-    return requireSession(requireProject(state, projectId), sessionId);
+    return this.cloneData(requireSession(requireProject(state, projectId), sessionId));
   }
 
   public async getGatewaySettings(): Promise<WorkbenchGatewaySettings> {
     const state = await this.readState();
-    return state.settings.gateway;
+    return this.cloneData(state.settings.gateway);
   }
 
   public async setGatewaySettings(gateway: WorkbenchGatewaySettings): Promise<WorkbenchGatewaySettings> {
@@ -278,6 +279,16 @@ export class WorkbenchStore {
   }
 
   private async readState(): Promise<WorkbenchState> {
+    if (this.stateCache) {
+      return this.stateCache;
+    }
+
+    const state = await this.loadStateFromDisk();
+    this.stateCache = state;
+    return state;
+  }
+
+  private async loadStateFromDisk(): Promise<WorkbenchState> {
     try {
       const raw = await readFile(this.stateFilePath, "utf-8");
       const parsed = JSON.parse(raw) as unknown;
@@ -317,7 +328,8 @@ export class WorkbenchStore {
       const state = await this.readState();
       const { next, result } = operation(state);
       await this.persist(next);
-      return result;
+      this.stateCache = next;
+      return this.cloneData(result);
     });
   }
 
@@ -337,6 +349,10 @@ export class WorkbenchStore {
     const tempPath = `${this.stateFilePath}.tmp`;
     await writeFile(tempPath, `${JSON.stringify(state, null, 2)}\n`, "utf-8");
     await rename(tempPath, this.stateFilePath);
+  }
+
+  private cloneData<T>(value: T): T {
+    return structuredClone(value);
   }
 }
 

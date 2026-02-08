@@ -396,6 +396,23 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
     getGatewayStatus: vi.fn(async () => createGatewayStatus()),
     updateGatewaySettings: vi.fn(async () => createGatewayStatus()),
     sendChatMessage: vi.fn(async () => ({
+      session: {
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator" as const,
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: [
+          {
+            id: "m0",
+            role: "user" as const,
+            content: "hello",
+            createdAt: "2026-02-07T00:00:00.000Z"
+          },
+          assistantReply
+        ]
+      },
       reply: assistantReply,
       providerId: "openai"
     }))

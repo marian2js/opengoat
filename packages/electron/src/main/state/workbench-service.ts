@@ -22,6 +22,7 @@ import type {
   WorkbenchMessage,
   WorkbenchOnboarding,
   WorkbenchProject,
+  WorkbenchSendMessageResult,
   WorkbenchSession
 } from "@shared/workbench";
 import { WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS } from "@shared/workbench";
@@ -238,11 +239,7 @@ export class WorkbenchService {
     projectId: string;
     sessionId: string;
     message: string;
-  }): Promise<{
-    reply: WorkbenchMessage;
-    tracePath?: string;
-    providerId: string;
-  }> {
+  }): Promise<WorkbenchSendMessageResult> {
     const message = params.message.trim();
     if (!message) {
       throw new Error("Message cannot be empty.");
@@ -269,19 +266,20 @@ export class WorkbenchService {
     }
 
     const assistantContent = (run.stdout || run.stderr || "No response was returned.").trim();
-    const reply = await this.store.appendMessage(project.id, session.id, {
+    const persistedSession = await this.store.appendMessage(project.id, session.id, {
       role: "assistant",
       content: assistantContent,
       tracePath: run.tracePath,
       providerId: run.providerId
     });
 
-    const latest = reply.messages[reply.messages.length - 1];
+    const latest = persistedSession.messages[persistedSession.messages.length - 1];
     if (!latest) {
       throw new Error("Assistant response could not be stored.");
     }
 
     return {
+      session: persistedSession,
       reply: latest,
       tracePath: run.tracePath,
       providerId: run.providerId

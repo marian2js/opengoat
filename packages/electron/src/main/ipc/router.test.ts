@@ -195,6 +195,22 @@ function createServiceStub(): WorkbenchService {
       hasAuthToken: false
     })),
     sendMessage: vi.fn(async () => ({
+      session: {
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: [
+          {
+            id: "m1",
+            role: "assistant",
+            content: "ok",
+            createdAt: "2026-02-07T00:00:00.000Z"
+          }
+        ]
+      },
       reply: {
         id: "m1",
         role: "assistant",
