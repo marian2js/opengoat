@@ -251,6 +251,32 @@ export class WorkbenchStore {
     });
   }
 
+  public async getProviderSetupCompleted(): Promise<boolean> {
+    const state = await this.readState();
+    return state.settings.onboarding.providerSetupCompleted === true;
+  }
+
+  public async setProviderSetupCompleted(value: boolean): Promise<boolean> {
+    const normalized = value === true;
+    return this.writeTransaction((state) => {
+      const now = this.nowIso();
+      return {
+        next: {
+          ...state,
+          updatedAt: now,
+          settings: {
+            ...state.settings,
+            onboarding: {
+              ...state.settings.onboarding,
+              providerSetupCompleted: normalized
+            }
+          }
+        },
+        result: normalized
+      };
+    });
+  }
+
   private async readState(): Promise<WorkbenchState> {
     try {
       const raw = await readFile(this.stateFilePath, "utf-8");
@@ -276,6 +302,9 @@ export class WorkbenchStore {
         gateway: {
           mode: "local",
           timeoutMs: WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS
+        },
+        onboarding: {
+          providerSetupCompleted: false
         }
       }
     };

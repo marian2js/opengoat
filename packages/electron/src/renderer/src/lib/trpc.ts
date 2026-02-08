@@ -28,6 +28,7 @@ export interface WorkbenchApiClient {
   getOnboardingStatus: () => Promise<WorkbenchOnboarding>;
   runOnboardingGuidedAuth: (input: { providerId: string }) => Promise<WorkbenchGuidedAuthResult>;
   submitOnboarding: (input: { providerId: string; env: Record<string, string> }) => Promise<WorkbenchOnboarding>;
+  completeOnboarding: () => Promise<void>;
   getGatewayStatus: () => Promise<WorkbenchGatewayStatus>;
   updateGatewaySettings: (input: {
     mode: "local" | "remote";
@@ -140,6 +141,11 @@ export function createWorkbenchApiClient(): WorkbenchApiClient {
       const trpc = getTrpcClient();
       await ensureContract(trpc);
       return (await trpc.mutation("onboarding.submit", input)) as WorkbenchOnboarding;
+    },
+    completeOnboarding: async () => {
+      const trpc = getTrpcClient();
+      await ensureContract(trpc);
+      await trpc.mutation("onboarding.complete");
     },
     getGatewayStatus: async () => {
       const trpc = getTrpcClient();

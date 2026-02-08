@@ -131,7 +131,7 @@ export function App() {
         onSaveGateway={() => void onSaveGateway()}
         onboardingNotice={onboardingNotice}
         onRunGuidedAuth={(providerId) => void runOnboardingGuidedAuth(providerId)}
-        onClose={closeOnboarding}
+        onClose={() => void closeOnboarding()}
         onSubmit={() => void onSaveOnboarding()}
       />
     );

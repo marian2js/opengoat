@@ -59,7 +59,8 @@ export class WorkbenchService {
     return {
       homeDir: this.opengoat.getHomeDir(),
       projects: await this.store.listProjects(),
-      onboarding: await this.getOnboardingState()
+      onboarding: await this.getOnboardingState(),
+      providerSetupCompleted: await this.store.getProviderSetupCompleted()
     };
   }
 
@@ -134,7 +135,12 @@ export class WorkbenchService {
   }): Promise<WorkbenchOnboarding> {
     await this.opengoat.setProviderConfig(input.providerId, input.env);
     await this.opengoat.setAgentProvider(DEFAULT_AGENT_ID, input.providerId);
+    await this.store.setProviderSetupCompleted(true);
     return this.getOnboardingState();
+  }
+
+  public async completeOnboarding(): Promise<void> {
+    await this.store.setProviderSetupCompleted(true);
   }
 
   public async getGatewayStatus(): Promise<WorkbenchGatewayStatus> {

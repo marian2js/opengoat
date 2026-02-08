@@ -60,7 +60,7 @@ import type {
   WorkbenchSession,
 } from "@shared/workbench";
 import { tool as defineTool } from "ai";
-import { Copy, FolderCode, Loader2, Settings2, Sparkles } from "lucide-react";
+import { ChevronDown, Copy, FolderCode, Loader2, Settings2, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
@@ -93,9 +93,8 @@ const starterPrompts = [
 export function ChatPanel(props: ChatPanelProps) {
   const gatewayMode = props.gateway?.mode ?? "local";
   const gatewayHost = resolveGatewayHost(props.gateway?.remoteUrl);
-  const chatId = `${props.activeProject?.id ?? "none"}:${
-    props.activeSession?.id ?? "none"
-  }`;
+  const chatId = `${props.activeProject?.id ?? "none"}:${props.activeSession?.id ?? "none"
+    }`;
   const initialMessages = useMemo(
     () => toElectronUiMessages(props.messages),
     [props.messages],
@@ -129,10 +128,10 @@ export function ChatPanel(props: ChatPanelProps) {
 
   const canSend = Boolean(
     props.activeSession &&
-      input.trim().length > 0 &&
-      status !== "submitted" &&
-      status !== "streaming" &&
-      !props.busy,
+    input.trim().length > 0 &&
+    status !== "submitted" &&
+    status !== "streaming" &&
+    !props.busy,
   );
   const resolvedError = chatError?.message ?? props.error;
   const sourceLinks = useMemo(() => {
@@ -225,18 +224,24 @@ export function ChatPanel(props: ChatPanelProps) {
           </p>
         </div>
         <div className="titlebar-no-drag flex items-center gap-2">
-          <Badge
-            variant="outline"
+          <Button
+            variant="ghost"
+            size="sm"
             className={
               gatewayMode === "remote"
-                ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
-                : "border-emerald-400/35 bg-emerald-400/10 text-emerald-200"
+                ? "h-8 gap-1 rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 text-amber-200 hover:bg-amber-400/20"
+                : "h-8 gap-1 rounded-full border border-emerald-400/35 bg-emerald-400/10 px-2.5 text-emerald-200 hover:bg-emerald-400/20"
+            }
+            onClick={props.onOpenOnboarding}
+            disabled={
+              props.busy || status === "submitted" || status === "streaming"
             }
           >
             {gatewayMode === "remote"
               ? `Remote${gatewayHost ? `: ${gatewayHost}` : " Gateway"}`
               : "Local Runtime"}
-          </Badge>
+            <ChevronDown className="size-3.5 opacity-80" />
+          </Button>
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Button
               variant="outline"
@@ -339,14 +344,14 @@ export function ChatPanel(props: ChatPanelProps) {
                   const metadata = message.metadata;
                   const tracePath =
                     metadata &&
-                    typeof metadata === "object" &&
-                    "tracePath" in metadata
+                      typeof metadata === "object" &&
+                      "tracePath" in metadata
                       ? String(metadata.tracePath ?? "")
                       : "";
                   const providerId =
                     metadata &&
-                    typeof metadata === "object" &&
-                    "providerId" in metadata
+                      typeof metadata === "object" &&
+                      "providerId" in metadata
                       ? String(metadata.providerId ?? "")
                       : "";
                   const isLastAssistant =
@@ -391,14 +396,13 @@ export function ChatPanel(props: ChatPanelProps) {
                       </Message>
 
                       {message.role === "assistant" &&
-                      (tracePath || providerId) ? (
+                        (tracePath || providerId) ? (
                         <div className="max-w-3xl">
                           <Reasoning className="mb-1" defaultOpen={false}>
                             <ReasoningTrigger />
                             <ReasoningContent>
-                              {`Provider: ${
-                                providerId || "orchestrator"
-                              }\nTrace: ${tracePath || "not emitted"}`}
+                              {`Provider: ${providerId || "orchestrator"
+                                }\nTrace: ${tracePath || "not emitted"}`}
                             </ReasoningContent>
                           </Reasoning>
 

@@ -80,6 +80,9 @@ export function createDesktopRouter(service: WorkbenchService) {
         .mutation(async ({ input }) => {
           return service.submitOnboarding(input);
         }),
+      complete: t.procedure.mutation(async () => {
+        await service.completeOnboarding();
+      }),
     }),
     gateway: t.router({
       status: t.procedure.query(async () => {

@@ -78,6 +78,7 @@ describe("WorkbenchService onboarding", () => {
       OPENAI_API_KEY: "sk-live"
     });
     expect(opengoat.setAgentProvider).toHaveBeenCalledWith("orchestrator", "openai");
+    expect(store.setProviderSetupCompleted).toHaveBeenCalledWith(true);
     expect(onboarding.needsOnboarding).toBe(false);
     expect(onboarding.activeProviderId).toBe("openai");
   });
@@ -469,7 +470,9 @@ function createStoreStub(): WorkbenchStore {
     setGatewaySettings: vi.fn(async () => ({
       mode: "local",
       timeoutMs: 10_000
-    }))
+    })),
+    getProviderSetupCompleted: vi.fn(async () => false),
+    setProviderSetupCompleted: vi.fn(async () => true)
   } as unknown as WorkbenchStore;
 }
 

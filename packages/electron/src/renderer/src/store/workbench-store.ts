@@ -60,7 +60,7 @@ interface WorkbenchUiState {
   setOnboardingDraftField: (key: string, value: string) => void;
   setOnboardingDraftGateway: (patch: Partial<OnboardingGatewayDraft>) => void;
   openOnboarding: () => Promise<void>;
-  closeOnboarding: () => void;
+  closeOnboarding: () => Promise<void>;
   sendMessage: (
     message: string,
     options?: {
@@ -112,7 +112,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           get().onboardingDraftEnv,
           get().onboardingDraftGateway
         );
-        const showOnboarding = boot.onboarding.needsOnboarding;
+        const showOnboarding = boot.onboarding.needsOnboarding || !boot.providerSetupCompleted;
 
         set({
           homeDir: boot.homeDir,
@@ -483,10 +483,15 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       }
     },
 
-    closeOnboarding: () => {
+    closeOnboarding: async () => {
       const state = get();
       if (state.onboarding?.needsOnboarding) {
         return;
+      }
+      try {
+        await api.completeOnboarding();
+      } catch {
+        // Keep local close UX resilient even if persistence fails.
       }
       set({
         showOnboarding: false,

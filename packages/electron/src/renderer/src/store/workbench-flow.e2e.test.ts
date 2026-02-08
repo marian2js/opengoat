@@ -96,7 +96,8 @@ function createStatefulApiMock(): WorkbenchApiClient {
     bootstrap: vi.fn(async () => ({
       homeDir: "/tmp/home",
       onboarding,
-      projects: [project]
+      projects: [project],
+      providerSetupCompleted: false
     })),
     listProjects: vi.fn(async () => [project]),
     pickProject: vi.fn(async () => null),
@@ -106,6 +107,7 @@ function createStatefulApiMock(): WorkbenchApiClient {
     removeSession: vi.fn(async () => undefined),
     getSessionMessages: vi.fn(async () => []),
     getOnboardingStatus: vi.fn(async () => onboarding),
+    completeOnboarding: vi.fn(async () => undefined),
     runOnboardingGuidedAuth: vi.fn(async () => ({
       providerId: "openai",
       env: {

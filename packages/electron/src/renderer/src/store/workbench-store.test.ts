@@ -314,6 +314,7 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
   const bootstrapPayload: WorkbenchBootstrap = {
     homeDir: "/tmp/home",
     onboarding: bootstrapOnboarding,
+    providerSetupCompleted: false,
     projects: [
       {
         id: "p1",
@@ -383,6 +384,7 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
     }),
     getSessionMessages: vi.fn(async () => []),
     getOnboardingStatus: vi.fn(async () => bootstrapOnboarding),
+    completeOnboarding: vi.fn(async () => undefined),
     runOnboardingGuidedAuth: vi.fn(async () => ({
       providerId: "openai",
       env: {

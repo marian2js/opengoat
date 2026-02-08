@@ -98,7 +98,8 @@ export const workbenchOnboardingSchema = z.object({
 export const workbenchBootstrapSchema = z.object({
   homeDir: z.string(),
   projects: z.array(workbenchProjectSchema),
-  onboarding: workbenchOnboardingSchema
+  onboarding: workbenchOnboardingSchema,
+  providerSetupCompleted: z.boolean().default(false)
 });
 
 export const workbenchStateSchema = z.object({
@@ -108,10 +109,20 @@ export const workbenchStateSchema = z.object({
   projects: z.array(workbenchProjectSchema),
   settings: z
     .object({
-      gateway: workbenchGatewaySettingsSchema.default(WORKBENCH_GATEWAY_DEFAULT_SETTINGS)
+      gateway: workbenchGatewaySettingsSchema.default(WORKBENCH_GATEWAY_DEFAULT_SETTINGS),
+      onboarding: z
+        .object({
+          providerSetupCompleted: z.boolean().default(false)
+        })
+        .default({
+          providerSetupCompleted: false
+        })
     })
     .default({
-      gateway: WORKBENCH_GATEWAY_DEFAULT_SETTINGS
+      gateway: WORKBENCH_GATEWAY_DEFAULT_SETTINGS,
+      onboarding: {
+        providerSetupCompleted: false
+      }
     })
 });
 
