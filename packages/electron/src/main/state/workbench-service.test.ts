@@ -240,7 +240,7 @@ describe("WorkbenchService onboarding", () => {
 });
 
 describe("WorkbenchService sendMessage", () => {
-  it("loads project .env values and forwards them to runAgent", async () => {
+  it("loads project .env values while preventing overrides for stored provider config keys", async () => {
     const loadDotEnvFn = vi.fn(
       async (params?: { cwd?: string; filename?: string; env?: NodeJS.ProcessEnv }) => {
         const cwd = params?.cwd;
@@ -252,6 +252,7 @@ describe("WorkbenchService sendMessage", () => {
           env.OPENAI_API_KEY = "nvapi-test";
           env.OPENAI_BASE_URL = "https://integrate.api.nvidia.com/v1";
           env.OPENAI_MODEL = "meta/llama-3.1-8b-instruct";
+          env.PROJECT_FEATURE_FLAG = "enabled";
         }
       }
     );
@@ -275,6 +276,18 @@ describe("WorkbenchService sendMessage", () => {
       providers: createProviderSummaries(),
       activeProviderId: "openai",
       onboardingByProvider: {},
+      initialProviderConfigs: {
+        openai: {
+          schemaVersion: 1,
+          providerId: "openai",
+          env: {
+            OPENAI_API_KEY: "stored-key",
+            OPENAI_BASE_URL: "https://stored.example/v1",
+            OPENAI_MODEL: "stored-model"
+          },
+          updatedAt: "2026-02-07T00:00:00.000Z"
+        }
+      },
       runAgent
     });
     const appendMessage = vi
@@ -346,8 +359,10 @@ describe("WorkbenchService sendMessage", () => {
     expect(runAgent).toHaveBeenCalledTimes(1);
     const runAgentCall = runAgent.mock.calls[0] as unknown[] | undefined;
     const runAgentArgs = (runAgentCall?.[1] ?? {}) as { env?: NodeJS.ProcessEnv };
-    expect(runAgentArgs.env?.OPENAI_BASE_URL).toBe("https://integrate.api.nvidia.com/v1");
-    expect(runAgentArgs.env?.OPENAI_MODEL).toBe("meta/llama-3.1-8b-instruct");
+    expect(runAgentArgs.env?.OPENAI_API_KEY).toBeUndefined();
+    expect(runAgentArgs.env?.OPENAI_BASE_URL).toBeUndefined();
+    expect(runAgentArgs.env?.OPENAI_MODEL).toBeUndefined();
+    expect(runAgentArgs.env?.PROJECT_FEATURE_FLAG).toBe("enabled");
     expect(loadDotEnvFn).toHaveBeenCalled();
     expect(appendMessage).toHaveBeenCalledTimes(2);
   });

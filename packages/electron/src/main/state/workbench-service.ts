@@ -391,11 +391,14 @@ export class WorkbenchService {
   }> {
     const gatewaySettings = await this.store.getGatewaySettings();
     if (gatewaySettings.mode !== "remote") {
+      const providerBinding = await this.opengoat.getAgentProvider(DEFAULT_AGENT_ID);
+      const providerConfig = await this.opengoat.getProviderConfig(providerBinding.providerId);
+      const providerConfigKeys = Object.keys(providerConfig?.env ?? {});
       const run = await this.opengoat.runAgent("orchestrator", {
         message: input.message,
         sessionRef: input.sessionRef,
         cwd: input.cwd,
-        env: await this.buildInvocationEnv(input.cwd)
+        env: await this.buildInvocationEnv(input.cwd, providerConfigKeys)
       });
       return {
         code: run.code,
@@ -469,11 +472,20 @@ export class WorkbenchService {
     }
   }
 
-  private async buildInvocationEnv(projectRootPath: string): Promise<NodeJS.ProcessEnv> {
+  private async buildInvocationEnv(
+    projectRootPath: string,
+    providerConfigKeys: string[] = []
+  ): Promise<NodeJS.ProcessEnv> {
     const env: NodeJS.ProcessEnv = { ...process.env };
 
     for (const cwd of collectDotEnvDirectories(projectRootPath)) {
       await this.loadDotEnvFn({ cwd, env });
+    }
+
+    for (const key of providerConfigKeys) {
+      if (key in env) {
+        delete env[key];
+      }
     }
 
     return env;
