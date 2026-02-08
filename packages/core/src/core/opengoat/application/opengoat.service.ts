@@ -1,4 +1,4 @@
-import type { AgentCreationResult, AgentDescriptor } from "../../domain/agent.js";
+import type { AgentCreationResult, AgentDescriptor, CreateAgentOptions } from "../../domain/agent.js";
 import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
 import type { InitializationResult } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
@@ -134,10 +134,36 @@ export class OpenGoatService {
     return this.bootstrapService.initialize();
   }
 
-  public async createAgent(rawName: string): Promise<AgentCreationResult> {
+  public async createAgent(rawName: string, options: CreateAgentOptions = {}): Promise<AgentCreationResult> {
     const identity = this.agentService.normalizeAgentName(rawName);
     const paths = this.pathsProvider.getPaths();
-    return this.agentService.ensureAgent(paths, identity);
+    const created = await this.agentService.ensureAgent(paths, identity);
+
+    if (options.providerId?.trim()) {
+      await this.providerService.setAgentProvider(paths, created.agent.id, options.providerId);
+      await this.agentManifestService.syncManifestProvider(paths, created.agent.id, options.providerId);
+    }
+
+    if (!options.createExternalAgent) {
+      return created;
+    }
+
+    const externalAgentCreation = await this.providerService.createProviderAgent(paths, created.agent.id, {
+      providerId: options.providerId,
+      displayName: created.agent.displayName,
+      workspaceDir: created.agent.workspaceDir,
+      internalConfigDir: created.agent.internalConfigDir
+    });
+
+    return {
+      ...created,
+      externalAgentCreation: {
+        providerId: externalAgentCreation.providerId,
+        code: externalAgentCreation.code,
+        stdout: externalAgentCreation.stdout,
+        stderr: externalAgentCreation.stderr
+      }
+    };
   }
 
   public async listAgents(): Promise<AgentDescriptor[]> {

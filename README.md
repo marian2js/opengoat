@@ -168,7 +168,9 @@ opengoat onboard                           # interactive provider setup
 # Agents
 opengoat agent --message "<text>"          # talk to the orchestrator
 opengoat agent <id> --message "<text>"     # talk to a specific agent
-opengoat agent create "<name>"             # create a new agent
+opengoat agent create "<name>"             # create a new local agent
+opengoat agent create "<name>" --provider openclaw --create-external
+                                           # also create the provider-side agent (if supported)
 opengoat agent list                        # list all agents
 opengoat route --message "<text>"          # preview routing decision
 

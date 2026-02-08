@@ -35,7 +35,7 @@ describe("provider CLI commands", () => {
     const code = await providerListCommand.run([], context);
 
     expect(code).toBe(0);
-    expect(stdout.output()).toContain("codex\tcli\tagent=false model=true auth=true");
+    expect(stdout.output()).toContain("codex\tcli\tagent=false model=true auth=true agentCreate=false");
   });
 
   it("agent provider get validates and prints binding", async () => {

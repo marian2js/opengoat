@@ -1,6 +1,11 @@
 import { BaseCliProvider } from "../../cli-provider.js";
 import { attachProviderSessionId } from "../../provider-session.js";
-import type { ProviderAuthOptions, ProviderExecutionResult, ProviderInvokeOptions } from "../../types.js";
+import type {
+  ProviderAuthOptions,
+  ProviderCreateAgentOptions,
+  ProviderExecutionResult,
+  ProviderInvokeOptions
+} from "../../types.js";
 
 export class OpenClawProvider extends BaseCliProvider {
   public constructor() {
@@ -14,7 +19,8 @@ export class OpenClawProvider extends BaseCliProvider {
         agent: true,
         model: true,
         auth: true,
-        passthrough: true
+        passthrough: true,
+        agentCreate: true
       }
     });
   }
@@ -48,6 +54,26 @@ export class OpenClawProvider extends BaseCliProvider {
     }
 
     return ["onboard"];
+  }
+
+  protected override buildCreateAgentInvocationArgs(options: ProviderCreateAgentOptions): string[] {
+    const args = [
+      "agents",
+      "add",
+      options.agentId,
+      "--workspace",
+      options.workspaceDir,
+      "--agent-dir",
+      options.internalConfigDir,
+      "--non-interactive"
+    ];
+
+    const model = options.env?.OPENGOAT_OPENCLAW_MODEL?.trim();
+    if (model) {
+      args.push("--model", model);
+    }
+
+    return args;
   }
 
   public override async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {

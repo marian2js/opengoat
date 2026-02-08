@@ -9,7 +9,11 @@ import {
 } from "../../packages/core/src/core/providers/index.js";
 import { SkillService } from "../../packages/core/src/core/skills/index.js";
 import { ProviderRegistry } from "../../packages/core/src/core/providers/registry.js";
-import type { Provider, ProviderInvokeOptions } from "../../packages/core/src/core/providers/types.js";
+import type {
+  Provider,
+  ProviderCreateAgentOptions,
+  ProviderInvokeOptions
+} from "../../packages/core/src/core/providers/types.js";
 import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
 import { NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
 import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
@@ -368,6 +372,73 @@ describe("ProviderService", () => {
     expect(captured[0]?.systemPrompt).toContain("# Project Context");
     expect(captured[0]?.systemPrompt).toContain("## AGENTS.md");
   });
+
+  it("creates provider-managed external agent when provider supports agentCreate", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+
+    const { paths, fileSystem } = await createPaths(root);
+    await seedAgent(fileSystem, paths, {
+      agentId: "research",
+      providerId: "external-provider",
+      bootstrapFiles: ["AGENTS.md"]
+    });
+
+    const captured: ProviderCreateAgentOptions[] = [];
+    const provider = createProvider({
+      id: "external-provider",
+      kind: "cli",
+      capabilities: { agent: true, model: true, auth: false, passthrough: false, agentCreate: true },
+      onInvoke: () => undefined,
+      onCreateAgent: (options) => captured.push(options)
+    });
+
+    const registry = new ProviderRegistry();
+    registry.register("external-provider", () => provider);
+
+    const service = createProviderService(fileSystem, registry);
+    const result = await service.createProviderAgent(paths, "research", {
+      displayName: "Research",
+      workspaceDir: path.join(paths.workspacesDir, "research"),
+      internalConfigDir: path.join(paths.agentsDir, "research")
+    });
+
+    expect(result.providerId).toBe("external-provider");
+    expect(result.code).toBe(0);
+    expect(captured[0]?.agentId).toBe("research");
+    expect(captured[0]?.workspaceDir).toBe(path.join(paths.workspacesDir, "research"));
+  });
+
+  it("throws when provider does not support external agent creation", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+
+    const { paths, fileSystem } = await createPaths(root);
+    await seedAgent(fileSystem, paths, {
+      agentId: "research",
+      providerId: "unsupported-provider",
+      bootstrapFiles: ["AGENTS.md"]
+    });
+
+    const registry = new ProviderRegistry();
+    registry.register("unsupported-provider", () =>
+      createProvider({
+        id: "unsupported-provider",
+        kind: "cli",
+        capabilities: { agent: true, model: true, auth: false, passthrough: false },
+        onInvoke: () => undefined
+      })
+    );
+
+    const service = createProviderService(fileSystem, registry);
+    await expect(
+      service.createProviderAgent(paths, "research", {
+        displayName: "Research",
+        workspaceDir: path.join(paths.workspacesDir, "research"),
+        internalConfigDir: path.join(paths.agentsDir, "research")
+      })
+    ).rejects.toThrow('Provider "unsupported-provider" does not support action "create_agent".');
+  });
 });
 
 function createProvider(params: {
@@ -375,6 +446,7 @@ function createProvider(params: {
   kind: Provider["kind"];
   capabilities: Provider["capabilities"];
   onInvoke: (options: ProviderInvokeOptions) => void;
+  onCreateAgent?: (options: ProviderCreateAgentOptions) => void;
 }): Provider {
   return {
     id: params.id,
@@ -386,6 +458,14 @@ function createProvider(params: {
       return {
         code: 0,
         stdout: "ok\n",
+        stderr: ""
+      };
+    },
+    async createAgent(options) {
+      params.onCreateAgent?.(options);
+      return {
+        code: 0,
+        stdout: "created\n",
         stderr: ""
       };
     }
@@ -424,6 +504,8 @@ async function seedAgent(
   paths: OpenGoatPaths,
   params: { agentId: string; providerId: string; bootstrapFiles: string[] }
 ): Promise<void> {
+  await fileSystem.ensureDir(path.join(paths.agentsDir, params.agentId));
+  await fileSystem.ensureDir(path.join(paths.workspacesDir, params.agentId));
   await fileSystem.writeFile(
     path.join(paths.agentsDir, params.agentId, "config.json"),
     JSON.stringify(

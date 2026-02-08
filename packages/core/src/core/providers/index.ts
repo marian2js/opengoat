@@ -43,6 +43,7 @@ export type { ProviderOnboardingEnvField, ProviderOnboardingSpec } from "./provi
 export type {
   Provider,
   ProviderAuthOptions,
+  ProviderCreateAgentOptions,
   ProviderCapabilities,
   ProviderExecutionResult,
   ProviderInvokeOptions,

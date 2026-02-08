@@ -7,6 +7,7 @@ import {
 import type {
   Provider,
   ProviderAuthOptions,
+  ProviderCreateAgentOptions,
   ProviderCapabilities,
   ProviderExecutionResult,
   ProviderInvokeOptions,
@@ -63,5 +64,9 @@ export abstract class BaseProvider implements Provider {
 
   public invokeAuth(_options: ProviderAuthOptions = {}): Promise<ProviderExecutionResult> {
     throw new UnsupportedProviderActionError(this.id, "auth");
+  }
+
+  public createAgent(_options: ProviderCreateAgentOptions): Promise<ProviderExecutionResult> {
+    throw new UnsupportedProviderActionError(this.id, "create_agent");
   }
 }

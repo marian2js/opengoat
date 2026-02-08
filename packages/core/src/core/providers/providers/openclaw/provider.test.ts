@@ -51,4 +51,53 @@ describe("openclaw provider", () => {
 
     expect(invocation.args).toEqual(["agent", "--session-id", "claw-session-7", "--message", "continue"]);
   });
+
+  it("maps external agent creation invocation to top-level agents add command", () => {
+    const provider = new OpenClawProvider();
+    const invocation = provider.buildCreateAgentInvocation({
+      agentId: "research-analyst",
+      displayName: "Research Analyst",
+      workspaceDir: "/tmp/workspaces/research-analyst",
+      internalConfigDir: "/tmp/agents/research-analyst"
+    });
+
+    expect(provider.capabilities.agentCreate).toBe(true);
+    expect(invocation.command).toBe("openclaw");
+    expect(invocation.args).toEqual([
+      "agents",
+      "add",
+      "research-analyst",
+      "--workspace",
+      "/tmp/workspaces/research-analyst",
+      "--agent-dir",
+      "/tmp/agents/research-analyst",
+      "--non-interactive"
+    ]);
+  });
+
+  it("passes configured OpenClaw model when creating external agents", () => {
+    const provider = new OpenClawProvider();
+    const invocation = provider.buildCreateAgentInvocation({
+      agentId: "research-analyst",
+      displayName: "Research Analyst",
+      workspaceDir: "/tmp/workspaces/research-analyst",
+      internalConfigDir: "/tmp/agents/research-analyst",
+      env: {
+        OPENGOAT_OPENCLAW_MODEL: "openai-codex"
+      }
+    });
+
+    expect(invocation.args).toEqual([
+      "agents",
+      "add",
+      "research-analyst",
+      "--workspace",
+      "/tmp/workspaces/research-analyst",
+      "--agent-dir",
+      "/tmp/agents/research-analyst",
+      "--non-interactive",
+      "--model",
+      "openai-codex"
+    ]);
+  });
 });

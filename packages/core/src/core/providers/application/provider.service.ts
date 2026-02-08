@@ -10,9 +10,11 @@ import {
   DEFAULT_PROVIDER_ID,
   InvalidAgentConfigError,
   InvalidProviderConfigError,
+  UnsupportedProviderActionError,
   listProviderSummaries,
   type AgentProviderBinding,
   type ProviderAuthOptions,
+  type ProviderCreateAgentOptions,
   type ProviderExecutionResult,
   type ProviderOnboardingSpec,
   type ProviderInvokeOptions,
@@ -288,6 +290,51 @@ export class ProviderService {
       stdout: result.stdout,
       stderr: result.stderr,
       providerSessionId: result.providerSessionId
+    });
+
+    return {
+      ...result,
+      ...binding
+    };
+  }
+
+  public async createProviderAgent(
+    paths: OpenGoatPaths,
+    agentId: string,
+    options: Omit<ProviderCreateAgentOptions, "agentId"> & { providerId?: string }
+  ): Promise<ProviderExecutionResult & AgentProviderBinding> {
+    const registry = await this.getProviderRegistry();
+    const binding = options.providerId
+      ? {
+          agentId,
+          providerId: registry.create(options.providerId).id
+        }
+      : await this.getAgentProvider(paths, agentId);
+    const provider = registry.create(binding.providerId);
+    this.logger.info("Creating provider-side agent.", {
+      agentId,
+      providerId: provider.id
+    });
+
+    if (!provider.capabilities.agentCreate || !provider.createAgent) {
+      throw new UnsupportedProviderActionError(provider.id, "create_agent");
+    }
+
+    const result = await provider.createAgent({
+      agentId,
+      displayName: options.displayName,
+      workspaceDir: options.workspaceDir,
+      internalConfigDir: options.internalConfigDir,
+      cwd: options.cwd,
+      env: await this.resolveProviderEnv(paths, provider.id, options.env),
+      onStdout: options.onStdout,
+      onStderr: options.onStderr
+    });
+
+    this.logger.info("Provider-side agent creation completed.", {
+      agentId,
+      providerId: provider.id,
+      code: result.code
     });
 
     return {

@@ -66,8 +66,54 @@ describe("CLI commands", () => {
     const code = await agentCreateCommand.run(["Research", "Analyst"], context);
 
     expect(code).toBe(0);
-    expect(createAgent).toHaveBeenCalledWith("Research Analyst");
+    expect(createAgent).toHaveBeenCalledWith("Research Analyst", {
+      providerId: undefined,
+      createExternalAgent: false
+    });
     expect(stdout.output()).toContain("Agent created: Research Analyst (research-analyst)");
+  });
+
+  it("agent create supports provider binding and optional external creation", async () => {
+    const createAgent = vi.fn(async () => ({
+      agent: {
+        id: "research-analyst",
+        displayName: "Research Analyst",
+        workspaceDir: "/tmp/workspaces/research-analyst",
+        internalConfigDir: "/tmp/agents/research-analyst"
+      },
+      createdPaths: ["a", "b"],
+      skippedPaths: [],
+      externalAgentCreation: {
+        providerId: "openclaw",
+        code: 0,
+        stdout: "created",
+        stderr: ""
+      }
+    }));
+
+    const { context, stdout } = createContext({ createAgent });
+    const code = await agentCreateCommand.run(
+      ["Research", "Analyst", "--provider", "openclaw", "--create-external"],
+      context
+    );
+
+    expect(code).toBe(0);
+    expect(createAgent).toHaveBeenCalledWith("Research Analyst", {
+      providerId: "openclaw",
+      createExternalAgent: true
+    });
+    expect(stdout.output()).toContain("External agent creation (openclaw): code 0");
+  });
+
+  it("agent create requires --provider when --create-external is set", async () => {
+    const createAgent = vi.fn();
+    const { context, stderr } = createContext({ createAgent });
+
+    const code = await agentCreateCommand.run(["Research", "--create-external"], context);
+
+    expect(code).toBe(1);
+    expect(createAgent).not.toHaveBeenCalled();
+    expect(stderr.output()).toContain("--create-external");
   });
 
   it("agent create rejects --set-default because orchestrator is always default", async () => {

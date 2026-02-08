@@ -3,6 +3,7 @@ import { ProviderCommandNotFoundError, UnsupportedProviderActionError } from "./
 import { BaseProvider, type BaseProviderConfig } from "./base-provider.js";
 import type {
   ProviderAuthOptions,
+  ProviderCreateAgentOptions,
   ProviderExecutionResult,
   ProviderInvocation,
   ProviderInvokeOptions
@@ -38,6 +39,13 @@ export abstract class BaseCliProvider extends BaseProvider {
     return options.passthroughArgs ?? [];
   }
 
+  protected buildCreateAgentInvocationArgs(
+    _options: ProviderCreateAgentOptions,
+    _command: string
+  ): string[] {
+    throw new UnsupportedProviderActionError(this.id, "create_agent");
+  }
+
   public buildInvocation(options: ProviderInvokeOptions, env: NodeJS.ProcessEnv = process.env): ProviderInvocation {
     this.validateInvokeOptions(options);
     const command = this.resolveCommand(env);
@@ -53,6 +61,15 @@ export abstract class BaseCliProvider extends BaseProvider {
     const command = this.resolveCommand(env);
     const args = this.buildAuthInvocationArgs(options, command);
 
+    return { command, args };
+  }
+
+  public buildCreateAgentInvocation(
+    options: ProviderCreateAgentOptions,
+    env: NodeJS.ProcessEnv = process.env
+  ): ProviderInvocation {
+    const command = this.resolveCommand(env);
+    const args = this.buildCreateAgentInvocationArgs(options, command);
     return { command, args };
   }
 
@@ -81,6 +98,28 @@ export abstract class BaseCliProvider extends BaseProvider {
   public override async invokeAuth(options: ProviderAuthOptions = {}): Promise<ProviderExecutionResult> {
     const env = options.env ?? process.env;
     const invocation = this.buildAuthInvocation(options, env);
+
+    try {
+      return await executeCommand({
+        command: invocation.command,
+        args: invocation.args,
+        cwd: options.cwd,
+        env,
+        onStdout: options.onStdout,
+        onStderr: options.onStderr
+      });
+    } catch (error) {
+      if (isSpawnPermissionOrMissing(error)) {
+        throw new ProviderCommandNotFoundError(this.id, invocation.command);
+      }
+
+      throw error;
+    }
+  }
+
+  public override async createAgent(options: ProviderCreateAgentOptions): Promise<ProviderExecutionResult> {
+    const env = options.env ?? process.env;
+    const invocation = this.buildCreateAgentInvocation(options, env);
 
     try {
       return await executeCommand({
