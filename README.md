@@ -101,6 +101,9 @@ pnpm desktop:dev
 
 Desktop architecture details are documented in [`docs/electron-app.md`](docs/electron-app.md).
 
+Desktop also supports an optional remote-gateway connection mode through onboarding advanced settings.
+This is off by default and only needed when OpenGoat is running on a remote machine.
+
 <details>
 <summary><strong>Install from source</strong></summary>
 

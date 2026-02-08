@@ -5,7 +5,7 @@ OpenGoat Gateway is an optional WebSocket control plane intended for remote-mach
 Use it when:
 
 - OpenGoat runs on a remote host/server.
-- Your app (for example Electron) needs to control that remote host.
+- Your app (for example Electron) needs to control that remote host (desktop onboarding includes an advanced remote-gateway toggle).
 
 Do not use it when:
 

@@ -20,6 +20,7 @@ describe("OnboardingPanel e2e", () => {
         onboarding: createOnboardingFixture(),
         providerId: "openai",
         env: {},
+        gateway: createGatewayDraft(),
         error: null,
         canClose: true,
         isSubmitting: false,
@@ -27,6 +28,7 @@ describe("OnboardingPanel e2e", () => {
         onboardingNotice: null,
         onSelectProvider: vi.fn(),
         onEnvChange: vi.fn(),
+        onGatewayChange: vi.fn(),
         onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit: vi.fn()
@@ -54,6 +56,7 @@ describe("OnboardingPanel e2e", () => {
         onboarding: createOnboardingFixture(),
         providerId,
         env,
+        gateway: createGatewayDraft(),
         error: null,
         canClose: true,
         isSubmitting: false,
@@ -66,6 +69,7 @@ describe("OnboardingPanel e2e", () => {
             [key]: value
           }));
         },
+        onGatewayChange: vi.fn(),
         onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit
@@ -96,6 +100,7 @@ describe("OnboardingPanel e2e", () => {
         onboarding: createOnboardingFixture(),
         providerId: "qwen-portal",
         env: {},
+        gateway: createGatewayDraft(),
         error: null,
         canClose: true,
         isSubmitting: false,
@@ -103,6 +108,7 @@ describe("OnboardingPanel e2e", () => {
         onboardingNotice: null,
         onSelectProvider: vi.fn(),
         onEnvChange: vi.fn(),
+        onGatewayChange: vi.fn(),
         onRunGuidedAuth,
         onClose: vi.fn(),
         onSubmit: vi.fn()
@@ -118,12 +124,18 @@ describe("OnboardingPanel e2e", () => {
     expect(onRunGuidedAuth).toHaveBeenCalledWith("qwen-portal");
   });
 
-  it("uses independent scroll areas for provider list and setup pane", () => {
-    render(
-      createElement(OnboardingPanel, {
-        onboarding: createLargeOnboardingFixture(36),
-        providerId: "provider-1",
-        env: {},
+  it("requires URL when remote gateway mode is enabled", async () => {
+    const user = userEvent.setup();
+
+    function StatefulHarness() {
+      const [gateway, setGateway] = useState(createGatewayDraft());
+      return createElement(OnboardingPanel, {
+        onboarding: createOnboardingFixture(),
+        providerId: "openrouter",
+        env: {
+          OPENROUTER_API_KEY: "or-test-key"
+        },
+        gateway,
         error: null,
         canClose: true,
         isSubmitting: false,
@@ -131,6 +143,48 @@ describe("OnboardingPanel e2e", () => {
         onboardingNotice: null,
         onSelectProvider: vi.fn(),
         onEnvChange: vi.fn(),
+        onGatewayChange: (patch) =>
+          setGateway((current) => ({
+            ...current,
+            ...patch
+          })),
+        onRunGuidedAuth: vi.fn(),
+        onClose: vi.fn(),
+        onSubmit: vi.fn()
+      });
+    }
+
+    render(createElement(StatefulHarness));
+
+    const saveButton = screen.getByRole("button", { name: /save and start/i });
+    expect(saveButton.hasAttribute("disabled")).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: /show advanced options/i }));
+    await user.click(screen.getByLabelText(/use remote opengoat server/i));
+    expect(saveButton.hasAttribute("disabled")).toBe(true);
+
+    await user.type(
+      screen.getByPlaceholderText("ws://remote-host:18789/gateway"),
+      "ws://remote-host:18789/gateway"
+    );
+    expect(saveButton.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("uses independent scroll areas for provider list and setup pane", () => {
+    render(
+      createElement(OnboardingPanel, {
+        onboarding: createLargeOnboardingFixture(36),
+        providerId: "provider-1",
+        env: {},
+        gateway: createGatewayDraft(),
+        error: null,
+        canClose: true,
+        isSubmitting: false,
+        isRunningGuidedAuth: false,
+        onboardingNotice: null,
+        onSelectProvider: vi.fn(),
+        onEnvChange: vi.fn(),
+        onGatewayChange: vi.fn(),
         onRunGuidedAuth: vi.fn(),
         onClose: vi.fn(),
         onSubmit: vi.fn()
@@ -147,6 +201,11 @@ function createOnboardingFixture(): WorkbenchOnboarding {
   return {
     activeProviderId: "openai",
     needsOnboarding: true,
+    gateway: {
+      mode: "local",
+      timeoutMs: 10_000,
+      hasAuthToken: false
+    },
     families: [
       {
         id: "openai",
@@ -229,6 +288,11 @@ function createLargeOnboardingFixture(totalProviders: number): WorkbenchOnboardi
   return {
     activeProviderId: providerIds[0] ?? "provider-1",
     needsOnboarding: true,
+    gateway: {
+      mode: "local",
+      timeoutMs: 10_000,
+      hasAuthToken: false
+    },
     families: [
       {
         id: "stress",
@@ -253,5 +317,14 @@ function createLargeOnboardingFixture(totalProviders: number): WorkbenchOnboardi
       missingRequiredEnv: [`${id.toUpperCase().replace(/-/g, "_")}_API_KEY`],
       hasConfig: false
     }))
+  };
+}
+
+function createGatewayDraft() {
+  return {
+    mode: "local" as "local" | "remote",
+    remoteUrl: "",
+    remoteToken: "",
+    timeoutMs: 10_000
   };
 }

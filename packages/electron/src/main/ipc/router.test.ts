@@ -94,6 +94,11 @@ function createServiceStub(): WorkbenchService {
       onboarding: {
         activeProviderId: "codex",
         needsOnboarding: true,
+        gateway: {
+          mode: "local",
+          timeoutMs: 10_000,
+          hasAuthToken: false
+        },
         families: [],
         providers: []
       }
@@ -132,12 +137,22 @@ function createServiceStub(): WorkbenchService {
     getOnboardingState: vi.fn(async () => ({
       activeProviderId: "codex",
       needsOnboarding: true,
+      gateway: {
+        mode: "local",
+        timeoutMs: 10_000,
+        hasAuthToken: false
+      },
       families: [],
       providers: []
     })),
     submitOnboarding: vi.fn(async () => ({
       activeProviderId: "openai",
       needsOnboarding: false,
+      gateway: {
+        mode: "local",
+        timeoutMs: 10_000,
+        hasAuthToken: false
+      },
       families: [],
       providers: []
     })),

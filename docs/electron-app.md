@@ -87,20 +87,25 @@ Desktop onboarding is now a guided first-run flow aligned with CLI intent:
 
 - Step 1: choose a provider (grouped by Cloud APIs vs Local Tools)
 - Step 2: complete only required fields in "Quick Setup"
-- Optional fields stay collapsed under "Advanced Settings"
+- Advanced options stay collapsed by default and include:
+  - optional provider env fields
+  - optional remote gateway connection settings (URL/token/timeout) for remote-host deployments
 
 Behavior rules:
 
 - If bootstrap reports `needsOnboarding=true`, onboarding is shown before chat.
 - On successful submit where `needsOnboarding=false`, onboarding closes automatically.
 - If provider execution later fails, onboarding can reopen with error context for repair.
+- Remote gateway mode is opt-in and never enabled by default.
+- Chat header shows a subtle runtime badge (`Local Runtime` or `Remote: <host>`) so users can verify where execution is happening.
 
 ## Project Working Path Behavior
 
 When sending a chat message from desktop:
 
 - OpenGoat always runs the entry agent as `orchestrator`.
-- The selected project's `rootPath` is sent as the run `cwd`.
+- In local mode, the selected project's `rootPath` is sent as the run `cwd` and local runtime execution is used.
+- In remote mode, desktop calls `agent.run` over the optional gateway; local runtime execution is skipped.
 - Session continuity is maintained by per-session `sessionKey`.
 
 This aligns with OpenGoat's working-path model.

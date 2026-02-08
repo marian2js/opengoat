@@ -14,6 +14,7 @@ export function App() {
     onboardingGuidedAuthState,
     onboardingDraftProviderId,
     onboardingDraftEnv,
+    onboardingDraftGateway,
     onboardingNotice,
     activeProjectId,
     activeSessionId,
@@ -33,6 +34,7 @@ export function App() {
     runOnboardingGuidedAuth,
     setOnboardingDraftProvider,
     setOnboardingDraftField,
+    setOnboardingDraftGateway,
     openOnboarding,
     closeOnboarding,
     sendMessage,
@@ -64,7 +66,10 @@ export function App() {
         return;
       }
 
-      if (action === "open-provider-settings") {
+      if (
+        action === "open-provider-settings" ||
+        action === "open-connection-settings"
+      ) {
         void openOnboarding();
       }
     });
@@ -88,7 +93,11 @@ export function App() {
     if (!onboardingDraftProviderId) {
       return;
     }
-    await submitOnboarding(onboardingDraftProviderId, onboardingDraftEnv);
+    await submitOnboarding(
+      onboardingDraftProviderId,
+      onboardingDraftEnv,
+      onboardingDraftGateway
+    );
   };
 
   if (isBootstrapping) {
@@ -105,12 +114,14 @@ export function App() {
         onboarding={onboarding}
         providerId={onboardingDraftProviderId}
         env={onboardingDraftEnv}
+        gateway={onboardingDraftGateway}
         error={error}
         canClose={!onboarding.needsOnboarding}
         isSubmitting={onboardingState === "submitting"}
         isRunningGuidedAuth={onboardingGuidedAuthState === "running"}
         onSelectProvider={setOnboardingDraftProvider}
         onEnvChange={setOnboardingDraftField}
+        onGatewayChange={setOnboardingDraftGateway}
         onboardingNotice={onboardingNotice}
         onRunGuidedAuth={(providerId) => void runOnboardingGuidedAuth(providerId)}
         onClose={closeOnboarding}
@@ -150,6 +161,7 @@ export function App() {
             activeProject={activeProject}
             activeSession={activeSession}
             messages={activeMessages}
+            gateway={onboarding?.gateway}
             error={error}
             busy={isBusy}
             onSubmitMessage={(message) =>

@@ -3,7 +3,11 @@ import { exposeElectronTRPC } from "electron-trpc/main";
 
 const MENU_ACTION_CHANNEL = "opengoat:menu-action";
 
-type MenuAction = "open-project" | "new-session" | "open-provider-settings";
+type MenuAction =
+  | "open-project"
+  | "new-session"
+  | "open-provider-settings"
+  | "open-connection-settings";
 
 process.once("loaded", () => {
   exposeElectronTRPC();

@@ -32,6 +32,30 @@ export const workbenchProjectSchema = z.object({
 
 export const providerKindSchema = z.enum(["cli", "http"]);
 
+export const workbenchGatewayModeSchema = z.enum(["local", "remote"]);
+
+export const WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS = 10_000;
+
+const WORKBENCH_GATEWAY_DEFAULT_SETTINGS = {
+  mode: "local" as const,
+  timeoutMs: WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS
+};
+
+export const workbenchGatewaySettingsSchema = z.object({
+  mode: workbenchGatewayModeSchema.default(WORKBENCH_GATEWAY_DEFAULT_SETTINGS.mode),
+  remoteUrl: z.string().trim().max(1024).optional(),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(1000)
+    .max(120_000)
+    .default(WORKBENCH_GATEWAY_DEFAULT_SETTINGS.timeoutMs)
+});
+
+export const workbenchGatewayStatusSchema = workbenchGatewaySettingsSchema.extend({
+  hasAuthToken: z.boolean().default(false)
+});
+
 export const providerOnboardingFieldSchema = z.object({
   key: z.string(),
   description: z.string(),
@@ -67,7 +91,8 @@ export const workbenchOnboardingSchema = z.object({
   activeProviderId: z.string(),
   needsOnboarding: z.boolean(),
   families: z.array(workbenchOnboardingFamilySchema),
-  providers: z.array(workbenchOnboardingProviderSchema)
+  providers: z.array(workbenchOnboardingProviderSchema),
+  gateway: workbenchGatewayStatusSchema
 });
 
 export const workbenchBootstrapSchema = z.object({
@@ -80,7 +105,14 @@ export const workbenchStateSchema = z.object({
   schemaVersion: z.literal(1),
   createdAt: z.string(),
   updatedAt: z.string(),
-  projects: z.array(workbenchProjectSchema)
+  projects: z.array(workbenchProjectSchema),
+  settings: z
+    .object({
+      gateway: workbenchGatewaySettingsSchema.default(WORKBENCH_GATEWAY_DEFAULT_SETTINGS)
+    })
+    .default({
+      gateway: WORKBENCH_GATEWAY_DEFAULT_SETTINGS
+    })
 });
 
 export type WorkbenchMessage = z.infer<typeof workbenchMessageSchema>;
@@ -89,6 +121,9 @@ export type WorkbenchProject = z.infer<typeof workbenchProjectSchema>;
 export type WorkbenchState = z.infer<typeof workbenchStateSchema>;
 export type WorkbenchOnboarding = z.infer<typeof workbenchOnboardingSchema>;
 export type WorkbenchBootstrap = z.infer<typeof workbenchBootstrapSchema>;
+export type WorkbenchGatewayMode = z.infer<typeof workbenchGatewayModeSchema>;
+export type WorkbenchGatewaySettings = z.infer<typeof workbenchGatewaySettingsSchema>;
+export type WorkbenchGatewayStatus = z.infer<typeof workbenchGatewayStatusSchema>;
 
 export const addProjectInputSchema = z.object({
   rootPath: z.string().min(1)
@@ -114,7 +149,15 @@ export const sendMessageInputSchema = sessionLookupInputSchema.extend({
 
 export const submitOnboardingInputSchema = z.object({
   providerId: z.string().trim().min(1),
-  env: z.record(z.string(), z.string()).default({})
+  env: z.record(z.string(), z.string()).default({}),
+  gateway: z
+    .object({
+      mode: workbenchGatewayModeSchema,
+      remoteUrl: z.string().trim().max(1024).optional(),
+      remoteToken: z.string().trim().max(2048).optional(),
+      timeoutMs: z.number().int().min(1000).max(120_000).optional()
+    })
+    .optional()
 });
 
 export const runGuidedAuthInputSchema = z.object({

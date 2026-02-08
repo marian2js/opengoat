@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 
-type OpenGoatDesktopMenuAction = "open-project" | "new-session" | "open-provider-settings";
+type OpenGoatDesktopMenuAction =
+  | "open-project"
+  | "new-session"
+  | "open-provider-settings"
+  | "open-connection-settings";
 
 interface OpenGoatDesktopApi {
   onMenuAction: (listener: (action: OpenGoatDesktopMenuAction) => void) => () => void;

@@ -10,6 +10,7 @@ describe("workbench store", () => {
       {
         activeProviderId: "openai",
         needsOnboarding: true,
+        gateway: createGatewayStatus(),
         families: [],
         providers: [
           {
@@ -94,6 +95,7 @@ describe("workbench store", () => {
     const submitOnboardingMock = vi.fn(async (): Promise<WorkbenchOnboarding> => ({
       activeProviderId: "openrouter",
       needsOnboarding: false,
+      gateway: createGatewayStatus(),
       families: [],
       providers: [
         {
@@ -118,13 +120,18 @@ describe("workbench store", () => {
     store.getState().setOnboardingDraftField("OPENROUTER_API_KEY", "abc123");
     await store.getState().submitOnboarding(
       store.getState().onboardingDraftProviderId,
-      store.getState().onboardingDraftEnv
+      store.getState().onboardingDraftEnv,
+      store.getState().onboardingDraftGateway
     );
 
     expect(submitOnboardingMock).toHaveBeenCalledWith({
       providerId: "openrouter",
       env: {
         OPENROUTER_API_KEY: "abc123"
+      },
+      gateway: {
+        mode: "local",
+        timeoutMs: 10_000
       }
     });
     expect(store.getState().onboardingState).toBe("hidden");
@@ -137,6 +144,7 @@ describe("workbench store", () => {
       submitOnboarding: vi.fn(async (): Promise<WorkbenchOnboarding> => ({
         activeProviderId: "openai",
         needsOnboarding: true,
+        gateway: createGatewayStatus(),
         families: [],
         providers: [
           {
@@ -162,7 +170,7 @@ describe("workbench store", () => {
     const store = createWorkbenchStore(api);
 
     await store.getState().bootstrap();
-    await store.getState().submitOnboarding("openai", {});
+    await store.getState().submitOnboarding("openai", {}, createGatewayDraft());
 
     expect(store.getState().showOnboarding).toBe(true);
     expect(store.getState().onboardingState).toBe("editing");
@@ -280,6 +288,7 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
   const bootstrapOnboarding: WorkbenchOnboarding = {
     activeProviderId: "openai",
     needsOnboarding: true,
+    gateway: createGatewayStatus(),
     families: [],
     providers: [
       {
@@ -335,6 +344,7 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
   const submittedOnboarding: WorkbenchOnboarding = {
     activeProviderId: "openai",
     needsOnboarding: false,
+    gateway: createGatewayStatus(),
     families: [],
     providers: [
       {
@@ -395,5 +405,22 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
   return {
     ...base,
     ...overrides
+  };
+}
+
+function createGatewayStatus() {
+  return {
+    mode: "local" as const,
+    timeoutMs: 10_000,
+    hasAuthToken: false
+  };
+}
+
+function createGatewayDraft() {
+  return {
+    mode: "local" as const,
+    remoteUrl: "",
+    remoteToken: "",
+    timeoutMs: 10_000
   };
 }

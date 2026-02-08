@@ -6,6 +6,7 @@ import {
 } from "@shared/workbench-contract";
 import type {
   WorkbenchBootstrap,
+  WorkbenchGatewayMode,
   WorkbenchGuidedAuthResult,
   WorkbenchMessage,
   WorkbenchOnboarding,
@@ -26,7 +27,16 @@ export interface WorkbenchApiClient {
   getSessionMessages: (input: { projectId: string; sessionId: string }) => Promise<WorkbenchMessage[]>;
   getOnboardingStatus: () => Promise<WorkbenchOnboarding>;
   runOnboardingGuidedAuth: (input: { providerId: string }) => Promise<WorkbenchGuidedAuthResult>;
-  submitOnboarding: (input: { providerId: string; env: Record<string, string> }) => Promise<WorkbenchOnboarding>;
+  submitOnboarding: (input: {
+    providerId: string;
+    env: Record<string, string>;
+    gateway?: {
+      mode: WorkbenchGatewayMode;
+      remoteUrl?: string;
+      remoteToken?: string;
+      timeoutMs?: number;
+    };
+  }) => Promise<WorkbenchOnboarding>;
   sendChatMessage: (input: {
     projectId: string;
     sessionId: string;

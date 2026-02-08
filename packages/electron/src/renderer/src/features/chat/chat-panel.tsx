@@ -45,6 +45,7 @@ import {
   Suggestion,
   Suggestions,
 } from "@renderer/components/ai-elements/suggestion";
+import { Badge } from "@renderer/components/ai-elements/badge";
 import {
   Tool,
   ToolContent,
@@ -53,6 +54,7 @@ import {
 } from "@renderer/components/ai-elements/tool";
 import { Button } from "@renderer/components/ui/button";
 import type {
+  WorkbenchGatewayStatus,
   WorkbenchMessage,
   WorkbenchProject,
   WorkbenchSession,
@@ -74,6 +76,7 @@ interface ChatPanelProps {
   activeProject: WorkbenchProject | null;
   activeSession: WorkbenchSession | null;
   messages: WorkbenchMessage[];
+  gateway?: WorkbenchGatewayStatus;
   error: string | null;
   busy: boolean;
   onSubmitMessage: (message: string) => Promise<WorkbenchMessage | null>;
@@ -88,6 +91,8 @@ const starterPrompts = [
 ];
 
 export function ChatPanel(props: ChatPanelProps) {
+  const gatewayMode = props.gateway?.mode ?? "local";
+  const gatewayHost = resolveGatewayHost(props.gateway?.remoteUrl);
   const chatId = `${props.activeProject?.id ?? "none"}:${
     props.activeSession?.id ?? "none"
   }`;
@@ -219,19 +224,33 @@ export function ChatPanel(props: ChatPanelProps) {
               : "Create a session to start chatting"}
           </p>
         </div>
-        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <Button
+        <div className="flex items-center gap-2">
+          <Badge
             variant="outline"
-            className="btn-glow gap-2"
-            onClick={props.onOpenOnboarding}
-            disabled={
-              props.busy || status === "submitted" || status === "streaming"
+            className={
+              gatewayMode === "remote"
+                ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+                : "border-emerald-400/35 bg-emerald-400/10 text-emerald-200"
             }
           >
-            <Settings2 className="size-4" />
-            Provider Setup
-          </Button>
-        </motion.div>
+            {gatewayMode === "remote"
+              ? `Remote${gatewayHost ? `: ${gatewayHost}` : " Gateway"}`
+              : "Local Runtime"}
+          </Badge>
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button
+              variant="outline"
+              className="btn-glow gap-2"
+              onClick={props.onOpenOnboarding}
+              disabled={
+                props.busy || status === "submitted" || status === "streaming"
+              }
+            >
+              <Settings2 className="size-4" />
+              Provider Setup
+            </Button>
+          </motion.div>
+        </div>
       </motion.header>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 md:px-5">
@@ -241,7 +260,10 @@ export function ChatPanel(props: ChatPanelProps) {
           transition={{ duration: 0.5, delay: 0.1, ease: [0.4, 0, 0.2, 1] }}
         >
           <Agent className="card-glow rounded-2xl border border-border/70 bg-[linear-gradient(180deg,hsl(221_42%_10%_/_0.86),hsl(223_40%_8%_/_0.84))] shadow-[0_18px_46px_hsl(226_80%_2%_/_0.32)]">
-            <AgentHeader name="OpenGoat Orchestrator" model="local runtime" />
+            <AgentHeader
+              name="OpenGoat Orchestrator"
+              model={gatewayMode === "remote" ? "remote gateway" : "local runtime"}
+            />
             <AgentContent className="space-y-3">
               <AgentInstructions>
                 Plan and execute project-scoped coding tasks, then report
@@ -523,4 +545,17 @@ export function ChatPanel(props: ChatPanelProps) {
       </motion.footer>
     </main>
   );
+}
+
+function resolveGatewayHost(rawUrl?: string): string | null {
+  const value = rawUrl?.trim();
+  if (!value) {
+    return null;
+  }
+  try {
+    const parsed = new URL(value);
+    return parsed.host || null;
+  } catch {
+    return value;
+  }
 }
