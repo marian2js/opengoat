@@ -18,9 +18,12 @@ In local setups, direct local runtime/IPC is preferred.
 ```bash
 opengoat gateway --help
 opengoat gateway --token "replace-with-strong-token"
+opengoat gateway --url "ws://remote-host:18789/gateway" --token "remote-token"
 ```
 
 Default bind is loopback (`127.0.0.1`). Non-loopback bind requires explicit `--allow-remote`.
+
+When `--url` (or `--remote-url`) is provided, the CLI connects to that remote gateway and does not start a local gateway process.
 
 ## Security posture
 

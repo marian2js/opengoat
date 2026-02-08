@@ -1,9 +1,9 @@
 import type { CliCommand } from "../framework/command.js";
-import { startOpenGoatGatewayServer } from "@opengoat/core";
+import { callOpenGoatGateway, startOpenGoatGatewayServer } from "@opengoat/core";
 
 export const gatewayCommand: CliCommand = {
   path: ["gateway"],
-  description: "Run optional OpenGoat Gateway for secure remote app connections.",
+  description: "Run or connect to optional OpenGoat Gateway for remote app connections.",
   async run(args, context): Promise<number> {
     const parsed = parseGatewayArgs(args);
     if (!parsed.ok) {
@@ -15,6 +15,37 @@ export const gatewayCommand: CliCommand = {
     if (parsed.help) {
       printHelp(context.stdout);
       return 0;
+    }
+
+    if (parsed.remoteUrl) {
+      try {
+        const resolvedToken = (parsed.token ?? process.env.OPENGOAT_GATEWAY_TOKEN?.trim()) || undefined;
+        const health = await callOpenGoatGateway<{
+          status?: string;
+          protocol?: number;
+          connectedClients?: number;
+          uptimeMs?: number;
+        }>({
+          url: parsed.remoteUrl,
+          token: resolvedToken,
+          timeoutMs: parsed.timeoutMs,
+          method: "health",
+          params: {
+            source: "opengoat-cli"
+          }
+        });
+
+        const payload = health.payload ?? {};
+        context.stdout.write(`Connected to remote gateway: ${parsed.remoteUrl}\n`);
+        context.stdout.write(
+          `Remote health: status=${payload.status ?? "unknown"} protocol=${payload.protocol ?? "unknown"} clients=${payload.connectedClients ?? "unknown"} uptimeMs=${payload.uptimeMs ?? "unknown"}\n`
+        );
+        return 0;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        context.stderr.write(`Failed to connect remote gateway: ${message}\n`);
+        return 1;
+      }
     }
 
     const bindIsLoopback = isLoopbackHost(parsed.bindHost);
@@ -100,6 +131,8 @@ type ParsedGatewayArgs =
       bindHost: string;
       port: number;
       token?: string;
+      remoteUrl?: string;
+      timeoutMs: number;
       allowedOrigins: string[];
     }
   | {
@@ -115,6 +148,8 @@ function parseGatewayArgs(args: string[]): ParsedGatewayArgs {
   let bindHost = "127.0.0.1";
   let port = 18789;
   let token: string | undefined;
+  let remoteUrl: string | undefined;
+  let timeoutMs = 10_000;
   const allowedOrigins: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
@@ -199,6 +234,53 @@ function parseGatewayArgs(args: string[]): ParsedGatewayArgs {
       continue;
     }
 
+    if (tokenArg === "--url" || tokenArg === "--remote-url") {
+      const value = args[index + 1]?.trim();
+      if (!value) {
+        return { ok: false, error: `Missing value for ${tokenArg}.` };
+      }
+      remoteUrl = value;
+      index += 1;
+      continue;
+    }
+
+    if (tokenArg.startsWith("--url=")) {
+      const value = tokenArg.slice("--url=".length).trim();
+      if (!value) {
+        return { ok: false, error: "Missing value for --url." };
+      }
+      remoteUrl = value;
+      continue;
+    }
+
+    if (tokenArg.startsWith("--remote-url=")) {
+      const value = tokenArg.slice("--remote-url=".length).trim();
+      if (!value) {
+        return { ok: false, error: "Missing value for --remote-url." };
+      }
+      remoteUrl = value;
+      continue;
+    }
+
+    if (tokenArg === "--timeout") {
+      const value = Number(args[index + 1]);
+      if (!Number.isFinite(value) || value <= 0) {
+        return { ok: false, error: "Invalid value for --timeout (must be > 0)." };
+      }
+      timeoutMs = Math.floor(value);
+      index += 1;
+      continue;
+    }
+
+    if (tokenArg.startsWith("--timeout=")) {
+      const value = Number(tokenArg.slice("--timeout=".length));
+      if (!Number.isFinite(value) || value <= 0) {
+        return { ok: false, error: "Invalid value for --timeout (must be > 0)." };
+      }
+      timeoutMs = Math.floor(value);
+      continue;
+    }
+
     if (tokenArg === "--allow-origin") {
       const value = args[index + 1]?.trim();
       if (!value) {
@@ -230,6 +312,8 @@ function parseGatewayArgs(args: string[]): ParsedGatewayArgs {
     bindHost,
     port,
     token,
+    remoteUrl,
+    timeoutMs,
     allowedOrigins
   };
 }
@@ -239,8 +323,12 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write(
     "  opengoat gateway [--port <1-65535>] [--bind <host>] [--token <value>] [--allow-origin <origin>] [--allow-remote] [--no-auth] [--verbose]\n"
   );
+  output.write(
+    "  opengoat gateway --url <ws://host:port/gateway> [--token <value>] [--timeout <ms>] [--verbose]\n"
+  );
   output.write("\n");
   output.write("Starts the optional OpenGoat Gateway (WebSocket + /health HTTP) for remote app control.\n");
+  output.write("With --url/--remote-url, connects to an existing remote gateway and does not start a local gateway.\n");
   output.write("Local OpenGoat usage does not require this gateway.\n");
   output.write("\n");
   output.write("Security defaults:\n");

@@ -65,6 +65,7 @@ OpenGoat includes an optional Gateway for remote desktop scenarios. Unlike OpenC
 ```bash
 opengoat gateway --help
 opengoat gateway --token "replace-with-strong-token"
+opengoat gateway --url "ws://remote-host:18789/gateway" --token "remote-token"
 ```
 
 ## Quick start
@@ -214,6 +215,7 @@ opengoat plugin doctor                     # check plugin health
 # Advanced
 opengoat acp                               # start ACP server (stdio)
 opengoat gateway                           # start optional remote-control gateway
+opengoat gateway --url "<ws-url>"          # connect to existing remote gateway (does not start local gateway)
 opengoat scenario run <name>               # run a test scenario
 ```
 

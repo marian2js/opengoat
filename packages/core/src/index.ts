@@ -23,4 +23,5 @@ export * from "./platform/node/node-path.port.js";
 export * from "./platform/node/node-command-runner.js";
 export * from "./platform/node/dotenv.js";
 export * from "./platform/node/acp-server.js";
+export * from "./platform/node/opengoat-gateway-client.js";
 export * from "./platform/node/opengoat-gateway-server.js";
