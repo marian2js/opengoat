@@ -9,6 +9,9 @@ const rootModules = path.resolve(currentDir, "../../node_modules");
 const externals = [
   "electron",
   "electron-squirrel-startup",
+  "ws",
+  "bufferutil",
+  "utf-8-validate",
   ...builtinModules,
   ...builtinModules.map((moduleName) => `node:${moduleName}`)
 ];

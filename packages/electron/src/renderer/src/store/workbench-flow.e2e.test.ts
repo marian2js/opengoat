@@ -17,7 +17,8 @@ describe("workbench flow e2e", () => {
     store.getState().setOnboardingDraftField("OPENROUTER_API_KEY", "openrouter-key");
     await store.getState().submitOnboarding(
       store.getState().onboardingDraftProviderId,
-      store.getState().onboardingDraftEnv
+      store.getState().onboardingDraftEnv,
+      store.getState().onboardingDraftGateway
     );
     expect(store.getState().onboardingDraftProviderId).toBe("openrouter");
     expect(store.getState().showOnboarding).toBe(false);
@@ -34,6 +35,11 @@ function createStatefulApiMock(): WorkbenchApiClient {
   let onboarding: WorkbenchOnboarding = {
     activeProviderId: "openai",
     needsOnboarding: true,
+    gateway: {
+      mode: "local",
+      timeoutMs: 10_000,
+      hasAuthToken: false
+    },
     families: [],
     providers: [
       {

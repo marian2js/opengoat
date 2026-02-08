@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { dialog } from "electron";
@@ -8,18 +9,21 @@ import {
 import {
   DEFAULT_AGENT_ID,
   buildProviderFamilies,
+  callOpenGoatGateway,
   loadDotEnv,
   selectProvidersForOnboarding,
   type OpenGoatService
 } from "@opengoat/core";
 import type {
   WorkbenchBootstrap,
+  WorkbenchGatewayMode,
   WorkbenchGuidedAuthResult,
   WorkbenchMessage,
   WorkbenchOnboarding,
   WorkbenchProject,
   WorkbenchSession
 } from "@shared/workbench";
+import { WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS } from "@shared/workbench";
 import { WorkbenchStore } from "./workbench-store";
 
 interface WorkbenchServiceDeps {
@@ -28,6 +32,7 @@ interface WorkbenchServiceDeps {
   loadDotEnvFn?: typeof loadDotEnv;
   resolveGuidedAuthFn?: typeof resolveCliGuidedAuth;
   runGuidedAuthFn?: typeof runCliGuidedAuth;
+  callGatewayFn?: typeof callOpenGoatGateway;
 }
 
 export class WorkbenchService {
@@ -36,6 +41,8 @@ export class WorkbenchService {
   private readonly loadDotEnvFn: typeof loadDotEnv;
   private readonly resolveGuidedAuthFn: typeof resolveCliGuidedAuth;
   private readonly runGuidedAuthFn: typeof runCliGuidedAuth;
+  private readonly callGatewayFn: typeof callOpenGoatGateway;
+  private remoteGatewayToken: string | undefined;
 
   public constructor(deps: WorkbenchServiceDeps) {
     this.opengoat = deps.opengoat;
@@ -43,6 +50,7 @@ export class WorkbenchService {
     this.loadDotEnvFn = deps.loadDotEnvFn ?? loadDotEnv;
     this.resolveGuidedAuthFn = deps.resolveGuidedAuthFn ?? resolveCliGuidedAuth;
     this.runGuidedAuthFn = deps.runGuidedAuthFn ?? runCliGuidedAuth;
+    this.callGatewayFn = deps.callGatewayFn ?? callOpenGoatGateway;
   }
 
   public async bootstrap(): Promise<WorkbenchBootstrap> {
@@ -59,6 +67,7 @@ export class WorkbenchService {
     const allProviders = await this.opengoat.listProviders();
     const providers = selectProvidersForOnboarding(DEFAULT_AGENT_ID, allProviders);
     const families = buildProviderFamilies(providers);
+    const gatewaySettings = await this.store.getGatewaySettings();
     const withOnboarding = await Promise.all(
       providers.map(async (provider) => {
         const onboarding = await this.opengoat.getProviderOnboarding(provider.id);
@@ -108,14 +117,27 @@ export class WorkbenchService {
       activeProviderId: activeProvider.providerId,
       needsOnboarding,
       families,
-      providers: withOnboarding
+      providers: withOnboarding,
+      gateway: {
+        mode: gatewaySettings.mode,
+        remoteUrl: gatewaySettings.remoteUrl,
+        timeoutMs: gatewaySettings.timeoutMs,
+        hasAuthToken: Boolean(this.remoteGatewayToken)
+      }
     };
   }
 
   public async submitOnboarding(input: {
     providerId: string;
     env: Record<string, string>;
+    gateway?: {
+      mode: WorkbenchGatewayMode;
+      remoteUrl?: string;
+      remoteToken?: string;
+      timeoutMs?: number;
+    };
   }): Promise<WorkbenchOnboarding> {
+    await this.applyGatewaySettings(input.gateway);
     await this.opengoat.setProviderConfig(input.providerId, input.env);
     await this.opengoat.setAgentProvider(DEFAULT_AGENT_ID, input.providerId);
     return this.getOnboardingState();
@@ -214,11 +236,10 @@ export class WorkbenchService {
       content: message
     });
 
-    const run = await this.opengoat.runAgent("orchestrator", {
+    const run = await this.executeOrchestratorRun({
       message,
       sessionRef: session.sessionKey,
-      cwd: project.rootPath,
-      env: await this.buildInvocationEnv(project.rootPath)
+      cwd: project.rootPath
     });
     if (run.code !== 0) {
       const details = (run.stderr || run.stdout || "No provider error details were returned.").trim();
@@ -245,6 +266,97 @@ export class WorkbenchService {
       tracePath: run.tracePath,
       providerId: run.providerId
     };
+  }
+
+  private async executeOrchestratorRun(input: {
+    message: string;
+    sessionRef: string;
+    cwd: string;
+  }): Promise<{
+    code: number;
+    stdout: string;
+    stderr: string;
+    providerId: string;
+    tracePath?: string;
+  }> {
+    const gatewaySettings = await this.store.getGatewaySettings();
+    if (gatewaySettings.mode !== "remote") {
+      const run = await this.opengoat.runAgent("orchestrator", {
+        message: input.message,
+        sessionRef: input.sessionRef,
+        cwd: input.cwd,
+        env: await this.buildInvocationEnv(input.cwd)
+      });
+      return {
+        code: run.code,
+        stdout: run.stdout,
+        stderr: run.stderr,
+        providerId: run.providerId,
+        tracePath: run.tracePath
+      };
+    }
+
+    const remoteUrl = gatewaySettings.remoteUrl?.trim();
+    if (!remoteUrl) {
+      throw new Error(
+        "Remote gateway mode is enabled, but no gateway URL is configured. Open Provider Setup and add a remote gateway URL, or switch back to local runtime."
+      );
+    }
+
+    const gatewayCall = await this.callGatewayFn<{
+      runId?: string;
+      result?: unknown;
+    }>({
+      url: remoteUrl,
+      token: this.remoteGatewayToken,
+      timeoutMs: gatewaySettings.timeoutMs,
+      method: "agent.run",
+      clientId: "opengoat-desktop",
+      clientDisplayName: "OpenGoat Desktop",
+      clientVersion: process.env.npm_package_version ?? "dev",
+      platform: process.platform,
+      mode: "operator-desktop",
+      params: {
+        idempotencyKey: randomUUID(),
+        agentId: "orchestrator",
+        message: input.message,
+        sessionRef: input.sessionRef,
+        cwd: input.cwd
+      }
+    });
+
+    return parseGatewayRunResult(gatewayCall.payload);
+  }
+
+  private async applyGatewaySettings(input?: {
+    mode: WorkbenchGatewayMode;
+    remoteUrl?: string;
+    remoteToken?: string;
+    timeoutMs?: number;
+  }): Promise<void> {
+    if (!input) {
+      return;
+    }
+
+    const mode: WorkbenchGatewayMode = input.mode === "remote" ? "remote" : "local";
+    const timeoutMs = normalizeGatewayTimeoutMs(input.timeoutMs);
+    const remoteUrl = input.remoteUrl?.trim() || undefined;
+
+    await this.store.setGatewaySettings({
+      mode,
+      remoteUrl,
+      timeoutMs
+    });
+
+    if (mode === "local") {
+      this.remoteGatewayToken = undefined;
+      return;
+    }
+
+    if (typeof input.remoteToken === "string") {
+      const token = input.remoteToken.trim();
+      this.remoteGatewayToken = token || undefined;
+    }
   }
 
   private async buildInvocationEnv(projectRootPath: string): Promise<NodeJS.ProcessEnv> {
@@ -297,6 +409,56 @@ function collectDotEnvDirectories(projectRootPath: string): string[] {
   }
 
   return resolved;
+}
+
+function normalizeGatewayTimeoutMs(value: number | undefined): number {
+  if (!Number.isFinite(value)) {
+    return WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS;
+  }
+  return Math.max(1000, Math.min(120_000, Math.floor(value ?? WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS)));
+}
+
+function parseGatewayRunResult(payload: unknown): {
+  code: number;
+  stdout: string;
+  stderr: string;
+  providerId: string;
+  tracePath?: string;
+} {
+  const payloadRecord = toRecord(payload);
+  if (!payloadRecord) {
+    throw new Error("Remote gateway returned an invalid response payload.");
+  }
+
+  const resultRecord = toRecord(payloadRecord.result) ?? payloadRecord;
+  const code = resultRecord.code;
+  if (typeof code !== "number" || !Number.isFinite(code)) {
+    throw new Error("Remote gateway response is missing result.code.");
+  }
+
+  const stdout = typeof resultRecord.stdout === "string" ? resultRecord.stdout : "";
+  const stderr = typeof resultRecord.stderr === "string" ? resultRecord.stderr : "";
+  const providerId = typeof resultRecord.providerId === "string" && resultRecord.providerId.trim()
+    ? resultRecord.providerId
+    : "remote-gateway";
+  const tracePath = typeof resultRecord.tracePath === "string" && resultRecord.tracePath.trim()
+    ? resultRecord.tracePath
+    : undefined;
+
+  return {
+    code,
+    stdout,
+    stderr,
+    providerId,
+    tracePath
+  };
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
 }
 
 function createDesktopGuidedAuthPrompter(notes: string[]): {

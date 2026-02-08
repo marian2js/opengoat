@@ -10,7 +10,11 @@ import path from "node:path";
 const APP_NAME = "OpenGoat";
 const MENU_ACTION_CHANNEL = "opengoat:menu-action";
 
-type MenuAction = "open-project" | "new-session" | "open-provider-settings";
+type MenuAction =
+  | "open-project"
+  | "new-session"
+  | "open-provider-settings"
+  | "open-connection-settings";
 
 if (started) {
   app.quit();
@@ -59,6 +63,10 @@ function buildApplicationMenu(): Menu {
         accelerator: "CmdOrCtrl+,",
         click: () => dispatchMenuAction("open-provider-settings"),
       },
+      {
+        label: "Connection Settings...",
+        click: () => dispatchMenuAction("open-connection-settings"),
+      },
       { type: "separator" },
       { role: "services" },
       { type: "separator" },
@@ -96,6 +104,10 @@ function buildApplicationMenu(): Menu {
         label: "Provider Settings...",
         accelerator: "Ctrl+,",
         click: () => dispatchMenuAction("open-provider-settings"),
+      },
+      {
+        label: "Connection Settings...",
+        click: () => dispatchMenuAction("open-connection-settings"),
       },
       { type: "separator" },
       { role: "quit" },

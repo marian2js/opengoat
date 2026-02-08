@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS,
+  type WorkbenchGatewaySettings,
   type WorkbenchMessage,
   type WorkbenchProject,
   type WorkbenchSession,
@@ -226,6 +228,29 @@ export class WorkbenchStore {
     return requireSession(requireProject(state, projectId), sessionId);
   }
 
+  public async getGatewaySettings(): Promise<WorkbenchGatewaySettings> {
+    const state = await this.readState();
+    return state.settings.gateway;
+  }
+
+  public async setGatewaySettings(gateway: WorkbenchGatewaySettings): Promise<WorkbenchGatewaySettings> {
+    const normalized = normalizeGatewaySettings(gateway);
+    return this.writeTransaction((state) => {
+      const now = this.nowIso();
+      return {
+        next: {
+          ...state,
+          updatedAt: now,
+          settings: {
+            ...state.settings,
+            gateway: normalized
+          }
+        },
+        result: normalized
+      };
+    });
+  }
+
   private async readState(): Promise<WorkbenchState> {
     try {
       const raw = await readFile(this.stateFilePath, "utf-8");
@@ -246,7 +271,13 @@ export class WorkbenchStore {
       schemaVersion: 1,
       createdAt: now,
       updatedAt: now,
-      projects: []
+      projects: [],
+      settings: {
+        gateway: {
+          mode: "local",
+          timeoutMs: WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS
+        }
+      }
     };
   }
 
@@ -322,4 +353,16 @@ function normalizeSessionTitle(input: string): string {
     return value;
   }
   return `${value.slice(0, 117)}...`;
+}
+
+function normalizeGatewaySettings(input: WorkbenchGatewaySettings): WorkbenchGatewaySettings {
+  const timeoutMs = Number.isFinite(input.timeoutMs)
+    ? Math.max(1000, Math.min(120_000, Math.floor(input.timeoutMs)))
+    : WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS;
+  const remoteUrl = input.remoteUrl?.trim();
+  return {
+    mode: input.mode === "remote" ? "remote" : "local",
+    remoteUrl: remoteUrl || undefined,
+    timeoutMs
+  };
 }

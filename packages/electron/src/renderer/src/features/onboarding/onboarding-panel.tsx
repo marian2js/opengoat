@@ -2,7 +2,7 @@ import { Badge } from "@renderer/components/ai-elements/badge";
 import { ScrollArea } from "@renderer/components/ai-elements/scroll-area";
 import { Button } from "@renderer/components/ui/button";
 import { Input } from "@renderer/components/ui/input";
-import type { WorkbenchOnboarding } from "@shared/workbench";
+import type { WorkbenchGatewayMode, WorkbenchOnboarding } from "@shared/workbench";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -10,6 +10,12 @@ interface OnboardingPanelProps {
   onboarding: WorkbenchOnboarding;
   providerId: string;
   env: Record<string, string>;
+  gateway: {
+    mode: WorkbenchGatewayMode;
+    remoteUrl: string;
+    remoteToken: string;
+    timeoutMs: number;
+  };
   error: string | null;
   canClose: boolean;
   isSubmitting: boolean;
@@ -17,6 +23,14 @@ interface OnboardingPanelProps {
   onboardingNotice: string | null;
   onSelectProvider: (providerId: string) => void;
   onEnvChange: (key: string, value: string) => void;
+  onGatewayChange: (
+    patch: Partial<{
+      mode: WorkbenchGatewayMode;
+      remoteUrl: string;
+      remoteToken: string;
+      timeoutMs: number;
+    }>
+  ) => void;
   onRunGuidedAuth: (providerId: string) => void;
   onClose: () => void;
   onSubmit: () => void;
@@ -113,6 +127,7 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
   const canSubmit =
     Boolean(selectedProvider) &&
     missingRequiredKeys.length === 0 &&
+    (props.gateway.mode !== "remote" || Boolean(props.gateway.remoteUrl.trim())) &&
     !props.isSubmitting;
   const totalProviderCount = providerFamilies.reduce(
     (count, family) => count + family.providers.length,
@@ -167,6 +182,7 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
               env={props.env}
               requiredFields={visibleRequiredFields}
               optionalFields={envPartition.optional}
+              gateway={props.gateway}
               showAdvanced={showAdvanced}
               missingRequiredKeys={missingRequiredKeys}
               disabled={props.isSubmitting}
@@ -174,6 +190,7 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
               onboardingNotice={props.onboardingNotice}
               onToggleAdvanced={() => setShowAdvanced((value) => !value)}
               onEnvChange={props.onEnvChange}
+              onGatewayChange={props.onGatewayChange}
               onRunGuidedAuth={props.onRunGuidedAuth}
             />
           </div>
@@ -193,6 +210,10 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
                 >
                   {props.error}
                 </motion.span>
+              ) : props.gateway.mode === "remote" && !props.gateway.remoteUrl.trim() ? (
+                <span className="text-amber-300">
+                  Remote gateway URL is required when remote mode is enabled.
+                </span>
               ) : missingStatusMessage ? (
                 <span className="text-amber-300">{missingStatusMessage}</span>
               ) : selectedProvider ? (
@@ -353,6 +374,12 @@ function ProviderListItem(props: {
 function SetupPane(props: {
   provider: OnboardingProvider | null;
   env: Record<string, string>;
+  gateway: {
+    mode: WorkbenchGatewayMode;
+    remoteUrl: string;
+    remoteToken: string;
+    timeoutMs: number;
+  };
   requiredFields: Array<{
     key: string;
     description: string;
@@ -372,6 +399,14 @@ function SetupPane(props: {
   onboardingNotice: string | null;
   onToggleAdvanced: () => void;
   onEnvChange: (key: string, value: string) => void;
+  onGatewayChange: (
+    patch: Partial<{
+      mode: WorkbenchGatewayMode;
+      remoteUrl: string;
+      remoteToken: string;
+      timeoutMs: number;
+    }>
+  ) => void;
   onRunGuidedAuth: (providerId: string) => void;
 }) {
   if (!props.provider) {
@@ -460,42 +495,173 @@ function SetupPane(props: {
             )}
           </section>
 
-          {hasOptional ? (
-            <section className="space-y-3">
-              <button
-                type="button"
-                onClick={props.onToggleAdvanced}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] transition hover:border-[var(--accent)]/60 hover:bg-[color-mix(in_oklab,var(--surface-strong)_82%,black)]"
-              >
-                {props.showAdvanced
-                  ? "Hide Optional Fields"
-                  : "Show Optional Fields"}
-              </button>
-              {props.showAdvanced ? (
-                <div className="space-y-3 rounded-lg border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_95%,black)] p-3">
-                  {props.optionalFields.map((field) => {
-                    const configured = provider.configuredEnvKeys.includes(
-                      field.key,
-                    );
-                    const value = props.env[field.key] ?? "";
-                    return (
-                      <EnvFieldInput
-                        key={field.key}
-                        field={field}
-                        value={value}
-                        configured={configured}
-                        missing={false}
-                        disabled={props.disabled}
-                        onChange={props.onEnvChange}
-                      />
-                    );
-                  })}
+          <section className="space-y-3">
+            <button
+              type="button"
+              onClick={props.onToggleAdvanced}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] transition hover:border-[var(--accent)]/60 hover:bg-[color-mix(in_oklab,var(--surface-strong)_82%,black)]"
+            >
+              {props.showAdvanced
+                ? "Hide Advanced Options"
+                : "Show Advanced Options"}
+            </button>
+            <p className="px-1 text-xs text-[var(--muted-foreground)]">
+              Advanced includes an optional remote OpenGoat connection.
+            </p>
+            {props.showAdvanced ? (
+              <div className="space-y-4 rounded-lg border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_95%,black)] p-3">
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                    Optional Provider Fields
+                  </p>
+                  {hasOptional ? (
+                    props.optionalFields.map((field) => {
+                      const configured = provider.configuredEnvKeys.includes(
+                        field.key,
+                      );
+                      const value = props.env[field.key] ?? "";
+                      return (
+                        <EnvFieldInput
+                          key={field.key}
+                          field={field}
+                          value={value}
+                          configured={configured}
+                          missing={false}
+                          disabled={props.disabled}
+                          onChange={props.onEnvChange}
+                        />
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted-foreground)]">
+                      No optional provider fields for this provider.
+                    </div>
+                  )}
                 </div>
-              ) : null}
-            </section>
-          ) : null}
+
+                <div className="h-px bg-[var(--border)]" />
+
+                <RemoteGatewaySettings
+                  gateway={props.gateway}
+                  disabled={props.disabled}
+                  onGatewayChange={props.onGatewayChange}
+                />
+              </div>
+            ) : null}
+          </section>
         </div>
       </ScrollArea>
+    </section>
+  );
+}
+
+function RemoteGatewaySettings(props: {
+  gateway: {
+    mode: WorkbenchGatewayMode;
+    remoteUrl: string;
+    remoteToken: string;
+    timeoutMs: number;
+  };
+  disabled: boolean;
+  onGatewayChange: (
+    patch: Partial<{
+      mode: WorkbenchGatewayMode;
+      remoteUrl: string;
+      remoteToken: string;
+      timeoutMs: number;
+    }>
+  ) => void;
+}) {
+  const isRemote = props.gateway.mode === "remote";
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+          Remote OpenGoat (Optional)
+        </p>
+        <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+          Use this only when your app needs to control OpenGoat on another machine.
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
+        <input
+          type="checkbox"
+          className="size-4"
+          checked={isRemote}
+          disabled={props.disabled}
+          onChange={(event) =>
+            props.onGatewayChange({
+              mode: event.currentTarget.checked ? "remote" : "local"
+            })
+          }
+        />
+        <span>Use remote OpenGoat server</span>
+        <span className="ml-auto rounded-full border border-[var(--border)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--muted-foreground)]">
+          {isRemote ? "Enabled" : "Local default"}
+        </span>
+      </label>
+
+      {isRemote ? (
+        <div className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-[var(--foreground)]">
+              Remote gateway URL
+            </p>
+            <Input
+              value={props.gateway.remoteUrl}
+              onChange={(event) =>
+                props.onGatewayChange({
+                  remoteUrl: event.target.value
+                })
+              }
+              placeholder="ws://remote-host:18789/gateway"
+              disabled={props.disabled}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-[var(--foreground)]">
+              Auth token (optional)
+            </p>
+            <Input
+              type="password"
+              value={props.gateway.remoteToken}
+              onChange={(event) =>
+                props.onGatewayChange({
+                  remoteToken: event.target.value
+                })
+              }
+              placeholder="Leave blank to keep current session token"
+              disabled={props.disabled}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-[var(--foreground)]">
+              Request timeout (ms)
+            </p>
+            <Input
+              type="number"
+              min={1000}
+              max={120000}
+              step={500}
+              value={String(props.gateway.timeoutMs)}
+              onChange={(event) => {
+                const parsed = Number(event.target.value);
+                if (!Number.isFinite(parsed)) {
+                  return;
+                }
+                props.onGatewayChange({
+                  timeoutMs: clampGatewayTimeout(parsed)
+                });
+              }}
+              disabled={props.disabled}
+            />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -704,4 +870,11 @@ function buildMissingStatusMessage(
     return null;
   }
   return parts.join(" • ");
+}
+
+function clampGatewayTimeout(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 10_000;
+  }
+  return Math.max(1000, Math.min(120_000, Math.floor(value)));
 }

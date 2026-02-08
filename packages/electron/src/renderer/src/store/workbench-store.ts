@@ -1,9 +1,11 @@
 import { create } from "zustand";
 import type {
+  WorkbenchGatewayMode,
   WorkbenchMessage,
   WorkbenchOnboarding,
   WorkbenchProject
 } from "@shared/workbench";
+import { WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS } from "@shared/workbench";
 import {
   createWorkbenchApiClient,
   type WorkbenchApiClient
@@ -12,6 +14,13 @@ import {
 export type OnboardingFlowState = "hidden" | "loading" | "editing" | "submitting";
 export type ChatFlowState = "idle" | "sending";
 export type OnboardingGuidedAuthState = "idle" | "running";
+
+export interface OnboardingGatewayDraft {
+  mode: WorkbenchGatewayMode;
+  remoteUrl: string;
+  remoteToken: string;
+  timeoutMs: number;
+}
 
 interface WorkbenchUiState {
   homeDir: string;
@@ -22,6 +31,7 @@ interface WorkbenchUiState {
   onboardingGuidedAuthState: OnboardingGuidedAuthState;
   onboardingDraftProviderId: string;
   onboardingDraftEnv: Record<string, string>;
+  onboardingDraftGateway: OnboardingGatewayDraft;
   onboardingNotice: string | null;
   chatState: ChatFlowState;
   activeProjectId: string | null;
@@ -38,10 +48,15 @@ interface WorkbenchUiState {
   renameSession: (projectId: string, sessionId: string, title: string) => Promise<void>;
   removeSession: (projectId: string, sessionId: string) => Promise<void>;
   selectSession: (projectId: string, sessionId: string) => Promise<void>;
-  submitOnboarding: (providerId: string, env: Record<string, string>) => Promise<void>;
+  submitOnboarding: (
+    providerId: string,
+    env: Record<string, string>,
+    gateway: OnboardingGatewayDraft
+  ) => Promise<void>;
   runOnboardingGuidedAuth: (providerId: string) => Promise<void>;
   setOnboardingDraftProvider: (providerId: string) => void;
   setOnboardingDraftField: (key: string, value: string) => void;
+  setOnboardingDraftGateway: (patch: Partial<OnboardingGatewayDraft>) => void;
   openOnboarding: () => Promise<void>;
   closeOnboarding: () => void;
   sendMessage: (
@@ -63,6 +78,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
     onboardingGuidedAuthState: "idle",
     onboardingDraftProviderId: "",
     onboardingDraftEnv: {},
+    onboardingDraftGateway: createDefaultGatewayDraft(),
     onboardingNotice: null,
     chatState: "idle",
     activeProjectId: null,
@@ -90,7 +106,8 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         const onboardingDraft = resolveOnboardingDraftState(
           boot.onboarding,
           get().onboardingDraftProviderId,
-          get().onboardingDraftEnv
+          get().onboardingDraftEnv,
+          get().onboardingDraftGateway
         );
         const showOnboarding = boot.onboarding.needsOnboarding;
 
@@ -102,6 +119,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           onboardingState: showOnboarding ? "editing" : "hidden",
           onboardingDraftProviderId: onboardingDraft.providerId,
           onboardingDraftEnv: onboardingDraft.env,
+          onboardingDraftGateway: onboardingDraft.gateway,
           onboardingNotice: null,
           activeProjectId: firstProject?.id ?? null,
           activeSessionId: firstSession?.id ?? null,
@@ -282,7 +300,11 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       }
     },
 
-    submitOnboarding: async (providerId: string, env: Record<string, string>) => {
+    submitOnboarding: async (
+      providerId: string,
+      env: Record<string, string>,
+      gateway: OnboardingGatewayDraft
+    ) => {
       set({
         isBusy: true,
         onboardingState: "submitting",
@@ -291,11 +313,14 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       try {
         const onboarding = await api.submitOnboarding({
           providerId,
-          env
+          env,
+          gateway: toGatewaySubmitInput(gateway)
         });
         const onboardingDraft = resolveOnboardingDraftState(
           onboarding,
-          onboarding.activeProviderId
+          onboarding.activeProviderId,
+          undefined,
+          gateway
         );
         const showOnboarding = onboarding.needsOnboarding;
 
@@ -305,6 +330,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           onboardingState: showOnboarding ? "editing" : "hidden",
           onboardingDraftProviderId: onboardingDraft.providerId,
           onboardingDraftEnv: onboardingDraft.env,
+          onboardingDraftGateway: onboardingDraft.gateway,
           onboardingNotice: null,
           isBusy: false
         });
@@ -335,6 +361,17 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         onboardingDraftEnv: {
           ...state.onboardingDraftEnv,
           [normalizedKey]: value
+        },
+        onboardingNotice: null,
+        error: null
+      }));
+    },
+
+    setOnboardingDraftGateway: (patch: Partial<OnboardingGatewayDraft>) => {
+      set((state) => ({
+        onboardingDraftGateway: {
+          ...state.onboardingDraftGateway,
+          ...patch
         },
         onboardingNotice: null,
         error: null
@@ -391,7 +428,8 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         const onboardingDraft = resolveOnboardingDraftState(
           onboarding,
           get().onboardingDraftProviderId,
-          get().onboardingDraftEnv
+          get().onboardingDraftEnv,
+          get().onboardingDraftGateway
         );
         set({
           onboarding,
@@ -399,6 +437,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           onboardingState: "editing",
           onboardingDraftProviderId: onboardingDraft.providerId,
           onboardingDraftEnv: onboardingDraft.env,
+          onboardingDraftGateway: onboardingDraft.gateway,
           onboardingNotice: null,
           isBusy: false
         });
@@ -540,7 +579,11 @@ function isProviderFailureError(error: unknown): boolean {
     return false;
   }
   const message = error.message.toLowerCase();
-  return message.includes("orchestrator provider failed") || message.includes("provider failed");
+  return (
+    message.includes("orchestrator provider failed") ||
+    message.includes("provider failed") ||
+    message.includes("remote gateway")
+  );
 }
 
 export function resolveOnboardingDraftProviderId(
@@ -571,21 +614,80 @@ function getConfiguredOnboardingEnv(
 function resolveOnboardingDraftState(
   onboarding: WorkbenchOnboarding,
   preferredProviderId?: string,
-  currentDraftEnv?: Record<string, string>
+  currentDraftEnv?: Record<string, string>,
+  currentGatewayDraft?: OnboardingGatewayDraft
 ): {
   providerId: string;
   env: Record<string, string>;
+  gateway: OnboardingGatewayDraft;
 } {
   const providerId = resolveOnboardingDraftProviderId(onboarding, preferredProviderId);
   const preferred = preferredProviderId?.trim();
+  const gateway = resolveGatewayDraftState(onboarding, currentGatewayDraft);
   if (preferred && preferred === providerId && currentDraftEnv && Object.keys(currentDraftEnv).length > 0) {
     return {
       providerId,
-      env: { ...currentDraftEnv }
+      env: { ...currentDraftEnv },
+      gateway
     };
   }
   return {
     providerId,
-    env: getConfiguredOnboardingEnv(onboarding, providerId)
+    env: getConfiguredOnboardingEnv(onboarding, providerId),
+    gateway
+  };
+}
+
+function resolveGatewayDraftState(
+  onboarding: WorkbenchOnboarding,
+  currentDraft?: OnboardingGatewayDraft
+): OnboardingGatewayDraft {
+  const gateway = onboarding.gateway;
+  return {
+    mode: gateway.mode,
+    remoteUrl: gateway.remoteUrl ?? "",
+    timeoutMs: gateway.timeoutMs,
+    remoteToken: currentDraft?.remoteToken ?? ""
+  };
+}
+
+function createDefaultGatewayDraft(): OnboardingGatewayDraft {
+  return {
+    mode: "local",
+    remoteUrl: "",
+    remoteToken: "",
+    timeoutMs: WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS
+  };
+}
+
+function toGatewaySubmitInput(
+  gateway: OnboardingGatewayDraft
+):
+  | {
+      mode: WorkbenchGatewayMode;
+      remoteUrl?: string;
+      remoteToken?: string;
+      timeoutMs: number;
+    }
+  | undefined {
+  const mode = gateway.mode === "remote" ? "remote" : "local";
+  const timeoutMs = Number.isFinite(gateway.timeoutMs)
+    ? Math.max(1000, Math.min(120_000, Math.floor(gateway.timeoutMs)))
+    : WORKBENCH_GATEWAY_DEFAULT_TIMEOUT_MS;
+
+  if (mode !== "remote") {
+    return {
+      mode: "local",
+      timeoutMs
+    };
+  }
+
+  const remoteUrl = gateway.remoteUrl.trim();
+  const remoteToken = gateway.remoteToken.trim();
+  return {
+    mode: "remote",
+    remoteUrl: remoteUrl || undefined,
+    remoteToken: remoteToken || undefined,
+    timeoutMs
   };
 }

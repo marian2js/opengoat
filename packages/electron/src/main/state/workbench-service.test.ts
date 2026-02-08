@@ -30,6 +30,11 @@ describe("WorkbenchService onboarding", () => {
 
     expect(boot.onboarding.activeProviderId).toBe("openai");
     expect(boot.onboarding.needsOnboarding).toBe(true);
+    expect(boot.onboarding.gateway).toEqual({
+      mode: "local",
+      timeoutMs: 10_000,
+      hasAuthToken: false
+    });
     expect(boot.onboarding.providers.map((provider) => provider.id)).toEqual(["openai"]);
     expect(boot.onboarding.families).toEqual([
       {
@@ -66,6 +71,10 @@ describe("WorkbenchService onboarding", () => {
       providerId: "openai",
       env: {
         OPENAI_API_KEY: "sk-live"
+      },
+      gateway: {
+        mode: "local",
+        timeoutMs: 10_000
       }
     });
 
@@ -244,6 +253,10 @@ describe("WorkbenchService sendMessage", () => {
         ]
       });
     const store = {
+      getGatewaySettings: vi.fn(async () => ({
+        mode: "local" as const,
+        timeoutMs: 10_000
+      })),
       getProject: vi.fn(async () => ({
         id: "p1",
         name: "project",
@@ -283,6 +296,112 @@ describe("WorkbenchService sendMessage", () => {
     expect(runAgentArgs.env?.OPENAI_MODEL).toBe("meta/llama-3.1-8b-instruct");
     expect(loadDotEnvFn).toHaveBeenCalled();
     expect(appendMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it("routes runs through remote gateway when remote mode is enabled", async () => {
+    const runAgent = vi.fn(async () => ({
+      code: 0,
+      stdout: "should-not-run-locally",
+      stderr: "",
+      providerId: "openai",
+      tracePath: "/tmp/local-trace.json",
+      entryAgentId: "orchestrator",
+      routing: {
+        entryAgentId: "orchestrator",
+        targetAgentId: "orchestrator",
+        confidence: 1,
+        reason: "test",
+        rewrittenMessage: "hello",
+        candidates: []
+      }
+    }));
+    const opengoat = createOpenGoatStub({
+      providers: createProviderSummaries(),
+      activeProviderId: "openai",
+      onboardingByProvider: {},
+      runAgent
+    });
+    const appendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: []
+      })
+      .mockResolvedValueOnce({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: [
+          {
+            id: "m1",
+            role: "assistant",
+            content: "remote-completed",
+            createdAt: "2026-02-07T00:00:00.000Z",
+            providerId: "openrouter",
+            tracePath: "/tmp/remote-trace.json"
+          }
+        ]
+      });
+    const store = {
+      getGatewaySettings: vi.fn(async () => ({
+        mode: "remote" as const,
+        remoteUrl: "ws://remote-host:18789/gateway",
+        timeoutMs: 8000
+      })),
+      getProject: vi.fn(async () => ({
+        id: "p1",
+        name: "project",
+        rootPath: "/tmp/project",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        sessions: []
+      })),
+      getSession: vi.fn(async () => ({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: []
+      })),
+      appendMessage
+    } as unknown as WorkbenchStore;
+    const callGatewayFn = vi.fn(async () => ({
+      hello: {},
+      payload: {
+        runId: "run-remote-1",
+        result: {
+          code: 0,
+          stdout: "remote-completed",
+          stderr: "",
+          providerId: "openrouter",
+          tracePath: "/tmp/remote-trace.json"
+        }
+      }
+    }));
+    const service = new WorkbenchService({
+      opengoat,
+      store,
+      callGatewayFn: callGatewayFn as never
+    });
+
+    await service.sendMessage({
+      projectId: "p1",
+      sessionId: "s1",
+      message: "hello"
+    });
+
+    expect(callGatewayFn).toHaveBeenCalledTimes(1);
+    expect(runAgent).toHaveBeenCalledTimes(0);
   });
 });
 
@@ -346,7 +465,15 @@ function createProviderSummaries(): ProviderSummary[] {
 
 function createStoreStub(): WorkbenchStore {
   return {
-    listProjects: vi.fn(async () => [])
+    listProjects: vi.fn(async () => []),
+    getGatewaySettings: vi.fn(async () => ({
+      mode: "local",
+      timeoutMs: 10_000
+    })),
+    setGatewaySettings: vi.fn(async () => ({
+      mode: "local",
+      timeoutMs: 10_000
+    }))
   } as unknown as WorkbenchStore;
 }
 
