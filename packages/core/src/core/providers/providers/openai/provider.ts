@@ -1,11 +1,18 @@
-import { VercelAiTextRuntime, parseLlmRuntimeError, type OpenAiCompatibleTextRuntime } from "../../../llm/index.js";
+import {
+  VercelAiTextRuntime,
+  parseLlmRuntimeError,
+  type OpenAiCompatibleTextRuntime,
+} from "../../../llm/index.js";
 import {
   ProviderAuthenticationError,
   ProviderRuntimeError,
-  UnsupportedProviderActionError
+  UnsupportedProviderActionError,
 } from "../../errors.js";
 import { BaseProvider } from "../../base-provider.js";
-import type { ProviderExecutionResult, ProviderInvokeOptions } from "../../types.js";
+import type {
+  ProviderExecutionResult,
+  ProviderInvokeOptions,
+} from "../../types.js";
 
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_OPENAI_ENDPOINT_PATH = "/responses";
@@ -27,13 +34,15 @@ export class OpenAIProvider extends BaseProvider {
         agent: false,
         model: true,
         auth: false,
-        passthrough: false
-      }
+        passthrough: false,
+      },
     });
     this.runtime = deps.runtime ?? new VercelAiTextRuntime();
   }
 
-  public async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
+  public async invoke(
+    options: ProviderInvokeOptions
+  ): Promise<ProviderExecutionResult> {
     this.validateInvokeOptions(options);
 
     const env = options.env ?? process.env;
@@ -48,7 +57,7 @@ export class OpenAIProvider extends BaseProvider {
         code: 1,
         stdout: "",
         stderr:
-          "Missing model for OpenAI-compatible base URL. Set OPENAI_MODEL or pass --model.\n"
+          "Missing model for OpenAI-compatible base URL. Set OPENAI_MODEL or pass --model.\n",
       };
     }
 
@@ -68,7 +77,7 @@ export class OpenAIProvider extends BaseProvider {
         style,
         model,
         message: options.message,
-        systemPrompt: options.systemPrompt
+        systemPrompt: options.systemPrompt,
       });
 
       options.onStdout?.(result.text);
@@ -76,15 +85,20 @@ export class OpenAIProvider extends BaseProvider {
         code: 0,
         stdout: result.text,
         stderr: "",
-        providerSessionId: result.providerSessionId
+        providerSessionId: result.providerSessionId,
       };
     } catch (error) {
       if (error instanceof ProviderRuntimeError) {
         throw error;
       }
       const details = parseLlmRuntimeError(error);
+      const lowerMessage = details.message.toLowerCase();
+      const timeoutLikeFailure =
+        lowerMessage.includes("timed out") ||
+        lowerMessage.includes("timeout") ||
+        lowerMessage.includes("headers timeout");
       const canFallback =
-        details.statusCode === 404 &&
+        (details.statusCode === 404 || timeoutLikeFailure) &&
         !explicitEndpoint &&
         !explicitEndpointPath &&
         !explicitStyle &&
@@ -97,7 +111,7 @@ export class OpenAIProvider extends BaseProvider {
       return {
         code: 1,
         stdout: "",
-        stderr: ensureTrailingNewline(details.message)
+        stderr: ensureTrailingNewline(details.message),
       };
     }
   }
@@ -121,7 +135,7 @@ export class OpenAIProvider extends BaseProvider {
         style: "chat",
         model,
         message: options.message,
-        systemPrompt: options.systemPrompt
+        systemPrompt: options.systemPrompt,
       });
 
       options.onStdout?.(result.text);
@@ -129,7 +143,7 @@ export class OpenAIProvider extends BaseProvider {
         code: 0,
         stdout: result.text,
         stderr: "",
-        providerSessionId: result.providerSessionId
+        providerSessionId: result.providerSessionId,
       };
     } catch (error) {
       if (error instanceof ProviderRuntimeError) {
@@ -139,13 +153,16 @@ export class OpenAIProvider extends BaseProvider {
       return {
         code: 1,
         stdout: "",
-        stderr: ensureTrailingNewline(details.message)
+        stderr: ensureTrailingNewline(details.message),
       };
     }
   }
 }
 
-function resolveOpenAIEndpoint(env: NodeJS.ProcessEnv, defaultPath = DEFAULT_OPENAI_ENDPOINT_PATH): string {
+function resolveOpenAIEndpoint(
+  env: NodeJS.ProcessEnv,
+  defaultPath = DEFAULT_OPENAI_ENDPOINT_PATH
+): string {
   const endpointOverride = resolveEndpointOverride(env);
   if (endpointOverride) {
     return endpointOverride;
@@ -157,7 +174,10 @@ function resolveOpenAIEndpoint(env: NodeJS.ProcessEnv, defaultPath = DEFAULT_OPE
   return `${baseUrl}${endpointPath.startsWith("/") ? "" : "/"}${endpointPath}`;
 }
 
-function resolveApiStyle(env: NodeJS.ProcessEnv, endpoint: string): "responses" | "chat" {
+function resolveApiStyle(
+  env: NodeJS.ProcessEnv,
+  endpoint: string
+): "responses" | "chat" {
   const explicit = resolveApiStyleOverride(env);
   if (explicit === "responses" || explicit === "chat") {
     return explicit;
@@ -174,7 +194,9 @@ function resolveEndpointOverride(env: NodeJS.ProcessEnv): string | undefined {
   return env.OPENAI_ENDPOINT?.trim();
 }
 
-function resolveEndpointPathOverride(env: NodeJS.ProcessEnv): string | undefined {
+function resolveEndpointPathOverride(
+  env: NodeJS.ProcessEnv
+): string | undefined {
   return env.OPENAI_ENDPOINT_PATH?.trim();
 }
 
@@ -186,7 +208,10 @@ function resolveBaseUrl(env: NodeJS.ProcessEnv): string {
   return env.OPENAI_BASE_URL?.trim() || DEFAULT_OPENAI_BASE_URL;
 }
 
-function resolveModel(options: ProviderInvokeOptions, env: NodeJS.ProcessEnv): string | null {
+function resolveModel(
+  options: ProviderInvokeOptions,
+  env: NodeJS.ProcessEnv
+): string | null {
   const explicitModel = options.model?.trim() || env.OPENAI_MODEL?.trim();
   if (explicitModel) {
     return explicitModel;
@@ -200,7 +225,11 @@ function resolveModel(options: ProviderInvokeOptions, env: NodeJS.ProcessEnv): s
 }
 
 function shouldUseDefaultOpenAIModel(env: NodeJS.ProcessEnv): boolean {
-  if (resolveEndpointOverride(env) || resolveEndpointPathOverride(env) || resolveApiStyleOverride(env)) {
+  if (
+    resolveEndpointOverride(env) ||
+    resolveEndpointPathOverride(env) ||
+    resolveApiStyleOverride(env)
+  ) {
     return false;
   }
 
