@@ -211,6 +211,7 @@ describe("workbench store", () => {
       "Error when talking to Gemini API",
       "Full report available at: /tmp/gemini-client-error.json",
       "TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 22h22m2s.",
+      'details: [{"quotaMetric":"generate_content_free_tier_requests","quotaId":"GenerateRequestsPerMinutePerProjectPerModel-FreeTier","quotaDimensions":{"location":"global","model":"gemini-3-pro"}}]',
       "at classifyGoogleError (file:///opt/homebrew/Cellar/gemini-cli/index.js:214:28)",
       "An unexpected critical error occurred:[object Object]"
     ].join("\n");
@@ -256,11 +257,74 @@ describe("workbench store", () => {
     await store.getState().sendMessage("hello");
 
     const text = store.getState().activeMessages[1]?.content ?? "";
-    expect(text).toContain("Orchestrator failed via Gemini");
+    expect(text).toContain("Orchestrator failed via Gemini (gemini-3-pro)");
     expect(text.toLowerCase()).toContain("quota exceeded");
     expect(text).not.toContain("DeprecationWarning");
     expect(text).not.toContain("Full report available");
     expect(text).not.toContain("classifyGoogleError");
+  });
+
+  it("prefers delegated agent attribution from run-status events over orchestrator wrapper text", async () => {
+    let storeRef: ReturnType<typeof createWorkbenchStore> | null = null;
+    const api = createApiMock({
+      bootstrap: vi.fn(async () => ({
+        homeDir: "/tmp/home",
+        onboarding: {
+          activeProviderId: "google",
+          needsOnboarding: false,
+          gateway: createGatewayStatus(),
+          families: [],
+          providers: []
+        },
+        providerSetupCompleted: true,
+        projects: [
+          {
+            id: "p1",
+            name: "project",
+            rootPath: "/tmp/project",
+            createdAt: "2026-02-07T00:00:00.000Z",
+            updatedAt: "2026-02-07T00:00:00.000Z",
+            sessions: [
+              {
+                id: "s1",
+                title: "Session",
+                agentId: "orchestrator",
+                sessionKey: "desktop:p1:s1",
+                createdAt: "2026-02-07T00:00:00.000Z",
+                updatedAt: "2026-02-07T00:00:00.000Z",
+                messages: []
+              }
+            ]
+          }
+        ]
+      })) as WorkbenchApiClient["bootstrap"],
+      sendChatMessage: vi.fn(async () => {
+        storeRef?.getState().appendRunStatusEvent({
+          projectId: "p1",
+          sessionId: "s1",
+          stage: "provider_invocation_completed",
+          timestamp: "2026-02-09T00:00:00.000Z",
+          runId: "run-1",
+          step: 1,
+          agentId: "developer",
+          providerId: "gemini",
+          code: 1
+        });
+        throw new Error(
+          "Orchestrator provider failed (google, code 1). TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 20h53m5s."
+        );
+      })
+    });
+    const store = createWorkbenchStore(api);
+    storeRef = store;
+
+    await store.getState().bootstrap();
+    await store.getState().sendMessage("hello");
+
+    const text = store.getState().activeMessages[1]?.content ?? "";
+    expect(text).toContain("Developer failed via Gemini");
+    expect(text).not.toContain("Orchestrator failed");
+    expect(text.toLowerCase()).toContain("quota exceeded");
   });
 
   it("rethrows send errors when requested for AI SDK transport", async () => {
@@ -847,6 +911,9 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
       hasConfig: Object.keys(input.env).length > 0
     })),
     createAgent: vi.fn(async () => {
+      throw new Error("not used");
+    }),
+    updateAgent: vi.fn(async () => {
       throw new Error("not used");
     }),
     deleteAgent: vi.fn(async () => {

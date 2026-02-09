@@ -124,6 +124,46 @@ describe("OnboardingPanel e2e", () => {
     expect(onRunGuidedAuth).toHaveBeenCalledWith("qwen-portal");
   });
 
+  it("shows Google Gemini model in credentials without advanced options", async () => {
+    const user = userEvent.setup();
+    const onEnvChange = vi.fn<[string, string], void>();
+
+    function StatefulHarness() {
+      const [providerId, setProviderId] = useState("google");
+      const [env, setEnv] = useState<Record<string, string>>({});
+
+      return createElement(OnboardingPanel, {
+        onboarding: createGoogleOnboardingFixture(),
+        providerId,
+        env,
+        gateway: createGatewayDraft(),
+        error: null,
+        canClose: true,
+        isSubmitting: false,
+        isRunningGuidedAuth: false,
+        onboardingNotice: null,
+        onSelectProvider: setProviderId,
+        onEnvChange: (key: string, value: string) => {
+          onEnvChange(key, value);
+          setEnv((current) => ({ ...current, [key]: value }));
+        },
+        onOpenRuntimeSettings: vi.fn(),
+        onRunGuidedAuth: vi.fn(),
+        onClose: vi.fn(),
+        onSubmit: vi.fn()
+      });
+    }
+
+    render(createElement(StatefulHarness));
+
+    const modelField = screen.getByLabelText(/gemini model/i);
+    expect(modelField).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /show advanced options/i })).toBeNull();
+
+    await user.type(modelField, "gemini-2.5-pro");
+    expect(onEnvChange).toHaveBeenLastCalledWith("GEMINI_MODEL", "gemini-2.5-pro");
+  });
+
   it("routes runtime chip interactions through callback", async () => {
     const user = userEvent.setup();
     const onOpenRuntimeSettings = vi.fn();
@@ -310,5 +350,47 @@ function createGatewayDraft() {
     remoteUrl: "",
     remoteToken: "",
     timeoutMs: 10_000
+  };
+}
+
+function createGoogleOnboardingFixture(): WorkbenchOnboarding {
+  return {
+    activeProviderId: "google",
+    needsOnboarding: true,
+    gateway: {
+      mode: "local",
+      timeoutMs: 10_000,
+      hasAuthToken: false
+    },
+    families: [
+      {
+        id: "google",
+        label: "Google",
+        providerIds: ["google"]
+      }
+    ],
+    providers: [
+      {
+        id: "google",
+        displayName: "Google Gemini",
+        kind: "http",
+        envFields: [
+          {
+            key: "GEMINI_API_KEY",
+            description: "Gemini API key",
+            required: true,
+            secret: true
+          },
+          {
+            key: "GEMINI_MODEL",
+            description: "Optional default model id"
+          }
+        ],
+        configuredEnvKeys: [],
+        configuredEnvValues: {},
+        missingRequiredEnv: ["GEMINI_API_KEY"],
+        hasConfig: false
+      }
+    ]
   };
 }

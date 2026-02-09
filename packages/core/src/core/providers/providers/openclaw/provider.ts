@@ -7,6 +7,7 @@ import type {
   ProviderExecutionResult,
   ProviderInvokeOptions,
 } from "../../types.js";
+import { delimiter } from "node:path";
 
 export class OpenClawProvider extends BaseCliProvider {
   public constructor() {
@@ -56,6 +57,27 @@ export class OpenClawProvider extends BaseCliProvider {
     return args;
   }
 
+  protected override prepareExecutionEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    if (process.platform !== "darwin") {
+      return env;
+    }
+
+    const preferredNodePaths = [
+      "/opt/homebrew/bin",
+      "/opt/homebrew/opt/node@22/bin",
+      "/usr/local/opt/node@22/bin",
+    ];
+    const mergedPath = dedupePathEntries([
+      ...preferredNodePaths,
+      ...(env.PATH?.split(delimiter) ?? []),
+    ]);
+
+    return {
+      ...env,
+      PATH: mergedPath.join(delimiter),
+    };
+  }
+
   protected override buildAuthInvocationArgs(
     options: ProviderAuthOptions,
   ): string[] {
@@ -103,4 +125,20 @@ export class OpenClawProvider extends BaseCliProvider {
     const result = await super.invoke(options);
     return attachProviderSessionId(result, sessionId);
   }
+}
+
+function dedupePathEntries(entries: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const rawEntry of entries) {
+    const entry = rawEntry.trim();
+    if (!entry || seen.has(entry)) {
+      continue;
+    }
+    seen.add(entry);
+    result.push(entry);
+  }
+
+  return result;
 }

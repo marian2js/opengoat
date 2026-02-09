@@ -48,4 +48,20 @@ describe("extended http provider catalog", () => {
     const modelField = onboarding.env?.find((field) => field.key === "CEREBRAS_MODEL");
     expect(modelField?.required).toBe(true);
   });
+
+  it("includes optional model configuration for Google Gemini onboarding", () => {
+    const spec = extendedHttpProviderCatalog.find((entry) => entry.id === "google");
+    if (!spec) {
+      throw new Error("missing google spec");
+    }
+
+    const onboarding = resolveExtendedHttpProviderOnboarding(spec);
+    const modelField = onboarding.env?.find((field) => field.key === "GEMINI_MODEL");
+    expect(modelField).toEqual({
+      key: "GEMINI_MODEL",
+      description: "Optional default model id",
+      required: undefined,
+      secret: undefined
+    });
+  });
 });

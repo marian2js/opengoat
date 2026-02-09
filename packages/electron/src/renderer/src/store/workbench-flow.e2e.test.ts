@@ -130,6 +130,15 @@ function createStatefulApiMock(): WorkbenchApiClient {
       createdPaths: [],
       skippedPaths: []
     })),
+    updateAgent: vi.fn(async () => ({
+      agent: {
+        id: "writer",
+        displayName: "Writer",
+        workspaceDir: "/tmp/workspaces/writer",
+        internalConfigDir: "/tmp/agents/writer",
+        providerId: "openrouter"
+      }
+    })),
     deleteAgent: vi.fn(async () => ({
       agentId: "writer",
       existed: true,

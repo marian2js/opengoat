@@ -3,6 +3,7 @@ import type {
   WorkbenchAgent,
   WorkbenchAgentCreationResult,
   WorkbenchAgentDeletionResult,
+  WorkbenchAgentUpdateResult,
   WorkbenchAgentProvider,
   WorkbenchGatewayMode,
   WorkbenchMessage,
@@ -75,6 +76,12 @@ interface WorkbenchUiState {
   createAgent: (input: {
     name: string;
     providerId?: string;
+    createExternalAgent?: boolean;
+    env?: Record<string, string>;
+  }) => Promise<void>;
+  updateAgent: (input: {
+    agentId: string;
+    providerId: string;
     createExternalAgent?: boolean;
     env?: Record<string, string>;
   }) => Promise<void>;
@@ -476,6 +483,43 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       }
     },
 
+    updateAgent: async (input) => {
+      const agentId = input.agentId.trim();
+      const providerId = input.providerId.trim();
+      if (!agentId) {
+        set({ error: "Agent id cannot be empty." });
+        return;
+      }
+      if (!providerId) {
+        set({ error: "Provider id cannot be empty." });
+        return;
+      }
+
+      set({ agentsState: "saving", agentsNotice: null, error: null });
+      try {
+        const result = await api.updateAgent({
+          agentId,
+          providerId,
+          createExternalAgent: input.createExternalAgent,
+          env: input.env
+        });
+        set((state) => ({
+          agents: upsertAgent(state.agents, result.agent),
+          agentProviders: result.provider
+            ? upsertAgentProvider(state.agentProviders, result.provider)
+            : state.agentProviders,
+          agentsState: "idle",
+          agentsNotice: buildAgentNotice(result)
+        }));
+        const externalFailure = buildExternalAgentFailure(result);
+        if (externalFailure) {
+          set({ error: externalFailure });
+        }
+      } catch (error) {
+        set({ agentsState: "idle", error: toErrorMessage(error) });
+      }
+    },
+
     deleteAgent: async (input) => {
       const agentId = input.agentId.trim();
       if (!agentId) {
@@ -790,13 +834,15 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           set({
             chatState: "idle",
             isBusy: false,
-            error: toErrorMessage(error),
+            error: summarizeChatError(error),
             activeMessages: currentMessages.filter((entry) => entry.id !== optimistic.id)
           });
           throw error;
         }
 
-        const errorMessage = buildChatErrorMessage(error);
+        const errorMessage = buildChatErrorMessage(error, {
+          runStatusEvents: get().runStatusEvents
+        });
         set({
           chatState: "idle",
           isBusy: false,
@@ -1013,29 +1059,37 @@ function upsertAgentProvider(
 }
 
 function buildAgentNotice(
-  result: WorkbenchAgentCreationResult | WorkbenchAgentDeletionResult
+  result: WorkbenchAgentCreationResult | WorkbenchAgentDeletionResult | WorkbenchAgentUpdateResult
 ): string | null {
-  if ("agent" in result) {
+  if ("createdPaths" in result) {
     if (result.externalAgentCreation) {
       return `Agent created. External creation (${result.externalAgentCreation.providerId}) returned code ${result.externalAgentCreation.code}.`;
     }
     return `Agent created: ${result.agent.displayName}.`;
   }
 
-  if (result.externalAgentDeletion) {
-    return `Agent removed locally. External deletion (${result.externalAgentDeletion.providerId}) returned code ${result.externalAgentDeletion.code}.`;
+  if ("existed" in result) {
+    if (result.externalAgentDeletion) {
+      return `Agent removed locally. External deletion (${result.externalAgentDeletion.providerId}) returned code ${result.externalAgentDeletion.code}.`;
+    }
+    return result.existed ? `Agent deleted locally: ${result.agentId}.` : `Agent not found locally: ${result.agentId}.`;
   }
-  return result.existed ? `Agent deleted locally: ${result.agentId}.` : `Agent not found locally: ${result.agentId}.`;
+
+  if (result.externalAgentCreation) {
+    return `Agent updated. External create-if-missing (${result.externalAgentCreation.providerId}) returned code ${result.externalAgentCreation.code}.`;
+  }
+  return `Agent updated: ${result.agent.displayName}.`;
 }
 
 function buildExternalAgentFailure(
-  result: WorkbenchAgentCreationResult | WorkbenchAgentDeletionResult
+  result: WorkbenchAgentCreationResult | WorkbenchAgentDeletionResult | WorkbenchAgentUpdateResult
 ): string | null {
-  if ("agent" in result) {
+  if ("createdPaths" in result || ("agent" in result && !("existed" in result))) {
     const external = result.externalAgentCreation;
     if (external && external.code !== 0) {
       const details = external.stderr.trim() || external.stdout.trim();
-      return `Local agent was created, but external provider agent creation failed (code ${external.code}). ${details || ""}`.trim();
+      const context = "createdPaths" in result ? "created" : "updated";
+      return `Local agent was ${context}, but external provider agent creation failed (code ${external.code}). ${details || ""}`.trim();
     }
     return null;
   }
@@ -1062,38 +1116,50 @@ function isAbortErrorLike(error: unknown): boolean {
   return error.name === "AbortError";
 }
 
-function buildChatErrorMessage(error: unknown): WorkbenchMessage {
+function buildChatErrorMessage(
+  error: unknown,
+  context?: {
+    runStatusEvents?: WorkbenchRunStatusEvent[];
+  }
+): WorkbenchMessage {
   return {
     id: `error-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     role: "assistant",
     providerId: WORKBENCH_CHAT_ERROR_PROVIDER_ID,
-    content: summarizeChatError(error),
+    content: summarizeChatError(error, context),
     createdAt: new Date().toISOString()
   };
 }
 
-function summarizeChatError(error: unknown): string {
+function summarizeChatError(
+  error: unknown,
+  context?: {
+    runStatusEvents?: WorkbenchRunStatusEvent[];
+  }
+): string {
   const raw = toErrorMessage(error).trim();
   if (!raw) {
     return "The request failed. Please try again.";
   }
 
-  const extracted = extractStructuredErrorDetail(raw);
+  const extracted = extractStructuredErrorDetail(raw, context?.runStatusEvents);
   const details = extracted.details ?? raw;
   const reason = summarizeErrorReason(details);
   const subject = extracted.agentLabel ? `${extracted.agentLabel} failed` : "The request failed";
   const providerContext = extracted.providerLabel ? ` via ${extracted.providerLabel}` : "";
+  const modelLabel = extractModelLabel(details);
+  const modelContext = modelLabel ? ` (${modelLabel})` : "";
 
   if (reason) {
-    return `${subject}${providerContext}: ${reason}`;
+    return `${subject}${providerContext}${modelContext}: ${reason}`;
   }
 
   const sanitized = sanitizeProviderErrorDetails(details);
   if (sanitized) {
-    return `${subject}${providerContext}: ${clampText(sanitized, 220)}`;
+    return `${subject}${providerContext}${modelContext}: ${clampText(sanitized, 220)}`;
   }
-  if (providerContext) {
-    return `${subject}${providerContext}.`;
+  if (providerContext || modelContext) {
+    return `${subject}${providerContext}${modelContext}.`;
   }
 
   return clampText(raw.replace(/\s+/g, " ").trim(), 220);
@@ -1103,15 +1169,32 @@ function extractStructuredErrorDetail(raw: string): {
   agentLabel: string | null;
   providerLabel: string | null;
   details: string | null;
+}
+function extractStructuredErrorDetail(
+  raw: string,
+  runStatusEvents?: WorkbenchRunStatusEvent[]
+): {
+  agentLabel: string | null;
+  providerLabel: string | null;
+  details: string | null;
 } {
   const delegatedMatch = raw.match(
-    /The delegated agent "([^"]+)" failed via provider "([^"]+)" \(exit code (\d+)\)\.\s*Details:\s*([\s\S]*)$/i
+    /The delegated agent ["`]?([^"`\n]+)["`]? failed via provider ["`]?([^"`\n]+)["`]?(?: \(exit code (\d+)\))?\.\s*(?:Details:\s*)?([\s\S]*)$/i
   );
   if (delegatedMatch) {
     return {
       agentLabel: formatAgentLabel(delegatedMatch[1]),
       providerLabel: formatProviderLabel(delegatedMatch[2]),
       details: delegatedMatch[4]?.trim() || null
+    };
+  }
+
+  const failedInvocation = findFailedProviderInvocation(runStatusEvents);
+  if (failedInvocation) {
+    return {
+      agentLabel: formatAgentLabel(failedInvocation.agentId),
+      providerLabel: formatProviderLabel(failedInvocation.providerId),
+      details: raw
     };
   }
 
@@ -1131,6 +1214,26 @@ function extractStructuredErrorDetail(raw: string): {
     providerLabel: null,
     details: null
   };
+}
+
+function findFailedProviderInvocation(
+  events?: WorkbenchRunStatusEvent[]
+): WorkbenchRunStatusEvent | null {
+  if (!events?.length) {
+    return null;
+  }
+
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (!event) {
+      continue;
+    }
+    if (event.stage === "provider_invocation_completed" && typeof event.code === "number" && event.code !== 0) {
+      return event;
+    }
+  }
+
+  return null;
 }
 
 function summarizeErrorReason(details: string): string | null {
@@ -1183,6 +1286,27 @@ function summarizeErrorReason(details: string): string | null {
     return "network connection failed while contacting the provider.";
   }
 
+  return null;
+}
+
+function extractModelLabel(details: string): string | null {
+  const patterns = [
+    /"model"\s*:\s*"([^"]+)"/i,
+    /\bmodel\s*[:=]\s*["']?([a-z0-9][a-z0-9._/-]{1,127})["']?/i,
+    /\bfor model\s+["']?([a-z0-9][a-z0-9._/-]{1,127})["']?/i
+  ];
+  for (const pattern of patterns) {
+    const match = details.match(pattern);
+    const candidate = match?.[1]?.trim();
+    if (!candidate) {
+      continue;
+    }
+    const lower = candidate.toLowerCase();
+    if (lower === "this" || lower === "unknown") {
+      continue;
+    }
+    return candidate;
+  }
   return null;
 }
 

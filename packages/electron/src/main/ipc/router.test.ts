@@ -39,6 +39,10 @@ describe("desktop IPC router", () => {
     await caller.agents.create({
       name: "writer"
     });
+    await caller.agents.update({
+      agentId: "writer",
+      providerId: "openclaw"
+    });
     await caller.agents.delete({
       agentId: "writer"
     });
@@ -74,6 +78,10 @@ describe("desktop IPC router", () => {
     });
     expect(service.createAgent).toHaveBeenCalledWith({
       name: "writer"
+    });
+    expect(service.updateAgent).toHaveBeenCalledWith({
+      agentId: "writer",
+      providerId: "openclaw"
     });
     expect(service.deleteAgent).toHaveBeenCalledWith({
       agentId: "writer"
@@ -208,6 +216,15 @@ function createServiceStub(): WorkbenchService {
       },
       createdPaths: [],
       skippedPaths: []
+    })),
+    updateAgent: vi.fn(async () => ({
+      agent: {
+        id: "writer",
+        displayName: "Writer",
+        workspaceDir: "/tmp/workspaces/writer",
+        internalConfigDir: "/tmp/agents/writer",
+        providerId: "openclaw"
+      }
     })),
     deleteAgent: vi.fn(async () => ({
       agentId: "writer",

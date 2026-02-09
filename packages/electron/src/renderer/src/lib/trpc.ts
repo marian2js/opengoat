@@ -9,6 +9,7 @@ import type {
   WorkbenchAgent,
   WorkbenchAgentCreationResult,
   WorkbenchAgentDeletionResult,
+  WorkbenchAgentUpdateResult,
   WorkbenchAgentProvider,
   WorkbenchBootstrap,
   WorkbenchGatewayStatus,
@@ -42,6 +43,12 @@ export interface WorkbenchApiClient {
     createExternalAgent?: boolean;
     env?: Record<string, string>;
   }) => Promise<WorkbenchAgentCreationResult>;
+  updateAgent: (input: {
+    agentId: string;
+    providerId: string;
+    createExternalAgent?: boolean;
+    env?: Record<string, string>;
+  }) => Promise<WorkbenchAgentUpdateResult>;
   deleteAgent: (input: {
     agentId: string;
     providerId?: string;
@@ -164,6 +171,20 @@ export function createWorkbenchApiClient(): WorkbenchApiClient {
       const trpc = getTrpcClient();
       await ensureContract(trpc);
       return (await trpc.mutation("agents.create", input)) as WorkbenchAgentCreationResult;
+    },
+    updateAgent: async (input) => {
+      const trpc = getTrpcClient();
+      await ensureContract(trpc);
+      try {
+        return (await trpc.mutation("agents.update", input)) as WorkbenchAgentUpdateResult;
+      } catch (error) {
+        if (isMissingProcedureError(error, "agents.update")) {
+          throw new Error(
+            "Desktop runtime is outdated for agent updates. Restart OpenGoat and try again."
+          );
+        }
+        throw error;
+      }
     },
     deleteAgent: async (input) => {
       const trpc = getTrpcClient();

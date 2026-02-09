@@ -65,6 +65,7 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
   const [renameValue, setRenameValue] = useState("");
   const [openMenuProjectId, setOpenMenuProjectId] = useState<string | null>(null);
   const [openMenuSessionKey, setOpenMenuSessionKey] = useState<string | null>(null);
+  const [collapsedProjectIds, setCollapsedProjectIds] = useState<Set<string>>(() => new Set());
 
   const renameEntity = useMemo(
     () => {
@@ -149,6 +150,30 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
   };
 
   const canCreateSessionFromHeader = Boolean(props.activeProjectId) && !props.busy;
+  const isProjectExpanded = (projectId: string) => !collapsedProjectIds.has(projectId);
+
+  const toggleProjectExpanded = (projectId: string) => {
+    setCollapsedProjectIds((current) => {
+      const next = new Set(current);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
+  };
+
+  const expandProject = (projectId: string) => {
+    setCollapsedProjectIds((current) => {
+      if (!current.has(projectId)) {
+        return current;
+      }
+      const next = new Set(current);
+      next.delete(projectId);
+      return next;
+    });
+  };
 
   return (
     <>
@@ -206,15 +231,19 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
             <div className="space-y-1">
               {props.projects.map((project) => {
                 const selected = project.id === props.activeProjectId;
+                const expanded = isProjectExpanded(project.id);
                 return (
                   <button
                     key={project.id}
                     type="button"
                     title={project.name}
                     className={`text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-md ${selected ? "bg-muted text-foreground" : ""}`}
-                    onClick={() => props.onSelectProject(project.id)}
+                    onClick={() => {
+                      props.onSelectProject(project.id);
+                      expandProject(project.id);
+                    }}
                   >
-                    {selected ? (
+                    {expanded ? (
                       <FolderOpen className="size-4" />
                     ) : (
                       <Folder className="size-4" />
@@ -231,6 +260,7 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
               <div className="space-y-3">
                 {props.projects.map((project) => {
                   const projectSelected = project.id === props.activeProjectId;
+                  const expanded = isProjectExpanded(project.id);
                   const isHomeProject = project.name === "Home";
                   const showActions = openMenuProjectId === project.id;
                   return (
@@ -239,13 +269,30 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
                         <button
                           type="button"
                           className={`hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 pr-16 text-left text-sm ${projectSelected ? "bg-muted text-foreground" : "text-muted-foreground"}`}
-                          onClick={() => props.onSelectProject(project.id)}
+                          onClick={() => {
+                            props.onSelectProject(project.id);
+                            expandProject(project.id);
+                          }}
                         >
-                          {projectSelected ? (
-                            <FolderOpen className="size-4 shrink-0" />
-                          ) : (
-                            <Folder className="size-4 shrink-0" />
-                          )}
+                          <button
+                            type="button"
+                            className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleProjectExpanded(project.id);
+                            }}
+                            aria-label={
+                              expanded
+                                ? `Collapse ${project.name}`
+                                : `Expand ${project.name}`
+                            }
+                          >
+                            {expanded ? (
+                              <FolderOpen className="size-4 shrink-0" />
+                            ) : (
+                              <Folder className="size-4 shrink-0" />
+                            )}
+                          </button>
                           <span className="truncate">{project.name}</span>
                         </button>
                         <div
@@ -262,6 +309,7 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
                             onClick={(event) => {
                               event.stopPropagation();
                               props.onCreateSession(project.id);
+                              expandProject(project.id);
                             }}
                           >
                             <Plus className="size-3.5" />
@@ -317,89 +365,91 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
                           </DropdownMenu>
                         </div>
                       </div>
-                      <div className="pl-7">
-                        {project.sessions.length === 0 ? (
-                          <p className="text-muted-foreground text-xs">No sessions</p>
-                        ) : (
-                          <div className="space-y-0.5">
-                            {project.sessions.map((session) => {
-                              const selected =
-                                project.id === props.activeProjectId &&
-                                session.id === props.activeSessionId;
-                              const sessionMenuKey = `${project.id}:${session.id}`;
-                              const showSessionActions = openMenuSessionKey === sessionMenuKey;
-                              return (
-                                <div key={session.id} className="group/session relative">
-                                  <button
-                                    type="button"
-                                    className={`hover:bg-muted w-full rounded-md px-2 py-1 pr-10 text-left text-sm ${selected ? "bg-muted text-foreground" : "text-muted-foreground"}`}
-                                    onClick={() => props.onSelectSession(project.id, session.id)}
-                                  >
-                                    <span className="truncate">{session.title}</span>
-                                  </button>
-                                  <div
-                                    className={`absolute top-1/2 right-0.5 flex -translate-y-1/2 items-center transition-opacity group-hover/session:opacity-100 group-focus-within/session:opacity-100 ${showSessionActions ? "opacity-100" : "opacity-0"}`}
-                                  >
-                                    <DropdownMenu
-                                      open={openMenuSessionKey === sessionMenuKey}
-                                      onOpenChange={(open) => {
-                                        setOpenMenuSessionKey(open ? sessionMenuKey : null);
-                                      }}
+                      {expanded ? (
+                        <div className="pl-7">
+                          {project.sessions.length === 0 ? (
+                            <p className="text-muted-foreground text-xs">No sessions</p>
+                          ) : (
+                            <div className="space-y-0.5">
+                              {project.sessions.map((session) => {
+                                const selected =
+                                  project.id === props.activeProjectId &&
+                                  session.id === props.activeSessionId;
+                                const sessionMenuKey = `${project.id}:${session.id}`;
+                                const showSessionActions = openMenuSessionKey === sessionMenuKey;
+                                return (
+                                  <div key={session.id} className="group/session relative">
+                                    <button
+                                      type="button"
+                                      className={`hover:bg-muted w-full rounded-md px-2 py-1 pr-10 text-left text-sm ${selected ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                                      onClick={() => props.onSelectSession(project.id, session.id)}
                                     >
-                                      <DropdownMenuTrigger asChild>
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="icon-xs"
-                                          className="text-muted-foreground hover:text-foreground"
-                                          aria-label={`${session.title} settings`}
-                                          title="Session settings"
-                                          onClick={(event) => event.stopPropagation()}
-                                        >
-                                          <MoreHorizontal className="size-3.5" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuItem
-                                          disabled={props.busy}
-                                          onClick={(event) => {
-                                            event.preventDefault();
-                                            onOpenRenameSessionDialog(
-                                              project.id,
-                                              session.id,
-                                              session.title
-                                            );
-                                          }}
-                                        >
-                                          <PencilLine className="size-4" />
-                                          Rename
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                          variant="destructive"
-                                          disabled={props.busy}
-                                          onClick={(event) => {
-                                            event.preventDefault();
-                                            if (
-                                              window.confirm(
-                                                `Delete session "${session.title}"?`
-                                              )
-                                            ) {
-                                              props.onRemoveSession(project.id, session.id);
-                                            }
-                                          }}
-                                        >
-                                          <Trash2 className="size-4" />
-                                          Delete
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
+                                      <span className="truncate">{session.title}</span>
+                                    </button>
+                                    <div
+                                      className={`absolute top-1/2 right-0.5 flex -translate-y-1/2 items-center transition-opacity group-hover/session:opacity-100 group-focus-within/session:opacity-100 ${showSessionActions ? "opacity-100" : "opacity-0"}`}
+                                    >
+                                      <DropdownMenu
+                                        open={openMenuSessionKey === sessionMenuKey}
+                                        onOpenChange={(open) => {
+                                          setOpenMenuSessionKey(open ? sessionMenuKey : null);
+                                        }}
+                                      >
+                                        <DropdownMenuTrigger asChild>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-xs"
+                                            className="text-muted-foreground hover:text-foreground"
+                                            aria-label={`${session.title} settings`}
+                                            title="Session settings"
+                                            onClick={(event) => event.stopPropagation()}
+                                          >
+                                            <MoreHorizontal className="size-3.5" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem
+                                            disabled={props.busy}
+                                            onClick={(event) => {
+                                              event.preventDefault();
+                                              onOpenRenameSessionDialog(
+                                                project.id,
+                                                session.id,
+                                                session.title
+                                              );
+                                            }}
+                                          >
+                                            <PencilLine className="size-4" />
+                                            Rename
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            variant="destructive"
+                                            disabled={props.busy}
+                                            onClick={(event) => {
+                                              event.preventDefault();
+                                              if (
+                                                window.confirm(
+                                                  `Delete session "${session.title}"?`
+                                                )
+                                              ) {
+                                                props.onRemoveSession(project.id, session.id);
+                                              }
+                                            }}
+                                          >
+                                            <Trash2 className="size-4" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
                     </section>
                   );
                 })}

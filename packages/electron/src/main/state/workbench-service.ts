@@ -24,6 +24,7 @@ import type {
   WorkbenchAgent,
   WorkbenchAgentCreationResult,
   WorkbenchAgentDeletionResult,
+  WorkbenchAgentUpdateResult,
   WorkbenchAgentProvider,
   WorkbenchGuidedAuthResult,
   WorkbenchMessage,
@@ -284,6 +285,67 @@ export class WorkbenchService {
     };
   }
 
+  public async updateAgent(input: {
+    agentId: string;
+    providerId: string;
+    createExternalAgent?: boolean;
+    env?: Record<string, string>;
+  }): Promise<WorkbenchAgentUpdateResult> {
+    await this.ensureInitialized();
+    const agentId = normalizeAgentId(input.agentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const requestedProviderId = input.providerId.trim().toLowerCase();
+    if (!requestedProviderId) {
+      throw new Error("Provider id cannot be empty.");
+    }
+
+    const providers = await this.opengoat.listProviders();
+    const provider = providers.find((entry) => entry.id === requestedProviderId);
+    if (!provider) {
+      throw new Error(`Unknown provider: ${input.providerId}`);
+    }
+    if (provider.kind !== "cli") {
+      throw new Error(`Provider "${provider.id}" is not supported for agent setup.`);
+    }
+
+    const env = input.env ?? {};
+    if (Object.keys(env).length > 0) {
+      await this.opengoat.setProviderConfig(provider.id, env);
+    }
+
+    const binding = await this.opengoat.setAgentProvider(agentId, provider.id);
+    let externalAgentCreation: WorkbenchAgentUpdateResult["externalAgentCreation"];
+    const supportsExternalAgentCreation = Boolean(provider.capabilities.agentCreate);
+    const shouldCreateExternalAgent = input.createExternalAgent !== false;
+    if (input.createExternalAgent === true && !supportsExternalAgentCreation) {
+      throw new Error(
+        `Provider "${provider.id}" does not support external agent creation.`
+      );
+    }
+    if (shouldCreateExternalAgent && supportsExternalAgentCreation) {
+      externalAgentCreation = await this.opengoat.createExternalAgent(agentId, {
+        providerId: binding.providerId
+      });
+    }
+
+    const agentDescriptor = (await this.opengoat.listAgents()).find((agent) => agent.id === agentId);
+    if (!agentDescriptor) {
+      throw new Error(`Agent "${agentId}" was not found.`);
+    }
+
+    return {
+      agent: {
+        ...agentDescriptor,
+        providerId: binding.providerId
+      },
+      provider: await this.buildAgentProviderSummary(binding.providerId, provider),
+      externalAgentCreation
+    };
+  }
+
   private async buildAgentProviderSummary(
     providerId: string,
     providerSummary?: CoreProviderSummary
@@ -448,7 +510,11 @@ export class WorkbenchService {
         throw error;
       }
       if (run.code !== 0) {
-        const details = (run.stderr || run.stdout || "No provider error details were returned.").trim();
+        const summary = run.stdout.trim();
+        const diagnostics = run.stderr.trim();
+        const details = summary && diagnostics
+          ? `${summary}\nProvider stderr:\n${diagnostics}`
+          : summary || diagnostics || "No provider error details were returned.";
         throw new Error(
           `Orchestrator provider failed (${run.providerId}, code ${run.code}). ${details}`
         );

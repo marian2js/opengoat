@@ -54,6 +54,10 @@ export abstract class BaseCliProvider extends BaseProvider {
     throw new UnsupportedProviderActionError(this.id, "delete_agent");
   }
 
+  protected prepareExecutionEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    return env;
+  }
+
   public buildInvocation(options: ProviderInvokeOptions, env: NodeJS.ProcessEnv = process.env): ProviderInvocation {
     this.validateInvokeOptions(options);
     const command = this.resolveCommand(env);
@@ -91,7 +95,7 @@ export abstract class BaseCliProvider extends BaseProvider {
   }
 
   public async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
-    const env = options.env ?? process.env;
+    const env = this.prepareExecutionEnv(options.env ?? process.env);
     const invocation = this.buildInvocation(options, env);
 
     try {
@@ -114,7 +118,7 @@ export abstract class BaseCliProvider extends BaseProvider {
   }
 
   public override async invokeAuth(options: ProviderAuthOptions = {}): Promise<ProviderExecutionResult> {
-    const env = options.env ?? process.env;
+    const env = this.prepareExecutionEnv(options.env ?? process.env);
     const invocation = this.buildAuthInvocation(options, env);
 
     try {
@@ -136,7 +140,7 @@ export abstract class BaseCliProvider extends BaseProvider {
   }
 
   public override async createAgent(options: ProviderCreateAgentOptions): Promise<ProviderExecutionResult> {
-    const env = options.env ?? process.env;
+    const env = this.prepareExecutionEnv(options.env ?? process.env);
     const invocation = this.buildCreateAgentInvocation(options, env);
 
     try {
@@ -158,7 +162,7 @@ export abstract class BaseCliProvider extends BaseProvider {
   }
 
   public override async deleteAgent(options: ProviderDeleteAgentOptions): Promise<ProviderExecutionResult> {
-    const env = options.env ?? process.env;
+    const env = this.prepareExecutionEnv(options.env ?? process.env);
     const invocation = this.buildDeleteAgentInvocation(options, env);
 
     try {

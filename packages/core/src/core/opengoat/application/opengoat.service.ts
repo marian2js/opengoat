@@ -208,6 +208,55 @@ export class OpenGoatService {
     };
   }
 
+  public async createExternalAgent(
+    rawAgentId: string,
+    options: {
+      providerId?: string;
+    } = {}
+  ): Promise<{
+    providerId: string;
+    code: number;
+    stdout: string;
+    stderr: string;
+  }> {
+    const paths = this.pathsProvider.getPaths();
+    const agentId = normalizeAgentId(rawAgentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const agent = (await this.agentService.listAgents(paths)).find((entry) => entry.id === agentId);
+    if (!agent) {
+      throw new Error(`Agent "${agentId}" was not found.`);
+    }
+
+    const resolvedProviderId =
+      options.providerId?.trim().toLowerCase() ??
+      (await this.providerService.getAgentProvider(paths, agentId)).providerId;
+    const supportsExternalAgentCreation = await this.providerSupportsExternalAgentCreation(
+      resolvedProviderId
+    );
+    if (!supportsExternalAgentCreation) {
+      throw new Error(
+        `Provider "${resolvedProviderId}" does not support external agent creation.`
+      );
+    }
+
+    const externalAgentCreation = await this.providerService.createProviderAgent(paths, agentId, {
+      providerId: resolvedProviderId,
+      displayName: agent.displayName,
+      workspaceDir: agent.workspaceDir,
+      internalConfigDir: agent.internalConfigDir
+    });
+
+    return {
+      providerId: externalAgentCreation.providerId,
+      code: externalAgentCreation.code,
+      stdout: externalAgentCreation.stdout,
+      stderr: externalAgentCreation.stderr
+    };
+  }
+
   private async providerSupportsExternalAgentCreation(providerId: string): Promise<boolean> {
     const providers = await this.providerService.listProviders();
     const provider = providers.find((entry) => entry.id === providerId);

@@ -263,7 +263,10 @@ export const extendedHttpProviderCatalog: ExtendedHttpProviderSpec[] = [
       envVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
       header: "bearer"
     },
-    requiredEnv: [field("GEMINI_API_KEY", "Gemini API key", { required: true, secret: true })],
+    requiredEnv: [
+      field("GEMINI_API_KEY", "Gemini API key", { required: true, secret: true }),
+      field("GEMINI_MODEL", "Optional default model id")
+    ],
     modelEnvVar: "GEMINI_MODEL",
     defaultModel: "gemini-3-pro-preview",
     stripProviderPrefix: true

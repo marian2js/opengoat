@@ -487,6 +487,80 @@ describe("WorkbenchService sendMessage", () => {
     expect(runAgent).toHaveBeenCalledTimes(0);
   });
 
+  it("preserves delegated-agent failure summary before provider stderr diagnostics", async () => {
+    const runAgent = vi.fn(async () => ({
+      code: 1,
+      stdout:
+        'The delegated agent "developer" failed via provider "gemini" (exit code 1).\n' +
+        "Details: TerminalQuotaError: You have exhausted your capacity on this model.",
+      stderr:
+        "(node:123) [DEP0040] DeprecationWarning: The `punycode` module is deprecated.\n" +
+        "TerminalQuotaError: You have exhausted your capacity on this model.",
+      providerId: "gemini",
+      tracePath: "/tmp/trace.json",
+      entryAgentId: "orchestrator",
+      routing: {
+        entryAgentId: "orchestrator",
+        targetAgentId: "orchestrator",
+        confidence: 1,
+        reason: "test",
+        rewrittenMessage: "hello",
+        candidates: []
+      }
+    }));
+    const opengoat = createOpenGoatStub({
+      providers: createProviderSummaries(),
+      activeProviderId: "openai",
+      onboardingByProvider: {},
+      runAgent
+    });
+    const appendMessage = vi.fn().mockResolvedValue({
+      id: "s1",
+      title: "Session",
+      agentId: "orchestrator",
+      sessionKey: "desktop:p1:s1",
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+      messages: []
+    });
+    const store = {
+      getGatewaySettings: vi.fn(async () => ({
+        mode: "local" as const,
+        timeoutMs: 10_000
+      })),
+      getProject: vi.fn(async () => ({
+        id: "p1",
+        name: "project",
+        rootPath: "/tmp/project",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        sessions: []
+      })),
+      getSession: vi.fn(async () => ({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: []
+      })),
+      appendMessage
+    } as unknown as WorkbenchStore;
+    const service = new WorkbenchService({ opengoat, store });
+
+    await expect(
+      service.sendMessage({
+        projectId: "p1",
+        sessionId: "s1",
+        message: "hello"
+      })
+    ).rejects.toThrow(
+      /The delegated agent "developer" failed via provider "gemini".*Provider stderr:/s
+    );
+    expect(appendMessage).toHaveBeenCalledTimes(1);
+  });
+
   it("stops an in-flight local run when requested", async () => {
     const runAgent = vi.fn(async (...args: unknown[]) => {
       const options = (args[1] ?? {}) as { abortSignal?: AbortSignal };
@@ -681,6 +755,65 @@ describe("WorkbenchService project management", () => {
   });
 });
 
+describe("WorkbenchService agent management", () => {
+  it("updates provider binding and optionally triggers external create-if-missing", async () => {
+    const providers = createProviderSummaries();
+    const opengoat = createOpenGoatStub({
+      providers,
+      activeProviderId: "openai",
+      onboardingByProvider: {
+        openclaw: {
+          env: [
+            {
+              key: "OPENCLAW_CMD",
+              description: "Optional openclaw binary path override"
+            }
+          ]
+        }
+      },
+      agents: [
+        {
+          id: "orchestrator",
+          displayName: "Orchestrator",
+          workspaceDir: "/tmp/workspaces/orchestrator",
+          internalConfigDir: "/tmp/agents/orchestrator"
+        },
+        {
+          id: "developer",
+          displayName: "Developer",
+          workspaceDir: "/tmp/workspaces/developer",
+          internalConfigDir: "/tmp/agents/developer"
+        }
+      ],
+      initialAgentProviders: {
+        orchestrator: "openai",
+        developer: "codex"
+      }
+    });
+    const store = createStoreStub();
+    const service = new WorkbenchService({ opengoat, store });
+
+    const result = await service.updateAgent({
+      agentId: "developer",
+      providerId: "openclaw",
+      createExternalAgent: true,
+      env: {
+        OPENCLAW_CMD: "/usr/local/bin/openclaw"
+      }
+    });
+
+    expect(opengoat.setProviderConfig).toHaveBeenCalledWith("openclaw", {
+      OPENCLAW_CMD: "/usr/local/bin/openclaw"
+    });
+    expect(opengoat.setAgentProvider).toHaveBeenCalledWith("developer", "openclaw");
+    expect(opengoat.createExternalAgent).toHaveBeenCalledWith("developer", {
+      providerId: "openclaw"
+    });
+    expect(result.agent.providerId).toBe("openclaw");
+    expect(result.provider?.id).toBe("openclaw");
+  });
+});
+
 function createProviderSummaries(): ProviderSummary[] {
   return [
     {
@@ -703,6 +836,18 @@ function createProviderSummaries(): ProviderSummary[] {
         model: true,
         auth: false,
         passthrough: false
+      }
+    },
+    {
+      id: "openclaw",
+      displayName: "OpenClaw",
+      kind: "cli",
+      capabilities: {
+        agent: true,
+        model: true,
+        auth: true,
+        passthrough: true,
+        agentCreate: true
       }
     }
   ];
@@ -734,15 +879,37 @@ function createOpenGoatStub(options: {
     }
   >;
   initialProviderConfigs?: Record<string, ProviderStoredConfig>;
+  initialAgentProviders?: Record<string, string>;
+  agents?: Array<{
+    id: string;
+    displayName: string;
+    workspaceDir: string;
+    internalConfigDir: string;
+  }>;
   runAgent?: ReturnType<typeof vi.fn>;
 }): OpenGoatService & {
   setProviderConfig: ReturnType<typeof vi.fn>;
   setAgentProvider: ReturnType<typeof vi.fn>;
+  createExternalAgent: ReturnType<typeof vi.fn>;
 } {
   const providerConfigs = new Map<string, ProviderStoredConfig | null>(
     Object.entries(options.initialProviderConfigs ?? {})
   );
-  const activeProvider = { value: options.activeProviderId };
+  const agentProviders = new Map<string, string>([
+    ["orchestrator", options.activeProviderId],
+    ...Object.entries(options.initialAgentProviders ?? {})
+  ]);
+  const listAgents = vi.fn(
+    async () =>
+      options.agents ?? [
+        {
+          id: "orchestrator",
+          displayName: "Orchestrator",
+          workspaceDir: "/tmp/workspaces/orchestrator",
+          internalConfigDir: "/tmp/agents/orchestrator"
+        }
+      ]
+  );
 
   const setProviderConfig = vi.fn(async (providerId: string, env: Record<string, string>) => {
     const next: ProviderStoredConfig = {
@@ -754,13 +921,19 @@ function createOpenGoatStub(options: {
     providerConfigs.set(providerId, next);
     return next;
   });
-  const setAgentProvider = vi.fn(async (_agentId: string, providerId: string) => {
-    activeProvider.value = providerId;
+  const setAgentProvider = vi.fn(async (agentId: string, providerId: string) => {
+    agentProviders.set(agentId, providerId);
     return {
-      agentId: "orchestrator",
+      agentId,
       providerId
     };
   });
+  const createExternalAgent = vi.fn(async (agentId: string, input?: { providerId?: string }) => ({
+    providerId: input?.providerId ?? agentProviders.get(agentId) ?? "openai",
+    code: 0,
+    stdout: "ok",
+    stderr: ""
+  }));
 
   return {
     initialize: vi.fn(async () => ({
@@ -769,14 +942,16 @@ function createOpenGoatStub(options: {
     })),
     getHomeDir: vi.fn(() => "/tmp/home"),
     listProviders: vi.fn(async () => options.providers),
-    getAgentProvider: vi.fn(async () => ({
-      agentId: "orchestrator",
-      providerId: activeProvider.value
+    getAgentProvider: vi.fn(async (agentId: string) => ({
+      agentId,
+      providerId: agentProviders.get(agentId) ?? options.activeProviderId
     })),
+    listAgents,
     getProviderOnboarding: vi.fn(async (providerId: string) => options.onboardingByProvider[providerId]),
     getProviderConfig: vi.fn(async (providerId: string) => providerConfigs.get(providerId) ?? null),
     setProviderConfig,
     setAgentProvider,
+    createExternalAgent,
     runAgent:
       options.runAgent ??
       vi.fn(async () => ({

@@ -76,10 +76,11 @@ export function OnboardingPanel(props: OnboardingPanelProps) {
   }, [envPartition.required, selectedProvider?.guidedAuth]);
   const visibleRequiredFields = useMemo(
     () =>
-      envPartition.required.filter(
-        (field) => !guidedHiddenRequiredKeySet.has(field.key),
+      envPartition.primary.filter(
+        (field) =>
+          !field.required || !guidedHiddenRequiredKeySet.has(field.key),
       ),
-    [envPartition.required, guidedHiddenRequiredKeySet],
+    [envPartition.primary, guidedHiddenRequiredKeySet],
   );
 
   useEffect(() => {
@@ -671,15 +672,25 @@ function splitEnvFields(
   }>,
 ) {
   const required: typeof fields = [];
+  const primary: typeof fields = [];
   const optional: typeof fields = [];
   for (const field of fields) {
     if (field.required) {
       required.push(field);
+      primary.push(field);
+      continue;
+    }
+    if (isModelFieldKey(field.key)) {
+      primary.push(field);
       continue;
     }
     optional.push(field);
   }
-  return { required, optional };
+  return { required, primary, optional };
+}
+
+function isModelFieldKey(key: string): boolean {
+  return key.trim().toUpperCase().includes("MODEL");
 }
 
 function isFieldSatisfied(params: {

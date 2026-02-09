@@ -20,7 +20,7 @@ import {
 } from "@renderer/components/ai-elements/select";
 import type { WorkbenchAgent, WorkbenchAgentProvider } from "@shared/workbench";
 import { cn } from "@renderer/lib/utils";
-import { ChevronDown, Trash2 } from "lucide-react";
+import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 
 interface AgentsPanelProps {
   agents: WorkbenchAgent[];
@@ -33,6 +33,12 @@ interface AgentsPanelProps {
   onCreate: (input: {
     name: string;
     providerId?: string;
+    createExternalAgent?: boolean;
+    env?: Record<string, string>;
+  }) => Promise<void> | void;
+  onUpdate: (input: {
+    agentId: string;
+    providerId: string;
     createExternalAgent?: boolean;
     env?: Record<string, string>;
   }) => Promise<void> | void;
@@ -59,6 +65,11 @@ export function AgentsPanel(props: AgentsPanelProps) {
   const [showAdvancedProviderSettings, setShowAdvancedProviderSettings] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<WorkbenchAgent | null>(null);
+  const [editProviderId, setEditProviderId] = useState("");
+  const [editCreateExternal, setEditCreateExternal] = useState(true);
+  const [editShowAdvancedProviderSettings, setEditShowAdvancedProviderSettings] = useState(false);
+  const [editFormError, setEditFormError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteProviderId, setDeleteProviderId] = useState("");
   const [deleteExternal, setDeleteExternal] = useState(false);
@@ -83,6 +94,22 @@ export function AgentsPanel(props: AgentsPanelProps) {
   );
   const supportsExternalAgentCreation = Boolean(selectedProvider?.supportsExternalAgentCreation);
   const hasAdvancedOptions = providerSettings.advanced.length > 0 || supportsExternalAgentCreation;
+  const normalizedEditProviderId = editProviderId.trim().toLowerCase();
+  const selectedEditProvider =
+    props.providers.find((provider) => provider.id === normalizedEditProviderId) ?? null;
+  const editProviderEnv =
+    (normalizedEditProviderId && providerEnvDrafts[normalizedEditProviderId]) ??
+    selectedEditProvider?.configuredEnvValues ??
+    {};
+  const editProviderSettings = useMemo(
+    () => partitionProviderSettingsFields(selectedEditProvider?.envFields ?? []),
+    [selectedEditProvider?.envFields]
+  );
+  const editSupportsExternalAgentCreation = Boolean(
+    selectedEditProvider?.supportsExternalAgentCreation
+  );
+  const editHasAdvancedOptions =
+    editProviderSettings.advanced.length > 0 || editSupportsExternalAgentCreation;
 
   const resetCreateForm = () => {
     setName("");
@@ -90,6 +117,13 @@ export function AgentsPanel(props: AgentsPanelProps) {
     setCreateExternal(true);
     setShowAdvancedProviderSettings(false);
     setFormError(null);
+  };
+  const resetEditForm = () => {
+    setEditTarget(null);
+    setEditProviderId("");
+    setEditCreateExternal(true);
+    setEditShowAdvancedProviderSettings(false);
+    setEditFormError(null);
   };
 
   useEffect(() => {
@@ -115,6 +149,21 @@ export function AgentsPanel(props: AgentsPanelProps) {
   }, [normalizedProviderId, providerEnvDrafts, selectedProvider]);
 
   useEffect(() => {
+    if (!normalizedEditProviderId) {
+      return;
+    }
+    if (providerEnvDrafts[normalizedEditProviderId]) {
+      return;
+    }
+    if (selectedEditProvider) {
+      setProviderEnvDrafts((drafts) => ({
+        ...drafts,
+        [normalizedEditProviderId]: { ...selectedEditProvider.configuredEnvValues }
+      }));
+    }
+  }, [normalizedEditProviderId, providerEnvDrafts, selectedEditProvider]);
+
+  useEffect(() => {
     setShowAdvancedProviderSettings(false);
     setCreateExternal(true);
   }, [normalizedProviderId]);
@@ -124,6 +173,17 @@ export function AgentsPanel(props: AgentsPanelProps) {
       setCreateExternal(false);
     }
   }, [supportsExternalAgentCreation, createExternal]);
+
+  useEffect(() => {
+    setEditShowAdvancedProviderSettings(false);
+    setEditCreateExternal(true);
+  }, [normalizedEditProviderId]);
+
+  useEffect(() => {
+    if (!editSupportsExternalAgentCreation && editCreateExternal) {
+      setEditCreateExternal(false);
+    }
+  }, [editSupportsExternalAgentCreation, editCreateExternal]);
 
   const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -163,6 +223,27 @@ export function AgentsPanel(props: AgentsPanelProps) {
     setDeleteTarget(null);
   };
 
+  const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editTarget) {
+      return;
+    }
+    const trimmedProvider = editProviderId.trim();
+    if (!trimmedProvider) {
+      setEditFormError("Agent provider is required.");
+      return;
+    }
+
+    setEditFormError(null);
+    await props.onUpdate({
+      agentId: editTarget.id,
+      providerId: trimmedProvider,
+      createExternalAgent: editSupportsExternalAgentCreation ? editCreateExternal : undefined,
+      env: sanitizeProviderEnv(editProviderEnv)
+    });
+    resetEditForm();
+  };
+
   const handleProviderFieldChange = (key: string, value: string) => {
     if (!normalizedProviderId) {
       return;
@@ -171,6 +252,18 @@ export function AgentsPanel(props: AgentsPanelProps) {
       ...drafts,
       [normalizedProviderId]: {
         ...(drafts[normalizedProviderId] ?? {}),
+        [key]: value
+      }
+    }));
+  };
+  const handleEditProviderFieldChange = (key: string, value: string) => {
+    if (!normalizedEditProviderId) {
+      return;
+    }
+    setProviderEnvDrafts((drafts) => ({
+      ...drafts,
+      [normalizedEditProviderId]: {
+        ...(drafts[normalizedEditProviderId] ?? {}),
         [key]: value
       }
     }));
@@ -283,6 +376,22 @@ export function AgentsPanel(props: AgentsPanelProps) {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-2 text-foreground/85 hover:text-foreground"
+                          onClick={() => {
+                            setEditTarget(agent);
+                            setEditProviderId(agent.providerId ?? "");
+                            setEditCreateExternal(true);
+                            setEditShowAdvancedProviderSettings(false);
+                            setEditFormError(null);
+                          }}
+                          disabled={props.busy}
+                        >
+                          <Pencil className="size-4" />
+                          Edit
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -465,6 +574,148 @@ export function AgentsPanel(props: AgentsPanelProps) {
               </Button>
               <Button type="submit" variant="outline" disabled={props.busy}>
                 Create agent
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(editTarget)} onOpenChange={(open) => !open && resetEditForm()}>
+        <DialogContent className="max-w-3xl border border-[var(--border)]/80 bg-[color-mix(in_oklab,var(--surface)_92%,black)]">
+          <DialogHeader>
+            <DialogTitle>Edit agent</DialogTitle>
+            <DialogDescription>
+              Update provider and runtime settings for this agent.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-4" onSubmit={handleUpdate}>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-foreground">Agent name</p>
+                <Input value={editTarget?.displayName ?? ""} disabled />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-foreground">Agent Provider</p>
+                <Select
+                  value={normalizedEditProviderId || undefined}
+                  onValueChange={(value) => {
+                    setEditProviderId(value);
+                    if (editFormError) {
+                      setEditFormError(null);
+                    }
+                  }}
+                  disabled={props.busy}
+                >
+                  <SelectTrigger
+                    className="h-11 w-full rounded-xl border border-[#2E2F31] bg-[#0E1117] text-foreground hover:bg-[#151922]"
+                  >
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent
+                    align="start"
+                    className="border-[#2E2F31] bg-[#0E1117]"
+                  >
+                    {providerOptions.map((provider) => (
+                      <SelectItem key={provider.id} value={provider.id}>
+                        {provider.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {selectedEditProvider && !props.providerConfigAvailable ? (
+              <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3 text-sm text-muted-foreground">
+                Provider settings require a newer desktop runtime.
+              </div>
+            ) : null}
+            {props.providerConfigAvailable && selectedEditProvider ? (
+              <div className="rounded-lg border border-[#2E2F31] bg-[#101113] px-3 py-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <Badge variant="outline">{selectedEditProvider.displayName}</Badge>
+                  <span className="text-muted-foreground">Provider settings</span>
+                </div>
+                {editProviderSettings.primary.length > 0 ? (
+                  <div className="mt-3 space-y-3">
+                    {editProviderSettings.primary.map((field) => (
+                      <ProviderEnvFieldInput
+                        key={field.key}
+                        field={field}
+                        value={editProviderEnv[field.key] ?? ""}
+                        disabled={props.busy}
+                        onChange={handleEditProviderFieldChange}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {editHasAdvancedOptions ? (
+                  <div className="mt-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-8 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => setEditShowAdvancedProviderSettings((current) => !current)}
+                      disabled={props.busy}
+                    >
+                      {editShowAdvancedProviderSettings
+                        ? "Hide advanced settings"
+                        : "Advanced settings"}
+                      <ChevronDown
+                        className={cn(
+                          "ml-1.5 size-3.5 transition-transform",
+                          editShowAdvancedProviderSettings ? "rotate-180" : ""
+                        )}
+                      />
+                    </Button>
+                    {editShowAdvancedProviderSettings ? (
+                      <div className="mt-2 space-y-3">
+                        {editSupportsExternalAgentCreation ? (
+                          <label className="flex items-center gap-2 rounded-lg border border-[#2E2F31] bg-[#0E1117] px-3 py-2 text-sm">
+                            <input
+                              type="checkbox"
+                              className="size-4"
+                              checked={editCreateExternal}
+                              onChange={(event) =>
+                                setEditCreateExternal(event.currentTarget.checked)
+                              }
+                              disabled={props.busy}
+                            />
+                            <span>Create agent if not exists</span>
+                          </label>
+                        ) : null}
+                        {editProviderSettings.advanced.map((field) => (
+                          <ProviderEnvFieldInput
+                            key={field.key}
+                            field={field}
+                            value={editProviderEnv[field.key] ?? ""}
+                            disabled={props.busy}
+                            onChange={handleEditProviderFieldChange}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {editFormError ? (
+              <p className="text-xs text-red-200">{editFormError}</p>
+            ) : null}
+
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={resetEditForm}
+                disabled={props.busy}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="outline" disabled={props.busy}>
+                Save changes
               </Button>
             </DialogFooter>
           </form>

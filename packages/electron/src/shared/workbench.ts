@@ -242,6 +242,13 @@ export const createAgentInputSchema = z.object({
   env: z.record(z.string(), z.string()).optional()
 });
 
+export const updateAgentInputSchema = z.object({
+  agentId: z.string().trim().min(1),
+  providerId: z.string().trim().min(1),
+  createExternalAgent: z.boolean().optional(),
+  env: z.record(z.string(), z.string()).optional()
+});
+
 export const deleteAgentInputSchema = z.object({
   agentId: z.string().trim().min(1),
   providerId: z.string().trim().min(1).optional(),
@@ -282,6 +289,19 @@ export const agentDeletionResultSchema = z.object({
     .optional()
 });
 
+export const agentUpdateResultSchema = z.object({
+  agent: workbenchAgentSchema,
+  provider: workbenchAgentProviderSchema.optional(),
+  externalAgentCreation: z
+    .object({
+      providerId: z.string(),
+      code: z.number(),
+      stdout: z.string(),
+      stderr: z.string()
+    })
+    .optional()
+});
+
 export const submitOnboardingInputSchema = z.object({
   providerId: z.string().trim().min(1),
   env: z.record(z.string(), z.string()).default({})
@@ -311,3 +331,4 @@ export type WorkbenchStopMessageResult = z.infer<typeof stopMessageResultSchema>
 export type WorkbenchRunStatusEvent = z.infer<typeof workbenchRunStatusEventSchema>;
 export type WorkbenchAgentCreationResult = z.infer<typeof agentCreationResultSchema>;
 export type WorkbenchAgentDeletionResult = z.infer<typeof agentDeletionResultSchema>;
+export type WorkbenchAgentUpdateResult = z.infer<typeof agentUpdateResultSchema>;

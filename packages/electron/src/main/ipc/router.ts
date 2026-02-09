@@ -4,6 +4,7 @@ import {
   addProjectInputSchema,
   createSessionInputSchema,
   createAgentInputSchema,
+  updateAgentInputSchema,
   deleteAgentInputSchema,
   removeProjectInputSchema,
   renameProjectInputSchema,
@@ -71,6 +72,11 @@ export function createDesktopRouter(service: WorkbenchService) {
         .input(createAgentInputSchema)
         .mutation(async ({ input }) => {
           return service.createAgent(input);
+        }),
+      update: t.procedure
+        .input(updateAgentInputSchema)
+        .mutation(async ({ input }) => {
+          return service.updateAgent(input);
         }),
       delete: t.procedure
         .input(deleteAgentInputSchema)

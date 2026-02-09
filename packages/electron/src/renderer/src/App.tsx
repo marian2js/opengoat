@@ -43,6 +43,7 @@ export function App() {
     selectSession,
     loadAgents,
     createAgent,
+    updateAgent,
     deleteAgent,
     clearAgentsNotice,
     submitOnboarding,
@@ -285,6 +286,7 @@ export function App() {
                   notice={agentsNotice}
                   onRefresh={() => void loadAgents()}
                   onCreate={(input) => void createAgent(input)}
+                  onUpdate={(input) => void updateAgent(input)}
                   onDelete={(input) => void deleteAgent(input)}
                   providerConfigAvailable={supportsAgentProviderConfig}
                   onDismissNotice={clearAgentsNotice}
@@ -320,11 +322,7 @@ export function App() {
                 gateway={onboarding?.gateway}
                 error={error}
                 busy={isBusy}
-                onSubmitMessage={(message) =>
-                  sendMessage(message, {
-                    rethrow: true
-                  })
-                }
+                onSubmitMessage={(message) => sendMessage(message)}
                 onStopMessage={() => stopMessage()}
                 onOpenRuntimeSettings={() => setShowRuntimeSettings(true)}
                 onOpenOnboarding={() => void openOnboarding()}
