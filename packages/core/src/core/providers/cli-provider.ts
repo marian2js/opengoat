@@ -221,6 +221,9 @@ export abstract class BaseCliProvider extends BaseProvider {
 
     for (let index = 0; index < resolvedImages.length; index += 1) {
       const image = resolvedImages[index];
+      if (!image) {
+        continue;
+      }
       if (image.sourcePath) {
         imagePaths.push(image.sourcePath);
         continue;
