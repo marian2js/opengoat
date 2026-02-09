@@ -30,7 +30,7 @@ import {
   Loader2,
   Settings2,
 } from "lucide-react";
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   createElectronChatTransport,
   getTextContent,
@@ -99,8 +99,11 @@ export function ChatPanel(props: ChatPanelProps) {
   }, [chatId, initialMessages, setMessages]);
 
   const isSubmitting = status === "submitted" || status === "streaming";
-  const showRunProgress =
-    Boolean(props.activeSession) && (isSubmitting || props.busy);
+  const hasRunProgress =
+    Boolean(props.activeSession) && props.runStatusEvents.length > 0;
+  const showActiveRunProgress =
+    hasRunProgress && (isSubmitting || props.busy);
+  const showRunProgress = hasRunProgress;
   const canSend = Boolean(
     props.activeSession &&
     input.trim().length > 0 &&
@@ -116,19 +119,38 @@ export function ChatPanel(props: ChatPanelProps) {
     () => collectHighlightedAgentNames(props.runStatusEvents),
     [props.runStatusEvents],
   );
+  const [isRunProgressOpen, setIsRunProgressOpen] = useState(false);
+  const wasRunActiveRef = useRef(false);
 
   useEffect(() => {
-    if (showRunProgress) {
+    if (showActiveRunProgress) {
       setLoadingStartedAtMs((current) => current ?? Date.now());
       return;
     }
 
     setLoadingStartedAtMs(null);
     setElapsedSeconds(0);
-  }, [showRunProgress]);
+  }, [showActiveRunProgress]);
 
   useEffect(() => {
-    if (!showRunProgress || loadingStartedAtMs === null) {
+    if (!hasRunProgress) {
+      setIsRunProgressOpen(false);
+      wasRunActiveRef.current = false;
+      return;
+    }
+
+    if (showActiveRunProgress) {
+      setIsRunProgressOpen(true);
+    } else if (wasRunActiveRef.current) {
+      // Collapse automatically once the run finishes, but keep it expandable.
+      setIsRunProgressOpen(false);
+    }
+
+    wasRunActiveRef.current = showActiveRunProgress;
+  }, [hasRunProgress, showActiveRunProgress]);
+
+  useEffect(() => {
+    if (!showActiveRunProgress || loadingStartedAtMs === null) {
       return;
     }
 
@@ -141,7 +163,7 @@ export function ChatPanel(props: ChatPanelProps) {
     updateElapsed();
     const interval = window.setInterval(updateElapsed, 1000);
     return () => window.clearInterval(interval);
-  }, [showRunProgress, loadingStartedAtMs]);
+  }, [showActiveRunProgress, loadingStartedAtMs]);
 
   const handlePromptSubmit = async (message: PromptInputMessage) => {
     const text = message.text.trim();
@@ -236,7 +258,7 @@ export function ChatPanel(props: ChatPanelProps) {
                     )}
                   >
                     <p className="mb-1 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                      {isUser ? "You" : isError ? "Error" : isAssistant ? "Assistant" : "System"}
+                      {isUser ? "You" : isError ? "Error" : isAssistant ? "Orchestrator" : "System"}
                     </p>
                     {content ? (
                       <p
@@ -262,10 +284,18 @@ export function ChatPanel(props: ChatPanelProps) {
           {showRunProgress ? (
             <article className="flex justify-start">
               <div className="w-full max-w-[min(72ch,100%)] rounded-xl border border-[#2E2F31] bg-[#141416] px-4 py-3">
-                <Task className="w-full" defaultOpen>
+                <Task
+                  className="w-full"
+                  open={isRunProgressOpen}
+                  onOpenChange={setIsRunProgressOpen}
+                >
                   <TaskTrigger title={runProgress.title}>
                     <div className="flex w-full items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin text-emerald-300" />
+                      {showActiveRunProgress ? (
+                        <Loader2 className="size-4 animate-spin text-emerald-300" />
+                      ) : (
+                        <CheckCircle2 className="size-4 text-emerald-300" />
+                      )}
                       <p className="font-medium text-foreground/90">
                         {renderAgentHighlightedText(
                           runProgress.title,
@@ -387,6 +417,7 @@ function buildRunProgress(
     return buildFallbackRunProgress(elapsedSeconds, gatewayMode);
   }
 
+  const runCompleted = events.some((event) => event.stage === "run_completed");
   const steps: RunProgressStep[] = [];
 
   const pushDone = (id: string, label: string, description: string) => {
@@ -511,7 +542,7 @@ function buildRunProgress(
     }
   }
 
-  if (!steps.some((entry) => entry.state === "active")) {
+  if (!runCompleted && !steps.some((entry) => entry.state === "active")) {
     activate(
       `waiting-${events.length}`,
       "Awaiting final response",
@@ -523,11 +554,14 @@ function buildRunProgress(
 
   const trimmedSteps = steps.slice(-8);
   const activeStep = [...trimmedSteps].reverse().find((entry) => entry.state === "active");
+  const latestStep = trimmedSteps[trimmedSteps.length - 1];
 
   return {
     title: activeStep?.label
       ? `${activeStep.label}`
-      : elapsedSeconds >= 60
+      : runCompleted
+        ? latestStep?.label ?? "Response ready"
+        : elapsedSeconds >= 60
         ? "Orchestrator is still working on your request"
         : "Orchestrator is working on your request",
     steps: trimmedSteps,

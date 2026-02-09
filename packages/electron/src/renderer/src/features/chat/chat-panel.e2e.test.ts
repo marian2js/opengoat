@@ -144,4 +144,139 @@ describe("ChatPanel", () => {
     expect(screen.getByText("Request queued")).toBeTruthy();
     expect(screen.getByText(/Reviewing your request/i)).toBeTruthy();
   });
+
+  it("labels assistant replies as orchestrator", () => {
+    const messages: WorkbenchMessage[] = [
+      {
+        id: "m-assistant",
+        role: "assistant",
+        content: "Done.",
+        createdAt: "2026-02-08T00:00:00.000Z",
+      },
+    ];
+
+    render(
+      createElement(ChatPanel, {
+        homeDir: "/tmp/home",
+        activeProject: {
+          id: "p1",
+          name: "Home",
+          rootPath: "/tmp",
+          createdAt: "2026-02-08T00:00:00.000Z",
+          updatedAt: "2026-02-08T00:00:00.000Z",
+          sessions: [],
+        },
+        activeSession: {
+          id: "s1",
+          title: "Session",
+          agentId: "orchestrator",
+          sessionKey: "desktop:p1:s1",
+          createdAt: "2026-02-08T00:00:00.000Z",
+          updatedAt: "2026-02-08T00:00:00.000Z",
+          messages,
+        },
+        messages,
+        runStatusEvents: [],
+        gateway: {
+          mode: "local",
+          timeoutMs: 10_000,
+          hasAuthToken: false,
+        },
+        error: null,
+        busy: false,
+        onSubmitMessage: vi.fn(async () => null),
+        onStopMessage: vi.fn(async () => undefined),
+        onOpenRuntimeSettings: vi.fn(),
+        onOpenOnboarding: vi.fn(),
+        onDismissError: vi.fn(),
+      }),
+    );
+
+    expect(screen.getByText("Orchestrator")).toBeTruthy();
+    expect(screen.queryByText("Assistant")).toBeNull();
+  });
+
+  it("keeps run timeline after completion and collapses it", () => {
+    const messages: WorkbenchMessage[] = [
+      {
+        id: "m-user",
+        role: "user",
+        content: "hello",
+        createdAt: "2026-02-08T00:00:00.000Z",
+      },
+      {
+        id: "m-assistant",
+        role: "assistant",
+        content: "done",
+        createdAt: "2026-02-08T00:00:05.000Z",
+      },
+    ];
+
+    render(
+      createElement(ChatPanel, {
+        homeDir: "/tmp/home",
+        activeProject: {
+          id: "p1",
+          name: "Home",
+          rootPath: "/tmp",
+          createdAt: "2026-02-08T00:00:00.000Z",
+          updatedAt: "2026-02-08T00:00:00.000Z",
+          sessions: [],
+        },
+        activeSession: {
+          id: "s1",
+          title: "Session",
+          agentId: "orchestrator",
+          sessionKey: "desktop:p1:s1",
+          createdAt: "2026-02-08T00:00:00.000Z",
+          updatedAt: "2026-02-08T00:00:00.000Z",
+          messages,
+        },
+        messages,
+        runStatusEvents: [
+          {
+            projectId: "p1",
+            sessionId: "s1",
+            stage: "run_started",
+            timestamp: "2026-02-08T00:00:01.000Z",
+            runId: "run-1",
+            agentId: "orchestrator",
+          },
+          {
+            projectId: "p1",
+            sessionId: "s1",
+            stage: "planner_started",
+            timestamp: "2026-02-08T00:00:02.000Z",
+            runId: "run-1",
+            step: 1,
+            agentId: "orchestrator",
+          },
+          {
+            projectId: "p1",
+            sessionId: "s1",
+            stage: "run_completed",
+            timestamp: "2026-02-08T00:00:05.000Z",
+            runId: "run-1",
+            step: 1,
+            agentId: "orchestrator",
+          },
+        ],
+        gateway: {
+          mode: "local",
+          timeoutMs: 10_000,
+          hasAuthToken: false,
+        },
+        error: null,
+        busy: false,
+        onSubmitMessage: vi.fn(async () => null),
+        onStopMessage: vi.fn(async () => undefined),
+        onOpenRuntimeSettings: vi.fn(),
+        onOpenOnboarding: vi.fn(),
+        onDismissError: vi.fn(),
+      }),
+    );
+
+    expect(screen.getByText("Response ready")).toBeTruthy();
+    expect(screen.queryByText("Request queued")).toBeNull();
+  });
 });
