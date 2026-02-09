@@ -45,7 +45,7 @@ export class OrchestrationPlannerService {
       "Action policy:",
       "- Use delegate_to_agent when a specialized agent should execute the next step.",
       "- Use install_skill when a skill should be installed for an agent before continuing.",
-      "- Use read_workspace_file / write_workspace_file when coordination artifacts are needed.",
+      "- Use read_workspace_file / write_workspace_file to read or write files in the active project working path.",
       "- Use respond_user when you can directly answer with high confidence.",
       "- Use finish when the task is complete.",
       "- Prefer hybrid mode for important handoffs (direct + markdown artifact).",

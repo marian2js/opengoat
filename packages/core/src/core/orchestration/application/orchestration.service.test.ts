@@ -297,6 +297,68 @@ describe("OrchestrationService integration flow", () => {
     expect(providerService.invokeAgent).toHaveBeenCalledTimes(2);
   });
 
+  it("writes workspace file actions into the run working path", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-write-working-path-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const providerService = createProviderService({
+      plannerExecutions: [
+        okExecution(
+          JSON.stringify({
+            rationale: "Write changelog directly.",
+            action: {
+              type: "write_workspace_file",
+              path: "CHANGELOG.md",
+              content: "# Changelog\n\n## [Unreleased]\n- Added.\n"
+            }
+          })
+        ),
+        okExecution(
+          JSON.stringify({
+            rationale: "Done.",
+            action: {
+              type: "finish",
+              mode: "direct",
+              message: "Created changelog."
+            }
+          })
+        )
+      ],
+      delegatedExecution: {
+        code: 0,
+        stdout: "unused",
+        stderr: ""
+      }
+    });
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      skillService: createSkillServiceStub() as unknown as SkillService,
+      agentManifestService: createManifestServiceStub([
+        createManifest("orchestrator", {
+          canReceive: true,
+          canDelegate: true,
+          provider: "openai"
+        })
+      ]) as unknown as AgentManifestService,
+      sessionService: createSessionServiceStub() as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-07T17:09:00.000Z"
+    });
+
+    const result = await service.runAgent(paths, "orchestrator", {
+      message: "Please create changelog",
+      cwd: tempDir
+    });
+
+    expect(result.code).toBe(0);
+    const changelogPath = path.join(tempDir, "CHANGELOG.md");
+    await expect(readFile(changelogPath, "utf-8")).resolves.toContain("# Changelog");
+    await expect(
+      readFile(path.join(paths.workspacesDir, "orchestrator", "CHANGELOG.md"), "utf-8")
+    ).rejects.toThrow();
+  });
+
   it("does not delegate to non-discoverable agents even if planner targets them", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-hidden-agent-"));
     tempDirs.push(tempDir);

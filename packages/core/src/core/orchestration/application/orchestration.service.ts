@@ -75,6 +75,12 @@ interface DelegationFailureSummary {
   message: string;
 }
 
+interface WorkspaceFileResolveInput {
+  paths: OpenGoatPaths;
+  requestedPath: string;
+  workingPathHint?: string;
+}
+
 interface WorkingTreeStatusEntry {
   path: string;
   raw: string;
@@ -530,7 +536,11 @@ export class OrchestrationService {
     }
 
     if (action.type === "read_workspace_file") {
-      const resolvedPath = this.resolveWorkspacePath(params.paths, action.path);
+      const resolvedPath = this.resolveWorkspacePath({
+        paths: params.paths,
+        requestedPath: action.path,
+        workingPathHint: params.options.cwd
+      });
       params.logger.info("Reading workspace file for orchestration context.", {
         path: resolvedPath
       });
@@ -545,7 +555,11 @@ export class OrchestrationService {
     }
 
     if (action.type === "write_workspace_file") {
-      const resolvedPath = this.resolveWorkspacePath(params.paths, action.path);
+      const resolvedPath = this.resolveWorkspacePath({
+        paths: params.paths,
+        requestedPath: action.path,
+        workingPathHint: params.options.cwd
+      });
       params.logger.info("Writing workspace file for orchestration context.", {
         path: resolvedPath
       });
@@ -788,15 +802,16 @@ export class OrchestrationService {
     }
   }
 
-  private resolveWorkspacePath(paths: OpenGoatPaths, requestedPath: string): string {
+  private resolveWorkspacePath(input: WorkspaceFileResolveInput): string {
+    const { requestedPath, workingPathHint } = input;
     const normalized = requestedPath.replace(/\\/g, "/").trim();
-    const orchestratorWorkspace = this.pathPort.join(paths.workspacesDir, DEFAULT_AGENT_ID);
+    const runWorkingPath = resolveInvocationWorkingPath(workingPathHint);
     const unsafeSegments = normalized.split("/").filter((segment) => segment === "..");
     if (unsafeSegments.length > 0) {
-      return this.pathPort.join(orchestratorWorkspace, "coordination", "unsafe-path-blocked.md");
+      return this.pathPort.join(runWorkingPath, ".opengoat", "coordination", "unsafe-path-blocked.md");
     }
     const relative = normalized.replace(/^\/+/, "");
-    return this.pathPort.join(orchestratorWorkspace, relative || "coordination/context.md");
+    return this.pathPort.join(runWorkingPath, relative || ".opengoat/coordination/context.md");
   }
 
   private async invokeAgentWithSession(

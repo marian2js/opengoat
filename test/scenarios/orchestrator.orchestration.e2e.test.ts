@@ -28,14 +28,15 @@ describe("orchestrator e2e orchestration flow", () => {
     const { service, provider, root } = await createHarness();
 
     const result = await service.runAgent("orchestrator", {
-      message: "e2e:artifact-flow"
+      message: "e2e:artifact-flow",
+      cwd: root
     });
 
     expect(result.code).toBe(0);
     expect(result.orchestration?.mode).toBe("ai-loop");
     expect(result.orchestration?.finalMessage).toBe("Artifact flow complete.");
 
-    const planPath = path.join(root, "workspaces", "orchestrator", "coordination", "plan.md");
+    const planPath = path.join(root, "coordination", "plan.md");
     expect(await readFile(planPath, "utf8")).toContain("Initial plan for delegated work.");
 
     const trace = JSON.parse(await readFile(result.tracePath, "utf8")) as {
@@ -68,9 +69,10 @@ describe("orchestrator e2e orchestration flow", () => {
   });
 
   it("falls back to respond_user when orchestrator planner output is malformed", async () => {
-    const { service } = await createHarness();
+    const { service, root } = await createHarness();
     const result = await service.runAgent("orchestrator", {
-      message: "e2e:malformed-planner"
+      message: "e2e:malformed-planner",
+      cwd: root
     });
 
     expect(result.code).toBe(0);
@@ -80,9 +82,10 @@ describe("orchestrator e2e orchestration flow", () => {
   });
 
   it("stops after delegation safety limit is reached", async () => {
-    const { service } = await createHarness();
+    const { service, root } = await createHarness();
     const result = await service.runAgent("orchestrator", {
-      message: "e2e:delegation-limit"
+      message: "e2e:delegation-limit",
+      cwd: root
     });
 
     expect(result.code).toBe(0);
