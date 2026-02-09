@@ -2,7 +2,7 @@
 
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { WorkbenchMessage } from "@shared/workbench";
 import { WORKBENCH_CHAT_ERROR_PROVIDER_ID } from "@shared/workbench";
 import { ChatPanel } from "./chat-panel";
@@ -10,6 +10,46 @@ import { ChatPanel } from "./chat-panel";
 afterEach(() => {
   cleanup();
 });
+
+function createPanelProps(
+  overrides: Partial<Parameters<typeof ChatPanel>[0]> = {},
+): Parameters<typeof ChatPanel>[0] {
+  return {
+    homeDir: "/tmp/home",
+    activeProject: {
+      id: "p1",
+      name: "Home",
+      rootPath: "/tmp",
+      createdAt: "2026-02-08T00:00:00.000Z",
+      updatedAt: "2026-02-08T00:00:00.000Z",
+      sessions: [],
+    },
+    activeSession: {
+      id: "s1",
+      title: "Session",
+      agentId: "orchestrator",
+      sessionKey: "desktop:p1:s1",
+      createdAt: "2026-02-08T00:00:00.000Z",
+      updatedAt: "2026-02-08T00:00:00.000Z",
+      messages: [],
+    },
+    messages: [],
+    runStatusEvents: [],
+    gateway: {
+      mode: "local",
+      timeoutMs: 10_000,
+      hasAuthToken: false,
+    },
+    error: null,
+    busy: false,
+    onSubmitMessage: vi.fn(async () => null),
+    onStopMessage: vi.fn(async () => undefined),
+    onOpenRuntimeSettings: vi.fn(),
+    onOpenOnboarding: vi.fn(),
+    onDismissError: vi.fn(),
+    ...overrides,
+  };
+}
 
 describe("ChatPanel", () => {
   it("renders provider failures as red inline error messages", () => {
@@ -323,5 +363,67 @@ describe("ChatPanel", () => {
 
     expect(screen.getByText("Response ready")).toBeTruthy();
     expect(screen.queryByText("Request queued")).toBeNull();
+  });
+
+  it("shows selected image attachments and enables submit without text", async () => {
+    const onSubmitMessage = vi.fn(async () => ({
+      id: "m-assistant",
+      role: "assistant" as const,
+      content: "Image received.",
+      createdAt: "2026-02-08T00:00:10.000Z",
+    }));
+
+    const view = render(
+      createElement(
+        ChatPanel,
+        createPanelProps({
+          onSubmitMessage,
+        }),
+      ),
+    );
+
+    const submitButton = screen.getByRole("button", { name: "Submit" });
+    expect(submitButton.hasAttribute("disabled")).toBe(true);
+
+    const fileInput = view.container.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement | null;
+    expect(fileInput).toBeTruthy();
+    if (!fileInput) {
+      throw new Error("expected hidden file input");
+    }
+
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(["fake-image"], "diagram.png", { type: "image/png" })],
+      },
+    });
+
+    expect(await screen.findByText("1 image attached")).toBeTruthy();
+    expect(screen.getByText("diagram.png")).toBeTruthy();
+    expect(submitButton.hasAttribute("disabled")).toBe(false);
+
+    fireEvent.click(submitButton);
+    await waitFor(() => {
+      expect(onSubmitMessage).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("shows a full-panel drop indicator while dragging image files", async () => {
+    render(createElement(ChatPanel, createPanelProps()));
+
+    fireEvent.dragEnter(window, {
+      dataTransfer: {
+        files: [new File(["fake-image"], "diagram.png", { type: "image/png" })],
+        types: ["Files"],
+      },
+    });
+
+    expect(await screen.findByText("Drop image to attach")).toBeTruthy();
+
+    fireEvent.dragLeave(window);
+    await waitFor(() => {
+      expect(screen.queryByText("Drop image to attach")).toBeNull();
+    });
   });
 });

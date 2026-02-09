@@ -9,6 +9,7 @@ import {
   PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
+  usePromptInputAttachments,
   type PromptInputMessage,
 } from "@renderer/components/ai-elements/prompt-input";
 import {
@@ -35,8 +36,17 @@ import {
   Loader2,
   PlusIcon,
   Settings2,
+  XIcon,
 } from "lucide-react";
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   createElectronChatTransport,
   getTextContent,
@@ -102,6 +112,9 @@ export function ChatPanel(props: ChatPanelProps) {
     transport,
   });
   const [input, setInput] = useState("");
+  const [attachmentCount, setAttachmentCount] = useState(0);
+  const [isFileDragActive, setIsFileDragActive] = useState(false);
+  const fileDragDepthRef = useRef(0);
   const [loadingStartedAtMs, setLoadingStartedAtMs] = useState<number | null>(
     null,
   );
@@ -122,7 +135,7 @@ export function ChatPanel(props: ChatPanelProps) {
   const showRunProgress = hasRunProgress;
   const canSend = Boolean(
     props.activeSession &&
-    input.trim().length > 0 &&
+    (input.trim().length > 0 || attachmentCount > 0) &&
     !isSubmitting &&
     !props.busy,
   );
@@ -143,6 +156,49 @@ export function ChatPanel(props: ChatPanelProps) {
   );
   const [isRunProgressOpen, setIsRunProgressOpen] = useState(false);
   const wasRunActiveRef = useRef(false);
+
+  useEffect(() => {
+    setAttachmentCount(0);
+  }, [chatId]);
+
+  useEffect(() => {
+    const onDragEnter = (event: DragEvent) => {
+      if (!isFileDragEvent(event)) {
+        return;
+      }
+
+      fileDragDepthRef.current += 1;
+      setIsFileDragActive(true);
+    };
+
+    const onDragLeave = () => {
+      if (fileDragDepthRef.current === 0) {
+        return;
+      }
+
+      fileDragDepthRef.current = Math.max(0, fileDragDepthRef.current - 1);
+      if (fileDragDepthRef.current === 0) {
+        setIsFileDragActive(false);
+      }
+    };
+
+    const resetFileDragState = () => {
+      fileDragDepthRef.current = 0;
+      setIsFileDragActive(false);
+    };
+
+    window.addEventListener("dragenter", onDragEnter);
+    window.addEventListener("dragleave", onDragLeave);
+    window.addEventListener("drop", resetFileDragState);
+    window.addEventListener("dragend", resetFileDragState);
+
+    return () => {
+      window.removeEventListener("dragenter", onDragEnter);
+      window.removeEventListener("dragleave", onDragLeave);
+      window.removeEventListener("drop", resetFileDragState);
+      window.removeEventListener("dragend", resetFileDragState);
+    };
+  }, []);
 
   useEffect(() => {
     if (showActiveRunProgress) {
@@ -198,8 +254,12 @@ export function ChatPanel(props: ChatPanelProps) {
     await sendMessage({ text: normalizedText, files: message.files });
   };
 
+  const handleAttachmentCountChange = useCallback((nextCount: number) => {
+    setAttachmentCount(nextCount);
+  }, []);
+
   return (
-    <main className="flex h-full min-h-0 min-w-0 flex-col bg-transparent">
+    <main className="relative flex h-full min-h-0 min-w-0 flex-col bg-transparent">
       <header className="titlebar-drag-region sticky top-0 z-30 border-0 bg-[#1F1F1F] px-4 shadow-[0_10px_24px_rgba(0,0,0,0.42)] md:px-5">
         <div className="flex h-12 items-center justify-between gap-3">
           <div className="min-w-0 truncate text-base leading-none tracking-tight">
@@ -404,13 +464,19 @@ export function ChatPanel(props: ChatPanelProps) {
           ) : null}
 
           <PromptInput
+            key={chatId}
             className="w-full"
             inputGroupClassName="rounded-lg border border-[#2F3032] bg-[#19191A] shadow-none"
             accept="image/*"
             multiple
+            globalDrop
             onSubmit={handlePromptSubmit}
           >
             <PromptInputBody>
+              <ComposerAttachmentTray
+                disabled={!props.activeSession || props.busy || isSubmitting}
+                onCountChange={handleAttachmentCountChange}
+              />
               <PromptInputTextarea
                 className="min-h-16 px-3 py-2 text-sm"
                 value={input}
@@ -444,7 +510,71 @@ export function ChatPanel(props: ChatPanelProps) {
           </PromptInput>
         </div>
       </footer>
+      {isFileDragActive ? (
+        <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center p-6">
+          <div className="w-full max-w-3xl rounded-2xl border-2 border-dashed border-cyan-300/70 bg-[#071226]/90 px-8 py-10 text-center shadow-[0_24px_64px_rgba(1,8,20,0.6)] backdrop-blur-sm">
+            <p className="text-lg font-semibold text-cyan-100">Drop image to attach</p>
+            <p className="mt-2 text-sm text-cyan-100/80">
+              Release to add it to your next message.
+            </p>
+          </div>
+        </div>
+      ) : null}
     </main>
+  );
+}
+
+interface ComposerAttachmentTrayProps {
+  disabled: boolean;
+  onCountChange: (count: number) => void;
+}
+
+function ComposerAttachmentTray(props: ComposerAttachmentTrayProps) {
+  const attachments = usePromptInputAttachments();
+  const { disabled, onCountChange } = props;
+
+  useEffect(() => {
+    onCountChange(attachments.files.length);
+  }, [attachments.files.length, onCountChange]);
+
+  useEffect(() => {
+    return () => {
+      onCountChange(0);
+    };
+  }, [onCountChange]);
+
+  if (attachments.files.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mx-2 mt-2 rounded-md border border-[#2E2F31] bg-[#131415] p-2">
+      <div className="mb-2 px-1 text-xs text-muted-foreground">
+        {attachments.files.length} image{attachments.files.length === 1 ? "" : "s"} attached
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {attachments.files.map((attachment, index) => (
+          <div
+            key={attachment.id}
+            className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-[#2E2F31] bg-[#1A1B1D] px-2 py-1 text-xs text-foreground/90"
+          >
+            <ImageIcon className="size-3.5 shrink-0 text-cyan-100/80" />
+            <span className="max-w-[26ch] truncate">
+              {attachment.filename || `Image ${index + 1}`}
+            </span>
+            <button
+              type="button"
+              className="ml-1 inline-flex size-5 items-center justify-center rounded transition hover:bg-black/35 disabled:cursor-not-allowed disabled:opacity-45"
+              onClick={() => attachments.remove(attachment.id)}
+              disabled={disabled}
+              aria-label={`Remove ${attachment.filename || `Image ${index + 1}`}`}
+            >
+              <XIcon className="size-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -615,6 +745,19 @@ function buildRunProgress(
         : `${entryAgentLabel} is working on your request`,
     steps: trimmedSteps,
   };
+}
+
+function isFileDragEvent(event: DragEvent): boolean {
+  const transfer = event.dataTransfer;
+  if (!transfer) {
+    return false;
+  }
+
+  if (transfer.files.length > 0) {
+    return true;
+  }
+
+  return Array.from(transfer.types ?? []).includes("Files");
 }
 
 function buildFallbackRunProgress(
