@@ -53,7 +53,8 @@ export class OpenRouterProvider extends BaseProvider {
         model,
         message: options.message,
         systemPrompt: options.systemPrompt,
-        headers
+        headers,
+        abortSignal: options.abortSignal
       });
 
       options.onStdout?.(result.text);

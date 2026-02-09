@@ -1106,13 +1106,14 @@ export const PromptInputSubmit = ({
   ...props
 }: PromptInputSubmitProps) => {
   const isGenerating = status === "submitted" || status === "streaming";
+  const canStop = isGenerating && Boolean(onStop);
 
   let Icon = <CornerDownLeftIcon className="size-4" />;
 
-  if (status === "submitted") {
-    Icon = <Spinner />;
-  } else if (status === "streaming") {
+  if (canStop) {
     Icon = <SquareIcon className="size-4" />;
+  } else if (status === "submitted") {
+    Icon = <Spinner />;
   } else if (status === "error") {
     Icon = <XIcon className="size-4" />;
   }

@@ -48,6 +48,7 @@ interface ChatPanelProps {
   error: string | null;
   busy: boolean;
   onSubmitMessage: (message: string) => Promise<WorkbenchMessage | null>;
+  onStopMessage: () => Promise<void>;
   onOpenRuntimeSettings: () => void;
   onOpenOnboarding: () => void;
   onDismissError: () => void;
@@ -67,12 +68,16 @@ export function ChatPanel(props: ChatPanelProps) {
       createElectronChatTransport({
         submitMessage: async (message: string) =>
           props.onSubmitMessage(message),
+        stopMessage: async () => {
+          await props.onStopMessage();
+        },
       }),
-    [props.onSubmitMessage],
+    [props.onStopMessage, props.onSubmitMessage],
   );
   const {
     messages,
     sendMessage,
+    stop,
     setMessages,
     clearError,
     status,
@@ -349,8 +354,9 @@ export function ChatPanel(props: ChatPanelProps) {
             <PromptInputFooter className="justify-end px-2 pb-2 pt-2">
               <PromptInputSubmit
                 className="size-8 rounded-lg"
-                disabled={!canSend}
+                disabled={!canSend && !isSubmitting}
                 status={status}
+                onStop={stop}
               />
             </PromptInputFooter>
           </PromptInput>

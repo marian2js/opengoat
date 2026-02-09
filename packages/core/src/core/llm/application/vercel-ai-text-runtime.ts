@@ -64,6 +64,7 @@ export class VercelAiTextRuntime implements OpenAiCompatibleTextRuntime {
       prompt: request.message,
       system: request.systemPrompt?.trim() || undefined,
       maxRetries: this.maxRetries,
+      abortSignal: request.abortSignal,
     });
 
     const text = result.text?.trim();

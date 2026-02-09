@@ -81,6 +81,7 @@ export class OpenAIProvider extends BaseProvider {
         model,
         message: options.message,
         systemPrompt: options.systemPrompt,
+        abortSignal: options.abortSignal,
       });
 
       options.onStdout?.(result.text);
@@ -140,6 +141,7 @@ export class OpenAIProvider extends BaseProvider {
         model,
         message: options.message,
         systemPrompt: options.systemPrompt,
+        abortSignal: options.abortSignal,
       });
 
       options.onStdout?.(result.text);

@@ -135,7 +135,8 @@ export class ExtendedHttpProvider extends BaseProvider {
       options,
       parseText: extractOpenAiLikeText,
       parseSessionId: (value) => extractStringValue((value as { id?: unknown }).id),
-      headers
+      headers,
+      abortSignal: options.abortSignal
     });
   }
 
@@ -189,7 +190,8 @@ export class ExtendedHttpProvider extends BaseProvider {
       options,
       parseText: extractAnthropicText,
       parseSessionId: (value) => extractStringValue((value as { id?: unknown }).id),
-      headers
+      headers,
+      abortSignal: options.abortSignal
     });
   }
 
@@ -412,6 +414,7 @@ export class ExtendedHttpProvider extends BaseProvider {
     parseText: (payload: unknown) => string | null;
     parseSessionId: (payload: unknown) => string | null;
     headers: Record<string, string>;
+    abortSignal?: AbortSignal;
   }): Promise<ProviderExecutionResult> {
     let response: Response;
 
@@ -419,7 +422,8 @@ export class ExtendedHttpProvider extends BaseProvider {
       response = await this.fetchFn(params.endpoint, {
         method: "POST",
         headers: params.headers,
-        body: JSON.stringify(params.payload)
+        body: JSON.stringify(params.payload),
+        signal: params.abortSignal
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

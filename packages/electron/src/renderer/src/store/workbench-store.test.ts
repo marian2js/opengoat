@@ -193,6 +193,52 @@ describe("workbench store", () => {
     expect(store.getState().activeMessages).toHaveLength(0);
   });
 
+  it("stops an active run and refreshes persisted session messages", async () => {
+    const getSessionMessages = vi.fn(async () => [
+      {
+        id: "m-user",
+        role: "user" as const,
+        content: "hello",
+        createdAt: "2026-02-07T00:00:00.000Z"
+      }
+    ]);
+    const stopChatMessage = vi.fn(async () => ({
+      stopped: true
+    }));
+    const api = createApiMock({
+      getSessionMessages: getSessionMessages as WorkbenchApiClient["getSessionMessages"],
+      stopChatMessage: stopChatMessage as WorkbenchApiClient["stopChatMessage"]
+    });
+    const store = createWorkbenchStore(api);
+
+    await store.getState().bootstrap();
+    store.setState({
+      chatState: "sending",
+      isBusy: true
+    });
+
+    await store.getState().stopMessage();
+
+    expect(stopChatMessage).toHaveBeenCalledWith({
+      projectId: "p1",
+      sessionId: "s1"
+    });
+    expect(getSessionMessages).toHaveBeenCalledWith({
+      projectId: "p1",
+      sessionId: "s1"
+    });
+    expect(store.getState().chatState).toBe("idle");
+    expect(store.getState().isBusy).toBe(false);
+    expect(store.getState().activeMessages).toEqual([
+      {
+        id: "m-user",
+        role: "user",
+        content: "hello",
+        createdAt: "2026-02-07T00:00:00.000Z"
+      }
+    ]);
+  });
+
   it("submits onboarding for selected provider and refreshes draft values", async () => {
     const submitOnboardingMock = vi.fn(async (): Promise<WorkbenchOnboarding> => ({
       activeProviderId: "openrouter",
@@ -728,6 +774,9 @@ function createApiMock(overrides: Partial<WorkbenchApiClient> = {}): WorkbenchAp
       },
       reply: assistantReply,
       providerId: "openai"
+    })),
+    stopChatMessage: vi.fn(async () => ({
+      stopped: true
     }))
   };
 

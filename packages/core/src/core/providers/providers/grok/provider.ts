@@ -56,7 +56,8 @@ export class GrokProvider extends BaseProvider {
         style,
         model,
         message: options.message,
-        systemPrompt: options.systemPrompt
+        systemPrompt: options.systemPrompt,
+        abortSignal: options.abortSignal
       });
 
       options.onStdout?.(result.text);

@@ -99,30 +99,40 @@ export class OpenCodeProvider extends BaseCliProvider {
   public override async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
     const env = options.env ?? process.env;
     const requestedSessionId = options.providerSessionId?.trim();
-    const beforeSnapshot = requestedSessionId ? [] : await this.readRecentSessionIds(env, options.cwd);
+    const beforeSnapshot = requestedSessionId
+      ? []
+      : await this.readRecentSessionIds(env, options.cwd, options.abortSignal);
     const result = await super.invoke(options);
     if (requestedSessionId) {
       return attachProviderSessionId(result, requestedSessionId);
     }
 
-    const afterSnapshot = await this.readRecentSessionIds(env, options.cwd);
+    const afterSnapshot = await this.readRecentSessionIds(env, options.cwd, options.abortSignal);
     const inferredSessionId = inferNewSessionId(beforeSnapshot, afterSnapshot);
     return attachProviderSessionId(result, inferredSessionId);
   }
 
-  private async readRecentSessionIds(env: NodeJS.ProcessEnv, cwd?: string): Promise<string[]> {
+  private async readRecentSessionIds(
+    env: NodeJS.ProcessEnv,
+    cwd?: string,
+    abortSignal?: AbortSignal
+  ): Promise<string[]> {
     try {
       const result = await executeCommand({
         command: this.resolveCommand(env),
         args: ["session", "list", "--format", "json", "--max-count", "20"],
         cwd,
-        env
+        env,
+        abortSignal
       });
       if (result.code !== 0) {
         return [];
       }
       return extractSessionIdsFromListOutput(result.stdout);
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw error;
+      }
       return [];
     }
   }

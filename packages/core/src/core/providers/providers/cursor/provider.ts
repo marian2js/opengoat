@@ -66,7 +66,7 @@ export class CursorProvider extends BaseCliProvider {
     let effectiveSessionId = requestedSessionId;
 
     if (!effectiveSessionId && options.forceNewProviderSession) {
-      effectiveSessionId = await this.createChatSessionId(env, options.cwd);
+      effectiveSessionId = await this.createChatSessionId(env, options.cwd, options.abortSignal);
     }
 
     const result = await super.invoke({
@@ -77,7 +77,11 @@ export class CursorProvider extends BaseCliProvider {
     return attachProviderSessionId(result, effectiveSessionId);
   }
 
-  private async createChatSessionId(env: NodeJS.ProcessEnv, cwd?: string): Promise<string | undefined> {
+  private async createChatSessionId(
+    env: NodeJS.ProcessEnv,
+    cwd?: string,
+    abortSignal?: AbortSignal
+  ): Promise<string | undefined> {
     const command = this.resolveCommand(env);
     const args = isCursorAgentCommand(command) ? ["create-chat"] : ["agent", "create-chat"];
 
@@ -86,7 +90,8 @@ export class CursorProvider extends BaseCliProvider {
         command,
         args,
         cwd,
-        env
+        env,
+        abortSignal
       });
       if (result.code !== 0) {
         return undefined;
@@ -96,7 +101,10 @@ export class CursorProvider extends BaseCliProvider {
         .map((line) => line.trim())
         .find((line) => Boolean(line));
       return firstLine || undefined;
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw error;
+      }
       return undefined;
     }
   }

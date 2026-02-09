@@ -16,6 +16,7 @@ export type ElectronUiMessage = UIMessage<ElectronUiMessageMetadata>;
 
 interface ElectronChatTransportDeps {
   submitMessage: (message: string) => Promise<WorkbenchMessage | null>;
+  stopMessage?: () => Promise<void> | void;
 }
 
 export function createElectronChatTransport(
@@ -24,7 +25,7 @@ export function createElectronChatTransport(
   return {
     sendMessages: async ({ messages, abortSignal }) => {
       if (abortSignal?.aborted) {
-        throw new Error("Request aborted.");
+        throw createAbortError();
       }
 
       const message = getLastUserText(messages);
@@ -32,7 +33,29 @@ export function createElectronChatTransport(
         throw new Error("Cannot send an empty message.");
       }
 
-      const reply = await deps.submitMessage(message);
+      let abortListener: (() => void) | undefined;
+      const abortPromise = new Promise<never>((_, reject) => {
+        if (!abortSignal) {
+          return;
+        }
+        abortListener = () => {
+          void Promise.resolve(deps.stopMessage?.()).catch(() => undefined);
+          reject(createAbortError());
+        };
+        abortSignal.addEventListener("abort", abortListener, { once: true });
+      });
+
+      let reply: WorkbenchMessage | null;
+      try {
+        reply = abortSignal
+          ? await Promise.race([deps.submitMessage(message), abortPromise])
+          : await deps.submitMessage(message);
+      } finally {
+        if (abortSignal && abortListener) {
+          abortSignal.removeEventListener("abort", abortListener);
+        }
+      }
+
       if (!reply) {
         throw new Error("No response was returned.");
       }
@@ -113,4 +136,10 @@ function createSingleReplyStream(
       controller.close();
     }
   });
+}
+
+function createAbortError(): Error {
+  const error = new Error("Request aborted.");
+  error.name = "AbortError";
+  return error;
 }

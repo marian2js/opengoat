@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { readUIMessageStream, type UIMessage } from "ai";
+import type { WorkbenchMessage } from "@shared/workbench";
 import {
   createElectronChatTransport,
   getTextContent,
@@ -47,6 +48,49 @@ describe("electron chat transport", () => {
       | undefined;
     expect(metadata?.tracePath).toBe("/tmp/trace.json");
     expect(metadata?.providerId).toBe("openai");
+  });
+
+  it("stops the active backend run when the chat request is aborted", async () => {
+    let resolveMessage: ((value: WorkbenchMessage) => void) | undefined;
+    const submitMessage = vi.fn(
+      () =>
+        new Promise<{
+          id: string;
+          role: "assistant";
+          content: string;
+          createdAt: string;
+        }>((resolve) => {
+          resolveMessage = resolve;
+        })
+    );
+    const stopMessage = vi.fn(async () => undefined);
+    const transport = createElectronChatTransport({ submitMessage, stopMessage });
+    const abortController = new AbortController();
+
+    const streamPromise = transport.sendMessages({
+      trigger: "submit-message",
+      chatId: "chat-1",
+      messageId: undefined,
+      messages: [
+        {
+          id: "user-1",
+          role: "user",
+          parts: [{ type: "text", text: "Stop this run" }]
+        }
+      ],
+      abortSignal: abortController.signal
+    });
+
+    abortController.abort();
+    await expect(streamPromise).rejects.toMatchObject({ name: "AbortError" });
+    expect(stopMessage).toHaveBeenCalledTimes(1);
+
+    resolveMessage?.({
+      id: "assistant-1",
+      role: "assistant",
+      content: "late reply",
+      createdAt: "2026-02-07T00:00:00.000Z"
+    });
   });
 
   it("maps persisted workbench messages into UI messages", () => {

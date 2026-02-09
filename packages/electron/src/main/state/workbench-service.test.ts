@@ -486,6 +486,102 @@ describe("WorkbenchService sendMessage", () => {
     expect(callGatewayFn).toHaveBeenCalledTimes(1);
     expect(runAgent).toHaveBeenCalledTimes(0);
   });
+
+  it("stops an in-flight local run when requested", async () => {
+    const runAgent = vi.fn(async (...args: unknown[]) => {
+      const options = (args[1] ?? {}) as { abortSignal?: AbortSignal };
+      return await new Promise<{
+        code: number;
+        stdout: string;
+        stderr: string;
+        providerId: string;
+        tracePath?: string;
+        entryAgentId: string;
+        routing: {
+          entryAgentId: string;
+          targetAgentId: string;
+          confidence: number;
+          reason: string;
+          rewrittenMessage: string;
+          candidates: unknown[];
+        };
+      }>((_resolve, reject) => {
+        options.abortSignal?.addEventListener(
+          "abort",
+          () => {
+            const error = new Error("stopped");
+            error.name = "AbortError";
+            reject(error);
+          },
+          { once: true }
+        );
+      });
+    });
+    const opengoat = createOpenGoatStub({
+      providers: createProviderSummaries(),
+      activeProviderId: "openai",
+      onboardingByProvider: {},
+      runAgent
+    });
+    const appendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: []
+      });
+    const store = {
+      getGatewaySettings: vi.fn(async () => ({
+        mode: "local" as const,
+        timeoutMs: 10_000
+      })),
+      getProject: vi.fn(async () => ({
+        id: "p1",
+        name: "project",
+        rootPath: "/tmp/project",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        sessions: []
+      })),
+      getSession: vi.fn(async () => ({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: []
+      })),
+      appendMessage
+    } as unknown as WorkbenchStore;
+    const service = new WorkbenchService({ opengoat, store });
+
+    const pending = service.sendMessage({
+      projectId: "p1",
+      sessionId: "s1",
+      message: "hello"
+    });
+
+    await vi.waitFor(() => {
+      expect(runAgent).toHaveBeenCalledTimes(1);
+    });
+
+    const stopResult = await service.stopMessage({
+      projectId: "p1",
+      sessionId: "s1"
+    });
+
+    expect(stopResult).toEqual({ stopped: true });
+    await expect(pending).rejects.toMatchObject({
+      name: "AbortError",
+      message: "Request stopped."
+    });
+    expect(appendMessage).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("WorkbenchService session management", () => {

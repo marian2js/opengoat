@@ -12,6 +12,7 @@ export interface OpenAiCompatibleTextRequest {
   endpointOverride?: string;
   endpointPathOverride?: string;
   headers?: Record<string, string>;
+  abortSignal?: AbortSignal;
 }
 
 export interface OpenAiCompatibleTextResult {

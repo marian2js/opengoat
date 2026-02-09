@@ -185,6 +185,9 @@ function createStatefulApiMock(): WorkbenchApiClient {
       };
       return onboarding.gateway;
     }),
-    sendChatMessage
+    sendChatMessage,
+    stopChatMessage: vi.fn(async () => ({
+      stopped: true
+    }))
   };
 }

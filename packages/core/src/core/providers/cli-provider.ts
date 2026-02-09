@@ -100,6 +100,7 @@ export abstract class BaseCliProvider extends BaseProvider {
         args: invocation.args,
         cwd: options.cwd,
         env,
+        abortSignal: options.abortSignal,
         onStdout: options.onStdout,
         onStderr: options.onStderr
       });

@@ -54,6 +54,7 @@ export class WorkbenchService {
   private readonly runGuidedAuthFn: typeof runCliGuidedAuth;
   private readonly callGatewayFn: typeof callOpenGoatGateway;
   private readonly onRunStatus?: (event: WorkbenchRunStatusEvent) => void;
+  private readonly activeRuns = new Map<string, AbortController>();
   private remoteGatewayToken: string | undefined;
   private initializationPromise: Promise<void> | undefined;
 
@@ -389,6 +390,20 @@ export class WorkbenchService {
     return this.store.listMessages(projectId, sessionId);
   }
 
+  public async stopMessage(params: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<{ stopped: boolean }> {
+    await this.ensureInitialized();
+    const activeRun = this.activeRuns.get(runKey(params.projectId, params.sessionId));
+    if (!activeRun) {
+      return { stopped: false };
+    }
+
+    activeRun.abort(createAbortError("Request stopped by user."));
+    return { stopped: true };
+  }
+
   public async sendMessage(params: {
     projectId: string;
     sessionId: string;
@@ -401,45 +416,68 @@ export class WorkbenchService {
 
     const project = await this.store.getProject(params.projectId);
     const session = await this.store.getSession(params.projectId, params.sessionId);
+    const currentRunKey = runKey(project.id, session.id);
+    const runAbortController = new AbortController();
+    this.activeRuns.set(currentRunKey, runAbortController);
+    try {
+      await this.store.appendMessage(project.id, session.id, {
+        role: "user",
+        content: message
+      });
 
-    await this.store.appendMessage(project.id, session.id, {
-      role: "user",
-      content: message
-    });
+      let run: {
+        code: number;
+        stdout: string;
+        stderr: string;
+        providerId: string;
+        tracePath?: string;
+      };
+      try {
+        run = await this.executeOrchestratorRun({
+          projectId: project.id,
+          sessionId: session.id,
+          message,
+          sessionRef: session.sessionKey,
+          cwd: project.rootPath,
+          abortSignal: runAbortController.signal
+        });
+      } catch (error) {
+        if (isAbortErrorLike(error)) {
+          throw createAbortError("Request stopped.");
+        }
+        throw error;
+      }
+      if (run.code !== 0) {
+        const details = (run.stderr || run.stdout || "No provider error details were returned.").trim();
+        throw new Error(
+          `Orchestrator provider failed (${run.providerId}, code ${run.code}). ${details}`
+        );
+      }
 
-    const run = await this.executeOrchestratorRun({
-      projectId: project.id,
-      sessionId: session.id,
-      message,
-      sessionRef: session.sessionKey,
-      cwd: project.rootPath
-    });
-    if (run.code !== 0) {
-      const details = (run.stderr || run.stdout || "No provider error details were returned.").trim();
-      throw new Error(
-        `Orchestrator provider failed (${run.providerId}, code ${run.code}). ${details}`
-      );
+      const assistantContent = (run.stdout || run.stderr || "No response was returned.").trim();
+      const persistedSession = await this.store.appendMessage(project.id, session.id, {
+        role: "assistant",
+        content: assistantContent,
+        tracePath: run.tracePath,
+        providerId: run.providerId
+      });
+
+      const latest = persistedSession.messages[persistedSession.messages.length - 1];
+      if (!latest) {
+        throw new Error("Assistant response could not be stored.");
+      }
+
+      return {
+        session: persistedSession,
+        reply: latest,
+        tracePath: run.tracePath,
+        providerId: run.providerId
+      };
+    } finally {
+      if (this.activeRuns.get(currentRunKey) === runAbortController) {
+        this.activeRuns.delete(currentRunKey);
+      }
     }
-
-    const assistantContent = (run.stdout || run.stderr || "No response was returned.").trim();
-    const persistedSession = await this.store.appendMessage(project.id, session.id, {
-      role: "assistant",
-      content: assistantContent,
-      tracePath: run.tracePath,
-      providerId: run.providerId
-    });
-
-    const latest = persistedSession.messages[persistedSession.messages.length - 1];
-    if (!latest) {
-      throw new Error("Assistant response could not be stored.");
-    }
-
-    return {
-      session: persistedSession,
-      reply: latest,
-      tracePath: run.tracePath,
-      providerId: run.providerId
-    };
   }
 
   private async executeOrchestratorRun(input: {
@@ -448,6 +486,7 @@ export class WorkbenchService {
     message: string;
     sessionRef: string;
     cwd: string;
+    abortSignal: AbortSignal;
   }): Promise<{
     code: number;
     stdout: string;
@@ -472,6 +511,7 @@ export class WorkbenchService {
         message: input.message,
         sessionRef: input.sessionRef,
         cwd: input.cwd,
+        abortSignal: input.abortSignal,
         env: await this.buildInvocationEnv(input.cwd, providerEnvKeys),
         hooks: {
           onEvent: (event) => {
@@ -510,6 +550,7 @@ export class WorkbenchService {
       url: remoteUrl,
       token: this.remoteGatewayToken,
       timeoutMs: gatewaySettings.timeoutMs,
+      abortSignal: input.abortSignal,
       method: "agent.run",
       clientId: "opengoat-desktop",
       clientDisplayName: "OpenGoat Desktop",
@@ -719,6 +760,20 @@ function toRecord(value: unknown): Record<string, unknown> | null {
     return null;
   }
   return value as Record<string, unknown>;
+}
+
+function runKey(projectId: string, sessionId: string): string {
+  return `${projectId}:${sessionId}`;
+}
+
+function isAbortErrorLike(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function createAbortError(message: string): Error {
+  const error = new Error(message);
+  error.name = "AbortError";
+  return error;
 }
 
 function createDesktopGuidedAuthPrompter(notes: string[]): {

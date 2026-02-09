@@ -55,6 +55,10 @@ describe("desktop IPC router", () => {
       projectId: "p1",
       sessionId: "s1"
     });
+    await caller.chat.stop({
+      projectId: "p1",
+      sessionId: "s1"
+    });
 
     expect(service.bootstrap).toHaveBeenCalledTimes(1);
     expect(service.listProjects).toHaveBeenCalledTimes(1);
@@ -77,6 +81,10 @@ describe("desktop IPC router", () => {
     expect(service.renameSession).toHaveBeenCalledWith("p1", "s1", "Renamed");
     expect(service.removeSession).toHaveBeenCalledWith("p1", "s1");
     expect(service.listMessages).toHaveBeenCalledWith("p1", "s1");
+    expect(service.stopMessage).toHaveBeenCalledWith({
+      projectId: "p1",
+      sessionId: "s1"
+    });
   });
 
   it("executes onboarding submit via mutation and forwards payload", async () => {
@@ -294,6 +302,9 @@ function createServiceStub(): WorkbenchService {
         createdAt: "2026-02-07T00:00:00.000Z"
       },
       providerId: "codex"
+    })),
+    stopMessage: vi.fn(async () => ({
+      stopped: true
     }))
   } as unknown as WorkbenchService;
 }

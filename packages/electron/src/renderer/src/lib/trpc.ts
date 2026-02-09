@@ -17,6 +17,7 @@ import type {
   WorkbenchOnboarding,
   WorkbenchProject,
   WorkbenchSendMessageResult,
+  WorkbenchStopMessageResult,
   WorkbenchSession
 } from "@shared/workbench";
 import superjson from "superjson";
@@ -66,6 +67,10 @@ export interface WorkbenchApiClient {
     sessionId: string;
     message: string;
   }) => Promise<WorkbenchSendMessageResult>;
+  stopChatMessage: (input: {
+    projectId: string;
+    sessionId: string;
+  }) => Promise<WorkbenchStopMessageResult>;
 }
 
 function createLinks() {
@@ -238,6 +243,18 @@ export function createWorkbenchApiClient(): WorkbenchApiClient {
       const trpc = getTrpcClient();
       await ensureContract(trpc);
       return (await trpc.mutation("chat.send", input)) as WorkbenchSendMessageResult;
+    },
+    stopChatMessage: async (input) => {
+      const trpc = getTrpcClient();
+      await ensureContract(trpc);
+      try {
+        return (await trpc.mutation("chat.stop", input)) as WorkbenchStopMessageResult;
+      } catch (error) {
+        if (isMissingProcedureError(error, "chat.stop")) {
+          return { stopped: false };
+        }
+        throw error;
+      }
     }
   };
 }

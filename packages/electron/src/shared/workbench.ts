@@ -194,11 +194,17 @@ export const sendMessageInputSchema = sessionLookupInputSchema.extend({
   message: z.string().trim().min(1)
 });
 
+export const stopMessageInputSchema = sessionLookupInputSchema;
+
 export const sendMessageResultSchema = z.object({
   session: workbenchSessionSchema,
   reply: workbenchMessageSchema,
   tracePath: z.string().optional(),
   providerId: z.string()
+});
+
+export const stopMessageResultSchema = z.object({
+  stopped: z.boolean()
 });
 
 export const workbenchRunStatusStageSchema = z.enum([
@@ -301,6 +307,7 @@ export const runGuidedAuthResultSchema = z.object({
 
 export type WorkbenchGuidedAuthResult = z.infer<typeof runGuidedAuthResultSchema>;
 export type WorkbenchSendMessageResult = z.infer<typeof sendMessageResultSchema>;
+export type WorkbenchStopMessageResult = z.infer<typeof stopMessageResultSchema>;
 export type WorkbenchRunStatusEvent = z.infer<typeof workbenchRunStatusEventSchema>;
 export type WorkbenchAgentCreationResult = z.infer<typeof agentCreationResultSchema>;
 export type WorkbenchAgentDeletionResult = z.infer<typeof agentDeletionResultSchema>;

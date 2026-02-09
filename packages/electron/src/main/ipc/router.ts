@@ -10,6 +10,7 @@ import {
   renameSessionInputSchema,
   runGuidedAuthInputSchema,
   sendMessageInputSchema,
+  stopMessageInputSchema,
   sessionLookupInputSchema,
   updateGatewayInputSchema,
   updateAgentProviderConfigInputSchema,
@@ -137,7 +138,12 @@ export function createDesktopRouter(service: WorkbenchService) {
         .input(sendMessageInputSchema)
         .mutation(async ({ input }) => {
           return service.sendMessage(input);
-      }),
+        }),
+      stop: t.procedure
+        .input(stopMessageInputSchema)
+        .mutation(async ({ input }) => {
+          return service.stopMessage(input);
+        }),
     }),
   });
 

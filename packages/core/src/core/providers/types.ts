@@ -25,6 +25,7 @@ export interface ProviderInvokeOptions {
   passthroughArgs?: string[];
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  abortSignal?: AbortSignal;
   onStdout?: (chunk: string) => void;
   onStderr?: (chunk: string) => void;
 }

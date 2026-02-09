@@ -11,6 +11,7 @@ export interface OpenGoatGatewayCallOptions {
   params?: unknown;
   token?: string;
   timeoutMs?: number;
+  abortSignal?: AbortSignal;
   clientId?: string;
   clientDisplayName?: string;
   clientVersion?: string;
@@ -30,6 +31,11 @@ export async function callOpenGoatGateway<T = unknown>(
   const timeoutMs = resolveTimeout(options.timeoutMs);
 
   return await new Promise<OpenGoatGatewayConnectResult<T>>((resolve, reject) => {
+    if (options.abortSignal?.aborted) {
+      reject(createAbortError());
+      return;
+    }
+
     const socket = new WebSocket(options.url, {
       maxPayload: OPENGOAT_GATEWAY_DEFAULTS.maxPayloadBytes
     });
@@ -45,9 +51,14 @@ export async function callOpenGoatGateway<T = unknown>(
       finish(new Error(`Gateway timeout after ${timeoutMs}ms.`));
     }, timeoutMs);
 
+    function onAbort() {
+      finish(createAbortError());
+    }
+
     const cleanup = () => {
       clearTimeout(timeout);
       socket.removeAllListeners();
+      options.abortSignal?.removeEventListener("abort", onAbort);
     };
 
     const finish = (error?: Error, result?: OpenGoatGatewayConnectResult<T>) => {
@@ -74,6 +85,8 @@ export async function callOpenGoatGateway<T = unknown>(
 
       resolve(result);
     };
+
+    options.abortSignal?.addEventListener("abort", onAbort, { once: true });
 
     socket.on("error", (error) => {
       finish(error instanceof Error ? error : new Error(String(error)));
@@ -176,6 +189,12 @@ export async function callOpenGoatGateway<T = unknown>(
       }
     });
   });
+}
+
+function createAbortError(): Error {
+  const error = new Error("Gateway request aborted.");
+  error.name = "AbortError";
+  return error;
 }
 
 function sendFrame(socket: WebSocket, frame: Record<string, unknown>): void {

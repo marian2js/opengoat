@@ -101,6 +101,7 @@ interface WorkbenchUiState {
       rethrow?: boolean;
     }
   ) => Promise<WorkbenchMessage | null>;
+  stopMessage: () => Promise<void>;
   appendRunStatusEvent: (event: WorkbenchRunStatusEvent) => void;
   clearError: () => void;
 }
@@ -765,6 +766,26 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         return result.reply;
       } catch (error) {
         const currentMessages = get().activeMessages;
+        if (isAbortErrorLike(error)) {
+          if (options?.rethrow) {
+            set({
+              chatState: "idle",
+              isBusy: false,
+              error: null,
+              activeMessages: currentMessages.filter((entry) => entry.id !== optimistic.id)
+            });
+            throw error;
+          }
+
+          set({
+            chatState: "idle",
+            isBusy: false,
+            error: null,
+            activeMessages: currentMessages.filter((entry) => entry.id !== optimistic.id)
+          });
+          return null;
+        }
+
         if (options?.rethrow) {
           set({
             chatState: "idle",
@@ -783,6 +804,49 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           activeMessages: [...currentMessages, errorMessage]
         });
         return errorMessage;
+      }
+    },
+
+    stopMessage: async () => {
+      const state = get();
+      const projectId = state.activeProjectId;
+      const sessionId = state.activeSessionId;
+      if (!projectId || !sessionId) {
+        return;
+      }
+
+      set({
+        chatState: "idle",
+        isBusy: false,
+        error: null
+      });
+
+      try {
+        await api.stopChatMessage({
+          projectId,
+          sessionId
+        });
+        const messages = await api.getSessionMessages({
+          projectId,
+          sessionId
+        });
+        set((current) => ({
+          projects: upsertProjectSessionMessages(
+            current.projects,
+            projectId,
+            sessionId,
+            messages
+          ),
+          activeMessages:
+            current.activeProjectId === projectId &&
+            current.activeSessionId === sessionId
+              ? messages
+              : current.activeMessages
+        }));
+      } catch (error) {
+        set({
+          error: toErrorMessage(error)
+        });
       }
     },
 
@@ -884,6 +948,31 @@ function removeProjectSession(
   });
 }
 
+function upsertProjectSessionMessages(
+  projects: WorkbenchProject[],
+  projectId: string,
+  sessionId: string,
+  messages: WorkbenchMessage[]
+): WorkbenchProject[] {
+  return projects.map((project) => {
+    if (project.id !== projectId) {
+      return project;
+    }
+
+    return {
+      ...project,
+      sessions: project.sessions.map((session) =>
+        session.id === sessionId
+          ? {
+              ...session,
+              messages
+            }
+          : session
+      )
+    };
+  });
+}
+
 function getProjectSessionMessages(
   projects: WorkbenchProject[],
   projectId: string,
@@ -964,6 +1053,13 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return "Unexpected error.";
+}
+
+function isAbortErrorLike(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return error.name === "AbortError";
 }
 
 function buildChatErrorMessage(error: unknown): WorkbenchMessage {

@@ -54,6 +54,7 @@ export function App() {
     openOnboarding,
     closeOnboarding,
     sendMessage,
+    stopMessage,
     appendRunStatusEvent,
     clearError
   } = useWorkbenchStore();
@@ -324,6 +325,7 @@ export function App() {
                     rethrow: true
                   })
                 }
+                onStopMessage={() => stopMessage()}
                 onOpenRuntimeSettings={() => setShowRuntimeSettings(true)}
                 onOpenOnboarding={() => void openOnboarding()}
                 onDismissError={clearError}
