@@ -1,11 +1,15 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { exposeElectronTRPC } from "electron-trpc/main";
+import type { DesktopAppUpdateState } from "@shared/app-update";
 
 const MENU_ACTION_CHANNEL = "opengoat:menu-action";
 const WINDOW_MODE_CHANNEL = "opengoat:window-mode";
 const WINDOW_CHROME_CHANNEL = "opengoat:window-chrome";
 const WINDOW_CHROME_GET_CHANNEL = "opengoat:window-chrome:get";
 const RUN_STATUS_CHANNEL = "opengoat:run-status";
+const APP_UPDATE_CHANNEL = "opengoat:app-update";
+const APP_UPDATE_GET_CHANNEL = "opengoat:app-update:get";
+const APP_UPDATE_INSTALL_CHANNEL = "opengoat:app-update:install";
 
 type MenuAction =
   | "open-project"
@@ -87,6 +91,25 @@ process.once("loaded", () => {
       return () => {
         ipcRenderer.removeListener(RUN_STATUS_CHANNEL, wrapped);
       };
+    },
+    onAppUpdate: (listener: (state: DesktopAppUpdateState) => void) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        state: DesktopAppUpdateState,
+      ) => {
+        listener(state);
+      };
+
+      ipcRenderer.on(APP_UPDATE_CHANNEL, wrapped);
+      return () => {
+        ipcRenderer.removeListener(APP_UPDATE_CHANNEL, wrapped);
+      };
+    },
+    getAppUpdateState: async (): Promise<DesktopAppUpdateState> => {
+      return ipcRenderer.invoke(APP_UPDATE_GET_CHANNEL);
+    },
+    installAppUpdate: async (): Promise<boolean> => {
+      return ipcRenderer.invoke(APP_UPDATE_INSTALL_CHANNEL);
     },
   });
 });

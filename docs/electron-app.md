@@ -122,6 +122,26 @@ Or directly:
 
 - `pnpm --filter @opengoat/desktop start`
 
+## Desktop Release Updates
+
+The desktop app checks for updates from GitHub Releases through Electron's
+native updater feed bridge (`update.electronjs.org`).
+
+Runtime behavior:
+
+- Updates are checked automatically in packaged builds on macOS/Windows.
+- The app polls for new releases every 4 hours.
+- When an update has downloaded, the renderer shows an **Update** button at the
+  top-right of the app.
+- Clicking **Update** calls `quitAndInstall` to restart into the new version.
+
+Maintainer requirements:
+
+- Publish desktop release artifacts to GitHub Releases for this repository.
+- Keep macOS code signing/notarization configured in release CI so update
+  packages can be trusted by the platform.
+- Ensure release version tags stay in sync with the desktop app version.
+
 ## Next Steps
 
 This setup intentionally ships a strong vertical slice first. Recommended follow-up phases:

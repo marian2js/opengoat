@@ -4,7 +4,9 @@ import { RuntimeSettingsModal } from "@renderer/features/runtime/runtime-setting
 import { ProjectsSidebar } from "@renderer/features/projects/projects-sidebar";
 import { ChatPanel } from "@renderer/features/chat/chat-panel";
 import { AgentsPanel } from "@renderer/features/agents/agents-panel";
+import { Button } from "@renderer/components/ui/button";
 import { getActiveProject, useWorkbenchStore } from "@renderer/store/workbench-store";
+import type { DesktopAppUpdateState } from "@shared/app-update";
 import { DESKTOP_IPC_CONTRACT_FEATURES } from "@shared/workbench-contract";
 
 export function App() {
@@ -68,6 +70,8 @@ export function App() {
     isMaximized: false,
     isFullScreen: false,
   });
+  const [appUpdate, setAppUpdate] = useState<DesktopAppUpdateState | null>(null);
+  const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
 
   useEffect(() => {
     void bootstrap();
@@ -163,6 +167,35 @@ export function App() {
     });
   }, [appendRunStatusEvent]);
 
+  useEffect(() => {
+    const desktopApi = window.opengoatDesktop;
+    if (!desktopApi?.onAppUpdate || !desktopApi.getAppUpdateState) {
+      return;
+    }
+
+    let disposed = false;
+    void desktopApi
+      .getAppUpdateState()
+      .then((state) => {
+        if (!disposed) {
+          setAppUpdate(state);
+        }
+      })
+      .catch(() => undefined);
+
+    const unsubscribe = desktopApi.onAppUpdate((state) => {
+      setAppUpdate(state);
+      if (state.status !== "update-downloaded") {
+        setIsInstallingUpdate(false);
+      }
+    });
+
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, []);
+
   const activeProject = useMemo(
     () => getActiveProject(projects, activeProjectId),
     [projects, activeProjectId]
@@ -172,6 +205,23 @@ export function App() {
     [activeProject, activeSessionId]
   );
   const isAgentsView = activeView === "agents";
+  const showUpdateButton = appUpdate?.status === "update-downloaded";
+
+  const installUpdate = async () => {
+    const desktopApi = window.opengoatDesktop;
+    if (!desktopApi?.installAppUpdate) {
+      return;
+    }
+    setIsInstallingUpdate(true);
+    try {
+      const started = await desktopApi.installAppUpdate();
+      if (!started) {
+        setIsInstallingUpdate(false);
+      }
+    } catch {
+      setIsInstallingUpdate(false);
+    }
+  };
 
   const onSaveOnboarding = async () => {
     if (!onboardingDraftProviderId) {
@@ -198,6 +248,23 @@ export function App() {
   if (showOnboarding && onboarding) {
     return (
       <>
+        {showUpdateButton ? (
+          <div className="titlebar-no-drag fixed right-4 top-3 z-50 md:right-5">
+            <Button
+              size="sm"
+              className="h-8 rounded-lg px-3"
+              onClick={() => void installUpdate()}
+              disabled={isInstallingUpdate}
+              title={
+                appUpdate?.availableVersion
+                  ? `Restart and install v${appUpdate.availableVersion}`
+                  : "Restart and install the latest OpenGoat desktop update"
+              }
+            >
+              {isInstallingUpdate ? "Installing..." : "Update"}
+            </Button>
+          </div>
+        ) : null}
         <OnboardingPanel
           onboarding={onboarding}
           providerId={onboardingDraftProviderId}
@@ -233,6 +300,23 @@ export function App() {
     <>
       <div className="dark h-screen bg-transparent text-foreground">
         <div className="relative h-full overflow-hidden">
+          {showUpdateButton ? (
+            <div className="titlebar-no-drag absolute right-4 top-3 z-40 md:right-5">
+              <Button
+                size="sm"
+                className="h-8 rounded-lg px-3"
+                onClick={() => void installUpdate()}
+                disabled={isInstallingUpdate}
+                title={
+                  appUpdate?.availableVersion
+                    ? `Restart and install v${appUpdate.availableVersion}`
+                    : "Restart and install the latest OpenGoat desktop update"
+                }
+              >
+                {isInstallingUpdate ? "Installing..." : "Update"}
+              </Button>
+            </div>
+          ) : null}
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_520px_at_-4%_-12%,hsl(163_82%_49%_/_0.22),transparent_56%),radial-gradient(860px_420px_at_108%_-8%,hsl(192_94%_54%_/_0.16),transparent_58%),linear-gradient(180deg,hsl(222_53%_6%),hsl(224_52%_4%))]" />
           <div className="pointer-events-none absolute inset-0 opacity-[0.12] [background-image:linear-gradient(hsl(215_24%_64%_/_0.28)_1px,transparent_1px),linear-gradient(90deg,hsl(215_24%_64%_/_0.28)_1px,transparent_1px)] [background-size:22px_22px]" />
           <div

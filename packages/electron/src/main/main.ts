@@ -1,7 +1,9 @@
 import { createDesktopRouter } from "@main/ipc/router";
 import { WorkbenchService } from "@main/state/workbench-service";
 import { WorkbenchStore } from "@main/state/workbench-store";
+import { DesktopAppUpdater } from "@main/update/desktop-updater";
 import { createOpenGoatRuntime } from "@opengoat/core";
+import type { DesktopAppUpdateState } from "@shared/app-update";
 import type { WorkbenchRunStatusEvent } from "@shared/workbench";
 import {
   app,
@@ -21,6 +23,9 @@ const WINDOW_MODE_CHANNEL = "opengoat:window-mode";
 const WINDOW_CHROME_CHANNEL = "opengoat:window-chrome";
 const WINDOW_CHROME_GET_CHANNEL = "opengoat:window-chrome:get";
 const RUN_STATUS_CHANNEL = "opengoat:run-status";
+const APP_UPDATE_CHANNEL = "opengoat:app-update";
+const APP_UPDATE_GET_CHANNEL = "opengoat:app-update:get";
+const APP_UPDATE_INSTALL_CHANNEL = "opengoat:app-update:install";
 
 const WINDOW_SIZE = {
   workspace: {
@@ -73,6 +78,9 @@ const workbenchService = new WorkbenchService({
 });
 
 const router = createDesktopRouter(workbenchService);
+const appUpdater = new DesktopAppUpdater({
+  onStateChange: (state) => emitAppUpdate(state),
+});
 
 function applyWindowMode(targetWindow: BrowserWindow, mode: WindowMode): void {
   const minimumSize = WINDOW_SIZE[mode];
@@ -134,6 +142,25 @@ function emitRunStatus(event: WorkbenchRunStatusEvent): void {
       continue;
     }
     window.webContents.send(RUN_STATUS_CHANNEL, event);
+  }
+}
+
+function emitAppUpdate(
+  state: DesktopAppUpdateState,
+  targetWindow?: BrowserWindow,
+): void {
+  if (targetWindow) {
+    if (!targetWindow.isDestroyed()) {
+      targetWindow.webContents.send(APP_UPDATE_CHANNEL, state);
+    }
+    return;
+  }
+
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) {
+      continue;
+    }
+    window.webContents.send(APP_UPDATE_CHANNEL, state);
   }
 }
 
@@ -328,6 +355,7 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
 app.whenReady().then(async () => {
   await runtime.service.initialize();
   Menu.setApplicationMenu(buildApplicationMenu());
+  appUpdater.start();
 
   ipcMain.on(WINDOW_MODE_CHANNEL, (event, mode: WindowMode) => {
     if (mode !== "workspace" && mode !== "onboarding") {
@@ -353,12 +381,21 @@ app.whenReady().then(async () => {
     return getWindowChromeState(targetWindow);
   });
 
+  ipcMain.handle(APP_UPDATE_GET_CHANNEL, () => {
+    return appUpdater.getState();
+  });
+
+  ipcMain.handle(APP_UPDATE_INSTALL_CHANNEL, () => {
+    return appUpdater.installUpdateAndRestart();
+  });
+
   const ipcHandler = createIPCHandler({ router: router as never, windows: [] });
 
   const window = await createMainWindow();
   ipcHandler.attachWindow(window);
   attachWindowChromeTracking(window);
   emitWindowChromeState(window);
+  emitAppUpdate(appUpdater.getState(), window);
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -366,6 +403,7 @@ app.whenReady().then(async () => {
       ipcHandler.attachWindow(newWindow);
       attachWindowChromeTracking(newWindow);
       emitWindowChromeState(newWindow);
+      emitAppUpdate(appUpdater.getState(), newWindow);
     }
   });
 });
@@ -374,4 +412,8 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", () => {
+  appUpdater.dispose();
 });

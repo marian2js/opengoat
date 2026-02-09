@@ -35,6 +35,20 @@ type OpenGoatDesktopRunStatusEvent = {
   code?: number;
   detail?: string;
 };
+type OpenGoatDesktopAppUpdateState = {
+  status:
+    | "idle"
+    | "disabled"
+    | "checking"
+    | "update-available"
+    | "update-downloaded"
+    | "error";
+  currentVersion: string;
+  availableVersion: string | null;
+  checkedAt: string | null;
+  reason: string | null;
+  error: string | null;
+};
 
 interface OpenGoatDesktopApi {
   onMenuAction: (listener: (action: OpenGoatDesktopMenuAction) => void) => () => void;
@@ -44,6 +58,9 @@ interface OpenGoatDesktopApi {
   onRunStatus: (
     listener: (event: OpenGoatDesktopRunStatusEvent) => void
   ) => () => void;
+  onAppUpdate: (listener: (state: OpenGoatDesktopAppUpdateState) => void) => () => void;
+  getAppUpdateState: () => Promise<OpenGoatDesktopAppUpdateState>;
+  installAppUpdate: () => Promise<boolean>;
 }
 
 declare global {
