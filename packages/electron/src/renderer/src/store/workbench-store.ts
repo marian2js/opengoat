@@ -8,6 +8,7 @@ import type {
   WorkbenchMessage,
   WorkbenchOnboarding,
   WorkbenchProject,
+  WorkbenchRunStatusEvent,
   WorkbenchSession
 } from "@shared/workbench";
 import {
@@ -53,6 +54,9 @@ interface WorkbenchUiState {
   activeProjectId: string | null;
   activeSessionId: string | null;
   activeMessages: WorkbenchMessage[];
+  runStatusProjectId: string | null;
+  runStatusSessionId: string | null;
+  runStatusEvents: WorkbenchRunStatusEvent[];
   isBootstrapping: boolean;
   isBusy: boolean;
   error: string | null;
@@ -97,6 +101,7 @@ interface WorkbenchUiState {
       rethrow?: boolean;
     }
   ) => Promise<WorkbenchMessage | null>;
+  appendRunStatusEvent: (event: WorkbenchRunStatusEvent) => void;
   clearError: () => void;
 }
 
@@ -122,6 +127,9 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
     activeProjectId: null,
     activeSessionId: null,
     activeMessages: [],
+    runStatusProjectId: null,
+    runStatusSessionId: null,
+    runStatusEvents: [],
     isBootstrapping: true,
     isBusy: false,
     error: null,
@@ -157,6 +165,9 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           activeProjectId: firstProject?.id ?? null,
           activeSessionId: firstSession?.id ?? null,
           activeMessages,
+          runStatusProjectId: null,
+          runStatusSessionId: null,
+          runStatusEvents: [],
           isBootstrapping: false,
           isBusy: false
         });
@@ -184,6 +195,9 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           activeProjectId: project.id,
           activeSessionId: firstSession?.id ?? null,
           activeMessages: firstSession?.messages ?? [],
+          runStatusProjectId: null,
+          runStatusSessionId: null,
+          runStatusEvents: [],
           isBusy: false
         }));
       } catch (error) {
@@ -206,6 +220,9 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           activeProjectId: project.id,
           activeSessionId: firstSession?.id ?? null,
           activeMessages: firstSession?.messages ?? [],
+          runStatusProjectId: null,
+          runStatusSessionId: null,
+          runStatusEvents: [],
           isBusy: false
         }));
       } catch (error) {
@@ -255,6 +272,9 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
             activeProjectId: fallbackProject?.id ?? null,
             activeSessionId: fallbackSession?.id ?? null,
             activeMessages: fallbackSession?.messages ?? [],
+            runStatusProjectId: null,
+            runStatusSessionId: null,
+            runStatusEvents: [],
             isBusy: false
           };
         });
@@ -276,7 +296,10 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       set({
         activeProjectId: projectId,
         activeSessionId: firstSession?.id ?? null,
-        activeMessages
+        activeMessages,
+        runStatusProjectId: null,
+        runStatusSessionId: null,
+        runStatusEvents: []
       });
     },
 
@@ -294,6 +317,9 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           activeProjectId: projectId,
           activeSessionId: session.id,
           activeMessages: session.messages,
+          runStatusProjectId: null,
+          runStatusSessionId: null,
+          runStatusEvents: [],
           isBusy: false
         }));
       } catch (error) {
@@ -346,6 +372,9 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
             activeProjectId: project?.id ?? null,
             activeSessionId: fallbackSession?.id ?? null,
             activeMessages: fallbackSession?.messages ?? [],
+            runStatusProjectId: null,
+            runStatusSessionId: null,
+            runStatusEvents: [],
             isBusy: false
           };
         });
@@ -367,7 +396,10 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         error: null,
         activeProjectId: projectId,
         activeSessionId: sessionId,
-        activeMessages: messages
+        activeMessages: messages,
+        runStatusProjectId: null,
+        runStatusSessionId: null,
+        runStatusEvents: []
       });
     },
 
@@ -711,7 +743,10 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         isBusy: true,
         chatState: "sending",
         error: null,
-        activeMessages: [...state.activeMessages, optimistic]
+        activeMessages: [...state.activeMessages, optimistic],
+        runStatusProjectId: projectId,
+        runStatusSessionId: sessionId,
+        runStatusEvents: []
       });
 
       try {
@@ -749,6 +784,26 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         });
         return errorMessage;
       }
+    },
+
+    appendRunStatusEvent: (event: WorkbenchRunStatusEvent) => {
+      set((state) => {
+        if (
+          state.runStatusProjectId !== event.projectId ||
+          state.runStatusSessionId !== event.sessionId
+        ) {
+          return state;
+        }
+
+        const nextEvents = [...state.runStatusEvents, event];
+        if (nextEvents.length > 64) {
+          nextEvents.splice(0, nextEvents.length - 64);
+        }
+
+        return {
+          runStatusEvents: nextEvents
+        };
+      });
     },
 
     clearError: () => {

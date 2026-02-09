@@ -5,6 +5,7 @@ const MENU_ACTION_CHANNEL = "opengoat:menu-action";
 const WINDOW_MODE_CHANNEL = "opengoat:window-mode";
 const WINDOW_CHROME_CHANNEL = "opengoat:window-chrome";
 const WINDOW_CHROME_GET_CHANNEL = "opengoat:window-chrome:get";
+const RUN_STATUS_CHANNEL = "opengoat:run-status";
 
 type MenuAction =
   | "open-project"
@@ -16,6 +17,30 @@ type WindowChromeState = {
   isMac: boolean;
   isMaximized: boolean;
   isFullScreen: boolean;
+};
+type RunStatusEvent = {
+  projectId: string;
+  sessionId: string;
+  stage:
+    | "run_started"
+    | "planner_started"
+    | "planner_decision"
+    | "delegation_started"
+    | "provider_invocation_started"
+    | "provider_invocation_completed"
+    | "run_completed"
+    | "remote_call_started"
+    | "remote_call_completed";
+  timestamp: string;
+  runId?: string;
+  step?: number;
+  agentId?: string;
+  targetAgentId?: string;
+  providerId?: string;
+  actionType?: string;
+  mode?: string;
+  code?: number;
+  detail?: string;
 };
 
 process.once("loaded", () => {
@@ -49,6 +74,19 @@ process.once("loaded", () => {
     },
     getWindowChrome: async (): Promise<WindowChromeState> => {
       return ipcRenderer.invoke(WINDOW_CHROME_GET_CHANNEL);
+    },
+    onRunStatus: (listener: (event: RunStatusEvent) => void) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        event: RunStatusEvent,
+      ) => {
+        listener(event);
+      };
+
+      ipcRenderer.on(RUN_STATUS_CHANNEL, wrapped);
+      return () => {
+        ipcRenderer.removeListener(RUN_STATUS_CHANNEL, wrapped);
+      };
     },
   });
 });

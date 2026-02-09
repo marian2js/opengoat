@@ -50,6 +50,7 @@ describe("ChatPanel", () => {
           messages,
         },
         messages,
+        runStatusEvents: [],
         gateway: {
           mode: "local",
           timeoutMs: 10_000,
@@ -100,6 +101,25 @@ describe("ChatPanel", () => {
           messages,
         },
         messages,
+        runStatusEvents: [
+          {
+            projectId: "p1",
+            sessionId: "s1",
+            stage: "run_started",
+            timestamp: "2026-02-08T00:00:01.000Z",
+            runId: "run-1",
+            agentId: "orchestrator",
+          },
+          {
+            projectId: "p1",
+            sessionId: "s1",
+            stage: "planner_started",
+            timestamp: "2026-02-08T00:00:02.000Z",
+            runId: "run-1",
+            step: 1,
+            agentId: "orchestrator",
+          },
+        ],
         gateway: {
           mode: "local",
           timeoutMs: 10_000,
@@ -115,9 +135,9 @@ describe("ChatPanel", () => {
     );
 
     expect(
-      screen.getByText("Orchestrator is working on your request"),
-    ).toBeTruthy();
-    expect(screen.getByText("Preparing your request")).toBeTruthy();
-    expect(screen.getByText(/orchestrator is planning/i)).toBeTruthy();
+      screen.getAllByText("Orchestrator is planning").length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText("Request queued")).toBeTruthy();
+    expect(screen.getByText(/Reviewing your request/i)).toBeTruthy();
   });
 });

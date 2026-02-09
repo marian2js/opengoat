@@ -264,6 +264,14 @@ export class ProviderService {
       cwd: invokeOptions.cwd,
       workspaceAccess
     });
+    options.onRunStatus?.({
+      type: "provider_invocation_started",
+      runId: options.runId,
+      timestamp: this.nowIso(),
+      step: options.orchestrationStep,
+      agentId,
+      providerId: provider.id
+    });
     this.logger.debug("Provider invoke request payload.", {
       agentId,
       providerId: provider.id,
@@ -280,6 +288,15 @@ export class ProviderService {
 
     const result = await provider.invoke(invokeOptions);
     this.logger.info("Provider invocation completed.", {
+      agentId,
+      providerId: provider.id,
+      code: result.code
+    });
+    options.onRunStatus?.({
+      type: "provider_invocation_completed",
+      runId: options.runId,
+      timestamp: this.nowIso(),
+      step: options.orchestrationStep,
       agentId,
       providerId: provider.id,
       code: result.code

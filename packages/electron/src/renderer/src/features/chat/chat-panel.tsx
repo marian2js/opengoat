@@ -19,6 +19,7 @@ import type {
   WorkbenchGatewayStatus,
   WorkbenchMessage,
   WorkbenchProject,
+  WorkbenchRunStatusEvent,
   WorkbenchSession,
 } from "@shared/workbench";
 import { WORKBENCH_CHAT_ERROR_PROVIDER_ID } from "@shared/workbench";
@@ -42,6 +43,7 @@ interface ChatPanelProps {
   activeProject: WorkbenchProject | null;
   activeSession: WorkbenchSession | null;
   messages: WorkbenchMessage[];
+  runStatusEvents: WorkbenchRunStatusEvent[];
   gateway?: WorkbenchGatewayStatus;
   error: string | null;
   busy: boolean;
@@ -102,8 +104,8 @@ export function ChatPanel(props: ChatPanelProps) {
   );
   const resolvedError = chatError?.message ?? props.error;
   const runProgress = useMemo(
-    () => buildRunProgress(elapsedSeconds, gatewayMode),
-    [elapsedSeconds, gatewayMode],
+    () => buildRunProgress(props.runStatusEvents, elapsedSeconds, gatewayMode),
+    [elapsedSeconds, gatewayMode, props.runStatusEvents],
   );
 
   useEffect(() => {
@@ -358,64 +360,213 @@ interface RunProgressState {
 }
 
 function buildRunProgress(
+  events: WorkbenchRunStatusEvent[],
   elapsedSeconds: number,
   gatewayMode: "local" | "remote",
 ): RunProgressState {
-  const runtimeLabel =
-    gatewayMode === "remote" ? "Remote runtime" : "Local provider runtime";
+  if (events.length === 0) {
+    return buildFallbackRunProgress(elapsedSeconds, gatewayMode);
+  }
+
+  const steps: RunProgressStep[] = [];
+
+  const pushDone = (id: string, label: string, description: string) => {
+    steps.push({ id, label, description, state: "done" });
+  };
+
+  const activate = (id: string, label: string, description: string) => {
+    const currentActiveIndex = steps.findIndex((entry) => entry.state === "active");
+    if (currentActiveIndex >= 0) {
+      steps[currentActiveIndex] = {
+        ...steps[currentActiveIndex],
+        state: "done",
+      };
+    }
+    steps.push({ id, label, description, state: "active" });
+  };
+
+  const completeActiveBy = (matcher: (entry: RunProgressStep) => boolean) => {
+    const activeIndex = steps.findIndex(
+      (entry) => entry.state === "active" && matcher(entry),
+    );
+    if (activeIndex >= 0) {
+      steps[activeIndex] = {
+        ...steps[activeIndex],
+        state: "done",
+      };
+    }
+  };
+
+  for (let index = 0; index < events.length; index += 1) {
+    const event = events[index];
+    if (!event) {
+      continue;
+    }
+    const eventKey = `${event.stage}-${event.step ?? "na"}-${index}`;
+    const agentLabel = formatIdentifier(event.agentId, "Orchestrator");
+    const targetLabel = formatIdentifier(event.targetAgentId, "agent");
+    const providerLabel = formatIdentifier(event.providerId, "provider runtime");
+
+    switch (event.stage) {
+      case "run_started":
+        pushDone(
+          eventKey,
+          "Request queued",
+          "Your message was added to this session and sent to the orchestrator.",
+        );
+        break;
+      case "planner_started":
+        activate(
+          `planner-${event.step ?? index}`,
+          "Orchestrator is planning",
+          "Reviewing your request and deciding the best next step.",
+        );
+        break;
+      case "planner_decision":
+        completeActiveBy((entry) => entry.id === `planner-${event.step ?? index}`);
+        if (event.actionType === "delegate_to_agent") {
+          pushDone(
+            eventKey,
+            `Delegating to ${targetLabel}`,
+            "The orchestrator delegated this task to a specialized agent.",
+          );
+        } else if (event.actionType === "respond_user" || event.actionType === "finish") {
+          pushDone(
+            eventKey,
+            "Orchestrator is preparing the final reply",
+            "The orchestrator is assembling the response for this chat.",
+          );
+        }
+        break;
+      case "delegation_started":
+        pushDone(
+          eventKey,
+          `${targetLabel} selected`,
+          event.providerId
+            ? `Routing work to ${targetLabel} via ${providerLabel}.`
+            : `Routing work to ${targetLabel}.`,
+        );
+        break;
+      case "provider_invocation_started":
+        activate(
+          `provider-${event.agentId ?? "agent"}-${event.step ?? index}-${index}`,
+          `${agentLabel} is working`,
+          event.providerId
+            ? `Calling ${providerLabel} to continue this request.`
+            : "Calling the configured runtime provider.",
+        );
+        break;
+      case "provider_invocation_completed":
+        completeActiveBy(
+          (entry) =>
+            entry.id.startsWith(`provider-${event.agentId ?? "agent"}-${event.step ?? index}`),
+        );
+        if (typeof event.code === "number" && event.code !== 0) {
+          pushDone(
+            eventKey,
+            `${agentLabel} returned an error`,
+            event.providerId
+              ? `${providerLabel} returned code ${event.code}.`
+              : `Provider returned code ${event.code}.`,
+          );
+        }
+        break;
+      case "remote_call_started":
+        activate(
+          `remote-call-${event.runId ?? "active"}`,
+          "Calling remote runtime",
+          "Sending your request to the configured OpenGoat gateway.",
+        );
+        break;
+      case "remote_call_completed":
+        completeActiveBy((entry) => entry.id.startsWith("remote-call-"));
+        pushDone(
+          eventKey,
+          "Remote runtime responded",
+          "The gateway returned control to this desktop session.",
+        );
+        break;
+      case "run_completed":
+        completeActiveBy(() => true);
+        pushDone(
+          eventKey,
+          "Response ready",
+          "The run is complete and the answer is being rendered in chat.",
+        );
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (!steps.some((entry) => entry.state === "active")) {
+    activate(
+      `waiting-${events.length}`,
+      "Awaiting final response",
+      elapsedSeconds >= 60
+        ? "Still running. Larger context, delegation chains, or provider latency can take longer."
+        : "The request is still running. You can keep using OpenGoat while it completes.",
+    );
+  }
+
+  const trimmedSteps = steps.slice(-8);
+  const activeStep = [...trimmedSteps].reverse().find((entry) => entry.state === "active");
+
+  return {
+    title: activeStep?.label
+      ? `${activeStep.label}`
+      : elapsedSeconds >= 60
+        ? "Orchestrator is still working on your request"
+        : "Orchestrator is working on your request",
+    steps: trimmedSteps,
+  };
+}
+
+function buildFallbackRunProgress(
+  elapsedSeconds: number,
+  gatewayMode: "local" | "remote",
+): RunProgressState {
+  const runtimeLabel = gatewayMode === "remote" ? "remote runtime" : "local provider runtime";
   const steps: RunProgressStep[] = [
     {
       id: "queued",
       label: "Preparing your request",
       description: "Your message is attached to this session and queued.",
-      state: "pending",
+      state: "done",
     },
     {
-      id: "planner",
-      label: "Orchestrator is planning",
-      description:
-        "The orchestrator is deciding whether to answer directly or delegate work.",
-      state: "pending",
-    },
-    {
-      id: "provider",
+      id: "runtime",
       label: `Calling ${runtimeLabel}`,
       description:
         gatewayMode === "remote"
           ? "OpenGoat is waiting for the remote gateway and provider response."
           : "OpenGoat is invoking your configured model provider.",
-      state: "pending",
-    },
-    {
-      id: "waiting",
-      label: "Awaiting final response",
-      description:
-        elapsedSeconds >= 60
-          ? "This request is taking longer than usual, often due to larger context or complex planning."
-          : "Complex prompts can take longer. You can keep working while this run continues.",
-      state: "pending",
+      state: "active",
     },
   ];
-
-  const activeIndex =
-    elapsedSeconds < 3 ? 0 : elapsedSeconds < 10 ? 1 : elapsedSeconds < 30 ? 2 : 3;
-  const resolvedSteps = steps.map((step, index) => ({
-    ...step,
-    state:
-      index < activeIndex
-        ? ("done" as const)
-        : index === activeIndex
-          ? ("active" as const)
-          : ("pending" as const),
-  }));
 
   return {
     title:
       elapsedSeconds >= 60
         ? "Orchestrator is still working on your request"
         : "Orchestrator is working on your request",
-    steps: resolvedSteps,
+    steps,
   };
+}
+
+function formatIdentifier(value: string | undefined, fallback: string): string {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return fallback;
+  }
+  return normalized
+    .split(/[-_]/g)
+    .map((segment) =>
+      segment.length > 0
+        ? `${segment[0]?.toUpperCase() ?? ""}${segment.slice(1)}`
+        : segment,
+    )
+    .join(" ");
 }
 
 function formatElapsed(seconds: number): string {

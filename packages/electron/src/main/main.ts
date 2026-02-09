@@ -2,6 +2,7 @@ import { createDesktopRouter } from "@main/ipc/router";
 import { WorkbenchService } from "@main/state/workbench-service";
 import { WorkbenchStore } from "@main/state/workbench-store";
 import { createOpenGoatRuntime } from "@opengoat/core";
+import type { WorkbenchRunStatusEvent } from "@shared/workbench";
 import {
   app,
   BrowserWindow,
@@ -19,6 +20,7 @@ const MENU_ACTION_CHANNEL = "opengoat:menu-action";
 const WINDOW_MODE_CHANNEL = "opengoat:window-mode";
 const WINDOW_CHROME_CHANNEL = "opengoat:window-chrome";
 const WINDOW_CHROME_GET_CHANNEL = "opengoat:window-chrome:get";
+const RUN_STATUS_CHANNEL = "opengoat:run-status";
 
 const WINDOW_SIZE = {
   workspace: {
@@ -67,6 +69,7 @@ const workbenchStore = new WorkbenchStore({
 const workbenchService = new WorkbenchService({
   opengoat: runtime.service,
   store: workbenchStore,
+  onRunStatus: (event) => emitRunStatus(event),
 });
 
 const router = createDesktopRouter(workbenchService);
@@ -123,6 +126,15 @@ function emitWindowChromeState(targetWindow: BrowserWindow): void {
     WINDOW_CHROME_CHANNEL,
     getWindowChromeState(targetWindow),
   );
+}
+
+function emitRunStatus(event: WorkbenchRunStatusEvent): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) {
+      continue;
+    }
+    window.webContents.send(RUN_STATUS_CHANNEL, event);
+  }
 }
 
 function attachWindowChromeTracking(targetWindow: BrowserWindow): void {

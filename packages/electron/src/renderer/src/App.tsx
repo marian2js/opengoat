@@ -24,6 +24,7 @@ export function App() {
     activeProjectId,
     activeSessionId,
     activeMessages,
+    runStatusEvents,
     agents,
     agentProviders,
     agentsState,
@@ -53,6 +54,7 @@ export function App() {
     openOnboarding,
     closeOnboarding,
     sendMessage,
+    appendRunStatusEvent,
     clearError
   } = useWorkbenchStore();
 
@@ -147,6 +149,17 @@ export function App() {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const desktopApi = window.opengoatDesktop;
+    if (!desktopApi?.onRunStatus) {
+      return;
+    }
+
+    return desktopApi.onRunStatus((event) => {
+      appendRunStatusEvent(event);
+    });
+  }, [appendRunStatusEvent]);
 
   const activeProject = useMemo(
     () => getActiveProject(projects, activeProjectId),
@@ -302,6 +315,7 @@ export function App() {
                 activeProject={activeProject}
                 activeSession={activeSession}
                 messages={activeMessages}
+                runStatusEvents={runStatusEvents}
                 gateway={onboarding?.gateway}
                 error={error}
                 busy={isBusy}
