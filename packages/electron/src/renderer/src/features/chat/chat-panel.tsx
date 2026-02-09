@@ -30,7 +30,7 @@ import {
   Loader2,
   Settings2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   createElectronChatTransport,
   getTextContent,
@@ -106,6 +106,10 @@ export function ChatPanel(props: ChatPanelProps) {
   const runProgress = useMemo(
     () => buildRunProgress(props.runStatusEvents, elapsedSeconds, gatewayMode),
     [elapsedSeconds, gatewayMode, props.runStatusEvents],
+  );
+  const highlightedAgentNames = useMemo(
+    () => collectHighlightedAgentNames(props.runStatusEvents),
+    [props.runStatusEvents],
   );
 
   useEffect(() => {
@@ -258,7 +262,10 @@ export function ChatPanel(props: ChatPanelProps) {
                     <div className="flex w-full items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="size-4 animate-spin text-emerald-300" />
                       <p className="font-medium text-foreground/90">
-                        {runProgress.title}
+                        {renderAgentHighlightedText(
+                          runProgress.title,
+                          highlightedAgentNames,
+                        )}
                       </p>
                       <span className="ml-auto text-xs text-muted-foreground/90">
                         {formatElapsed(elapsedSeconds)}
@@ -282,10 +289,16 @@ export function ChatPanel(props: ChatPanelProps) {
                         </span>
                         <span className="space-y-0.5">
                           <p className="text-sm font-medium leading-5">
-                            {step.label}
+                            {renderAgentHighlightedText(
+                              step.label,
+                              highlightedAgentNames,
+                            )}
                           </p>
                           <p className="text-sm leading-5 text-muted-foreground">
-                            {step.description}
+                            {renderAgentHighlightedText(
+                              step.description,
+                              highlightedAgentNames,
+                            )}
                           </p>
                         </span>
                       </TaskItem>
@@ -405,7 +418,6 @@ function buildRunProgress(
     const eventKey = `${event.stage}-${event.step ?? "na"}-${index}`;
     const agentLabel = formatIdentifier(event.agentId, "Orchestrator");
     const targetLabel = formatIdentifier(event.targetAgentId, "agent");
-    const providerLabel = formatIdentifier(event.providerId, "provider runtime");
 
     switch (event.stage) {
       case "run_started":
@@ -442,18 +454,14 @@ function buildRunProgress(
         pushDone(
           eventKey,
           `${targetLabel} selected`,
-          event.providerId
-            ? `Routing work to ${targetLabel} via ${providerLabel}.`
-            : `Routing work to ${targetLabel}.`,
+          `Routing work to ${targetLabel}.`,
         );
         break;
       case "provider_invocation_started":
         activate(
           `provider-${event.agentId ?? "agent"}-${event.step ?? index}-${index}`,
           `${agentLabel} is working`,
-          event.providerId
-            ? `Calling ${providerLabel} to continue this request.`
-            : "Calling the configured runtime provider.",
+          `Calling ${agentLabel} to continue this request.`,
         );
         break;
       case "provider_invocation_completed":
@@ -465,9 +473,7 @@ function buildRunProgress(
           pushDone(
             eventKey,
             `${agentLabel} returned an error`,
-            event.providerId
-              ? `${providerLabel} returned code ${event.code}.`
-              : `Provider returned code ${event.code}.`,
+            `${agentLabel} returned code ${event.code}.`,
           );
         }
         break;
@@ -526,7 +532,10 @@ function buildFallbackRunProgress(
   elapsedSeconds: number,
   gatewayMode: "local" | "remote",
 ): RunProgressState {
-  const runtimeLabel = gatewayMode === "remote" ? "remote runtime" : "local provider runtime";
+  const statusDescription =
+    gatewayMode === "remote"
+      ? "Calling Orchestrator through your remote runtime."
+      : "Calling Orchestrator to continue this request.";
   const steps: RunProgressStep[] = [
     {
       id: "queued",
@@ -536,11 +545,8 @@ function buildFallbackRunProgress(
     },
     {
       id: "runtime",
-      label: `Calling ${runtimeLabel}`,
-      description:
-        gatewayMode === "remote"
-          ? "OpenGoat is waiting for the remote gateway and provider response."
-          : "OpenGoat is invoking your configured model provider.",
+      label: "Orchestrator is working",
+      description: statusDescription,
       state: "active",
     },
   ];
@@ -567,6 +573,60 @@ function formatIdentifier(value: string | undefined, fallback: string): string {
         : segment,
     )
     .join(" ");
+}
+
+function collectHighlightedAgentNames(
+  events: WorkbenchRunStatusEvent[],
+): string[] {
+  const names = new Set<string>(["Orchestrator"]);
+  for (const event of events) {
+    const formattedAgent = formatIdentifier(event.agentId, "").trim();
+    if (formattedAgent) {
+      names.add(formattedAgent);
+    }
+    const formattedTarget = formatIdentifier(event.targetAgentId, "").trim();
+    if (formattedTarget) {
+      names.add(formattedTarget);
+    }
+  }
+  return [...names];
+}
+
+function renderAgentHighlightedText(
+  text: string,
+  agentNames: string[],
+): ReactNode {
+  if (!text || agentNames.length === 0) {
+    return text;
+  }
+
+  const escapedNames = agentNames
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0)
+    .sort((left, right) => right.length - left.length)
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (escapedNames.length === 0) {
+    return text;
+  }
+
+  const matcher = new RegExp(`\\b(${escapedNames.join("|")})\\b`, "gi");
+  const parts = text.split(matcher);
+  if (parts.length <= 1) {
+    return text;
+  }
+
+  const highlightedNames = new Set(agentNames.map((name) => name.toLowerCase()));
+  return parts.map((part, index) => {
+    const normalized = part.trim().toLowerCase();
+    if (!normalized || !highlightedNames.has(normalized)) {
+      return <Fragment key={`text-${index}`}>{part}</Fragment>;
+    }
+    return (
+      <strong key={`text-${index}`} className="font-semibold text-foreground">
+        {part}
+      </strong>
+    );
+  });
 }
 
 function formatElapsed(seconds: number): string {
