@@ -143,6 +143,126 @@ describe("workbench store", () => {
     expect(state.activeMessages[1]?.content.toLowerCase()).toContain("quota");
   });
 
+  it("attributes delegated-provider failures to the delegated agent and keeps details concise", async () => {
+    const noisyDelegationError = [
+      'Orchestrator provider failed (google, code 1). The delegated agent "developer" failed via provider "gemini" (exit code 1).',
+      "Details: (node:29874) [DEP0040] DeprecationWarning: The `punycode` module is deprecated.",
+      "YOLO mode is enabled. All tool calls will be automatically approved.",
+      "Error when talking to Gemini API",
+      "TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 22h22m2s.",
+      "at classifyGoogleError (file:///opt/homebrew/Cellar/gemini-cli/index.js:214:28)"
+    ].join("\n");
+    const api = createApiMock({
+      bootstrap: vi.fn(async () => ({
+        homeDir: "/tmp/home",
+        onboarding: {
+          activeProviderId: "google",
+          needsOnboarding: false,
+          gateway: createGatewayStatus(),
+          families: [],
+          providers: []
+        },
+        providerSetupCompleted: true,
+        projects: [
+          {
+            id: "p1",
+            name: "project",
+            rootPath: "/tmp/project",
+            createdAt: "2026-02-07T00:00:00.000Z",
+            updatedAt: "2026-02-07T00:00:00.000Z",
+            sessions: [
+              {
+                id: "s1",
+                title: "Session",
+                agentId: "orchestrator",
+                sessionKey: "desktop:p1:s1",
+                createdAt: "2026-02-07T00:00:00.000Z",
+                updatedAt: "2026-02-07T00:00:00.000Z",
+                messages: []
+              }
+            ]
+          }
+        ]
+      })) as WorkbenchApiClient["bootstrap"],
+      sendChatMessage: vi.fn(async () => {
+        throw new Error(noisyDelegationError);
+      })
+    });
+    const store = createWorkbenchStore(api);
+
+    await store.getState().bootstrap();
+    await store.getState().sendMessage("hello");
+
+    const text = store.getState().activeMessages[1]?.content ?? "";
+    expect(text).toContain("Developer failed via Gemini");
+    expect(text.toLowerCase()).toContain("quota exceeded");
+    expect(text).not.toContain("DeprecationWarning");
+    expect(text).not.toContain("classifyGoogleError");
+  });
+
+  it("summarizes orchestrator provider errors instead of showing raw stack dumps", async () => {
+    const noisyProviderError = [
+      "Orchestrator provider failed (gemini, code 1).",
+      "(node:29874) [DEP0040] DeprecationWarning: The `punycode` module is deprecated.",
+      "(Use `node --trace-deprecation ...` to show where the warning was created)",
+      "YOLO mode is enabled. All tool calls will be automatically approved.",
+      "Loaded cached credentials.",
+      "Hook registry initialized with 0 hook entries",
+      "Error when talking to Gemini API",
+      "Full report available at: /tmp/gemini-client-error.json",
+      "TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 22h22m2s.",
+      "at classifyGoogleError (file:///opt/homebrew/Cellar/gemini-cli/index.js:214:28)",
+      "An unexpected critical error occurred:[object Object]"
+    ].join("\n");
+    const api = createApiMock({
+      bootstrap: vi.fn(async () => ({
+        homeDir: "/tmp/home",
+        onboarding: {
+          activeProviderId: "gemini",
+          needsOnboarding: false,
+          gateway: createGatewayStatus(),
+          families: [],
+          providers: []
+        },
+        providerSetupCompleted: true,
+        projects: [
+          {
+            id: "p1",
+            name: "project",
+            rootPath: "/tmp/project",
+            createdAt: "2026-02-07T00:00:00.000Z",
+            updatedAt: "2026-02-07T00:00:00.000Z",
+            sessions: [
+              {
+                id: "s1",
+                title: "Session",
+                agentId: "orchestrator",
+                sessionKey: "desktop:p1:s1",
+                createdAt: "2026-02-07T00:00:00.000Z",
+                updatedAt: "2026-02-07T00:00:00.000Z",
+                messages: []
+              }
+            ]
+          }
+        ]
+      })) as WorkbenchApiClient["bootstrap"],
+      sendChatMessage: vi.fn(async () => {
+        throw new Error(noisyProviderError);
+      })
+    });
+    const store = createWorkbenchStore(api);
+
+    await store.getState().bootstrap();
+    await store.getState().sendMessage("hello");
+
+    const text = store.getState().activeMessages[1]?.content ?? "";
+    expect(text).toContain("Orchestrator failed via Gemini");
+    expect(text.toLowerCase()).toContain("quota exceeded");
+    expect(text).not.toContain("DeprecationWarning");
+    expect(text).not.toContain("Full report available");
+    expect(text).not.toContain("classifyGoogleError");
+  });
+
   it("rethrows send errors when requested for AI SDK transport", async () => {
     const api = createApiMock({
       bootstrap: vi.fn(async () => ({

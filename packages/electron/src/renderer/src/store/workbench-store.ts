@@ -1073,80 +1073,201 @@ function buildChatErrorMessage(error: unknown): WorkbenchMessage {
 }
 
 function summarizeChatError(error: unknown): string {
-  const raw = toErrorMessage(error).replace(/\s+/g, " ").trim();
-  const lower = raw.toLowerCase();
+  const raw = toErrorMessage(error).trim();
+  if (!raw) {
+    return "The request failed. Please try again.";
+  }
+
+  const extracted = extractStructuredErrorDetail(raw);
+  const details = extracted.details ?? raw;
+  const reason = summarizeErrorReason(details);
+  const subject = extracted.agentLabel ? `${extracted.agentLabel} failed` : "The request failed";
+  const providerContext = extracted.providerLabel ? ` via ${extracted.providerLabel}` : "";
+
+  if (reason) {
+    return `${subject}${providerContext}: ${reason}`;
+  }
+
+  const sanitized = sanitizeProviderErrorDetails(details);
+  if (sanitized) {
+    return `${subject}${providerContext}: ${clampText(sanitized, 220)}`;
+  }
+  if (providerContext) {
+    return `${subject}${providerContext}.`;
+  }
+
+  return clampText(raw.replace(/\s+/g, " ").trim(), 220);
+}
+
+function extractStructuredErrorDetail(raw: string): {
+  agentLabel: string | null;
+  providerLabel: string | null;
+  details: string | null;
+} {
+  const delegatedMatch = raw.match(
+    /The delegated agent "([^"]+)" failed via provider "([^"]+)" \(exit code (\d+)\)\.\s*Details:\s*([\s\S]*)$/i
+  );
+  if (delegatedMatch) {
+    return {
+      agentLabel: formatAgentLabel(delegatedMatch[1]),
+      providerLabel: formatProviderLabel(delegatedMatch[2]),
+      details: delegatedMatch[4]?.trim() || null
+    };
+  }
+
+  const orchestratorFailureMatch = raw.match(
+    /orchestrator provider failed \(([^,]+), code (\d+)\)\.\s*([\s\S]*)$/i
+  );
+  if (orchestratorFailureMatch) {
+    return {
+      agentLabel: "Orchestrator",
+      providerLabel: formatProviderLabel(orchestratorFailureMatch[1]),
+      details: orchestratorFailureMatch[3]?.trim() || null
+    };
+  }
+
+  return {
+    agentLabel: null,
+    providerLabel: null,
+    details: null
+  };
+}
+
+function summarizeErrorReason(details: string): string | null {
+  const lower = details.toLowerCase();
 
   if (
     lower.includes("quota exceeded") ||
     lower.includes("resource_exhausted") ||
-    lower.includes("rate limit")
+    lower.includes("rate limit") ||
+    lower.includes("terminalquotaerror") ||
+    lower.includes("exhausted your capacity")
   ) {
-    return "The provider quota or rate limit was exceeded. Check your plan and limits, then try again.";
+    const resetMatch = details.match(/reset after ([^.\n]+)/i);
+    const retryMatch = details.match(/try again in ([^.\n]+)/i);
+    const retryWindow = resetMatch?.[1]?.trim() || retryMatch?.[1]?.trim();
+    if (retryWindow) {
+      return `quota exceeded. Try again in ${retryWindow}.`;
+    }
+    return "quota or rate limit exceeded. Check your plan and limits, then try again.";
   }
 
   if (
     lower.includes("invalid_api_key") ||
     lower.includes("unauthorized") ||
     lower.includes("authentication") ||
-    lower.includes("http 401")
+    lower.includes("http 401") ||
+    lower.includes("forbidden")
   ) {
-    return "The provider rejected your credentials. Update provider settings and try again.";
+    return "credentials were rejected. Update provider settings and try again.";
   }
 
   if (lower.includes("timed out")) {
-    return "The provider request timed out. Please retry in a moment.";
+    const timeoutMatch = details.match(/timed out after (\d+)ms/i);
+    if (timeoutMatch) {
+      const timeoutMs = Number(timeoutMatch[1]);
+      if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+        const seconds = Math.max(1, Math.round(timeoutMs / 1000));
+        return `request timed out after ${seconds}s. Please retry.`;
+      }
+    }
+    return "request timed out. Please retry.";
   }
 
-  const structuredDetail = extractStructuredErrorDetail(raw);
-  if (structuredDetail) {
-    return structuredDetail;
+  if (
+    lower.includes("connection refused") ||
+    lower.includes("enotfound") ||
+    lower.includes("econnreset") ||
+    lower.includes("network error")
+  ) {
+    return "network connection failed while contacting the provider.";
   }
 
-  return clampText(raw, 240);
+  return null;
 }
 
-function extractStructuredErrorDetail(raw: string): string | null {
-  const providerFailureMatch = raw.match(
-    /orchestrator provider failed \(([^,]+), code (\d+)\)\.\s*(.*)$/i
-  );
-  if (!providerFailureMatch) {
-    return null;
-  }
-
-  const providerId = providerFailureMatch[1]?.trim();
-  const details = providerFailureMatch[3]?.trim();
-  const parsed = parseJsonErrorMessage(details) ?? clampText(details, 180);
-  if (!parsed) {
-    return providerId
-      ? `The ${providerId} provider request failed.`
-      : "The provider request failed.";
-  }
-
-  return providerId
-    ? `${capitalize(providerId)} provider error: ${parsed}`
-    : `Provider error: ${parsed}`;
-}
-
-function parseJsonErrorMessage(value?: string): string | null {
+function sanitizeProviderErrorDetails(value?: string): string {
   if (!value) {
+    return "";
+  }
+
+  const withoutAnsi = value.replace(
+    // Strip ANSI escapes from provider stderr so message text is clean.
+    /\u001B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g,
+    ""
+  );
+  const lines = withoutAnsi
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !isProviderNoiseLine(line))
+    .filter((line) => !/^at\s+/i.test(line))
+    .filter((line) => !/^file:\/\//i.test(line));
+  if (!lines.length) {
+    return "";
+  }
+
+  const deduped: string[] = [];
+  for (const line of lines) {
+    if (deduped[deduped.length - 1] !== line) {
+      deduped.push(line);
+    }
+  }
+  return deduped.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function isProviderNoiseLine(line: string): boolean {
+  const lower = line.toLowerCase();
+  if (
+    lower.includes("deprecationwarning") ||
+    lower.includes("punycode") ||
+    lower.startsWith("(use node --trace-deprecation") ||
+    lower.includes("yolo mode is enabled") ||
+    lower.includes("loaded cached credentials") ||
+    lower.includes("hook registry initialized") ||
+    lower.startsWith("full report available at:") ||
+    lower.includes("an unexpected critical error occurred")
+  ) {
+    return true;
+  }
+
+  return /^\(node:\d+\)\s+\[dep\d+\]/i.test(line);
+}
+
+function formatAgentLabel(agentId?: string): string | null {
+  if (!agentId) {
     return null;
   }
+  return toTitleLabel(agentId);
+}
 
-  const jsonStart = value.indexOf("{");
-  if (jsonStart === -1) {
-    return clampText(value, 180);
+function formatProviderLabel(providerId?: string): string | null {
+  const normalized = providerId?.trim().toLowerCase();
+  if (!normalized) {
+    return null;
   }
+  if (normalized === "openai") {
+    return "OpenAI";
+  }
+  if (normalized === "openrouter") {
+    return "OpenRouter";
+  }
+  if (normalized === "google") {
+    return "Google";
+  }
+  if (normalized === "gemini") {
+    return "Gemini";
+  }
+  return toTitleLabel(providerId ?? "");
+}
 
-  const candidate = value.slice(jsonStart).trim();
-  try {
-    const parsed = JSON.parse(candidate) as
-      | { error?: { message?: string }; message?: string }
-      | undefined;
-    const message = parsed?.error?.message?.trim() || parsed?.message?.trim();
-    return message ? clampText(message, 180) : clampText(value.slice(0, jsonStart).trim(), 180);
-  } catch {
-    return clampText(value, 180);
-  }
+function toTitleLabel(value: string): string {
+  return value
+    .trim()
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
 }
 
 function clampText(value: string, maxLength: number): string {
@@ -1158,13 +1279,6 @@ function clampText(value: string, maxLength: number): string {
     return trimmed;
   }
   return `${trimmed.slice(0, maxLength - 1)}…`;
-}
-
-function capitalize(value: string): string {
-  if (!value) {
-    return value;
-  }
-  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }
 
 export function resolveOnboardingDraftProviderId(
