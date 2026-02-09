@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026.2.9
+
+- Initial public release of OpenGoat
+
+- OpenGoat CLI and Core packages
+- Modular provider system supporting Claude, Cursor, OpenAI, Gemini, Grok, and more
+- Agent Client Protocol (ACP) server for editor integration
+- Session and agent management commands
+- Interactive onboarding flow for provider setup
+- CalVer-based release versioning
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),

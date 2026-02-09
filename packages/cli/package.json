@@ -1,6 +1,6 @@
 {
   "name": "@opengoat/cli",
-  "version": "0.1.0",
+  "version": "2026.2.9",
   "description": "OpenGoat agent orchestrator CLI",
   "type": "module",
   "main": "dist/index.js",
