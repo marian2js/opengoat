@@ -11,7 +11,6 @@ import type {
   AgentProviderBinding,
   ProviderExecutionResult,
   ProviderInvokeOptions,
-  ProviderRunStatusEvent,
   ProviderService
 } from "../../providers/index.js";
 import { SessionService, type PreparedSessionRun, type SessionCompactionResult, type SessionRunInfo } from "../../sessions/index.js";
@@ -23,6 +22,7 @@ import type {
   OrchestrationStepLog,
   OrchestrationTaskSessionPolicy
 } from "../domain/loop.js";
+import type { OrchestrationRunEvent, OrchestrationRunOptions } from "../domain/run-events.js";
 import type { AgentRunTrace, OrchestrationRunResult, RoutingDecision } from "../domain/routing.js";
 import { OrchestrationPlannerService } from "./orchestration-planner.service.js";
 import { RoutingService } from "./routing.service.js";
@@ -140,7 +140,7 @@ export class OrchestrationService {
   public async runAgent(
     paths: OpenGoatPaths,
     entryAgentId: string,
-    options: ProviderInvokeOptions
+    options: OrchestrationRunOptions
   ): Promise<OrchestrationRunResult> {
     const runId = generateRunId();
     const runLogger = this.logger.child({ runId });
@@ -152,7 +152,7 @@ export class OrchestrationService {
       resolvedEntryAgentId
     });
     emitRunStatusEvent(options, {
-      type: "run_started",
+      stage: "run_started",
       runId,
       timestamp: this.nowIso(),
       agentId: resolvedEntryAgentId
@@ -165,9 +165,8 @@ export class OrchestrationService {
       const sessionAgentId = options.directAgentSession ? resolvedEntryAgentId : DEFAULT_AGENT_ID;
       const direct = await this.invokeAgentWithSession(paths, resolvedEntryAgentId, {
         ...options,
-        message: options.message,
-        runId
-      }, { sessionAgentId });
+        message: options.message
+      }, { sessionAgentId, runId });
       const completedAt = this.nowIso();
       const routing: RoutingDecision = {
         entryAgentId: resolvedEntryAgentId,
@@ -208,7 +207,7 @@ export class OrchestrationService {
         }
       });
       emitRunStatusEvent(options, {
-        type: "run_completed",
+        stage: "run_completed",
         runId,
         timestamp: this.nowIso(),
         agentId: resolvedEntryAgentId
@@ -256,7 +255,7 @@ export class OrchestrationService {
       }
     });
     emitRunStatusEvent(options, {
-      type: "run_completed",
+      stage: "run_completed",
       runId,
       timestamp: this.nowIso(),
       agentId: DEFAULT_AGENT_ID
@@ -275,7 +274,7 @@ export class OrchestrationService {
     paths: OpenGoatPaths,
     runId: string,
     manifests: AgentManifest[],
-    options: ProviderInvokeOptions,
+    options: OrchestrationRunOptions,
     runLogger: Logger
   ): Promise<OrchestrationLoopResult> {
     const steps: OrchestrationStepLog[] = [];
@@ -318,7 +317,7 @@ export class OrchestrationService {
         prompt: plannerPrompt
       });
       emitRunStatusEvent(options, {
-        type: "planner_started",
+        stage: "planner_started",
         runId,
         timestamp: this.nowIso(),
         step,
@@ -330,10 +329,8 @@ export class OrchestrationService {
         message: plannerPrompt,
         skillsPromptOverride: orchestratorSkillsSnapshot.prompt,
         sessionRef: options.sessionRef,
-        forceNewSession: step === 1 ? options.forceNewSession : false,
-        runId,
-        orchestrationStep: step
-      }, { silent: true });
+        forceNewSession: step === 1 ? options.forceNewSession : false
+      }, { silent: true, runId, step });
       const plannerRawOutput = plannerCall.execution.stdout.trim() || plannerCall.execution.stderr.trim();
       stepLogger.debug("Planner raw output payload.", {
         output: plannerRawOutput
@@ -354,7 +351,7 @@ export class OrchestrationService {
           }
         };
         emitRunStatusEvent(options, {
-          type: "planner_decision",
+          stage: "planner_decision",
           runId,
           timestamp: this.nowIso(),
           step,
@@ -390,7 +387,7 @@ export class OrchestrationService {
         "I could not complete orchestration due to planner output parsing issues."
       );
       emitRunStatusEvent(options, {
-        type: "planner_decision",
+        stage: "planner_decision",
         runId,
         timestamp: this.nowIso(),
         step,
@@ -497,7 +494,7 @@ export class OrchestrationService {
     step: number;
     action: OrchestrationAction;
     manifests: AgentManifest[];
-    options: ProviderInvokeOptions;
+    options: OrchestrationRunOptions;
     sessionGraph: OrchestrationRunLedger["sessionGraph"];
     stepLog: OrchestrationStepLog;
     sharedNotes: string[];
@@ -623,7 +620,7 @@ export class OrchestrationService {
       sessionPolicy: effectiveSessionPolicy
     });
     emitRunStatusEvent(params.options, {
-      type: "delegation_started",
+      stage: "delegation_started",
       runId: params.runId,
       timestamp: this.nowIso(),
       step: params.step,
@@ -682,11 +679,8 @@ export class OrchestrationService {
       sessionRef: `agent:${targetAgentId}:task:${taskKey}`,
       forceNewSession: forceNewTaskSession,
       providerSessionId,
-      forceNewProviderSession: forceNewTaskSession,
-      onRunStatus: params.options.onRunStatus,
-      runId: params.runId,
-      orchestrationStep: params.step
-    }, { silent: true });
+      forceNewProviderSession: forceNewTaskSession
+    }, { silent: true, runId: params.runId, step: params.step });
     const responseText =
       delegateCall.execution.stdout.trim() ||
       (delegateCall.execution.stderr.trim() ? `[stderr] ${delegateCall.execution.stderr.trim()}` : "");
@@ -776,8 +770,8 @@ export class OrchestrationService {
   private async invokeAgentWithSession(
     paths: OpenGoatPaths,
     agentId: string,
-    options: ProviderInvokeOptions,
-    behavior: { silent?: boolean; sessionAgentId?: string } = {}
+    options: OrchestrationRunOptions,
+    behavior: { silent?: boolean; sessionAgentId?: string; runId?: string; step?: number } = {}
   ): Promise<AgentInvocationResult> {
     const sessionAgentId = normalizeAgentId(behavior.sessionAgentId ?? agentId) || DEFAULT_AGENT_ID;
     this.logger.debug("Preparing agent invocation with session context.", {
@@ -807,7 +801,33 @@ export class OrchestrationService {
     }
     const workingPath = preparedSession.enabled ? preparedSession.info.workingPath : resolveInvocationWorkingPath(options.cwd);
     const beforeSnapshot = await this.captureWorkingTreeSnapshot(workingPath);
-    const execution = await this.providerService.invokeAgent(paths, agentId, invokeOptions);
+    const execution = await this.providerService.invokeAgent(paths, agentId, invokeOptions, {
+      runId: behavior.runId,
+      step: behavior.step,
+      hooks: {
+        onInvocationStarted: (event) => {
+          emitRunStatusEvent(options, {
+            stage: "provider_invocation_started",
+            runId: event.runId ?? behavior.runId ?? "unknown-run",
+            timestamp: event.timestamp,
+            step: event.step ?? behavior.step,
+            agentId: event.agentId,
+            providerId: event.providerId
+          });
+        },
+        onInvocationCompleted: (event) => {
+          emitRunStatusEvent(options, {
+            stage: "provider_invocation_completed",
+            runId: event.runId ?? behavior.runId ?? "unknown-run",
+            timestamp: event.timestamp,
+            step: event.step ?? behavior.step,
+            agentId: event.agentId,
+            providerId: event.providerId,
+            code: event.code
+          });
+        }
+      }
+    });
     const afterSnapshot = await this.captureWorkingTreeSnapshot(workingPath);
     const workingTreeEffect = summarizeWorkingTreeEffect(beforeSnapshot, afterSnapshot);
     this.logger.debug("Agent invocation execution returned.", {
@@ -1027,18 +1047,19 @@ function resolveEntryAgentId(entryAgentId: string, manifests: Array<{ agentId: s
 }
 
 function emitRunStatusEvent(
-  options: ProviderInvokeOptions,
-  event: ProviderRunStatusEvent
+  options: OrchestrationRunOptions,
+  event: OrchestrationRunEvent
 ): void {
-  options.onRunStatus?.(event);
+  options.hooks?.onEvent?.(event);
 }
 
-function sanitizeProviderInvokeOptions(options: ProviderInvokeOptions): ProviderInvokeOptions {
+function sanitizeProviderInvokeOptions(options: OrchestrationRunOptions): ProviderInvokeOptions {
   const sanitized: ProviderInvokeOptions = { ...options };
   delete sanitized.sessionRef;
   delete sanitized.forceNewSession;
   delete sanitized.disableSession;
   delete sanitized.directAgentSession;
+  delete (sanitized as ProviderInvokeOptions & { hooks?: unknown }).hooks;
   return sanitized;
 }
 

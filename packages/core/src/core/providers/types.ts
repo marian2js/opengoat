@@ -13,8 +13,6 @@ export interface ProviderInvokeOptions {
   message: string;
   systemPrompt?: string;
   skillsPromptOverride?: string;
-  runId?: string;
-  orchestrationStep?: number;
   sessionRef?: string;
   forceNewSession?: boolean;
   disableSession?: boolean;
@@ -29,28 +27,27 @@ export interface ProviderInvokeOptions {
   env?: NodeJS.ProcessEnv;
   onStdout?: (chunk: string) => void;
   onStderr?: (chunk: string) => void;
-  onRunStatus?: (event: ProviderRunStatusEvent) => void;
 }
 
-export interface ProviderRunStatusEvent {
-  type:
-    | "run_started"
-    | "planner_started"
-    | "planner_decision"
-    | "delegation_started"
-    | "provider_invocation_started"
-    | "provider_invocation_completed"
-    | "run_completed";
+export interface ProviderInvocationLifecycleEvent {
   runId?: string;
-  timestamp?: string;
+  timestamp: string;
   step?: number;
-  agentId?: string;
-  targetAgentId?: string;
-  providerId?: string;
-  actionType?: string;
-  mode?: string;
-  code?: number;
-  detail?: string;
+  agentId: string;
+  providerId: string;
+}
+
+export interface ProviderInvocationLifecycleHooks {
+  onInvocationStarted?: (event: ProviderInvocationLifecycleEvent) => void;
+  onInvocationCompleted?: (
+    event: ProviderInvocationLifecycleEvent & { code: number }
+  ) => void;
+}
+
+export interface ProviderInvokeRuntimeContext {
+  runId?: string;
+  step?: number;
+  hooks?: ProviderInvocationLifecycleHooks;
 }
 
 export interface ProviderAuthOptions {
