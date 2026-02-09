@@ -16,7 +16,6 @@ import type {
   AgentProviderBinding,
   ProviderExecutionResult,
   ProviderAuthOptions,
-  ProviderInvokeOptions,
   ProviderOnboardingSpec,
   ProviderRegistry,
   ProviderStoredConfig,
@@ -27,7 +26,12 @@ import { AgentManifestService } from "../../agents/application/agent-manifest.se
 import { AgentService } from "../../agents/application/agent.service.js";
 import { WorkspaceContextService } from "../../agents/application/workspace-context.service.js";
 import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
-import { OrchestrationService, type OrchestrationRunResult, type RoutingDecision } from "../../orchestration/index.js";
+import {
+  OrchestrationService,
+  type OrchestrationRunOptions,
+  type OrchestrationRunResult,
+  type RoutingDecision
+} from "../../orchestration/index.js";
 import { ProviderService } from "../../providers/application/provider.service.js";
 import { SkillService, type InstallSkillRequest, type InstallSkillResult, type ResolvedSkill } from "../../skills/index.js";
 import {
@@ -293,7 +297,7 @@ export class OpenGoatService {
 
   public async runAgent(
     agentId: string,
-    options: ProviderInvokeOptions
+    options: OrchestrationRunOptions
   ): Promise<OrchestrationRunResult> {
     const paths = this.pathsProvider.getPaths();
     return this.orchestrationService.runAgent(paths, agentId, options);

@@ -13,7 +13,7 @@ import {
   callOpenGoatGateway,
   loadDotEnv,
   selectProvidersForOnboarding,
-  type ProviderRunStatusEvent,
+  type OrchestrationRunEvent,
   type OpenGoatService,
   type ProviderSummary as CoreProviderSummary
 } from "@opengoat/core";
@@ -473,8 +473,10 @@ export class WorkbenchService {
         sessionRef: input.sessionRef,
         cwd: input.cwd,
         env: await this.buildInvocationEnv(input.cwd, providerEnvKeys),
-        onRunStatus: (event) => {
-          this.emitRunStatusFromCoreEvent(event, input.projectId, input.sessionId);
+        hooks: {
+          onEvent: (event) => {
+            this.emitRunStatusFromCoreEvent(event, input.projectId, input.sessionId);
+          }
         }
       });
       return {
@@ -569,15 +571,15 @@ export class WorkbenchService {
   }
 
   private emitRunStatusFromCoreEvent(
-    event: ProviderRunStatusEvent,
+    event: OrchestrationRunEvent,
     projectId: string,
     sessionId: string
   ): void {
     this.onRunStatus?.({
       projectId,
       sessionId,
-      stage: event.type,
-      timestamp: event.timestamp ?? new Date().toISOString(),
+      stage: event.stage,
+      timestamp: event.timestamp,
       runId: event.runId,
       step: event.step,
       agentId: event.agentId,

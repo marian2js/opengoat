@@ -47,8 +47,10 @@ export type {
   ProviderDeleteAgentOptions,
   ProviderCapabilities,
   ProviderExecutionResult,
+  ProviderInvocationLifecycleEvent,
+  ProviderInvocationLifecycleHooks,
   ProviderInvokeOptions,
-  ProviderRunStatusEvent,
+  ProviderInvokeRuntimeContext,
   ProviderKind,
   ProviderSummary,
   AgentProviderBinding

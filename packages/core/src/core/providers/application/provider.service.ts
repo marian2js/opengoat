@@ -17,6 +17,7 @@ import {
   type ProviderCreateAgentOptions,
   type ProviderDeleteAgentOptions,
   type ProviderExecutionResult,
+  type ProviderInvokeRuntimeContext,
   type ProviderOnboardingSpec,
   type ProviderInvokeOptions,
   type ProviderSummary,
@@ -221,7 +222,8 @@ export class ProviderService {
   public async invokeAgent(
     paths: OpenGoatPaths,
     agentId: string,
-    options: ProviderInvokeOptions
+    options: ProviderInvokeOptions,
+    runtimeContext: ProviderInvokeRuntimeContext = {}
   ): Promise<ProviderExecutionResult & AgentProviderBinding> {
     const registry = await this.getProviderRegistry();
     const config = await this.readAgentConfig(paths, agentId);
@@ -264,11 +266,10 @@ export class ProviderService {
       cwd: invokeOptions.cwd,
       workspaceAccess
     });
-    options.onRunStatus?.({
-      type: "provider_invocation_started",
-      runId: options.runId,
+    runtimeContext.hooks?.onInvocationStarted?.({
+      runId: runtimeContext.runId,
       timestamp: this.nowIso(),
-      step: options.orchestrationStep,
+      step: runtimeContext.step,
       agentId,
       providerId: provider.id
     });
@@ -292,11 +293,10 @@ export class ProviderService {
       providerId: provider.id,
       code: result.code
     });
-    options.onRunStatus?.({
-      type: "provider_invocation_completed",
-      runId: options.runId,
+    runtimeContext.hooks?.onInvocationCompleted?.({
+      runId: runtimeContext.runId,
       timestamp: this.nowIso(),
-      step: options.orchestrationStep,
+      step: runtimeContext.step,
       agentId,
       providerId: provider.id,
       code: result.code
