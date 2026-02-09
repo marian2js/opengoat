@@ -7,6 +7,12 @@ import {
   PromptInputTextarea,
   type PromptInputMessage,
 } from "@renderer/components/ai-elements/prompt-input";
+import {
+  Task,
+  TaskContent,
+  TaskItem,
+  TaskTrigger,
+} from "@renderer/components/ai-elements/task";
 import { Button } from "@renderer/components/ui/button";
 import { cn } from "@renderer/lib/utils";
 import type {
@@ -16,7 +22,13 @@ import type {
   WorkbenchSession,
 } from "@shared/workbench";
 import { WORKBENCH_CHAT_ERROR_PROVIDER_ID } from "@shared/workbench";
-import { ChevronDown, Loader2, Settings2 } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Circle,
+  Loader2,
+  Settings2,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   createElectronChatTransport,
@@ -69,6 +81,10 @@ export function ChatPanel(props: ChatPanelProps) {
     transport,
   });
   const [input, setInput] = useState("");
+  const [loadingStartedAtMs, setLoadingStartedAtMs] = useState<number | null>(
+    null,
+  );
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
     setMessages(initialMessages);
@@ -76,6 +92,8 @@ export function ChatPanel(props: ChatPanelProps) {
   }, [chatId, initialMessages, setMessages]);
 
   const isSubmitting = status === "submitted" || status === "streaming";
+  const showRunProgress =
+    Boolean(props.activeSession) && (isSubmitting || props.busy);
   const canSend = Boolean(
     props.activeSession &&
     input.trim().length > 0 &&
@@ -83,6 +101,36 @@ export function ChatPanel(props: ChatPanelProps) {
     !props.busy,
   );
   const resolvedError = chatError?.message ?? props.error;
+  const runProgress = useMemo(
+    () => buildRunProgress(elapsedSeconds, gatewayMode),
+    [elapsedSeconds, gatewayMode],
+  );
+
+  useEffect(() => {
+    if (showRunProgress) {
+      setLoadingStartedAtMs((current) => current ?? Date.now());
+      return;
+    }
+
+    setLoadingStartedAtMs(null);
+    setElapsedSeconds(0);
+  }, [showRunProgress]);
+
+  useEffect(() => {
+    if (!showRunProgress || loadingStartedAtMs === null) {
+      return;
+    }
+
+    const updateElapsed = () => {
+      setElapsedSeconds(
+        Math.max(0, Math.floor((Date.now() - loadingStartedAtMs) / 1000)),
+      );
+    };
+
+    updateElapsed();
+    const interval = window.setInterval(updateElapsed, 1000);
+    return () => window.clearInterval(interval);
+  }, [showRunProgress, loadingStartedAtMs]);
 
   const handlePromptSubmit = async (message: PromptInputMessage) => {
     const text = message.text.trim();
@@ -200,6 +248,51 @@ export function ChatPanel(props: ChatPanelProps) {
               );
             })
           )}
+          {showRunProgress ? (
+            <article className="flex justify-start">
+              <div className="w-full max-w-[min(72ch,100%)] rounded-xl border border-[#2E2F31] bg-[#141416] px-4 py-3">
+                <Task className="w-full" defaultOpen>
+                  <TaskTrigger title={runProgress.title}>
+                    <div className="flex w-full items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin text-emerald-300" />
+                      <p className="font-medium text-foreground/90">
+                        {runProgress.title}
+                      </p>
+                      <span className="ml-auto text-xs text-muted-foreground/90">
+                        {formatElapsed(elapsedSeconds)}
+                      </span>
+                    </div>
+                  </TaskTrigger>
+                  <TaskContent>
+                    {runProgress.steps.map((step) => (
+                      <TaskItem
+                        key={step.id}
+                        className="flex items-start gap-2 text-foreground/90"
+                      >
+                        <span className="mt-0.5">
+                          {step.state === "done" ? (
+                            <CheckCircle2 className="size-4 text-emerald-300" />
+                          ) : step.state === "active" ? (
+                            <Loader2 className="size-4 animate-spin text-emerald-300" />
+                          ) : (
+                            <Circle className="size-4 text-muted-foreground/80" />
+                          )}
+                        </span>
+                        <span className="space-y-0.5">
+                          <p className="text-sm font-medium leading-5">
+                            {step.label}
+                          </p>
+                          <p className="text-sm leading-5 text-muted-foreground">
+                            {step.description}
+                          </p>
+                        </span>
+                      </TaskItem>
+                    ))}
+                  </TaskContent>
+                </Task>
+              </div>
+            </article>
+          ) : null}
         </div>
       </section>
       <footer className="titlebar-no-drag flex-none border-t border-[#2E2F31] bg-transparent px-4 py-3 backdrop-blur md:px-5">
@@ -250,6 +343,88 @@ export function ChatPanel(props: ChatPanelProps) {
       </footer>
     </main>
   );
+}
+
+interface RunProgressStep {
+  id: string;
+  label: string;
+  description: string;
+  state: "done" | "active" | "pending";
+}
+
+interface RunProgressState {
+  title: string;
+  steps: RunProgressStep[];
+}
+
+function buildRunProgress(
+  elapsedSeconds: number,
+  gatewayMode: "local" | "remote",
+): RunProgressState {
+  const runtimeLabel =
+    gatewayMode === "remote" ? "Remote runtime" : "Local provider runtime";
+  const steps: RunProgressStep[] = [
+    {
+      id: "queued",
+      label: "Preparing your request",
+      description: "Your message is attached to this session and queued.",
+      state: "pending",
+    },
+    {
+      id: "planner",
+      label: "Orchestrator is planning",
+      description:
+        "The orchestrator is deciding whether to answer directly or delegate work.",
+      state: "pending",
+    },
+    {
+      id: "provider",
+      label: `Calling ${runtimeLabel}`,
+      description:
+        gatewayMode === "remote"
+          ? "OpenGoat is waiting for the remote gateway and provider response."
+          : "OpenGoat is invoking your configured model provider.",
+      state: "pending",
+    },
+    {
+      id: "waiting",
+      label: "Awaiting final response",
+      description:
+        elapsedSeconds >= 60
+          ? "This request is taking longer than usual, often due to larger context or complex planning."
+          : "Complex prompts can take longer. You can keep working while this run continues.",
+      state: "pending",
+    },
+  ];
+
+  const activeIndex =
+    elapsedSeconds < 3 ? 0 : elapsedSeconds < 10 ? 1 : elapsedSeconds < 30 ? 2 : 3;
+  const resolvedSteps = steps.map((step, index) => ({
+    ...step,
+    state:
+      index < activeIndex
+        ? ("done" as const)
+        : index === activeIndex
+          ? ("active" as const)
+          : ("pending" as const),
+  }));
+
+  return {
+    title:
+      elapsedSeconds >= 60
+        ? "Orchestrator is still working on your request"
+        : "Orchestrator is working on your request",
+    steps: resolvedSteps,
+  };
+}
+
+function formatElapsed(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}m ${remainingSeconds}s`;
 }
 
 function resolveGatewayHost(rawUrl?: string): string | null {
