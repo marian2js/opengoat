@@ -1,4 +1,5 @@
 import { MakerDeb } from "@electron-forge/maker-deb";
+import { MakerDMG } from "@electron-forge/maker-dmg";
 import { MakerRpm } from "@electron-forge/maker-rpm";
 import { MakerZIP } from "@electron-forge/maker-zip";
 import { VitePlugin } from "@electron-forge/plugin-vite";
@@ -11,7 +12,7 @@ const config: ForgeConfig = {
   },
   makers: [
     // new MakerSquirrel({}),
-    // new MakerDMG({}),
+    new MakerDMG({}),
     new MakerZIP({}, ["darwin", "win32"]),
     new MakerRpm({}),
     new MakerZIP({}, ["linux"]),
