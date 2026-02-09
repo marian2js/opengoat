@@ -28,6 +28,7 @@ export type ChatFlowState = "idle" | "sending";
 export type OnboardingGuidedAuthState = "idle" | "running";
 export type GatewayFlowState = "idle" | "saving";
 export type AgentsFlowState = "idle" | "loading" | "saving";
+const MAX_IMAGE_PREVIEW_URL_LENGTH = 1_000_000;
 
 export interface OnboardingGatewayDraft {
   mode: WorkbenchGatewayMode;
@@ -808,10 +809,11 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           message: trimmed,
           images: normalizedImages
         });
+        const sessionWithImagePreviews = mergeOptimisticImagePreviews(result.session, optimistic);
 
         set((current) => ({
-          projects: upsertProjectSession(current.projects, projectId, result.session),
-          activeMessages: result.session.messages,
+          projects: upsertProjectSession(current.projects, projectId, sessionWithImagePreviews),
+          activeMessages: sessionWithImagePreviews.messages,
           chatState: "idle",
           isBusy: false
         }));
@@ -1088,8 +1090,94 @@ function toWorkbenchMessageImages(images: WorkbenchImageInput[]): WorkbenchMessa
 
   return images.map((image, index) => ({
     name: image.name || image.path?.split(/[\\/]/g).at(-1) || `Image ${index + 1}`,
-    mediaType: image.mediaType
+    mediaType: image.mediaType,
+    previewUrl: toImagePreviewUrl(image)
   }));
+}
+
+function toImagePreviewUrl(image: WorkbenchImageInput): string | undefined {
+  const dataUrl = image.dataUrl?.trim();
+  if (!dataUrl || !dataUrl.startsWith("data:image/")) {
+    return undefined;
+  }
+  if (dataUrl.length > MAX_IMAGE_PREVIEW_URL_LENGTH) {
+    return undefined;
+  }
+  return dataUrl;
+}
+
+function mergeOptimisticImagePreviews(
+  session: WorkbenchSession,
+  optimisticUserMessage: WorkbenchMessage
+): WorkbenchSession {
+  const optimisticImages = optimisticUserMessage.images;
+  if (!optimisticImages || optimisticImages.length === 0) {
+    return session;
+  }
+  if (!optimisticImages.some((image) => Boolean(image.previewUrl))) {
+    return session;
+  }
+
+  const targetIndex = findMatchingUserMessageIndex(session.messages, optimisticUserMessage);
+  if (targetIndex < 0) {
+    return session;
+  }
+
+  const targetMessage = session.messages[targetIndex];
+  if (!targetMessage?.images || targetMessage.images.length === 0) {
+    return session;
+  }
+
+  const mergedImages = targetMessage.images.map((image, index) => {
+    const namedPreview = optimisticImages.find(
+      (candidate) =>
+        normalizeImageName(candidate.name) !== null &&
+        normalizeImageName(candidate.name) === normalizeImageName(image.name)
+    )?.previewUrl;
+    const previewUrl = namedPreview || optimisticImages[index]?.previewUrl;
+    if (!previewUrl) {
+      return image;
+    }
+    return {
+      ...image,
+      previewUrl
+    };
+  });
+
+  const nextMessages = session.messages.slice();
+  nextMessages[targetIndex] = {
+    ...targetMessage,
+    images: mergedImages
+  };
+  return {
+    ...session,
+    messages: nextMessages
+  };
+}
+
+function findMatchingUserMessageIndex(
+  messages: WorkbenchMessage[],
+  optimisticUserMessage: WorkbenchMessage
+): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const candidate = messages[index];
+    if (!candidate || candidate.role !== "user") {
+      continue;
+    }
+    if (candidate.content !== optimisticUserMessage.content) {
+      continue;
+    }
+    if ((candidate.images?.length ?? 0) !== (optimisticUserMessage.images?.length ?? 0)) {
+      continue;
+    }
+    return index;
+  }
+  return -1;
+}
+
+function normalizeImageName(name: string | undefined): string | null {
+  const normalized = name?.trim().toLowerCase();
+  return normalized || null;
 }
 
 function buildAgentNotice(

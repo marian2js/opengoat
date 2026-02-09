@@ -113,6 +113,7 @@ export function ChatPanel(props: ChatPanelProps) {
   });
   const [input, setInput] = useState("");
   const [attachmentCount, setAttachmentCount] = useState(0);
+  const [composerVersion, setComposerVersion] = useState(0);
   const [isFileDragActive, setIsFileDragActive] = useState(false);
   const fileDragDepthRef = useRef(0);
   const [loadingStartedAtMs, setLoadingStartedAtMs] = useState<number | null>(
@@ -252,6 +253,7 @@ export function ChatPanel(props: ChatPanelProps) {
 
     setInput("");
     await sendMessage({ text: normalizedText, files: message.files });
+    setComposerVersion((current) => current + 1);
   };
 
   const handleAttachmentCountChange = useCallback((nextCount: number) => {
@@ -358,17 +360,36 @@ export function ChatPanel(props: ChatPanelProps) {
                       </p>
                     ) : null}
                     {images.length > 0 ? (
-                      <ul className="mt-2 flex flex-wrap gap-1.5">
-                        {images.map((image, imageIndex) => (
-                          <li
-                            key={`${message.id}-img-${imageIndex}`}
-                            className="inline-flex items-center gap-1 rounded-md border border-[#394355] bg-[#1A2231] px-2 py-1 text-[11px] text-blue-100/95"
-                          >
-                            <ImageIcon className="size-3.5" />
-                            <span className="max-w-[26ch] truncate">{image.name || `Image ${imageIndex + 1}`}</span>
-                          </li>
-                        ))}
-                      </ul>
+                      <div className="mt-2 space-y-2">
+                        <ul className="flex flex-wrap gap-2">
+                          {images
+                            .filter((image) => Boolean(image.previewUrl))
+                            .map((image, imageIndex) => (
+                              <li
+                                key={`${message.id}-img-preview-${imageIndex}`}
+                                className="overflow-hidden rounded-lg border border-[#394355] bg-[#161F2F]"
+                              >
+                                <img
+                                  src={image.previewUrl}
+                                  alt={image.name || `Image ${imageIndex + 1}`}
+                                  className="h-24 w-24 object-cover"
+                                  loading="lazy"
+                                />
+                              </li>
+                            ))}
+                        </ul>
+                        <ul className="flex flex-wrap gap-1.5">
+                          {images.map((image, imageIndex) => (
+                            <li
+                              key={`${message.id}-img-${imageIndex}`}
+                              className="inline-flex items-center gap-1 rounded-md border border-[#394355] bg-[#1A2231] px-2 py-1 text-[11px] text-blue-100/95"
+                            >
+                              <ImageIcon className="size-3.5" />
+                              <span className="max-w-[26ch] truncate">{image.name || `Image ${imageIndex + 1}`}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ) : null}
                     {isStreamingAssistant && !content ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -464,7 +485,7 @@ export function ChatPanel(props: ChatPanelProps) {
           ) : null}
 
           <PromptInput
-            key={chatId}
+            key={`${chatId}:${composerVersion}`}
             className="w-full"
             inputGroupClassName={cn(
               "rounded-lg border border-[#2F3032] bg-[#19191A] shadow-none transition-[border-color,box-shadow,background-color] duration-150",
@@ -551,7 +572,7 @@ function ComposerAttachmentTray(props: ComposerAttachmentTrayProps) {
   }
 
   return (
-    <div className="mx-3 mt-3 flex flex-wrap gap-2">
+    <div className="mx-3 mt-3 flex w-full flex-wrap items-start justify-start gap-2">
       {attachments.files.map((attachment, index) => (
         <div
           key={attachment.id}
@@ -885,16 +906,20 @@ function resolveGatewayHost(rawUrl?: string): string | null {
   }
 }
 
-function getMessageImages(message: ElectronUiMessage): Array<{ name?: string; mediaType?: string }> {
+function getMessageImages(message: ElectronUiMessage): Array<{ name?: string; mediaType?: string; previewUrl?: string }> {
   const fromMetadata = message.metadata?.images ?? [];
   if (fromMetadata.length > 0) {
     return fromMetadata;
   }
 
   return message.parts
-    .filter((part): part is { type: "file"; filename?: string; mediaType?: string } => part.type === "file")
+    .filter(
+      (part): part is { type: "file"; filename?: string; mediaType?: string; url?: string } =>
+        part.type === "file"
+    )
     .map((part) => ({
       name: part.filename,
-      mediaType: part.mediaType
+      mediaType: part.mediaType,
+      previewUrl: part.url?.trim() || undefined
     }));
 }

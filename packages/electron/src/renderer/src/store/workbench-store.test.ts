@@ -188,7 +188,13 @@ describe("workbench store", () => {
 
     const optimisticUser = store.getState().activeMessages.at(-1);
     expect(optimisticUser?.role).toBe("user");
-    expect(optimisticUser?.images).toEqual([{ name: "diagram.png", mediaType: "image/png" }]);
+    expect(optimisticUser?.images).toEqual([
+      {
+        name: "diagram.png",
+        mediaType: "image/png",
+        previewUrl: "data:image/png;base64,aGVsbG8="
+      }
+    ]);
 
     await pending;
     expect(sendChatMessage).toHaveBeenCalledWith({
@@ -197,6 +203,10 @@ describe("workbench store", () => {
       message: "hello",
       images: [{ dataUrl: "data:image/png;base64,aGVsbG8=", mediaType: "image/png", name: "diagram.png" }]
     });
+    const persistedUser = store
+      .getState()
+      .activeMessages.find((entry) => entry.role === "user" && entry.content === "hello");
+    expect(persistedUser?.images?.[0]?.previewUrl).toBe("data:image/png;base64,aGVsbG8=");
   });
 
   it("attributes delegated-provider failures to the delegated agent and keeps details concise", async () => {

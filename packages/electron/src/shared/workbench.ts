@@ -5,7 +5,8 @@ export const WORKBENCH_CHAT_ERROR_PROVIDER_ID = "__opengoat_error__";
 
 export const workbenchMessageImageSchema = z.object({
   name: z.string().trim().min(1).max(240).optional(),
-  mediaType: z.string().trim().min(1).max(160).optional()
+  mediaType: z.string().trim().min(1).max(160).optional(),
+  previewUrl: z.string().trim().min(1).max(2_000_000).optional()
 });
 
 export const workbenchMessageSchema = z.object({

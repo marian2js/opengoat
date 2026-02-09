@@ -403,12 +403,15 @@ describe("ChatPanel", () => {
       expect(screen.queryByText("diagram.png")).toBeTruthy();
     });
     expect(screen.getByText("diagram.png")).toBeTruthy();
+    expect(screen.getByLabelText("Remove diagram.png")).toBeTruthy();
     expect(submitButton.hasAttribute("disabled")).toBe(false);
 
     fireEvent.click(submitButton);
     await waitFor(() => {
       expect(onSubmitMessage).toHaveBeenCalledTimes(1);
     });
+    expect(screen.queryByLabelText("Remove diagram.png")).toBeNull();
+    expect(screen.getByRole("img", { name: "diagram.png" })).toBeTruthy();
   });
 
   it("shows a full-panel drop indicator while dragging image files", async () => {
