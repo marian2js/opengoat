@@ -54,8 +54,7 @@ export class GeminiProvider extends BaseCliProvider {
 }
 
 function hasApprovalModeOverride(args: string[]): boolean {
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
+  for (const arg of args) {
     if (arg === "--yolo" || arg === "-y") {
       return true;
     }
