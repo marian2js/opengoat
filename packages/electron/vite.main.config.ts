@@ -1,5 +1,5 @@
-import path from "node:path";
 import { builtinModules } from "node:module";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
@@ -13,7 +13,7 @@ const externals = [
   "bufferutil",
   "utf-8-validate",
   ...builtinModules,
-  ...builtinModules.map((moduleName) => `node:${moduleName}`)
+  ...builtinModules.map((moduleName) => `node:${moduleName}`),
 ];
 
 export default defineConfig({
@@ -23,21 +23,21 @@ export default defineConfig({
       "@shared": path.resolve(currentDir, "src/shared"),
       "@cli/onboard-guided-auth": path.resolve(
         currentDir,
-        "../cli/src/cli/commands/onboard-guided-auth.ts"
+        "../cli/src/cli/commands/onboard-guided-auth.ts",
       ),
       "@opengoat/core": path.resolve(currentDir, "../core/src/index.ts"),
       "@trpc/server": path.resolve(rootModules, "@trpc/server"),
-      "@trpc/client": path.resolve(rootModules, "@trpc/client")
-    }
+      "@trpc/client": path.resolve(rootModules, "@trpc/client"),
+    },
   },
   build: {
     lib: {
       entry: path.resolve(currentDir, "src/main/main.ts"),
       fileName: () => "main.cjs",
-      formats: ["cjs"]
+      formats: ["cjs"],
     },
     rollupOptions: {
-      external: externals
-    }
-  }
+      external: externals,
+    },
+  },
 });
