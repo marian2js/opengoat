@@ -201,6 +201,34 @@ export const sendMessageResultSchema = z.object({
   providerId: z.string()
 });
 
+export const workbenchRunStatusStageSchema = z.enum([
+  "run_started",
+  "planner_started",
+  "planner_decision",
+  "delegation_started",
+  "provider_invocation_started",
+  "provider_invocation_completed",
+  "run_completed",
+  "remote_call_started",
+  "remote_call_completed"
+]);
+
+export const workbenchRunStatusEventSchema = z.object({
+  projectId: z.string().min(1),
+  sessionId: z.string().min(1),
+  stage: workbenchRunStatusStageSchema,
+  timestamp: z.string(),
+  runId: z.string().optional(),
+  step: z.number().int().positive().optional(),
+  agentId: z.string().optional(),
+  targetAgentId: z.string().optional(),
+  providerId: z.string().optional(),
+  actionType: z.string().optional(),
+  mode: z.string().optional(),
+  code: z.number().optional(),
+  detail: z.string().optional()
+});
+
 export const createAgentInputSchema = z.object({
   name: z.string().trim().min(1),
   providerId: z.string().trim().min(1).optional(),
@@ -273,5 +301,6 @@ export const runGuidedAuthResultSchema = z.object({
 
 export type WorkbenchGuidedAuthResult = z.infer<typeof runGuidedAuthResultSchema>;
 export type WorkbenchSendMessageResult = z.infer<typeof sendMessageResultSchema>;
+export type WorkbenchRunStatusEvent = z.infer<typeof workbenchRunStatusEventSchema>;
 export type WorkbenchAgentCreationResult = z.infer<typeof agentCreationResultSchema>;
 export type WorkbenchAgentDeletionResult = z.infer<typeof agentDeletionResultSchema>;

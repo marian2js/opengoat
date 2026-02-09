@@ -48,6 +48,7 @@ export type {
   ProviderCapabilities,
   ProviderExecutionResult,
   ProviderInvokeOptions,
+  ProviderRunStatusEvent,
   ProviderKind,
   ProviderSummary,
   AgentProviderBinding

@@ -7,7 +7,13 @@ import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type { CommandRunnerPort } from "../../ports/command-runner.port.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
-import type { AgentProviderBinding, ProviderExecutionResult, ProviderInvokeOptions, ProviderService } from "../../providers/index.js";
+import type {
+  AgentProviderBinding,
+  ProviderExecutionResult,
+  ProviderInvokeOptions,
+  ProviderRunStatusEvent,
+  ProviderService
+} from "../../providers/index.js";
 import { SessionService, type PreparedSessionRun, type SessionCompactionResult, type SessionRunInfo } from "../../sessions/index.js";
 import type { SkillService } from "../../skills/index.js";
 import type {
@@ -145,6 +151,12 @@ export class OrchestrationService {
       entryAgentId,
       resolvedEntryAgentId
     });
+    emitRunStatusEvent(options, {
+      type: "run_started",
+      runId,
+      timestamp: this.nowIso(),
+      agentId: resolvedEntryAgentId
+    });
 
     if (resolvedEntryAgentId !== DEFAULT_AGENT_ID) {
       runLogger.info("Running direct non-orchestrator invocation.", {
@@ -153,7 +165,8 @@ export class OrchestrationService {
       const sessionAgentId = options.directAgentSession ? resolvedEntryAgentId : DEFAULT_AGENT_ID;
       const direct = await this.invokeAgentWithSession(paths, resolvedEntryAgentId, {
         ...options,
-        message: options.message
+        message: options.message,
+        runId
       }, { sessionAgentId });
       const completedAt = this.nowIso();
       const routing: RoutingDecision = {
@@ -193,6 +206,12 @@ export class OrchestrationService {
           },
           taskThreads: []
         }
+      });
+      emitRunStatusEvent(options, {
+        type: "run_completed",
+        runId,
+        timestamp: this.nowIso(),
+        agentId: resolvedEntryAgentId
       });
 
       return {
@@ -235,6 +254,12 @@ export class OrchestrationService {
         sessionGraph: loopResult.sessionGraph,
         taskThreads: loopResult.taskThreads
       }
+    });
+    emitRunStatusEvent(options, {
+      type: "run_completed",
+      runId,
+      timestamp: this.nowIso(),
+      agentId: DEFAULT_AGENT_ID
     });
 
     return {
@@ -292,13 +317,22 @@ export class OrchestrationService {
       stepLogger.debug("Planner prompt payload.", {
         prompt: plannerPrompt
       });
+      emitRunStatusEvent(options, {
+        type: "planner_started",
+        runId,
+        timestamp: this.nowIso(),
+        step,
+        agentId: DEFAULT_AGENT_ID
+      });
 
       const plannerCall = await this.invokeAgentWithSession(paths, DEFAULT_AGENT_ID, {
         ...options,
         message: plannerPrompt,
         skillsPromptOverride: orchestratorSkillsSnapshot.prompt,
         sessionRef: options.sessionRef,
-        forceNewSession: step === 1 ? options.forceNewSession : false
+        forceNewSession: step === 1 ? options.forceNewSession : false,
+        runId,
+        orchestrationStep: step
       }, { silent: true });
       const plannerRawOutput = plannerCall.execution.stdout.trim() || plannerCall.execution.stderr.trim();
       stepLogger.debug("Planner raw output payload.", {
@@ -319,6 +353,15 @@ export class OrchestrationService {
             message: providerFailureMessage
           }
         };
+        emitRunStatusEvent(options, {
+          type: "planner_decision",
+          runId,
+          timestamp: this.nowIso(),
+          step,
+          agentId: DEFAULT_AGENT_ID,
+          actionType: "respond_user",
+          mode: "direct"
+        });
         stepLogger.warn("Planner provider invocation failed.", {
           providerId: plannerCall.execution.providerId,
           code: plannerCall.execution.code,
@@ -346,6 +389,18 @@ export class OrchestrationService {
         plannerRawOutput,
         "I could not complete orchestration due to planner output parsing issues."
       );
+      emitRunStatusEvent(options, {
+        type: "planner_decision",
+        runId,
+        timestamp: this.nowIso(),
+        step,
+        agentId: DEFAULT_AGENT_ID,
+        actionType: plannerDecision.action.type,
+        targetAgentId: plannerDecision.action.type === "delegate_to_agent"
+          ? normalizeAgentId(plannerDecision.action.targetAgentId)
+          : undefined,
+        mode: plannerDecision.action.mode
+      });
       stepLogger.info("Planner decision parsed.", {
         actionType: plannerDecision.action.type,
         actionMode: plannerDecision.action.mode ?? "direct",
@@ -567,6 +622,17 @@ export class OrchestrationService {
       taskKey,
       sessionPolicy: effectiveSessionPolicy
     });
+    emitRunStatusEvent(params.options, {
+      type: "delegation_started",
+      runId: params.runId,
+      timestamp: this.nowIso(),
+      step: params.step,
+      agentId: DEFAULT_AGENT_ID,
+      targetAgentId,
+      providerId: targetRuntime.providerId,
+      mode,
+      detail: action.reason
+    });
     const handoffBaseDir = this.pathPort.join(params.paths.sessionsDir, params.runId);
     let outboundPath: string | undefined;
     if (mode === "artifacts" || mode === "hybrid") {
@@ -616,7 +682,10 @@ export class OrchestrationService {
       sessionRef: `agent:${targetAgentId}:task:${taskKey}`,
       forceNewSession: forceNewTaskSession,
       providerSessionId,
-      forceNewProviderSession: forceNewTaskSession
+      forceNewProviderSession: forceNewTaskSession,
+      onRunStatus: params.options.onRunStatus,
+      runId: params.runId,
+      orchestrationStep: params.step
     }, { silent: true });
     const responseText =
       delegateCall.execution.stdout.trim() ||
@@ -955,6 +1024,13 @@ function resolveEntryAgentId(entryAgentId: string, manifests: Array<{ agentId: s
   }
 
   return manifests[0]?.agentId || normalizedEntryAgentId;
+}
+
+function emitRunStatusEvent(
+  options: ProviderInvokeOptions,
+  event: ProviderRunStatusEvent
+): void {
+  options.onRunStatus?.(event);
 }
 
 function sanitizeProviderInvokeOptions(options: ProviderInvokeOptions): ProviderInvokeOptions {

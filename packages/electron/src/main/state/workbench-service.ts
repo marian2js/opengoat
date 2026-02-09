@@ -13,6 +13,7 @@ import {
   callOpenGoatGateway,
   loadDotEnv,
   selectProvidersForOnboarding,
+  type ProviderRunStatusEvent,
   type OpenGoatService,
   type ProviderSummary as CoreProviderSummary
 } from "@opengoat/core";
@@ -28,6 +29,7 @@ import type {
   WorkbenchMessage,
   WorkbenchOnboarding,
   WorkbenchProject,
+  WorkbenchRunStatusEvent,
   WorkbenchSendMessageResult,
   WorkbenchSession
 } from "@shared/workbench";
@@ -37,6 +39,7 @@ import { WorkbenchStore } from "./workbench-store";
 interface WorkbenchServiceDeps {
   opengoat: OpenGoatService;
   store: WorkbenchStore;
+  onRunStatus?: (event: WorkbenchRunStatusEvent) => void;
   loadDotEnvFn?: typeof loadDotEnv;
   resolveGuidedAuthFn?: typeof resolveCliGuidedAuth;
   runGuidedAuthFn?: typeof runCliGuidedAuth;
@@ -50,6 +53,7 @@ export class WorkbenchService {
   private readonly resolveGuidedAuthFn: typeof resolveCliGuidedAuth;
   private readonly runGuidedAuthFn: typeof runCliGuidedAuth;
   private readonly callGatewayFn: typeof callOpenGoatGateway;
+  private readonly onRunStatus?: (event: WorkbenchRunStatusEvent) => void;
   private remoteGatewayToken: string | undefined;
   private initializationPromise: Promise<void> | undefined;
 
@@ -60,6 +64,7 @@ export class WorkbenchService {
     this.resolveGuidedAuthFn = deps.resolveGuidedAuthFn ?? resolveCliGuidedAuth;
     this.runGuidedAuthFn = deps.runGuidedAuthFn ?? runCliGuidedAuth;
     this.callGatewayFn = deps.callGatewayFn ?? callOpenGoatGateway;
+    this.onRunStatus = deps.onRunStatus;
   }
 
   public async bootstrap(): Promise<WorkbenchBootstrap> {
@@ -403,6 +408,8 @@ export class WorkbenchService {
     });
 
     const run = await this.executeOrchestratorRun({
+      projectId: project.id,
+      sessionId: session.id,
       message,
       sessionRef: session.sessionKey,
       cwd: project.rootPath
@@ -436,6 +443,8 @@ export class WorkbenchService {
   }
 
   private async executeOrchestratorRun(input: {
+    projectId: string;
+    sessionId: string;
     message: string;
     sessionRef: string;
     cwd: string;
@@ -463,7 +472,10 @@ export class WorkbenchService {
         message: input.message,
         sessionRef: input.sessionRef,
         cwd: input.cwd,
-        env: await this.buildInvocationEnv(input.cwd, providerEnvKeys)
+        env: await this.buildInvocationEnv(input.cwd, providerEnvKeys),
+        onRunStatus: (event) => {
+          this.emitRunStatusFromCoreEvent(event, input.projectId, input.sessionId);
+        }
       });
       return {
         code: run.code,
@@ -480,6 +492,14 @@ export class WorkbenchService {
         "Remote gateway mode is enabled, but no gateway URL is configured. Open Provider Setup and add a remote gateway URL, or switch back to local runtime."
       );
     }
+    this.emitRunStatus?.({
+      projectId: input.projectId,
+      sessionId: input.sessionId,
+      stage: "remote_call_started",
+      timestamp: new Date().toISOString(),
+      agentId: DEFAULT_AGENT_ID,
+      detail: "Submitting this request to your remote OpenGoat gateway."
+    });
 
     const gatewayCall = await this.callGatewayFn<{
       runId?: string;
@@ -502,8 +522,19 @@ export class WorkbenchService {
         cwd: input.cwd
       }
     });
+    const parsedGatewayResult = parseGatewayRunResult(gatewayCall.payload);
+    this.emitRunStatus?.({
+      projectId: input.projectId,
+      sessionId: input.sessionId,
+      stage: "remote_call_completed",
+      timestamp: new Date().toISOString(),
+      runId: parsedGatewayResult.runId,
+      agentId: DEFAULT_AGENT_ID,
+      providerId: parsedGatewayResult.providerId,
+      code: parsedGatewayResult.code
+    });
 
-    return parseGatewayRunResult(gatewayCall.payload);
+    return parsedGatewayResult;
   }
 
   private async applyGatewaySettings(input?: {
@@ -535,6 +566,28 @@ export class WorkbenchService {
       const token = input.remoteToken.trim();
       this.remoteGatewayToken = token || undefined;
     }
+  }
+
+  private emitRunStatusFromCoreEvent(
+    event: ProviderRunStatusEvent,
+    projectId: string,
+    sessionId: string
+  ): void {
+    this.onRunStatus?.({
+      projectId,
+      sessionId,
+      stage: event.type,
+      timestamp: event.timestamp ?? new Date().toISOString(),
+      runId: event.runId,
+      step: event.step,
+      agentId: event.agentId,
+      targetAgentId: event.targetAgentId,
+      providerId: event.providerId,
+      actionType: event.actionType,
+      mode: event.mode,
+      code: event.code,
+      detail: event.detail
+    });
   }
 
   private async buildInvocationEnv(
@@ -624,6 +677,7 @@ function parseGatewayRunResult(payload: unknown): {
   stderr: string;
   providerId: string;
   tracePath?: string;
+  runId?: string;
 } {
   const payloadRecord = toRecord(payload);
   if (!payloadRecord) {
@@ -644,13 +698,17 @@ function parseGatewayRunResult(payload: unknown): {
   const tracePath = typeof resultRecord.tracePath === "string" && resultRecord.tracePath.trim()
     ? resultRecord.tracePath
     : undefined;
+  const runId = typeof payloadRecord.runId === "string" && payloadRecord.runId.trim()
+    ? payloadRecord.runId.trim()
+    : undefined;
 
   return {
     code,
     stdout,
     stderr,
     providerId,
-    tracePath
+    tracePath,
+    runId
   };
 }
 
