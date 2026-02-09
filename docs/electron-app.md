@@ -130,7 +130,7 @@ native updater feed bridge (`update.electronjs.org`).
 Runtime behavior:
 
 - Updates are checked automatically in packaged builds on macOS/Windows.
-- The app polls for new releases every 4 hours.
+- The app polls for new releases every hour.
 - When an update has downloaded, the renderer shows an **Update** button at the
   top-right of the app.
 - Clicking **Update** calls `quitAndInstall` to restart into the new version.

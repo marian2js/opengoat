@@ -3,7 +3,7 @@ import { app, autoUpdater } from "electron";
 
 const DEFAULT_UPDATE_BASE_URL = "https://update.electronjs.org";
 const DEFAULT_REPOSITORY = "marian2js/opengoat";
-const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 interface ElectronAppLike {
   isPackaged: boolean;
