@@ -431,9 +431,15 @@ export class WorkbenchService {
     return this.addProject(first);
   }
 
-  public async createSession(projectId: string, title?: string): Promise<WorkbenchSession> {
+  public async createSession(
+    projectId: string,
+    title?: string,
+    agentIdInput?: string,
+  ): Promise<WorkbenchSession> {
+    await this.ensureInitialized();
     const sessionTitle = normalizeSessionTitle(title);
-    return this.store.createSession(projectId, sessionTitle);
+    const agentId = await this.resolveSessionAgentId(agentIdInput);
+    return this.store.createSession(projectId, sessionTitle, agentId);
   }
 
   public listSessions(projectId: string): Promise<WorkbenchSession[]> {
@@ -494,10 +500,13 @@ export class WorkbenchService {
         providerId: string;
         tracePath?: string;
       };
+      const sessionAgentId = normalizeAgentId(session.agentId) ?? DEFAULT_AGENT_ID;
+      const sessionAgentLabel = formatAgentLabel(sessionAgentId);
       try {
-        run = await this.executeOrchestratorRun({
+        run = await this.executeAgentRun({
           projectId: project.id,
           sessionId: session.id,
+          agentId: sessionAgentId,
           message,
           sessionRef: session.sessionKey,
           cwd: project.rootPath,
@@ -516,7 +525,7 @@ export class WorkbenchService {
           ? `${summary}\nProvider stderr:\n${diagnostics}`
           : summary || diagnostics || "No provider error details were returned.";
         throw new Error(
-          `Orchestrator provider failed (${run.providerId}, code ${run.code}). ${details}`
+          `${sessionAgentLabel} provider failed (${run.providerId}, code ${run.code}). ${details}`
         );
       }
 
@@ -546,9 +555,10 @@ export class WorkbenchService {
     }
   }
 
-  private async executeOrchestratorRun(input: {
+  private async executeAgentRun(input: {
     projectId: string;
     sessionId: string;
+    agentId: string;
     message: string;
     sessionRef: string;
     cwd: string;
@@ -562,7 +572,7 @@ export class WorkbenchService {
   }> {
     const gatewaySettings = await this.store.getGatewaySettings();
     if (gatewaySettings.mode !== "remote") {
-      const providerBinding = await this.opengoat.getAgentProvider(DEFAULT_AGENT_ID);
+      const providerBinding = await this.opengoat.getAgentProvider(input.agentId);
       const providerConfig = await this.opengoat.getProviderConfig(providerBinding.providerId);
       const providerOnboarding = await this.opengoat.getProviderOnboarding(
         providerBinding.providerId
@@ -573,10 +583,11 @@ export class WorkbenchService {
           ...(providerOnboarding?.env ?? []).map((entry) => entry.key),
         ]),
       ];
-      const run = await this.opengoat.runAgent("orchestrator", {
+      const run = await this.opengoat.runAgent(input.agentId, {
         message: input.message,
         sessionRef: input.sessionRef,
         cwd: input.cwd,
+        directAgentSession: input.agentId !== DEFAULT_AGENT_ID,
         abortSignal: input.abortSignal,
         env: await this.buildInvocationEnv(input.cwd, providerEnvKeys),
         hooks: {
@@ -600,12 +611,12 @@ export class WorkbenchService {
         "Remote gateway mode is enabled, but no gateway URL is configured. Open Provider Setup and add a remote gateway URL, or switch back to local runtime."
       );
     }
-    this.emitRunStatus?.({
+    this.onRunStatus?.({
       projectId: input.projectId,
       sessionId: input.sessionId,
       stage: "remote_call_started",
       timestamp: new Date().toISOString(),
-      agentId: DEFAULT_AGENT_ID,
+      agentId: input.agentId,
       detail: "Submitting this request to your remote OpenGoat gateway."
     });
 
@@ -625,20 +636,20 @@ export class WorkbenchService {
       mode: "operator-desktop",
       params: {
         idempotencyKey: randomUUID(),
-        agentId: "orchestrator",
+        agentId: input.agentId,
         message: input.message,
         sessionRef: input.sessionRef,
         cwd: input.cwd
       }
     });
     const parsedGatewayResult = parseGatewayRunResult(gatewayCall.payload);
-    this.emitRunStatus?.({
+    this.onRunStatus?.({
       projectId: input.projectId,
       sessionId: input.sessionId,
       stage: "remote_call_completed",
       timestamp: new Date().toISOString(),
       runId: parsedGatewayResult.runId,
-      agentId: DEFAULT_AGENT_ID,
+      agentId: input.agentId,
       providerId: parsedGatewayResult.providerId,
       code: parsedGatewayResult.code
     });
@@ -699,6 +710,24 @@ export class WorkbenchService {
     });
   }
 
+  private async resolveSessionAgentId(rawAgentId?: string): Promise<string> {
+    const normalizedInput = rawAgentId?.trim();
+    const agentId = normalizedInput
+      ? normalizeAgentId(normalizedInput) ?? DEFAULT_AGENT_ID
+      : DEFAULT_AGENT_ID;
+    if (agentId === DEFAULT_AGENT_ID) {
+      return agentId;
+    }
+
+    const agents = await this.opengoat.listAgents();
+    const exists = agents.some((agent) => agent.id === agentId);
+    if (!exists) {
+      throw new Error(`Agent "${agentId}" was not found.`);
+    }
+
+    return agentId;
+  }
+
   private async buildInvocationEnv(
     projectRootPath: string,
     providerConfigKeys: string[] = []
@@ -748,6 +777,20 @@ function normalizeSessionTitle(input?: string): string {
     return value;
   }
   return `${value.slice(0, 117)}...`;
+}
+
+function formatAgentLabel(agentId: string): string {
+  if (agentId === DEFAULT_AGENT_ID) {
+    return "Orchestrator";
+  }
+  return agentId
+    .split(/[-_]/g)
+    .map((segment) =>
+      segment.length > 0
+        ? `${segment[0]?.toUpperCase() ?? ""}${segment.slice(1)}`
+        : segment,
+    )
+    .join(" ");
 }
 
 function collectDotEnvDirectories(projectRootPath: string): string[] {

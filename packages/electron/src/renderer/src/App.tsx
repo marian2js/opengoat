@@ -81,6 +81,8 @@ export function App() {
     (ipcContractVersion ?? 0) >= DESKTOP_IPC_CONTRACT_FEATURES.agents;
   const supportsAgentProviderConfig =
     (ipcContractVersion ?? 0) >= DESKTOP_IPC_CONTRACT_FEATURES.agentProviderConfig;
+  const supportsDirectAgentSessions =
+    (ipcContractVersion ?? 0) >= DESKTOP_IPC_CONTRACT_FEATURES.directAgentSessions;
 
   useEffect(() => {
     if (activeView === "agents" && supportsAgents) {
@@ -372,6 +374,21 @@ export function App() {
                   onCreate={(input) => void createAgent(input)}
                   onUpdate={(input) => void updateAgent(input)}
                   onDelete={(input) => void deleteAgent(input)}
+                  directAgentSessionsAvailable={supportsDirectAgentSessions}
+                  onStartChat={async (agentId) => {
+                    if (!supportsDirectAgentSessions) {
+                      return;
+                    }
+                    const targetProjectId =
+                      activeProjectId ??
+                      projects.find((project) => project.name === "Home")?.id ??
+                      projects[0]?.id;
+                    if (!targetProjectId) {
+                      return;
+                    }
+                    await createSession(targetProjectId, undefined, agentId);
+                    setActiveView("chat");
+                  }}
                   providerConfigAvailable={supportsAgentProviderConfig}
                   onDismissNotice={clearAgentsNotice}
                   onDismissError={clearError}

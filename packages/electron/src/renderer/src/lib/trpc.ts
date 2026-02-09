@@ -54,7 +54,7 @@ export interface WorkbenchApiClient {
     providerId?: string;
     deleteExternalAgent?: boolean;
   }) => Promise<WorkbenchAgentDeletionResult>;
-  createSession: (input: { projectId: string; title?: string }) => Promise<WorkbenchSession>;
+  createSession: (input: { projectId: string; title?: string; agentId?: string }) => Promise<WorkbenchSession>;
   renameSession: (input: { projectId: string; sessionId: string; title: string }) => Promise<WorkbenchSession>;
   removeSession: (input: { projectId: string; sessionId: string }) => Promise<void>;
   getSessionMessages: (input: { projectId: string; sessionId: string }) => Promise<WorkbenchMessage[]>;

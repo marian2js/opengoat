@@ -99,6 +99,8 @@ export function ChatPanel(props: ChatPanelProps) {
   }, [chatId, initialMessages, setMessages]);
 
   const isSubmitting = status === "submitted" || status === "streaming";
+  const sessionAgentId = props.activeSession?.agentId ?? "orchestrator";
+  const sessionAgentLabel = formatIdentifier(sessionAgentId, "Orchestrator");
   const hasRunProgress =
     Boolean(props.activeSession) && props.runStatusEvents.length > 0;
   const showActiveRunProgress =
@@ -112,12 +114,18 @@ export function ChatPanel(props: ChatPanelProps) {
   );
   const resolvedError = chatError?.message ?? props.error;
   const runProgress = useMemo(
-    () => buildRunProgress(props.runStatusEvents, elapsedSeconds, gatewayMode),
-    [elapsedSeconds, gatewayMode, props.runStatusEvents],
+    () =>
+      buildRunProgress(
+        props.runStatusEvents,
+        elapsedSeconds,
+        gatewayMode,
+        sessionAgentLabel,
+      ),
+    [elapsedSeconds, gatewayMode, props.runStatusEvents, sessionAgentLabel],
   );
   const highlightedAgentNames = useMemo(
-    () => collectHighlightedAgentNames(props.runStatusEvents),
-    [props.runStatusEvents],
+    () => collectHighlightedAgentNames(props.runStatusEvents, sessionAgentLabel),
+    [props.runStatusEvents, sessionAgentLabel],
   );
   const [isRunProgressOpen, setIsRunProgressOpen] = useState(false);
   const wasRunActiveRef = useRef(false);
@@ -188,6 +196,9 @@ export function ChatPanel(props: ChatPanelProps) {
             </span>
           </div>
           <div className="titlebar-no-drag flex items-center gap-2">
+            <span className="inline-flex h-8 items-center rounded-lg border border-[#2E2F31] bg-[#161617] px-3 text-xs font-medium text-muted-foreground">
+              Agent: {sessionAgentLabel}
+            </span>
             <Button
               variant="ghost"
               size="sm"
@@ -258,7 +269,7 @@ export function ChatPanel(props: ChatPanelProps) {
                     )}
                   >
                     <p className="mb-1 text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                      {isUser ? "You" : isError ? "Error" : isAssistant ? "Orchestrator" : "System"}
+                      {isUser ? "You" : isError ? "Error" : isAssistant ? sessionAgentLabel : "System"}
                     </p>
                     {content ? (
                       <p
@@ -412,9 +423,10 @@ function buildRunProgress(
   events: WorkbenchRunStatusEvent[],
   elapsedSeconds: number,
   gatewayMode: "local" | "remote",
+  entryAgentLabel: string,
 ): RunProgressState {
   if (events.length === 0) {
-    return buildFallbackRunProgress(elapsedSeconds, gatewayMode);
+    return buildFallbackRunProgress(elapsedSeconds, gatewayMode, entryAgentLabel);
   }
 
   const runCompleted = events.some((event) => event.stage === "run_completed");
@@ -461,7 +473,7 @@ function buildRunProgress(
         pushDone(
           eventKey,
           "Request queued",
-          "Your message was added to this session and sent to the orchestrator.",
+          `Your message was added to this session and sent to ${entryAgentLabel}.`,
         );
         break;
       case "planner_started":
@@ -478,8 +490,8 @@ function buildRunProgress(
         } else if (event.actionType === "respond_user" || event.actionType === "finish") {
           pushDone(
             eventKey,
-            "Orchestrator is preparing the final reply",
-            "The orchestrator is assembling the response for this chat.",
+            `${entryAgentLabel} is preparing the final reply`,
+            `${entryAgentLabel} is assembling the response for this chat.`,
           );
         }
         break;
@@ -544,7 +556,7 @@ function buildRunProgress(
       "Awaiting final response",
       elapsedSeconds >= 60
         ? "Still running. Larger context, delegation chains, or provider latency can take longer."
-        : "The request is still running. You can keep using OpenGoat while it completes.",
+        : `The request is still running with ${entryAgentLabel}. You can keep using OpenGoat while it completes.`,
     );
   }
 
@@ -558,8 +570,8 @@ function buildRunProgress(
       : runCompleted
         ? latestStep?.label ?? "Response ready"
         : elapsedSeconds >= 60
-        ? "Orchestrator is still working on your request"
-        : "Orchestrator is working on your request",
+        ? `${entryAgentLabel} is still working on your request`
+        : `${entryAgentLabel} is working on your request`,
     steps: trimmedSteps,
   };
 }
@@ -567,11 +579,12 @@ function buildRunProgress(
 function buildFallbackRunProgress(
   elapsedSeconds: number,
   gatewayMode: "local" | "remote",
+  entryAgentLabel: string,
 ): RunProgressState {
   const statusDescription =
     gatewayMode === "remote"
-      ? "Calling Orchestrator through your remote runtime."
-      : "Calling Orchestrator to continue this request.";
+      ? `Calling ${entryAgentLabel} through your remote runtime.`
+      : `Calling ${entryAgentLabel} to continue this request.`;
   const steps: RunProgressStep[] = [
     {
       id: "queued",
@@ -581,7 +594,7 @@ function buildFallbackRunProgress(
     },
     {
       id: "runtime",
-      label: "Orchestrator is working",
+      label: `${entryAgentLabel} is working`,
       description: statusDescription,
       state: "active",
     },
@@ -590,8 +603,8 @@ function buildFallbackRunProgress(
   return {
     title:
       elapsedSeconds >= 60
-        ? "Orchestrator is still working on your request"
-        : "Orchestrator is working on your request",
+        ? `${entryAgentLabel} is still working on your request`
+        : `${entryAgentLabel} is working on your request`,
     steps,
   };
 }
@@ -613,8 +626,9 @@ function formatIdentifier(value: string | undefined, fallback: string): string {
 
 function collectHighlightedAgentNames(
   events: WorkbenchRunStatusEvent[],
+  entryAgentLabel: string,
 ): string[] {
-  const names = new Set<string>(["Orchestrator"]);
+  const names = new Set<string>([entryAgentLabel]);
   for (const event of events) {
     const formattedAgent = formatIdentifier(event.agentId, "").trim();
     if (formattedAgent) {

@@ -51,6 +51,11 @@ describe("desktop IPC router", () => {
       sessionId: "s1",
       title: "Renamed"
     });
+    await caller.sessions.create({
+      projectId: "p1",
+      title: "Developer",
+      agentId: "developer"
+    });
     await caller.sessions.remove({
       projectId: "p1",
       sessionId: "s1"
@@ -87,6 +92,7 @@ describe("desktop IPC router", () => {
       agentId: "writer"
     });
     expect(service.renameSession).toHaveBeenCalledWith("p1", "s1", "Renamed");
+    expect(service.createSession).toHaveBeenCalledWith("p1", "Developer", "developer");
     expect(service.removeSession).toHaveBeenCalledWith("p1", "s1");
     expect(service.listMessages).toHaveBeenCalledWith("p1", "s1");
     expect(service.stopMessage).toHaveBeenCalledWith({

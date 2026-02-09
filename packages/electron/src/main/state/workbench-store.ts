@@ -115,14 +115,18 @@ export class WorkbenchStore {
     });
   }
 
-  public async createSession(projectId: string, title: string): Promise<WorkbenchSession> {
+  public async createSession(
+    projectId: string,
+    title: string,
+    agentId = "orchestrator",
+  ): Promise<WorkbenchSession> {
     return this.writeTransaction((state) => {
       const project = requireProject(state, projectId);
       const now = this.nowIso();
       const session: WorkbenchSession = {
         id: randomUUID(),
         title,
-        agentId: "orchestrator",
+        agentId,
         sessionKey: `desktop:${project.id}:${randomUUID()}`,
         createdAt: now,
         updatedAt: now,

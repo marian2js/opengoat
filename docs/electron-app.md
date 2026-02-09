@@ -103,7 +103,7 @@ Behavior rules:
 
 When sending a chat message from desktop:
 
-- OpenGoat always runs the entry agent as `orchestrator`.
+- Sessions default to `orchestrator`, and users can also start direct sessions with individual non-orchestrator agents from the Agents view.
 - In local mode, the selected project's `rootPath` is sent as the run `cwd` and local runtime execution is used.
 - In remote mode, desktop calls `agent.run` over the optional gateway; local runtime execution is skipped.
 - Session continuity is maintained by per-session `sessionKey`.

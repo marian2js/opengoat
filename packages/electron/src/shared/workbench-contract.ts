@@ -1,11 +1,12 @@
 import { z } from "zod";
 
 export const MIN_DESKTOP_IPC_CONTRACT_VERSION = 6 as const;
-export const DESKTOP_IPC_CONTRACT_VERSION = 9 as const;
+export const DESKTOP_IPC_CONTRACT_VERSION = 10 as const;
 export const DESKTOP_IPC_CONTRACT_FEATURES = {
   agents: 7,
   agentProviderConfig: 8,
-  chatStop: 9
+  chatStop: 9,
+  directAgentSessions: 10
 } as const;
 
 export const desktopContractSchema = z.object({

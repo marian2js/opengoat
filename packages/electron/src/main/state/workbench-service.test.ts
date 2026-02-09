@@ -240,6 +240,103 @@ describe("WorkbenchService onboarding", () => {
 });
 
 describe("WorkbenchService sendMessage", () => {
+  it("runs non-orchestrator sessions directly with direct agent sessions enabled", async () => {
+    const runAgent = vi.fn(async () => ({
+      code: 0,
+      stdout: "developer reply",
+      stderr: "",
+      providerId: "codex",
+      tracePath: "/tmp/direct-trace.json",
+      entryAgentId: "developer",
+      routing: {
+        entryAgentId: "developer",
+        targetAgentId: "developer",
+        confidence: 1,
+        reason: "direct",
+        rewrittenMessage: "hello",
+        candidates: [],
+      },
+    }));
+    const opengoat = createOpenGoatStub({
+      providers: createProviderSummaries(),
+      activeProviderId: "openai",
+      onboardingByProvider: {},
+      initialAgentProviders: {
+        developer: "codex",
+      },
+      runAgent,
+    });
+    const appendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        id: "s1",
+        title: "Session",
+        agentId: "developer",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: [],
+      })
+      .mockResolvedValueOnce({
+        id: "s1",
+        title: "Session",
+        agentId: "developer",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: [
+          {
+            id: "m1",
+            role: "assistant",
+            content: "developer reply",
+            createdAt: "2026-02-07T00:00:00.000Z",
+            providerId: "codex",
+            tracePath: "/tmp/direct-trace.json",
+          },
+        ],
+      });
+    const store = {
+      getGatewaySettings: vi.fn(async () => ({
+        mode: "local" as const,
+        timeoutMs: 10_000,
+      })),
+      getProject: vi.fn(async () => ({
+        id: "p1",
+        name: "project",
+        rootPath: "/tmp/project",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        sessions: [],
+      })),
+      getSession: vi.fn(async () => ({
+        id: "s1",
+        title: "Session",
+        agentId: "developer",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: [],
+      })),
+      appendMessage,
+    } as unknown as WorkbenchStore;
+    const service = new WorkbenchService({ opengoat, store });
+
+    await service.sendMessage({
+      projectId: "p1",
+      sessionId: "s1",
+      message: "hello",
+    });
+
+    expect(runAgent).toHaveBeenCalledWith(
+      "developer",
+      expect.objectContaining({
+        message: "hello",
+        sessionRef: "desktop:p1:s1",
+        directAgentSession: true,
+      }),
+    );
+  });
+
   it("loads project .env values while preventing overrides for stored provider config keys", async () => {
     const loadDotEnvFn = vi.fn(
       async (params?: { cwd?: string; filename?: string; env?: NodeJS.ProcessEnv }) => {
@@ -659,6 +756,45 @@ describe("WorkbenchService sendMessage", () => {
 });
 
 describe("WorkbenchService session management", () => {
+  it("creates direct-agent sessions for non-default agents", async () => {
+    const opengoat = createOpenGoatStub({
+      providers: createProviderSummaries(),
+      activeProviderId: "openai",
+      onboardingByProvider: {},
+      agents: [
+        {
+          id: "orchestrator",
+          displayName: "Orchestrator",
+          workspaceDir: "/tmp/workspaces/orchestrator",
+          internalConfigDir: "/tmp/agents/orchestrator",
+        },
+        {
+          id: "developer",
+          displayName: "Developer",
+          workspaceDir: "/tmp/workspaces/developer",
+          internalConfigDir: "/tmp/agents/developer",
+        },
+      ],
+    });
+    const createSession = vi.fn(async () => ({
+      id: "s1",
+      title: "New session",
+      agentId: "developer",
+      sessionKey: "desktop:p1:s1",
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+      messages: [],
+    }));
+    const store = {
+      createSession,
+    } as unknown as WorkbenchStore;
+    const service = new WorkbenchService({ opengoat, store });
+
+    await service.createSession("p1", undefined, "developer");
+
+    expect(createSession).toHaveBeenCalledWith("p1", "New session", "developer");
+  });
+
   it("renames and removes sessions through the store", async () => {
     const opengoat = createOpenGoatStub({
       providers: createProviderSummaries(),

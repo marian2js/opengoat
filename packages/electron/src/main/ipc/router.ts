@@ -93,7 +93,7 @@ export function createDesktopRouter(service: WorkbenchService) {
       create: t.procedure
         .input(createSessionInputSchema)
         .mutation(async ({ input }) => {
-          return service.createSession(input.projectId, input.title);
+          return service.createSession(input.projectId, input.title, input.agentId);
         }),
       rename: t.procedure
         .input(renameSessionInputSchema)

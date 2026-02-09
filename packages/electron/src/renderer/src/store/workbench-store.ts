@@ -67,7 +67,7 @@ interface WorkbenchUiState {
   renameProject: (projectId: string, name: string) => Promise<void>;
   removeProject: (projectId: string) => Promise<void>;
   selectProject: (projectId: string) => Promise<void>;
-  createSession: (projectId: string, title?: string) => Promise<void>;
+  createSession: (projectId: string, title?: string, agentId?: string) => Promise<void>;
   renameSession: (projectId: string, sessionId: string, title: string) => Promise<void>;
   removeSession: (projectId: string, sessionId: string) => Promise<void>;
   selectSession: (projectId: string, sessionId: string) => Promise<void>;
@@ -311,12 +311,13 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       });
     },
 
-    createSession: async (projectId: string, title?: string) => {
+    createSession: async (projectId: string, title?: string, agentId?: string) => {
       set({ isBusy: true, error: null });
       try {
         const session = await api.createSession({
           projectId,
-          title
+          title,
+          agentId
         });
         set((state) => ({
           projects: upsertProjectSession(state.projects, projectId, session, {

@@ -15,7 +15,7 @@ export const workbenchMessageSchema = z.object({
 export const workbenchSessionSchema = z.object({
   id: z.string(),
   title: z.string(),
-  agentId: z.literal("orchestrator"),
+  agentId: z.string().trim().min(1),
   sessionKey: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -178,7 +178,8 @@ export const removeProjectInputSchema = projectLookupInputSchema;
 
 export const createSessionInputSchema = z.object({
   projectId: z.string().min(1),
-  title: z.string().trim().max(120).optional()
+  title: z.string().trim().max(120).optional(),
+  agentId: z.string().trim().min(1).optional()
 });
 
 export const sessionLookupInputSchema = z.object({

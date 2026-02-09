@@ -384,7 +384,14 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
                                       className={`hover:bg-muted w-full rounded-md px-2 py-1 pr-10 text-left text-sm ${selected ? "bg-muted text-foreground" : "text-muted-foreground"}`}
                                       onClick={() => props.onSelectSession(project.id, session.id)}
                                     >
-                                      <span className="truncate">{session.title}</span>
+                                      <span className="flex min-w-0 items-center gap-2">
+                                        <span className="truncate">{session.title}</span>
+                                        {session.agentId !== "orchestrator" ? (
+                                          <span className="shrink-0 rounded border border-[#2E2F31] bg-[#17181A] px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">
+                                            {session.agentId}
+                                          </span>
+                                        ) : null}
+                                      </span>
                                     </button>
                                     <div
                                       className={`absolute top-1/2 right-0.5 flex -translate-y-1/2 items-center transition-opacity group-hover/session:opacity-100 group-focus-within/session:opacity-100 ${showSessionActions ? "opacity-100" : "opacity-0"}`}

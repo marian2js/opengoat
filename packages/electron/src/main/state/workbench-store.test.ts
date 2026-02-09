@@ -97,6 +97,21 @@ describe("WorkbenchStore", () => {
     expect(project.sessions[0]?.title).toBe("New Session");
   });
 
+  it("creates sessions with a specific target agent", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "opengoat-desktop-store-"));
+    tempRoots.push(root);
+    const stateFilePath = path.join(root, "state.json");
+    const store = new WorkbenchStore({
+      stateFilePath,
+      nowIso: () => "2026-02-08T00:00:00.000Z",
+    });
+
+    const project = await store.addProject("/tmp/workspace-alpha");
+    const session = await store.createSession(project.id, "Developer", "developer");
+
+    expect(session.agentId).toBe("developer");
+  });
+
   it("backfills a default Home session for legacy states with empty Home", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "opengoat-desktop-store-"));
     tempRoots.push(root);

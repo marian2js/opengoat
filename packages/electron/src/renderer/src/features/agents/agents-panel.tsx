@@ -20,7 +20,7 @@ import {
 } from "@renderer/components/ai-elements/select";
 import type { WorkbenchAgent, WorkbenchAgentProvider } from "@shared/workbench";
 import { cn } from "@renderer/lib/utils";
-import { ChevronDown, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, MessageSquare, Pencil, Trash2 } from "lucide-react";
 
 interface AgentsPanelProps {
   agents: WorkbenchAgent[];
@@ -47,6 +47,8 @@ interface AgentsPanelProps {
     providerId?: string;
     deleteExternalAgent?: boolean;
   }) => Promise<void> | void;
+  directAgentSessionsAvailable: boolean;
+  onStartChat: (agentId: string) => Promise<void> | void;
   providerConfigAvailable: boolean;
   onDismissNotice: () => void;
   onDismissError: () => void;
@@ -352,6 +354,8 @@ export function AgentsPanel(props: AgentsPanelProps) {
               <div className="space-y-2">
                 {props.agents.map((agent) => {
                   const isOrchestrator = agent.id === "orchestrator";
+                  const canStartDirectChat =
+                    !isOrchestrator && props.directAgentSessionsAvailable;
                   return (
                     <div
                       key={agent.id}
@@ -376,6 +380,26 @@ export function AgentsPanel(props: AgentsPanelProps) {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-8 gap-2 text-foreground/85 hover:text-foreground",
+                            !canStartDirectChat ? "opacity-55" : "",
+                          )}
+                          onClick={() => void props.onStartChat(agent.id)}
+                          disabled={props.busy || !canStartDirectChat}
+                          title={
+                            isOrchestrator
+                              ? "Use the main chat view for orchestrator."
+                              : props.directAgentSessionsAvailable
+                                ? `Start a direct chat with ${agent.displayName}.`
+                                : "Direct agent chat requires a newer desktop runtime."
+                          }
+                        >
+                          <MessageSquare className="size-4" />
+                          Chat
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
