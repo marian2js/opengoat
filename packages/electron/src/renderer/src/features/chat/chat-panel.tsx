@@ -259,7 +259,7 @@ export function ChatPanel(props: ChatPanelProps) {
   }, []);
 
   return (
-    <main className="relative flex h-full min-h-0 min-w-0 flex-col bg-transparent">
+    <main className="flex h-full min-h-0 min-w-0 flex-col bg-transparent">
       <header className="titlebar-drag-region sticky top-0 z-30 border-0 bg-[#1F1F1F] px-4 shadow-[0_10px_24px_rgba(0,0,0,0.42)] md:px-5">
         <div className="flex h-12 items-center justify-between gap-3">
           <div className="min-w-0 truncate text-base leading-none tracking-tight">
@@ -466,7 +466,12 @@ export function ChatPanel(props: ChatPanelProps) {
           <PromptInput
             key={chatId}
             className="w-full"
-            inputGroupClassName="rounded-lg border border-[#2F3032] bg-[#19191A] shadow-none"
+            inputGroupClassName={cn(
+              "rounded-lg border border-[#2F3032] bg-[#19191A] shadow-none transition-[border-color,box-shadow,background-color] duration-150",
+              isFileDragActive
+                ? "border-cyan-300/70 bg-[#17212d] shadow-[0_0_0_1px_rgba(125,211,252,0.35)]"
+                : null,
+            )}
             accept="image/*"
             multiple
             globalDrop
@@ -477,8 +482,16 @@ export function ChatPanel(props: ChatPanelProps) {
                 disabled={!props.activeSession || props.busy || isSubmitting}
                 onCountChange={handleAttachmentCountChange}
               />
+              {isFileDragActive ? (
+                <div className="mx-3 mt-2 rounded-md border border-cyan-300/55 bg-cyan-500/10 px-2 py-1 text-xs font-medium text-cyan-100">
+                  Drop image here to attach
+                </div>
+              ) : null}
               <PromptInputTextarea
-                className="min-h-16 px-3 py-2 text-sm"
+                className={cn(
+                  "min-h-16 px-3 py-2 text-sm transition-colors",
+                  isFileDragActive ? "text-cyan-100/95 placeholder:text-cyan-100/65" : null,
+                )}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 disabled={!props.activeSession || props.busy || isSubmitting}
@@ -510,16 +523,6 @@ export function ChatPanel(props: ChatPanelProps) {
           </PromptInput>
         </div>
       </footer>
-      {isFileDragActive ? (
-        <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center p-6">
-          <div className="w-full max-w-3xl rounded-2xl border-2 border-dashed border-cyan-300/70 bg-[#071226]/90 px-8 py-10 text-center shadow-[0_24px_64px_rgba(1,8,20,0.6)] backdrop-blur-sm">
-            <p className="text-lg font-semibold text-cyan-100">Drop image to attach</p>
-            <p className="mt-2 text-sm text-cyan-100/80">
-              Release to add it to your next message.
-            </p>
-          </div>
-        </div>
-      ) : null}
     </main>
   );
 }
@@ -548,32 +551,29 @@ function ComposerAttachmentTray(props: ComposerAttachmentTrayProps) {
   }
 
   return (
-    <div className="mx-2 mt-2 rounded-md border border-[#2E2F31] bg-[#131415] p-2">
-      <div className="mb-2 px-1 text-xs text-muted-foreground">
-        {attachments.files.length} image{attachments.files.length === 1 ? "" : "s"} attached
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {attachments.files.map((attachment, index) => (
-          <div
-            key={attachment.id}
-            className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-[#2E2F31] bg-[#1A1B1D] px-2 py-1 text-xs text-foreground/90"
+    <div className="mx-3 mt-3 flex flex-wrap gap-2">
+      {attachments.files.map((attachment, index) => (
+        <div
+          key={attachment.id}
+          className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#3A3B3E] bg-[#232428] px-2 py-1 text-sm text-foreground/95"
+        >
+          <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-[#4A4C52] bg-[#17181A]">
+            <ImageIcon className="size-2.5 text-cyan-100/85" />
+          </span>
+          <span className="max-w-[24ch] truncate font-medium">
+            {attachment.filename || `Image ${index + 1}`}
+          </span>
+          <button
+            type="button"
+            className="inline-flex size-5 items-center justify-center rounded-full text-foreground/75 transition hover:bg-black/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
+            onClick={() => attachments.remove(attachment.id)}
+            disabled={disabled}
+            aria-label={`Remove ${attachment.filename || `Image ${index + 1}`}`}
           >
-            <ImageIcon className="size-3.5 shrink-0 text-cyan-100/80" />
-            <span className="max-w-[26ch] truncate">
-              {attachment.filename || `Image ${index + 1}`}
-            </span>
-            <button
-              type="button"
-              className="ml-1 inline-flex size-5 items-center justify-center rounded transition hover:bg-black/35 disabled:cursor-not-allowed disabled:opacity-45"
-              onClick={() => attachments.remove(attachment.id)}
-              disabled={disabled}
-              aria-label={`Remove ${attachment.filename || `Image ${index + 1}`}`}
-            >
-              <XIcon className="size-3.5" />
-            </button>
-          </div>
-        ))}
-      </div>
+            <XIcon className="size-3.5" />
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

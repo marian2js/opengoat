@@ -399,7 +399,9 @@ describe("ChatPanel", () => {
       },
     });
 
-    expect(await screen.findByText("1 image attached")).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.queryByText("diagram.png")).toBeTruthy();
+    });
     expect(screen.getByText("diagram.png")).toBeTruthy();
     expect(submitButton.hasAttribute("disabled")).toBe(false);
 
@@ -419,11 +421,11 @@ describe("ChatPanel", () => {
       },
     });
 
-    expect(await screen.findByText("Drop image to attach")).toBeTruthy();
+    expect(await screen.findByText("Drop image here to attach")).toBeTruthy();
 
     fireEvent.dragLeave(window);
     await waitFor(() => {
-      expect(screen.queryByText("Drop image to attach")).toBeNull();
+      expect(screen.queryByText("Drop image here to attach")).toBeNull();
     });
   });
 });
