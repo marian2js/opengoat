@@ -161,6 +161,142 @@ describe("OrchestrationService integration flow", () => {
     expect(providerService.invokeAgent).toHaveBeenCalledTimes(1);
   });
 
+  it("fails fast when delegated provider invocation returns a non-zero code", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-delegate-fail-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const providerService = createProviderService({
+      plannerExecutions: [
+        okExecution(
+          JSON.stringify({
+            rationale: "Delegate implementation to writer.",
+            action: {
+              type: "delegate_to_agent",
+              mode: "direct",
+              reason: "writer agent owns markdown docs",
+              targetAgentId: "writer",
+              message: "Create ABOUT.md for this project."
+            }
+          })
+        ),
+        okExecution(
+          JSON.stringify({
+            rationale: "This should never execute.",
+            action: {
+              type: "finish",
+              mode: "direct",
+              message: "unexpected"
+            }
+          })
+        )
+      ],
+      delegatedExecution: {
+        code: 1,
+        stdout: "",
+        stderr: "command failed"
+      }
+    });
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      skillService: createSkillServiceStub() as unknown as SkillService,
+      agentManifestService: createManifestServiceStub([
+        createManifest("orchestrator", {
+          canReceive: true,
+          canDelegate: true,
+          provider: "openai"
+        }),
+        createManifest("writer", {
+          canReceive: true,
+          canDelegate: false,
+          provider: "codex"
+        })
+      ]) as unknown as AgentManifestService,
+      sessionService: createSessionServiceStub() as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-07T17:07:00.000Z"
+    });
+
+    const result = await service.runAgent(paths, "orchestrator", {
+      message: "Please create ABOUT.md",
+      cwd: tempDir
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("delegated agent \"writer\" failed");
+    expect(result.orchestration?.steps).toHaveLength(1);
+    expect(result.orchestration?.steps[0]?.note).toContain("delegated agent");
+    expect(providerService.invokeAgent).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails fast when delegated agent reports missing tools and no progress", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-delegate-blocked-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const providerService = createProviderService({
+      plannerExecutions: [
+        okExecution(
+          JSON.stringify({
+            rationale: "Delegate implementation to writer.",
+            action: {
+              type: "delegate_to_agent",
+              mode: "direct",
+              targetAgentId: "writer",
+              message: "Create ABOUT.md for this project."
+            }
+          })
+        ),
+        okExecution(
+          JSON.stringify({
+            rationale: "This should never execute.",
+            action: {
+              type: "finish",
+              mode: "direct",
+              message: "unexpected"
+            }
+          })
+        )
+      ],
+      delegatedExecution: {
+        code: 0,
+        stdout:
+          "I cannot complete this task because write_file and run_shell_command are unavailable in this environment.",
+        stderr: ""
+      }
+    });
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      skillService: createSkillServiceStub() as unknown as SkillService,
+      agentManifestService: createManifestServiceStub([
+        createManifest("orchestrator", {
+          canReceive: true,
+          canDelegate: true,
+          provider: "openai"
+        }),
+        createManifest("writer", {
+          canReceive: true,
+          canDelegate: false,
+          provider: "codex"
+        })
+      ]) as unknown as AgentManifestService,
+      sessionService: createSessionServiceStub() as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-07T17:08:00.000Z"
+    });
+
+    const result = await service.runAgent(paths, "orchestrator", {
+      message: "Please create ABOUT.md",
+      cwd: tempDir
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("could not continue this request");
+    expect(result.stdout).toContain("missing runtime tools/permissions");
+    expect(result.orchestration?.steps).toHaveLength(1);
+    expect(providerService.invokeAgent).toHaveBeenCalledTimes(2);
+  });
+
   it("does not delegate to non-discoverable agents even if planner targets them", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-hidden-agent-"));
     tempDirs.push(tempDir);

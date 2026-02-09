@@ -15,6 +15,8 @@ describe("gemini provider", () => {
     expect(invocation.args).toEqual([
       "--model",
       "gemini-2.5-pro",
+      "--approval-mode",
+      "yolo",
       "--output-format",
       "json",
       "--prompt",
@@ -29,7 +31,14 @@ describe("gemini provider", () => {
       { ...process.env, GEMINI_MODEL: "gemini-2.5-flash" }
     );
 
-    expect(invocation.args).toEqual(["--model", "gemini-2.5-flash", "--prompt", "plan next steps"]);
+    expect(invocation.args).toEqual([
+      "--model",
+      "gemini-2.5-flash",
+      "--approval-mode",
+      "yolo",
+      "--prompt",
+      "plan next steps"
+    ]);
   });
 
   it("prepends system prompt for CLI providers", () => {
@@ -52,6 +61,26 @@ describe("gemini provider", () => {
     );
 
     expect(invocation.command).toBe("gemini-beta");
+  });
+
+  it("supports approval mode override via GEMINI_APPROVAL_MODE", () => {
+    const provider = new GeminiProvider();
+    const invocation = provider.buildInvocation(
+      { message: "ping" },
+      { ...process.env, GEMINI_APPROVAL_MODE: "auto_edit" }
+    );
+
+    expect(invocation.args).toEqual(["--approval-mode", "auto_edit", "--prompt", "ping"]);
+  });
+
+  it("does not force approval mode when passthrough already sets it", () => {
+    const provider = new GeminiProvider();
+    const invocation = provider.buildInvocation({
+      message: "ping",
+      passthroughArgs: ["--approval-mode", "plan"]
+    });
+
+    expect(invocation.args).toEqual(["--approval-mode", "plan", "--prompt", "ping"]);
   });
 
   it("does not support auth action", () => {

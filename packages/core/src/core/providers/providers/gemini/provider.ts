@@ -26,7 +26,12 @@ export class GeminiProvider extends BaseCliProvider {
       args.push("--model", model);
     }
 
-    args.push(...(options.passthroughArgs ?? []));
+    const passthroughArgs = options.passthroughArgs ?? [];
+    if (!hasApprovalModeOverride(passthroughArgs)) {
+      args.push("--approval-mode", resolveApprovalMode(options.env));
+    }
+
+    args.push(...passthroughArgs);
     args.push("--prompt", options.message);
 
     return args;
@@ -40,9 +45,31 @@ export class GeminiProvider extends BaseCliProvider {
     return super.buildInvocation(
       {
         ...options,
-        model: options.model?.trim() || defaultModel || undefined
+        model: options.model?.trim() || defaultModel || undefined,
+        env
       },
       env
     );
   }
+}
+
+function hasApprovalModeOverride(args: string[]): boolean {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--yolo" || arg === "-y") {
+      return true;
+    }
+    if (arg === "--approval-mode") {
+      return true;
+    }
+    if (arg.startsWith("--approval-mode=")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function resolveApprovalMode(env: NodeJS.ProcessEnv | undefined): string {
+  const configured = env?.GEMINI_APPROVAL_MODE?.trim();
+  return configured || "yolo";
 }

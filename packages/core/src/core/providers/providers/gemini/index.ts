@@ -15,6 +15,10 @@ export const providerModule: ProviderModule = {
         description: "Optional default model id"
       },
       {
+        key: "GEMINI_APPROVAL_MODE",
+        description: "Optional default approval mode for non-interactive runs (default: yolo)"
+      },
+      {
         key: "GEMINI_API_KEY",
         description: "Optional Gemini API key",
         secret: true

@@ -70,6 +70,11 @@ interface TaskThreadState {
   lastResponse?: string;
 }
 
+interface DelegationFailureSummary {
+  reason: "provider_error" | "blocked_no_progress";
+  message: string;
+}
+
 interface WorkingTreeStatusEntry {
   path: string;
   raw: string;
@@ -735,6 +740,33 @@ export class OrchestrationService {
       reason: action.reason || params.stepLog.plannerDecision.rationale
     });
 
+    const delegationFailure = summarizeDelegationFailure({
+      targetAgentId,
+      providerId: delegateCall.execution.providerId,
+      code: delegateCall.execution.code,
+      responseText,
+      workingTreeEffect: delegateCall.workingTreeEffect
+    });
+    if (delegationFailure) {
+      params.stepLog.note = delegationFailure.message;
+      this.addRecentEvent(params.recentEvents, delegationFailure.message);
+      params.sharedNotes.push(clampText(delegationFailure.message, 1200));
+      params.logger.warn("Delegation failed; stopping orchestration loop.", {
+        targetAgentId,
+        providerId: delegateCall.execution.providerId,
+        code: delegateCall.execution.code,
+        failureReason: delegationFailure.reason
+      });
+      return {
+        finalMessage: delegationFailure.message,
+        execution: {
+          ...delegateCall.execution,
+          code: delegateCall.execution.code !== 0 ? delegateCall.execution.code : 1,
+          stdout: ensureTrailingNewline(delegationFailure.message)
+        }
+      };
+    }
+
     const note = `Delegated to ${targetAgentId} [task:${taskKey}]: ${summarizeText(responseText || "(no response)")}`;
     params.sharedNotes.push(clampText(note, 2000));
     this.addRecentEvent(params.recentEvents, note);
@@ -1224,6 +1256,68 @@ function renderPlannerProviderFailureMessage(providerId: string, code: number, d
   ]
     .join("\n")
     .trim();
+}
+
+function summarizeDelegationFailure(params: {
+  targetAgentId: string;
+  providerId: string;
+  code: number;
+  responseText: string;
+  workingTreeEffect: WorkingTreeEffect | undefined;
+}): DelegationFailureSummary | undefined {
+  if (params.code !== 0) {
+    const detail = summarizeText(params.responseText || "(no provider details)");
+    return {
+      reason: "provider_error",
+      message: [
+        `The delegated agent "${params.targetAgentId}" failed via provider "${params.providerId}" (exit code ${params.code}).`,
+        `Details: ${detail}`
+      ].join("\n")
+    };
+  }
+
+  const blockReason = extractBlockedNoProgressReason(params.responseText, params.workingTreeEffect);
+  if (!blockReason) {
+    return undefined;
+  }
+
+  return {
+    reason: "blocked_no_progress",
+    message: [
+      `The delegated agent "${params.targetAgentId}" could not continue this request.`,
+      blockReason
+    ].join("\n")
+  };
+}
+
+function extractBlockedNoProgressReason(
+  responseText: string,
+  workingTreeEffect: WorkingTreeEffect | undefined
+): string | undefined {
+  const normalized = responseText.toLowerCase();
+  if (!normalized.trim()) {
+    return undefined;
+  }
+
+  const toolUnavailableSignals = [
+    /write_file/,
+    /run_shell_command/,
+    /tool(?:s)? (?:is|are)?\s*(?:not found|unavailable|missing|not listed|not available)/,
+    /cannot create .* file/,
+    /i(?:'| a)?m stuck/,
+    /unable to proceed/
+  ];
+  const hasToolSignal = toolUnavailableSignals.some((pattern) => pattern.test(normalized));
+  if (!hasToolSignal) {
+    return undefined;
+  }
+
+  const noTrackedChanges = !workingTreeEffect?.enabled || workingTreeEffect.touchedPaths.length === 0;
+  if (!noTrackedChanges) {
+    return undefined;
+  }
+
+  return "It reported missing runtime tools/permissions and made no tracked workspace changes. Check provider capabilities or switch to a compatible agent provider for file-editing tasks.";
 }
 
 function clampText(value: string, maxChars: number): string {
