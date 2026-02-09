@@ -107,6 +107,83 @@ describe("OrchestrationService integration flow", () => {
     expect(trace.orchestration?.steps[0]?.plannerDecision.action.type).toBe("delegate_to_agent");
   });
 
+  it("forwards image inputs to delegated agents", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-images-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const providerService = createProviderService({
+      plannerExecutions: [
+        okExecution(
+          JSON.stringify({
+            rationale: "Delegate vision work.",
+            action: {
+              type: "delegate_to_agent",
+              mode: "direct",
+              targetAgentId: "writer",
+              message: "Analyze attached images."
+            }
+          })
+        ),
+        okExecution(
+          JSON.stringify({
+            rationale: "Done.",
+            action: {
+              type: "finish",
+              mode: "direct",
+              message: "Done."
+            }
+          })
+        )
+      ],
+      delegatedExecution: {
+        code: 0,
+        stdout: "Image analyzed.",
+        stderr: ""
+      }
+    });
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      skillService: createSkillServiceStub() as unknown as SkillService,
+      agentManifestService: createManifestServiceStub([
+        createManifest("orchestrator", {
+          canReceive: true,
+          canDelegate: true,
+          provider: "openai"
+        }),
+        createManifest("writer", {
+          canReceive: true,
+          canDelegate: false,
+          provider: "codex"
+        })
+      ]) as unknown as AgentManifestService,
+      sessionService: createSessionServiceStub() as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-07T17:00:00.000Z"
+    });
+
+    await service.runAgent(paths, "orchestrator", {
+      message: "Analyze this image",
+      images: [
+        {
+          dataUrl: "data:image/png;base64,aGVsbG8="
+        }
+      ],
+      cwd: tempDir
+    });
+
+    const delegateCall = providerService.invokeAgent.mock.calls.find((call) => call[1] === "writer");
+    expect(delegateCall?.[2]).toEqual(
+      expect.objectContaining({
+        images: [
+          {
+            dataUrl: "data:image/png;base64,aGVsbG8="
+          }
+        ]
+      })
+    );
+  });
+
   it("returns an actionable response when planner provider invocation fails", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-provider-fail-"));
     tempDirs.push(tempDir);

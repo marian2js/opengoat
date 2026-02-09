@@ -27,6 +27,7 @@ type AgentArgsResult =
       ok: true;
       agentId: string;
       message: string;
+      images: Array<{ path: string }>;
       model?: string;
       cwd?: string;
       sessionRef?: string;
@@ -57,6 +58,7 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
 
   let message: string | undefined;
   let model: string | undefined;
+  const images: Array<{ path: string }> = [];
   let cwd: string | undefined;
   let sessionRef: string | undefined;
   let forceNewSession = false;
@@ -88,6 +90,16 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
         return { ok: false, error: "Missing value for --session." };
       }
       sessionRef = value.trim();
+      index += 1;
+      continue;
+    }
+
+    if (token === "--image") {
+      const value = known[index + 1];
+      if (!value?.trim()) {
+        return { ok: false, error: "Missing value for --image." };
+      }
+      images.push({ path: value.trim() });
       index += 1;
       continue;
     }
@@ -144,6 +156,7 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
     ok: true,
     agentId,
     message: message.trim(),
+    images,
     model,
     cwd,
     sessionRef,
@@ -171,7 +184,7 @@ function isHelpRequest(args: string[]): boolean {
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write(
-    "  opengoat agent [agent-id] --message <text> [--session <key|id>] [--new-session|--no-session]\n"
+    "  opengoat agent [agent-id] --message <text> [--image <path>] [--session <key|id>] [--new-session|--no-session]\n"
   );
   output.write(
     "                [--direct-session] [--model <model>] [--cwd <path>] [--no-stream] [-- <provider-args>]\n"

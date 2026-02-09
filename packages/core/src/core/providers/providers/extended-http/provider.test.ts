@@ -40,6 +40,50 @@ describe("extended http provider", () => {
     expect(body.messages).toEqual([{ role: "user", content: "ping" }]);
   });
 
+  it("serializes image inputs for OpenAI-chat providers", async () => {
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        choices: [{ message: { content: "image ok" } }],
+        id: "chatcmpl_img_1"
+      })
+    );
+
+    const provider = new ExtendedHttpProvider(findSpec("groq"), {
+      fetchFn
+    });
+
+    const result = await provider.invoke({
+      message: "what is in this image?",
+      images: [
+        {
+          dataUrl: "data:image/png;base64,aGVsbG8="
+        }
+      ],
+      env: {
+        GROQ_API_KEY: "gsk_test"
+      }
+    });
+
+    expect(result.code).toBe(0);
+    const [, request] = fetchFn.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(request.body));
+    expect(body.messages[0]).toEqual({
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: "what is in this image?"
+        },
+        {
+          type: "image_url",
+          image_url: {
+            url: "data:image/png;base64,aGVsbG8="
+          }
+        }
+      ]
+    });
+  });
+
   it("invokes anthropic-compatible providers with x-api-key auth", async () => {
     const fetchFn = vi.fn(async () =>
       createJsonResponse({
@@ -74,6 +118,50 @@ describe("extended http provider", () => {
     const payload = JSON.parse(String(request.body));
     expect(payload.model).toBe("claude-opus-4-5");
     expect(payload.system).toBe("You are helpful.");
+  });
+
+  it("serializes image inputs for anthropic-compatible providers", async () => {
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        id: "msg_2",
+        content: [{ type: "text", text: "ok" }]
+      })
+    );
+
+    const provider = new ExtendedHttpProvider(findSpec("anthropic"), {
+      fetchFn
+    });
+
+    const result = await provider.invoke({
+      message: "analyze this",
+      images: [
+        {
+          dataUrl: "data:image/png;base64,aGVsbG8="
+        }
+      ],
+      model: "anthropic/claude-opus-4-5",
+      env: {
+        ANTHROPIC_API_KEY: "ant-key"
+      }
+    });
+
+    expect(result.code).toBe(0);
+    const [, request] = fetchFn.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(String(request.body));
+    expect(payload.messages[0]?.content).toEqual([
+      {
+        type: "text",
+        text: "analyze this"
+      },
+      {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: "image/png",
+          data: "aGVsbG8="
+        }
+      }
+    ]);
   });
 
   it("supports providers with dynamic base URLs", async () => {
@@ -142,6 +230,49 @@ describe("extended http provider", () => {
     expect(result.code).toBe(0);
     expect(result.stdout).toBe("bedrock ok\n");
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("serializes image inputs for bedrock providers", async () => {
+    const send = vi.fn(async () => ({
+      output: {
+        message: {
+          content: [{ text: "bedrock image ok" }]
+        }
+      }
+    }));
+
+    const provider = new ExtendedHttpProvider(findSpec("amazon-bedrock"), {
+      createBedrockClient: () => ({ send })
+    });
+
+    const result = await provider.invoke({
+      message: "analyze this",
+      images: [
+        {
+          dataUrl: "data:image/png;base64,aGVsbG8="
+        }
+      ],
+      env: {
+        AMAZON_BEDROCK_MODEL: "anthropic.claude-3-5-sonnet"
+      }
+    });
+
+    expect(result.code).toBe(0);
+    expect(send).toHaveBeenCalledTimes(1);
+    const commandInput = (send.mock.calls[0]?.[0] as { input?: unknown })?.input as {
+      messages?: Array<{ content?: Array<Record<string, unknown>> }>;
+    };
+    expect(commandInput.messages?.[0]?.content).toEqual([
+      { text: "analyze this" },
+      {
+        image: {
+          format: "png",
+          source: {
+            bytes: Buffer.from("aGVsbG8=", "base64")
+          }
+        }
+      }
+    ]);
   });
 });
 

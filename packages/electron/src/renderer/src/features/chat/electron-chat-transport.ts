@@ -1,21 +1,26 @@
 import type {
   ChatTransport,
+  FileUIPart,
   TextUIPart,
   UIMessage,
   UIMessageChunk
 } from "ai";
-import type { WorkbenchMessage } from "@shared/workbench";
+import type { WorkbenchImageInput, WorkbenchMessage, WorkbenchMessageImage } from "@shared/workbench";
 
 export interface ElectronUiMessageMetadata {
   createdAt?: string;
   tracePath?: string;
   providerId?: string;
+  images?: WorkbenchMessageImage[];
 }
 
 export type ElectronUiMessage = UIMessage<ElectronUiMessageMetadata>;
 
 interface ElectronChatTransportDeps {
-  submitMessage: (message: string) => Promise<WorkbenchMessage | null>;
+  submitMessage: (input: {
+    message: string;
+    images: WorkbenchImageInput[];
+  }) => Promise<WorkbenchMessage | null>;
   stopMessage?: () => Promise<void> | void;
 }
 
@@ -28,8 +33,8 @@ export function createElectronChatTransport(
         throw createAbortError();
       }
 
-      const message = getLastUserText(messages);
-      if (!message) {
+      const input = getLastUserInput(messages);
+      if (!input) {
         throw new Error("Cannot send an empty message.");
       }
 
@@ -48,8 +53,8 @@ export function createElectronChatTransport(
       let reply: WorkbenchMessage | null;
       try {
         reply = abortSignal
-          ? await Promise.race([deps.submitMessage(message), abortPromise])
-          : await deps.submitMessage(message);
+          ? await Promise.race([deps.submitMessage(input), abortPromise])
+          : await deps.submitMessage(input);
       } finally {
         if (abortSignal && abortListener) {
           abortSignal.removeEventListener("abort", abortListener);
@@ -98,29 +103,72 @@ export function getTextContent(message: UIMessage): string {
     .trim();
 }
 
-function getLastUserText(messages: UIMessage[]): string {
+function getLastUserInput(messages: UIMessage[]): {
+  message: string;
+  images: WorkbenchImageInput[];
+} | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const candidate = messages[index];
     if (!candidate || candidate.role !== "user") {
       continue;
     }
-    const content = getTextContent(candidate);
-    if (content) {
-      return content;
+    const text = getTextContent(candidate);
+    const images = getImageInputs(candidate);
+    const message = text || (images.length > 0 ? "Please analyze the attached image(s)." : "");
+    if (message) {
+      return {
+        message,
+        images
+      };
     }
   }
-  return "";
+  return null;
+}
+
+export function getImageInputs(message: UIMessage): WorkbenchImageInput[] {
+  const parts = message.parts.filter((part): part is FileUIPart => part.type === "file");
+  return parts
+    .map((part) => {
+      const url = part.url?.trim();
+      if (!url) {
+        return null;
+      }
+      const mediaType = part.mediaType?.trim() || undefined;
+      if (mediaType && !mediaType.startsWith("image/")) {
+        return null;
+      }
+
+      if (url.startsWith("data:")) {
+        return {
+          dataUrl: url,
+          mediaType,
+          name: part.filename?.trim() || undefined
+        };
+      }
+
+      if (url.startsWith("blob:")) {
+        return null;
+      }
+
+      return {
+        path: url,
+        mediaType,
+        name: part.filename?.trim() || undefined
+      };
+    })
+    .filter((entry): entry is WorkbenchImageInput => Boolean(entry));
 }
 
 function buildMetadata(message: WorkbenchMessage): ElectronUiMessageMetadata | undefined {
   const metadata: ElectronUiMessageMetadata = {
     createdAt: message.createdAt,
     tracePath: message.tracePath,
-    providerId: message.providerId
+    providerId: message.providerId,
+    images: message.images
   };
 
   const hasData = Boolean(
-    metadata.createdAt || metadata.tracePath || metadata.providerId
+    metadata.createdAt || metadata.tracePath || metadata.providerId || metadata.images?.length
   );
   return hasData ? metadata : undefined;
 }

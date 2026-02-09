@@ -9,6 +9,7 @@ import {
   UnsupportedProviderActionError,
 } from "../../errors.js";
 import { BaseProvider } from "../../base-provider.js";
+import { resolveProviderImageInputs } from "../../image-input.js";
 import type {
   ProviderExecutionResult,
   ProviderInvokeOptions,
@@ -46,6 +47,15 @@ export class OpenAIProvider extends BaseProvider {
     options: ProviderInvokeOptions
   ): Promise<ProviderExecutionResult> {
     this.validateInvokeOptions(options);
+    const resolvedImages = await resolveProviderImageInputs({
+      providerId: this.id,
+      images: options.images,
+      cwd: options.cwd
+    });
+    const runtimeImages = resolvedImages.map((image) => ({
+      image: image.base64Data,
+      mediaType: image.mediaType
+    }));
 
     const env = options.env ?? process.env;
     const apiKey = env.OPENAI_API_KEY?.trim();
@@ -80,6 +90,7 @@ export class OpenAIProvider extends BaseProvider {
         requestTimeoutMs: resolveRequestTimeoutMs(env),
         model,
         message: options.message,
+        images: runtimeImages,
         systemPrompt: options.systemPrompt,
         abortSignal: options.abortSignal,
       });
@@ -109,7 +120,7 @@ export class OpenAIProvider extends BaseProvider {
         style === "responses";
 
       if (canFallback) {
-        return this.invokeChatFallback(options, env, apiKey, model);
+        return this.invokeChatFallback(options, env, apiKey, model, runtimeImages);
       }
 
       return {
@@ -128,7 +139,8 @@ export class OpenAIProvider extends BaseProvider {
     options: ProviderInvokeOptions,
     env: NodeJS.ProcessEnv,
     apiKey: string,
-    model: string
+    model: string,
+    images: Array<{ image: string; mediaType?: string }>
   ): Promise<ProviderExecutionResult> {
     try {
       const result = await this.runtime.generateText({
@@ -140,6 +152,7 @@ export class OpenAIProvider extends BaseProvider {
         requestTimeoutMs: resolveRequestTimeoutMs(env),
         model,
         message: options.message,
+        images,
         systemPrompt: options.systemPrompt,
         abortSignal: options.abortSignal,
       });

@@ -1,5 +1,9 @@
 import { useChat } from "@ai-sdk/react";
 import {
+  PromptInputActionAddAttachments,
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuTrigger,
   PromptInput,
   PromptInputBody,
   PromptInputFooter,
@@ -27,7 +31,9 @@ import {
   CheckCircle2,
   ChevronDown,
   Circle,
+  ImageIcon,
   Loader2,
+  PlusIcon,
   Settings2,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -47,7 +53,15 @@ interface ChatPanelProps {
   gateway?: WorkbenchGatewayStatus;
   error: string | null;
   busy: boolean;
-  onSubmitMessage: (message: string) => Promise<WorkbenchMessage | null>;
+  onSubmitMessage: (input: {
+    message: string;
+    images: Array<{
+      path?: string;
+      dataUrl?: string;
+      mediaType?: string;
+      name?: string;
+    }>;
+  }) => Promise<WorkbenchMessage | null>;
   onStopMessage: () => Promise<void>;
   onOpenRuntimeSettings: () => void;
   onOpenOnboarding: () => void;
@@ -66,8 +80,8 @@ export function ChatPanel(props: ChatPanelProps) {
   const transport = useMemo(
     () =>
       createElectronChatTransport({
-        submitMessage: async (message: string) =>
-          props.onSubmitMessage(message),
+        submitMessage: async (input) =>
+          props.onSubmitMessage(input),
         stopMessage: async () => {
           await props.onStopMessage();
         },
@@ -175,12 +189,13 @@ export function ChatPanel(props: ChatPanelProps) {
 
   const handlePromptSubmit = async (message: PromptInputMessage) => {
     const text = message.text.trim();
-    if (!text || !props.activeSession || isSubmitting || props.busy) {
+    const normalizedText = text || (message.files.length > 0 ? "Please analyze the attached image(s)." : "");
+    if (!normalizedText || !props.activeSession || isSubmitting || props.busy) {
       return;
     }
 
     setInput("");
-    await sendMessage({ text });
+    await sendMessage({ text: normalizedText, files: message.files });
   };
 
   return (
@@ -240,13 +255,14 @@ export function ChatPanel(props: ChatPanelProps) {
           ) : (
             messages.map((message, index) => {
               const content = getTextContent(message).trim();
+              const images = getMessageImages(message);
               const isError =
                 message.metadata?.providerId === WORKBENCH_CHAT_ERROR_PROVIDER_ID;
               const isUser = message.role === "user";
               const isAssistant = message.role === "assistant" && !isError;
               const isStreamingAssistant =
                 isAssistant && index === messages.length - 1 && isSubmitting;
-              if (!content && !isStreamingAssistant) {
+              if (!content && images.length === 0 && !isStreamingAssistant) {
                 return null;
               }
 
@@ -280,6 +296,19 @@ export function ChatPanel(props: ChatPanelProps) {
                       >
                         {content}
                       </p>
+                    ) : null}
+                    {images.length > 0 ? (
+                      <ul className="mt-2 flex flex-wrap gap-1.5">
+                        {images.map((image, imageIndex) => (
+                          <li
+                            key={`${message.id}-img-${imageIndex}`}
+                            className="inline-flex items-center gap-1 rounded-md border border-[#394355] bg-[#1A2231] px-2 py-1 text-[11px] text-blue-100/95"
+                          >
+                            <ImageIcon className="size-3.5" />
+                            <span className="max-w-[26ch] truncate">{image.name || `Image ${imageIndex + 1}`}</span>
+                          </li>
+                        ))}
+                      </ul>
                     ) : null}
                     {isStreamingAssistant && !content ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -377,6 +406,8 @@ export function ChatPanel(props: ChatPanelProps) {
           <PromptInput
             className="w-full"
             inputGroupClassName="rounded-lg border border-[#2F3032] bg-[#19191A] shadow-none"
+            accept="image/*"
+            multiple
             onSubmit={handlePromptSubmit}
           >
             <PromptInputBody>
@@ -392,7 +423,17 @@ export function ChatPanel(props: ChatPanelProps) {
                 }
               />
             </PromptInputBody>
-            <PromptInputFooter className="justify-end px-2 pb-2 pt-2">
+            <PromptInputFooter className="justify-between px-2 pb-2 pt-2">
+              <PromptInputActionMenu>
+                <PromptInputActionMenuTrigger
+                  className="size-8 rounded-lg border border-[#2E2F31] bg-[#161617] text-foreground/90 hover:bg-[#1D1D1F]"
+                >
+                  <PlusIcon className="size-4" />
+                </PromptInputActionMenuTrigger>
+                <PromptInputActionMenuContent>
+                  <PromptInputActionAddAttachments />
+                </PromptInputActionMenuContent>
+              </PromptInputActionMenu>
               <PromptInputSubmit
                 className="size-8 rounded-lg"
                 disabled={!canSend && !isSubmitting}
@@ -699,4 +740,18 @@ function resolveGatewayHost(rawUrl?: string): string | null {
   } catch {
     return value;
   }
+}
+
+function getMessageImages(message: ElectronUiMessage): Array<{ name?: string; mediaType?: string }> {
+  const fromMetadata = message.metadata?.images ?? [];
+  if (fromMetadata.length > 0) {
+    return fromMetadata;
+  }
+
+  return message.parts
+    .filter((part): part is { type: "file"; filename?: string; mediaType?: string } => part.type === "file")
+    .map((part) => ({
+      name: part.filename,
+      mediaType: part.mediaType
+    }));
 }

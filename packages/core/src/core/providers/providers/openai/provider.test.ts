@@ -40,6 +40,36 @@ describe("openai provider", () => {
     );
   });
 
+  it("forwards image inputs to the runtime as multimodal content", async () => {
+    const runtime = createRuntime(async () => ({
+      text: "image analyzed\n"
+    }));
+    const provider = new OpenAIProvider({ runtime });
+
+    const result = await provider.invoke({
+      message: "Describe the image",
+      images: [
+        {
+          name: "chart.png",
+          dataUrl: "data:image/png;base64,aGVsbG8="
+        }
+      ],
+      env: { OPENAI_API_KEY: "test-key" }
+    });
+
+    expect(result.code).toBe(0);
+    expect(runtime.generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        images: [
+          {
+            image: "aGVsbG8=",
+            mediaType: "image/png"
+          }
+        ]
+      })
+    );
+  });
+
   it("supports compatible base URL with chat completions path", async () => {
     const runtime = createRuntime(async () => ({
       text: "hello from compatible endpoint\n",

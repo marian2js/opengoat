@@ -3,10 +3,16 @@ import { z } from "zod";
 export const messageRoleSchema = z.enum(["user", "assistant"]);
 export const WORKBENCH_CHAT_ERROR_PROVIDER_ID = "__opengoat_error__";
 
+export const workbenchMessageImageSchema = z.object({
+  name: z.string().trim().min(1).max(240).optional(),
+  mediaType: z.string().trim().min(1).max(160).optional()
+});
+
 export const workbenchMessageSchema = z.object({
   id: z.string(),
   role: messageRoleSchema,
   content: z.string(),
+  images: z.array(workbenchMessageImageSchema).optional(),
   createdAt: z.string(),
   tracePath: z.string().optional(),
   providerId: z.string().optional()
@@ -150,6 +156,7 @@ export const workbenchStateSchema = z.object({
 });
 
 export type WorkbenchMessage = z.infer<typeof workbenchMessageSchema>;
+export type WorkbenchMessageImage = z.infer<typeof workbenchMessageImageSchema>;
 export type WorkbenchSession = z.infer<typeof workbenchSessionSchema>;
 export type WorkbenchProject = z.infer<typeof workbenchProjectSchema>;
 export type WorkbenchState = z.infer<typeof workbenchStateSchema>;
@@ -191,8 +198,30 @@ export const renameSessionInputSchema = sessionLookupInputSchema.extend({
   title: z.string().trim().min(1).max(120)
 });
 
+export const workbenchImageInputSchema = z
+  .object({
+    path: z.string().trim().min(1).max(4096).optional(),
+    dataUrl: z.string().trim().min(1).max(16_000_000).optional(),
+    mediaType: z.string().trim().min(1).max(160).optional(),
+    name: z.string().trim().min(1).max(240).optional()
+  })
+  .superRefine((value, context) => {
+    if (!value.path && !value.dataUrl) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Each image must include either path or dataUrl."
+      });
+    }
+  });
+
+export type WorkbenchImageInput = z.infer<typeof workbenchImageInputSchema>;
+
 export const sendMessageInputSchema = sessionLookupInputSchema.extend({
-  message: z.string().trim().min(1)
+  message: z.string().trim().min(1),
+  images: z
+    .array(workbenchImageInputSchema)
+    .max(8)
+    .optional()
 });
 
 export const stopMessageInputSchema = sessionLookupInputSchema;

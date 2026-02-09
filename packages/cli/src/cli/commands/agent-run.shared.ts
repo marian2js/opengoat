@@ -3,6 +3,7 @@ import type { CliContext } from "../framework/command.js";
 export interface AgentRunRequest {
   agentId: string;
   message: string;
+  images?: Array<{ path: string }>;
   model?: string;
   cwd?: string;
   sessionRef?: string;
@@ -23,6 +24,7 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
   try {
     result = await context.service.runAgent(request.agentId, {
       message: request.message,
+      images: request.images,
       model: request.model,
       cwd: request.cwd || process.cwd(),
       sessionRef: request.sessionRef,

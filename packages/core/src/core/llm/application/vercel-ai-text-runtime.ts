@@ -59,12 +59,28 @@ export class VercelAiTextRuntime implements OpenAiCompatibleTextRuntime {
       fetch: this.createFetchMiddleware(request, this.fetchFn),
     });
     const model = resolveModel(provider, request.style, request.model);
+    const normalizedMessage = request.message.trim();
+    const imageInputs = request.images?.filter((entry) => Boolean(entry?.image)) ?? [];
+    const userContent =
+      imageInputs.length > 0
+        ? [
+            { type: "text" as const, text: normalizedMessage },
+            ...imageInputs.map((imageInput) => ({
+              type: "image" as const,
+              image: imageInput.image,
+              mediaType: imageInput.mediaType
+            }))
+          ]
+        : normalizedMessage;
+
     const result = await this.generateTextFn({
       model,
-      prompt: request.message,
+      ...(imageInputs.length > 0
+        ? { messages: [{ role: "user" as const, content: userContent }] }
+        : { prompt: normalizedMessage }),
       system: request.systemPrompt?.trim() || undefined,
       maxRetries: this.maxRetries,
-      abortSignal: request.abortSignal,
+      abortSignal: request.abortSignal
     });
 
     const text = result.text?.trim();

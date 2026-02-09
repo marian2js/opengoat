@@ -423,7 +423,7 @@ export function App() {
                 gateway={onboarding?.gateway}
                 error={error}
                 busy={isBusy}
-                onSubmitMessage={(message) => sendMessage(message)}
+                onSubmitMessage={(input) => sendMessage(input.message, { images: input.images })}
                 onStopMessage={() => stopMessage()}
                 onOpenRuntimeSettings={() => setShowRuntimeSettings(true)}
                 onOpenOnboarding={() => void openOnboarding()}

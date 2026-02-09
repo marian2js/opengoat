@@ -6,7 +6,9 @@ import type {
   WorkbenchAgentUpdateResult,
   WorkbenchAgentProvider,
   WorkbenchGatewayMode,
+  WorkbenchImageInput,
   WorkbenchMessage,
+  WorkbenchMessageImage,
   WorkbenchOnboarding,
   WorkbenchProject,
   WorkbenchRunStatusEvent,
@@ -105,6 +107,7 @@ interface WorkbenchUiState {
   sendMessage: (
     message: string,
     options?: {
+      images?: WorkbenchImageInput[];
       rethrow?: boolean;
     }
   ) => Promise<WorkbenchMessage | null>;
@@ -762,6 +765,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
     sendMessage: async (
       message: string,
       options?: {
+        images?: WorkbenchImageInput[];
         rethrow?: boolean;
       }
     ) => {
@@ -769,6 +773,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
       if (!trimmed) {
         return null;
       }
+      const normalizedImages = normalizeWorkbenchImages(options?.images);
 
       const state = get();
       const projectId = state.activeProjectId;
@@ -782,6 +787,7 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         id: `optimistic-${Date.now()}`,
         role: "user",
         content: trimmed,
+        images: toWorkbenchMessageImages(normalizedImages),
         createdAt: new Date().toISOString()
       };
 
@@ -799,7 +805,8 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         const result = await api.sendChatMessage({
           projectId,
           sessionId,
-          message: trimmed
+          message: trimmed,
+          images: normalizedImages
         });
 
         set((current) => ({
@@ -1057,6 +1064,32 @@ function upsertAgentProvider(
   return providers
     .map((entry) => (entry.id === provider.id ? provider : entry))
     .sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function normalizeWorkbenchImages(images: WorkbenchImageInput[] | undefined): WorkbenchImageInput[] {
+  if (!images || images.length === 0) {
+    return [];
+  }
+
+  return images
+    .map((image) => ({
+      path: image.path?.trim() || undefined,
+      dataUrl: image.dataUrl?.trim() || undefined,
+      mediaType: image.mediaType?.trim() || undefined,
+      name: image.name?.trim() || undefined
+    }))
+    .filter((image) => Boolean(image.path || image.dataUrl));
+}
+
+function toWorkbenchMessageImages(images: WorkbenchImageInput[]): WorkbenchMessageImage[] | undefined {
+  if (images.length === 0) {
+    return undefined;
+  }
+
+  return images.map((image, index) => ({
+    name: image.name || image.path?.split(/[\\/]/g).at(-1) || `Image ${index + 1}`,
+    mediaType: image.mediaType
+  }));
 }
 
 function buildAgentNotice(

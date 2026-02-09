@@ -338,6 +338,7 @@ export class OrchestrationService {
       const plannerCall = await this.invokeAgentWithSession(paths, DEFAULT_AGENT_ID, {
         ...options,
         message: plannerPrompt,
+        images: step === 1 ? options.images : undefined,
         skillsPromptOverride: orchestratorSkillsSnapshot.prompt,
         sessionRef: options.sessionRef,
         forceNewSession: step === 1 ? options.forceNewSession : false
@@ -693,6 +694,7 @@ export class OrchestrationService {
         : undefined;
     const delegateCall = await this.invokeAgentWithSession(params.paths, targetAgentId, {
       message: delegateMessage,
+      images: params.options.images,
       env: params.options.env,
       cwd: params.options.cwd,
       sessionRef: `agent:${targetAgentId}:task:${taskKey}`,

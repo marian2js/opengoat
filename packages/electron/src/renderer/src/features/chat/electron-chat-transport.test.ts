@@ -3,6 +3,7 @@ import { readUIMessageStream, type UIMessage } from "ai";
 import type { WorkbenchMessage } from "@shared/workbench";
 import {
   createElectronChatTransport,
+  getImageInputs,
   getTextContent,
   toElectronUiMessages
 } from "./electron-chat-transport";
@@ -39,7 +40,10 @@ describe("electron chat transport", () => {
     }
 
     const finalMessage = updates.at(-1);
-    expect(submitMessage).toHaveBeenCalledWith("Say hello");
+    expect(submitMessage).toHaveBeenCalledWith({
+      message: "Say hello",
+      images: []
+    });
     expect(finalMessage?.id).toBe("assistant-1");
     expect(finalMessage?.role).toBe("assistant");
     expect(getTextContent(finalMessage as UIMessage)).toBe("Hello from OpenGoat.");
@@ -113,5 +117,29 @@ describe("electron chat transport", () => {
       | undefined;
     expect(metadata?.tracePath).toBe("/tmp/run.json");
     expect(metadata?.providerId).toBe("openai");
+  });
+
+  it("extracts image inputs from user file parts", () => {
+    const message: UIMessage = {
+      id: "user-1",
+      role: "user",
+      parts: [
+        { type: "text", text: "Describe this" },
+        {
+          type: "file",
+          filename: "chart.png",
+          mediaType: "image/png",
+          url: "data:image/png;base64,aGVsbG8="
+        }
+      ]
+    };
+
+    expect(getImageInputs(message)).toEqual([
+      {
+        dataUrl: "data:image/png;base64,aGVsbG8=",
+        mediaType: "image/png",
+        name: "chart.png"
+      }
+    ]);
   });
 });

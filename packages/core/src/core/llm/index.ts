@@ -1,5 +1,6 @@
 export type {
   OpenAiCompatibleApiStyle,
+  OpenAiCompatibleImageInput,
   OpenAiCompatibleTextRequest,
   OpenAiCompatibleTextResult,
   OpenAiCompatibleTextRuntime

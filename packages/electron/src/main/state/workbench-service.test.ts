@@ -337,6 +337,130 @@ describe("WorkbenchService sendMessage", () => {
     );
   });
 
+  it("forwards image inputs to runAgent and stores user image metadata", async () => {
+    const runAgent = vi.fn(async () => ({
+      code: 0,
+      stdout: "image analyzed",
+      stderr: "",
+      providerId: "openai",
+      tracePath: "/tmp/trace.json",
+      entryAgentId: "orchestrator",
+      routing: {
+        entryAgentId: "orchestrator",
+        targetAgentId: "orchestrator",
+        confidence: 1,
+        reason: "direct",
+        rewrittenMessage: "describe image",
+        candidates: [],
+      },
+    }));
+    const opengoat = createOpenGoatStub({
+      providers: createProviderSummaries(),
+      activeProviderId: "openai",
+      onboardingByProvider: {},
+      initialAgentProviders: {
+        orchestrator: "openai",
+      },
+      runAgent,
+    });
+    const appendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: [],
+      })
+      .mockResolvedValueOnce({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: [
+          {
+            id: "m1",
+            role: "assistant",
+            content: "image analyzed",
+            createdAt: "2026-02-07T00:00:00.000Z",
+            providerId: "openai",
+            tracePath: "/tmp/trace.json",
+          },
+        ],
+      });
+    const store = {
+      getGatewaySettings: vi.fn(async () => ({
+        mode: "local" as const,
+        timeoutMs: 10_000,
+      })),
+      getProject: vi.fn(async () => ({
+        id: "p1",
+        name: "project",
+        rootPath: "/tmp/project",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        sessions: [],
+      })),
+      getSession: vi.fn(async () => ({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: [],
+      })),
+      appendMessage,
+    } as unknown as WorkbenchStore;
+    const service = new WorkbenchService({ opengoat, store });
+
+    await service.sendMessage({
+      projectId: "p1",
+      sessionId: "s1",
+      message: "describe image",
+      images: [
+        {
+          dataUrl: "data:image/png;base64,aGVsbG8=",
+          mediaType: "image/png",
+          name: "diagram.png",
+        },
+      ],
+    });
+
+    expect(runAgent).toHaveBeenCalledWith(
+      "orchestrator",
+      expect.objectContaining({
+        images: [
+          {
+            dataUrl: "data:image/png;base64,aGVsbG8=",
+            mediaType: "image/png",
+            name: "diagram.png",
+            path: undefined,
+          },
+        ],
+      }),
+    );
+    expect(appendMessage).toHaveBeenNthCalledWith(
+      1,
+      "p1",
+      "s1",
+      expect.objectContaining({
+        role: "user",
+        content: "describe image",
+        images: [
+          {
+            name: "diagram.png",
+            mediaType: "image/png",
+          },
+        ],
+      }),
+    );
+  });
+
   it("loads project .env values while preventing overrides for stored provider config keys", async () => {
     const loadDotEnvFn = vi.fn(
       async (params?: { cwd?: string; filename?: string; env?: NodeJS.ProcessEnv }) => {
@@ -582,6 +706,67 @@ describe("WorkbenchService sendMessage", () => {
 
     expect(callGatewayFn).toHaveBeenCalledTimes(1);
     expect(runAgent).toHaveBeenCalledTimes(0);
+  });
+
+  it("rejects image attachments in remote gateway mode", async () => {
+    const runAgent = vi.fn();
+    const opengoat = createOpenGoatStub({
+      providers: createProviderSummaries(),
+      activeProviderId: "openai",
+      onboardingByProvider: {},
+      runAgent
+    });
+    const appendMessage = vi.fn().mockResolvedValue({
+      id: "s1",
+      title: "Session",
+      agentId: "orchestrator",
+      sessionKey: "desktop:p1:s1",
+      createdAt: "2026-02-07T00:00:00.000Z",
+      updatedAt: "2026-02-07T00:00:00.000Z",
+      messages: []
+    });
+    const store = {
+      getGatewaySettings: vi.fn(async () => ({
+        mode: "remote" as const,
+        remoteUrl: "ws://remote-host:18789/gateway",
+        timeoutMs: 8000
+      })),
+      getProject: vi.fn(async () => ({
+        id: "p1",
+        name: "project",
+        rootPath: "/tmp/project",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        sessions: []
+      })),
+      getSession: vi.fn(async () => ({
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: []
+      })),
+      appendMessage
+    } as unknown as WorkbenchStore;
+    const callGatewayFn = vi.fn();
+    const service = new WorkbenchService({
+      opengoat,
+      store,
+      callGatewayFn: callGatewayFn as never
+    });
+
+    await expect(
+      service.sendMessage({
+        projectId: "p1",
+        sessionId: "s1",
+        message: "hello",
+        images: [{ dataUrl: "data:image/png;base64,aGVsbG8=" }]
+      })
+    ).rejects.toThrow(/supported only in local runtime mode/i);
+    expect(callGatewayFn).not.toHaveBeenCalled();
+    expect(runAgent).not.toHaveBeenCalled();
   });
 
   it("preserves delegated-agent failure summary before provider stderr diagnostics", async () => {

@@ -143,6 +143,62 @@ describe("workbench store", () => {
     expect(state.activeMessages[1]?.content.toLowerCase()).toContain("quota");
   });
 
+  it("forwards image attachments through sendChatMessage and optimistic state", async () => {
+    const sendChatMessage = vi.fn(async () => ({
+      session: {
+        id: "s1",
+        title: "Session",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:00.000Z",
+        messages: [
+          {
+            id: "m-user",
+            role: "user" as const,
+            content: "hello",
+            images: [{ name: "diagram.png", mediaType: "image/png" }],
+            createdAt: "2026-02-07T00:00:00.000Z"
+          },
+          {
+            id: "m-assistant",
+            role: "assistant" as const,
+            content: "done",
+            createdAt: "2026-02-07T00:00:01.000Z",
+            providerId: "openai"
+          }
+        ]
+      },
+      reply: {
+        id: "m-assistant",
+        role: "assistant" as const,
+        content: "done",
+        createdAt: "2026-02-07T00:00:01.000Z",
+        providerId: "openai"
+      },
+      providerId: "openai"
+    }));
+    const api = createApiMock({ sendChatMessage: sendChatMessage as WorkbenchApiClient["sendChatMessage"] });
+    const store = createWorkbenchStore(api);
+    await store.getState().bootstrap();
+
+    const pending = store.getState().sendMessage("hello", {
+      images: [{ dataUrl: "data:image/png;base64,aGVsbG8=", mediaType: "image/png", name: "diagram.png" }]
+    });
+
+    const optimisticUser = store.getState().activeMessages.at(-1);
+    expect(optimisticUser?.role).toBe("user");
+    expect(optimisticUser?.images).toEqual([{ name: "diagram.png", mediaType: "image/png" }]);
+
+    await pending;
+    expect(sendChatMessage).toHaveBeenCalledWith({
+      projectId: "p1",
+      sessionId: "s1",
+      message: "hello",
+      images: [{ dataUrl: "data:image/png;base64,aGVsbG8=", mediaType: "image/png", name: "diagram.png" }]
+    });
+  });
+
   it("attributes delegated-provider failures to the delegated agent and keeps details concise", async () => {
     const noisyDelegationError = [
       'Orchestrator provider failed (google, code 1). The delegated agent "developer" failed via provider "gemini" (exit code 1).',

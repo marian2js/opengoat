@@ -10,7 +10,7 @@ export const agentRunCommand: CliCommand = {
     if (!parsed.ok) {
       context.stderr.write(`${parsed.error}\n`);
       context.stderr.write(
-        "Usage: opengoat agent run <agent-id> --message <text> [--session <key|id>] [--new-session|--no-session]\n"
+        "Usage: opengoat agent run <agent-id> --message <text> [--image <path>] [--session <key|id>] [--new-session|--no-session]\n"
       );
       context.stderr.write(
         "       [--direct-session] [--model <model>] [--cwd <path>] [--no-stream] [-- <provider-args>]\n"
@@ -27,6 +27,7 @@ type RunArgsResult =
       ok: true;
       agentId: string;
       message: string;
+      images: Array<{ path: string }>;
       model?: string;
       cwd?: string;
       sessionRef?: string;
@@ -54,6 +55,7 @@ function parseRunArgs(args: string[]): RunArgsResult {
 
   let message: string | undefined;
   let model: string | undefined;
+  const images: Array<{ path: string }> = [];
   let cwd: string | undefined;
   let sessionRef: string | undefined;
   let forceNewSession = false;
@@ -85,6 +87,16 @@ function parseRunArgs(args: string[]): RunArgsResult {
         return { ok: false, error: "Missing value for --session." };
       }
       sessionRef = value.trim();
+      index += 1;
+      continue;
+    }
+
+    if (token === "--image") {
+      const value = known[index + 1];
+      if (!value?.trim()) {
+        return { ok: false, error: "Missing value for --image." };
+      }
+      images.push({ path: value.trim() });
       index += 1;
       continue;
     }
@@ -141,6 +153,7 @@ function parseRunArgs(args: string[]): RunArgsResult {
     ok: true,
     agentId,
     message: message.trim(),
+    images,
     model,
     cwd,
     sessionRef,

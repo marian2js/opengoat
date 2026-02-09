@@ -14,6 +14,7 @@ import type {
   WorkbenchBootstrap,
   WorkbenchGatewayStatus,
   WorkbenchGuidedAuthResult,
+  WorkbenchImageInput,
   WorkbenchMessage,
   WorkbenchOnboarding,
   WorkbenchProject,
@@ -73,6 +74,7 @@ export interface WorkbenchApiClient {
     projectId: string;
     sessionId: string;
     message: string;
+    images?: WorkbenchImageInput[];
   }) => Promise<WorkbenchSendMessageResult>;
   stopChatMessage: (input: {
     projectId: string;

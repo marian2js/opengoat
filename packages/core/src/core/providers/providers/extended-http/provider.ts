@@ -10,6 +10,7 @@ import {
   ProviderRuntimeError,
   UnsupportedProviderActionError
 } from "../../errors.js";
+import { imageExtensionForMediaType, resolveProviderImageInputs, type ResolvedProviderImageInput } from "../../image-input.js";
 import type {
   ProviderExecutionResult,
   ProviderInvokeOptions
@@ -65,18 +66,23 @@ export class ExtendedHttpProvider extends BaseProvider {
 
   public async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
     this.validateInvokeOptions(options);
+    const resolvedImages = await resolveProviderImageInputs({
+      providerId: this.id,
+      images: options.images,
+      cwd: options.cwd
+    });
 
     const env = options.env ?? process.env;
 
     if (this.spec.protocol === "bedrock-converse") {
-      return this.invokeBedrock(options, env);
+      return this.invokeBedrock(options, env, resolvedImages);
     }
 
     if (this.spec.protocol === "anthropic-messages") {
-      return this.invokeAnthropic(options, env);
+      return this.invokeAnthropic(options, env, resolvedImages);
     }
 
-    return this.invokeOpenAiChat(options, env);
+    return this.invokeOpenAiChat(options, env, resolvedImages);
   }
 
   public override invokeAuth(): Promise<ProviderExecutionResult> {
@@ -85,7 +91,8 @@ export class ExtendedHttpProvider extends BaseProvider {
 
   private async invokeOpenAiChat(
     options: ProviderInvokeOptions,
-    env: NodeJS.ProcessEnv
+    env: NodeJS.ProcessEnv,
+    images: ResolvedProviderImageInput[]
   ): Promise<ProviderExecutionResult> {
     const model = this.resolveModel(options, env);
     if (!model) {
@@ -125,7 +132,7 @@ export class ExtendedHttpProvider extends BaseProvider {
 
     const payload = {
       model,
-      messages: buildChatMessages(options),
+      messages: buildChatMessages(options, images),
       stream: false
     };
 
@@ -142,7 +149,8 @@ export class ExtendedHttpProvider extends BaseProvider {
 
   private async invokeAnthropic(
     options: ProviderInvokeOptions,
-    env: NodeJS.ProcessEnv
+    env: NodeJS.ProcessEnv,
+    images: ResolvedProviderImageInput[]
   ): Promise<ProviderExecutionResult> {
     const endpoint = this.resolveEndpoint(env, "/v1/messages");
     if (!endpoint) {
@@ -173,12 +181,7 @@ export class ExtendedHttpProvider extends BaseProvider {
       messages: [
         {
           role: "user",
-          content: [
-            {
-              type: "text",
-              text: options.message
-            }
-          ]
+          content: buildAnthropicUserContent(options.message, images)
         }
       ],
       ...(options.systemPrompt?.trim() ? { system: options.systemPrompt.trim() } : {})
@@ -197,7 +200,8 @@ export class ExtendedHttpProvider extends BaseProvider {
 
   private async invokeBedrock(
     options: ProviderInvokeOptions,
-    env: NodeJS.ProcessEnv
+    env: NodeJS.ProcessEnv,
+    images: ResolvedProviderImageInput[]
   ): Promise<ProviderExecutionResult> {
     const model = this.resolveModel(options, env);
     if (!model) {
@@ -214,7 +218,7 @@ export class ExtendedHttpProvider extends BaseProvider {
     const messages: Message[] = [
       {
         role: "user",
-        content: [{ text: options.message }]
+        content: buildBedrockUserContent(options.message, images)
       }
     ];
 
@@ -559,8 +563,11 @@ export class ExtendedHttpProvider extends BaseProvider {
   }
 }
 
-function buildChatMessages(options: ProviderInvokeOptions): Array<Record<string, string>> {
-  const messages: Array<Record<string, string>> = [];
+function buildChatMessages(
+  options: ProviderInvokeOptions,
+  images: ResolvedProviderImageInput[]
+): Array<Record<string, unknown>> {
+  const messages: Array<Record<string, unknown>> = [];
 
   const systemPrompt = options.systemPrompt?.trim();
   if (systemPrompt) {
@@ -570,12 +577,86 @@ function buildChatMessages(options: ProviderInvokeOptions): Array<Record<string,
     });
   }
 
-  messages.push({
-    role: "user",
-    content: options.message
-  });
+  if (images.length === 0) {
+    messages.push({
+      role: "user",
+      content: options.message
+    });
+  } else {
+    messages.push({
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: options.message
+        },
+        ...images.map((image) => ({
+          type: "image_url",
+          image_url: {
+            url: `data:${image.mediaType};base64,${image.base64Data}`
+          }
+        }))
+      ]
+    });
+  }
 
   return messages;
+}
+
+function buildAnthropicUserContent(
+  message: string,
+  images: ResolvedProviderImageInput[]
+): Array<Record<string, unknown>> {
+  return [
+    {
+      type: "text",
+      text: message
+    },
+    ...images.map((image) => ({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: image.mediaType,
+        data: image.base64Data
+      }
+    }))
+  ];
+}
+
+function buildBedrockUserContent(
+  message: string,
+  images: ResolvedProviderImageInput[]
+): NonNullable<Message["content"]> {
+  return [
+    { text: message },
+    ...images.map((image) => ({
+      image: {
+        format: resolveBedrockImageFormat(image.mediaType),
+        source: {
+          bytes: Buffer.from(image.base64Data, "base64")
+        }
+      }
+    }))
+  ];
+}
+
+function resolveBedrockImageFormat(mediaType: string): "png" | "jpeg" | "gif" | "webp" {
+  const extension = imageExtensionForMediaType(mediaType);
+  switch (extension) {
+    case "png":
+      return "png";
+    case "jpg":
+    case "jpeg":
+      return "jpeg";
+    case "gif":
+      return "gif";
+    case "webp":
+      return "webp";
+    default:
+      throw new Error(
+        `Unsupported Bedrock image media type: ${mediaType}. Supported types: image/png, image/jpeg, image/gif, image/webp.`
+      );
+  }
 }
 
 function extractOpenAiLikeText(payload: unknown): string | null {

@@ -1,5 +1,12 @@
 export type ProviderKind = "cli" | "http";
 
+export interface ProviderImageInput {
+  path?: string;
+  dataUrl?: string;
+  mediaType?: string;
+  name?: string;
+}
+
 export interface ProviderCapabilities {
   agent: boolean;
   model: boolean;
@@ -11,6 +18,7 @@ export interface ProviderCapabilities {
 
 export interface ProviderInvokeOptions {
   message: string;
+  images?: ProviderImageInput[];
   systemPrompt?: string;
   skillsPromptOverride?: string;
   sessionRef?: string;

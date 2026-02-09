@@ -74,6 +74,35 @@ describe("grok provider", () => {
     );
   });
 
+  it("forwards image inputs to the runtime", async () => {
+    const runtime = createRuntime(async () => ({ text: "image reply\n" }));
+    const provider = new GrokProvider({ runtime });
+
+    const result = await provider.invoke({
+      message: "Describe this",
+      images: [
+        {
+          dataUrl: "data:image/png;base64,aGVsbG8="
+        }
+      ],
+      env: {
+        XAI_API_KEY: "test-key"
+      }
+    });
+
+    expect(result.code).toBe(0);
+    expect(runtime.generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        images: [
+          {
+            image: "aGVsbG8=",
+            mediaType: "image/png"
+          }
+        ]
+      })
+    );
+  });
+
   it("fails on malformed successful payload", async () => {
     const runtime = createRuntime(async () => {
       throw new ProviderRuntimeError("grok", "no textual output found in response");

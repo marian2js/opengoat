@@ -186,6 +186,8 @@ opengoat onboard                           # interactive provider setup
 
 # Agents
 opengoat agent --message "<text>"          # talk to the orchestrator
+opengoat agent --message "<text>" --image ./diagram.png
+                                           # include one or more image attachments
 opengoat agent <id> --message "<text>"     # talk to a specific agent
 opengoat agent create "<name>"             # create a new local agent
 opengoat agent create "<name>" --provider openclaw

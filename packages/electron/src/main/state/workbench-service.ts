@@ -27,7 +27,9 @@ import type {
   WorkbenchAgentUpdateResult,
   WorkbenchAgentProvider,
   WorkbenchGuidedAuthResult,
+  WorkbenchImageInput,
   WorkbenchMessage,
+  WorkbenchMessageImage,
   WorkbenchOnboarding,
   WorkbenchProject,
   WorkbenchRunStatusEvent,
@@ -476,11 +478,13 @@ export class WorkbenchService {
     projectId: string;
     sessionId: string;
     message: string;
+    images?: WorkbenchImageInput[];
   }): Promise<WorkbenchSendMessageResult> {
     const message = params.message.trim();
     if (!message) {
       throw new Error("Message cannot be empty.");
     }
+    const images = normalizeWorkbenchImages(params.images);
 
     const project = await this.store.getProject(params.projectId);
     const session = await this.store.getSession(params.projectId, params.sessionId);
@@ -490,7 +494,8 @@ export class WorkbenchService {
     try {
       await this.store.appendMessage(project.id, session.id, {
         role: "user",
-        content: message
+        content: message,
+        images: toWorkbenchMessageImages(images)
       });
 
       let run: {
@@ -508,6 +513,7 @@ export class WorkbenchService {
           sessionId: session.id,
           agentId: sessionAgentId,
           message,
+          images,
           sessionRef: session.sessionKey,
           cwd: project.rootPath,
           abortSignal: runAbortController.signal
@@ -560,6 +566,7 @@ export class WorkbenchService {
     sessionId: string;
     agentId: string;
     message: string;
+    images: WorkbenchImageInput[];
     sessionRef: string;
     cwd: string;
     abortSignal: AbortSignal;
@@ -585,6 +592,7 @@ export class WorkbenchService {
       ];
       const run = await this.opengoat.runAgent(input.agentId, {
         message: input.message,
+        images: input.images,
         sessionRef: input.sessionRef,
         cwd: input.cwd,
         directAgentSession: input.agentId !== DEFAULT_AGENT_ID,
@@ -609,6 +617,11 @@ export class WorkbenchService {
     if (!remoteUrl) {
       throw new Error(
         "Remote gateway mode is enabled, but no gateway URL is configured. Open Provider Setup and add a remote gateway URL, or switch back to local runtime."
+      );
+    }
+    if (input.images.length > 0) {
+      throw new Error(
+        "Image attachments are currently supported only in local runtime mode."
       );
     }
     this.onRunStatus?.({
@@ -791,6 +804,32 @@ function formatAgentLabel(agentId: string): string {
         : segment,
     )
     .join(" ");
+}
+
+function normalizeWorkbenchImages(images: WorkbenchImageInput[] | undefined): WorkbenchImageInput[] {
+  if (!images || images.length === 0) {
+    return [];
+  }
+
+  return images
+    .map((image) => ({
+      path: image.path?.trim() || undefined,
+      dataUrl: image.dataUrl?.trim() || undefined,
+      mediaType: image.mediaType?.trim() || undefined,
+      name: image.name?.trim() || undefined
+    }))
+    .filter((image) => Boolean(image.path || image.dataUrl));
+}
+
+function toWorkbenchMessageImages(images: WorkbenchImageInput[]): WorkbenchMessageImage[] | undefined {
+  if (images.length === 0) {
+    return undefined;
+  }
+
+  return images.map((image, index) => ({
+    name: image.name || image.path?.split(/[\\/]/g).at(-1) || `Image ${index + 1}`,
+    mediaType: image.mediaType
+  }));
 }
 
 function collectDotEnvDirectories(projectRootPath: string): string[] {

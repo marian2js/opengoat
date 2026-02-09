@@ -4,6 +4,7 @@ import {
   UnsupportedProviderActionError
 } from "../../errors.js";
 import { BaseProvider } from "../../base-provider.js";
+import { resolveProviderImageInputs } from "../../image-input.js";
 import type { ProviderExecutionResult, ProviderInvokeOptions } from "../../types.js";
 
 const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
@@ -33,6 +34,11 @@ export class OpenRouterProvider extends BaseProvider {
 
   public async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
     this.validateInvokeOptions(options);
+    const resolvedImages = await resolveProviderImageInputs({
+      providerId: this.id,
+      images: options.images,
+      cwd: options.cwd
+    });
 
     const env = options.env ?? process.env;
     const apiKey = env.OPENROUTER_API_KEY?.trim();
@@ -52,6 +58,10 @@ export class OpenRouterProvider extends BaseProvider {
         style: "chat",
         model,
         message: options.message,
+        images: resolvedImages.map((image) => ({
+          image: image.base64Data,
+          mediaType: image.mediaType
+        })),
         systemPrompt: options.systemPrompt,
         headers,
         abortSignal: options.abortSignal

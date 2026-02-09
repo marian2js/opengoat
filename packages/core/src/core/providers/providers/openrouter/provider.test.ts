@@ -55,6 +55,33 @@ describe("openrouter provider", () => {
     );
   });
 
+  it("forwards image inputs to the runtime", async () => {
+    const runtime = createRuntime(async () => ({ text: "ok\n" }));
+    const provider = new OpenRouterProvider({ runtime });
+
+    const result = await provider.invoke({
+      message: "Analyze this image",
+      images: [
+        {
+          dataUrl: "data:image/png;base64,aGVsbG8="
+        }
+      ],
+      env: { OPENROUTER_API_KEY: "test-key" }
+    });
+
+    expect(result.code).toBe(0);
+    expect(runtime.generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        images: [
+          {
+            image: "aGVsbG8=",
+            mediaType: "image/png"
+          }
+        ]
+      })
+    );
+  });
+
   it("returns non-zero result when runtime request fails", async () => {
     const runtime = createRuntime(async () => ({ text: "unused\n" }));
     runtime.generateText.mockRejectedValueOnce({
