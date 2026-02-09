@@ -465,11 +465,7 @@ function buildRunProgress(
         );
         break;
       case "planner_started":
-        activate(
-          `planner-${event.step ?? index}`,
-          "Orchestrator is planning",
-          "Reviewing your request and deciding the best next step.",
-        );
+        // Planning state is implicit in the run timeline; avoid redundant visual noise.
         break;
       case "planner_decision":
         completeActiveBy((entry) => entry.id === `planner-${event.step ?? index}`);

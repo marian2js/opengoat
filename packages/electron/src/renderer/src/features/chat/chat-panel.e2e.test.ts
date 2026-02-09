@@ -136,13 +136,8 @@ describe("ChatPanel", () => {
       }),
     );
 
-    expect(
-      screen.getAllByText((_, element) =>
-        Boolean(element?.textContent?.includes("Orchestrator is planning")),
-      ).length,
-    ).toBeGreaterThan(0);
     expect(screen.getByText("Request queued")).toBeTruthy();
-    expect(screen.getByText(/Reviewing your request/i)).toBeTruthy();
+    expect(screen.getAllByText("Awaiting final response").length).toBeGreaterThan(0);
   });
 
   it("labels assistant replies as orchestrator", () => {
