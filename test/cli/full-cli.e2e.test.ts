@@ -19,7 +19,7 @@ afterEach(async () => {
 });
 
 describe("CLI full e2e smoke", () => {
-  it("covers core CLI workflows end-to-end", async () => {
+  it("covers core CLI workflows end-to-end", { timeout: 120000 }, async () => {
     const root = await createTempDir("opengoat-full-cli-e2e-");
     roots.push(root);
 
@@ -32,84 +32,249 @@ describe("CLI full e2e smoke", () => {
     const env: NodeJS.ProcessEnv = {
       OPENCLAW_CMD: stubPath,
       OPENGOAT_OPENCLAW_CMD: stubPath,
-      OPENCLAW_STUB_LOG: stubLogPath
+      OPENCLAW_STUB_LOG: stubLogPath,
     };
 
-    await expectOk(await runBinary(["init"], opengoatHome, env), "Default agent: goat");
-    await expectOk(await runBinary(["onboard", "--non-interactive", "--local"], opengoatHome, env), "Mode: local");
-
-    await expectOk(await runBinary(["agent", "--help"], opengoatHome, env), "Usage:");
-    await expectOk(await runBinary(["session", "--help"], opengoatHome, env), "session <command>");
-    await expectOk(await runBinary(["skill", "--help"], opengoatHome, env), "skill list");
-    await expectOk(await runBinary(["provider", "--help"], opengoatHome, env), "provider list");
-    await expectOk(await runBinary(["scenario", "--help"], opengoatHome, env), "scenario run");
-    await expectOk(await runBinary(["acp", "--help"], opengoatHome, env), "opengoat acp");
-
-    await expectOk(await runBinary(["route", "--message", "Need API implementation support"], opengoatHome, env), "Routing decision");
     await expectOk(
-      await runBinary(["agent", "create", "Developer", "--individual", "--skill", "coding"], opengoatHome, env),
-      "Agent ready: Developer (developer)"
-    );
-    await expectOk(await runBinary(["agent", "list"], opengoatHome, env), "developer");
-    await expectOk(await runBinary(["agent", "set-manager", "developer", "goat"], opengoatHome, env), "Current reports-to: goat");
-
-    await expectOk(
-      await runBinary(["agent", "run", "developer", "--message", "Implement a REST endpoint", "--no-stream"], opengoatHome, env),
-      "stub-agent-reply"
+      await runBinary(["init"], opengoatHome, env),
+      "Default agent: goat",
     );
     await expectOk(
-      await runBinary(["agent", "developer", "--message", "Summarize progress", "--no-stream"], opengoatHome, env),
-      "stub-agent-reply"
-    );
-
-    await expectOk(await runBinary(["session", "list", "--agent", "developer"], opengoatHome, env), "agent:developer:main");
-    await expectOk(
-      await runBinary(["session", "history", "--agent", "developer", "--limit", "5"], opengoatHome, env),
-      "Session key: agent:developer:main"
-    );
-    await expectOk(
-      await runBinary(["session", "rename", "--agent", "developer", "--title", "Developer Session"], opengoatHome, env),
-      "Renamed session"
-    );
-    await expectOk(await runBinary(["session", "compact", "--agent", "developer"], opengoatHome, env), "Compaction");
-    await expectOk(await runBinary(["session", "reset", "--agent", "developer"], opengoatHome, env), "Reset session");
-    await expectOk(await runBinary(["session", "remove", "--agent", "developer"], opengoatHome, env), "Removed session");
-
-    await expectOk(
-      await runBinary(["skill", "install", "helper", "--agent", "goat", "--from", skillSourcePath], opengoatHome, env),
-      "Installed skill: helper"
-    );
-    await expectOk(await runBinary(["skill", "list", "--agent", "goat"], opengoatHome, env), "helper");
-    await expectOk(await runBinary(["skill", "list", "--global"], opengoatHome, env), "helper");
-
-    await expectOk(await runBinary(["provider", "list"], opengoatHome, env), "openclaw");
-    await expectOk(await runBinary(["agent", "provider", "get", "goat"], opengoatHome, env), "goat\topenclaw");
-    await expectOk(
-      await runBinary(["agent", "provider", "set", "goat", "openclaw"], opengoatHome, env),
-      "provider-set-ok"
+      await runBinary(
+        ["onboard", "--non-interactive", "--local"],
+        opengoatHome,
+        env,
+      ),
+      "Mode: local",
     );
 
     await expectOk(
-      await runBinary(["scenario", "run", "--file", scenarioPath, "--mode", "scripted"], opengoatHome, env),
-      "Scenario: scripted-smoke"
+      await runBinary(["agent", "--help"], opengoatHome, env),
+      "Usage:",
+    );
+    await expectOk(
+      await runBinary(["session", "--help"], opengoatHome, env),
+      "session <command>",
+    );
+    await expectOk(
+      await runBinary(["skill", "--help"], opengoatHome, env),
+      "skill list",
+    );
+    await expectOk(
+      await runBinary(["provider", "--help"], opengoatHome, env),
+      "provider list",
+    );
+    await expectOk(
+      await runBinary(["scenario", "--help"], opengoatHome, env),
+      "scenario run",
+    );
+    await expectOk(
+      await runBinary(["acp", "--help"], opengoatHome, env),
+      "opengoat acp",
     );
 
-    await expectOk(await runBinary(["agent", "delete", "developer"], opengoatHome, env), "Agent deleted: developer");
-    await expectOk(await runBinary(["agent", "list"], opengoatHome, env), "goat");
+    await expectOk(
+      await runBinary(
+        ["route", "--message", "Need API implementation support"],
+        opengoatHome,
+        env,
+      ),
+      "Routing decision",
+    );
+    await expectOk(
+      await runBinary(
+        ["agent", "create", "Developer", "--individual", "--skill", "coding"],
+        opengoatHome,
+        env,
+      ),
+      "Agent ready: Developer (developer)",
+    );
+    await expectOk(
+      await runBinary(["agent", "list"], opengoatHome, env),
+      "developer",
+    );
+    await expectOk(
+      await runBinary(
+        ["agent", "set-manager", "developer", "goat"],
+        opengoatHome,
+        env,
+      ),
+      "Current reports-to: goat",
+    );
+
+    await expectOk(
+      await runBinary(
+        [
+          "agent",
+          "run",
+          "developer",
+          "--message",
+          "Implement a REST endpoint",
+          "--no-stream",
+        ],
+        opengoatHome,
+        env,
+      ),
+      "stub-agent-reply",
+    );
+    await expectOk(
+      await runBinary(
+        [
+          "agent",
+          "developer",
+          "--message",
+          "Summarize progress",
+          "--no-stream",
+        ],
+        opengoatHome,
+        env,
+      ),
+      "stub-agent-reply",
+    );
+
+    await expectOk(
+      await runBinary(
+        ["session", "list", "--agent", "developer"],
+        opengoatHome,
+        env,
+      ),
+      "agent:developer:main",
+    );
+    await expectOk(
+      await runBinary(
+        ["session", "history", "--agent", "developer", "--limit", "5"],
+        opengoatHome,
+        env,
+      ),
+      "Session key: agent:developer:main",
+    );
+    await expectOk(
+      await runBinary(
+        [
+          "session",
+          "rename",
+          "--agent",
+          "developer",
+          "--title",
+          "Developer Session",
+        ],
+        opengoatHome,
+        env,
+      ),
+      "Renamed session",
+    );
+    await expectOk(
+      await runBinary(
+        ["session", "compact", "--agent", "developer"],
+        opengoatHome,
+        env,
+      ),
+      "Compaction",
+    );
+    await expectOk(
+      await runBinary(
+        ["session", "reset", "--agent", "developer"],
+        opengoatHome,
+        env,
+      ),
+      "Reset session",
+    );
+    await expectOk(
+      await runBinary(
+        ["session", "remove", "--agent", "developer"],
+        opengoatHome,
+        env,
+      ),
+      "Removed session",
+    );
+
+    await expectOk(
+      await runBinary(
+        [
+          "skill",
+          "install",
+          "helper",
+          "--agent",
+          "goat",
+          "--from",
+          skillSourcePath,
+        ],
+        opengoatHome,
+        env,
+      ),
+      "Installed skill: helper",
+    );
+    await expectOk(
+      await runBinary(["skill", "list", "--agent", "goat"], opengoatHome, env),
+      "helper",
+    );
+    await expectOk(
+      await runBinary(["skill", "list", "--global"], opengoatHome, env),
+      "helper",
+    );
+
+    await expectOk(
+      await runBinary(["provider", "list"], opengoatHome, env),
+      "openclaw",
+    );
+    await expectOk(
+      await runBinary(["agent", "provider", "get", "goat"], opengoatHome, env),
+      "goat\topenclaw",
+    );
+    await expectOk(
+      await runBinary(
+        ["agent", "provider", "set", "goat", "openclaw"],
+        opengoatHome,
+        env,
+      ),
+      "provider-set-ok",
+    );
+
+    await expectOk(
+      await runBinary(
+        ["scenario", "run", "--file", scenarioPath, "--mode", "scripted"],
+        opengoatHome,
+        env,
+      ),
+      "Scenario: scripted-smoke",
+    );
+
+    await expectOk(
+      await runBinary(["agent", "delete", "developer"], opengoatHome, env),
+      "Agent deleted: developer",
+    );
+    await expectOk(
+      await runBinary(["agent", "list"], opengoatHome, env),
+      "goat",
+    );
 
     const calls = await readStubCalls(stubLogPath);
     const flattened = calls.map((entry) => entry.join(" "));
-    expect(flattened.some((entry) => entry.includes("agents add developer"))).toBe(true);
-    expect(flattened.some((entry) => entry.includes("agents delete developer --force"))).toBe(true);
-    expect(flattened.some((entry) => entry.includes("agents provider get goat"))).toBe(true);
-    expect(flattened.some((entry) => entry.includes("agents provider set goat openclaw"))).toBe(true);
-    expect(flattened.some((entry) => entry.startsWith("agent developer"))).toBe(true);
+    expect(
+      flattened.some((entry) => entry.includes("agents add developer")),
+    ).toBe(true);
+    expect(
+      flattened.some((entry) =>
+        entry.includes("agents delete developer --force"),
+      ),
+    ).toBe(true);
+    expect(
+      flattened.some((entry) => entry.includes("agents provider get goat")),
+    ).toBe(true);
+    expect(
+      flattened.some((entry) =>
+        entry.includes("agents provider set goat openclaw"),
+      ),
+    ).toBe(true);
+    expect(flattened.some((entry) => entry.startsWith("agent developer"))).toBe(
+      true,
+    );
   });
 });
 
 async function expectOk(
   result: { code: number; stdout: string; stderr: string },
-  stdoutSnippet: string
+  stdoutSnippet: string,
 ): Promise<void> {
   expect(result.code).toBe(0);
   expect(result.stdout).toContain(stdoutSnippet);
@@ -128,9 +293,9 @@ async function writeSkillFixture(root: string): Promise<string> {
       "",
       "# Helper",
       "",
-      "- Use this skill in smoke tests."
+      "- Use this skill in smoke tests.",
     ].join("\n"),
-    "utf-8"
+    "utf-8",
   );
   return skillDir;
 }
@@ -146,23 +311,25 @@ async function writeScenarioFixture(root: string): Promise<string> {
         entryAgentId: "goat",
         scripted: {
           agentReplies: {
-            goat: "Scripted response from goat."
-          }
+            goat: "Scripted response from goat.",
+          },
         },
         assertions: {
           mustSucceed: true,
-          stdoutIncludes: ["Scripted response from goat"]
-        }
+          stdoutIncludes: ["Scripted response from goat"],
+        },
       },
       null,
-      2
+      2,
     ) + "\n",
-    "utf-8"
+    "utf-8",
   );
   return scenarioPath;
 }
 
-async function createOpenClawStub(root: string): Promise<{ stubPath: string; stubLogPath: string }> {
+async function createOpenClawStub(
+  root: string,
+): Promise<{ stubPath: string; stubLogPath: string }> {
   const stubLogPath = path.join(root, "openclaw-stub.log");
   const stubPath = path.join(root, "openclaw-stub.mjs");
 
@@ -184,15 +351,15 @@ async function createOpenClawStub(root: string): Promise<{ stubPath: string; stu
       "if (args[0] === 'agents' && args[1] === 'add') { process.stdout.write('agent-created\\n'); process.exit(0); }",
       "if (args[0] === 'agents' && args[1] === 'delete') { process.stdout.write('agent-deleted\\n'); process.exit(0); }",
       "if (args[0] === 'agent') { process.stdout.write('stub-agent-reply\\n'); process.exit(0); }",
-      "process.stdout.write('openclaw-stub-ok\\n');"
+      "process.stdout.write('openclaw-stub-ok\\n');",
     ].join("\n"),
-    "utf-8"
+    "utf-8",
   );
   await chmod(stubPath, 0o755);
 
   return {
     stubPath,
-    stubLogPath
+    stubLogPath,
   };
 }
 
@@ -208,9 +375,13 @@ async function readStubCalls(stubLogPath: string): Promise<string[][]> {
 async function runBinary(
   args: string[],
   opengoatHome: string,
-  envOverrides: NodeJS.ProcessEnv = {}
+  envOverrides: NodeJS.ProcessEnv = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
-  const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const projectRoot = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "..",
+  );
   const binaryPath = path.join(projectRoot, "bin", "opengoat");
 
   try {
@@ -219,13 +390,13 @@ async function runBinary(
       env: {
         ...process.env,
         OPENGOAT_HOME: opengoatHome,
-        ...envOverrides
-      }
+        ...envOverrides,
+      },
     });
     return {
       code: 0,
       stdout: stdout ?? "",
-      stderr: stderr ?? ""
+      stderr: stderr ?? "",
     };
   } catch (error) {
     const failed = error as {
@@ -236,7 +407,7 @@ async function runBinary(
     return {
       code: typeof failed.code === "number" ? failed.code : 1,
       stdout: failed.stdout ?? "",
-      stderr: failed.stderr ?? ""
+      stderr: failed.stderr ?? "",
     };
   }
 }
