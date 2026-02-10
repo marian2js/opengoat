@@ -1,15 +1,15 @@
+import { OpenGoatService } from "../../opengoat/index.js";
+import type { FileSystemPort } from "../../ports/file-system.port.js";
+import type { PathPort } from "../../ports/path.port.js";
+import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import {
   BaseProvider,
   ProviderRegistry,
   type ProviderCreateAgentOptions,
   type ProviderDeleteAgentOptions,
   type ProviderExecutionResult,
-  type ProviderInvokeOptions
+  type ProviderInvokeOptions,
 } from "../../providers/index.js";
-import { OpenGoatService } from "../../opengoat/index.js";
-import type { FileSystemPort } from "../../ports/file-system.port.js";
-import type { PathPort } from "../../ports/path.port.js";
-import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import type { ScenarioRunResult, ScenarioSpec } from "../domain/scenario.js";
 
 interface ScenarioRunnerServiceDeps {
@@ -32,10 +32,13 @@ export class ScenarioRunnerService {
     this.nowIso = deps.nowIso ?? (() => new Date().toISOString());
   }
 
-  public async runLive(service: OpenGoatService, scenario: ScenarioSpec): Promise<ScenarioRunResult> {
+  public async runLive(
+    service: OpenGoatService,
+    scenario: ScenarioSpec,
+  ): Promise<ScenarioRunResult> {
     await service.initialize();
     const result = await service.runAgent(scenario.entryAgentId ?? "goat", {
-      message: scenario.message
+      message: scenario.message,
     });
     return this.evaluate("live", scenario, result);
   }
@@ -53,17 +56,21 @@ export class ScenarioRunnerService {
       pathPort: this.pathPort,
       pathsProvider: this.pathsProvider,
       providerRegistry: registry,
-      nowIso: this.nowIso
+      nowIso: this.nowIso,
     });
 
     await service.initialize();
     for (const agent of scenario.agents ?? []) {
       const created = await service.createAgent(agent.name);
-      await this.writeAgentManifest(created.agent.id, agent.name, agent.description);
+      await this.writeAgentManifest(
+        created.agent.id,
+        agent.name,
+        agent.description,
+      );
     }
 
     const result = await service.runAgent(scenario.entryAgentId ?? "goat", {
-      message: scenario.message
+      message: scenario.message,
     });
     return this.evaluate("scripted", scenario, result);
   }
@@ -71,7 +78,7 @@ export class ScenarioRunnerService {
   private evaluate(
     mode: "live" | "scripted",
     scenario: ScenarioSpec,
-    result: Awaited<ReturnType<OpenGoatService["runAgent"]>>
+    result: Awaited<ReturnType<OpenGoatService["runAgent"]>>,
   ): ScenarioRunResult {
     const assertions = scenario.assertions ?? {};
     const failures: string[] = [];
@@ -93,13 +100,21 @@ export class ScenarioRunnerService {
       success: failures.length === 0,
       failures,
       tracePath: result.tracePath,
-      output
+      output,
     };
   }
 
-  private async writeAgentManifest(agentId: string, name: string, description: string): Promise<void> {
+  private async writeAgentManifest(
+    agentId: string,
+    name: string,
+    description: string,
+  ): Promise<void> {
     const paths = this.pathsProvider.getPaths();
-    const manifestPath = this.pathPort.join(paths.workspacesDir, agentId, "AGENTS.md");
+    const manifestPath = this.pathPort.join(
+      paths.workspacesDir,
+      agentId,
+      "AGENTS.md",
+    );
     const content =
       [
         "---",
@@ -119,7 +134,7 @@ export class ScenarioRunnerService {
         "",
         `# ${name}`,
         "",
-        description
+        description,
       ].join("\n") + "\n";
     await this.fileSystem.writeFile(manifestPath, content);
   }
@@ -139,13 +154,15 @@ class ScenarioScriptedProvider extends BaseProvider {
         auth: false,
         passthrough: false,
         agentCreate: true,
-        agentDelete: true
-      }
+        agentDelete: true,
+      },
     });
     this.scenario = scenario;
   }
 
-  public async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
+  public async invoke(
+    options: ProviderInvokeOptions,
+  ): Promise<ProviderExecutionResult> {
     this.validateInvokeOptions(options);
     const agentId = options.agent ?? "unknown";
 
@@ -154,23 +171,27 @@ class ScenarioScriptedProvider extends BaseProvider {
     return {
       code: 0,
       stdout: output,
-      stderr: ""
+      stderr: "",
     };
   }
 
-  public async createAgent(_options: ProviderCreateAgentOptions): Promise<ProviderExecutionResult> {
+  public override async createAgent(
+    _options: ProviderCreateAgentOptions,
+  ): Promise<ProviderExecutionResult> {
     return {
       code: 0,
       stdout: "",
-      stderr: ""
+      stderr: "",
     };
   }
 
-  public async deleteAgent(_options: ProviderDeleteAgentOptions): Promise<ProviderExecutionResult> {
+  public override async deleteAgent(
+    _options: ProviderDeleteAgentOptions,
+  ): Promise<ProviderExecutionResult> {
     return {
       code: 0,
       stdout: "",
-      stderr: ""
+      stderr: "",
     };
   }
 
