@@ -193,6 +193,14 @@ interface SessionRemoveResponse {
   message?: string;
 }
 
+interface SessionRenameResponse {
+  session?: {
+    name: string;
+    sessionRef: string;
+  };
+  message?: string;
+}
+
 interface SessionSendMessageResponse {
   agentId: string;
   sessionRef: string;
@@ -785,6 +793,40 @@ export function App(): ReactElement {
     }
   }
 
+  async function handleRenameSession(session: WorkspaceSessionItem): Promise<void> {
+    const nextName = window.prompt(`Rename session \"${session.title}\"`, session.title)?.trim();
+    if (!nextName || nextName === session.title) {
+      return;
+    }
+
+    setMutating(true);
+    setActionMessage(null);
+    setOpenSessionMenuId(null);
+    setOpenWorkspaceMenuId(null);
+
+    try {
+      const response = await fetchJson<SessionRenameResponse>("/api/sessions/rename", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          agentId: "goat",
+          sessionRef: session.sessionKey,
+          name: nextName
+        })
+      });
+
+      setActionMessage(response.message ?? `Session renamed to \"${nextName}\".`);
+      await refreshSessions();
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "Unable to rename session.";
+      setActionMessage(message);
+    } finally {
+      setMutating(false);
+    }
+  }
+
   function appendSessionMessage(sessionId: string, message: SessionChatMessage): void {
     setSessionMessagesById((current) => {
       const next = current[sessionId] ? [...current[sessionId], message] : [message];
@@ -1079,6 +1121,17 @@ export function App(): ReactElement {
                           </button>
                           {openSessionMenuId === session.sessionId ? (
                             <div className="absolute right-1 top-8 z-20 min-w-[120px] rounded-md border border-border bg-card p-1 shadow-lg">
+                              <button
+                                type="button"
+                                className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent/80"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  void handleRenameSession(session);
+                                }}
+                              >
+                                Rename
+                              </button>
                               <button
                                 type="button"
                                 className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-danger hover:bg-danger/10"

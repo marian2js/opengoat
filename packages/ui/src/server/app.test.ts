@@ -360,6 +360,17 @@ describe("OpenGoat UI server API", () => {
     });
     expect(removeSessionResponse.statusCode).toBe(200);
     expect(removeSession).toHaveBeenCalledWith("goat", "agent:goat:main");
+
+    const renameSessionResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/rename",
+      payload: {
+        sessionRef: "agent:goat:main",
+        name: "Renamed Session"
+      }
+    });
+    expect(renameSessionResponse.statusCode).toBe(200);
+    expect(renameSession).toHaveBeenCalledWith("goat", "Renamed Session", "agent:goat:main");
   });
 
   it("sends a message to an existing session", async () => {

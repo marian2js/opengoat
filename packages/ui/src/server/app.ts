@@ -420,6 +420,36 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   });
 
+  app.post<{ Body: { agentId?: string; sessionRef?: string; name?: string } }>("/api/sessions/rename", async (request, reply) => {
+    return safeReply(reply, async () => {
+      const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
+      const sessionRef = request.body?.sessionRef?.trim();
+      const name = request.body?.name?.trim();
+      if (!sessionRef) {
+        reply.code(400);
+        return {
+          error: "sessionRef is required"
+        };
+      }
+      if (!name) {
+        reply.code(400);
+        return {
+          error: "name is required"
+        };
+      }
+
+      const renamed = await renameUiSession(service, agentId, name, sessionRef);
+      return {
+        agentId,
+        session: {
+          name: renamed.title,
+          sessionRef
+        },
+        message: `Session renamed to \"${renamed.title}\".`
+      };
+    });
+  });
+
   const handleSessionMessage = async (
     request: { body?: { agentId?: string; sessionRef?: string; workingPath?: string; message?: string } },
     reply: FastifyReply
