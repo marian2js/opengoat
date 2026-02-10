@@ -70,11 +70,6 @@ interface ProviderSummary {
   capabilities: object;
 }
 
-interface OpenClawGatewayConfig {
-  mode: string;
-  gatewayUrl?: string;
-}
-
 export interface OpenClawUiService {
   initialize?: () => Promise<unknown>;
   getHomeDir: () => string;
@@ -85,7 +80,6 @@ export interface OpenClawUiService {
   listSkills: (agentId?: string) => Promise<ResolvedSkill[]>;
   listGlobalSkills: () => Promise<ResolvedSkill[]>;
   listProviders: () => Promise<ProviderSummary[]>;
-  getOpenClawGatewayConfig?: () => Promise<OpenClawGatewayConfig>;
 }
 
 export interface OpenGoatUiServerOptions {
@@ -138,16 +132,11 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
 
   app.get("/api/openclaw/overview", async (_request, reply) => {
     return safeReply(reply, async () => {
-      const [agents, providers, gateway] = await Promise.all([
-        service.listAgents(),
-        service.listProviders(),
-        resolveGatewayConfig(service)
-      ]);
+      const [agents, providers] = await Promise.all([service.listAgents(), service.listProviders()]);
 
       return {
         agents,
         providers,
-        gateway,
         totals: {
           agents: agents.length,
           providers: providers.length
@@ -237,14 +226,6 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     return safeReply(reply, async () => {
       return {
         providers: await service.listProviders()
-      };
-    });
-  });
-
-  app.get("/api/openclaw/gateway", async (_request, reply) => {
-    return safeReply(reply, async () => {
-      return {
-        gateway: await resolveGatewayConfig(service)
       };
     });
   });
@@ -346,17 +327,6 @@ function normalizeSkills(value: string[] | string | undefined): string[] | undef
     .filter(Boolean);
 
   return parsed.length > 0 ? parsed : undefined;
-}
-
-async function resolveGatewayConfig(service: OpenClawUiService): Promise<OpenClawGatewayConfig> {
-  if (typeof service.getOpenClawGatewayConfig !== "function") {
-    return { mode: "unknown" };
-  }
-  try {
-    return await service.getOpenClawGatewayConfig();
-  } catch {
-    return { mode: "unknown" };
-  }
 }
 
 async function safeReply<T>(reply: FastifyReply, operation: () => Promise<T>): Promise<T | { error: string }> {

@@ -49,10 +49,6 @@ interface ProviderSummary {
   capabilities: object;
 }
 
-interface OpenClawGatewayConfig {
-  mode: string;
-}
-
 let activeServer: Awaited<ReturnType<typeof createOpenGoatUiServer>> | undefined;
 
 afterEach(async () => {
@@ -154,11 +150,6 @@ function createMockService(): OpenClawUiService {
     listSessions: async (): Promise<SessionSummary[]> => [],
     listSkills: async (): Promise<ResolvedSkill[]> => [],
     listGlobalSkills: async (): Promise<ResolvedSkill[]> => [],
-    listProviders: async (): Promise<ProviderSummary[]> => [],
-    getOpenClawGatewayConfig: async (): Promise<OpenClawGatewayConfig> => {
-      return {
-        mode: "local"
-      };
-    }
+    listProviders: async (): Promise<ProviderSummary[]> => []
   };
 }
