@@ -27,6 +27,7 @@ export function App() {
     activeSessionId,
     activeMessages,
     runStatusEvents,
+    runningSessionKeys,
     agents,
     agentProviders,
     agentsState,
@@ -206,6 +207,15 @@ export function App() {
     () => activeProject?.sessions.find((session) => session.id === activeSessionId) ?? null,
     [activeProject, activeSessionId]
   );
+  const isActiveSessionRunning = useMemo(
+    () =>
+      Boolean(
+        activeProjectId &&
+          activeSessionId &&
+          runningSessionKeys.includes(`${activeProjectId}:${activeSessionId}`)
+      ),
+    [activeProjectId, activeSessionId, runningSessionKeys]
+  );
   const isAgentsView = activeView === "agents";
   const showUpdateButton = appUpdate?.status === "update-downloaded";
 
@@ -334,6 +344,7 @@ export function App() {
               projects={projects}
               activeProjectId={activeProjectId}
               activeSessionId={activeSessionId}
+              runningSessionKeys={runningSessionKeys}
               busy={isBusy}
               collapsed={sidebarCollapsed}
               agentsActive={isAgentsView}
@@ -420,11 +431,17 @@ export function App() {
                 activeSession={activeSession}
                 messages={activeMessages}
                 runStatusEvents={runStatusEvents}
+                isSessionRunning={isActiveSessionRunning}
                 gateway={onboarding?.gateway}
                 error={error}
                 busy={isBusy}
                 onSubmitMessage={(input) => sendMessage(input.message, { images: input.images })}
-                onStopMessage={() => stopMessage()}
+                onStopMessage={() =>
+                  stopMessage({
+                    projectId: activeProject?.id ?? null,
+                    sessionId: activeSession?.id ?? null
+                  })
+                }
                 onOpenRuntimeSettings={() => setShowRuntimeSettings(true)}
                 onOpenOnboarding={() => void openOnboarding()}
                 onDismissError={clearError}

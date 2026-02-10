@@ -25,6 +25,7 @@ import {
   PanelLeftOpen,
   PencilLine,
   Plus,
+  Loader2,
   Trash2,
   Users
 } from "lucide-react";
@@ -34,6 +35,7 @@ interface ProjectsSidebarProps {
   projects: WorkbenchProject[];
   activeProjectId: string | null;
   activeSessionId: string | null;
+  runningSessionKeys: string[];
   busy: boolean;
   collapsed: boolean;
   agentsActive: boolean;
@@ -151,6 +153,8 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
 
   const canCreateSessionFromHeader = Boolean(props.activeProjectId) && !props.busy;
   const isProjectExpanded = (projectId: string) => !collapsedProjectIds.has(projectId);
+  const isSessionRunning = (projectId: string, sessionId: string) =>
+    props.runningSessionKeys.includes(`${projectId}:${sessionId}`);
 
   const toggleProjectExpanded = (projectId: string) => {
     setCollapsedProjectIds((current) => {
@@ -385,6 +389,12 @@ export function ProjectsSidebar(props: ProjectsSidebarProps) {
                                       onClick={() => props.onSelectSession(project.id, session.id)}
                                     >
                                       <span className="flex min-w-0 items-center gap-2">
+                                        {isSessionRunning(project.id, session.id) ? (
+                                          <Loader2
+                                            className="size-3 shrink-0 animate-spin text-emerald-300"
+                                            aria-label={`${session.title} is running`}
+                                          />
+                                        ) : null}
                                         <span className="truncate">{session.title}</span>
                                         {session.agentId !== "orchestrator" ? (
                                           <span className="shrink-0 rounded border border-[#2E2F31] bg-[#17181A] px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">

@@ -58,9 +58,10 @@ interface WorkbenchUiState {
   activeProjectId: string | null;
   activeSessionId: string | null;
   activeMessages: WorkbenchMessage[];
-  runStatusProjectId: string | null;
-  runStatusSessionId: string | null;
+  runStatusBySessionKey: Record<string, WorkbenchRunStatusEvent[]>;
   runStatusEvents: WorkbenchRunStatusEvent[];
+  runningSessionCounts: Record<string, number>;
+  runningSessionKeys: string[];
   isBootstrapping: boolean;
   isBusy: boolean;
   error: string | null;
@@ -112,7 +113,7 @@ interface WorkbenchUiState {
       rethrow?: boolean;
     }
   ) => Promise<WorkbenchMessage | null>;
-  stopMessage: () => Promise<void>;
+  stopMessage: (target?: { projectId?: string | null; sessionId?: string | null }) => Promise<void>;
   appendRunStatusEvent: (event: WorkbenchRunStatusEvent) => void;
   clearError: () => void;
 }
@@ -139,9 +140,10 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
     activeProjectId: null,
     activeSessionId: null,
     activeMessages: [],
-    runStatusProjectId: null,
-    runStatusSessionId: null,
+    runStatusBySessionKey: {},
     runStatusEvents: [],
+    runningSessionCounts: {},
+    runningSessionKeys: [],
     isBootstrapping: true,
     isBusy: false,
     error: null,
@@ -177,9 +179,10 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           activeProjectId: firstProject?.id ?? null,
           activeSessionId: firstSession?.id ?? null,
           activeMessages,
-          runStatusProjectId: null,
-          runStatusSessionId: null,
+          runStatusBySessionKey: {},
           runStatusEvents: [],
+          runningSessionCounts: {},
+          runningSessionKeys: [],
           isBootstrapping: false,
           isBusy: false
         });
@@ -207,9 +210,11 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           activeProjectId: project.id,
           activeSessionId: firstSession?.id ?? null,
           activeMessages: firstSession?.messages ?? [],
-          runStatusProjectId: null,
-          runStatusSessionId: null,
-          runStatusEvents: [],
+          runStatusEvents: resolveRunStatusEvents(
+            state.runStatusBySessionKey,
+            project.id,
+            firstSession?.id ?? null
+          ),
           isBusy: false
         }));
       } catch (error) {
@@ -232,9 +237,11 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           activeProjectId: project.id,
           activeSessionId: firstSession?.id ?? null,
           activeMessages: firstSession?.messages ?? [],
-          runStatusProjectId: null,
-          runStatusSessionId: null,
-          runStatusEvents: [],
+          runStatusEvents: resolveRunStatusEvents(
+            state.runStatusBySessionKey,
+            project.id,
+            firstSession?.id ?? null
+          ),
           isBusy: false
         }));
       } catch (error) {
@@ -270,9 +277,18 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         await api.removeProject({ projectId });
         set((state) => {
           const projects = state.projects.filter((project) => project.id !== projectId);
+          const runStatusBySessionKey = removeProjectRunStatus(state.runStatusBySessionKey, projectId);
+          const runningSessionCounts = removeProjectRunningSessions(
+            state.runningSessionCounts,
+            projectId
+          );
+          const runningSessionKeys = Object.keys(runningSessionCounts);
           if (state.activeProjectId !== projectId) {
             return {
               projects,
+              runStatusBySessionKey,
+              runningSessionCounts,
+              runningSessionKeys,
               isBusy: false
             };
           }
@@ -284,9 +300,14 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
             activeProjectId: fallbackProject?.id ?? null,
             activeSessionId: fallbackSession?.id ?? null,
             activeMessages: fallbackSession?.messages ?? [],
-            runStatusProjectId: null,
-            runStatusSessionId: null,
-            runStatusEvents: [],
+            runStatusBySessionKey,
+            runStatusEvents: resolveRunStatusEvents(
+              runStatusBySessionKey,
+              fallbackProject?.id ?? null,
+              fallbackSession?.id ?? null
+            ),
+            runningSessionCounts,
+            runningSessionKeys,
             isBusy: false
           };
         });
@@ -309,9 +330,18 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         activeProjectId: projectId,
         activeSessionId: firstSession?.id ?? null,
         activeMessages,
-        runStatusProjectId: null,
-        runStatusSessionId: null,
-        runStatusEvents: []
+        runStatusEvents: resolveRunStatusEvents(
+          state.runStatusBySessionKey,
+          projectId,
+          firstSession?.id ?? null
+        ),
+        chatState: isSessionRunning(
+          state.runningSessionCounts,
+          projectId,
+          firstSession?.id ?? null
+        )
+          ? "sending"
+          : "idle"
       });
     },
 
@@ -330,9 +360,10 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           activeProjectId: projectId,
           activeSessionId: session.id,
           activeMessages: session.messages,
-          runStatusProjectId: null,
-          runStatusSessionId: null,
-          runStatusEvents: [],
+          runStatusEvents: resolveRunStatusEvents(state.runStatusBySessionKey, projectId, session.id),
+          chatState: isSessionRunning(state.runningSessionCounts, projectId, session.id)
+            ? "sending"
+            : "idle",
           isBusy: false
         }));
       } catch (error) {
@@ -371,9 +402,23 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           const wasActive =
             state.activeProjectId === projectId && state.activeSessionId === sessionId;
           const projects = removeProjectSession(state.projects, projectId, sessionId);
+          const runStatusBySessionKey = removeSessionRunStatus(
+            state.runStatusBySessionKey,
+            projectId,
+            sessionId
+          );
+          const runningSessionCounts = removeRunningSessionCounter(
+            state.runningSessionCounts,
+            projectId,
+            sessionId
+          );
+          const runningSessionKeys = Object.keys(runningSessionCounts);
           if (!wasActive) {
             return {
               projects,
+              runStatusBySessionKey,
+              runningSessionCounts,
+              runningSessionKeys,
               isBusy: false
             };
           }
@@ -385,9 +430,21 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
             activeProjectId: project?.id ?? null,
             activeSessionId: fallbackSession?.id ?? null,
             activeMessages: fallbackSession?.messages ?? [],
-            runStatusProjectId: null,
-            runStatusSessionId: null,
-            runStatusEvents: [],
+            runStatusBySessionKey,
+            runStatusEvents: resolveRunStatusEvents(
+              runStatusBySessionKey,
+              project?.id ?? null,
+              fallbackSession?.id ?? null
+            ),
+            runningSessionCounts,
+            runningSessionKeys,
+            chatState: isSessionRunning(
+              runningSessionCounts,
+              project?.id ?? null,
+              fallbackSession?.id ?? null
+            )
+              ? "sending"
+              : "idle",
             isBusy: false
           };
         });
@@ -397,7 +454,8 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
     },
 
     selectSession: async (projectId: string, sessionId: string) => {
-      const messages = getProjectSessionMessages(get().projects, projectId, sessionId);
+      const state = get();
+      const messages = getProjectSessionMessages(state.projects, projectId, sessionId);
       if (!messages) {
         set({
           error: `Session not found: ${sessionId}`
@@ -410,9 +468,10 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         activeProjectId: projectId,
         activeSessionId: sessionId,
         activeMessages: messages,
-        runStatusProjectId: null,
-        runStatusSessionId: null,
-        runStatusEvents: []
+        runStatusEvents: resolveRunStatusEvents(state.runStatusBySessionKey, projectId, sessionId),
+        chatState: isSessionRunning(state.runningSessionCounts, projectId, sessionId)
+          ? "sending"
+          : "idle"
       });
     },
 
@@ -791,15 +850,40 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
         images: toWorkbenchMessageImages(normalizedImages),
         createdAt: new Date().toISOString()
       };
+      const targetSessionKey = toSessionKey(projectId, sessionId);
 
-      set({
-        isBusy: true,
-        chatState: "sending",
-        error: null,
-        activeMessages: [...state.activeMessages, optimistic],
-        runStatusProjectId: projectId,
-        runStatusSessionId: sessionId,
-        runStatusEvents: []
+      set((current) => {
+        const runningSessionCounts = incrementRunningSessionCount(
+          current.runningSessionCounts,
+          projectId,
+          sessionId
+        );
+        const runStatusBySessionKey = {
+          ...current.runStatusBySessionKey,
+          [targetSessionKey]: []
+        };
+        const projects = appendProjectSessionMessage(
+          current.projects,
+          projectId,
+          sessionId,
+          optimistic
+        );
+        return {
+          chatState: "sending",
+          error: null,
+          projects,
+          activeMessages:
+            current.activeProjectId === projectId && current.activeSessionId === sessionId
+              ? [...current.activeMessages, optimistic]
+              : current.activeMessages,
+          runStatusBySessionKey,
+          runStatusEvents:
+            current.activeProjectId === projectId && current.activeSessionId === sessionId
+              ? []
+              : current.runStatusEvents,
+          runningSessionCounts,
+          runningSessionKeys: Object.keys(runningSessionCounts)
+        };
       });
 
       try {
@@ -813,69 +897,102 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
 
         set((current) => ({
           projects: upsertProjectSession(current.projects, projectId, sessionWithImagePreviews),
-          activeMessages: sessionWithImagePreviews.messages,
-          chatState: "idle",
-          isBusy: false
+          activeMessages:
+            current.activeProjectId === projectId && current.activeSessionId === sessionId
+              ? sessionWithImagePreviews.messages
+              : current.activeMessages
         }));
         return result.reply;
       } catch (error) {
-        const currentMessages = get().activeMessages;
+        const currentState = get();
+        const currentMessages =
+          currentState.activeProjectId === projectId && currentState.activeSessionId === sessionId
+            ? currentState.activeMessages
+            : getProjectSessionMessages(currentState.projects, projectId, sessionId) ?? [];
         if (isAbortErrorLike(error)) {
           if (options?.rethrow) {
-            set({
-              chatState: "idle",
-              isBusy: false,
+            set((current) => ({
               error: null,
-              activeMessages: currentMessages.filter((entry) => entry.id !== optimistic.id)
-            });
+              projects: removeProjectSessionMessage(current.projects, projectId, sessionId, optimistic.id),
+              activeMessages:
+                current.activeProjectId === projectId && current.activeSessionId === sessionId
+                  ? currentMessages.filter((entry) => entry.id !== optimistic.id)
+                  : current.activeMessages
+            }));
             throw error;
           }
 
           set({
-            chatState: "idle",
-            isBusy: false,
-            error: null,
-            activeMessages: currentMessages.filter((entry) => entry.id !== optimistic.id)
+            error: null
           });
           return null;
         }
 
         if (options?.rethrow) {
-          set({
-            chatState: "idle",
-            isBusy: false,
+          set((current) => ({
             error: summarizeChatError(error),
-            activeMessages: currentMessages.filter((entry) => entry.id !== optimistic.id)
-          });
+            projects: removeProjectSessionMessage(current.projects, projectId, sessionId, optimistic.id),
+            activeMessages:
+              current.activeProjectId === projectId && current.activeSessionId === sessionId
+                ? currentMessages.filter((entry) => entry.id !== optimistic.id)
+                : current.activeMessages
+          }));
           throw error;
         }
 
         const errorMessage = buildChatErrorMessage(error, {
-          runStatusEvents: get().runStatusEvents
+          runStatusEvents: currentState.runStatusBySessionKey[targetSessionKey] ?? []
         });
-        set({
-          chatState: "idle",
-          isBusy: false,
+        set((current) => ({
           error: null,
-          activeMessages: [...currentMessages, errorMessage]
-        });
+          activeMessages:
+            current.activeProjectId === projectId && current.activeSessionId === sessionId
+              ? [...currentMessages, errorMessage]
+              : current.activeMessages
+        }));
         return errorMessage;
+      } finally {
+        set((current) => {
+          const runningSessionCounts = decrementRunningSessionCount(
+            current.runningSessionCounts,
+            projectId,
+            sessionId
+          );
+          return {
+            runningSessionCounts,
+            runningSessionKeys: Object.keys(runningSessionCounts),
+            chatState: isSessionRunning(
+              runningSessionCounts,
+              current.activeProjectId,
+              current.activeSessionId
+            )
+              ? "sending"
+              : "idle",
+            isBusy: false
+          };
+        });
       }
     },
 
-    stopMessage: async () => {
+    stopMessage: async (target) => {
       const state = get();
-      const projectId = state.activeProjectId;
-      const sessionId = state.activeSessionId;
+      const projectId = target?.projectId ?? state.activeProjectId;
+      const sessionId = target?.sessionId ?? state.activeSessionId;
       if (!projectId || !sessionId) {
         return;
       }
 
-      set({
-        chatState: "idle",
+      set((current) => ({
+        chatState: isSessionRunning(
+          current.runningSessionCounts,
+          current.activeProjectId,
+          current.activeSessionId
+        )
+          ? "sending"
+          : "idle",
         isBusy: false,
         error: null
-      });
+      }));
 
       try {
         await api.stopChatMessage({
@@ -886,19 +1003,24 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
           projectId,
           sessionId
         });
-        set((current) => ({
-          projects: upsertProjectSessionMessages(
+        set((current) => {
+          const projects = upsertProjectSessionMessages(
             current.projects,
             projectId,
             sessionId,
             messages
-          ),
-          activeMessages:
-            current.activeProjectId === projectId &&
-            current.activeSessionId === sessionId
-              ? messages
-              : current.activeMessages
-        }));
+          );
+          const isActiveTarget =
+            current.activeProjectId === projectId && current.activeSessionId === sessionId;
+          return {
+            projects,
+            activeMessages: isActiveTarget ? messages : current.activeMessages,
+            chatState:
+              isActiveTarget && isSessionRunning(current.runningSessionCounts, projectId, sessionId)
+                ? "sending"
+                : "idle"
+          };
+        });
       } catch (error) {
         set({
           error: toErrorMessage(error)
@@ -908,20 +1030,20 @@ export function createWorkbenchStore(api: WorkbenchApiClient = createWorkbenchAp
 
     appendRunStatusEvent: (event: WorkbenchRunStatusEvent) => {
       set((state) => {
-        if (
-          state.runStatusProjectId !== event.projectId ||
-          state.runStatusSessionId !== event.sessionId
-        ) {
-          return state;
+        const key = toSessionKey(event.projectId, event.sessionId);
+        const sessionEvents = [...(state.runStatusBySessionKey[key] ?? []), event];
+        if (sessionEvents.length > 64) {
+          sessionEvents.splice(0, sessionEvents.length - 64);
         }
-
-        const nextEvents = [...state.runStatusEvents, event];
-        if (nextEvents.length > 64) {
-          nextEvents.splice(0, nextEvents.length - 64);
-        }
-
+        const runStatusBySessionKey = {
+          ...state.runStatusBySessionKey,
+          [key]: sessionEvents
+        };
+        const isActiveTarget =
+          state.activeProjectId === event.projectId && state.activeSessionId === event.sessionId;
         return {
-          runStatusEvents: nextEvents
+          runStatusBySessionKey,
+          runStatusEvents: isActiveTarget ? sessionEvents : state.runStatusEvents
         };
       });
     },
@@ -942,6 +1064,118 @@ export function getActiveProject(
     return null;
   }
   return projects.find((project) => project.id === activeProjectId) ?? null;
+}
+
+function resolveRunStatusEvents(
+  runStatusBySessionKey: Record<string, WorkbenchRunStatusEvent[]>,
+  projectId: string | null,
+  sessionId: string | null
+): WorkbenchRunStatusEvent[] {
+  if (!projectId || !sessionId) {
+    return [];
+  }
+  return runStatusBySessionKey[toSessionKey(projectId, sessionId)] ?? [];
+}
+
+function toSessionKey(projectId: string, sessionId: string): string {
+  return `${projectId}:${sessionId}`;
+}
+
+function isSessionRunning(
+  runningSessionCounts: Record<string, number>,
+  projectId: string | null,
+  sessionId: string | null
+): boolean {
+  if (!projectId || !sessionId) {
+    return false;
+  }
+  return (runningSessionCounts[toSessionKey(projectId, sessionId)] ?? 0) > 0;
+}
+
+function incrementRunningSessionCount(
+  runningSessionCounts: Record<string, number>,
+  projectId: string,
+  sessionId: string
+): Record<string, number> {
+  const key = toSessionKey(projectId, sessionId);
+  return {
+    ...runningSessionCounts,
+    [key]: (runningSessionCounts[key] ?? 0) + 1
+  };
+}
+
+function decrementRunningSessionCount(
+  runningSessionCounts: Record<string, number>,
+  projectId: string,
+  sessionId: string
+): Record<string, number> {
+  const key = toSessionKey(projectId, sessionId);
+  const current = runningSessionCounts[key] ?? 0;
+  if (current <= 1) {
+    const next = { ...runningSessionCounts };
+    delete next[key];
+    return next;
+  }
+  return {
+    ...runningSessionCounts,
+    [key]: current - 1
+  };
+}
+
+function removeRunningSessionCounter(
+  runningSessionCounts: Record<string, number>,
+  projectId: string,
+  sessionId: string
+): Record<string, number> {
+  const key = toSessionKey(projectId, sessionId);
+  if (!(key in runningSessionCounts)) {
+    return runningSessionCounts;
+  }
+  const next = { ...runningSessionCounts };
+  delete next[key];
+  return next;
+}
+
+function removeProjectRunningSessions(
+  runningSessionCounts: Record<string, number>,
+  projectId: string
+): Record<string, number> {
+  const prefix = `${projectId}:`;
+  const next: Record<string, number> = {};
+  for (const [key, value] of Object.entries(runningSessionCounts)) {
+    if (!key.startsWith(prefix)) {
+      next[key] = value;
+    }
+  }
+  return next;
+}
+
+function removeSessionRunStatus(
+  runStatusBySessionKey: Record<string, WorkbenchRunStatusEvent[]>,
+  projectId: string,
+  sessionId: string
+): Record<string, WorkbenchRunStatusEvent[]> {
+  const key = toSessionKey(projectId, sessionId);
+  if (!(key in runStatusBySessionKey)) {
+    return runStatusBySessionKey;
+  }
+  const next = { ...runStatusBySessionKey };
+  delete next[key];
+  return next;
+}
+
+function removeProjectRunStatus(
+  runStatusBySessionKey: Record<string, WorkbenchRunStatusEvent[]>,
+  projectId: string
+): Record<string, WorkbenchRunStatusEvent[]> {
+  const prefix = `${projectId}:`;
+  const next: Record<string, WorkbenchRunStatusEvent[]> = {};
+  for (const [key, events] of Object.entries(runStatusBySessionKey)) {
+    if (!key.startsWith(prefix)) {
+      next[key] = events;
+    }
+  }
+  return next;
 }
 
 function upsertProject(
@@ -1022,6 +1256,54 @@ function upsertProjectSessionMessages(
           ? {
               ...session,
               messages
+            }
+          : session
+      )
+    };
+  });
+}
+
+function appendProjectSessionMessage(
+  projects: WorkbenchProject[],
+  projectId: string,
+  sessionId: string,
+  message: WorkbenchMessage
+): WorkbenchProject[] {
+  return projects.map((project) => {
+    if (project.id !== projectId) {
+      return project;
+    }
+    return {
+      ...project,
+      sessions: project.sessions.map((session) =>
+        session.id === sessionId
+          ? {
+              ...session,
+              messages: [...session.messages, message]
+            }
+          : session
+      )
+    };
+  });
+}
+
+function removeProjectSessionMessage(
+  projects: WorkbenchProject[],
+  projectId: string,
+  sessionId: string,
+  messageId: string
+): WorkbenchProject[] {
+  return projects.map((project) => {
+    if (project.id !== projectId) {
+      return project;
+    }
+    return {
+      ...project,
+      sessions: project.sessions.map((session) =>
+        session.id === sessionId
+          ? {
+              ...session,
+              messages: session.messages.filter((message) => message.id !== messageId)
             }
           : session
       )
@@ -1287,11 +1569,6 @@ function summarizeChatError(
   return clampText(raw.replace(/\s+/g, " ").trim(), 220);
 }
 
-function extractStructuredErrorDetail(raw: string): {
-  agentLabel: string | null;
-  providerLabel: string | null;
-  details: string | null;
-}
 function extractStructuredErrorDetail(
   raw: string,
   runStatusEvents?: WorkbenchRunStatusEvent[]

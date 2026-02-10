@@ -21,7 +21,6 @@ interface ElectronChatTransportDeps {
     message: string;
     images: WorkbenchImageInput[];
   }) => Promise<WorkbenchMessage | null>;
-  stopMessage?: () => Promise<void> | void;
 }
 
 export function createElectronChatTransport(
@@ -44,7 +43,6 @@ export function createElectronChatTransport(
           return;
         }
         abortListener = () => {
-          void Promise.resolve(deps.stopMessage?.()).catch(() => undefined);
           reject(createAbortError());
         };
         abortSignal.addEventListener("abort", abortListener, { once: true });

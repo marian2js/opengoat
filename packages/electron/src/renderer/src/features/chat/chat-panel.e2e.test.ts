@@ -35,6 +35,7 @@ function createPanelProps(
     },
     messages: [],
     runStatusEvents: [],
+    isSessionRunning: false,
     gateway: {
       mode: "local",
       timeoutMs: 10_000,
@@ -91,6 +92,7 @@ describe("ChatPanel", () => {
         },
         messages,
         runStatusEvents: [],
+        isSessionRunning: false,
         gateway: {
           mode: "local",
           timeoutMs: 10_000,
@@ -161,6 +163,7 @@ describe("ChatPanel", () => {
             agentId: "orchestrator",
           },
         ],
+        isSessionRunning: true,
         gateway: {
           mode: "local",
           timeoutMs: 10_000,
@@ -212,6 +215,7 @@ describe("ChatPanel", () => {
         },
         messages,
         runStatusEvents: [],
+        isSessionRunning: false,
         gateway: {
           mode: "local",
           timeoutMs: 10_000,
@@ -263,6 +267,7 @@ describe("ChatPanel", () => {
         },
         messages,
         runStatusEvents: [],
+        isSessionRunning: false,
         gateway: {
           mode: "local",
           timeoutMs: 10_000,
@@ -346,6 +351,7 @@ describe("ChatPanel", () => {
             agentId: "orchestrator",
           },
         ],
+        isSessionRunning: false,
         gateway: {
           mode: "local",
           timeoutMs: 10_000,

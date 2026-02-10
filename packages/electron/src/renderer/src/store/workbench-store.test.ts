@@ -209,6 +209,271 @@ describe("workbench store", () => {
     expect(persistedUser?.images?.[0]?.previewUrl).toBe("data:image/png;base64,aGVsbG8=");
   });
 
+  it("keeps in-flight session messages and timeline when switching sessions", async () => {
+    let resolveSend!: (value: Awaited<ReturnType<WorkbenchApiClient["sendChatMessage"]>>) => void;
+    const sendChatMessage = vi.fn(
+      () =>
+        new Promise<Awaited<ReturnType<WorkbenchApiClient["sendChatMessage"]>>>((resolve) => {
+          resolveSend = resolve;
+        })
+    );
+    const api = createApiMock({
+      bootstrap: vi.fn(async () => ({
+        homeDir: "/tmp/home",
+        onboarding: {
+          activeProviderId: "openai",
+          needsOnboarding: false,
+          gateway: createGatewayStatus(),
+          families: [],
+          providers: []
+        },
+        providerSetupCompleted: true,
+        projects: [
+          {
+            id: "p1",
+            name: "project",
+            rootPath: "/tmp/project",
+            createdAt: "2026-02-07T00:00:00.000Z",
+            updatedAt: "2026-02-07T00:00:00.000Z",
+            sessions: [
+              {
+                id: "s1",
+                title: "Session One",
+                agentId: "orchestrator",
+                sessionKey: "desktop:p1:s1",
+                createdAt: "2026-02-07T00:00:00.000Z",
+                updatedAt: "2026-02-07T00:00:00.000Z",
+                messages: []
+              },
+              {
+                id: "s2",
+                title: "Session Two",
+                agentId: "orchestrator",
+                sessionKey: "desktop:p1:s2",
+                createdAt: "2026-02-07T00:00:00.000Z",
+                updatedAt: "2026-02-07T00:00:00.000Z",
+                messages: []
+              }
+            ]
+          }
+        ]
+      })) as WorkbenchApiClient["bootstrap"],
+      sendChatMessage: sendChatMessage as WorkbenchApiClient["sendChatMessage"]
+    });
+    const store = createWorkbenchStore(api);
+    await store.getState().bootstrap();
+
+    const pending = store.getState().sendMessage("hello");
+    store.getState().appendRunStatusEvent({
+      projectId: "p1",
+      sessionId: "s1",
+      stage: "run_started",
+      timestamp: "2026-02-09T00:00:00.000Z",
+      runId: "run-1",
+      agentId: "orchestrator"
+    });
+    await store.getState().selectSession("p1", "s2");
+    store.getState().appendRunStatusEvent({
+      projectId: "p1",
+      sessionId: "s1",
+      stage: "planner_started",
+      timestamp: "2026-02-09T00:00:01.000Z",
+      runId: "run-1",
+      step: 1,
+      agentId: "orchestrator"
+    });
+    await store.getState().selectSession("p1", "s1");
+
+    const state = store.getState();
+    expect(state.activeMessages.some((message) => message.role === "user" && message.content === "hello")).toBe(true);
+    expect(state.runStatusEvents).toHaveLength(2);
+    expect(state.runningSessionKeys).toContain("p1:s1");
+
+    resolveSend({
+      session: {
+        id: "s1",
+        title: "Session One",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:05.000Z",
+        messages: [
+          {
+            id: "m-user",
+            role: "user",
+            content: "hello",
+            createdAt: "2026-02-07T00:00:00.000Z"
+          },
+          {
+            id: "m-assistant",
+            role: "assistant",
+            content: "done",
+            createdAt: "2026-02-07T00:00:05.000Z",
+            providerId: "openai"
+          }
+        ]
+      },
+      reply: {
+        id: "m-assistant",
+        role: "assistant",
+        content: "done",
+        createdAt: "2026-02-07T00:00:05.000Z",
+        providerId: "openai"
+      },
+      providerId: "openai"
+    });
+    await pending;
+
+    expect(store.getState().activeMessages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant"
+    ]);
+    expect(store.getState().runningSessionKeys).not.toContain("p1:s1");
+  });
+
+  it("supports concurrent runs across sessions without clobbering active session messages", async () => {
+    const deferred: Record<string, ((value: Awaited<ReturnType<WorkbenchApiClient["sendChatMessage"]>>) => void) | undefined> = {};
+    const sendChatMessage = vi.fn(
+      (input: { projectId: string; sessionId: string; message: string }) =>
+        new Promise<Awaited<ReturnType<WorkbenchApiClient["sendChatMessage"]>>>((resolve) => {
+          deferred[input.sessionId] = resolve;
+        })
+    );
+    const api = createApiMock({
+      bootstrap: vi.fn(async () => ({
+        homeDir: "/tmp/home",
+        onboarding: {
+          activeProviderId: "openai",
+          needsOnboarding: false,
+          gateway: createGatewayStatus(),
+          families: [],
+          providers: []
+        },
+        providerSetupCompleted: true,
+        projects: [
+          {
+            id: "p1",
+            name: "project",
+            rootPath: "/tmp/project",
+            createdAt: "2026-02-07T00:00:00.000Z",
+            updatedAt: "2026-02-07T00:00:00.000Z",
+            sessions: [
+              {
+                id: "s1",
+                title: "Session One",
+                agentId: "orchestrator",
+                sessionKey: "desktop:p1:s1",
+                createdAt: "2026-02-07T00:00:00.000Z",
+                updatedAt: "2026-02-07T00:00:00.000Z",
+                messages: []
+              },
+              {
+                id: "s2",
+                title: "Session Two",
+                agentId: "orchestrator",
+                sessionKey: "desktop:p1:s2",
+                createdAt: "2026-02-07T00:00:00.000Z",
+                updatedAt: "2026-02-07T00:00:00.000Z",
+                messages: []
+              }
+            ]
+          }
+        ]
+      })) as WorkbenchApiClient["bootstrap"],
+      sendChatMessage: sendChatMessage as WorkbenchApiClient["sendChatMessage"]
+    });
+    const store = createWorkbenchStore(api);
+    await store.getState().bootstrap();
+
+    const firstPending = store.getState().sendMessage("first");
+    await store.getState().selectSession("p1", "s2");
+    const secondPending = store.getState().sendMessage("second");
+
+    expect(store.getState().runningSessionKeys.sort()).toEqual(["p1:s1", "p1:s2"]);
+
+    expect(deferred.s1).toBeTruthy();
+    deferred.s1?.({
+      session: {
+        id: "s1",
+        title: "Session One",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s1",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:05.000Z",
+        messages: [
+          {
+            id: "m1-user",
+            role: "user",
+            content: "first",
+            createdAt: "2026-02-07T00:00:00.000Z"
+          },
+          {
+            id: "m1-assistant",
+            role: "assistant",
+            content: "done-1",
+            createdAt: "2026-02-07T00:00:05.000Z",
+            providerId: "openai"
+          }
+        ]
+      },
+      reply: {
+        id: "m1-assistant",
+        role: "assistant",
+        content: "done-1",
+        createdAt: "2026-02-07T00:00:05.000Z",
+        providerId: "openai"
+      },
+      providerId: "openai"
+    });
+    await firstPending;
+
+    expect(store.getState().activeSessionId).toBe("s2");
+    expect(store.getState().activeMessages.some((message) => message.content === "first")).toBe(false);
+
+    expect(deferred.s2).toBeTruthy();
+    deferred.s2?.({
+      session: {
+        id: "s2",
+        title: "Session Two",
+        agentId: "orchestrator",
+        sessionKey: "desktop:p1:s2",
+        createdAt: "2026-02-07T00:00:00.000Z",
+        updatedAt: "2026-02-07T00:00:06.000Z",
+        messages: [
+          {
+            id: "m2-user",
+            role: "user",
+            content: "second",
+            createdAt: "2026-02-07T00:00:01.000Z"
+          },
+          {
+            id: "m2-assistant",
+            role: "assistant",
+            content: "done-2",
+            createdAt: "2026-02-07T00:00:06.000Z",
+            providerId: "openai"
+          }
+        ]
+      },
+      reply: {
+        id: "m2-assistant",
+        role: "assistant",
+        content: "done-2",
+        createdAt: "2026-02-07T00:00:06.000Z",
+        providerId: "openai"
+      },
+      providerId: "openai"
+    });
+    await secondPending;
+
+    expect(store.getState().activeSessionId).toBe("s2");
+    expect(store.getState().activeMessages.map((message) => message.content)).toEqual([
+      "second",
+      "done-2"
+    ]);
+    expect(store.getState().runningSessionKeys).toEqual([]);
+  });
+
   it("attributes delegated-provider failures to the delegated agent and keeps details concise", async () => {
     const noisyDelegationError = [
       'Orchestrator provider failed (google, code 1). The delegated agent "developer" failed via provider "gemini" (exit code 1).',

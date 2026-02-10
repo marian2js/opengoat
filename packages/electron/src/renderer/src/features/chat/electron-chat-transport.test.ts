@@ -54,21 +54,15 @@ describe("electron chat transport", () => {
     expect(metadata?.providerId).toBe("openai");
   });
 
-  it("stops the active backend run when the chat request is aborted", async () => {
+  it("aborts the UI request when the chat request is aborted", async () => {
     let resolveMessage: ((value: WorkbenchMessage) => void) | undefined;
     const submitMessage = vi.fn(
       () =>
-        new Promise<{
-          id: string;
-          role: "assistant";
-          content: string;
-          createdAt: string;
-        }>((resolve) => {
+        new Promise<WorkbenchMessage>((resolve) => {
           resolveMessage = resolve;
         })
     );
-    const stopMessage = vi.fn(async () => undefined);
-    const transport = createElectronChatTransport({ submitMessage, stopMessage });
+    const transport = createElectronChatTransport({ submitMessage });
     const abortController = new AbortController();
 
     const streamPromise = transport.sendMessages({
@@ -87,7 +81,6 @@ describe("electron chat transport", () => {
 
     abortController.abort();
     await expect(streamPromise).rejects.toMatchObject({ name: "AbortError" });
-    expect(stopMessage).toHaveBeenCalledTimes(1);
 
     resolveMessage?.({
       id: "assistant-1",

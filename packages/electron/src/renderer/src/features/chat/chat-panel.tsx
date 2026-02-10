@@ -60,6 +60,7 @@ interface ChatPanelProps {
   activeSession: WorkbenchSession | null;
   messages: WorkbenchMessage[];
   runStatusEvents: WorkbenchRunStatusEvent[];
+  isSessionRunning: boolean;
   gateway?: WorkbenchGatewayStatus;
   error: string | null;
   busy: boolean;
@@ -92,11 +93,8 @@ export function ChatPanel(props: ChatPanelProps) {
       createElectronChatTransport({
         submitMessage: async (input) =>
           props.onSubmitMessage(input),
-        stopMessage: async () => {
-          await props.onStopMessage();
-        },
       }),
-    [props.onStopMessage, props.onSubmitMessage],
+    [props.onSubmitMessage],
   );
   const {
     messages,
@@ -132,13 +130,14 @@ export function ChatPanel(props: ChatPanelProps) {
   const hasRunProgress =
     Boolean(props.activeSession) && props.runStatusEvents.length > 0;
   const showActiveRunProgress =
-    hasRunProgress && (isSubmitting || props.busy);
+    hasRunProgress && (isSubmitting || props.isSessionRunning);
   const showRunProgress = hasRunProgress;
   const canSend = Boolean(
     props.activeSession &&
     (input.trim().length > 0 || attachmentCount > 0) &&
     !isSubmitting &&
-    !props.busy,
+    !props.busy &&
+    !props.isSessionRunning,
   );
   const resolvedError = chatError?.message ?? props.error;
   const runProgress = useMemo(
@@ -259,6 +258,11 @@ export function ChatPanel(props: ChatPanelProps) {
   const handleAttachmentCountChange = useCallback((nextCount: number) => {
     setAttachmentCount(nextCount);
   }, []);
+
+  const handleStop = useCallback(() => {
+    void props.onStopMessage();
+    stop();
+  }, [props.onStopMessage, stop]);
 
   return (
     <main className="flex h-full min-h-0 min-w-0 flex-col bg-transparent">
@@ -500,7 +504,7 @@ export function ChatPanel(props: ChatPanelProps) {
           >
             <PromptInputBody>
               <ComposerAttachmentTray
-                disabled={!props.activeSession || props.busy || isSubmitting}
+                disabled={!props.activeSession || props.busy || isSubmitting || props.isSessionRunning}
                 onCountChange={handleAttachmentCountChange}
               />
               {isFileDragActive ? (
@@ -515,7 +519,7 @@ export function ChatPanel(props: ChatPanelProps) {
                 )}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                disabled={!props.activeSession || props.busy || isSubmitting}
+                disabled={!props.activeSession || props.busy || isSubmitting || props.isSessionRunning}
                 placeholder={
                   props.activeSession
                     ? "Message OpenGoat..."
@@ -538,7 +542,7 @@ export function ChatPanel(props: ChatPanelProps) {
                 className="size-8 rounded-lg"
                 disabled={!canSend && !isSubmitting}
                 status={status}
-                onStop={stop}
+                onStop={handleStop}
               />
             </PromptInputFooter>
           </PromptInput>
