@@ -26,7 +26,7 @@ export const agentCreateCommand: CliCommand = {
     context.stdout.write(`Workspace: ${result.agent.workspaceDir}\n`);
     context.stdout.write(`Internal config: ${result.agent.internalConfigDir}\n`);
     if (result.alreadyExisted) {
-      context.stdout.write("Local agent already existed; OpenClaw sync skipped.\n");
+      context.stdout.write("Local agent already existed; OpenClaw sync was still attempted.\n");
     }
     if (result.runtimeSync) {
       context.stdout.write(`OpenClaw sync: ${result.runtimeSync.runtimeId} (code ${result.runtimeSync.code})\n`);

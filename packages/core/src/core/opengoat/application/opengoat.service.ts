@@ -56,6 +56,15 @@ interface OpenGoatServiceDeps {
 }
 
 const OPENCLAW_PROVIDER_ID = "openclaw";
+const LEGACY_ORCHESTRATOR_AGENT_ID = "orchestrator";
+
+export interface RuntimeDefaultsSyncResult {
+  goatSyncCode?: number;
+  goatSynced: boolean;
+  legacyOrchestratorDeleteCode?: number;
+  legacyOrchestratorRemoved: boolean;
+  warnings: string[];
+}
 
 export class OpenGoatService {
   private readonly pathsProvider: OpenGoatPathsProvider;
@@ -131,6 +140,73 @@ export class OpenGoatService {
     return this.bootstrapService.initialize();
   }
 
+  public async syncRuntimeDefaults(): Promise<RuntimeDefaultsSyncResult> {
+    const paths = this.pathsProvider.getPaths();
+    const warnings: string[] = [];
+    let goatSynced = false;
+    let goatSyncCode: number | undefined;
+    let legacyOrchestratorRemoved = false;
+    let legacyOrchestratorDeleteCode: number | undefined;
+
+    let goatDescriptor = (await this.agentService.listAgents(paths)).find((agent) => agent.id === DEFAULT_AGENT_ID);
+    if (!goatDescriptor) {
+      const created = await this.agentService.ensureAgent(
+        paths,
+        {
+          id: DEFAULT_AGENT_ID,
+          displayName: "Goat"
+        },
+        {
+          type: "manager",
+          reportsTo: null,
+          skills: ["manager"]
+        }
+      );
+      goatDescriptor = created.agent;
+    }
+
+    try {
+      const goatSync = await this.providerService.createProviderAgent(paths, DEFAULT_AGENT_ID, {
+        providerId: OPENCLAW_PROVIDER_ID,
+        displayName: goatDescriptor.displayName,
+        workspaceDir: goatDescriptor.workspaceDir,
+        internalConfigDir: goatDescriptor.internalConfigDir
+      });
+      goatSyncCode = goatSync.code;
+      goatSynced = goatSync.code === 0 || containsAlreadyExistsMessage(goatSync.stdout, goatSync.stderr);
+      if (!goatSynced) {
+        warnings.push(
+          `OpenClaw sync for "goat" failed (code ${goatSync.code}). ${(goatSync.stderr || goatSync.stdout).trim()}`
+        );
+      }
+    } catch (error) {
+      warnings.push(`OpenClaw sync for "goat" failed: ${toErrorMessage(error)}`);
+    }
+
+    try {
+      const cleanup = await this.providerService.deleteProviderAgent(paths, LEGACY_ORCHESTRATOR_AGENT_ID, {
+        providerId: OPENCLAW_PROVIDER_ID
+      });
+      legacyOrchestratorDeleteCode = cleanup.code;
+      legacyOrchestratorRemoved = cleanup.code === 0 || containsNotFoundMessage(cleanup.stdout, cleanup.stderr);
+      if (!legacyOrchestratorRemoved) {
+        warnings.push(
+          `OpenClaw cleanup for legacy "orchestrator" failed (code ${cleanup.code}). ${(cleanup.stderr || cleanup.stdout).trim()}`
+        );
+      }
+    } catch (error) {
+      warnings.push(`OpenClaw cleanup for legacy "orchestrator" failed: ${toErrorMessage(error)}`);
+    }
+
+    return {
+      goatSyncCode,
+      goatSynced,
+      legacyOrchestratorDeleteCode,
+      legacyOrchestratorRemoved,
+      warnings
+    };
+  }
+
   public async createAgent(rawName: string, options: CreateAgentOptions = {}): Promise<AgentCreationResult> {
     const identity = this.agentService.normalizeAgentName(rawName);
     const paths = this.pathsProvider.getPaths();
@@ -140,10 +216,6 @@ export class OpenGoatService {
       skills: options.skills
     });
 
-    if (created.alreadyExisted) {
-      return created;
-    }
-
     const runtimeSync = await this.providerService.createProviderAgent(paths, created.agent.id, {
       providerId: OPENCLAW_PROVIDER_ID,
       displayName: created.agent.displayName,
@@ -151,8 +223,10 @@ export class OpenGoatService {
       internalConfigDir: created.agent.internalConfigDir
     });
 
-    if (runtimeSync.code !== 0) {
-      await this.agentService.removeAgent(paths, created.agent.id);
+    if (runtimeSync.code !== 0 && !containsAlreadyExistsMessage(runtimeSync.stdout, runtimeSync.stderr)) {
+      if (!created.alreadyExisted) {
+        await this.agentService.removeAgent(paths, created.agent.id);
+      }
       throw new Error(
         `OpenClaw agent creation failed for "${created.agent.id}" (exit ${runtimeSync.code}). ${
           runtimeSync.stderr.trim() || runtimeSync.stdout.trim() || ""
@@ -352,4 +426,21 @@ export class OpenGoatService {
   public getPaths() {
     return this.pathsProvider.getPaths();
   }
+}
+
+function containsAlreadyExistsMessage(stdout: string, stderr: string): boolean {
+  const text = `${stdout}\n${stderr}`.toLowerCase();
+  return text.includes("already exists") || text.includes("exists");
+}
+
+function containsNotFoundMessage(stdout: string, stderr: string): boolean {
+  const text = `${stdout}\n${stderr}`.toLowerCase();
+  return text.includes("not found") || text.includes("does not exist");
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }

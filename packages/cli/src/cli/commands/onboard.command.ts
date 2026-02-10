@@ -83,6 +83,7 @@ export const onboardCommand: CliCommand = {
               gatewayToken
             })
           : await context.service.setOpenClawGatewayConfig({ mode: "local" });
+      const runtimeSync = await context.service.syncRuntimeDefaults?.();
 
       if (!parsed.nonInteractive) {
         await prompter.outro("OpenClaw onboarding complete.");
@@ -91,6 +92,25 @@ export const onboardCommand: CliCommand = {
       context.stdout.write(`Mode: ${config.mode}\n`);
       if (config.mode === "external") {
         context.stdout.write(`Gateway URL: ${config.gatewayUrl}\n`);
+      }
+      if (runtimeSync) {
+        context.stdout.write(
+          `OpenClaw default sync: goat=${runtimeSync.goatSynced ? "ok" : "failed"}`
+        );
+        if (typeof runtimeSync.goatSyncCode === "number") {
+          context.stdout.write(` (code ${runtimeSync.goatSyncCode})`);
+        }
+        context.stdout.write("\n");
+        context.stdout.write(
+          `OpenClaw legacy cleanup: orchestrator=${runtimeSync.legacyOrchestratorRemoved ? "ok" : "failed"}`
+        );
+        if (typeof runtimeSync.legacyOrchestratorDeleteCode === "number") {
+          context.stdout.write(` (code ${runtimeSync.legacyOrchestratorDeleteCode})`);
+        }
+        context.stdout.write("\n");
+        for (const warning of runtimeSync.warnings) {
+          context.stderr.write(`${warning}\n`);
+        }
       }
       context.stdout.write(
         `Saved runtime config: ${context.service.getPaths().providersDir}/openclaw/config.json\n`
