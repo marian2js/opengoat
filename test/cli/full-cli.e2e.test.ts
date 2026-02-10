@@ -266,7 +266,7 @@ describe("CLI full e2e smoke", () => {
         entry.includes("agents provider set goat openclaw"),
       ),
     ).toBe(true);
-    expect(flattened.some((entry) => entry.startsWith("agent developer"))).toBe(
+    expect(flattened.some((entry) => entry.includes("agent --agent developer"))).toBe(
       true,
     );
   });

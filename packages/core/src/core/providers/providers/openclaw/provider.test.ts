@@ -14,6 +14,7 @@ describe("openclaw provider", () => {
     expect(invocation.command).toBe("openclaw");
     expect(invocation.args).toEqual([
       "agent",
+      "--agent",
       "builder",
       "--model",
       "gpt-5",
