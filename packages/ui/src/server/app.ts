@@ -72,13 +72,14 @@ interface ResolvedSkill {
 export interface OpenClawUiService {
   initialize?: () => Promise<unknown>;
   getHomeDir: () => string;
+  getPaths?: () => unknown;
   listAgents: () => Promise<AgentDescriptor[]>;
   createAgent: (name: string, options?: Record<string, unknown>) => Promise<AgentCreationResult>;
   deleteAgent: (agentId: string, options?: Record<string, unknown>) => Promise<AgentDeletionResult>;
   listSessions: (agentId?: string, options?: { activeMinutes?: number }) => Promise<SessionSummary[]>;
   listSkills: (agentId?: string) => Promise<ResolvedSkill[]>;
   listGlobalSkills: () => Promise<ResolvedSkill[]>;
-  prepareSession: (
+  prepareSession?: (
     agentId?: string,
     options?: { sessionRef?: string; workingPath?: string; forceNew?: boolean }
   ) => Promise<SessionRunInfo>;
@@ -93,6 +94,11 @@ interface SessionRunInfo {
   workspacePath: string;
   workingPath: string;
   isNewSession: boolean;
+}
+
+interface LegacyPreparedSessionRun {
+  enabled: boolean;
+  info?: SessionRunInfo;
 }
 
 export interface OpenGoatUiServerOptions {
@@ -238,7 +244,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
       const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
       const project = await resolveProjectFolder(request.body?.folderName, request.body?.folderPath);
       const sessionRef = buildProjectSessionRef(project.name, project.path);
-      const prepared = await service.prepareSession(agentId, {
+      const prepared = await prepareProjectSession(service, agentId, {
         sessionRef,
         workingPath: project.path,
         forceNew: true
@@ -359,6 +365,48 @@ function normalizeSkills(value: string[] | string | undefined): string[] | undef
     .filter(Boolean);
 
   return parsed.length > 0 ? parsed : undefined;
+}
+
+async function prepareProjectSession(
+  service: OpenClawUiService,
+  agentId: string,
+  options: {
+    sessionRef: string;
+    workingPath: string;
+    forceNew: boolean;
+  }
+): Promise<SessionRunInfo> {
+  if (typeof service.prepareSession === "function") {
+    return service.prepareSession(agentId, options);
+  }
+
+  // Backward-compatible path: older @opengoat/core builds don't expose prepareSession
+  // but still expose getPaths() and sessionService.prepareRunSession(...) on the service instance.
+  const legacy = service as OpenClawUiService & {
+    sessionService?: {
+      prepareRunSession?: (
+        paths: unknown,
+        legacyAgentId: string,
+        request: { sessionRef?: string; forceNew?: boolean; workingPath?: string; userMessage: string }
+      ) => Promise<LegacyPreparedSessionRun>;
+    };
+  };
+
+  if (typeof legacy.getPaths === "function" && typeof legacy.sessionService?.prepareRunSession === "function") {
+    const prepared = await legacy.sessionService.prepareRunSession(legacy.getPaths(), agentId, {
+      sessionRef: options.sessionRef,
+      forceNew: options.forceNew,
+      workingPath: options.workingPath,
+      userMessage: ""
+    });
+
+    if (!prepared.enabled || !prepared.info) {
+      throw new Error("Session preparation was disabled.");
+    }
+    return prepared.info;
+  }
+
+  throw new Error("Project session preparation is unavailable. Restart the UI server after updating dependencies.");
 }
 
 async function resolveProjectFolder(

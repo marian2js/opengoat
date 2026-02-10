@@ -167,6 +167,54 @@ describe("OpenGoat UI server API", () => {
     expect(payload.project.sessionRef.startsWith("project:")).toBe(true);
     expect(payload.session.sessionKey).toBe("project:opengoat");
   });
+
+  it("creates project session through legacy core fallback when prepareSession is unavailable", async () => {
+    const prepareRunSession = vi.fn(async (): Promise<{ enabled: true; info: SessionRunInfo }> => {
+      return {
+        enabled: true,
+        info: {
+          agentId: "goat",
+          sessionKey: "project:legacy",
+          sessionId: "legacy-session-1",
+          transcriptPath: "/tmp/transcript.jsonl",
+          workspacePath: "/tmp/workspace",
+          workingPath: "/tmp",
+          isNewSession: true
+        }
+      };
+    });
+
+    const legacyService = {
+      ...createMockService(),
+      prepareSession: undefined,
+      getPaths: () => {
+        return { homeDir: "/tmp/opengoat-home" };
+      },
+      sessionService: {
+        prepareRunSession
+      }
+    };
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: legacyService
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/projects",
+      payload: {
+        folderPath: "/tmp",
+        folderName: "tmp"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(prepareRunSession).toHaveBeenCalledTimes(1);
+    const payload = response.json() as { session: { sessionKey: string } };
+    expect(payload.session.sessionKey).toBe("project:legacy");
+  });
 });
 
 function createMockService(): OpenClawUiService {
