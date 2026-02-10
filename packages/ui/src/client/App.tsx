@@ -166,7 +166,9 @@ interface WorkspaceRenameResponse {
 }
 
 interface WorkspaceDeleteResponse {
-  deletedSessions: number;
+  removedWorkspace?: {
+    sessionRef: string;
+  };
   message?: string;
 }
 
@@ -583,7 +585,7 @@ export function App(): ReactElement {
   }
 
   async function handleDeleteWorkspace(workspace: WorkspaceNode): Promise<void> {
-    const confirmed = window.confirm(`Delete all sessions for workspace \"${workspace.name}\"?`);
+    const confirmed = window.confirm(`Remove workspace \"${workspace.name}\" from sidebar? Sessions will be kept.`);
     if (!confirmed) {
       return;
     }
@@ -600,14 +602,14 @@ export function App(): ReactElement {
         },
         body: JSON.stringify({
           agentId: "goat",
-          workingPath: workspace.workingPath
+          sessionRef: workspace.projectSessionKey
         })
       });
 
-      setActionMessage(response.message ?? `Deleted workspace sessions for \"${workspace.name}\".`);
+      setActionMessage(response.message ?? `Workspace \"${workspace.name}\" removed.`);
       await refreshSessions();
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to delete workspace sessions.";
+      const message = requestError instanceof Error ? requestError.message : "Unable to remove workspace.";
       setActionMessage(message);
     } finally {
       setMutating(false);
@@ -751,7 +753,7 @@ export function App(): ReactElement {
                         void handleDeleteWorkspace(workspace);
                       }}
                     >
-                      Delete
+                      Remove
                     </button>
                   </div>
                 ) : null}

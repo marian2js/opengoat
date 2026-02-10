@@ -290,7 +290,7 @@ describe("OpenGoat UI server API", () => {
     expect(renameSession).toHaveBeenCalledTimes(1);
   });
 
-  it("renames and deletes workspace sessions", async () => {
+  it("renames and removes workspace entries", async () => {
     const renameSession = vi.fn<OpenClawUiService["renameSession"]>(async (): Promise<SessionSummary> => {
       return {
         sessionKey: "project:tmp",
@@ -319,30 +319,11 @@ describe("OpenGoat UI server API", () => {
         transcriptPath: "/tmp/transcript-1.jsonl"
       };
     });
-    const listSessions = vi.fn<OpenClawUiService["listSessions"]>(async (): Promise<SessionSummary[]> => {
-      return [
-        {
-          sessionKey: "project:tmp",
-          sessionId: "session-1",
-          title: "tmp",
-          updatedAt: Date.now(),
-          transcriptPath: "/tmp/transcript-1.jsonl",
-          workspacePath: "/tmp/workspace",
-          workingPath: "/tmp",
-          inputChars: 0,
-          outputChars: 0,
-          totalChars: 0,
-          compactionCount: 0
-        }
-      ];
-    });
-
     activeServer = await createOpenGoatUiServer({
       logger: false,
       attachFrontend: false,
       service: {
         ...createMockService(),
-        listSessions,
         renameSession,
         removeSession
       }
@@ -363,11 +344,12 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/workspaces/delete",
       payload: {
-        workingPath: "/tmp"
+        sessionRef: "project:tmp"
       }
     });
     expect(deleteResponse.statusCode).toBe(200);
     expect(removeSession).toHaveBeenCalledTimes(1);
+    expect(removeSession).toHaveBeenCalledWith("goat", "project:tmp");
   });
 });
 

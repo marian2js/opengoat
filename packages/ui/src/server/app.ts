@@ -356,33 +356,25 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   });
 
-  app.post<{ Body: { agentId?: string; workingPath?: string } }>("/api/workspaces/delete", async (request, reply) => {
+  app.post<{ Body: { agentId?: string; sessionRef?: string } }>("/api/workspaces/delete", async (request, reply) => {
     return safeReply(reply, async () => {
       const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
-      const workingPath = request.body?.workingPath?.trim();
-      if (!workingPath) {
+      const sessionRef = request.body?.sessionRef?.trim();
+      if (!sessionRef) {
         reply.code(400);
         return {
-          error: "workingPath is required"
+          error: "sessionRef is required"
         };
       }
 
-      const resolvedWorkingPath = path.resolve(workingPath);
-      const sessions = await service.listSessions(agentId);
-      const targets = sessions.filter((session) => {
-        const sessionPath = session.workingPath?.trim();
-        return sessionPath ? path.resolve(sessionPath) === resolvedWorkingPath : false;
-      });
-
-      for (const session of targets) {
-        await removeUiSession(service, agentId, session.sessionKey);
-      }
+      const removed = await removeUiSession(service, agentId, sessionRef);
 
       return {
         agentId,
-        deletedSessions: targets.length,
-        workingPath: resolvedWorkingPath,
-        message: `Removed ${targets.length} session${targets.length === 1 ? "" : "s"} for workspace.`
+        removedWorkspace: {
+          sessionRef: removed.sessionKey
+        },
+        message: "Workspace removed."
       };
     });
   });
