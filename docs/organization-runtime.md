@@ -30,6 +30,10 @@ Hierarchy lives in `AGENTS.md` front matter:
 
 OpenGoat maintains this hierarchy as source-of-truth and syncs agent lifecycle with OpenClaw.
 
+Restructure reporting with:
+
+- `opengoat agent set-manager <agent-id> <manager-id|none>`
+
 ## Routing Helper (`opengoat route`)
 
 `route` is a dry-run helper only.

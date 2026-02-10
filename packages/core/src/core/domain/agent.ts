@@ -27,6 +27,13 @@ export interface CreateAgentOptions {
   skills?: string[];
 }
 
+export interface AgentManagerUpdateResult {
+  agentId: string;
+  previousReportsTo: string | null;
+  reportsTo: string | null;
+  updatedPaths: string[];
+}
+
 export interface AgentDeletionResult {
   agentId: string;
   existed: boolean;

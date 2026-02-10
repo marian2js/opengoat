@@ -9,6 +9,7 @@ import { agentListCommand } from "./commands/agent-list.command.js";
 import { agentProviderGetCommand } from "./commands/agent-provider-get.command.js";
 import { agentProviderSetCommand } from "./commands/agent-provider-set.command.js";
 import { agentRunCommand } from "./commands/agent-run.command.js";
+import { agentSetManagerCommand } from "./commands/agent-set-manager.command.js";
 import { initCommand } from "./commands/init.command.js";
 import { onboardCommand } from "./commands/onboard.command.js";
 import { providerCommand } from "./commands/provider.command.js";
@@ -63,6 +64,7 @@ export async function runCli(argv: string[]): Promise<number> {
       agentCommand,
       agentCreateCommand,
       agentDeleteCommand,
+      agentSetManagerCommand,
       agentProviderGetCommand,
       agentProviderSetCommand,
       agentListCommand,

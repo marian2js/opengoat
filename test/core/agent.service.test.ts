@@ -223,6 +223,35 @@ describe("AgentService", () => {
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });
 
+  it("updates manager relationship in AGENTS.md and config.json", async () => {
+    const { service, paths } = await createAgentServiceWithPaths();
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
+    await service.ensureAgent(paths, { id: "cto", displayName: "CTO" }, { type: "manager", reportsTo: "goat" });
+    await service.ensureAgent(paths, { id: "engineer", displayName: "Engineer" });
+
+    const result = await service.setAgentManager(paths, "engineer", "cto");
+
+    expect(result.agentId).toBe("engineer");
+    expect(result.previousReportsTo).toBe("goat");
+    expect(result.reportsTo).toBe("cto");
+
+    const agentsMd = await readFile(path.join(paths.workspacesDir, "engineer", "AGENTS.md"), "utf-8");
+    expect(agentsMd).toContain("reportsTo: cto");
+    const config = JSON.parse(await readFile(path.join(paths.agentsDir, "engineer", "config.json"), "utf-8")) as {
+      organization?: { reportsTo?: string | null };
+    };
+    expect(config.organization?.reportsTo).toBe("cto");
+  });
+
+  it("rejects manager reassignment that would create a cycle", async () => {
+    const { service, paths } = await createAgentServiceWithPaths();
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
+    await service.ensureAgent(paths, { id: "cto", displayName: "CTO" }, { type: "manager", reportsTo: "goat" });
+    await service.ensureAgent(paths, { id: "engineer", displayName: "Engineer" }, { reportsTo: "cto" });
+
+    await expect(service.setAgentManager(paths, "cto", "engineer")).rejects.toThrow("create a cycle");
+  });
+
   it("removes a non-default agent workspace and internal config", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "developer", displayName: "Developer" });

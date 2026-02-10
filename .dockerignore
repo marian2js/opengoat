@@ -1,0 +1,16 @@
+.git
+.github
+.agent
+.agents
+.claude
+.cursor
+.windsurf
+node_modules
+packages/*/node_modules
+.pnpm-store
+coverage
+dist
+packages/*/dist
+*.log
+.DS_Store
+.env
