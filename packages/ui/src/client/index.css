@@ -36,3 +36,24 @@ body {
 #root {
   min-height: 100vh;
 }
+
+.react-flow__controls {
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.5rem !important;
+  overflow: hidden;
+}
+
+.react-flow__controls button {
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+}
+
+.react-flow__controls button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__minimap {
+  background: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+}

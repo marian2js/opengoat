@@ -18,6 +18,11 @@ interface AgentDescriptor {
   internalConfigDir: string;
 }
 
+interface OrganizationAgent extends AgentDescriptor {
+  reportsTo: string | null;
+  type: "manager" | "individual" | "unknown";
+}
+
 interface AgentCreationResult {
   agent: AgentDescriptor;
   createdPaths: string[];
@@ -124,7 +129,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
 
   app.get("/api/openclaw/overview", async (_request, reply) => {
     return safeReply(reply, async () => {
-      const agents = await service.listAgents();
+      const agents = await resolveOrganizationAgents(service);
 
       return {
         agents,
@@ -138,7 +143,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
   app.get("/api/agents", async (_request, reply) => {
     return safeReply(reply, async () => {
       return {
-        agents: await service.listAgents()
+        agents: await resolveOrganizationAgents(service)
       };
     });
   });
@@ -310,6 +315,70 @@ function normalizeSkills(value: string[] | string | undefined): string[] | undef
     .filter(Boolean);
 
   return parsed.length > 0 ? parsed : undefined;
+}
+
+async function resolveOrganizationAgents(service: OpenClawUiService): Promise<OrganizationAgent[]> {
+  const agents = await service.listAgents();
+  const agentIds = new Set(agents.map((agent) => agent.id));
+
+  return Promise.all(
+    agents.map(async (agent) => {
+      const fallbackReportsTo = agent.id === DEFAULT_AGENT_ID ? null : DEFAULT_AGENT_ID;
+      const fallbackType: OrganizationAgent["type"] = agent.id === DEFAULT_AGENT_ID ? "manager" : "individual";
+
+      try {
+        const configPath = path.resolve(agent.internalConfigDir, "config.json");
+        const raw = await readFile(configPath, "utf8");
+        const parsed = JSON.parse(raw) as {
+          organization?: {
+            reportsTo?: string | null;
+            type?: string;
+          };
+        };
+
+        const organization = parsed.organization;
+        const reportsTo = normalizeReportsToValue(organization?.reportsTo, fallbackReportsTo, agentIds);
+        const type = normalizeTypeValue(organization?.type, fallbackType);
+
+        return {
+          ...agent,
+          reportsTo,
+          type
+        };
+      } catch {
+        return {
+          ...agent,
+          reportsTo: fallbackReportsTo,
+          type: fallbackType
+        };
+      }
+    })
+  );
+}
+
+function normalizeReportsToValue(
+  value: string | null | undefined,
+  fallback: string | null,
+  knownAgentIds: Set<string>
+): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || normalized === "null" || normalized === "none") {
+    return null;
+  }
+
+  return knownAgentIds.has(normalized) ? normalized : fallback;
+}
+
+function normalizeTypeValue(rawType: string | undefined, fallback: OrganizationAgent["type"]): OrganizationAgent["type"] {
+  const normalized = rawType?.trim().toLowerCase();
+  if (normalized === "manager" || normalized === "individual") {
+    return normalized;
+  }
+  return fallback;
 }
 
 async function safeReply<T>(reply: FastifyReply, operation: () => Promise<T>): Promise<T | { error: string }> {
