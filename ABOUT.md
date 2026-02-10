@@ -139,6 +139,11 @@ CLI module:
 
 - `packages/cli/src/cli`
 
+Optional UI extension module:
+
+- `packages/ui/src/server` (Fastify API + single-port host)
+- `packages/ui/src/client` (React/Vite app with sidebar management UI)
+
 ## 11) Legacy Removed
 
 - plugin system
