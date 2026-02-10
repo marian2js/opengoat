@@ -42,13 +42,6 @@ interface ResolvedSkill {
   source: string;
 }
 
-interface ProviderSummary {
-  id: string;
-  displayName: string;
-  kind: string;
-  capabilities: object;
-}
-
 let activeServer: Awaited<ReturnType<typeof createOpenGoatUiServer>> | undefined;
 
 afterEach(async () => {
@@ -149,7 +142,6 @@ function createMockService(): OpenClawUiService {
     },
     listSessions: async (): Promise<SessionSummary[]> => [],
     listSkills: async (): Promise<ResolvedSkill[]> => [],
-    listGlobalSkills: async (): Promise<ResolvedSkill[]> => [],
-    listProviders: async (): Promise<ProviderSummary[]> => []
+    listGlobalSkills: async (): Promise<ResolvedSkill[]> => []
   };
 }

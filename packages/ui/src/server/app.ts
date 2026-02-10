@@ -63,13 +63,6 @@ interface ResolvedSkill {
   source: string;
 }
 
-interface ProviderSummary {
-  id: string;
-  displayName: string;
-  kind: string;
-  capabilities: object;
-}
-
 export interface OpenClawUiService {
   initialize?: () => Promise<unknown>;
   getHomeDir: () => string;
@@ -79,7 +72,6 @@ export interface OpenClawUiService {
   listSessions: (agentId?: string, options?: { activeMinutes?: number }) => Promise<SessionSummary[]>;
   listSkills: (agentId?: string) => Promise<ResolvedSkill[]>;
   listGlobalSkills: () => Promise<ResolvedSkill[]>;
-  listProviders: () => Promise<ProviderSummary[]>;
 }
 
 export interface OpenGoatUiServerOptions {
@@ -132,14 +124,12 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
 
   app.get("/api/openclaw/overview", async (_request, reply) => {
     return safeReply(reply, async () => {
-      const [agents, providers] = await Promise.all([service.listAgents(), service.listProviders()]);
+      const agents = await service.listAgents();
 
       return {
         agents,
-        providers,
         totals: {
-          agents: agents.length,
-          providers: providers.length
+          agents: agents.length
         }
       };
     });
@@ -222,13 +212,6 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   });
 
-  app.get("/api/providers", async (_request, reply) => {
-    return safeReply(reply, async () => {
-      return {
-        providers: await service.listProviders()
-      };
-    });
-  });
 }
 
 interface FrontendOptions {

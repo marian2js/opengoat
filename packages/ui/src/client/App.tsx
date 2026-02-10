@@ -1,6 +1,6 @@
 import type { ComponentType, FormEvent, ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Bot, Boxes, Home, RefreshCw, UserRoundPlus, UsersRound } from "lucide-react";
+import { Boxes, Home, RefreshCw, UserRoundPlus, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,12 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-type ViewKey = "overview" | "agents" | "sessions" | "skills" | "providers";
+type ViewKey = "overview" | "agents" | "sessions" | "skills";
 
 interface HealthResponse {
   ok: boolean;
   mode: "development" | "production";
-  homeDir: string;
   timestamp: string;
 }
 
@@ -22,20 +21,6 @@ interface Agent {
   displayName: string;
   workspaceDir: string;
   internalConfigDir: string;
-}
-
-interface Provider {
-  id: string;
-  displayName: string;
-  kind: string;
-  capabilities: {
-    agent: boolean;
-    model: boolean;
-    auth: boolean;
-    passthrough: boolean;
-    agentCreate?: boolean;
-    agentDelete?: boolean;
-  };
 }
 
 interface Session {
@@ -61,10 +46,8 @@ interface Skill {
 
 interface OverviewResponse {
   agents: Agent[];
-  providers: Provider[];
   totals: {
     agents: number;
-    providers: number;
   };
 }
 
@@ -89,9 +72,7 @@ interface DashboardState {
 
 interface CreateAgentForm {
   name: string;
-  type: "manager" | "individual";
   reportsTo: string;
-  skills: string;
 }
 
 interface SidebarItem {
@@ -104,15 +85,12 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
   { id: "agents", label: "Agents", icon: UsersRound },
   { id: "sessions", label: "Sessions", icon: UserRoundPlus },
-  { id: "skills", label: "Skills", icon: Boxes },
-  { id: "providers", label: "Providers", icon: Bot }
+  { id: "skills", label: "Skills", icon: Boxes }
 ];
 
 const DEFAULT_FORM: CreateAgentForm = {
   name: "",
-  type: "individual",
-  reportsTo: "goat",
-  skills: ""
+  reportsTo: "goat"
 };
 
 export function App(): ReactElement {
@@ -156,6 +134,26 @@ export function App(): ReactElement {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    if (!state) {
+      return;
+    }
+    const agentIds = state.overview.agents.map((agent) => agent.id);
+    if (agentIds.length === 0) {
+      return;
+    }
+
+    setCreateForm((current) => {
+      if (agentIds.includes(current.reportsTo)) {
+        return current;
+      }
+      return {
+        ...current,
+        reportsTo: agentIds[0] ?? "goat"
+      };
+    });
+  }, [state]);
+
   const metrics = useMemo(() => {
     if (!state) {
       return [];
@@ -163,7 +161,6 @@ export function App(): ReactElement {
 
     return [
       { label: "Agents", value: state.overview.totals.agents, hint: "Organization members" },
-      { label: "Providers", value: state.overview.totals.providers, hint: "Runtime adapters" },
       { label: "Goat Sessions", value: state.sessions.sessions.length, hint: "Saved conversation contexts" },
       { label: "Global Skills", value: state.globalSkills.skills.length, hint: "Reusable capabilities" }
     ];
@@ -173,6 +170,20 @@ export function App(): ReactElement {
     event.preventDefault();
     if (!createForm.name.trim()) {
       setActionMessage("Agent name is required.");
+      return;
+    }
+
+    if (!state || state.overview.agents.length === 0) {
+      setActionMessage("No available manager targets found.");
+      return;
+    }
+
+    const allowedReportsTo = new Set(state.overview.agents.map((agent) => agent.id));
+    const reportsTo = allowedReportsTo.has(createForm.reportsTo)
+      ? createForm.reportsTo
+      : (state.overview.agents[0]?.id ?? "");
+    if (!reportsTo) {
+      setActionMessage("Reports To is required.");
       return;
     }
 
@@ -186,14 +197,15 @@ export function App(): ReactElement {
         },
         body: JSON.stringify({
           name: createForm.name,
-          type: createForm.type,
-          reportsTo: createForm.reportsTo.trim() || undefined,
-          skills: createForm.skills.trim()
+          reportsTo
         })
       });
 
       setActionMessage(response.message ?? `Agent \"${createForm.name}\" processed.`);
-      setCreateForm(DEFAULT_FORM);
+      setCreateForm((current) => ({
+        ...current,
+        name: ""
+      }));
       await loadData();
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Unable to create agent.";
@@ -298,7 +310,7 @@ export function App(): ReactElement {
             <div className="space-y-4">
               {activeView === "overview" ? (
                 <>
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {metrics.map((metric) => (
                       <Card key={metric.label}>
                         <CardHeader>
@@ -311,16 +323,6 @@ export function App(): ReactElement {
                       </Card>
                     ))}
                   </div>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Home Directory</CardTitle>
-                      <CardDescription>Current OpenGoat runtime root.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <code className="rounded bg-accent px-2 py-1 text-xs">{state.health.homeDir}</code>
-                    </CardContent>
-                  </Card>
                 </>
               ) : null}
 
@@ -346,50 +348,33 @@ export function App(): ReactElement {
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground" htmlFor="type">
-                            Type
-                          </label>
-                          <select
-                            id="type"
-                            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
-                            value={createForm.type}
-                            onChange={(event) =>
-                              setCreateForm((value) => ({
-                                ...value,
-                                type: event.target.value as CreateAgentForm["type"]
-                              }))
-                            }
-                          >
-                            <option value="individual">Individual</option>
-                            <option value="manager">Manager</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-1">
                           <label className="text-xs text-muted-foreground" htmlFor="reportsTo">
                             Reports To
                           </label>
-                          <Input
+                          <select
                             id="reportsTo"
+                            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
                             value={createForm.reportsTo}
-                            onChange={(event) => setCreateForm((value) => ({ ...value, reportsTo: event.target.value }))}
-                            placeholder="goat"
-                          />
+                            onChange={(event) =>
+                              setCreateForm((value) => ({
+                                ...value,
+                                reportsTo: event.target.value
+                              }))
+                            }
+                          >
+                            {(state?.overview.agents ?? []).map((agent) => (
+                              <option key={agent.id} value={agent.id}>
+                                {agent.displayName} ({agent.id})
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
-                        <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground" htmlFor="skills">
-                            Skills (comma-separated)
-                          </label>
-                          <Input
-                            id="skills"
-                            value={createForm.skills}
-                            onChange={(event) => setCreateForm((value) => ({ ...value, skills: event.target.value }))}
-                            placeholder="manager, testing"
-                          />
-                        </div>
-
-                        <Button className="w-full" disabled={isMutating} type="submit">
+                        <Button
+                          className="w-full"
+                          disabled={isMutating || (state?.overview.agents.length ?? 0) === 0}
+                          type="submit"
+                        >
                           Create Agent
                         </Button>
                       </form>
@@ -504,36 +489,6 @@ export function App(): ReactElement {
                 </div>
               ) : null}
 
-              {activeView === "providers" ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Providers</CardTitle>
-                    <CardDescription>Available provider runtimes and capabilities.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {state.overview.providers.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No providers configured.</p>
-                    ) : (
-                      state.overview.providers.map((provider) => (
-                        <div key={provider.id} className="rounded-md border border-border p-3">
-                          <div className="mb-1 flex items-center justify-between">
-                            <div>
-                              <p className="font-medium">{provider.displayName}</p>
-                              <p className="text-xs text-muted-foreground">{provider.id}</p>
-                            </div>
-                            <Badge>{provider.kind}</Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            agent:{String(provider.capabilities.agent)} auth:{String(provider.capabilities.auth)} passthrough:
-                            {String(provider.capabilities.passthrough)}
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </CardContent>
-                </Card>
-              ) : null}
-
               {actionMessage ? (
                 <Card className="border-primary/30">
                   <CardContent className="pt-5">
@@ -576,8 +531,6 @@ function viewTitle(view: ViewKey): string {
       return "Sessions";
     case "skills":
       return "Skills";
-    case "providers":
-      return "Providers";
     default:
       return "Dashboard";
   }
@@ -593,8 +546,6 @@ function viewDescription(view: ViewKey): string {
       return "Inspect saved conversation sessions.";
     case "skills":
       return "Review assigned and global skills.";
-    case "providers":
-      return "Check provider integrations and capabilities.";
     default:
       return "";
   }
