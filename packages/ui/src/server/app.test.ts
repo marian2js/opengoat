@@ -123,26 +123,42 @@ describe("OpenGoat UI server API", () => {
   });
 
   it("creates project session through the api", async () => {
-    const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(
-      async (): Promise<SessionRunInfo> => {
-        return {
-          agentId: "goat",
-          sessionKey: "project:opengoat",
-          sessionId: "session-1",
-          transcriptPath: "/tmp/transcript.jsonl",
-          workspacePath: "/tmp/workspace",
-          workingPath: "/tmp/opengoat",
-          isNewSession: true
-        };
-      }
-    );
+    const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(async (_agentId, options): Promise<SessionRunInfo> => {
+      const sessionKey = options?.sessionRef ?? "agent:goat:main";
+      const isProject = sessionKey.startsWith("project:");
+      return {
+        agentId: "goat",
+        sessionKey,
+        sessionId: isProject ? "project-session-1" : "workspace-session-1",
+        transcriptPath: "/tmp/transcript.jsonl",
+        workspacePath: "/tmp/workspace",
+        workingPath: options?.workingPath ?? "/tmp/opengoat",
+        isNewSession: !isProject
+      };
+    });
+    const renameSession = vi.fn<NonNullable<OpenClawUiService["renameSession"]>>(async (_agentId, title = "Session", sessionRef = "agent:goat:main"): Promise<SessionSummary> => {
+      return {
+        sessionKey: sessionRef,
+        sessionId: sessionRef.startsWith("project:") ? "project-session-1" : "workspace-session-1",
+        title,
+        updatedAt: Date.now(),
+        transcriptPath: "/tmp/transcript.jsonl",
+        workspacePath: "/tmp/workspace",
+        workingPath: "/tmp/opengoat",
+        inputChars: 0,
+        outputChars: 0,
+        totalChars: 0,
+        compactionCount: 0
+      };
+    });
 
     activeServer = await createOpenGoatUiServer({
       logger: false,
       attachFrontend: false,
       service: {
         ...createMockService(),
-        prepareSession
+        prepareSession,
+        renameSession
       }
     });
 
@@ -156,7 +172,8 @@ describe("OpenGoat UI server API", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(prepareSession).toHaveBeenCalledTimes(1);
+    expect(prepareSession).toHaveBeenCalledTimes(2);
+    expect(renameSession).toHaveBeenCalledTimes(2);
 
     const payload = response.json() as {
       project: { name: string; path: string; sessionRef: string };
@@ -165,21 +182,23 @@ describe("OpenGoat UI server API", () => {
     expect(payload.project.name).toBe("tmp");
     expect(payload.project.path).toBe("/tmp");
     expect(payload.project.sessionRef.startsWith("project:")).toBe(true);
-    expect(payload.session.sessionKey).toBe("project:opengoat");
+    expect(payload.session.sessionKey.startsWith("workspace:")).toBe(true);
   });
 
   it("creates project session through legacy core fallback when prepareSession is unavailable", async () => {
-    const prepareRunSession = vi.fn(async (): Promise<{ enabled: true; info: SessionRunInfo }> => {
+    const prepareRunSession = vi.fn(async (_paths: unknown, _agentId: string, request: { sessionRef?: string; workingPath?: string }): Promise<{ enabled: true; info: SessionRunInfo }> => {
+      const sessionKey = request.sessionRef ?? "agent:goat:main";
+      const isProject = sessionKey.startsWith("project:");
       return {
         enabled: true,
         info: {
           agentId: "goat",
-          sessionKey: "project:legacy",
-          sessionId: "legacy-session-1",
+          sessionKey,
+          sessionId: isProject ? "legacy-project-session-1" : "legacy-workspace-session-1",
           transcriptPath: "/tmp/transcript.jsonl",
           workspacePath: "/tmp/workspace",
-          workingPath: "/tmp",
-          isNewSession: true
+          workingPath: request.workingPath ?? "/tmp",
+          isNewSession: !isProject
         }
       };
     });
@@ -211,9 +230,9 @@ describe("OpenGoat UI server API", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(prepareRunSession).toHaveBeenCalledTimes(1);
+    expect(prepareRunSession).toHaveBeenCalledTimes(2);
     const payload = response.json() as { session: { sessionKey: string } };
-    expect(payload.session.sessionKey).toBe("project:legacy");
+    expect(payload.session.sessionKey.startsWith("workspace:")).toBe(true);
   });
 
   it("returns unsupported for native picker on non-macos platforms", async () => {

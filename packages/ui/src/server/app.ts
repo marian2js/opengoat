@@ -273,21 +273,28 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     return safeReply(reply, async () => {
       const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
       const project = await resolveProjectFolder(request.body?.folderName, request.body?.folderPath);
-      const sessionRef = buildProjectSessionRef(project.name, project.path);
+      const projectSessionRef = buildProjectSessionRef(project.name, project.path);
+      await prepareProjectSession(service, agentId, {
+        sessionRef: projectSessionRef,
+        workingPath: project.path,
+        forceNew: false
+      });
+      await renameUiSession(service, agentId, project.name, projectSessionRef);
+
+      const workspaceSessionRef = buildWorkspaceSessionRef(project.name, project.path);
       const prepared = await prepareProjectSession(service, agentId, {
-        sessionRef,
+        sessionRef: workspaceSessionRef,
         workingPath: project.path,
         forceNew: true
       });
-
-      await renameUiSession(service, agentId, project.name, sessionRef);
+      await renameUiSession(service, agentId, resolveDefaultWorkspaceSessionTitle(), workspaceSessionRef);
 
       return {
         agentId,
         project: {
           name: project.name,
           path: project.path,
-          sessionRef
+          sessionRef: projectSessionRef
         },
         session: prepared,
         message: `Project \"${project.name}\" added and session created.`

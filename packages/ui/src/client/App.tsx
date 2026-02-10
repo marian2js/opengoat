@@ -460,6 +460,9 @@ export function App(): ReactElement {
       if (!workingPath) {
         continue;
       }
+      if (session.sessionKey.startsWith("project:")) {
+        continue;
+      }
 
       const items = sessionsByPath.get(workingPath) ?? [];
       items.push({
