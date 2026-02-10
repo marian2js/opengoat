@@ -17,10 +17,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Home,
   Folder,
+  FolderOpen,
   FolderPlus,
-  Circle,
+  Home,
   MoreHorizontal,
   Plus,
   RefreshCw,
@@ -247,6 +247,7 @@ export function App(): ReactElement {
   const [hoveredWorkspaceId, setHoveredWorkspaceId] = useState<string | null>(null);
   const [openWorkspaceMenuId, setOpenWorkspaceMenuId] = useState<string | null>(null);
   const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(null);
+  const [collapsedWorkspaceIds, setCollapsedWorkspaceIds] = useState<Set<string>>(() => new Set());
 
   const handleViewChange = useCallback((nextView: ViewKey) => {
     setActiveView(nextView);
@@ -387,6 +388,23 @@ export function App(): ReactElement {
       })
       .sort((left, right) => right.updatedAt - left.updatedAt);
   }, [projects, sessions]);
+
+  useEffect(() => {
+    setCollapsedWorkspaceIds((current) => {
+      const validIds = new Set(workspaceNodes.map((workspace) => workspace.id));
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of current) {
+        if (validIds.has(id)) {
+          next.add(id);
+          continue;
+        }
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [workspaceNodes]);
+
   const healthTimestamp = state ? new Date(state.health.timestamp).toLocaleString() : "Loading...";
 
   const metrics = useMemo<MetricCard[]>(() => {
@@ -728,149 +746,163 @@ export function App(): ReactElement {
               {!isSidebarCollapsed ? <span className="ml-2">Add Project</span> : null}
             </button>
 
-            {workspaceNodes.map((workspace) => (
-              <div key={workspace.id} className="relative mb-1">
-                <div
-                  className="relative"
-                  onMouseEnter={() => setHoveredWorkspaceId(workspace.id)}
-                  onMouseLeave={() => {
-                    setHoveredWorkspaceId((current) => (current === workspace.id ? null : current));
-                  }}
-                >
-                  <button
-                    type="button"
-                    title={`${workspace.name} (${workspace.workingPath})`}
-                    onClick={() => {
-                      setActiveView("sessions");
-                      setOpenSessionMenuId(null);
+            {workspaceNodes.map((workspace) => {
+              const isWorkspaceCollapsed = collapsedWorkspaceIds.has(workspace.id);
+              const FolderIcon = isWorkspaceCollapsed ? Folder : FolderOpen;
+
+              return (
+                <div key={workspace.id} className="relative mb-1">
+                  <div
+                    className="relative"
+                    onMouseEnter={() => setHoveredWorkspaceId(workspace.id)}
+                    onMouseLeave={() => {
+                      setHoveredWorkspaceId((current) => (current === workspace.id ? null : current));
                     }}
-                    className={cn(
-                      "flex w-full items-center rounded-md px-3 py-2 pr-16 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
-                      isSidebarCollapsed && "justify-center px-2 pr-2"
-                    )}
                   >
-                    <Folder className="size-4 shrink-0" />
-                    {!isSidebarCollapsed ? <span className="ml-2 truncate">{workspace.name}</span> : null}
-                  </button>
+                    <button
+                      type="button"
+                      title={`${workspace.name} (${workspace.workingPath})`}
+                      onClick={() => {
+                        setCollapsedWorkspaceIds((current) => {
+                          const next = new Set(current);
+                          if (next.has(workspace.id)) {
+                            next.delete(workspace.id);
+                          } else {
+                            next.add(workspace.id);
+                          }
+                          return next;
+                        });
+                        setOpenWorkspaceMenuId(null);
+                        setOpenSessionMenuId(null);
+                      }}
+                      className={cn(
+                        "flex w-full items-center rounded-md px-3 py-2 pr-16 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
+                        isSidebarCollapsed && "justify-center px-2 pr-2"
+                      )}
+                    >
+                      <FolderIcon className="size-4 shrink-0" />
+                      {!isSidebarCollapsed ? <span className="ml-2 truncate">{workspace.name}</span> : null}
+                    </button>
 
-                  {!isSidebarCollapsed && (hoveredWorkspaceId === workspace.id || openWorkspaceMenuId === workspace.id) ? (
-                    <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
-                      <button
-                        type="button"
-                        aria-label={`New session in ${workspace.name}`}
-                        title="New Session"
-                        disabled={isMutating}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setOpenSessionMenuId(null);
-                          void handleCreateWorkspaceSession(workspace);
-                        }}
-                        className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-                      >
-                        <Plus className="size-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Workspace menu for ${workspace.name}`}
-                        title="More"
-                        disabled={isMutating}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setOpenSessionMenuId(null);
-                          setOpenWorkspaceMenuId((current) => (current === workspace.id ? null : workspace.id));
-                        }}
-                        className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-                      >
-                        <MoreHorizontal className="size-3.5" />
-                      </button>
-                    </div>
-                  ) : null}
-
-                  {!isSidebarCollapsed && openWorkspaceMenuId === workspace.id ? (
-                    <div className="absolute right-2 top-9 z-20 min-w-[140px] rounded-md border border-border bg-card p-1 shadow-lg">
-                      <button
-                        type="button"
-                        className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent/80"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          void handleRenameWorkspace(workspace);
-                        }}
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-danger hover:bg-danger/10"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          void handleDeleteWorkspace(workspace);
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-
-                {!isSidebarCollapsed ? (
-                  <div className="mt-0.5 space-y-0.5">
-                    {workspace.sessions.map((session) => (
-                      <div key={session.sessionId} className="group/session relative">
+                    {!isSidebarCollapsed && (hoveredWorkspaceId === workspace.id || openWorkspaceMenuId === workspace.id) ? (
+                      <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
                         <button
                           type="button"
-                          title={`${session.title} (${session.sessionKey})`}
-                          onClick={() => {
-                            setActiveView("sessions");
-                            setOpenWorkspaceMenuId(null);
-                          }}
-                          className="flex w-full items-center rounded-md py-1.5 pl-9 pr-8 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-                        >
-                          <Circle className="mr-2 size-2 shrink-0 fill-current text-info" />
-                          <span className="truncate">{session.title}</span>
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`Session menu for ${session.title}`}
-                          title="Session menu"
+                          aria-label={`New session in ${workspace.name}`}
+                          title="New Session"
                           disabled={isMutating}
                           onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
-                            setOpenWorkspaceMenuId(null);
-                            setOpenSessionMenuId((current) => (current === session.sessionId ? null : session.sessionId));
+                            setOpenSessionMenuId(null);
+                            void handleCreateWorkspaceSession(workspace);
                           }}
-                          className={cn(
-                            "absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50",
-                            openSessionMenuId === session.sessionId ? "opacity-100" : "opacity-0 group-hover/session:opacity-100"
-                          )}
+                          className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                        >
+                          <Plus className="size-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Workspace menu for ${workspace.name}`}
+                          title="More"
+                          disabled={isMutating}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setOpenSessionMenuId(null);
+                            setOpenWorkspaceMenuId((current) => (current === workspace.id ? null : workspace.id));
+                          }}
+                          className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
                         >
                           <MoreHorizontal className="size-3.5" />
                         </button>
-                        {openSessionMenuId === session.sessionId ? (
-                          <div className="absolute right-1 top-8 z-20 min-w-[120px] rounded-md border border-border bg-card p-1 shadow-lg">
-                            <button
-                              type="button"
-                              className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-danger hover:bg-danger/10"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                void handleRemoveSession(session);
-                              }}
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ) : null}
                       </div>
-                    ))}
+                    ) : null}
+
+                    {!isSidebarCollapsed && openWorkspaceMenuId === workspace.id ? (
+                      <div className="absolute right-2 top-9 z-20 min-w-[140px] rounded-md border border-border bg-card p-1 shadow-lg">
+                        <button
+                          type="button"
+                          className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent/80"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void handleRenameWorkspace(workspace);
+                          }}
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-danger hover:bg-danger/10"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void handleDeleteWorkspace(workspace);
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
-            ))}
+
+                  {!isSidebarCollapsed && !isWorkspaceCollapsed ? (
+                    <div className="mt-0.5 space-y-0.5">
+                      {workspace.sessions.map((session) => (
+                        <div key={session.sessionId} className="group/session relative">
+                          <button
+                            type="button"
+                            title={`${session.title} (${session.sessionKey})`}
+                            onClick={() => {
+                              setActiveView("sessions");
+                              setOpenWorkspaceMenuId(null);
+                            }}
+                            className="flex w-full items-center rounded-md py-1.5 pl-9 pr-8 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                          >
+                            <span className="mr-2 inline-block size-2 shrink-0" aria-hidden="true" />
+                            <span className="truncate">{session.title}</span>
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Session menu for ${session.title}`}
+                            title="Session menu"
+                            disabled={isMutating}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setOpenWorkspaceMenuId(null);
+                              setOpenSessionMenuId((current) => (current === session.sessionId ? null : session.sessionId));
+                            }}
+                            className={cn(
+                              "absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50",
+                              openSessionMenuId === session.sessionId ? "opacity-100" : "opacity-0 group-hover/session:opacity-100"
+                            )}
+                          >
+                            <MoreHorizontal className="size-3.5" />
+                          </button>
+                          {openSessionMenuId === session.sessionId ? (
+                            <div className="absolute right-1 top-8 z-20 min-w-[120px] rounded-md border border-border bg-card p-1 shadow-lg">
+                              <button
+                                type="button"
+                                className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-danger hover:bg-danger/10"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  void handleRemoveSession(session);
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </nav>
 
           <div className="border-t border-border p-3">
