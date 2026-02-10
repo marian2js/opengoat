@@ -63,6 +63,50 @@ describe("OpenGoatService", () => {
     expect(agents.map((agent) => agent.id)).toEqual(["goat", "research-analyst"]);
   });
 
+  it("still syncs OpenClaw when the local agent already exists", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service, provider } = createService(root);
+    await service.initialize();
+
+    await service.createAgent("Research Analyst");
+    const second = await service.createAgent("Research Analyst");
+
+    expect(second.alreadyExisted).toBe(true);
+    expect(second.runtimeSync?.runtimeId).toBe("openclaw");
+    expect(provider.createdAgents.filter((entry) => entry.agentId === "research-analyst")).toHaveLength(2);
+  });
+
+  it("does not delete local files when sync fails for an already existing agent", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service, provider } = createService(root);
+    await service.initialize();
+    await service.createAgent("Research Analyst");
+    provider.failCreate = true;
+
+    await expect(service.createAgent("Research Analyst")).rejects.toThrow("OpenClaw agent creation failed");
+
+    const agents = await service.listAgents();
+    expect(agents.map((agent) => agent.id)).toEqual(["goat", "research-analyst"]);
+  });
+
+  it("treats OpenClaw already-exists response as successful sync", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service, provider } = createService(root);
+    await service.initialize();
+    await service.createAgent("Research Analyst");
+    provider.createAlreadyExists = true;
+
+    const repeated = await service.createAgent("Research Analyst");
+    expect(repeated.alreadyExisted).toBe(true);
+    expect(repeated.runtimeSync?.runtimeId).toBe("openclaw");
+  });
+
   it("rolls back local files when OpenClaw create fails", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
@@ -109,6 +153,21 @@ describe("OpenGoatService", () => {
     expect(forced.existed).toBe(true);
   });
 
+  it("syncs runtime defaults with goat and cleans legacy orchestrator", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service, provider } = createService(root);
+    await service.initialize();
+
+    const result = await service.syncRuntimeDefaults();
+
+    expect(result.goatSynced).toBe(true);
+    expect(result.legacyOrchestratorRemoved).toBe(true);
+    expect(provider.createdAgents.some((entry) => entry.agentId === "goat")).toBe(true);
+    expect(provider.deletedAgents.some((entry) => entry.agentId === "orchestrator")).toBe(true);
+  });
+
   it("updates who an agent reports to", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
@@ -148,6 +207,7 @@ class FakeOpenClawProvider extends BaseProvider {
   public readonly createdAgents: ProviderCreateAgentOptions[] = [];
   public readonly deletedAgents: ProviderDeleteAgentOptions[] = [];
   public failCreate = false;
+  public createAlreadyExists = false;
   public failDelete = false;
 
   public constructor() {
@@ -181,6 +241,13 @@ class FakeOpenClawProvider extends BaseProvider {
         code: 1,
         stdout: "",
         stderr: "create failed"
+      };
+    }
+    if (this.createAlreadyExists) {
+      return {
+        code: 1,
+        stdout: "",
+        stderr: "agent already exists"
       };
     }
     return {

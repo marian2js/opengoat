@@ -100,7 +100,7 @@ describe("agent create OpenClaw sync e2e", () => {
 
     const opengoatHome = path.join(root, "opengoat-home");
     await mkdir(opengoatHome, { recursive: true });
-    const { stubPath, stubLogPath } = await createOpenClawStub(root, true);
+    const { stubPath, stubLogPath } = await createOpenClawStub(root, { failOnAdd: true });
 
     const result = await runBinary(
       ["agent", "create", "Failing Agent"],
@@ -116,11 +116,63 @@ describe("agent create OpenClaw sync e2e", () => {
     const calls = await readStubCalls(stubLogPath);
     expect(calls).toHaveLength(1);
   });
+
+  it("still calls OpenClaw create when the local agent already exists", async () => {
+    const root = await createTempDir("opengoat-agent-create-e2e-");
+    roots.push(root);
+
+    const opengoatHome = path.join(root, "opengoat-home");
+    await mkdir(opengoatHome, { recursive: true });
+    const first = await createOpenClawStub(root, { logName: "openclaw-stub-first.log" });
+    const second = await createOpenClawStub(root, { logName: "openclaw-stub-second.log" });
+
+    const createFirst = await runBinary(
+      ["agent", "create", "Repeatable Agent"],
+      opengoatHome,
+      {
+        OPENCLAW_CMD: first.stubPath,
+        OPENCLAW_STUB_LOG: first.stubLogPath
+      }
+    );
+    expect(createFirst.code).toBe(0);
+
+    const createSecond = await runBinary(
+      ["agent", "create", "Repeatable Agent"],
+      opengoatHome,
+      {
+        OPENCLAW_CMD: second.stubPath,
+        OPENCLAW_STUB_LOG: second.stubLogPath
+      }
+    );
+
+    expect(createSecond.code).toBe(0);
+    expect(createSecond.stdout).toContain("Local agent already existed; OpenClaw sync was still attempted.");
+    const calls = await readStubCalls(second.stubLogPath);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual(
+      expect.arrayContaining([
+        "agents",
+        "add",
+        "repeatable-agent",
+        "--workspace",
+        path.join(opengoatHome, "workspaces", "repeatable-agent"),
+        "--agent-dir",
+        path.join(opengoatHome, "agents", "repeatable-agent"),
+        "--non-interactive"
+      ])
+    );
+  });
 });
 
-async function createOpenClawStub(root: string, failOnAdd = false): Promise<{ stubPath: string; stubLogPath: string }> {
-  const stubLogPath = path.join(root, "openclaw-stub.log");
-  const stubPath = path.join(root, "openclaw-stub.mjs");
+async function createOpenClawStub(
+  root: string,
+  options: { failOnAdd?: boolean; logName?: string } = {}
+): Promise<{ stubPath: string; stubLogPath: string }> {
+  const failOnAdd = options.failOnAdd ?? false;
+  const logName = options.logName ?? "openclaw-stub.log";
+  const safeSuffix = logName.replace(/[^a-z0-9.-]/gi, "-");
+  const stubLogPath = path.join(root, safeSuffix);
+  const stubPath = path.join(root, `${safeSuffix}.mjs`);
 
   await writeFile(
     stubPath,

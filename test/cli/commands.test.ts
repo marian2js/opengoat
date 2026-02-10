@@ -96,14 +96,21 @@ describe("CLI commands", () => {
       },
       createdPaths: [],
       skippedPaths: [],
-      alreadyExisted: true
+      alreadyExisted: true,
+      runtimeSync: {
+        runtimeId: "openclaw",
+        code: 0,
+        stdout: "",
+        stderr: ""
+      }
     }));
     const { context, stdout } = createContext({ createAgent });
 
     const code = await agentCreateCommand.run(["Developer"], context);
 
     expect(code).toBe(0);
-    expect(stdout.output()).toContain("Local agent already existed; OpenClaw sync skipped.");
+    expect(stdout.output()).toContain("Local agent already existed; OpenClaw sync was still attempted.");
+    expect(stdout.output()).toContain("OpenClaw sync: openclaw (code 0)");
   });
 
   it("agent delete validates usage", async () => {

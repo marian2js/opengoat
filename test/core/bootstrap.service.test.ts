@@ -136,6 +136,41 @@ describe("BootstrapService", () => {
     };
     expect(index.agents).toEqual(["goat", "research"]);
   });
+
+  it("removes legacy orchestrator agent during bootstrap", async () => {
+    const { service, paths, fileSystem } = await createBootstrapService();
+
+    const legacyWorkspaceDir = path.join(paths.workspacesDir, "orchestrator");
+    const legacyAgentDir = path.join(paths.agentsDir, "orchestrator");
+    await fileSystem.ensureDir(paths.homeDir);
+    await fileSystem.ensureDir(paths.workspacesDir);
+    await fileSystem.ensureDir(paths.agentsDir);
+    await fileSystem.ensureDir(legacyWorkspaceDir);
+    await fileSystem.ensureDir(legacyAgentDir);
+    await fileSystem.writeFile(
+      path.join(legacyWorkspaceDir, "workspace.json"),
+      JSON.stringify({ id: "orchestrator", displayName: "Orchestrator" }, null, 2) + "\n"
+    );
+    await fileSystem.writeFile(
+      paths.agentsIndexJsonPath,
+      JSON.stringify(
+        {
+          schemaVersion: 1,
+          agents: ["orchestrator"],
+          updatedAt: "2026-01-01T00:00:00.000Z"
+        },
+        null,
+        2
+      ) + "\n"
+    );
+
+    await service.initialize();
+
+    expect(await fileSystem.exists(legacyWorkspaceDir)).toBe(false);
+    expect(await fileSystem.exists(legacyAgentDir)).toBe(false);
+    const index = JSON.parse(await readFile(paths.agentsIndexJsonPath, "utf-8")) as { agents: string[] };
+    expect(index.agents).toEqual(["goat"]);
+  });
 });
 
 async function createBootstrapService(): Promise<{
