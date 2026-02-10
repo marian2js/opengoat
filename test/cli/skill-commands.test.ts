@@ -35,7 +35,7 @@ describe("skill commands", () => {
         id: "code-review",
         name: "Code Review",
         description: "Review code changes.",
-        source: "workspace",
+        source: "managed",
         skillFilePath: "/tmp/workspace/skills/code-review/SKILL.md"
       }
     ]);
@@ -44,7 +44,7 @@ describe("skill commands", () => {
     const code = await skillListCommand.run([], context);
 
     expect(code).toBe(0);
-    expect(listSkills).toHaveBeenCalledWith("orchestrator");
+    expect(listSkills).toHaveBeenCalledWith("goat");
     expect(stdout.output()).toContain("code-review");
   });
 

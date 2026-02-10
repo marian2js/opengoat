@@ -3,7 +3,7 @@ import { executeAgentRun } from "./agent-run.shared.js";
 
 export const agentRunCommand: CliCommand = {
   path: ["agent", "run"],
-  description: "Run a message through an agent's configured provider.",
+  description: "Run a message through an OpenClaw-backed agent.",
   async run(args, context): Promise<number> {
     const parsed = parseRunArgs(args);
 
@@ -12,9 +12,7 @@ export const agentRunCommand: CliCommand = {
       context.stderr.write(
         "Usage: opengoat agent run <agent-id> --message <text> [--image <path>] [--session <key|id>] [--new-session|--no-session]\n"
       );
-      context.stderr.write(
-        "       [--direct-session] [--model <model>] [--cwd <path>] [--no-stream] [-- <provider-args>]\n"
-      );
+      context.stderr.write("       [--model <model>] [--cwd <path>] [--no-stream] [-- <runtime-args>]\n");
       return 1;
     }
 
@@ -33,7 +31,6 @@ type RunArgsResult =
       sessionRef?: string;
       forceNewSession: boolean;
       disableSession: boolean;
-      directAgentSession: boolean;
       passthroughArgs: string[];
       stream: boolean;
     }
@@ -60,7 +57,6 @@ function parseRunArgs(args: string[]): RunArgsResult {
   let sessionRef: string | undefined;
   let forceNewSession = false;
   let disableSession = false;
-  let directAgentSession = false;
   let stream = true;
 
   for (let index = 0; index < known.length; index += 1) {
@@ -111,11 +107,6 @@ function parseRunArgs(args: string[]): RunArgsResult {
       continue;
     }
 
-    if (token === "--direct-session") {
-      directAgentSession = true;
-      continue;
-    }
-
     if (token === "--model") {
       const value = known[index + 1];
       if (!value) {
@@ -145,10 +136,6 @@ function parseRunArgs(args: string[]): RunArgsResult {
   if (forceNewSession && disableSession) {
     return { ok: false, error: "Use either --new-session or --no-session, not both." };
   }
-  if (disableSession && directAgentSession) {
-    return { ok: false, error: "Use either --direct-session or --no-session, not both." };
-  }
-
   return {
     ok: true,
     agentId,
@@ -159,7 +146,6 @@ function parseRunArgs(args: string[]): RunArgsResult {
     sessionRef,
     forceNewSession,
     disableSession,
-    directAgentSession,
     passthroughArgs,
     stream
   };

@@ -19,7 +19,7 @@ afterEach(async () => {
 });
 
 describe("SessionService", () => {
-  it("creates a session, appends transcript messages, and injects prior history", async () => {
+  it("creates a session and appends transcript messages", async () => {
     const root = await createTempDir("opengoat-session-");
     roots.push(root);
 
@@ -39,7 +39,6 @@ describe("SessionService", () => {
 
     expect(first.info.isNewSession).toBe(true);
     expect(first.info.sessionKey).toBe("agent:orchestrator:main");
-    expect(first.contextPrompt).toBe("");
 
     await service.recordAssistantReply(paths, first.info, "hello from assistant");
 
@@ -52,8 +51,6 @@ describe("SessionService", () => {
       throw new Error("Expected session-enabled run.");
     }
     expect(second.info.isNewSession).toBe(false);
-    expect(second.contextPrompt).toContain("hello from user");
-    expect(second.contextPrompt).toContain("hello from assistant");
 
     const history = await service.getSessionHistory(paths, "orchestrator", {
       includeCompaction: true
@@ -308,7 +305,7 @@ async function seedAgentConfig(
         schemaVersion: 1,
         id: agentId,
         displayName: "Orchestrator",
-        provider: { id: "codex" },
+        provider: { id: "openclaw" },
         runtime: {
           sessions: {
             mainKey: "main",

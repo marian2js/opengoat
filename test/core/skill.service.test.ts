@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 describe("SkillService", () => {
-  it("merges managed + workspace skills with workspace precedence", async () => {
+  it("lists only assigned centralized skills for an agent", async () => {
     const { service, paths, fileSystem } = await createHarness();
     const managedPath = path.join(paths.skillsDir, "code-review");
     await fileSystem.ensureDir(managedPath);
@@ -27,43 +27,39 @@ describe("SkillService", () => {
       ["---", "name: Code Review", "description: Managed description", "---", "", "# Managed"].join("\n")
     );
 
-    const workspacePath = path.join(paths.workspacesDir, "orchestrator", "skills", "code-review");
-    await fileSystem.ensureDir(workspacePath);
-    await fileSystem.writeFile(
-      path.join(workspacePath, "SKILL.md"),
-      ["---", "name: Code Review", "description: Workspace description", "---", "", "# Workspace"].join("\n")
-    );
+    await setAssignedSkills(fileSystem, paths, ["code-review"]);
 
-    const skills = await service.listSkills(paths, "orchestrator");
+    const skills = await service.listSkills(paths, "goat");
     expect(skills).toHaveLength(1);
-    expect(skills[0]?.source).toBe("workspace");
-    expect(skills[0]?.description).toContain("Workspace");
+    expect(skills[0]?.source).toBe("managed");
+    expect(skills[0]?.id).toBe("code-review");
   });
 
   it("builds an agent skills prompt with skill entries", async () => {
     const { service, paths, fileSystem } = await createHarness();
-    const workspacePath = path.join(paths.workspacesDir, "orchestrator", "skills", "deploy-checklist");
-    await fileSystem.ensureDir(workspacePath);
+    const skillPath = path.join(paths.skillsDir, "deploy-checklist");
+    await fileSystem.ensureDir(skillPath);
     await fileSystem.writeFile(
-      path.join(workspacePath, "SKILL.md"),
+      path.join(skillPath, "SKILL.md"),
       ["---", "name: Deploy Checklist", "description: Release process", "---", "", "# Deploy", "", "- Step A"].join(
         "\n"
       )
     );
+    await setAssignedSkills(fileSystem, paths, ["deploy-checklist"]);
 
-    const prompt = await service.buildSkillsPrompt(paths, "orchestrator");
+    const prompt = await service.buildSkillsPrompt(paths, "goat");
     expect(prompt.prompt).toContain("## Skills");
     expect(prompt.prompt).toContain("<available_skills>");
     expect(prompt.prompt).toContain("deploy-checklist");
-    expect(prompt.prompt).toContain("Self-install/update");
+    expect(prompt.prompt).toContain("global skills store");
   });
 
   it("omits disable-model-invocation skills from prompt while keeping them installed", async () => {
     const { service, paths, fileSystem } = await createHarness();
-    const workspacePath = path.join(paths.workspacesDir, "orchestrator", "skills", "hidden-skill");
-    await fileSystem.ensureDir(workspacePath);
+    const skillPath = path.join(paths.skillsDir, "hidden-skill");
+    await fileSystem.ensureDir(skillPath);
     await fileSystem.writeFile(
-      path.join(workspacePath, "SKILL.md"),
+      path.join(skillPath, "SKILL.md"),
       [
         "---",
         "name: Hidden Skill",
@@ -74,36 +70,56 @@ describe("SkillService", () => {
         "# Hidden"
       ].join("\n")
     );
+    await setAssignedSkills(fileSystem, paths, ["hidden-skill"]);
 
-    const allSkills = await service.listSkills(paths, "orchestrator");
+    const allSkills = await service.listSkills(paths, "goat");
     expect(allSkills.some((skill) => skill.id === "hidden-skill")).toBe(true);
 
-    const prompt = await service.buildSkillsPrompt(paths, "orchestrator");
+    const prompt = await service.buildSkillsPrompt(paths, "goat");
     expect(prompt.prompt).not.toContain("hidden-skill");
   });
 
-  it("loads plugin skills as part of merged skill context", async () => {
-    const pluginSkillRoots: string[] = [];
-    const { service, paths, fileSystem } = await createHarness({
-      pluginSkillDirsProvider: async () => pluginSkillRoots
-    });
+  it("loads extra-dir skills when assigned", async () => {
+    const { service, paths, fileSystem } = await createHarness();
+    const extraSkillsRoot = path.join(paths.homeDir, "extra-skills");
 
-    const pluginRoot = path.join(paths.homeDir, "openclaw-compat", "extensions", "demo-plugin", "skills");
-    pluginSkillRoots.push(pluginRoot);
-    const pluginSkillDir = path.join(pluginRoot, "release-audit");
-    await fileSystem.ensureDir(pluginSkillDir);
+    const extraSkillDir = path.join(extraSkillsRoot, "release-audit");
+    await fileSystem.ensureDir(extraSkillDir);
     await fileSystem.writeFile(
-      path.join(pluginSkillDir, "SKILL.md"),
-      ["---", "name: Release Audit", "description: Plugin skill", "---", "", "# Audit"].join("\n")
+      path.join(extraSkillDir, "SKILL.md"),
+      ["---", "name: Release Audit", "description: Extra-dir skill", "---", "", "# Audit"].join("\n")
+    );
+    await setAssignedSkills(fileSystem, paths, ["release-audit"]);
+    await writeFile(
+      path.join(paths.agentsDir, "goat", "config.json"),
+      JSON.stringify(
+        {
+          schemaVersion: 2,
+          id: "goat",
+          runtime: {
+            skills: {
+              enabled: true,
+              includeManaged: true,
+              assigned: ["release-audit"],
+              load: {
+                extraDirs: [extraSkillsRoot]
+              }
+            }
+          }
+        },
+        null,
+        2
+      ) + "\n",
+      "utf8"
     );
 
-    const skills = await service.listSkills(paths, "orchestrator");
+    const skills = await service.listSkills(paths, "goat");
     expect(skills).toHaveLength(1);
-    expect(skills[0]?.source).toBe("plugin");
+    expect(skills[0]?.source).toBe("extra");
     expect(skills[0]?.id).toBe("release-audit");
   });
 
-  it("installs from source path and preserves extra files", async () => {
+  it("installs from source path and assigns to agent", async () => {
     const { service, paths, fileSystem } = await createHarness();
     const sourceSkillDir = path.join(paths.homeDir, "tmp-source-skill");
     await fileSystem.ensureDir(sourceSkillDir);
@@ -114,29 +130,19 @@ describe("SkillService", () => {
     await fileSystem.writeFile(path.join(sourceSkillDir, "references.md"), "extra\n");
 
     const result = await service.installSkill(paths, {
-      agentId: "orchestrator",
+      agentId: "goat",
       skillName: "local-skill",
       sourcePath: sourceSkillDir
     });
 
     expect(result.source).toBe("source-path");
     expect(await readFile(result.installedPath, "utf8")).toContain("Local Skill");
-    expect(await readFile(path.join(path.dirname(result.installedPath), "references.md"), "utf8")).toContain(
-      "extra"
-    );
-  });
+    expect(await readFile(path.join(path.dirname(result.installedPath), "references.md"), "utf8")).toContain("extra");
 
-  it("generates a scaffold skill when no source exists", async () => {
-    const { service, paths } = await createHarness();
-    const result = await service.installSkill(paths, {
-      skillName: "Release Notes",
-      description: "Generate release notes"
-    });
-
-    const markdown = await readFile(result.installedPath, "utf8");
-    expect(result.source).toBe("generated");
-    expect(markdown).toContain("# Release Notes");
-    expect(markdown).toContain("Generate release notes");
+    const config = JSON.parse(await readFile(path.join(paths.agentsDir, "goat", "config.json"), "utf8")) as {
+      runtime?: { skills?: { assigned?: string[] } };
+    };
+    expect(config.runtime?.skills?.assigned).toContain("local-skill");
   });
 
   it("installs and lists global managed skills", async () => {
@@ -161,9 +167,7 @@ async function createHarness(): Promise<{
   paths: ReturnType<TestPathsProvider["getPaths"]>;
   fileSystem: NodeFileSystem;
 }>;
-async function createHarness(options: {
-  pluginSkillDirsProvider?: (paths: ReturnType<TestPathsProvider["getPaths"]>) => Promise<string[]>;
-} = {}): Promise<{
+async function createHarness(): Promise<{
   service: SkillService;
   paths: ReturnType<TestPathsProvider["getPaths"]>;
   fileSystem: NodeFileSystem;
@@ -183,20 +187,19 @@ async function createHarness(options: {
   await fileSystem.ensureDir(paths.providersDir);
   await fileSystem.ensureDir(paths.runsDir);
 
-  await fileSystem.ensureDir(path.join(paths.workspacesDir, "orchestrator"));
-  await fileSystem.ensureDir(path.join(paths.workspacesDir, "orchestrator", "skills"));
-  await fileSystem.ensureDir(path.join(paths.agentsDir, "orchestrator"));
+  await fileSystem.ensureDir(path.join(paths.workspacesDir, "goat"));
+  await fileSystem.ensureDir(path.join(paths.agentsDir, "goat"));
   await writeFile(
-    path.join(paths.agentsDir, "orchestrator", "config.json"),
+    path.join(paths.agentsDir, "goat", "config.json"),
     JSON.stringify(
       {
-        schemaVersion: 1,
-        id: "orchestrator",
+        schemaVersion: 2,
+        id: "goat",
         runtime: {
           skills: {
             enabled: true,
-            includeWorkspace: true,
-            includeManaged: true
+            includeManaged: true,
+            assigned: []
           }
         }
       },
@@ -209,10 +212,19 @@ async function createHarness(options: {
   return {
     service: new SkillService({
       fileSystem,
-      pathPort,
-      pluginSkillDirsProvider: options.pluginSkillDirsProvider
+      pathPort
     }),
     paths,
     fileSystem
   };
+}
+
+async function setAssignedSkills(fileSystem: NodeFileSystem, paths: ReturnType<TestPathsProvider["getPaths"]>, skills: string[]): Promise<void> {
+  const configPath = path.join(paths.agentsDir, "goat", "config.json");
+  const raw = await readFile(configPath, "utf8");
+  const config = JSON.parse(raw) as { runtime?: { skills?: { assigned?: string[] } } };
+  config.runtime = config.runtime ?? {};
+  config.runtime.skills = config.runtime.skills ?? {};
+  config.runtime.skills.assigned = skills;
+  await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
 }

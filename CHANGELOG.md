@@ -62,7 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Corrected display line processing with `toVisualLines` helper.
 
 ### Changed
-- **Architecture**: Restructured the project into a monorepo with `@opengoat/cli`, `@opengoat/core`, and `@opengoat/electron` packages.
+- **Architecture**: Restructured the project into a monorepo with `@opengoat/cli` and `@opengoat/core` packages.
 - **Package Management**: Migrated from npm to pnpm with workspace configuration.
 - **CLI Framework**: Replaced `node:readline` with `CliPrompter` framework using `@clack/prompts`.
 - **Primary Entrypoint**: Designated `onboard` as the primary command for initial setup.

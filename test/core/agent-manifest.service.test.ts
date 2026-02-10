@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentManifestService } from "../../packages/core/src/core/agents/index.js";
@@ -21,7 +20,7 @@ afterEach(async () => {
 describe("AgentManifestService", () => {
   it("parses AGENTS.md front matter metadata", async () => {
     const { service, fileSystem, paths } = await createHarness();
-    await seedAgent(fileSystem, paths, "researcher", "openai");
+    await seedAgent(fileSystem, paths, "researcher", "Researcher");
 
     await fileSystem.writeFile(
       path.join(paths.workspacesDir, "researcher", "AGENTS.md"),
@@ -30,9 +29,11 @@ describe("AgentManifestService", () => {
         "id: researcher",
         "name: Researcher",
         "description: Handles research tasks",
-        "provider: openai",
+        "type: specialist",
+        "reportsTo: goat",
         "discoverable: false",
         "tags: [research, docs]",
+        "skills: [research, citations]",
         "delegation:",
         "  canReceive: true",
         "  canDelegate: false",
@@ -47,42 +48,24 @@ describe("AgentManifestService", () => {
     const manifest = await service.getManifest(paths, "researcher");
 
     expect(manifest.metadata.name).toBe("Researcher");
-    expect(manifest.metadata.provider).toBe("openai");
+    expect(manifest.metadata.type).toBe("individual");
+    expect(manifest.metadata.reportsTo).toBe("goat");
     expect(manifest.metadata.discoverable).toBe(false);
     expect(manifest.metadata.tags).toEqual(["research", "docs"]);
+    expect(manifest.metadata.skills).toEqual(["research", "citations"]);
     expect(manifest.metadata.priority).toBe(80);
     expect(manifest.source).toBe("frontmatter");
   });
 
-  it("syncs provider in AGENTS.md front matter", async () => {
+  it("derives defaults when AGENTS.md is missing", async () => {
     const { service, fileSystem, paths } = await createHarness();
-    await seedAgent(fileSystem, paths, "researcher", "openai");
+    await seedAgent(fileSystem, paths, "developer", "Developer");
 
-    await fileSystem.writeFile(
-      path.join(paths.workspacesDir, "researcher", "AGENTS.md"),
-      [
-        "---",
-        "id: researcher",
-        "name: Researcher",
-        "description: Handles research tasks",
-        "provider: openai",
-        "tags: [research]",
-        "delegation:",
-        "  canReceive: true",
-        "  canDelegate: false",
-        "priority: 50",
-        "---",
-        "",
-        "# Research Agent"
-      ].join("\n") + "\n"
-    );
-
-    await service.syncManifestProvider(paths, "researcher", "openrouter");
-    const updated = await readFile(path.join(paths.workspacesDir, "researcher", "AGENTS.md"), "utf8");
-
-    expect(updated).toContain("provider: openrouter");
-    expect(updated).toContain("discoverable: true");
-    expect(updated).toContain("# Research Agent");
+    const manifest = await service.getManifest(paths, "developer");
+    expect(manifest.source).toBe("derived");
+    expect(manifest.metadata.type).toBe("individual");
+    expect(manifest.metadata.reportsTo).toBe("goat");
+    expect(manifest.metadata.skills).toEqual([]);
   });
 });
 
@@ -128,24 +111,12 @@ async function seedAgent(
   fileSystem: NodeFileSystem,
   paths: OpenGoatPaths,
   agentId: string,
-  providerId: string
+  displayName: string
 ): Promise<void> {
   await fileSystem.ensureDir(path.join(paths.workspacesDir, agentId));
   await fileSystem.ensureDir(path.join(paths.agentsDir, agentId));
   await fileSystem.writeFile(
     path.join(paths.workspacesDir, agentId, "workspace.json"),
-    JSON.stringify({ displayName: "Researcher" }, null, 2) + "\n"
-  );
-  await fileSystem.writeFile(
-    path.join(paths.agentsDir, agentId, "config.json"),
-    JSON.stringify(
-      {
-        provider: {
-          id: providerId
-        }
-      },
-      null,
-      2
-    ) + "\n"
+    JSON.stringify({ displayName }, null, 2) + "\n"
   );
 }

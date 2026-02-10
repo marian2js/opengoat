@@ -1,5 +1,4 @@
 import { DEFAULT_BOOTSTRAP_MAX_CHARS, WorkspaceContextService } from "../../agents/index.js";
-import { isDefaultAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
@@ -7,11 +6,9 @@ import type { PathPort } from "../../ports/path.port.js";
 import type { AgentSkillsConfig, SkillService } from "../../skills/index.js";
 import {
   AgentConfigNotFoundError,
-  DEFAULT_PROVIDER_ID,
   InvalidAgentConfigError,
   InvalidProviderConfigError,
   UnsupportedProviderActionError,
-  listProviderSummaries,
   type AgentProviderBinding,
   type ProviderAuthOptions,
   type ProviderCreateAgentOptions,
@@ -45,23 +42,15 @@ interface AgentConfigShape {
   runtime?: {
     bootstrapMaxChars?: number;
     skills?: AgentSkillsConfig;
-    workspaceAccess?: AgentWorkspaceAccess;
-  };
-  provider?: {
-    id?: string;
-    updatedAt?: string;
   };
   [key: string]: unknown;
 }
-
-type AgentWorkspaceAccess = "internal" | "external" | "auto";
-type ResolvedWorkspaceAccess = Exclude<AgentWorkspaceAccess, "auto">;
 
 export interface AgentRuntimeProfile {
   agentId: string;
   providerId: string;
   providerKind: "cli" | "http";
-  workspaceAccess: ResolvedWorkspaceAccess;
+  workspaceAccess: "internal";
 }
 
 export interface ProviderStoredConfig {
@@ -70,6 +59,14 @@ export interface ProviderStoredConfig {
   env: Record<string, string>;
   updatedAt: string;
 }
+
+export interface OpenClawGatewayConfig {
+  mode: "local" | "external";
+  gatewayUrl?: string;
+  gatewayToken?: string;
+}
+
+const OPENCLAW_PROVIDER_ID = "openclaw";
 
 export class ProviderService {
   private readonly fileSystem: FileSystemPort;
@@ -96,12 +93,21 @@ export class ProviderService {
 
   public async listProviders(): Promise<ProviderSummary[]> {
     const registry = await this.getProviderRegistry();
-    return listProviderSummaries(registry);
+    const provider = registry.create(OPENCLAW_PROVIDER_ID);
+    return [
+      {
+        id: provider.id,
+        displayName: provider.displayName,
+        kind: provider.kind,
+        capabilities: provider.capabilities
+      }
+    ];
   }
 
   public async getProviderOnboarding(providerId: string): Promise<ProviderOnboardingSpec | undefined> {
+    assertOpenClawProviderId(providerId);
     const registry = await this.getProviderRegistry();
-    return registry.getProviderOnboarding(providerId);
+    return registry.getProviderOnboarding(OPENCLAW_PROVIDER_ID);
   }
 
   public async invokeProviderAuth(
@@ -109,12 +115,11 @@ export class ProviderService {
     providerId: string,
     options: ProviderAuthOptions = {}
   ): Promise<ProviderExecutionResult> {
+    assertOpenClawProviderId(providerId);
     const registry = await this.getProviderRegistry();
-    const provider = registry.create(providerId);
-    const env = await this.resolveProviderEnv(paths, provider.id, options.env);
-    this.logger.info("Invoking provider auth.", {
-      providerId: provider.id
-    });
+    const provider = registry.create(OPENCLAW_PROVIDER_ID);
+    const env = await this.resolveProviderEnv(paths, options.env);
+    this.logger.info("Invoking OpenClaw auth.");
     return provider.invokeAuth?.({
       ...options,
       env
@@ -129,7 +134,8 @@ export class ProviderService {
     paths: OpenGoatPaths,
     providerId: string
   ): Promise<ProviderStoredConfig | null> {
-    const configPath = this.getProviderConfigPath(paths, providerId);
+    assertOpenClawProviderId(providerId);
+    const configPath = this.getProviderConfigPath(paths);
     const exists = await this.fileSystem.exists(configPath);
     if (!exists) {
       return null;
@@ -153,22 +159,25 @@ export class ProviderService {
   public async setProviderConfig(
     paths: OpenGoatPaths,
     providerId: string,
-    env: Record<string, string>
+    env: Record<string, string>,
+    options: {
+      replace?: boolean;
+    } = {}
   ): Promise<ProviderStoredConfig> {
-    const registry = await this.getProviderRegistry();
-    const provider = registry.create(providerId);
-    const providerDir = this.pathPort.join(paths.providersDir, provider.id);
-    const configPath = this.getProviderConfigPath(paths, provider.id);
-    const existing = await this.getProviderConfig(paths, provider.id);
+    assertOpenClawProviderId(providerId);
+    const providerDir = this.pathPort.join(paths.providersDir, OPENCLAW_PROVIDER_ID);
+    const configPath = this.getProviderConfigPath(paths);
+    const existing = await this.getProviderConfig(paths, OPENCLAW_PROVIDER_ID);
+    const replace = options.replace ?? false;
 
     const mergedEnv = sanitizeEnvMap({
-      ...(existing?.env ?? {}),
+      ...(replace ? {} : (existing?.env ?? {})),
       ...env
     });
 
     const next: ProviderStoredConfig = {
       schemaVersion: 1,
-      providerId: provider.id,
+      providerId: OPENCLAW_PROVIDER_ID,
       env: mergedEnv,
       updatedAt: this.nowIso()
     };
@@ -178,44 +187,69 @@ export class ProviderService {
     return next;
   }
 
-  public async getAgentProvider(
-    paths: OpenGoatPaths,
-    agentId: string,
-    configOverride?: AgentConfigShape
-  ): Promise<AgentProviderBinding> {
-    const registry = await this.getProviderRegistry();
-    const config = configOverride ?? (await this.readAgentConfig(paths, agentId));
-    const configuredProviderId = getConfiguredProviderId(config);
+  public async getOpenClawGatewayConfig(paths: OpenGoatPaths): Promise<OpenClawGatewayConfig> {
+    const config = await this.getProviderConfig(paths, OPENCLAW_PROVIDER_ID);
+    const env = config?.env ?? {};
+    const explicitMode = env.OPENGOAT_OPENCLAW_GATEWAY_MODE?.trim().toLowerCase();
+    const parsedArgs = parseOpenClawArguments(env.OPENCLAW_ARGUMENTS ?? "");
 
-    // Validate at read time so invalid configs are surfaced early.
-    const provider = registry.create(configuredProviderId);
+    const mode: "local" | "external" =
+      explicitMode === "external" || parsedArgs.remoteUrl || parsedArgs.token ? "external" : "local";
 
     return {
+      mode,
+      gatewayUrl: env.OPENCLAW_GATEWAY_URL?.trim() || parsedArgs.remoteUrl,
+      gatewayToken: env.OPENCLAW_GATEWAY_PASSWORD?.trim() || parsedArgs.token
+    };
+  }
+
+  public async setOpenClawGatewayConfig(paths: OpenGoatPaths, config: OpenClawGatewayConfig): Promise<OpenClawGatewayConfig> {
+    const current = await this.getProviderConfig(paths, OPENCLAW_PROVIDER_ID);
+    const nextEnv: Record<string, string> = {
+      ...(current?.env ?? {})
+    };
+
+    delete nextEnv.OPENCLAW_ARGUMENTS;
+    delete nextEnv.OPENCLAW_GATEWAY_URL;
+    delete nextEnv.OPENCLAW_GATEWAY_PASSWORD;
+
+    if (config.mode === "external") {
+      const gatewayUrl = config.gatewayUrl?.trim();
+      const gatewayToken = config.gatewayToken?.trim();
+      if (!gatewayUrl || !gatewayToken) {
+        throw new Error("External gateway mode requires gatewayUrl and gatewayToken.");
+      }
+      nextEnv.OPENGOAT_OPENCLAW_GATEWAY_MODE = "external";
+      nextEnv.OPENCLAW_GATEWAY_URL = gatewayUrl;
+      nextEnv.OPENCLAW_GATEWAY_PASSWORD = gatewayToken;
+      nextEnv.OPENCLAW_ARGUMENTS = `--remote ${gatewayUrl} --token ${gatewayToken}`;
+    } else {
+      nextEnv.OPENGOAT_OPENCLAW_GATEWAY_MODE = "local";
+    }
+
+    await this.setProviderConfig(paths, OPENCLAW_PROVIDER_ID, nextEnv, { replace: true });
+    return this.getOpenClawGatewayConfig(paths);
+  }
+
+  public async getAgentProvider(
+    _paths: OpenGoatPaths,
+    agentId: string
+  ): Promise<AgentProviderBinding> {
+    return {
       agentId,
-      providerId: provider.id
+      providerId: OPENCLAW_PROVIDER_ID
     };
   }
 
   public async setAgentProvider(
-    paths: OpenGoatPaths,
+    _paths: OpenGoatPaths,
     agentId: string,
     providerId: string
   ): Promise<AgentProviderBinding> {
-    const registry = await this.getProviderRegistry();
-    const provider = registry.create(providerId);
-    const configPath = this.getAgentConfigPath(paths, agentId);
-    const config = await this.readAgentConfig(paths, agentId);
-
-    config.provider = {
-      id: provider.id,
-      updatedAt: this.nowIso()
-    };
-
-    await this.fileSystem.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
-
+    assertOpenClawProviderId(providerId);
     return {
       agentId,
-      providerId: provider.id
+      providerId: OPENCLAW_PROVIDER_ID
     };
   }
 
@@ -226,46 +260,36 @@ export class ProviderService {
     runtimeContext: ProviderInvokeRuntimeContext = {}
   ): Promise<ProviderExecutionResult & AgentProviderBinding> {
     const registry = await this.getProviderRegistry();
+    const provider = registry.create(OPENCLAW_PROVIDER_ID);
     const config = await this.readAgentConfig(paths, agentId);
-    const binding = await this.getAgentProvider(paths, agentId, config);
-    const provider = registry.create(binding.providerId);
-
     const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
-    const workspaceAccess = resolveWorkspaceAccess(agentId, config.runtime?.workspaceAccess, provider.kind);
-    const contextSystemPrompt =
-      workspaceAccess === "internal"
-        ? await this.buildInternalWorkspacePrompt(
-            paths,
-            agentId,
-            config,
-            workspaceDir,
-            options.skillsPromptOverride
-          )
-        : "";
-    const sessionContext = options.sessionContext?.trim();
-    const sessionContextPrompt = sessionContext ? ["## Session Context", sessionContext].join("\n") : "";
+    const contextSystemPrompt = await this.buildInternalWorkspacePrompt(
+      paths,
+      agentId,
+      config,
+      workspaceDir,
+      options.skillsPromptOverride
+    );
     const mergedSystemPrompt = [
       options.systemPrompt?.trim() || "",
-      contextSystemPrompt,
-      sessionContextPrompt
+      contextSystemPrompt
     ]
       .filter(Boolean)
       .join("\n\n");
-    const resolvedCwd = resolveInvokeCwd(workspaceAccess, options.cwd, workspaceDir);
+
     const invokeOptions: ProviderInvokeOptions = {
       ...options,
       systemPrompt: mergedSystemPrompt || undefined,
-      cwd: resolvedCwd,
-      env: await this.resolveProviderEnv(paths, provider.id, options.env),
+      cwd: options.cwd || workspaceDir,
+      env: await this.resolveProviderEnv(paths, options.env),
       agent: provider.capabilities.agent ? options.agent || agentId : options.agent
     };
 
-    this.logger.info("Invoking provider for agent.", {
+    this.logger.info("Invoking OpenClaw for agent.", {
       agentId,
-      providerId: provider.id,
-      cwd: invokeOptions.cwd,
-      workspaceAccess
+      cwd: invokeOptions.cwd
     });
+
     runtimeContext.hooks?.onInvocationStarted?.({
       runId: runtimeContext.runId,
       timestamp: this.nowIso(),
@@ -273,26 +297,9 @@ export class ProviderService {
       agentId,
       providerId: provider.id
     });
-    this.logger.debug("Provider invoke request payload.", {
-      agentId,
-      providerId: provider.id,
-      message: invokeOptions.message,
-      systemPrompt: invokeOptions.systemPrompt,
-      sessionRef: options.sessionRef,
-      forceNewSession: options.forceNewSession,
-      disableSession: options.disableSession,
-      providerSessionId: options.providerSessionId,
-      forceNewProviderSession: options.forceNewProviderSession,
-      passthroughArgs: invokeOptions.passthroughArgs,
-      model: invokeOptions.model
-    });
 
     const result = await provider.invoke(invokeOptions);
-    this.logger.info("Provider invocation completed.", {
-      agentId,
-      providerId: provider.id,
-      code: result.code
-    });
+
     runtimeContext.hooks?.onInvocationCompleted?.({
       runId: runtimeContext.runId,
       timestamp: this.nowIso(),
@@ -301,18 +308,11 @@ export class ProviderService {
       providerId: provider.id,
       code: result.code
     });
-    this.logger.debug("Provider invoke response payload.", {
-      agentId,
-      providerId: provider.id,
-      code: result.code,
-      stdout: result.stdout,
-      stderr: result.stderr,
-      providerSessionId: result.providerSessionId
-    });
 
     return {
       ...result,
-      ...binding
+      agentId,
+      providerId: provider.id
     };
   }
 
@@ -321,19 +321,12 @@ export class ProviderService {
     agentId: string,
     options: Omit<ProviderCreateAgentOptions, "agentId"> & { providerId?: string }
   ): Promise<ProviderExecutionResult & AgentProviderBinding> {
-    const registry = await this.getProviderRegistry();
-    const binding = options.providerId
-      ? {
-          agentId,
-          providerId: registry.create(options.providerId).id
-        }
-      : await this.getAgentProvider(paths, agentId);
-    const provider = registry.create(binding.providerId);
-    this.logger.info("Creating provider-side agent.", {
-      agentId,
-      providerId: provider.id
-    });
+    if (options.providerId) {
+      assertOpenClawProviderId(options.providerId);
+    }
 
+    const registry = await this.getProviderRegistry();
+    const provider = registry.create(OPENCLAW_PROVIDER_ID);
     if (!provider.capabilities.agentCreate || !provider.createAgent) {
       throw new UnsupportedProviderActionError(provider.id, "create_agent");
     }
@@ -344,20 +337,15 @@ export class ProviderService {
       workspaceDir: options.workspaceDir,
       internalConfigDir: options.internalConfigDir,
       cwd: options.cwd,
-      env: await this.resolveProviderEnv(paths, provider.id, options.env),
+      env: await this.resolveProviderEnv(paths, options.env),
       onStdout: options.onStdout,
       onStderr: options.onStderr
     });
 
-    this.logger.info("Provider-side agent creation completed.", {
-      agentId,
-      providerId: provider.id,
-      code: result.code
-    });
-
     return {
       ...result,
-      ...binding
+      agentId,
+      providerId: provider.id
     };
   }
 
@@ -366,19 +354,12 @@ export class ProviderService {
     agentId: string,
     options: Omit<ProviderDeleteAgentOptions, "agentId"> & { providerId?: string }
   ): Promise<ProviderExecutionResult & AgentProviderBinding> {
-    const registry = await this.getProviderRegistry();
-    const binding = options.providerId
-      ? {
-          agentId,
-          providerId: registry.create(options.providerId).id
-        }
-      : await this.getAgentProvider(paths, agentId);
-    const provider = registry.create(binding.providerId);
-    this.logger.info("Deleting provider-side agent.", {
-      agentId,
-      providerId: provider.id
-    });
+    if (options.providerId) {
+      assertOpenClawProviderId(options.providerId);
+    }
 
+    const registry = await this.getProviderRegistry();
+    const provider = registry.create(OPENCLAW_PROVIDER_ID);
     if (!provider.capabilities.agentDelete || !provider.deleteAgent) {
       throw new UnsupportedProviderActionError(provider.id, "delete_agent");
     }
@@ -386,33 +367,26 @@ export class ProviderService {
     const result = await provider.deleteAgent({
       agentId,
       cwd: options.cwd,
-      env: await this.resolveProviderEnv(paths, provider.id, options.env),
+      env: await this.resolveProviderEnv(paths, options.env),
       onStdout: options.onStdout,
       onStderr: options.onStderr
     });
 
-    this.logger.info("Provider-side agent deletion completed.", {
-      agentId,
-      providerId: provider.id,
-      code: result.code
-    });
-
     return {
       ...result,
-      ...binding
+      agentId,
+      providerId: provider.id
     };
   }
 
-  public async getAgentRuntimeProfile(paths: OpenGoatPaths, agentId: string): Promise<AgentRuntimeProfile> {
+  public async getAgentRuntimeProfile(_paths: OpenGoatPaths, agentId: string): Promise<AgentRuntimeProfile> {
     const registry = await this.getProviderRegistry();
-    const config = await this.readAgentConfig(paths, agentId);
-    const binding = await this.getAgentProvider(paths, agentId, config);
-    const provider = registry.create(binding.providerId);
+    const provider = registry.create(OPENCLAW_PROVIDER_ID);
     return {
       agentId,
       providerId: provider.id,
       providerKind: provider.kind,
-      workspaceAccess: resolveWorkspaceAccess(agentId, config.runtime?.workspaceAccess, provider.kind)
+      workspaceAccess: "internal"
     };
   }
 
@@ -470,16 +444,15 @@ export class ProviderService {
     return this.pathPort.join(paths.agentsDir, agentId, "config.json");
   }
 
-  private getProviderConfigPath(paths: OpenGoatPaths, providerId: string): string {
-    return this.pathPort.join(paths.providersDir, providerId, "config.json");
+  private getProviderConfigPath(paths: OpenGoatPaths): string {
+    return this.pathPort.join(paths.providersDir, OPENCLAW_PROVIDER_ID, "config.json");
   }
 
   private async resolveProviderEnv(
     paths: OpenGoatPaths,
-    providerId: string,
     inputEnv: NodeJS.ProcessEnv | undefined
   ): Promise<NodeJS.ProcessEnv> {
-    const config = await this.getProviderConfig(paths, providerId);
+    const config = await this.getProviderConfig(paths, OPENCLAW_PROVIDER_ID);
     return {
       ...(config?.env ?? {}),
       ...(inputEnv ?? process.env)
@@ -506,34 +479,6 @@ export class ProviderService {
 
     return Promise.resolve(input);
   }
-}
-
-function resolveWorkspaceAccess(
-  agentId: string,
-  configuredAccess: AgentWorkspaceAccess | undefined,
-  providerKind: "cli" | "http"
-): ResolvedWorkspaceAccess {
-  if (configuredAccess === "internal" || configuredAccess === "external") {
-    return configuredAccess;
-  }
-
-  if (isDefaultAgentId(agentId)) {
-    return "internal";
-  }
-
-  return providerKind === "http" ? "internal" : "external";
-}
-
-function resolveInvokeCwd(workspaceAccess: ResolvedWorkspaceAccess, requestedCwd: string | undefined, workspaceDir: string): string {
-  if (workspaceAccess === "internal") {
-    return requestedCwd || workspaceDir;
-  }
-  return requestedCwd || process.cwd();
-}
-
-function getConfiguredProviderId(config: AgentConfigShape): string {
-  const providerId = config.provider?.id?.trim().toLowerCase();
-  return providerId || DEFAULT_PROVIDER_ID;
 }
 
 function resolveBootstrapMaxChars(raw: number | undefined): number {
@@ -586,4 +531,25 @@ function sanitizeEnvMap(input: Record<string, string>): Record<string, string> {
     sanitized[normalizedKey] = normalizedValue;
   }
   return sanitized;
+}
+
+function parseOpenClawArguments(raw: string): { remoteUrl?: string; token?: string } {
+  const parts = raw
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const remoteIndex = parts.findIndex((part) => part === "--remote");
+  const tokenIndex = parts.findIndex((part) => part === "--token");
+
+  return {
+    remoteUrl: remoteIndex >= 0 ? parts[remoteIndex + 1] : undefined,
+    token: tokenIndex >= 0 ? parts[tokenIndex + 1] : undefined
+  };
+}
+
+function assertOpenClawProviderId(providerId: string): void {
+  if (providerId.trim().toLowerCase() !== OPENCLAW_PROVIDER_ID) {
+    throw new Error(`Only \"${OPENCLAW_PROVIDER_ID}\" is supported in this OpenGoat version.`);
+  }
 }

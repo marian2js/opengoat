@@ -403,8 +403,8 @@ export class OpenGoatAcpAgent implements Agent {
         availableModes: [
           {
             id: this.defaultAgentId,
-            name: "Orchestrator",
-            description: "Default OpenGoat orchestrator agent."
+            name: "Manager",
+            description: "Default OpenGoat manager agent (goat / head of organization)."
           }
         ]
       };

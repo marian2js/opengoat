@@ -18,146 +18,10 @@ function createContext(service: unknown) {
 }
 
 describe("onboard command", () => {
-  it("configures provider credentials in non-interactive mode", async () => {
-    const service = {
-      initialize: vi.fn(async () => ({
-        defaultAgent: "orchestrator"
-      })),
-      listProviders: vi.fn(async () => [
-        {
-          id: "openai",
-          displayName: "OpenAI",
-          kind: "http",
-          capabilities: { agent: false, model: true, auth: false, passthrough: false }
-        }
-      ]),
-      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "codex" })),
-      setAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openai" })),
-      getProviderOnboarding: vi.fn(async () => ({
-        env: [{ key: "OPENAI_API_KEY", description: "OpenAI key", required: true, secret: true }],
-        auth: { supported: false, description: "API key only" }
-      })),
-      getProviderConfig: vi.fn(async () => null),
-      setProviderConfig: vi.fn(async () => ({
-        providerId: "openai",
-        env: { OPENAI_API_KEY: "sk-test" }
-      })),
-      authenticateProvider: vi.fn(),
-      getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
-    };
-
-    const { context, stdout } = createContext(service);
-    const code = await onboardCommand.run(
-      ["--non-interactive", "--provider", "openai", "--openai-api-key", "sk-test"],
-      context
-    );
-
-    expect(code).toBe(0);
-    expect(service.initialize).toHaveBeenCalledOnce();
-    expect(service.setAgentProvider).toHaveBeenCalledWith("orchestrator", "openai");
-    expect(service.setProviderConfig).toHaveBeenCalledWith(
-      "openai",
-      expect.objectContaining({ OPENAI_API_KEY: "sk-test" })
-    );
-    expect(stdout.output()).toContain("Onboarding complete.");
-  });
-
-  it("accepts dynamic provider env flags with inline assignment syntax", async () => {
-    const service = {
-      initialize: vi.fn(async () => ({
-        defaultAgent: "orchestrator"
-      })),
-      listProviders: vi.fn(async () => [
-        {
-          id: "openai",
-          displayName: "OpenAI",
-          kind: "http",
-          capabilities: { agent: false, model: true, auth: false, passthrough: false }
-        }
-      ]),
-      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openai" })),
-      setAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openai" })),
-      getProviderOnboarding: vi.fn(async () => ({
-        env: [{ key: "OPENAI_API_KEY", description: "OpenAI key", required: true, secret: true }],
-        auth: { supported: false, description: "API key only" }
-      })),
-      getProviderConfig: vi.fn(async () => null),
-      setProviderConfig: vi.fn(async () => ({
-        providerId: "openai",
-        env: {
-          OPENAI_API_KEY: "sk-test",
-          OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
-          OPENAI_MODEL: "moonshotai/kimi-k2.5"
-        }
-      })),
-      authenticateProvider: vi.fn(),
-      getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
-    };
-
-    const { context } = createContext(service);
-    const code = await onboardCommand.run(
-      [
-        "--non-interactive",
-        "--provider",
-        "openai",
-        "--openai-api-key=sk-test",
-        "--openai-base-url=https://integrate.api.nvidia.com/v1",
-        "--openai-model=moonshotai/kimi-k2.5"
-      ],
-      context
-    );
-
-    expect(code).toBe(0);
-    expect(service.setProviderConfig).toHaveBeenCalledWith(
-      "openai",
-      expect.objectContaining({
-        OPENAI_API_KEY: "sk-test",
-        OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
-        OPENAI_MODEL: "moonshotai/kimi-k2.5"
-      })
-    );
-  });
-
-  it("fails when required provider keys are missing in non-interactive mode", async () => {
-    const service = {
-      initialize: vi.fn(async () => ({})),
-      listProviders: vi.fn(async () => [
-        {
-          id: "openai",
-          displayName: "OpenAI",
-          kind: "http",
-          capabilities: { agent: false, model: true, auth: false, passthrough: false }
-        }
-      ]),
-      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openai" })),
-      setAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openai" })),
-      getProviderOnboarding: vi.fn(async () => ({
-        env: [{ key: "OPENAI_API_KEY", description: "OpenAI key", required: true, secret: true }]
-      })),
-      getProviderConfig: vi.fn(async () => null),
-      setProviderConfig: vi.fn(),
-      authenticateProvider: vi.fn(),
-      getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
-    };
-
-    const { context, stderr } = createContext(service);
-    const code = await onboardCommand.run(["--non-interactive", "--provider", "openai"], context);
-
-    expect(code).toBe(1);
-    expect(stderr.output()).toContain("Missing required provider settings");
-    expect(service.setProviderConfig).not.toHaveBeenCalled();
-  });
-
   it("prints help", async () => {
     const service = {
       initialize: vi.fn(),
-      listProviders: vi.fn(),
-      getAgentProvider: vi.fn(),
-      setAgentProvider: vi.fn(),
-      getProviderOnboarding: vi.fn(),
-      getProviderConfig: vi.fn(),
-      setProviderConfig: vi.fn(),
-      authenticateProvider: vi.fn(),
+      setOpenClawGatewayConfig: vi.fn(),
       getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
     };
 
@@ -169,207 +33,87 @@ describe("onboard command", () => {
     expect(stdout.output()).toContain("opengoat onboard");
   });
 
-  it("runs provider auth flow when requested", async () => {
+  it("defaults to local gateway in non-interactive mode", async () => {
     const service = {
       initialize: vi.fn(async () => ({})),
-      listProviders: vi.fn(async () => [
-        {
-          id: "codex",
-          displayName: "Codex",
-          kind: "cli",
-          capabilities: { agent: true, model: true, auth: true, passthrough: true }
-        }
-      ]),
-      getAgentProvider: vi.fn(async () => ({ agentId: "developer", providerId: "codex" })),
-      setAgentProvider: vi.fn(async () => ({ agentId: "developer", providerId: "codex" })),
-      getProviderOnboarding: vi.fn(async () => ({
-        auth: { supported: true, description: "Runs codex login" }
+      setOpenClawGatewayConfig: vi.fn(async () => ({ mode: "local" })),
+      getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
+    };
+
+    const { context, stdout } = createContext(service);
+    const code = await onboardCommand.run(["--non-interactive"], context);
+
+    expect(code).toBe(0);
+    expect(service.initialize).toHaveBeenCalledOnce();
+    expect(service.setOpenClawGatewayConfig).toHaveBeenCalledWith({ mode: "local" });
+    expect(stdout.output()).toContain("Mode: local");
+    expect(stdout.output()).toContain("/tmp/providers/openclaw/config.json");
+  });
+
+  it("configures external gateway in non-interactive mode", async () => {
+    const service = {
+      initialize: vi.fn(async () => ({})),
+      setOpenClawGatewayConfig: vi.fn(async () => ({
+        mode: "external",
+        gatewayUrl: "ws://remote-host:18789",
+        gatewayToken: "secret-token"
       })),
-      getProviderConfig: vi.fn(async () => null),
-      setProviderConfig: vi.fn(),
-      authenticateProvider: vi.fn(async () => ({ code: 0, stdout: "", stderr: "" })),
       getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
     };
 
     const { context, stdout } = createContext(service);
     const code = await onboardCommand.run(
-      ["--non-interactive", "--agent", "developer", "--provider", "codex", "--run-auth"],
-      context
-    );
-
-    expect(code).toBe(0);
-    expect(service.authenticateProvider).toHaveBeenCalledTimes(1);
-    expect(service.authenticateProvider).toHaveBeenCalledWith(
-      "codex",
-      expect.objectContaining({
-        env: process.env,
-        onStdout: expect.any(Function),
-        onStderr: expect.any(Function)
-      })
-    );
-    expect(stdout.output()).toContain("Provider auth flow completed.");
-  });
-
-  it("maps --model to provider model env var discovered from onboarding metadata", async () => {
-    const service = {
-      initialize: vi.fn(async () => ({})),
-      listProviders: vi.fn(async () => [
-        {
-          id: "anthropic",
-          displayName: "Anthropic",
-          kind: "http",
-          capabilities: { agent: false, model: true, auth: false, passthrough: false }
-        }
-      ]),
-      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "anthropic" })),
-      setAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "anthropic" })),
-      getProviderOnboarding: vi.fn(async () => ({
-        env: [
-          { key: "ANTHROPIC_API_KEY", description: "Anthropic key", required: true, secret: true },
-          { key: "ANTHROPIC_MODEL", description: "Optional model id", required: false, secret: false }
-        ],
-        auth: { supported: false, description: "API key only" }
-      })),
-      getProviderConfig: vi.fn(async () => null),
-      setProviderConfig: vi.fn(async () => ({
-        providerId: "anthropic",
-        env: { ANTHROPIC_API_KEY: "ant-test", ANTHROPIC_MODEL: "claude-opus-4-5" }
-      })),
-      authenticateProvider: vi.fn(),
-      getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
-    };
-
-    const { context } = createContext(service);
-    const code = await onboardCommand.run(
       [
         "--non-interactive",
-        "--provider",
-        "anthropic",
-        "--model",
-        "claude-opus-4-5",
-        "--env",
-        "ANTHROPIC_API_KEY=ant-test"
+        "--external",
+        "--gateway-url",
+        "ws://remote-host:18789",
+        "--gateway-token",
+        "secret-token"
       ],
       context
     );
 
     expect(code).toBe(0);
-    expect(service.setProviderConfig).toHaveBeenCalledWith(
-      "anthropic",
-      expect.objectContaining({
-        ANTHROPIC_MODEL: "claude-opus-4-5"
-      })
-    );
+    expect(service.setOpenClawGatewayConfig).toHaveBeenCalledWith({
+      mode: "external",
+      gatewayUrl: "ws://remote-host:18789",
+      gatewayToken: "secret-token"
+    });
+    expect(stdout.output()).toContain("Mode: external");
+    expect(stdout.output()).toContain("Gateway URL: ws://remote-host:18789");
   });
 
-  it("defaults orchestrator to OpenGoat-priority internal providers", async () => {
+  it("fails when external mode is missing gateway details", async () => {
     const service = {
       initialize: vi.fn(async () => ({})),
-      listProviders: vi.fn(async () => [
-        {
-          id: "codex",
-          displayName: "Codex CLI",
-          kind: "cli",
-          capabilities: { agent: false, model: true, auth: true, passthrough: true }
-        },
-        {
-          id: "anthropic",
-          displayName: "Anthropic",
-          kind: "http",
-          capabilities: { agent: false, model: true, auth: false, passthrough: false }
-        },
-        {
-          id: "openai",
-          displayName: "OpenAI",
-          kind: "http",
-          capabilities: { agent: false, model: true, auth: false, passthrough: false }
-        }
-      ]),
-      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "codex" })),
-      setAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openai" })),
-      getProviderOnboarding: vi.fn(async () => ({})),
-      getProviderConfig: vi.fn(async () => null),
-      setProviderConfig: vi.fn(),
-      authenticateProvider: vi.fn(),
+      setOpenClawGatewayConfig: vi.fn(),
       getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
     };
 
-    const { context } = createContext(service);
-    const code = await onboardCommand.run(["--non-interactive"], context);
+    const { context, stderr } = createContext(service);
+    const code = await onboardCommand.run(["--non-interactive", "--external"], context);
 
-    expect(code).toBe(0);
-    expect(service.setAgentProvider).toHaveBeenCalledWith("orchestrator", "openai");
+    expect(code).toBe(1);
+    expect(stderr.output()).toContain("External mode requires --gateway-url and --gateway-token.");
+    expect(service.setOpenClawGatewayConfig).not.toHaveBeenCalled();
   });
 
-  it("rejects explicit external orchestrator provider selections", async () => {
+  it("rejects gateway URL/token flags when local mode is selected", async () => {
     const service = {
-      initialize: vi.fn(async () => ({})),
-      listProviders: vi.fn(async () => [
-        {
-          id: "codex",
-          displayName: "Codex CLI",
-          kind: "cli",
-          capabilities: { agent: false, model: true, auth: true, passthrough: true }
-        },
-        {
-          id: "openai",
-          displayName: "OpenAI",
-          kind: "http",
-          capabilities: { agent: false, model: true, auth: false, passthrough: false }
-        }
-      ]),
-      getAgentProvider: vi.fn(async () => ({ agentId: "orchestrator", providerId: "openai" })),
-      setAgentProvider: vi.fn(),
-      getProviderOnboarding: vi.fn(),
-      getProviderConfig: vi.fn(),
-      setProviderConfig: vi.fn(),
-      authenticateProvider: vi.fn(),
+      initialize: vi.fn(),
+      setOpenClawGatewayConfig: vi.fn(),
       getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
     };
 
     const { context, stderr } = createContext(service);
     const code = await onboardCommand.run(
-      ["--non-interactive", "--agent", "orchestrator", "--provider", "codex"],
+      ["--local", "--gateway-url", "ws://remote-host:18789"],
       context
     );
 
     expect(code).toBe(1);
-    expect(stderr.output()).toContain("not supported for orchestrator onboarding");
-    expect(service.setAgentProvider).not.toHaveBeenCalled();
-  });
-
-  it("sorts internal providers before external providers", async () => {
-    const service = {
-      initialize: vi.fn(async () => ({})),
-      listProviders: vi.fn(async () => [
-        {
-          id: "codex",
-          displayName: "Codex CLI",
-          kind: "cli",
-          capabilities: { agent: false, model: true, auth: true, passthrough: true }
-        },
-        {
-          id: "anthropic",
-          displayName: "Anthropic",
-          kind: "http",
-          capabilities: { agent: false, model: true, auth: false, passthrough: false }
-        }
-      ]),
-      getAgentProvider: vi.fn(async () => {
-        throw new Error("no current provider");
-      }),
-      setAgentProvider: vi.fn(async () => ({ agentId: "developer", providerId: "openai" })),
-      getProviderOnboarding: vi.fn(async () => ({})),
-      getProviderConfig: vi.fn(async () => null),
-      setProviderConfig: vi.fn(),
-      authenticateProvider: vi.fn(),
-      getPaths: vi.fn(() => ({ providersDir: "/tmp/providers" }))
-    };
-
-    const { context } = createContext(service);
-    const code = await onboardCommand.run(["--non-interactive", "--agent", "developer"], context);
-
-    expect(code).toBe(0);
-    expect(service.setAgentProvider).toHaveBeenCalledWith("developer", "anthropic");
+    expect(stderr.output()).toContain("--gateway-url/--gateway-token are only valid with --external.");
+    expect(service.initialize).not.toHaveBeenCalled();
   });
 });

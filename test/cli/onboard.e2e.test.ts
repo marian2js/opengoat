@@ -19,33 +19,27 @@ afterEach(async () => {
 });
 
 describe("onboard command e2e", () => {
-  it("bootstraps a fresh home, assigns provider, and saves provider config", async () => {
+  it("bootstraps a fresh home and saves local OpenClaw runtime config", async () => {
     const root = await createTempDir("opengoat-onboard-e2e-");
     roots.push(root);
 
-    const result = await runBinary(
-      ["onboard", "--non-interactive", "--provider", "openai", "--openai-api-key", "sk-test"],
-      root
-    );
+    const result = await runBinary(["onboard", "--non-interactive"], root);
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("Onboarding complete.");
-    expect(result.stdout).toContain("Provider: openai");
+    expect(result.stdout).toContain("Mode: local");
+    expect(result.stdout).toContain("Saved runtime config:");
 
-    const agentConfig = JSON.parse(await readFile(path.join(root, "agents", "orchestrator", "config.json"), "utf-8")) as {
-      provider?: { id?: string };
-    };
-    expect(agentConfig.provider?.id).toBe("openai");
-
-    const providerConfig = JSON.parse(await readFile(path.join(root, "providers", "openai", "config.json"), "utf-8")) as {
+    const providerConfig = JSON.parse(
+      await readFile(path.join(root, "providers", "openclaw", "config.json"), "utf-8")
+    ) as {
       providerId?: string;
       env?: Record<string, string>;
     };
-    expect(providerConfig.providerId).toBe("openai");
-    expect(providerConfig.env?.OPENAI_API_KEY).toBe("sk-test");
+    expect(providerConfig.providerId).toBe("openclaw");
+    expect(providerConfig.env?.OPENGOAT_OPENCLAW_GATEWAY_MODE).toBe("local");
   });
 
-  it("supports dynamic provider flags for env assignment", async () => {
+  it("saves external OpenClaw gateway settings", async () => {
     const root = await createTempDir("opengoat-onboard-e2e-");
     roots.push(root);
 
@@ -53,50 +47,51 @@ describe("onboard command e2e", () => {
       [
         "onboard",
         "--non-interactive",
-        "--provider",
-        "openai",
-        "--openai-api-key=sk-test",
-        "--openai-base-url=https://integrate.api.nvidia.com/v1",
-        "--openai-model=moonshotai/kimi-k2.5"
+        "--external",
+        "--gateway-url",
+        "ws://remote-host:18789",
+        "--gateway-token",
+        "secret-token"
       ],
       root
     );
 
     expect(result.code).toBe(0);
-    const providerConfig = JSON.parse(await readFile(path.join(root, "providers", "openai", "config.json"), "utf-8")) as {
+    expect(result.stdout).toContain("Mode: external");
+    expect(result.stdout).toContain("Gateway URL: ws://remote-host:18789");
+
+    const providerConfig = JSON.parse(
+      await readFile(path.join(root, "providers", "openclaw", "config.json"), "utf-8")
+    ) as {
       env?: Record<string, string>;
     };
-    expect(providerConfig.env).toEqual(
-      expect.objectContaining({
-        OPENAI_API_KEY: "sk-test",
-        OPENAI_BASE_URL: "https://integrate.api.nvidia.com/v1",
-        OPENAI_MODEL: "moonshotai/kimi-k2.5"
-      })
-    );
+    expect(providerConfig.env?.OPENGOAT_OPENCLAW_GATEWAY_MODE).toBe("external");
+    expect(providerConfig.env?.OPENCLAW_GATEWAY_URL).toBe("ws://remote-host:18789");
+    expect(providerConfig.env?.OPENCLAW_GATEWAY_PASSWORD).toBe("secret-token");
+    expect(providerConfig.env?.OPENCLAW_ARGUMENTS).toContain("--remote ws://remote-host:18789");
   });
 
-  it("fails with a clear error when required provider settings are missing", async () => {
+  it("fails with a clear error when external mode is missing required fields", async () => {
     const root = await createTempDir("opengoat-onboard-e2e-");
     roots.push(root);
 
-    const result = await runBinary(["onboard", "--non-interactive", "--provider", "google"], root);
+    const result = await runBinary(["onboard", "--non-interactive", "--external"], root);
 
     expect(result.code).toBe(1);
-    expect(result.stderr).toContain("Missing required provider settings for google: GEMINI_API_KEY");
-    expect(result.stderr).toContain("Provide values with --env KEY=VALUE");
+    expect(result.stderr).toContain("External mode requires --gateway-url and --gateway-token.");
   });
 
-  it("rejects external providers for orchestrator onboarding", async () => {
+  it("rejects gateway url/token flags in local mode", async () => {
     const root = await createTempDir("opengoat-onboard-e2e-");
     roots.push(root);
 
     const result = await runBinary(
-      ["onboard", "--non-interactive", "--agent", "orchestrator", "--provider", "codex"],
+      ["onboard", "--non-interactive", "--local", "--gateway-url", "ws://remote-host:18789"],
       root
     );
 
     expect(result.code).toBe(1);
-    expect(result.stderr).toContain('Provider "codex" is not supported for orchestrator onboarding.');
+    expect(result.stderr).toContain("--gateway-url/--gateway-token are only valid with --external.");
   });
 });
 

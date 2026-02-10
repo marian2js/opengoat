@@ -1,143 +1,70 @@
 import { randomUUID } from "node:crypto";
-import path from "node:path";
-import { isDiscoverableByOrchestrator, type AgentManifest, type AgentManifestService } from "../../agents/index.js";
+import type { AgentManifestService } from "../../agents/index.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
-import type { CommandRunnerPort } from "../../ports/command-runner.port.js";
-import type { FileSystemPort } from "../../ports/file-system.port.js";
-import type { PathPort } from "../../ports/path.port.js";
 import type {
   AgentProviderBinding,
   ProviderExecutionResult,
   ProviderInvokeOptions,
   ProviderService
 } from "../../providers/index.js";
-import { SessionService, type PreparedSessionRun, type SessionCompactionResult, type SessionRunInfo } from "../../sessions/index.js";
-import type { SkillService } from "../../skills/index.js";
-import type {
-  OrchestrationAction,
-  OrchestrationPlannerDecision,
-  OrchestrationRunLedger,
-  OrchestrationStepLog,
-  OrchestrationTaskSessionPolicy
-} from "../domain/loop.js";
+import { SessionService, type SessionCompactionResult, type SessionRunInfo } from "../../sessions/index.js";
 import type { OrchestrationRunEvent, OrchestrationRunOptions } from "../domain/run-events.js";
 import type { AgentRunTrace, OrchestrationRunResult, RoutingDecision } from "../domain/routing.js";
-import { OrchestrationPlannerService } from "./orchestration-planner.service.js";
 import { RoutingService } from "./routing.service.js";
 
 interface OrchestrationServiceDeps {
   providerService: ProviderService;
-  skillService: SkillService;
   agentManifestService: AgentManifestService;
   sessionService: SessionService;
-  commandRunner?: CommandRunnerPort;
   routingService?: RoutingService;
-  plannerService?: OrchestrationPlannerService;
-  fileSystem: FileSystemPort;
-  pathPort: PathPort;
+  fileSystem: {
+    ensureDir(path: string): Promise<void>;
+    writeFile(path: string, content: string): Promise<void>;
+  };
+  pathPort: {
+    join(...parts: string[]): string;
+  };
   nowIso: () => string;
   logger?: Logger;
 }
 
 interface AgentInvocationResult {
   execution: ProviderExecutionResult & AgentProviderBinding;
-  workingTreeEffect?: WorkingTreeEffect;
   session?: SessionRunInfo & {
     preRunCompactionApplied: boolean;
     postRunCompaction: SessionCompactionResult;
   };
 }
 
-interface OrchestrationLoopResult {
-  finalMessage: string;
-  execution: ProviderExecutionResult & AgentProviderBinding;
-  steps: OrchestrationStepLog[];
-  sessionGraph: OrchestrationRunLedger["sessionGraph"];
-  taskThreads: NonNullable<OrchestrationRunLedger["taskThreads"]>;
-}
-
-interface TaskThreadState {
-  taskKey: string;
-  agentId: string;
-  providerId?: string;
-  providerSessionId?: string;
-  sessionKey?: string;
-  sessionId?: string;
-  createdStep: number;
-  updatedStep: number;
-  lastResponse?: string;
-}
-
-interface DelegationFailureSummary {
-  reason: "provider_error" | "blocked_no_progress";
-  message: string;
-}
-
-interface WorkspaceFileResolveInput {
-  paths: OpenGoatPaths;
-  requestedPath: string;
-  workingPathHint?: string;
-}
-
-interface WorkingTreeStatusEntry {
-  path: string;
-  raw: string;
-}
-
-interface WorkingTreeSnapshot {
-  enabled: boolean;
-  workingPath: string;
-  entries: WorkingTreeStatusEntry[];
-}
-
-interface WorkingTreeEffect {
-  enabled: boolean;
-  workingPath?: string;
-  beforeEntries: number;
-  afterEntries: number;
-  touchedPaths: string[];
-  summary: string;
-}
-
-const MAX_ORCHESTRATION_STEPS = 12;
-const MAX_DELEGATION_STEPS = 8;
-const SHARED_NOTES_MAX_CHARS = 12_000;
-const RECENT_EVENTS_WINDOW = 10;
-
 export class OrchestrationService {
   private readonly providerService: ProviderService;
-  private readonly skillService: SkillService;
   private readonly agentManifestService: AgentManifestService;
   private readonly sessionService: SessionService;
-  private readonly commandRunner?: CommandRunnerPort;
   private readonly routingService: RoutingService;
-  private readonly plannerService: OrchestrationPlannerService;
-  private readonly fileSystem: FileSystemPort;
-  private readonly pathPort: PathPort;
+  private readonly fileSystem: {
+    ensureDir(path: string): Promise<void>;
+    writeFile(path: string, content: string): Promise<void>;
+  };
+  private readonly pathPort: {
+    join(...parts: string[]): string;
+  };
   private readonly nowIso: () => string;
   private readonly logger: Logger;
 
   public constructor(deps: OrchestrationServiceDeps) {
     this.providerService = deps.providerService;
-    this.skillService = deps.skillService;
     this.agentManifestService = deps.agentManifestService;
     this.sessionService = deps.sessionService;
-    this.commandRunner = deps.commandRunner;
     this.routingService = deps.routingService ?? new RoutingService();
-    this.plannerService = deps.plannerService ?? new OrchestrationPlannerService();
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
     this.nowIso = deps.nowIso;
-    this.logger = (deps.logger ?? createNoopLogger()).child({ scope: "orchestration-service" });
+    this.logger = (deps.logger ?? createNoopLogger()).child({ scope: "manager-runtime-service" });
   }
 
-  public async routeMessage(
-    paths: OpenGoatPaths,
-    entryAgentId: string,
-    message: string
-  ): Promise<RoutingDecision> {
+  public async routeMessage(paths: OpenGoatPaths, entryAgentId: string, message: string): Promise<RoutingDecision> {
     const manifests = await this.agentManifestService.listManifests(paths);
     const resolvedEntryAgentId = resolveEntryAgentId(entryAgentId, manifests);
 
@@ -154,14 +81,10 @@ export class OrchestrationService {
     options: OrchestrationRunOptions
   ): Promise<OrchestrationRunResult> {
     const runId = generateRunId();
-    const runLogger = this.logger.child({ runId });
     const startedAt = this.nowIso();
     const manifests = await this.agentManifestService.listManifests(paths);
     const resolvedEntryAgentId = resolveEntryAgentId(entryAgentId, manifests);
-    runLogger.info("Starting agent run.", {
-      entryAgentId,
-      resolvedEntryAgentId
-    });
+
     emitRunStatusEvent(options, {
       stage: "run_started",
       runId,
@@ -169,82 +92,40 @@ export class OrchestrationService {
       agentId: resolvedEntryAgentId
     });
 
-    if (resolvedEntryAgentId !== DEFAULT_AGENT_ID) {
-      runLogger.info("Running direct non-orchestrator invocation.", {
-        targetAgentId: resolvedEntryAgentId
-      });
-      const sessionAgentId = options.directAgentSession ? resolvedEntryAgentId : DEFAULT_AGENT_ID;
-      const direct = await this.invokeAgentWithSession(paths, resolvedEntryAgentId, {
-        ...options,
-        message: options.message
-      }, { sessionAgentId, runId });
-      const completedAt = this.nowIso();
-      const routing: RoutingDecision = {
-        entryAgentId: resolvedEntryAgentId,
-        targetAgentId: resolvedEntryAgentId,
-        confidence: 1,
-        reason: "Direct invocation of a non-orchestrator agent.",
-        rewrittenMessage: options.message,
-        candidates: []
-      };
-      const trace = await this.buildAndWriteTrace({
-        paths,
-        runId,
-        startedAt,
-        completedAt,
-        entryAgentId: resolvedEntryAgentId,
-        userMessage: options.message,
-        routing,
-        execution: direct.execution,
-        durationMs: 0,
-        session: direct.session,
-          orchestration: {
-            mode: "single-agent",
-            finalMessage: direct.execution.stdout,
-            steps: [],
-            sessionGraph: {
-            nodes: [
-              {
-                agentId: resolvedEntryAgentId,
-                providerId: direct.execution.providerId,
-                sessionKey: direct.session?.sessionKey,
-                sessionId: direct.session?.sessionId,
-                providerSessionId: direct.execution.providerSessionId
-              }
-            ],
-            edges: []
-          },
-          taskThreads: []
-        }
-      });
-      emitRunStatusEvent(options, {
-        stage: "run_completed",
-        runId,
-        timestamp: this.nowIso(),
-        agentId: resolvedEntryAgentId
-      });
+    const sessionAgentId = resolvedEntryAgentId;
+    const startedMs = Date.now();
+    const direct = await this.invokeAgentWithSession(paths, resolvedEntryAgentId, options, {
+      sessionAgentId,
+      runId
+    });
+    const durationMs = Date.now() - startedMs;
 
-      return {
-        ...direct.execution,
-        entryAgentId: resolvedEntryAgentId,
-        routing,
-        tracePath: trace.tracePath,
-        session: direct.session,
-        orchestration: trace.trace.orchestration
-      };
-    }
-
-    const startTime = Date.now();
-    const loopResult = await this.runAiOrchestrationLoop(paths, runId, manifests, options, runLogger);
-    const durationMs = Date.now() - startTime;
-    const completedAt = this.nowIso();
     const routing: RoutingDecision = {
-      entryAgentId: DEFAULT_AGENT_ID,
-      targetAgentId: DEFAULT_AGENT_ID,
-      confidence: 0.9,
-      reason: "AI orchestration loop executed by orchestrator.",
+      entryAgentId: resolvedEntryAgentId,
+      targetAgentId: resolvedEntryAgentId,
+      confidence: 1,
+      reason: "Direct OpenClaw runtime invocation.",
       rewrittenMessage: options.message,
       candidates: []
+    };
+
+    const completedAt = this.nowIso();
+    const orchestration: OrchestrationRunResult["orchestration"] = {
+      mode: "single-agent",
+      steps: [],
+      finalMessage: direct.execution.stdout,
+      sessionGraph: {
+        nodes: [
+          {
+            agentId: resolvedEntryAgentId,
+            providerId: direct.execution.providerId,
+            sessionKey: direct.session?.sessionKey,
+            sessionId: direct.session?.sessionId,
+            providerSessionId: direct.execution.providerSessionId
+          }
+        ],
+        edges: []
+      }
     };
 
     const trace = await this.buildAndWriteTrace({
@@ -252,587 +133,46 @@ export class OrchestrationService {
       runId,
       startedAt,
       completedAt,
-      entryAgentId: DEFAULT_AGENT_ID,
+      entryAgentId: resolvedEntryAgentId,
       userMessage: options.message,
       routing,
-      execution: loopResult.execution,
+      execution: direct.execution,
       durationMs,
-      orchestration: {
-        mode: "ai-loop",
-        finalMessage: loopResult.finalMessage,
-        steps: loopResult.steps,
-        sessionGraph: loopResult.sessionGraph,
-        taskThreads: loopResult.taskThreads
-      }
+      session: direct.session,
+      orchestration
     });
+
+    this.logger.info("Completed manager runtime invocation.", {
+      runId,
+      entryAgentId: resolvedEntryAgentId,
+      code: direct.execution.code,
+      durationMs
+    });
+
     emitRunStatusEvent(options, {
       stage: "run_completed",
       runId,
       timestamp: this.nowIso(),
-      agentId: DEFAULT_AGENT_ID
+      agentId: resolvedEntryAgentId
     });
 
     return {
-      ...loopResult.execution,
-      entryAgentId: DEFAULT_AGENT_ID,
+      ...direct.execution,
+      entryAgentId: resolvedEntryAgentId,
       routing,
       tracePath: trace.tracePath,
-      orchestration: trace.trace.orchestration
+      session: direct.session,
+      orchestration
     };
-  }
-
-  private async runAiOrchestrationLoop(
-    paths: OpenGoatPaths,
-    runId: string,
-    manifests: AgentManifest[],
-    options: OrchestrationRunOptions,
-    runLogger: Logger
-  ): Promise<OrchestrationLoopResult> {
-    const steps: OrchestrationStepLog[] = [];
-    const sessionGraph: OrchestrationRunLedger["sessionGraph"] = {
-      nodes: [],
-      edges: []
-    };
-    const taskThreads = new Map<string, TaskThreadState>();
-    const sharedNotes: string[] = [];
-    const recentEvents: string[] = [];
-    let orchestratorSkillsSnapshot = await this.skillService.buildSkillsPrompt(paths, DEFAULT_AGENT_ID);
-    let orchestratorSkillsSummary = orchestratorSkillsSnapshot.skills.map((skill) => ({
-      id: skill.id,
-      name: skill.name,
-      description: skill.description,
-      source: skill.source
-    }));
-    let delegationCount = 0;
-    let finalMessage = "";
-    let lastExecution: ProviderExecutionResult & AgentProviderBinding = await this.buildSyntheticExecution(paths, DEFAULT_AGENT_ID);
-    runLogger.info("Starting orchestration loop.", {
-      maxSteps: MAX_ORCHESTRATION_STEPS,
-      maxDelegations: MAX_DELEGATION_STEPS,
-      loadedSkills: orchestratorSkillsSummary.length
-    });
-
-    for (let step = 1; step <= MAX_ORCHESTRATION_STEPS; step += 1) {
-      const stepLogger = runLogger.child({ step });
-      const plannerPrompt = this.plannerService.buildPlannerPrompt({
-        userMessage: options.message,
-        step,
-        maxSteps: MAX_ORCHESTRATION_STEPS,
-        sharedNotes: clampText(sharedNotes.join("\n\n"), SHARED_NOTES_MAX_CHARS),
-        recentEvents,
-        agents: manifests,
-        taskThreads: summarizeTaskThreads(taskThreads),
-        skills: orchestratorSkillsSummary
-      });
-      stepLogger.debug("Planner prompt payload.", {
-        prompt: plannerPrompt
-      });
-      emitRunStatusEvent(options, {
-        stage: "planner_started",
-        runId,
-        timestamp: this.nowIso(),
-        step,
-        agentId: DEFAULT_AGENT_ID
-      });
-
-      const plannerCall = await this.invokeAgentWithSession(paths, DEFAULT_AGENT_ID, {
-        ...options,
-        message: plannerPrompt,
-        images: step === 1 ? options.images : undefined,
-        skillsPromptOverride: orchestratorSkillsSnapshot.prompt,
-        sessionRef: options.sessionRef,
-        forceNewSession: step === 1 ? options.forceNewSession : false
-      }, { silent: true, runId, step });
-      const plannerRawOutput = plannerCall.execution.stdout.trim() || plannerCall.execution.stderr.trim();
-      stepLogger.debug("Planner raw output payload.", {
-        output: plannerRawOutput
-      });
-      if (plannerCall.execution.code !== 0) {
-        const providerFailureMessage = renderPlannerProviderFailureMessage(
-          plannerCall.execution.providerId,
-          plannerCall.execution.code,
-          plannerCall.execution.stderr || plannerCall.execution.stdout
-        );
-        const plannerDecision: OrchestrationPlannerDecision = {
-          rationale: "Planner provider invocation failed.",
-          action: {
-            type: "respond_user",
-            mode: "direct",
-            reason: "planner_provider_failure",
-            message: providerFailureMessage
-          }
-        };
-        emitRunStatusEvent(options, {
-          stage: "planner_decision",
-          runId,
-          timestamp: this.nowIso(),
-          step,
-          agentId: DEFAULT_AGENT_ID,
-          actionType: "respond_user",
-          mode: "direct"
-        });
-        stepLogger.warn("Planner provider invocation failed.", {
-          providerId: plannerCall.execution.providerId,
-          code: plannerCall.execution.code,
-          stderr: plannerCall.execution.stderr,
-          stdout: plannerCall.execution.stdout
-        });
-        addSessionNode(sessionGraph, DEFAULT_AGENT_ID, plannerCall.session, plannerCall.execution);
-
-        const stepLog: OrchestrationStepLog = {
-          step,
-          timestamp: this.nowIso(),
-          plannerRawOutput,
-          plannerDecision,
-          note: `Planner provider ${plannerCall.execution.providerId} failed with code ${plannerCall.execution.code}.`
-        };
-        steps.push(stepLog);
-        finalMessage = providerFailureMessage;
-        lastExecution = {
-          ...plannerCall.execution,
-          stdout: ensureTrailingNewline(providerFailureMessage)
-        };
-        break;
-      }
-      const plannerDecision = this.plannerService.parseDecision(
-        plannerRawOutput,
-        "I could not complete orchestration due to planner output parsing issues."
-      );
-      emitRunStatusEvent(options, {
-        stage: "planner_decision",
-        runId,
-        timestamp: this.nowIso(),
-        step,
-        agentId: DEFAULT_AGENT_ID,
-        actionType: plannerDecision.action.type,
-        targetAgentId: plannerDecision.action.type === "delegate_to_agent"
-          ? normalizeAgentId(plannerDecision.action.targetAgentId)
-          : undefined,
-        mode: plannerDecision.action.mode
-      });
-      stepLogger.info("Planner decision parsed.", {
-        actionType: plannerDecision.action.type,
-        actionMode: plannerDecision.action.mode ?? "direct",
-        rationale: plannerDecision.rationale
-      });
-      addSessionNode(sessionGraph, DEFAULT_AGENT_ID, plannerCall.session, plannerCall.execution);
-
-      const stepLog: OrchestrationStepLog = {
-        step,
-        timestamp: this.nowIso(),
-        plannerRawOutput,
-        plannerDecision
-      };
-
-      const actionResult = await this.executeAction({
-        paths,
-        runId,
-        step,
-        action: plannerDecision.action,
-        manifests,
-        options,
-        sessionGraph,
-        stepLog,
-        sharedNotes,
-        recentEvents,
-        taskThreads,
-        logger: stepLogger
-      });
-      steps.push(stepLog);
-
-      if (actionResult.finalMessage !== undefined) {
-        finalMessage = actionResult.finalMessage;
-        if (actionResult.execution) {
-          lastExecution = actionResult.execution;
-        }
-        break;
-      }
-
-      if (actionResult.execution) {
-        lastExecution = actionResult.execution;
-      }
-
-      if (plannerDecision.action.type === "delegate_to_agent") {
-        delegationCount += 1;
-      }
-      if (
-        plannerDecision.action.type === "install_skill" &&
-        (normalizeAgentId(plannerDecision.action.targetAgentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID) ===
-          DEFAULT_AGENT_ID
-      ) {
-        orchestratorSkillsSnapshot = await this.skillService.buildSkillsPrompt(paths, DEFAULT_AGENT_ID);
-        orchestratorSkillsSummary = orchestratorSkillsSnapshot.skills.map((skill) => ({
-          id: skill.id,
-          name: skill.name,
-          description: skill.description,
-          source: skill.source
-        }));
-      }
-      if (delegationCount >= MAX_DELEGATION_STEPS) {
-        stepLogger.warn("Delegation safety limit reached.");
-        finalMessage = "Stopped orchestration after reaching delegation safety limit.";
-        break;
-      }
-    }
-
-    if (!finalMessage) {
-      finalMessage =
-        sharedNotes.length > 0
-          ? `Orchestration reached step limit.\n\nCurrent synthesis:\n${clampText(sharedNotes.join("\n\n"), 2000)}`
-          : "Orchestration stopped at safety step limit without a final response.";
-    }
-
-    if (!lastExecution.stdout.trim()) {
-      lastExecution = {
-        ...lastExecution,
-        code: 0,
-        stdout: ensureTrailingNewline(finalMessage),
-        stderr: lastExecution.stderr
-      };
-    }
-
-    return {
-      finalMessage,
-      execution: lastExecution,
-      steps,
-      sessionGraph,
-      taskThreads: summarizeTaskThreads(taskThreads)
-    };
-  }
-
-  private async executeAction(params: {
-    paths: OpenGoatPaths;
-    runId: string;
-    step: number;
-    action: OrchestrationAction;
-    manifests: AgentManifest[];
-    options: OrchestrationRunOptions;
-    sessionGraph: OrchestrationRunLedger["sessionGraph"];
-    stepLog: OrchestrationStepLog;
-    sharedNotes: string[];
-    recentEvents: string[];
-    taskThreads: Map<string, TaskThreadState>;
-    logger: Logger;
-  }): Promise<{
-    finalMessage?: string;
-    execution?: ProviderExecutionResult & AgentProviderBinding;
-  }> {
-    const action = params.action;
-
-    if (action.type === "finish" || action.type === "respond_user") {
-      const message = action.message.trim() || "Completed.";
-      params.logger.info("Completing orchestration with direct response.", {
-        actionType: action.type
-      });
-      params.stepLog.note = action.reason;
-      this.addRecentEvent(params.recentEvents, `Step ${params.step}: ${action.type}`);
-      return {
-        finalMessage: message,
-        execution: {
-          ...(await this.buildSyntheticExecution(params.paths, DEFAULT_AGENT_ID)),
-          code: 0,
-          stdout: ensureTrailingNewline(message)
-        }
-      };
-    }
-
-    if (action.type === "read_workspace_file") {
-      const resolvedPath = this.resolveWorkspacePath({
-        paths: params.paths,
-        requestedPath: action.path,
-        workingPathHint: params.options.cwd
-      });
-      params.logger.info("Reading workspace file for orchestration context.", {
-        path: resolvedPath
-      });
-      const exists = await this.fileSystem.exists(resolvedPath);
-      const content = exists ? await this.fileSystem.readFile(resolvedPath) : `[MISSING] ${resolvedPath}`;
-      params.sharedNotes.push(
-        clampText(`Read ${action.path}:\n${content}`, 2500)
-      );
-      params.stepLog.artifactIO = { readPath: resolvedPath };
-      this.addRecentEvent(params.recentEvents, `Read file ${action.path}`);
-      return {};
-    }
-
-    if (action.type === "write_workspace_file") {
-      const resolvedPath = this.resolveWorkspacePath({
-        paths: params.paths,
-        requestedPath: action.path,
-        workingPathHint: params.options.cwd
-      });
-      params.logger.info("Writing workspace file for orchestration context.", {
-        path: resolvedPath
-      });
-      await this.fileSystem.ensureDir(path.dirname(resolvedPath));
-      await this.fileSystem.writeFile(resolvedPath, ensureTrailingNewline(action.content));
-      params.stepLog.artifactIO = { writePath: resolvedPath };
-      this.addRecentEvent(params.recentEvents, `Wrote file ${action.path}`);
-      return {};
-    }
-
-    if (action.type === "install_skill") {
-      const targetAgentId = normalizeAgentId(action.targetAgentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
-      params.logger.info("Installing skill requested by orchestrator action.", {
-        targetAgentId,
-        skillName: action.skillName
-      });
-      const result = await this.skillService.installSkill(params.paths, {
-        scope: "agent",
-        agentId: targetAgentId,
-        skillName: action.skillName,
-        sourcePath: action.sourcePath,
-        description: action.description,
-        content: action.content
-      });
-
-      const installedFor = result.agentId || targetAgentId;
-      params.stepLog.note = `Installed skill ${result.skillId} for ${installedFor} (${result.source}).`;
-      params.sharedNotes.push(
-        `Skill installed: ${result.skillId} for ${installedFor} from ${result.source} at ${result.installedPath}`
-      );
-      this.addRecentEvent(
-        params.recentEvents,
-        `Installed skill ${result.skillId} for ${installedFor} (${result.source})`
-      );
-      return {};
-    }
-
-    const targetAgentId = normalizeAgentId(action.targetAgentId);
-    const targetManifest = params.manifests.find((manifest) => manifest.agentId === targetAgentId);
-    if (!targetManifest || !isDiscoverableByOrchestrator(targetManifest)) {
-      const note = `Invalid delegation target "${action.targetAgentId}" (missing, non-receivable, or non-discoverable).`;
-      params.logger.warn("Invalid delegation target.", {
-        requestedTargetAgentId: action.targetAgentId
-      });
-      params.sharedNotes.push(note);
-      params.stepLog.note = note;
-      this.addRecentEvent(params.recentEvents, note);
-      return {};
-    }
-
-    const taskKey = resolveTaskKey(action.taskKey, targetAgentId, params.step);
-    const requestedSessionPolicy = action.sessionPolicy ?? "auto";
-    const existingThread = params.taskThreads.get(taskKey);
-    const canReuseThread = Boolean(existingThread && existingThread.agentId === targetAgentId);
-    const effectiveSessionPolicy: OrchestrationTaskSessionPolicy =
-      requestedSessionPolicy === "reuse" ? (canReuseThread ? "reuse" : "new") : requestedSessionPolicy;
-    const forceNewTaskSession = effectiveSessionPolicy === "new" || !canReuseThread;
-    if (requestedSessionPolicy === "reuse" && !canReuseThread) {
-      const note = `Requested reuse for task "${taskKey}" but no matching thread exists; creating a new session.`;
-      params.sharedNotes.push(note);
-      this.addRecentEvent(params.recentEvents, note);
-      params.logger.warn("Requested task session reuse but no matching thread was found.", {
-        taskKey,
-        targetAgentId
-      });
-    }
-
-    const targetRuntime = await this.providerService.getAgentRuntimeProfile(params.paths, targetAgentId);
-    const mode = action.mode ?? "hybrid";
-    params.logger.info("Delegating task to agent.", {
-      fromAgentId: DEFAULT_AGENT_ID,
-      toAgentId: targetAgentId,
-      targetWorkspaceAccess: targetRuntime.workspaceAccess,
-      mode,
-      reason: action.reason,
-      taskKey,
-      sessionPolicy: effectiveSessionPolicy
-    });
-    emitRunStatusEvent(params.options, {
-      stage: "delegation_started",
-      runId: params.runId,
-      timestamp: this.nowIso(),
-      step: params.step,
-      agentId: DEFAULT_AGENT_ID,
-      targetAgentId,
-      providerId: targetRuntime.providerId,
-      mode,
-      detail: action.reason
-    });
-    const handoffBaseDir = this.pathPort.join(params.paths.sessionsDir, params.runId);
-    let outboundPath: string | undefined;
-    if (mode === "artifacts" || mode === "hybrid") {
-      await this.fileSystem.ensureDir(handoffBaseDir);
-      outboundPath = this.pathPort.join(handoffBaseDir, `step-${String(params.step).padStart(2, "0")}-to-${targetAgentId}.md`);
-      const handoffDocument = renderHandoffDocument({
-        step: params.step,
-        userMessage: params.options.message,
-        delegateMessage: action.message,
-        expectedOutput: action.expectedOutput,
-        sharedNotes: params.sharedNotes
-      });
-      await this.fileSystem.writeFile(outboundPath, ensureTrailingNewline(handoffDocument));
-      params.stepLog.artifactIO = {
-        ...params.stepLog.artifactIO,
-        writePath: outboundPath
-      };
-    }
-
-    const delegateMessage = renderDelegateMessage({
-      step: params.step,
-      userMessage: params.options.message,
-      delegateMessage: action.message,
-      expectedOutput: action.expectedOutput,
-      mode,
-      outboundPath,
-      exposeArtifactPath: targetRuntime.workspaceAccess === "internal",
-      sharedNotes: params.sharedNotes
-    });
-    params.logger.debug("Delegation message payload.", {
-      fromAgentId: DEFAULT_AGENT_ID,
-      toAgentId: targetAgentId,
-      taskKey,
-      request: delegateMessage,
-      mode,
-      outboundPath
-    });
-
-    const providerSessionId =
-      effectiveSessionPolicy !== "new" && existingThread?.agentId === targetAgentId
-        ? existingThread.providerSessionId
-        : undefined;
-    const delegateCall = await this.invokeAgentWithSession(params.paths, targetAgentId, {
-      message: delegateMessage,
-      images: params.options.images,
-      env: params.options.env,
-      cwd: params.options.cwd,
-      sessionRef: `agent:${targetAgentId}:task:${taskKey}`,
-      forceNewSession: forceNewTaskSession,
-      providerSessionId,
-      forceNewProviderSession: forceNewTaskSession
-    }, { silent: true, runId: params.runId, step: params.step });
-    const responseText =
-      delegateCall.execution.stdout.trim() ||
-      (delegateCall.execution.stderr.trim() ? `[stderr] ${delegateCall.execution.stderr.trim()}` : "");
-    params.logger.debug("Delegation response payload.", {
-      fromAgentId: DEFAULT_AGENT_ID,
-      toAgentId: targetAgentId,
-      code: delegateCall.execution.code,
-      providerId: delegateCall.execution.providerId,
-      response: responseText
-    });
-
-    let inboundPath: string | undefined;
-    if (mode === "artifacts" || mode === "hybrid") {
-      await this.fileSystem.ensureDir(handoffBaseDir);
-      inboundPath = this.pathPort.join(handoffBaseDir, `step-${String(params.step).padStart(2, "0")}-from-${targetAgentId}.md`);
-      await this.fileSystem.writeFile(inboundPath, ensureTrailingNewline(responseText || "(empty response)"));
-      params.stepLog.artifactIO = {
-        ...params.stepLog.artifactIO,
-        readPath: inboundPath
-      };
-    }
-
-    params.stepLog.agentCall = {
-      targetAgentId,
-      taskKey,
-      sessionPolicy: effectiveSessionPolicy,
-      request: delegateMessage,
-      response: responseText,
-      code: delegateCall.execution.code,
-      providerId: delegateCall.execution.providerId,
-      sessionKey: delegateCall.session?.sessionKey,
-      sessionId: delegateCall.session?.sessionId,
-      providerSessionId: delegateCall.execution.providerSessionId,
-      workingTreeEffect: delegateCall.workingTreeEffect
-    };
-
-    addSessionNode(params.sessionGraph, targetAgentId, delegateCall.session, delegateCall.execution);
-    upsertTaskThread(params.taskThreads, {
-      taskKey,
-      agentId: targetAgentId,
-      createdStep: params.step,
-      updatedStep: params.step,
-      providerId: delegateCall.execution.providerId,
-      providerSessionId: delegateCall.execution.providerSessionId,
-      sessionKey: delegateCall.session?.sessionKey,
-      sessionId: delegateCall.session?.sessionId,
-      lastResponse: summarizeText(responseText || "(no response)")
-    });
-    params.sessionGraph.edges.push({
-      fromAgentId: DEFAULT_AGENT_ID,
-      toAgentId: targetAgentId,
-      reason: action.reason || params.stepLog.plannerDecision.rationale
-    });
-
-    const delegationFailure = summarizeDelegationFailure({
-      targetAgentId,
-      providerId: delegateCall.execution.providerId,
-      code: delegateCall.execution.code,
-      responseText,
-      workingTreeEffect: delegateCall.workingTreeEffect
-    });
-    if (delegationFailure) {
-      params.stepLog.note = delegationFailure.message;
-      this.addRecentEvent(params.recentEvents, delegationFailure.message);
-      params.sharedNotes.push(clampText(delegationFailure.message, 1200));
-      params.logger.warn("Delegation failed; stopping orchestration loop.", {
-        targetAgentId,
-        providerId: delegateCall.execution.providerId,
-        code: delegateCall.execution.code,
-        failureReason: delegationFailure.reason
-      });
-      return {
-        finalMessage: delegationFailure.message,
-        execution: {
-          ...delegateCall.execution,
-          code: delegateCall.execution.code !== 0 ? delegateCall.execution.code : 1,
-          stdout: ensureTrailingNewline(delegationFailure.message)
-        }
-      };
-    }
-
-    const note = `Delegated to ${targetAgentId} [task:${taskKey}]: ${summarizeText(responseText || "(no response)")}`;
-    params.sharedNotes.push(clampText(note, 2000));
-    this.addRecentEvent(params.recentEvents, note);
-    if (delegateCall.workingTreeEffect && delegateCall.workingTreeEffect.enabled) {
-      const effectNote = `Working tree effect (${targetAgentId}): ${delegateCall.workingTreeEffect.summary}`;
-      params.sharedNotes.push(clampText(effectNote, 1200));
-      this.addRecentEvent(params.recentEvents, effectNote);
-    }
-
-    return {
-      execution: delegateCall.execution
-    };
-  }
-
-  private addRecentEvent(events: string[], value: string): void {
-    events.push(summarizeText(value));
-    while (events.length > RECENT_EVENTS_WINDOW) {
-      events.shift();
-    }
-  }
-
-  private resolveWorkspacePath(input: WorkspaceFileResolveInput): string {
-    const { requestedPath, workingPathHint } = input;
-    const normalized = requestedPath.replace(/\\/g, "/").trim();
-    const runWorkingPath = resolveInvocationWorkingPath(workingPathHint);
-    const unsafeSegments = normalized.split("/").filter((segment) => segment === "..");
-    if (unsafeSegments.length > 0) {
-      return this.pathPort.join(runWorkingPath, ".opengoat", "coordination", "unsafe-path-blocked.md");
-    }
-    const relative = normalized.replace(/^\/+/, "");
-    return this.pathPort.join(runWorkingPath, relative || ".opengoat/coordination/context.md");
   }
 
   private async invokeAgentWithSession(
     paths: OpenGoatPaths,
     agentId: string,
     options: OrchestrationRunOptions,
-    behavior: { silent?: boolean; sessionAgentId?: string; runId?: string; step?: number } = {}
+    behavior: { sessionAgentId?: string; runId?: string; step?: number } = {}
   ): Promise<AgentInvocationResult> {
     const sessionAgentId = normalizeAgentId(behavior.sessionAgentId ?? agentId) || DEFAULT_AGENT_ID;
-    this.logger.debug("Preparing agent invocation with session context.", {
-      agentId,
-      sessionAgentId,
-      message: options.message,
-      sessionRef: options.sessionRef,
-      forceNewSession: options.forceNewSession,
-      disableSession: options.disableSession,
-      providerSessionId: options.providerSessionId,
-      forceNewProviderSession: options.forceNewProviderSession
-    });
     const preparedSession = await this.sessionService.prepareRunSession(paths, sessionAgentId, {
       sessionRef: options.sessionRef,
       forceNew: options.forceNewSession,
@@ -840,16 +180,12 @@ export class OrchestrationService {
       workingPath: options.cwd,
       userMessage: options.message
     });
-    const invokeOptions = sanitizeProviderInvokeOptions({
-      ...options,
-      sessionContext: preparedSession.enabled ? preparedSession.contextPrompt : undefined
-    });
-    if (behavior.silent) {
-      delete invokeOptions.onStdout;
-      delete invokeOptions.onStderr;
+
+    const invokeOptions = sanitizeProviderInvokeOptions(options);
+    if (preparedSession.enabled) {
+      invokeOptions.providerSessionId = preparedSession.info.sessionId;
     }
-    const workingPath = preparedSession.enabled ? preparedSession.info.workingPath : resolveInvocationWorkingPath(options.cwd);
-    const beforeSnapshot = await this.captureWorkingTreeSnapshot(workingPath);
+
     const execution = await this.providerService.invokeAgent(paths, agentId, invokeOptions, {
       runId: behavior.runId,
       step: behavior.step,
@@ -877,22 +213,10 @@ export class OrchestrationService {
         }
       }
     });
-    const afterSnapshot = await this.captureWorkingTreeSnapshot(workingPath);
-    const workingTreeEffect = summarizeWorkingTreeEffect(beforeSnapshot, afterSnapshot);
-    this.logger.debug("Agent invocation execution returned.", {
-      agentId,
-      sessionAgentId,
-      providerId: execution.providerId,
-      code: execution.code,
-      stdout: execution.stdout,
-      stderr: execution.stderr,
-      providerSessionId: execution.providerSessionId,
-      workingTreeEffect: workingTreeEffect?.summary
-    });
+
     if (!preparedSession.enabled) {
       return {
         execution,
-        workingTreeEffect,
         session: undefined
       };
     }
@@ -900,8 +224,9 @@ export class OrchestrationService {
     const assistantContent =
       execution.stdout.trim() ||
       (execution.stderr.trim()
-        ? `[Provider error code ${execution.code}] ${execution.stderr.trim()}`
-        : `[Provider exited with code ${execution.code}]`);
+        ? `[Runtime error code ${execution.code}] ${execution.stderr.trim()}`
+        : `[Runtime exited with code ${execution.code}]`);
+
     const postRunCompaction = await this.sessionService.recordAssistantReply(
       paths,
       preparedSession.info,
@@ -910,7 +235,6 @@ export class OrchestrationService {
 
     return {
       execution,
-      workingTreeEffect,
       session: {
         ...preparedSession.info,
         preRunCompactionApplied: preparedSession.compactionApplied,
@@ -960,126 +284,16 @@ export class OrchestrationService {
       },
       orchestration: params.orchestration
     };
-    const tracePath = await this.writeTrace(params.paths, trace);
-    return { tracePath, trace };
-  }
 
-  private async captureWorkingTreeSnapshot(workingPath: string): Promise<WorkingTreeSnapshot | undefined> {
-    if (!this.commandRunner) {
-      return undefined;
-    }
-    if (!(await this.fileSystem.exists(workingPath))) {
-      return undefined;
-    }
-    try {
-      const result = await this.commandRunner.run({
-        command: "git",
-        args: ["status", "--porcelain=v1", "--untracked-files=all"],
-        cwd: workingPath
-      });
-      if (result.code !== 0) {
-        return undefined;
-      }
-
-      const entries = parsePorcelainEntries(result.stdout);
-      return {
-        enabled: true,
-        workingPath,
-        entries
-      };
-    } catch {
-      return undefined;
-    }
-  }
-
-  private async buildSyntheticExecution(
-    paths: OpenGoatPaths,
-    agentId: string
-  ): Promise<ProviderExecutionResult & AgentProviderBinding> {
-    const binding = await this.providerService.getAgentProvider(paths, agentId);
-    return {
-      ...binding,
-      code: 0,
-      stdout: "",
-      stderr: ""
-    };
-  }
-
-  private async writeTrace(paths: OpenGoatPaths, trace: AgentRunTrace): Promise<string> {
-    await this.fileSystem.ensureDir(paths.runsDir);
-    const tracePath = this.pathPort.join(paths.runsDir, `${trace.runId}.json`);
+    await this.fileSystem.ensureDir(params.paths.runsDir);
+    const tracePath = this.pathPort.join(params.paths.runsDir, `${trace.runId}.json`);
     await this.fileSystem.writeFile(tracePath, `${JSON.stringify(trace, null, 2)}\n`);
-    return tracePath;
+    return { tracePath, trace };
   }
 }
 
 function generateRunId(): string {
   return randomUUID().toLowerCase();
-}
-
-function resolveInvocationWorkingPath(cwd: string | undefined): string {
-  const normalized = cwd?.trim();
-  if (normalized) {
-    return path.resolve(normalized);
-  }
-  return process.cwd();
-}
-
-function parsePorcelainEntries(stdout: string): WorkingTreeStatusEntry[] {
-  const lines = stdout
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .filter(Boolean);
-
-  return lines.map((line) => {
-    const status = line.slice(0, 2);
-    const rawPath = line.length > 3 ? line.slice(3).trim() : "";
-    const finalPath = rawPath.includes(" -> ") ? rawPath.split(" -> ").at(-1)?.trim() || rawPath : rawPath;
-    return {
-      raw: `${status} ${finalPath}`.trim(),
-      path: finalPath
-    };
-  });
-}
-
-function summarizeWorkingTreeEffect(
-  beforeSnapshot: WorkingTreeSnapshot | undefined,
-  afterSnapshot: WorkingTreeSnapshot | undefined
-): WorkingTreeEffect | undefined {
-  if (!beforeSnapshot || !afterSnapshot || !beforeSnapshot.enabled || !afterSnapshot.enabled) {
-    return undefined;
-  }
-
-  const beforeMap = new Map(beforeSnapshot.entries.map((entry) => [entry.path, entry.raw]));
-  const afterMap = new Map(afterSnapshot.entries.map((entry) => [entry.path, entry.raw]));
-  const touched = new Set<string>();
-
-  for (const [path, raw] of afterMap.entries()) {
-    if (beforeMap.get(path) !== raw) {
-      touched.add(path);
-    }
-  }
-  for (const [path, raw] of beforeMap.entries()) {
-    if (afterMap.get(path) !== raw) {
-      touched.add(path);
-    }
-  }
-
-  const touchedPaths = [...touched].sort((left, right) => left.localeCompare(right));
-  const summary = touchedPaths.length === 0
-    ? "No tracked changes detected."
-    : `Touched ${touchedPaths.length} path(s): ${touchedPaths.slice(0, 8).join(", ")}${
-        touchedPaths.length > 8 ? ", ..." : ""
-      }`;
-
-  return {
-    enabled: true,
-    workingPath: afterSnapshot.workingPath,
-    beforeEntries: beforeSnapshot.entries.length,
-    afterEntries: afterSnapshot.entries.length,
-    touchedPaths,
-    summary
-  };
 }
 
 function resolveEntryAgentId(entryAgentId: string, manifests: Array<{ agentId: string }>): string {
@@ -1095,10 +309,7 @@ function resolveEntryAgentId(entryAgentId: string, manifests: Array<{ agentId: s
   return manifests[0]?.agentId || normalizedEntryAgentId;
 }
 
-function emitRunStatusEvent(
-  options: OrchestrationRunOptions,
-  event: OrchestrationRunEvent
-): void {
+function emitRunStatusEvent(options: OrchestrationRunOptions, event: OrchestrationRunEvent): void {
   options.hooks?.onEvent?.(event);
 }
 
@@ -1107,241 +318,6 @@ function sanitizeProviderInvokeOptions(options: OrchestrationRunOptions): Provid
   delete sanitized.sessionRef;
   delete sanitized.forceNewSession;
   delete sanitized.disableSession;
-  delete sanitized.directAgentSession;
   delete (sanitized as ProviderInvokeOptions & { hooks?: unknown }).hooks;
   return sanitized;
-}
-
-function renderDelegateMessage(params: {
-  step: number;
-  userMessage: string;
-  delegateMessage: string;
-  expectedOutput?: string;
-  mode: "direct" | "artifacts" | "hybrid";
-  outboundPath?: string;
-  exposeArtifactPath: boolean;
-  sharedNotes: string[];
-}): string {
-  const lines = [
-    `Delegation step: ${params.step}`,
-    "",
-    "Original user request:",
-    params.userMessage,
-    "",
-    "Delegation instruction:",
-    params.delegateMessage,
-    ""
-  ];
-  if (params.expectedOutput?.trim()) {
-    lines.push("Expected output:", params.expectedOutput.trim(), "");
-  }
-  if (params.sharedNotes.length > 0) {
-    lines.push("Shared notes from previous steps:", clampText(params.sharedNotes.join("\n\n"), 4000), "");
-  }
-  if ((params.mode === "artifacts" || params.mode === "hybrid") && params.outboundPath && params.exposeArtifactPath) {
-    lines.push(`Coordination file: ${params.outboundPath}`, "You may use this markdown artifact for durable handoff context.", "");
-  } else if (params.mode === "artifacts" || params.mode === "hybrid") {
-    lines.push("Coordination artifacts are managed internally by the orchestrator.", "");
-  }
-  lines.push("Return a concise result for the orchestrator.");
-  return lines.join("\n");
-}
-
-function renderHandoffDocument(params: {
-  step: number;
-  userMessage: string;
-  delegateMessage: string;
-  expectedOutput?: string;
-  sharedNotes: string[];
-}): string {
-  return [
-    `# Delegation Step ${params.step}`,
-    "",
-    "## User Request",
-    params.userMessage,
-    "",
-    "## Delegation Instruction",
-    params.delegateMessage,
-    "",
-    "## Expected Output",
-    params.expectedOutput?.trim() || "(not specified)",
-    "",
-    "## Prior Notes",
-    params.sharedNotes.length > 0 ? clampText(params.sharedNotes.join("\n\n"), 4000) : "(none)"
-  ].join("\n");
-}
-
-function addSessionNode(
-  graph: OrchestrationRunLedger["sessionGraph"],
-  agentId: string,
-  session:
-    | (SessionRunInfo & {
-        preRunCompactionApplied: boolean;
-        postRunCompaction?: SessionCompactionResult;
-      })
-    | undefined,
-  execution?: ProviderExecutionResult & AgentProviderBinding
-): void {
-  if (!session) {
-    return;
-  }
-
-  const exists = graph.nodes.some(
-    (node) =>
-      node.agentId === agentId &&
-      node.providerId === execution?.providerId &&
-      node.sessionKey === session.sessionKey &&
-      node.sessionId === session.sessionId &&
-      node.providerSessionId === execution?.providerSessionId
-  );
-  if (exists) {
-    return;
-  }
-
-  graph.nodes.push({
-    agentId,
-    providerId: execution?.providerId,
-    sessionKey: session.sessionKey,
-    sessionId: session.sessionId,
-    providerSessionId: execution?.providerSessionId
-  });
-}
-
-function resolveTaskKey(actionTaskKey: string | undefined, targetAgentId: string, step: number): string {
-  const explicit = actionTaskKey?.trim().toLowerCase();
-  if (explicit) {
-    return explicit;
-  }
-  return `${targetAgentId}-step-${String(step).padStart(2, "0")}`;
-}
-
-function upsertTaskThread(threads: Map<string, TaskThreadState>, next: TaskThreadState): void {
-  const existing = threads.get(next.taskKey);
-  if (!existing) {
-    threads.set(next.taskKey, next);
-    return;
-  }
-
-  threads.set(next.taskKey, {
-    ...existing,
-    ...next,
-    createdStep: existing.createdStep,
-    updatedStep: next.updatedStep
-  });
-}
-
-function summarizeTaskThreads(
-  threads: Map<string, TaskThreadState>
-): NonNullable<OrchestrationRunLedger["taskThreads"]> {
-  return [...threads.values()]
-    .sort((left, right) => left.createdStep - right.createdStep)
-    .map((thread) => ({
-      taskKey: thread.taskKey,
-      agentId: thread.agentId,
-      providerId: thread.providerId,
-      providerSessionId: thread.providerSessionId,
-      sessionKey: thread.sessionKey,
-      sessionId: thread.sessionId,
-      createdStep: thread.createdStep,
-      updatedStep: thread.updatedStep,
-      lastResponse: thread.lastResponse
-    }));
-}
-
-function summarizeText(value: string): string {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (normalized.length <= 180) {
-    return normalized;
-  }
-  return `${normalized.slice(0, 177)}...`;
-}
-
-function ensureTrailingNewline(value: string): string {
-  return value.endsWith("\n") ? value : `${value}\n`;
-}
-
-function renderPlannerProviderFailureMessage(providerId: string, code: number, detailsRaw: string): string {
-  const details = detailsRaw.trim();
-  const summary = details
-    ? `\n\nProvider error details:\n${clampText(details, 1200)}`
-    : "";
-
-  return [
-    `The orchestrator provider (${providerId}) failed while planning (exit code ${code}).`,
-    "Open provider setup in the desktop app and verify credentials/model configuration.",
-    summary
-  ]
-    .join("\n")
-    .trim();
-}
-
-function summarizeDelegationFailure(params: {
-  targetAgentId: string;
-  providerId: string;
-  code: number;
-  responseText: string;
-  workingTreeEffect: WorkingTreeEffect | undefined;
-}): DelegationFailureSummary | undefined {
-  if (params.code !== 0) {
-    const detail = summarizeText(params.responseText || "(no provider details)");
-    return {
-      reason: "provider_error",
-      message: [
-        `The delegated agent "${params.targetAgentId}" failed via provider "${params.providerId}" (exit code ${params.code}).`,
-        `Details: ${detail}`
-      ].join("\n")
-    };
-  }
-
-  const blockReason = extractBlockedNoProgressReason(params.responseText, params.workingTreeEffect);
-  if (!blockReason) {
-    return undefined;
-  }
-
-  return {
-    reason: "blocked_no_progress",
-    message: [
-      `The delegated agent "${params.targetAgentId}" could not continue this request.`,
-      blockReason
-    ].join("\n")
-  };
-}
-
-function extractBlockedNoProgressReason(
-  responseText: string,
-  workingTreeEffect: WorkingTreeEffect | undefined
-): string | undefined {
-  const normalized = responseText.toLowerCase();
-  if (!normalized.trim()) {
-    return undefined;
-  }
-
-  const toolUnavailableSignals = [
-    /write_file/,
-    /run_shell_command/,
-    /tool(?:s)? (?:is|are)?\s*(?:not found|unavailable|missing|not listed|not available)/,
-    /cannot create .* file/,
-    /i(?:'| a)?m stuck/,
-    /unable to proceed/
-  ];
-  const hasToolSignal = toolUnavailableSignals.some((pattern) => pattern.test(normalized));
-  if (!hasToolSignal) {
-    return undefined;
-  }
-
-  const noTrackedChanges = !workingTreeEffect?.enabled || workingTreeEffect.touchedPaths.length === 0;
-  if (!noTrackedChanges) {
-    return undefined;
-  }
-
-  return "It reported missing runtime tools/permissions and made no tracked workspace changes. Check provider capabilities or switch to a compatible agent provider for file-editing tasks.";
-}
-
-function clampText(value: string, maxChars: number): string {
-  if (value.length <= maxChars) {
-    return value;
-  }
-  const head = value.slice(0, Math.floor(maxChars * 0.7));
-  const tail = value.slice(-(maxChars - head.length - 20));
-  return `${head}\n...[truncated]...\n${tail}`;
 }

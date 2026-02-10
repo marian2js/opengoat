@@ -28,14 +28,14 @@ describe("runCli", () => {
     roots.push(root);
     process.env.OPENGOAT_HOME = root;
 
-    const code = await runCli(["onboard", "--non-interactive", "--provider", "openai", "--openai-api-key", "sk-test"]);
+    const code = await runCli(["onboard", "--non-interactive", "--local"]);
 
     expect(code).toBe(0);
 
     const config = JSON.parse(await readFile(path.join(root, "config.json"), "utf-8")) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("orchestrator");
+    expect(config.defaultAgent).toBe("goat");
   });
 
   it("bootstraps through CLI init command", async () => {
@@ -50,7 +50,7 @@ describe("runCli", () => {
     const config = JSON.parse(await readFile(path.join(root, "config.json"), "utf-8")) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("orchestrator");
+    expect(config.defaultAgent).toBe("goat");
   });
 
   it("returns non-zero for unknown commands", async () => {

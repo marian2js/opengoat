@@ -46,7 +46,7 @@ describe("OpenGoatAcpAgent", () => {
       code: 0,
       stdout: "hello from OpenGoat",
       stderr: "",
-      providerId: "openai",
+      providerId: "openclaw",
       agentId: "orchestrator",
       entryAgentId: "orchestrator",
       routing: {
@@ -122,7 +122,7 @@ describe("OpenGoatAcpAgent", () => {
       code: 0,
       stdout: "late answer",
       stderr: "",
-      providerId: "openai",
+      providerId: "openclaw",
       agentId: "orchestrator",
       entryAgentId: "orchestrator",
       routing: {
@@ -197,7 +197,7 @@ function createDefaultService() {
       code: 0,
       stdout: "ok",
       stderr: "",
-      providerId: "openai",
+      providerId: "openclaw",
       agentId: "orchestrator",
       entryAgentId: "orchestrator",
       routing: {

@@ -28,7 +28,7 @@ describe("opengoat binary", () => {
 
     const { stdout } = await execFileAsync(
       binaryPath,
-      ["onboard", "--non-interactive", "--provider", "openai", "--openai-api-key", "sk-test"],
+      ["onboard", "--non-interactive", "--local"],
       {
         cwd: projectRoot,
         env: {
@@ -38,12 +38,12 @@ describe("opengoat binary", () => {
       }
     );
 
-    expect(stdout).toContain("Onboarding complete.");
+    expect(stdout).toContain("Mode: local");
 
     const config = JSON.parse(await readFile(path.join(root, "config.json"), "utf-8")) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("orchestrator");
+    expect(config.defaultAgent).toBe("goat");
   });
 
   it("runs init and creates config files", async () => {
@@ -61,11 +61,11 @@ describe("opengoat binary", () => {
       }
     });
 
-    expect(stdout).toContain("Default agent: orchestrator");
+    expect(stdout).toContain("Default agent: goat");
 
     const config = JSON.parse(await readFile(path.join(root, "config.json"), "utf-8")) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("orchestrator");
+    expect(config.defaultAgent).toBe("goat");
   });
 });

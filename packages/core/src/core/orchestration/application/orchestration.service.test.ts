@@ -2,802 +2,181 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AgentManifest, AgentManifestService } from "../../agents/index.js";
-import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
+import type { AgentManifestService } from "../../agents/index.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
-import type { ProviderExecutionResult, ProviderService, ProviderInvokeOptions } from "../../providers/index.js";
+import type { ProviderService } from "../../providers/index.js";
 import type { SessionService } from "../../sessions/index.js";
-import type { SkillService } from "../../skills/index.js";
 import { NodeFileSystem } from "../../../platform/node/node-file-system.js";
 import { NodePathPort } from "../../../platform/node/node-path.port.js";
 import { OrchestrationService } from "./orchestration.service.js";
 
-describe("OrchestrationService integration flow", () => {
+describe("OrchestrationService manager runtime", () => {
   const tempDirs: string[] = [];
 
   afterEach(async () => {
-    for (const dir of tempDirs) {
-      await rm(dir, { recursive: true, force: true });
+    while (tempDirs.length > 0) {
+      const dir = tempDirs.pop();
+      if (dir) {
+        await rm(dir, { recursive: true, force: true });
+      }
     }
-    tempDirs.length = 0;
   });
 
-  it("runs planner -> delegation -> finish and writes trace ledger", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-flow-"));
+  it("runs a direct single-agent invocation and writes trace", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-manager-runtime-"));
     tempDirs.push(tempDir);
     const paths = createPaths(tempDir);
-    const providerService = createProviderService({
-      plannerExecutions: [
-        okExecution(
-          JSON.stringify({
-            rationale: "Delegate implementation to writer.",
-            action: {
-              type: "delegate_to_agent",
-              mode: "direct",
-              reason: "writer agent owns markdown docs",
-              targetAgentId: "writer",
-              message: "Create ABOUT.md for this project.",
-              expectedOutput: "A complete ABOUT.md file.",
-              taskKey: "task-about",
-              sessionPolicy: "new"
-            }
-          })
-        ),
-        okExecution(
-          JSON.stringify({
-            rationale: "Delegation completed successfully.",
-            action: {
-              type: "finish",
-              mode: "direct",
-              reason: "done",
-              message: "Created ABOUT.md with project context."
-            }
-          })
-        )
-      ],
-      delegatedExecution: {
+
+    const providerService = {
+      invokeAgent: vi.fn(async () => ({
         code: 0,
-        stdout: "Done. ABOUT.md is created.",
+        stdout: "hello from goat\n",
         stderr: "",
-        providerSessionId: "delegate-session-1"
-      }
-    });
-    const service = new OrchestrationService({
-      providerService: providerService as unknown as ProviderService,
-      skillService: createSkillServiceStub() as unknown as SkillService,
-      agentManifestService: createManifestServiceStub([
-        createManifest("orchestrator", {
-          canReceive: true,
-          canDelegate: true,
-          provider: "openai"
-        }),
-        createManifest("writer", {
-          canReceive: true,
-          canDelegate: false,
-          provider: "codex"
-        })
-      ]) as unknown as AgentManifestService,
-      sessionService: createSessionServiceStub() as unknown as SessionService,
-      fileSystem: new NodeFileSystem(),
-      pathPort: new NodePathPort(),
-      nowIso: () => "2026-02-07T17:00:00.000Z"
-    });
-
-    const result = await service.runAgent(paths, "orchestrator", {
-      message: "Please create ABOUT.md",
-      cwd: tempDir
-    });
-
-    expect(result.code).toBe(0);
-    expect(result.stdout.trim()).toBe("Created ABOUT.md with project context.");
-    expect(result.orchestration?.mode).toBe("ai-loop");
-    expect(result.orchestration?.steps).toHaveLength(2);
-    expect(result.orchestration?.steps[0]?.agentCall?.targetAgentId).toBe("writer");
-    expect(result.orchestration?.taskThreads?.[0]?.taskKey).toBe("task-about");
-    expect(providerService.invokeAgent).toHaveBeenCalledTimes(3);
-
-    const traceRaw = await readFile(result.tracePath, "utf-8");
-    const trace = JSON.parse(traceRaw) as {
-      orchestration?: {
-        finalMessage: string;
-        steps: Array<{ plannerDecision: { action: { type: string } } }>;
-      };
+        agentId: "goat",
+        providerId: "openclaw"
+      }))
     };
-    expect(trace.orchestration?.finalMessage).toBe("Created ABOUT.md with project context.");
-    expect(trace.orchestration?.steps[0]?.plannerDecision.action.type).toBe("delegate_to_agent");
-  });
 
-  it("forwards image inputs to delegated agents", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-images-"));
-    tempDirs.push(tempDir);
-    const paths = createPaths(tempDir);
-    const providerService = createProviderService({
-      plannerExecutions: [
-        okExecution(
-          JSON.stringify({
-            rationale: "Delegate vision work.",
-            action: {
-              type: "delegate_to_agent",
-              mode: "direct",
-              targetAgentId: "writer",
-              message: "Analyze attached images."
-            }
-          })
-        ),
-        okExecution(
-          JSON.stringify({
-            rationale: "Done.",
-            action: {
-              type: "finish",
-              mode: "direct",
-              message: "Done."
-            }
-          })
-        )
-      ],
-      delegatedExecution: {
-        code: 0,
-        stdout: "Image analyzed.",
-        stderr: ""
-      }
-    });
+    const sessionService = {
+      prepareRunSession: vi.fn(async () => ({
+        enabled: true,
+        info: {
+          agentId: "goat",
+          sessionKey: "agent:goat:main",
+          sessionId: "session-1",
+          transcriptPath: path.join(paths.sessionsDir, "goat", "session-1.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "goat"),
+          workingPath: tempDir,
+          isNewSession: true
+        },
+        compactionApplied: false
+      })),
+      recordAssistantReply: vi.fn(async () => ({
+        sessionKey: "agent:goat:main",
+        sessionId: "session-1",
+        transcriptPath: path.join(paths.sessionsDir, "goat", "session-1.jsonl"),
+        applied: false,
+        compactedMessages: 0
+      }))
+    };
+
     const service = new OrchestrationService({
       providerService: providerService as unknown as ProviderService,
-      skillService: createSkillServiceStub() as unknown as SkillService,
-      agentManifestService: createManifestServiceStub([
-        createManifest("orchestrator", {
-          canReceive: true,
-          canDelegate: true,
-          provider: "openai"
-        }),
-        createManifest("writer", {
-          canReceive: true,
-          canDelegate: false,
-          provider: "codex"
-        })
-      ]) as unknown as AgentManifestService,
-      sessionService: createSessionServiceStub() as unknown as SessionService,
-      fileSystem: new NodeFileSystem(),
-      pathPort: new NodePathPort(),
-      nowIso: () => "2026-02-07T17:00:00.000Z"
-    });
-
-    await service.runAgent(paths, "orchestrator", {
-      message: "Analyze this image",
-      images: [
-        {
-          dataUrl: "data:image/png;base64,aGVsbG8="
-        }
-      ],
-      cwd: tempDir
-    });
-
-    const delegateCall = providerService.invokeAgent.mock.calls.find((call) => call[1] === "writer");
-    expect(delegateCall?.[2]).toEqual(
-      expect.objectContaining({
-        images: [
-          {
-            dataUrl: "data:image/png;base64,aGVsbG8="
-          }
-        ]
-      })
-    );
-  });
-
-  it("returns an actionable response when planner provider invocation fails", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-provider-fail-"));
-    tempDirs.push(tempDir);
-    const paths = createPaths(tempDir);
-    const providerService = createProviderService({
-      plannerExecutions: [
-        {
-          code: 1,
-          stdout: "",
-          stderr: "401 unauthorized - missing OPENAI_API_KEY"
-        }
-      ],
-      delegatedExecution: {
-        code: 0,
-        stdout: "unused",
-        stderr: ""
-      }
-    });
-    const service = new OrchestrationService({
-      providerService: providerService as unknown as ProviderService,
-      skillService: createSkillServiceStub() as unknown as SkillService,
-      agentManifestService: createManifestServiceStub([
-        createManifest("orchestrator", {
-          canReceive: true,
-          canDelegate: true,
-          provider: "openai"
-        }),
-        createManifest("writer", {
-          canReceive: true,
-          canDelegate: false,
-          provider: "codex"
-        })
-      ]) as unknown as AgentManifestService,
-      sessionService: createSessionServiceStub() as unknown as SessionService,
-      fileSystem: new NodeFileSystem(),
-      pathPort: new NodePathPort(),
-      nowIso: () => "2026-02-07T17:05:00.000Z"
-    });
-
-    const result = await service.runAgent(paths, "orchestrator", {
-      message: "Please create ABOUT.md",
-      cwd: tempDir
-    });
-
-    expect(result.code).toBe(1);
-    expect(result.stdout).toContain("Open provider setup in the desktop app");
-    expect(result.stdout).toContain("OPENAI_API_KEY");
-    expect(result.orchestration?.steps).toHaveLength(1);
-    expect(result.orchestration?.steps[0]?.plannerDecision.action.type).toBe("respond_user");
-    expect(result.orchestration?.steps[0]?.plannerDecision.action.reason).toBe("planner_provider_failure");
-    expect(result.orchestration?.finalMessage).not.toContain("planner output parsing issues");
-    expect(providerService.invokeAgent).toHaveBeenCalledTimes(1);
-  });
-
-  it("fails fast when delegated provider invocation returns a non-zero code", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-delegate-fail-"));
-    tempDirs.push(tempDir);
-    const paths = createPaths(tempDir);
-    const providerService = createProviderService({
-      plannerExecutions: [
-        okExecution(
-          JSON.stringify({
-            rationale: "Delegate implementation to writer.",
-            action: {
-              type: "delegate_to_agent",
-              mode: "direct",
-              reason: "writer agent owns markdown docs",
-              targetAgentId: "writer",
-              message: "Create ABOUT.md for this project."
-            }
-          })
-        ),
-        okExecution(
-          JSON.stringify({
-            rationale: "This should never execute.",
-            action: {
-              type: "finish",
-              mode: "direct",
-              message: "unexpected"
-            }
-          })
-        )
-      ],
-      delegatedExecution: {
-        code: 1,
-        stdout: "",
-        stderr: "command failed"
-      }
-    });
-    const service = new OrchestrationService({
-      providerService: providerService as unknown as ProviderService,
-      skillService: createSkillServiceStub() as unknown as SkillService,
-      agentManifestService: createManifestServiceStub([
-        createManifest("orchestrator", {
-          canReceive: true,
-          canDelegate: true,
-          provider: "openai"
-        }),
-        createManifest("writer", {
-          canReceive: true,
-          canDelegate: false,
-          provider: "codex"
-        })
-      ]) as unknown as AgentManifestService,
-      sessionService: createSessionServiceStub() as unknown as SessionService,
-      fileSystem: new NodeFileSystem(),
-      pathPort: new NodePathPort(),
-      nowIso: () => "2026-02-07T17:07:00.000Z"
-    });
-
-    const result = await service.runAgent(paths, "orchestrator", {
-      message: "Please create ABOUT.md",
-      cwd: tempDir
-    });
-
-    expect(result.code).toBe(1);
-    expect(result.stdout).toContain("delegated agent \"writer\" failed");
-    expect(result.orchestration?.steps).toHaveLength(1);
-    expect(result.orchestration?.steps[0]?.note).toContain("delegated agent");
-    expect(providerService.invokeAgent).toHaveBeenCalledTimes(2);
-  });
-
-  it("fails fast when delegated agent reports missing tools and no progress", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-delegate-blocked-"));
-    tempDirs.push(tempDir);
-    const paths = createPaths(tempDir);
-    const providerService = createProviderService({
-      plannerExecutions: [
-        okExecution(
-          JSON.stringify({
-            rationale: "Delegate implementation to writer.",
-            action: {
-              type: "delegate_to_agent",
-              mode: "direct",
-              targetAgentId: "writer",
-              message: "Create ABOUT.md for this project."
-            }
-          })
-        ),
-        okExecution(
-          JSON.stringify({
-            rationale: "This should never execute.",
-            action: {
-              type: "finish",
-              mode: "direct",
-              message: "unexpected"
-            }
-          })
-        )
-      ],
-      delegatedExecution: {
-        code: 0,
-        stdout:
-          "I cannot complete this task because write_file and run_shell_command are unavailable in this environment.",
-        stderr: ""
-      }
-    });
-    const service = new OrchestrationService({
-      providerService: providerService as unknown as ProviderService,
-      skillService: createSkillServiceStub() as unknown as SkillService,
-      agentManifestService: createManifestServiceStub([
-        createManifest("orchestrator", {
-          canReceive: true,
-          canDelegate: true,
-          provider: "openai"
-        }),
-        createManifest("writer", {
-          canReceive: true,
-          canDelegate: false,
-          provider: "codex"
-        })
-      ]) as unknown as AgentManifestService,
-      sessionService: createSessionServiceStub() as unknown as SessionService,
-      fileSystem: new NodeFileSystem(),
-      pathPort: new NodePathPort(),
-      nowIso: () => "2026-02-07T17:08:00.000Z"
-    });
-
-    const result = await service.runAgent(paths, "orchestrator", {
-      message: "Please create ABOUT.md",
-      cwd: tempDir
-    });
-
-    expect(result.code).toBe(1);
-    expect(result.stdout).toContain("could not continue this request");
-    expect(result.stdout).toContain("missing runtime tools/permissions");
-    expect(result.orchestration?.steps).toHaveLength(1);
-    expect(providerService.invokeAgent).toHaveBeenCalledTimes(2);
-  });
-
-  it("writes workspace file actions into the run working path", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-write-working-path-"));
-    tempDirs.push(tempDir);
-    const paths = createPaths(tempDir);
-    const providerService = createProviderService({
-      plannerExecutions: [
-        okExecution(
-          JSON.stringify({
-            rationale: "Write changelog directly.",
-            action: {
-              type: "write_workspace_file",
-              path: "CHANGELOG.md",
-              content: "# Changelog\n\n## [Unreleased]\n- Added.\n"
-            }
-          })
-        ),
-        okExecution(
-          JSON.stringify({
-            rationale: "Done.",
-            action: {
-              type: "finish",
-              mode: "direct",
-              message: "Created changelog."
-            }
-          })
-        )
-      ],
-      delegatedExecution: {
-        code: 0,
-        stdout: "unused",
-        stderr: ""
-      }
-    });
-    const service = new OrchestrationService({
-      providerService: providerService as unknown as ProviderService,
-      skillService: createSkillServiceStub() as unknown as SkillService,
-      agentManifestService: createManifestServiceStub([
-        createManifest("orchestrator", {
-          canReceive: true,
-          canDelegate: true,
-          provider: "openai"
-        })
-      ]) as unknown as AgentManifestService,
-      sessionService: createSessionServiceStub() as unknown as SessionService,
-      fileSystem: new NodeFileSystem(),
-      pathPort: new NodePathPort(),
-      nowIso: () => "2026-02-07T17:09:00.000Z"
-    });
-
-    const result = await service.runAgent(paths, "orchestrator", {
-      message: "Please create changelog",
-      cwd: tempDir
-    });
-
-    expect(result.code).toBe(0);
-    const changelogPath = path.join(tempDir, "CHANGELOG.md");
-    await expect(readFile(changelogPath, "utf-8")).resolves.toContain("# Changelog");
-    await expect(
-      readFile(path.join(paths.workspacesDir, "orchestrator", "CHANGELOG.md"), "utf-8")
-    ).rejects.toThrow();
-  });
-
-  it("does not delegate to non-discoverable agents even if planner targets them", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-orch-hidden-agent-"));
-    tempDirs.push(tempDir);
-    const paths = createPaths(tempDir);
-    const providerService = createProviderService({
-      plannerExecutions: [
-        okExecution(
-          JSON.stringify({
-            rationale: "Try delegating to hidden agent.",
-            action: {
-              type: "delegate_to_agent",
-              mode: "direct",
-              targetAgentId: "writer",
-              message: "Draft docs"
-            }
-          })
-        ),
-        okExecution(
-          JSON.stringify({
-            rationale: "Fallback after invalid target.",
-            action: {
-              type: "finish",
-              mode: "direct",
-              message: "Finished without delegation."
-            }
-          })
-        )
-      ],
-      delegatedExecution: {
-        code: 0,
-        stdout: "unexpected",
-        stderr: ""
-      }
-    });
-    const service = new OrchestrationService({
-      providerService: providerService as unknown as ProviderService,
-      skillService: createSkillServiceStub() as unknown as SkillService,
-      agentManifestService: createManifestServiceStub([
-        createManifest("orchestrator", {
-          canReceive: true,
-          canDelegate: true,
-          provider: "openai"
-        }),
-        createManifest("writer", {
-          canReceive: true,
-          canDelegate: false,
-          provider: "codex",
-          discoverable: false
-        })
-      ]) as unknown as AgentManifestService,
-      sessionService: createSessionServiceStub() as unknown as SessionService,
-      fileSystem: new NodeFileSystem(),
-      pathPort: new NodePathPort(),
-      nowIso: () => "2026-02-07T17:10:00.000Z"
-    });
-
-    const result = await service.runAgent(paths, "orchestrator", {
-      message: "Please draft docs",
-      cwd: tempDir
-    });
-
-    expect(result.code).toBe(0);
-    expect(result.stdout.trim()).toBe("Finished without delegation.");
-    expect(result.orchestration?.steps[0]?.agentCall).toBeUndefined();
-    expect(result.orchestration?.steps[0]?.note).toContain("non-discoverable");
-    expect(providerService.invokeAgent).toHaveBeenCalledTimes(2);
-  });
-
-  it("allows direct invocation of non-discoverable agents", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-direct-hidden-agent-"));
-    tempDirs.push(tempDir);
-    const paths = createPaths(tempDir);
-    const providerService = createProviderService({
-      plannerExecutions: [okExecution("unused")],
-      delegatedExecution: {
-        code: 0,
-        stdout: "Writer handled request.",
-        stderr: ""
-      }
-    });
-    const service = new OrchestrationService({
-      providerService: providerService as unknown as ProviderService,
-      skillService: createSkillServiceStub() as unknown as SkillService,
-      agentManifestService: createManifestServiceStub([
-        createManifest("orchestrator", {
-          canReceive: true,
-          canDelegate: true,
-          provider: "openai"
-        }),
-        createManifest("writer", {
-          canReceive: true,
-          canDelegate: false,
-          provider: "codex",
-          discoverable: false
-        })
-      ]) as unknown as AgentManifestService,
-      sessionService: createSessionServiceStub() as unknown as SessionService,
-      fileSystem: new NodeFileSystem(),
-      pathPort: new NodePathPort(),
-      nowIso: () => "2026-02-07T17:15:00.000Z"
-    });
-
-    const result = await service.runAgent(paths, "writer", {
-      message: "Draft docs",
-      cwd: tempDir
-    });
-
-    expect(result.entryAgentId).toBe("writer");
-    expect(result.stdout.trim()).toBe("Writer handled request.");
-    expect(result.routing.targetAgentId).toBe("writer");
-    expect(providerService.invokeAgent).toHaveBeenCalledTimes(1);
-  });
-
-  it("uses orchestrator sessions by default for direct agent runs", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-direct-session-default-"));
-    tempDirs.push(tempDir);
-    const paths = createPaths(tempDir);
-    const providerService = createProviderService({
-      plannerExecutions: [okExecution("unused")],
-      delegatedExecution: {
-        code: 0,
-        stdout: "Writer handled request.",
-        stderr: ""
-      }
-    });
-    const sessionService = createSessionServiceSpy();
-    const service = new OrchestrationService({
-      providerService: providerService as unknown as ProviderService,
-      skillService: createSkillServiceStub() as unknown as SkillService,
-      agentManifestService: createManifestServiceStub([
-        createManifest("orchestrator", {
-          canReceive: true,
-          canDelegate: true,
-          provider: "openai"
-        }),
-        createManifest("writer", {
-          canReceive: true,
-          canDelegate: false,
-          provider: "codex",
-          discoverable: false
-        })
-      ]) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["goat"]) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
-      nowIso: () => "2026-02-07T17:20:00.000Z"
+      nowIso: () => "2026-02-10T10:00:00.000Z"
     });
 
-    await service.runAgent(paths, "writer", {
-      message: "Draft docs",
+    const result = await service.runAgent(paths, "goat", {
+      message: "hello",
+      cwd: tempDir
+    });
+
+    expect(providerService.invokeAgent).toHaveBeenCalledWith(
+      paths,
+      "goat",
+      expect.objectContaining({
+        providerSessionId: "session-1"
+      }),
+      expect.any(Object)
+    );
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("hello from goat");
+    expect(result.orchestration?.mode).toBe("single-agent");
+    expect(result.orchestration?.steps).toEqual([]);
+    expect(result.orchestration?.sessionGraph.nodes[0]?.agentId).toBe("goat");
+
+    const trace = JSON.parse(await readFile(result.tracePath, "utf8")) as {
+      orchestration?: { mode?: string; steps?: unknown[] };
+    };
+    expect(trace.orchestration?.mode).toBe("single-agent");
+    expect(trace.orchestration?.steps).toEqual([]);
+  });
+
+  it("uses target agent session scope by default", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-manager-session-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+
+    const sessionService = {
+      prepareRunSession: vi.fn(async () => ({ enabled: false })),
+      recordAssistantReply: vi.fn()
+    };
+
+    const service = new OrchestrationService({
+      providerService: {
+        invokeAgent: vi.fn(async () => ({
+          code: 0,
+          stdout: "ok\n",
+          stderr: "",
+          agentId: "developer",
+          providerId: "openclaw"
+        }))
+      } as unknown as ProviderService,
+      agentManifestService: createManifestServiceStub(["goat", "developer"]) as unknown as AgentManifestService,
+      sessionService: sessionService as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-10T10:00:00.000Z"
+    });
+
+    await service.runAgent(paths, "developer", {
+      message: "ship it",
       cwd: tempDir
     });
 
     expect(sessionService.prepareRunSession).toHaveBeenCalledWith(
       paths,
-      DEFAULT_AGENT_ID,
-      expect.objectContaining({
-        userMessage: "Draft docs"
-      })
+      "developer",
+      expect.objectContaining({ userMessage: "ship it" })
     );
   });
 
-  it("uses direct agent sessions when explicitly requested", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-direct-session-agent-"));
-    tempDirs.push(tempDir);
-    const paths = createPaths(tempDir);
-    const providerService = createProviderService({
-      plannerExecutions: [okExecution("unused")],
-      delegatedExecution: {
-        code: 0,
-        stdout: "Writer handled request.",
-        stderr: ""
-      }
-    });
-    const sessionService = createSessionServiceSpy();
-    const service = new OrchestrationService({
-      providerService: providerService as unknown as ProviderService,
-      skillService: createSkillServiceStub() as unknown as SkillService,
-      agentManifestService: createManifestServiceStub([
-        createManifest("orchestrator", {
-          canReceive: true,
-          canDelegate: true,
-          provider: "openai"
-        }),
-        createManifest("writer", {
-          canReceive: true,
-          canDelegate: false,
-          provider: "codex",
-          discoverable: false
-        })
-      ]) as unknown as AgentManifestService,
-      sessionService: sessionService as unknown as SessionService,
-      fileSystem: new NodeFileSystem(),
-      pathPort: new NodePathPort(),
-      nowIso: () => "2026-02-07T17:25:00.000Z"
-    });
-
-    await service.runAgent(paths, "writer", {
-      message: "Draft docs",
-      cwd: tempDir,
-      directAgentSession: true
-    });
-
-    expect(sessionService.prepareRunSession).toHaveBeenCalledWith(
-      paths,
-      "writer",
-      expect.objectContaining({
-        userMessage: "Draft docs"
-      })
-    );
-  });
 });
 
-function createPaths(homeDir: string): OpenGoatPaths {
+function createPaths(root: string): OpenGoatPaths {
   return {
-    homeDir,
-    workspacesDir: path.join(homeDir, "workspaces"),
-    agentsDir: path.join(homeDir, "agents"),
-    skillsDir: path.join(homeDir, "skills"),
-    providersDir: path.join(homeDir, "providers"),
-    sessionsDir: path.join(homeDir, "sessions"),
-    runsDir: path.join(homeDir, "runs"),
-    globalConfigJsonPath: path.join(homeDir, "config.json"),
-    globalConfigMarkdownPath: path.join(homeDir, "CONFIG.md"),
-    agentsIndexJsonPath: path.join(homeDir, "agents.json")
+    homeDir: root,
+    workspacesDir: path.join(root, "workspaces"),
+    agentsDir: path.join(root, "agents"),
+    skillsDir: path.join(root, "skills"),
+    providersDir: path.join(root, "providers"),
+    sessionsDir: path.join(root, "sessions"),
+    runsDir: path.join(root, "runs"),
+    globalConfigJsonPath: path.join(root, "config.json"),
+    globalConfigMarkdownPath: path.join(root, "CONFIG.md"),
+    agentsIndexJsonPath: path.join(root, "agents.json")
   };
 }
 
-function createProviderService(params: {
-  plannerExecutions: ProviderExecutionResult[];
-  delegatedExecution: ProviderExecutionResult;
-}): {
-  invokeAgent: ReturnType<typeof vi.fn>;
-  getAgentProvider: ReturnType<typeof vi.fn>;
-  getAgentRuntimeProfile: ReturnType<typeof vi.fn>;
-} {
-  let plannerCallIndex = 0;
-
-  const invokeAgent = vi.fn(async (_paths: OpenGoatPaths, agentId: string, _options: ProviderInvokeOptions) => {
-    if (agentId === "orchestrator") {
-      const next = params.plannerExecutions[plannerCallIndex] ?? params.plannerExecutions.at(-1);
-      plannerCallIndex += 1;
-      return {
+function createManifestServiceStub(agentIds: string[]) {
+  return {
+    listManifests: vi.fn(async () =>
+      agentIds.map((agentId) => ({
         agentId,
-        providerId: "openai",
-        ...(next ?? { code: 1, stdout: "", stderr: "missing planner output" })
-      };
-    }
-
-    return {
-      agentId,
-      providerId: "codex",
-      ...params.delegatedExecution
-    };
-  });
-
-  const getAgentProvider = vi.fn(async (_paths: OpenGoatPaths, agentId: string) => ({
-    agentId,
-    providerId: agentId === "orchestrator" ? "openai" : "codex"
-  }));
-
-  const getAgentRuntimeProfile = vi.fn(async (_paths: OpenGoatPaths, agentId: string) => ({
-    agentId,
-    providerId: agentId === "orchestrator" ? "openai" : "codex",
-    providerKind: agentId === "orchestrator" ? "http" : "cli",
-    workspaceAccess: agentId === "orchestrator" ? "internal" : "external"
-  }));
-
-  return {
-    invokeAgent,
-    getAgentProvider,
-    getAgentRuntimeProfile
-  };
-}
-
-function createSkillServiceStub(): Pick<SkillService, "buildSkillsPrompt" | "installSkill"> {
-  return {
-    buildSkillsPrompt: vi.fn(async () => ({
-      prompt: "",
-      skills: []
-    })),
-    installSkill: vi.fn(async () => ({
-      scope: "agent",
-      agentId: "orchestrator",
-      skillId: "skill",
-      skillName: "skill",
-      source: "generated",
-      installedPath: "/tmp/skill/SKILL.md",
-      replaced: false
-    }))
-  };
-}
-
-function createManifestServiceStub(manifests: AgentManifest[]): Pick<AgentManifestService, "listManifests"> {
-  return {
-    listManifests: vi.fn(async () => manifests)
-  };
-}
-
-function createSessionServiceStub(): Pick<SessionService, "prepareRunSession" | "recordAssistantReply"> {
-  return {
-    prepareRunSession: vi.fn(async () => ({ enabled: false })),
-    recordAssistantReply: vi.fn(async () => ({
-      sessionKey: "unused",
-      sessionId: "unused",
-      transcriptPath: "/tmp/unused.jsonl",
-      applied: false,
-      compactedMessages: 0
-    }))
-  };
-}
-
-function createSessionServiceSpy(): Pick<SessionService, "prepareRunSession" | "recordAssistantReply"> & {
-  prepareRunSession: ReturnType<typeof vi.fn>;
-} {
-  return {
-    prepareRunSession: vi.fn(async () => ({ enabled: false })),
-    recordAssistantReply: vi.fn(async () => ({
-      sessionKey: "unused",
-      sessionId: "unused",
-      transcriptPath: "/tmp/unused.jsonl",
-      applied: false,
-      compactedMessages: 0
-    }))
-  };
-}
-
-function createManifest(
-  agentId: string,
-  options: {
-    canReceive: boolean;
-    canDelegate: boolean;
-    provider: string;
-    discoverable?: boolean;
-  }
-): AgentManifest {
-  return {
-    agentId,
-    filePath: `/tmp/${agentId}/AGENTS.md`,
-    workspaceDir: `/tmp/${agentId}`,
-    body: "",
-    source: "derived",
-    metadata: {
-      id: agentId,
-      name: agentId,
-      description: `${agentId} agent`,
-      provider: options.provider,
-      discoverable: options.discoverable ?? true,
-      tags: [],
-      delegation: {
-        canReceive: options.canReceive,
-        canDelegate: options.canDelegate
-      },
-      priority: 50
-    }
-  };
-}
-
-function okExecution(stdout: string): ProviderExecutionResult {
-  return {
-    code: 0,
-    stdout,
-    stderr: ""
+        filePath: "",
+        workspaceDir: "",
+        body: "",
+        source: "derived",
+        metadata: {
+          id: agentId,
+          name: agentId,
+          description: `${agentId} agent`,
+          type: agentId === "goat" ? "manager" : "individual",
+          reportsTo: agentId === "goat" ? null : "goat",
+          discoverable: true,
+          tags: [],
+          skills: agentId === "goat" ? ["manager"] : [],
+          delegation: {
+            canReceive: true,
+            canDelegate: agentId === "goat"
+          },
+          priority: 50
+        }
+      }))
+    )
   };
 }

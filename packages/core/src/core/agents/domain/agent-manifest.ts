@@ -1,18 +1,23 @@
-import { isDefaultAgentId, normalizeAgentId } from "../../domain/agent-id.js";
-import { DEFAULT_PROVIDER_ID } from "../../providers/index.js";
+import { DEFAULT_AGENT_ID, isDefaultAgentId, normalizeAgentId } from "../../domain/agent-id.js";
 
 export interface AgentDelegationMetadata {
   canReceive: boolean;
   canDelegate: boolean;
 }
 
+export type AgentType = "manager" | "individual";
+
+export const MANAGER_SKILL_ID = "manager";
+
 export interface AgentManifestMetadata {
   id: string;
   name: string;
   description: string;
-  provider: string;
+  type: AgentType;
+  reportsTo: string | null;
   discoverable: boolean;
   tags: string[];
+  skills: string[];
   delegation: AgentDelegationMetadata;
   priority: number;
 }
@@ -26,8 +31,24 @@ export interface AgentManifest {
   source: "frontmatter" | "derived";
 }
 
-export function isDiscoverableByOrchestrator(manifest: AgentManifest): boolean {
+export function isDiscoverableByManager(manifest: AgentManifest): boolean {
   return manifest.metadata.discoverable && manifest.metadata.delegation.canReceive;
+}
+
+export function hasManagerSkill(skills: string[]): boolean {
+  return skills.some((skill) => sanitizeId(skill) === MANAGER_SKILL_ID);
+}
+
+export function isManagerAgent(manifest: AgentManifest): boolean {
+  return manifest.metadata.delegation.canDelegate || hasManagerSkill(manifest.metadata.skills);
+}
+
+export function isDirectReport(manifest: AgentManifest, managerAgentId: string): boolean {
+  const managerId = normalizeAgentId(managerAgentId);
+  if (!managerId) {
+    return false;
+  }
+  return (manifest.metadata.reportsTo ?? "") === managerId;
 }
 
 interface ParsedFrontMatter {
@@ -81,9 +102,16 @@ export function parseAgentManifestMarkdown(markdown: string): ParsedFrontMatter 
     const rawValue = line.slice(separator + 1).trim();
 
     if (key === "tags") {
-      const parsedTags = parseTagsValue(rawValue, lines, index);
-      data.tags = parsedTags.tags;
+      const parsedTags = parseStringListValue(rawValue, lines, index, sanitizeTag);
+      data.tags = parsedTags.values;
       index = parsedTags.nextIndex;
+      continue;
+    }
+
+    if (key === "skills") {
+      const parsedSkills = parseStringListValue(rawValue, lines, index, sanitizeId);
+      data.skills = parsedSkills.values;
+      index = parsedSkills.nextIndex;
       continue;
     }
 
@@ -122,10 +150,26 @@ export function parseAgentManifestMarkdown(markdown: string): ParsedFrontMatter 
       continue;
     }
 
-    if (key === "provider") {
-      const provider = sanitizeId(unquote(rawValue));
-      if (provider) {
-        data.provider = provider;
+    if (key === "type") {
+      const type = unquote(rawValue).toLowerCase();
+      if (type === "manager") {
+        data.type = "manager";
+      }
+      if (type === "individual") {
+        data.type = "individual";
+      }
+      continue;
+    }
+
+    if (key === "reportsTo") {
+      const value = unquote(rawValue).trim().toLowerCase();
+      if (value === "null" || value === "none" || value === "") {
+        data.reportsTo = null;
+      } else {
+        const normalizedReport = normalizeAgentId(value);
+        if (normalizedReport) {
+          data.reportsTo = normalizedReport;
+        }
       }
     }
   }
@@ -140,32 +184,52 @@ export function parseAgentManifestMarkdown(markdown: string): ParsedFrontMatter 
 export function normalizeAgentManifestMetadata(params: {
   agentId: string;
   displayName: string;
-  providerId: string;
   metadata?: Partial<AgentManifestMetadata>;
 }): AgentManifestMetadata {
   const metadata = params.metadata ?? {};
   const agentId = normalizeAgentId(metadata.id ?? params.agentId) || normalizeAgentId(params.agentId) || "agent";
+  const explicitType = metadata.type;
+  const inferredType: AgentType =
+    explicitType ??
+    (metadata.delegation?.canDelegate === true ||
+    hasManagerSkill(metadata.skills ?? []) ||
+    isDefaultAgentId(agentId)
+      ? "manager"
+      : "individual");
   const name = metadata.name?.trim() || params.displayName.trim() || agentId;
   const description =
-    metadata.description?.trim() || (isDefaultAgentId(agentId) ? "Primary orchestration agent." : `Agent ${name}.`);
-  const provider =
-    sanitizeId(metadata.provider ?? params.providerId) || sanitizeId(params.providerId) || DEFAULT_PROVIDER_ID;
+    metadata.description?.trim() ||
+    (inferredType === "manager" ? "Manager agent coordinating direct reports." : `Agent ${name}.`);
   const discoverable = metadata.discoverable ?? true;
-  const tags = dedupeTags(metadata.tags ?? []);
+  const tags = dedupe(metadata.tags ?? []);
+  const normalizedSkills = dedupe((metadata.skills ?? []).map((skill) => sanitizeId(skill)).filter(Boolean));
+  const skills =
+    inferredType === "manager" && !hasManagerSkill(normalizedSkills)
+      ? dedupe([MANAGER_SKILL_ID, ...normalizedSkills])
+      : normalizedSkills;
   const delegation = {
     canReceive: metadata.delegation?.canReceive ?? true,
-    canDelegate: metadata.delegation?.canDelegate ?? isDefaultAgentId(agentId)
+    canDelegate: metadata.delegation?.canDelegate ?? (inferredType === "manager" || hasManagerSkill(skills))
   };
+  const type: AgentType = delegation.canDelegate || hasManagerSkill(skills) ? "manager" : inferredType;
   const priority =
     typeof metadata.priority === "number" && Number.isFinite(metadata.priority) ? metadata.priority : DEFAULT_PRIORITY;
+
+  const reportsTo = resolveReportsTo({
+    agentId,
+    reportsTo: metadata.reportsTo,
+    type
+  });
 
   return {
     id: agentId,
     name,
     description,
-    provider,
+    type,
+    reportsTo,
     discoverable,
     tags,
+    skills,
     delegation,
     priority
   };
@@ -174,15 +238,18 @@ export function normalizeAgentManifestMetadata(params: {
 export function formatAgentManifestMarkdown(metadata: AgentManifestMetadata, body: string): string {
   const safeBody = body.startsWith("\n") ? body.slice(1) : body;
   const tagsValue = metadata.tags.join(", ");
+  const skillsValue = metadata.skills.join(", ");
 
   return [
     "---",
     `id: ${metadata.id}`,
     `name: ${metadata.name}`,
     `description: ${metadata.description}`,
-    `provider: ${metadata.provider}`,
+    `type: ${metadata.type}`,
+    `reportsTo: ${metadata.reportsTo ?? "null"}`,
     `discoverable: ${metadata.discoverable}`,
     `tags: [${tagsValue}]`,
+    `skills: [${skillsValue}]`,
     "delegation:",
     `  canReceive: ${metadata.delegation.canReceive}`,
     `  canDelegate: ${metadata.delegation.canDelegate}`,
@@ -193,21 +260,22 @@ export function formatAgentManifestMarkdown(metadata: AgentManifestMetadata, bod
   ].join("\n") + "\n";
 }
 
-function parseTagsValue(
+function parseStringListValue(
   rawValue: string,
   lines: string[],
-  startIndex: number
-): { tags: string[]; nextIndex: number } {
+  startIndex: number,
+  sanitize: (value: string) => string
+): { values: string[]; nextIndex: number } {
   if (rawValue.startsWith("[") && rawValue.endsWith("]")) {
-    const tags = rawValue
+    const values = rawValue
       .slice(1, -1)
       .split(",")
-      .map((value) => sanitizeTag(unquote(value.trim())))
+      .map((value) => sanitize(unquote(value.trim())))
       .filter(Boolean);
-    return { tags: dedupeTags(tags), nextIndex: startIndex };
+    return { values: dedupe(values), nextIndex: startIndex };
   }
 
-  const tags: string[] = [];
+  const values: string[] = [];
   let index = startIndex;
   while (index < lines.length) {
     const current = lines[index];
@@ -221,15 +289,15 @@ function parseTagsValue(
       break;
     }
 
-    const tag = sanitizeTag(unquote(trimmed.slice(2).trim()));
-    if (tag) {
-      tags.push(tag);
+    const value = sanitize(unquote(trimmed.slice(2).trim()));
+    if (value) {
+      values.push(value);
     }
     index += 1;
   }
 
   return {
-    tags: dedupeTags(tags),
+    values: dedupe(values),
     nextIndex: index
   };
 }
@@ -279,6 +347,30 @@ function parseDelegation(lines: string[], startIndex: number): {
   };
 }
 
+function resolveReportsTo(params: {
+  agentId: string;
+  reportsTo: string | null | undefined;
+  type: AgentType;
+}): string | null {
+  if (params.type === "manager") {
+    if (isDefaultAgentId(params.agentId)) {
+      return null;
+    }
+    if (params.reportsTo && params.reportsTo !== params.agentId) {
+      return params.reportsTo;
+    }
+    return DEFAULT_AGENT_ID;
+  }
+
+  if (params.reportsTo === null) {
+    return DEFAULT_AGENT_ID;
+  }
+  if (params.reportsTo && params.reportsTo !== params.agentId) {
+    return params.reportsTo;
+  }
+  return isDefaultAgentId(params.agentId) ? null : DEFAULT_AGENT_ID;
+}
+
 function parseBoolean(rawValue: string, fallback: boolean): boolean {
   const normalized = unquote(rawValue).toLowerCase();
   if (normalized === "true" || normalized === "yes" || normalized === "1") {
@@ -308,6 +400,6 @@ function sanitizeTag(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-function dedupeTags(values: string[]): string[] {
+function dedupe(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.trim().length > 0))];
 }

@@ -1,5 +1,4 @@
-import { isDiscoverableByOrchestrator, type AgentManifest } from "../../agents/index.js";
-import { DEFAULT_AGENT_ID, isDefaultAgentId } from "../../domain/agent-id.js";
+import { isDiscoverableByManager, isDirectReport, isManagerAgent, type AgentManifest } from "../../agents/index.js";
 import type { RoutingCandidate, RoutingDecision } from "../domain/routing.js";
 
 interface RoutingServiceInput {
@@ -12,6 +11,7 @@ export class RoutingService {
   public decide(input: RoutingServiceInput): RoutingDecision {
     const entryAgentId = input.entryAgentId.trim().toLowerCase();
     const message = input.message.trim();
+    const entryManifest = input.manifests.find((manifest) => manifest.agentId === entryAgentId);
 
     if (!message) {
       return {
@@ -24,20 +24,22 @@ export class RoutingService {
       };
     }
 
-    if (!isDefaultAgentId(entryAgentId)) {
+    const canDelegate = Boolean(entryManifest && isManagerAgent(entryManifest));
+    if (!canDelegate) {
       return {
         entryAgentId,
         targetAgentId: entryAgentId,
         confidence: 1,
-        reason: "Direct invocation of a non-orchestrator agent.",
+        reason: "Entry agent is not a manager (missing manager skill).",
         rewrittenMessage: message,
         candidates: []
       };
     }
 
     const candidates = input.manifests
-      .filter((manifest) => !isDefaultAgentId(manifest.agentId))
-      .filter((manifest) => isDiscoverableByOrchestrator(manifest))
+      .filter((manifest) => manifest.agentId !== entryAgentId)
+      .filter((manifest) => isDirectReport(manifest, entryAgentId))
+      .filter((manifest) => isDiscoverableByManager(manifest))
       .map((manifest) => scoreCandidate(message, manifest))
       .sort((left, right) => right.score - left.score);
 
@@ -45,9 +47,9 @@ export class RoutingService {
     if (!top || top.score <= 0) {
       return {
         entryAgentId,
-        targetAgentId: DEFAULT_AGENT_ID,
+        targetAgentId: entryAgentId,
         confidence: 0.35,
-        reason: "No specialized agent strongly matched the request.",
+        reason: "No direct-report agent strongly matched the request.",
         rewrittenMessage: message,
         candidates
       };

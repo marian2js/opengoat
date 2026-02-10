@@ -2,7 +2,7 @@ import type { CliCommand } from "../framework/command.js";
 
 export const agentProviderSetCommand: CliCommand = {
   path: ["agent", "provider", "set"],
-  description: "Assign one provider to an agent.",
+  description: "Set agent provider binding via OpenClaw passthrough.",
   async run(args, context): Promise<number> {
     const agentId = args[0]?.trim();
     const providerId = args[1]?.trim();
@@ -12,8 +12,13 @@ export const agentProviderSetCommand: CliCommand = {
       return 1;
     }
 
-    const binding = await context.service.setAgentProvider(agentId, providerId);
-    context.stdout.write(`Provider for ${binding.agentId} set to ${binding.providerId}\n`);
-    return 0;
+    const result = await context.service.runOpenClaw(["agents", "provider", "set", agentId, providerId, ...args.slice(2)]);
+    if (result.stdout.trim()) {
+      context.stdout.write(result.stdout);
+    }
+    if (result.stderr.trim()) {
+      context.stderr.write(result.stderr);
+    }
+    return result.code;
   }
 };

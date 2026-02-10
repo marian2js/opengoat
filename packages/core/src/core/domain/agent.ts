@@ -10,10 +10,11 @@ export interface AgentDescriptor extends AgentIdentity {
 
 export interface AgentCreationResult {
   agent: AgentDescriptor;
+  alreadyExisted?: boolean;
   createdPaths: string[];
   skippedPaths: string[];
-  externalAgentCreation?: {
-    providerId: string;
+  runtimeSync?: {
+    runtimeId: string;
     code: number;
     stdout: string;
     stderr: string;
@@ -21,8 +22,9 @@ export interface AgentCreationResult {
 }
 
 export interface CreateAgentOptions {
-  providerId?: string;
-  createExternalAgent?: boolean;
+  type?: "manager" | "individual";
+  reportsTo?: string | null;
+  skills?: string[];
 }
 
 export interface AgentDeletionResult {
@@ -30,8 +32,8 @@ export interface AgentDeletionResult {
   existed: boolean;
   removedPaths: string[];
   skippedPaths: string[];
-  externalAgentDeletion?: {
-    providerId: string;
+  runtimeSync?: {
+    runtimeId: string;
     code: number;
     stdout: string;
     stderr: string;
@@ -39,6 +41,5 @@ export interface AgentDeletionResult {
 }
 
 export interface DeleteAgentOptions {
-  providerId?: string;
-  deleteExternalAgent?: boolean;
+  force?: boolean;
 }

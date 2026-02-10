@@ -6,7 +6,8 @@ import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import {
   renderAgentsIndex,
   renderGlobalConfig,
-  renderGlobalConfigMarkdown
+  renderGlobalConfigMarkdown,
+  renderDefaultManagerSkillMarkdown
 } from "../../templates/default-templates.js";
 import { AgentService } from "../../agents/application/agent.service.js";
 
@@ -54,15 +55,30 @@ export class BootstrapService {
       skippedPaths
     );
 
-    const orchestrator: AgentIdentity = {
+    const ceo: AgentIdentity = {
       id: DEFAULT_AGENT_ID,
-      displayName: "Orchestrator"
+      displayName: "Goat"
     };
 
-    const agentResult = await this.agentService.ensureAgent(paths, orchestrator);
+    const agentResult = await this.agentService.ensureAgent(paths, ceo, {
+      type: "manager",
+      reportsTo: null,
+      skills: ["manager"]
+    });
 
     createdPaths.push(...agentResult.createdPaths);
     skippedPaths.push(...agentResult.skippedPaths);
+
+    const managerSkillDir = `${paths.skillsDir}/manager`;
+    const managerSkillFile = `${managerSkillDir}/SKILL.md`;
+    const managerSkillExists = await this.fileSystem.exists(managerSkillFile);
+    await this.fileSystem.ensureDir(managerSkillDir);
+    if (!managerSkillExists) {
+      await this.fileSystem.writeFile(managerSkillFile, `${renderDefaultManagerSkillMarkdown()}\n`);
+      createdPaths.push(managerSkillFile);
+    } else {
+      skippedPaths.push(managerSkillFile);
+    }
 
     return {
       paths,

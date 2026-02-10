@@ -18,87 +18,17 @@ afterEach(async () => {
   }
 });
 
-describe("agent create external provider e2e", () => {
-  it("creates provider-side Claude agent definitions", async () => {
+describe("agent create OpenClaw sync e2e", () => {
+  it("creates an agent and syncs it to OpenClaw", async () => {
     const root = await createTempDir("opengoat-agent-create-e2e-");
     roots.push(root);
 
     const opengoatHome = path.join(root, "opengoat-home");
-    const providerHome = path.join(root, "provider-home");
     await mkdir(opengoatHome, { recursive: true });
-    await mkdir(providerHome, { recursive: true });
+    const { stubPath, stubLogPath } = await createOpenClawStub(root);
 
     const result = await runBinary(
-      ["agent", "create", "Claude Writer", "--provider", "claude"],
-      opengoatHome,
-      {
-        HOME: providerHome
-      }
-    );
-
-    expect(result.code).toBe(0);
-    expect(result.stdout).toContain("External agent creation (claude): code 0");
-
-    const createdAgentPath = path.join(providerHome, ".claude", "agents", "claude-writer.md");
-    const contents = await readFile(createdAgentPath, "utf-8");
-    expect(contents).toContain('name: "claude-writer"');
-    expect(contents).toContain("You are Claude Writer");
-  });
-
-  it("creates provider-side OpenCode agent definitions", async () => {
-    const root = await createTempDir("opengoat-agent-create-e2e-");
-    roots.push(root);
-
-    const opengoatHome = path.join(root, "opengoat-home");
-    const opencodeConfigDir = path.join(root, "opencode-config");
-    await mkdir(opengoatHome, { recursive: true });
-    await mkdir(opencodeConfigDir, { recursive: true });
-
-    const result = await runBinary(
-      ["agent", "create", "OpenCode Writer", "--provider", "opencode"],
-      opengoatHome,
-      {
-        OPENCODE_CONFIG_DIR: opencodeConfigDir
-      }
-    );
-
-    expect(result.code).toBe(0);
-    expect(result.stdout).toContain("External agent creation (opencode): code 0");
-
-    const createdAgentPath = path.join(opencodeConfigDir, "agent", "opencode-writer.md");
-    const contents = await readFile(createdAgentPath, "utf-8");
-    expect(contents).toContain("mode: subagent");
-    expect(contents).toContain("You are OpenCode Writer");
-  });
-
-  it("creates provider-side OpenClaw agents via provider command", async () => {
-    const root = await createTempDir("opengoat-agent-create-e2e-");
-    roots.push(root);
-
-    const opengoatHome = path.join(root, "opengoat-home");
-    const stubLogPath = path.join(root, "openclaw-stub.log");
-    const stubPath = path.join(root, "openclaw-stub.mjs");
-    await mkdir(opengoatHome, { recursive: true });
-
-    await writeFile(
-      stubPath,
-      [
-        "#!/usr/bin/env node",
-        "import { appendFileSync } from 'node:fs';",
-        "const logPath = process.env.OPENCLAW_STUB_LOG;",
-        "if (!logPath) {",
-        "  process.stderr.write('missing OPENCLAW_STUB_LOG\\n');",
-        "  process.exit(2);",
-        "}",
-        "appendFileSync(logPath, `${JSON.stringify(process.argv.slice(2))}\\n`, 'utf-8');",
-        "process.stdout.write('openclaw-stub-ok\\n');"
-      ].join("\n"),
-      "utf-8"
-    );
-    await chmod(stubPath, 0o755);
-
-    const result = await runBinary(
-      ["agent", "create", "OpenClaw Writer", "--provider", "openclaw"],
+      ["agent", "create", "OpenClaw Writer", "--specialist", "--reports-to", "goat", "--skill", "writing"],
       opengoatHome,
       {
         OPENCLAW_CMD: stubPath,
@@ -107,14 +37,10 @@ describe("agent create external provider e2e", () => {
     );
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("External agent creation (openclaw): code 0");
+    expect(result.stdout).toContain("Agent ready: OpenClaw Writer (openclaw-writer)");
+    expect(result.stdout).toContain("OpenClaw sync: openclaw (code 0)");
 
-    const commandLog = await readFile(stubLogPath, "utf-8");
-    const calls = commandLog
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as string[]);
+    const calls = await readStubCalls(stubLogPath);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toEqual(
       expect.arrayContaining([
@@ -129,7 +55,108 @@ describe("agent create external provider e2e", () => {
       ])
     );
   });
+
+  it("deletes an agent and syncs deletion to OpenClaw", async () => {
+    const root = await createTempDir("opengoat-agent-create-e2e-");
+    roots.push(root);
+
+    const opengoatHome = path.join(root, "opengoat-home");
+    await mkdir(opengoatHome, { recursive: true });
+    const { stubPath, stubLogPath } = await createOpenClawStub(root);
+
+    const createResult = await runBinary(
+      ["agent", "create", "Temporary Agent"],
+      opengoatHome,
+      {
+        OPENCLAW_CMD: stubPath,
+        OPENCLAW_STUB_LOG: stubLogPath
+      }
+    );
+    expect(createResult.code).toBe(0);
+
+    const deleteResult = await runBinary(
+      ["agent", "delete", "temporary-agent"],
+      opengoatHome,
+      {
+        OPENCLAW_CMD: stubPath,
+        OPENCLAW_STUB_LOG: stubLogPath
+      }
+    );
+
+    expect(deleteResult.code).toBe(0);
+    expect(deleteResult.stdout).toContain("Agent deleted: temporary-agent");
+    expect(deleteResult.stdout).toContain("OpenClaw sync: openclaw (code 0)");
+
+    const calls = await readStubCalls(stubLogPath);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toEqual(
+      expect.arrayContaining(["agents", "delete", "temporary-agent", "--force"])
+    );
+  });
+
+  it("reports an error when OpenClaw create sync fails", async () => {
+    const root = await createTempDir("opengoat-agent-create-e2e-");
+    roots.push(root);
+
+    const opengoatHome = path.join(root, "opengoat-home");
+    await mkdir(opengoatHome, { recursive: true });
+    const { stubPath, stubLogPath } = await createOpenClawStub(root, true);
+
+    const result = await runBinary(
+      ["agent", "create", "Failing Agent"],
+      opengoatHome,
+      {
+        OPENCLAW_CMD: stubPath,
+        OPENCLAW_STUB_LOG: stubLogPath
+      }
+    );
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("OpenClaw agent creation failed");
+    const calls = await readStubCalls(stubLogPath);
+    expect(calls).toHaveLength(1);
+  });
 });
+
+async function createOpenClawStub(root: string, failOnAdd = false): Promise<{ stubPath: string; stubLogPath: string }> {
+  const stubLogPath = path.join(root, "openclaw-stub.log");
+  const stubPath = path.join(root, "openclaw-stub.mjs");
+
+  await writeFile(
+    stubPath,
+    [
+      "#!/usr/bin/env node",
+      "import { appendFileSync } from 'node:fs';",
+      "const logPath = process.env.OPENCLAW_STUB_LOG;",
+      "if (!logPath) {",
+      "  process.stderr.write('missing OPENCLAW_STUB_LOG\\n');",
+      "  process.exit(2);",
+      "}",
+      "const args = process.argv.slice(2);",
+      "appendFileSync(logPath, `${JSON.stringify(args)}\\n`, 'utf-8');",
+      failOnAdd
+        ? "if (args[0] === 'agents' && args[1] === 'add') { process.stderr.write('stub create failure\\n'); process.exit(1); }"
+        : "",
+      "process.stdout.write('openclaw-stub-ok\\n');"
+    ].filter(Boolean).join("\n"),
+    "utf-8"
+  );
+  await chmod(stubPath, 0o755);
+
+  return {
+    stubPath,
+    stubLogPath
+  };
+}
+
+async function readStubCalls(stubLogPath: string): Promise<string[][]> {
+  const commandLog = await readFile(stubLogPath, "utf-8");
+  return commandLog
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as string[]);
+}
 
 async function runBinary(
   args: string[],

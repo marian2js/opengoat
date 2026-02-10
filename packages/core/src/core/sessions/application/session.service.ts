@@ -57,7 +57,6 @@ export type PreparedSessionRun =
   | {
       enabled: true;
       info: SessionRunInfo;
-      contextPrompt: string;
       compactionApplied: boolean;
     };
 
@@ -156,15 +155,6 @@ export class SessionService {
       store
     });
 
-    const contextPrompt = await this.buildSessionContext({
-      transcriptPath,
-      config,
-      sessionKey,
-      sessionId,
-      workspacePath,
-      workingPath
-    });
-
     await this.appendMessage({
       paths,
       agentId: normalizedAgentId,
@@ -184,7 +174,6 @@ export class SessionService {
         workingPath,
         isNewSession
       },
-      contextPrompt,
       compactionApplied: compaction.applied
     };
   }
@@ -615,51 +604,6 @@ export class SessionService {
     await this.persistStore(params.paths, params.agentId, store);
   }
 
-  private async buildSessionContext(params: {
-    transcriptPath: string;
-    config: SessionConfig;
-    sessionKey: string;
-    sessionId: string;
-    workspacePath: string;
-    workingPath: string;
-  }): Promise<string> {
-    const records = await this.readTranscriptRecords(params.transcriptPath);
-    const history = records
-      .filter((record) => isSessionTranscriptMessage(record) || isSessionTranscriptCompaction(record))
-      .map((record) => {
-        if (isSessionTranscriptCompaction(record)) {
-          return {
-            label: "COMPACTION",
-            timestamp: record.timestamp,
-            content: record.summary
-          };
-        }
-
-        return {
-          label: record.role.toUpperCase(),
-          timestamp: record.timestamp,
-          content: record.content
-        };
-      });
-
-    const pruned = pruneHistory(history, params.config);
-    if (pruned.length === 0) {
-      return "";
-    }
-
-    const lines = [
-      `Session key: ${params.sessionKey}`,
-      `Session id: ${params.sessionId}`,
-      `Workspace path: ${params.workspacePath}`,
-      `Working path: ${params.workingPath}`,
-      "",
-      "Recent session history:",
-      ...pruned.map((entry) => `[${entry.label} ${new Date(entry.timestamp).toISOString()}] ${entry.content}`)
-    ];
-    const rendered = lines.join("\n");
-    return clampText(rendered, params.config.contextMaxChars);
-  }
-
   private async ensureTranscriptHeader(params: {
     transcriptPath: string;
     agentId: string;
@@ -1065,36 +1009,6 @@ function clampPositive(value: number, fallback: number): number {
     return fallback;
   }
   return Math.floor(value);
-}
-
-function pruneHistory(
-  history: Array<{ label: string; timestamp: number; content: string }>,
-  config: SessionConfig
-): Array<{ label: string; timestamp: number; content: string }> {
-  if (history.length === 0) {
-    return [];
-  }
-
-  if (!config.pruning.enabled) {
-    return history;
-  }
-
-  const maxMessages = Math.max(config.pruning.maxMessages, config.pruning.keepRecentMessages);
-  const keepRecent = Math.max(1, config.pruning.keepRecentMessages);
-
-  let selected = history.slice(-maxMessages);
-  while (selected.length > keepRecent && estimateHistoryChars(selected) > config.pruning.maxChars) {
-    selected = selected.slice(1);
-  }
-
-  return selected.map((entry) => ({
-    ...entry,
-    content: clampText(entry.content, 1500)
-  }));
-}
-
-function estimateHistoryChars(history: Array<{ label: string; content: string }>): number {
-  return history.reduce((total, entry) => total + entry.label.length + entry.content.length + 32, 0);
 }
 
 function summarizeCompactedMessages(messages: SessionTranscriptMessage[], maxChars: number): string {

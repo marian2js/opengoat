@@ -5,25 +5,12 @@ export interface ScenarioAgentSpec {
 }
 
 export interface ScenarioScriptedSpec {
-  orchestratorActions: Array<{
-    rationale: string;
-    action: {
-      type: "delegate_to_agent" | "respond_user" | "finish";
-      mode?: "direct" | "artifacts" | "hybrid";
-      targetAgentId?: string;
-      message: string;
-      expectedOutput?: string;
-    };
-  }>;
   agentReplies: Record<string, string>;
 }
 
 export interface ScenarioAssertions {
   mustSucceed?: boolean;
   stdoutIncludes?: string[];
-  delegatedAgents?: string[];
-  minSteps?: number;
-  maxSteps?: number;
 }
 
 export interface ScenarioSpec {
@@ -42,6 +29,4 @@ export interface ScenarioRunResult {
   failures: string[];
   tracePath: string;
   output: string;
-  delegatedAgents: string[];
-  steps: number;
 }

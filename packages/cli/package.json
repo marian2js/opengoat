@@ -1,7 +1,7 @@
 {
   "name": "@opengoat/cli",
   "version": "2026.2.9",
-  "description": "OpenGoat agent orchestrator CLI",
+  "description": "OpenGoat organization runtime CLI",
   "type": "module",
   "main": "dist/index.js",
   "bin": {

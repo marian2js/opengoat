@@ -3,7 +3,7 @@ import type { CliCommand } from "../framework/command.js";
 
 export const skillListCommand: CliCommand = {
   path: ["skill", "list"],
-  description: "List installed skills for one agent or global scope.",
+  description: "List assigned skills for an agent or all centralized skills.",
   async run(args, context): Promise<number> {
     const parsed = parseListArgs(args);
     if (!parsed.ok) {
@@ -40,7 +40,7 @@ export const skillListCommand: CliCommand = {
       context.stdout.write("No skills installed.\n");
       context.stdout.write(parsed.global
         ? "Install one with: opengoat skill install <name> --global [--from <path>]\n"
-        : "Install one with: opengoat skill install <name> [--agent <id>] [--from <path>]\n");
+        : "Assign one with: opengoat skill install <name> [--agent <id>] [--from <path>]\n");
       return 0;
     }
 

@@ -10,8 +10,8 @@ describe("agent image options", () => {
       code: 0,
       stdout: "ok\n",
       stderr: "",
-      agentId: "orchestrator",
-      providerId: "openai"
+      agentId: "goat",
+      providerId: "openclaw"
     }));
 
     const exitCode = await agentCommand.run(
@@ -21,7 +21,7 @@ describe("agent image options", () => {
 
     expect(exitCode).toBe(0);
     expect(runAgent).toHaveBeenCalledWith(
-      "orchestrator",
+      "goat",
       expect.objectContaining({
         message: "describe image",
         images: [{ path: "./diagram.png" }, { path: "./chart.jpg" }]
@@ -35,7 +35,7 @@ describe("agent image options", () => {
       stdout: "ok\n",
       stderr: "",
       agentId: "writer",
-      providerId: "codex"
+      providerId: "openclaw"
     }));
 
     const exitCode = await agentRunCommand.run(
@@ -76,4 +76,3 @@ function createContext(runAgent: ReturnType<typeof vi.fn>) {
     stderr: new PassThrough()
   };
 }
-

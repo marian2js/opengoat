@@ -38,8 +38,6 @@ export const scenarioRunCommand: CliCommand = {
       context.stdout.write(`Scenario: ${report.scenarioName}\n`);
       context.stdout.write(`Mode: ${report.mode}\n`);
       context.stdout.write(`Success: ${report.success}\n`);
-      context.stdout.write(`Steps: ${report.steps}\n`);
-      context.stdout.write(`Delegated agents: ${report.delegatedAgents.join(", ") || "(none)"}\n`);
       context.stdout.write(`Trace: ${report.tracePath}\n`);
       context.stdout.write(`Output:\n${report.output}\n`);
       if (report.failures.length > 0) {
@@ -131,6 +129,6 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("  opengoat scenario run --file <scenario.json> [--mode live|scripted] [--json]\n");
   output.write("\n");
   output.write("Notes:\n");
-  output.write("  - live mode uses your configured providers and agents.\n");
-  output.write("  - scripted mode runs deterministic orchestration from scenario.scripted.\n");
+  output.write("  - live mode uses your configured OpenClaw runtime and agents.\n");
+  output.write("  - scripted mode returns deterministic agent replies from scenario.scripted.agentReplies.\n");
 }

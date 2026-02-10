@@ -1,34 +1,12 @@
-import { emitKeypressEvents } from "node:readline";
-import {
-  DEFAULT_AGENT_ID,
-  buildProviderFamilies,
-  filterProvidersForOnboarding,
-  isDefaultOnboardingAgent,
-  resolveExtendedHttpProviderModelEnvVar,
-  resolveOnboardingProviderSetupUrl,
-  sortProvidersForOnboarding
-} from "@opengoat/core";
-import type { OpenGoatService, ProviderOnboardingFamily, ProviderOnboardingSpec, ProviderSummary } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
-import { resolveGuidedAuth, runGuidedAuth } from "./onboard-guided-auth.js";
 import {
   createCliPrompter,
-  PromptCancelledError,
-  type CliPrompter
+  PromptCancelledError
 } from "../framework/prompter.js";
-
-const PROVIDER_MODEL_ENV_KEY: Record<string, string> = {
-  gemini: "GEMINI_MODEL",
-  grok: "GROK_MODEL",
-  openai: "OPENAI_MODEL",
-  openclaw: "OPENGOAT_OPENCLAW_MODEL",
-  opencode: "OPENCODE_MODEL",
-  openrouter: "OPENROUTER_MODEL"
-};
 
 export const onboardCommand: CliCommand = {
   path: ["onboard"],
-  description: "Onboard an agent/provider and configure credentials.",
+  description: "Configure OpenClaw gateway connection (local or external).",
   async run(args, context): Promise<number> {
     const parsed = parseOnboardArgs(args);
     if (!parsed.ok) {
@@ -44,178 +22,79 @@ export const onboardCommand: CliCommand = {
 
     await context.service.initialize();
 
-    const agentId = parsed.agentId ?? DEFAULT_AGENT_ID;
-    const providers = await context.service.listProviders();
-    if (providers.length === 0) {
-      context.stderr.write("No providers discovered.\n");
-      return 1;
-    }
-    const selectableProviders = sortProvidersForOnboarding(filterProvidersForOnboarding(agentId, providers));
-    if (selectableProviders.length === 0) {
-      context.stderr.write(`No eligible providers available for agent "${agentId}".\n`);
-      return 1;
-    }
-
     const prompter = createCliPrompter({
       stdin: process.stdin,
       stdout: process.stdout,
       stderr: process.stderr
     });
-    const interactive = !parsed.nonInteractive;
-
-    if (interactive) {
-      await prompter.intro("OpenGoat Onboarding");
-      await prompter.note(`Agent: ${agentId}`, "Setup");
-      await prompter.note("Use arrow keys to move and Enter to select.", "Controls");
-    }
 
     try {
-      let selectedProvider: ProviderSummary | null = null;
-      let selectedEnvUpdates: Record<string, string> = {};
-      let selectedShouldRunAuth = false;
-      let preferredProviderId: string | undefined;
+      let mode = parsed.mode;
+      let gatewayUrl = parsed.gatewayUrl;
+      let gatewayToken = parsed.gatewayToken;
 
-      while (!selectedProvider) {
-        const providerId = await resolveProviderId({
-          service: context.service,
-          providers: selectableProviders,
-          agentId,
-          requestedProviderId: parsed.providerId,
-          nonInteractive: parsed.nonInteractive,
-          prompter,
-          preferredProviderId
-        });
-        if (!providerId) {
-          return 1;
+      if (!parsed.nonInteractive) {
+        await prompter.intro("OpenGoat Onboarding");
+        await prompter.note("All OpenGoat agents run as OpenClaw agents.", "Runtime");
+
+        if (!mode) {
+          mode = await prompter.select(
+            "Select OpenClaw connection mode",
+            [
+              { value: "local", label: "Local Gateway", hint: "Use local OpenClaw runtime." },
+              { value: "external", label: "External Gateway", hint: "Connect to a remote OpenClaw gateway." }
+            ],
+            "local"
+          );
         }
 
-        const provider = selectableProviders.find((entry) => entry.id === providerId);
-        if (!provider) {
-          if (
-            isDefaultOnboardingAgent(agentId) &&
-            providers.some((entry) => entry.id === providerId) &&
-            !selectableProviders.some((entry) => entry.id === providerId)
-          ) {
-            context.stderr.write(
-              `Provider "${providerId}" is not supported for orchestrator onboarding. ` +
-              "Choose an internal provider.\n"
-            );
-            return 1;
+        if (mode === "external") {
+          if (!gatewayUrl) {
+            gatewayUrl = (
+              await prompter.text({
+                message: "External gateway URL",
+                placeholder: "ws://host:port"
+              })
+            ).trim();
           }
-          context.stderr.write(`Unknown provider: ${providerId}\n`);
-          return 1;
-        }
-        preferredProviderId = provider.id;
-
-        const onboarding = (await context.service.getProviderOnboarding(provider.id)) ?? {};
-        const existingConfig = await context.service.getProviderConfig(provider.id);
-        const envUpdates = {
-          ...(existingConfig?.env ?? {}),
-          ...parsed.env
-        };
-
-        const guidedAuth = resolveGuidedAuth(provider.id);
-
-        const modelEnvKey = resolveProviderModelEnvKey(provider.id, onboarding);
-        if (parsed.model && modelEnvKey) {
-          envUpdates[modelEnvKey] = parsed.model;
-        }
-
-        if (
-          guidedAuth &&
-          !parsed.nonInteractive &&
-          !parsed.skipAuth &&
-          (parsed.runAuth ||
-            (await prompter.confirm({
-              message: `${guidedAuth.title}: ${guidedAuth.description} Start guided sign-in now?`,
-              initialValue: true
-            })))
-        ) {
-          const authResult = await runGuidedAuth(provider.id, { prompter });
-          Object.assign(envUpdates, authResult.env);
-          if (authResult.note) {
-            await prompter.note(authResult.note, guidedAuth.title);
+          if (!gatewayToken) {
+            gatewayToken = (
+              await prompter.text({
+                message: "External gateway token",
+                required: true,
+                secret: true
+              })
+            ).trim();
           }
         }
-
-        if (parsed.nonInteractive) {
-          const missing = findMissingRequiredEnv(envUpdates, onboarding, process.env);
-          if (missing.length > 0) {
-            context.stderr.write(
-              `Missing required provider settings for ${provider.id}: ${missing.join(", ")}\n`
-            );
-            context.stderr.write("Provide values with --env KEY=VALUE or provider-specific key flags.\n");
-            return 1;
-          }
-        } else {
-          const envAction = await promptForEnvValues({
-            provider,
-            onboarding,
-            env: envUpdates,
-            prompter,
-            allowBack: !parsed.providerId,
-            guidedAuthAvailable: Boolean(guidedAuth)
-          });
-          if (envAction === "back") {
-            continue;
-          }
-        }
-
-        const shouldRunAuth = await resolveRunAuth({
-          parsed,
-          provider,
-          onboarding,
-          prompter
-        });
-
-        selectedProvider = provider;
-        selectedEnvUpdates = envUpdates;
-        selectedShouldRunAuth = shouldRunAuth;
       }
 
-      const provider = selectedProvider;
-      const envUpdates = selectedEnvUpdates;
-      const shouldRunAuth = selectedShouldRunAuth;
-
-      await context.service.setAgentProvider(agentId, provider.id);
-
-      if (Object.keys(envUpdates).length > 0) {
-        await context.service.setProviderConfig(provider.id, envUpdates);
+      const resolvedMode = mode ?? "local";
+      if (resolvedMode === "external" && (!gatewayUrl || !gatewayToken)) {
+        context.stderr.write("External mode requires --gateway-url and --gateway-token.\n");
+        return 1;
       }
 
-      if (shouldRunAuth) {
-        const authResult = await context.service.authenticateProvider(provider.id, {
-          env: process.env,
-          onStdout: (chunk) => {
-            context.stdout.write(chunk);
-          },
-          onStderr: (chunk) => {
-            context.stderr.write(chunk);
-          }
-        });
+      const config =
+        resolvedMode === "external"
+          ? await context.service.setOpenClawGatewayConfig({
+              mode: "external",
+              gatewayUrl,
+              gatewayToken
+            })
+          : await context.service.setOpenClawGatewayConfig({ mode: "local" });
 
-        if (authResult.code !== 0) {
-          context.stderr.write(`Provider auth failed for ${provider.id}.\n`);
-          return authResult.code;
-        }
+      if (!parsed.nonInteractive) {
+        await prompter.outro("OpenClaw onboarding complete.");
       }
 
-      if (interactive) {
-        await prompter.outro("Onboarding complete.");
-      } else {
-        context.stdout.write("Onboarding complete.\n");
+      context.stdout.write(`Mode: ${config.mode}\n`);
+      if (config.mode === "external") {
+        context.stdout.write(`Gateway URL: ${config.gatewayUrl}\n`);
       }
-      context.stdout.write(`Agent: ${agentId}\n`);
-      context.stdout.write(`Provider: ${provider.id}\n`);
-      if (Object.keys(envUpdates).length > 0) {
-        context.stdout.write(
-          `Saved provider config: ${context.service.getPaths().providersDir}/${provider.id}/config.json\n`
-        );
-      }
-      if (shouldRunAuth) {
-        context.stdout.write("Provider auth flow completed.\n");
-      }
-
+      context.stdout.write(
+        `Saved runtime config: ${context.service.getPaths().providersDir}/openclaw/config.json\n`
+      );
       return 0;
     } catch (error) {
       if (error instanceof PromptCancelledError) {
@@ -228,727 +107,94 @@ export const onboardCommand: CliCommand = {
 
 type ParsedOnboardArgs =
   | {
-    ok: true;
-    help: boolean;
-    nonInteractive: boolean;
-    runAuth?: boolean;
-    skipAuth?: boolean;
-    providerId?: string;
-    agentId?: string;
-    model?: string;
-    env: Record<string, string>;
-  }
+      ok: true;
+      help: boolean;
+      nonInteractive: boolean;
+      mode?: "local" | "external";
+      gatewayUrl?: string;
+      gatewayToken?: string;
+    }
   | {
-    ok: false;
-    error: string;
-  };
+      ok: false;
+      error: string;
+    };
 
 function parseOnboardArgs(args: string[]): ParsedOnboardArgs {
-  let nonInteractive = false;
   let help = false;
-  let runAuth = false;
-  let skipAuth = false;
-  let providerId: string | undefined;
-  let agentId: string | undefined;
-  let model: string | undefined;
-  const env: Record<string, string> = {};
+  let nonInteractive = false;
+  let mode: "local" | "external" | undefined;
+  let gatewayUrl: string | undefined;
+  let gatewayToken: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
-    const rawToken = args[index];
-    if (!rawToken) {
+    const token = args[index];
+    if (!token) {
       continue;
     }
-    const assignment = parseInlineOptionAssignment(rawToken);
-    const token = assignment?.token ?? rawToken;
-    const inlineValue = assignment?.value;
 
     if (token === "--help" || token === "-h" || token === "help") {
-      if (inlineValue !== undefined) {
-        return { ok: false, error: `${token} does not accept a value.` };
-      }
       help = true;
       continue;
     }
 
     if (token === "--non-interactive") {
-      if (inlineValue !== undefined) {
-        return { ok: false, error: `${token} does not accept a value.` };
-      }
       nonInteractive = true;
       continue;
     }
 
-    if (token === "--run-auth") {
-      if (inlineValue !== undefined) {
-        return { ok: false, error: `${token} does not accept a value.` };
-      }
-      runAuth = true;
+    if (token === "--local") {
+      mode = "local";
       continue;
     }
 
-    if (token === "--skip-auth") {
-      if (inlineValue !== undefined) {
-        return { ok: false, error: `${token} does not accept a value.` };
-      }
-      skipAuth = true;
+    if (token === "--external") {
+      mode = "external";
       continue;
     }
 
-    if (token === "--provider") {
-      const value = resolveOptionValue({
-        args,
-        index,
-        inlineValue,
-        missingMessage: "Missing value for --provider."
-      });
-      if (!value.ok) {
-        return { ok: false, error: value.error };
+    if (token === "--gateway-url") {
+      const value = args[index + 1]?.trim();
+      if (!value) {
+        return { ok: false, error: "Missing value for --gateway-url." };
       }
-      providerId = value.value.toLowerCase();
-      if (value.consumedNextArg) {
-        index += 1;
-      }
+      gatewayUrl = value;
+      index += 1;
       continue;
     }
 
-    if (token === "--agent") {
-      const value = resolveOptionValue({
-        args,
-        index,
-        inlineValue,
-        missingMessage: "Missing value for --agent."
-      });
-      if (!value.ok) {
-        return { ok: false, error: value.error };
+    if (token === "--gateway-token") {
+      const value = args[index + 1]?.trim();
+      if (!value) {
+        return { ok: false, error: "Missing value for --gateway-token." };
       }
-      agentId = value.value.toLowerCase();
-      if (value.consumedNextArg) {
-        index += 1;
-      }
-      continue;
-    }
-
-    if (token === "--model") {
-      const value = resolveOptionValue({
-        args,
-        index,
-        inlineValue,
-        missingMessage: "Missing value for --model."
-      });
-      if (!value.ok) {
-        return { ok: false, error: value.error };
-      }
-      model = value.value;
-      if (value.consumedNextArg) {
-        index += 1;
-      }
-      continue;
-    }
-
-    if (token === "--openai-api-key") {
-      const value = resolveOptionValue({
-        args,
-        index,
-        inlineValue,
-        missingMessage: "Missing value for --openai-api-key."
-      });
-      if (!value.ok) {
-        return { ok: false, error: value.error };
-      }
-      env.OPENAI_API_KEY = value.value;
-      if (value.consumedNextArg) {
-        index += 1;
-      }
-      continue;
-    }
-
-    if (token === "--openrouter-api-key") {
-      const value = resolveOptionValue({
-        args,
-        index,
-        inlineValue,
-        missingMessage: "Missing value for --openrouter-api-key."
-      });
-      if (!value.ok) {
-        return { ok: false, error: value.error };
-      }
-      env.OPENROUTER_API_KEY = value.value;
-      if (value.consumedNextArg) {
-        index += 1;
-      }
-      continue;
-    }
-
-    if (token === "--xai-api-key") {
-      const value = resolveOptionValue({
-        args,
-        index,
-        inlineValue,
-        missingMessage: "Missing value for --xai-api-key."
-      });
-      if (!value.ok) {
-        return { ok: false, error: value.error };
-      }
-      env.XAI_API_KEY = value.value;
-      if (value.consumedNextArg) {
-        index += 1;
-      }
-      continue;
-    }
-
-    if (token === "--env") {
-      const value = resolveOptionValue({
-        args,
-        index,
-        inlineValue,
-        missingMessage: "Missing value for --env."
-      });
-      if (!value.ok) {
-        return { ok: false, error: value.error };
-      }
-      const parsed = parseEnvPair(value.value);
-      if (!parsed) {
-        return { ok: false, error: `Invalid --env entry: ${value.value}` };
-      }
-      env[parsed.key] = parsed.value;
-      if (value.consumedNextArg) {
-        index += 1;
-      }
-      continue;
-    }
-
-    if (isDynamicEnvOption(token)) {
-      const value = resolveOptionValue({
-        args,
-        index,
-        inlineValue,
-        missingMessage: `Missing value for ${token}.`
-      });
-      if (!value.ok) {
-        return { ok: false, error: value.error };
-      }
-      env[dynamicOptionToEnvKey(token)] = value.value;
-      if (value.consumedNextArg) {
-        index += 1;
-      }
+      gatewayToken = value;
+      index += 1;
       continue;
     }
 
     return { ok: false, error: `Unknown option: ${token}` };
   }
 
-  if (runAuth && skipAuth) {
-    return { ok: false, error: "Use either --run-auth or --skip-auth, not both." };
+  if (mode === "local" && (gatewayUrl || gatewayToken)) {
+    return { ok: false, error: "--gateway-url/--gateway-token are only valid with --external." };
   }
 
   return {
     ok: true,
     help,
     nonInteractive,
-    runAuth: runAuth || undefined,
-    skipAuth: skipAuth || undefined,
-    providerId,
-    agentId,
-    model,
-    env
+    mode,
+    gatewayUrl,
+    gatewayToken
   };
-}
-
-function parseInlineOptionAssignment(
-  rawToken: string | undefined
-): { token: string; value: string } | null {
-  if (!rawToken?.startsWith("--")) {
-    return null;
-  }
-
-  const separator = rawToken.indexOf("=");
-  if (separator <= 2) {
-    return null;
-  }
-
-  return {
-    token: rawToken.slice(0, separator),
-    value: rawToken.slice(separator + 1)
-  };
-}
-
-function resolveOptionValue(params: {
-  args: string[];
-  index: number;
-  inlineValue: string | undefined;
-  missingMessage: string;
-}):
-  | { ok: true; value: string; consumedNextArg: boolean }
-  | { ok: false; error: string } {
-  const fromInline = params.inlineValue?.trim();
-  if (fromInline !== undefined) {
-    if (!fromInline) {
-      return { ok: false, error: params.missingMessage };
-    }
-    return {
-      ok: true,
-      value: fromInline,
-      consumedNextArg: false
-    };
-  }
-
-  const fromNextArg = params.args[params.index + 1]?.trim();
-  if (!fromNextArg) {
-    return { ok: false, error: params.missingMessage };
-  }
-
-  return {
-    ok: true,
-    value: fromNextArg,
-    consumedNextArg: true
-  };
-}
-
-function isDynamicEnvOption(token: string): boolean {
-  if (!token.startsWith("--")) {
-    return false;
-  }
-
-  const optionName = token.slice(2);
-  return /^[a-z0-9][a-z0-9-]*-[a-z0-9-]+$/.test(optionName);
-}
-
-function dynamicOptionToEnvKey(token: string): string {
-  return token
-    .slice(2)
-    .split("-")
-    .filter(Boolean)
-    .map((segment) => segment.toUpperCase())
-    .join("_");
-}
-
-async function resolveProviderId(params: {
-  service: OpenGoatService;
-  providers: ProviderSummary[];
-  agentId: string;
-  requestedProviderId?: string;
-  nonInteractive: boolean;
-  prompter: CliPrompter;
-  preferredProviderId?: string;
-}): Promise<string | null> {
-  if (params.requestedProviderId) {
-    return params.requestedProviderId;
-  }
-
-  let currentProviderId: string | undefined;
-  try {
-    const current = await params.service.getAgentProvider(params.agentId);
-    currentProviderId = current.providerId;
-  } catch {
-    currentProviderId = undefined;
-  }
-
-  if (params.nonInteractive) {
-    if (currentProviderId && params.providers.some((provider) => provider.id === currentProviderId)) {
-      return currentProviderId;
-    }
-    return params.providers[0]?.id ?? null;
-  }
-
-  const defaultProvider =
-    params.preferredProviderId && params.providers.some((provider) => provider.id === params.preferredProviderId)
-      ? params.preferredProviderId
-      : currentProviderId && params.providers.some((provider) => provider.id === currentProviderId)
-        ? currentProviderId
-        : params.providers[0]?.id;
-  const families = buildProviderFamilies(params.providers);
-  const defaultFamilyId = resolveDefaultFamilyId(defaultProvider, families);
-
-  const selectedFamilyId = await params.prompter.select(
-    "Model/auth provider",
-    families.map((family) => ({
-      value: family.id,
-      label: family.hint ? `${family.label} (${family.hint})` : family.label
-    })),
-    defaultFamilyId
-  );
-  const selectedFamily = families.find((family) => family.id === selectedFamilyId);
-  if (!selectedFamily) {
-    return null;
-  }
-
-  if (selectedFamily.providerIds.length === 1) {
-    return selectedFamily.providerIds[0] ?? null;
-  }
-
-  const selectedProviderId = await params.prompter.select(
-    `${selectedFamily.label} auth method`,
-    selectedFamily.providerIds
-      .map((id) => params.providers.find((provider) => provider.id === id))
-      .filter((provider): provider is ProviderSummary => Boolean(provider))
-      .map((provider) => ({
-        value: provider.id,
-        label: `${formatProviderDisplayName(provider)} (${provider.id})`,
-        hint: resolveGuidedAuth(provider.id)?.description
-      })),
-    defaultProvider && selectedFamily.providerIds.includes(defaultProvider)
-      ? defaultProvider
-      : selectedFamily.providerIds[0]
-  );
-
-  return selectedProviderId || null;
-}
-
-async function promptForEnvValues(params: {
-  provider: ProviderSummary;
-  onboarding: ProviderOnboardingSpec;
-  env: Record<string, string>;
-  prompter: CliPrompter;
-  allowBack: boolean;
-  guidedAuthAvailable: boolean;
-}): Promise<"continue" | "back"> {
-  const fields = (params.onboarding.env ?? []).filter((field) => Boolean(field.required));
-  if (fields.length === 0) {
-    return "continue";
-  }
-
-  await params.prompter.note(
-    `Configure required settings for provider "${params.provider.id}".`,
-    "Provider Setup"
-  );
-
-  for (const field of fields) {
-    const existing = params.env[field.key] ?? process.env[field.key]?.trim();
-    if (existing) {
-      params.env[field.key] = existing;
-      continue;
-    }
-
-    if (params.allowBack) {
-      const response = await promptTextOrBack({
-        prompter: params.prompter,
-        message: formatEnvPromptMessage(params.provider.id, field, params.guidedAuthAvailable),
-        initialValue: field.secret ? undefined : existing,
-        existingValue: existing,
-        required: true,
-        secret: Boolean(field.secret)
-      });
-      if (response.action === "back") {
-        return "back";
-      }
-      params.env[field.key] = response.value;
-      continue;
-    }
-
-    const value = await params.prompter.text({
-      message: formatEnvPromptMessage(params.provider.id, field, params.guidedAuthAvailable),
-      initialValue: field.secret ? undefined : existing,
-      required: true,
-      secret: Boolean(field.secret)
-    });
-    params.env[field.key] = value;
-  }
-
-  return "continue";
-}
-
-async function resolveRunAuth(params: {
-  parsed: Extract<ParsedOnboardArgs, { ok: true }>;
-  provider: ProviderSummary;
-  onboarding: ProviderOnboardingSpec;
-  prompter: CliPrompter;
-}): Promise<boolean> {
-  if (params.parsed.skipAuth) {
-    return false;
-  }
-  if (params.parsed.runAuth) {
-    return true;
-  }
-
-  const auth = params.onboarding.auth;
-  if (!auth?.supported || !params.provider.capabilities.auth || params.parsed.nonInteractive) {
-    return false;
-  }
-
-  return params.prompter.confirm({
-    message: `Run provider auth now? ${auth.description}`,
-    initialValue: false
-  });
-}
-
-function findMissingRequiredEnv(
-  configured: Record<string, string>,
-  onboarding: ProviderOnboardingSpec,
-  runtimeEnv: NodeJS.ProcessEnv
-): string[] {
-  const fields = onboarding.env ?? [];
-  const missing: string[] = [];
-  for (const field of fields) {
-    if (!field.required) {
-      continue;
-    }
-    const value = configured[field.key] ?? runtimeEnv[field.key]?.trim();
-    if (!value) {
-      missing.push(field.key);
-    }
-  }
-  return missing;
-}
-
-function parseEnvPair(raw: string): { key: string; value: string } | null {
-  const separator = raw.indexOf("=");
-  if (separator <= 0) {
-    return null;
-  }
-
-  const key = raw.slice(0, separator).trim();
-  const value = raw.slice(separator + 1).trim();
-  if (!key || !value) {
-    return null;
-  }
-
-  return { key, value };
-}
-
-function formatProviderDisplayName(provider: ProviderSummary): string {
-  return provider.displayName;
-}
-
-function resolveDefaultFamilyId(
-  defaultProviderId: string | undefined,
-  families: ProviderOnboardingFamily[]
-): string | undefined {
-  if (!defaultProviderId) {
-    return families[0]?.id;
-  }
-  return families.find((family) => family.providerIds.includes(defaultProviderId))?.id ?? families[0]?.id;
-}
-
-function formatEnvPromptMessage(
-  providerId: string,
-  field: { key: string; description: string },
-  guidedAuthAvailable: boolean
-): string {
-  const base = `${field.description} (${field.key})`;
-  const lines = [base];
-
-  const setupUrl = resolveOnboardingProviderSetupUrl(providerId);
-  if (setupUrl) {
-    lines.push(`Get credentials: ${setupUrl}`);
-  }
-
-  if (guidedAuthAvailable && /OAUTH|TOKEN/i.test(field.key)) {
-    lines.push("Tip: guided sign-in can fill this automatically.");
-  }
-
-  return lines.join("\n");
-}
-
-function isBackCommand(value: string): boolean {
-  return value.trim().toLowerCase() === ":back";
-}
-
-async function promptTextOrBack(params: {
-  prompter: CliPrompter;
-  message: string;
-  initialValue?: string;
-  existingValue?: string;
-  required: boolean;
-  secret: boolean;
-}): Promise<{ action: "submit"; value: string } | { action: "back" }> {
-  const stdin = process.stdin as NodeJS.ReadStream & { isTTY?: boolean; setRawMode?: (mode: boolean) => void };
-  const stdout = process.stdout as NodeJS.WriteStream & { isTTY?: boolean };
-  if (!stdin.isTTY || !stdout.isTTY || typeof stdin.setRawMode !== "function") {
-    const fallbackValue = await params.prompter.text({
-      message: `${params.message} [type :back to provider list]`,
-      initialValue: params.initialValue,
-      required: params.required,
-      secret: params.secret
-    });
-    if (isBackCommand(fallbackValue)) {
-      return { action: "back" };
-    }
-    return { action: "submit", value: fallbackValue.trim() };
-  }
-
-  return await new Promise<{ action: "submit"; value: string } | { action: "back" }>((resolve, reject) => {
-    type Focus = "input" | "back";
-    const existingValue = params.existingValue?.trim() || "";
-    const preserveExistingOnEmpty = existingValue.length > 0;
-    let value = params.initialValue ?? "";
-    let focus: Focus = "input";
-    let error = "";
-    let renderedLines = 0;
-    const originalRawMode = Boolean((stdin as NodeJS.ReadStream & { isRaw?: boolean }).isRaw);
-    const toVisualLines = (rawLines: string[]): string[] =>
-      rawLines.flatMap((line) => {
-        const parts = line.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-        return parts.length > 0 ? parts : [""];
-      });
-
-    const clearRenderedLines = () => {
-      if (renderedLines <= 0) {
-        return;
-      }
-      stdout.write(`\x1B[${renderedLines}A`);
-      for (let index = 0; index < renderedLines; index += 1) {
-        stdout.write("\x1B[2K\r");
-        if (index < renderedLines - 1) {
-          stdout.write("\x1B[1B");
-        }
-      }
-      if (renderedLines > 1) {
-        stdout.write(`\x1B[${renderedLines - 1}A`);
-      }
-      stdout.write("\r");
-      renderedLines = 0;
-    };
-
-    const cleanup = () => {
-      stdin.off("keypress", onKeypress);
-      stdin.setRawMode?.(originalRawMode);
-      stdout.write("\x1B[?25h");
-      clearRenderedLines();
-    };
-
-    const render = () => {
-      const displayValue = params.secret ? "•".repeat(value.length) : value;
-      const hasExistingValue = preserveExistingOnEmpty;
-      const keepCurrentHint = hasExistingValue ? "Press Enter to keep current value." : "";
-      const inputHint = params.required
-        ? "Type a value and press Enter."
-        : "Type a value and press Enter, or leave empty to skip.";
-      const helperText = [inputHint, keepCurrentHint].filter(Boolean).join(" ");
-      const caret = focus === "input" ? "█" : "";
-      const valueSuffix = `${displayValue}${caret}`;
-      const inputPrefix = focus === "input" ? "›" : " ";
-      const inputLabel = focus === "input" ? "Value" : "Value";
-      const logicalLines = [
-        params.message,
-        `${inputPrefix} ${inputLabel}: ${valueSuffix}`,
-        `  ${helperText}`,
-        `${focus === "back" ? "●" : "○"} ← Back to provider list`,
-        ...(error ? [error] : [])
-      ];
-      const lines = toVisualLines(logicalLines);
-
-      if (renderedLines > 0) {
-        stdout.write(`\x1B[${renderedLines}A`);
-      }
-
-      const totalLines = Math.max(renderedLines, lines.length);
-      for (let index = 0; index < totalLines; index += 1) {
-        const line = lines[index] ?? "";
-        stdout.write("\x1B[2K\r");
-        stdout.write(line);
-        stdout.write("\n");
-      }
-      renderedLines = lines.length;
-    };
-
-    const submitInput = () => {
-      const trimmed = value.trim();
-      if (!trimmed && preserveExistingOnEmpty) {
-        cleanup();
-        resolve({ action: "submit", value: existingValue });
-        return;
-      }
-      if (params.required && !trimmed) {
-        error = "Value is required.";
-        render();
-        return;
-      }
-      cleanup();
-      resolve({ action: "submit", value: trimmed });
-    };
-
-    const onKeypress = (chunk: string, key: { name?: string; ctrl?: boolean; meta?: boolean; sequence?: string }) => {
-      if (key.ctrl && key.name === "c") {
-        cleanup();
-        reject(new PromptCancelledError());
-        return;
-      }
-
-      if (key.name === "down") {
-        focus = "back";
-        error = "";
-        render();
-        return;
-      }
-
-      if (key.name === "up") {
-        focus = "input";
-        error = "";
-        render();
-        return;
-      }
-
-      if (key.name === "return" || key.name === "enter") {
-        if (focus === "back") {
-          cleanup();
-          resolve({ action: "back" });
-          return;
-        }
-        submitInput();
-        return;
-      }
-
-      if (focus !== "input") {
-        return;
-      }
-
-      if (key.name === "backspace" || key.name === "delete") {
-        value = value.slice(0, -1);
-        error = "";
-        render();
-        return;
-      }
-
-      const sequence = key.sequence ?? chunk;
-      if (!sequence || key.ctrl || key.meta) {
-        return;
-      }
-      if (sequence.length === 1 && sequence >= " ") {
-        value += sequence;
-        error = "";
-        render();
-      }
-    };
-
-    emitKeypressEvents(stdin);
-    stdin.setRawMode?.(true);
-    stdin.resume();
-    stdout.write("\x1B[?25l");
-    stdin.on("keypress", onKeypress);
-    render();
-  });
-}
-
-function resolveProviderModelEnvKey(providerId: string, onboarding: ProviderOnboardingSpec): string | undefined {
-  const candidate = (onboarding.env ?? [])
-    .map((field) => field.key.trim())
-    .find((key) => /_MODEL$/.test(key));
-  if (candidate) {
-    return candidate;
-  }
-
-  return PROVIDER_MODEL_ENV_KEY[providerId] ?? resolveExtendedHttpProviderModelEnvVar(providerId);
 }
 
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
-  output.write(
-    "  opengoat onboard [--agent <id>] [--provider <id>] [--non-interactive] [--run-auth|--skip-auth]\n"
-  );
-  output.write("                  [--model <id>] [--env KEY=VALUE]...\n");
-  output.write("                  [--openai-api-key <key>] [--openrouter-api-key <key>] [--xai-api-key <key>]\n");
-  output.write(
-    "                  [--<provider>-<field> <value>] [--<provider>-<field>=<value>]\n"
-  );
+  output.write("  opengoat onboard [--local|--external] [--gateway-url <url>] [--gateway-token <token>] [--non-interactive]\n");
   output.write("\n");
-  output.write("Notes:\n");
-  output.write("  - On first run, this bootstraps ~/.opengoat automatically.\n");
-  output.write("  - Providers are auto-discovered from provider folders.\n");
-  output.write("  - Orchestrator onboarding only allows internal providers.\n");
-  output.write("  - Interactive mode supports arrow-key selection.\n");
-  output.write(`  - Agent defaults to ${DEFAULT_AGENT_ID}.\n`);
-  output.write(
-    "  - Dynamic provider flags map to env keys (example: --openai-base-url => OPENAI_BASE_URL).\n"
-  );
-  output.write("  - Provider settings are stored in ~/.opengoat/providers/<provider>/config.json.\n");
+  output.write("Examples:\n");
+  output.write("  opengoat onboard\n");
+  output.write("  opengoat onboard --local --non-interactive\n");
+  output.write("  opengoat onboard --external --gateway-url ws://host:18789 --gateway-token <token> --non-interactive\n");
 }

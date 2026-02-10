@@ -14,8 +14,9 @@ import type { PathPort } from "../../ports/path.port.js";
 import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import type {
   AgentProviderBinding,
-  ProviderExecutionResult,
+  OpenClawGatewayConfig,
   ProviderAuthOptions,
+  ProviderExecutionResult,
   ProviderOnboardingSpec,
   ProviderRegistry,
   ProviderStoredConfig,
@@ -35,13 +36,6 @@ import {
 import { ProviderService } from "../../providers/application/provider.service.js";
 import { SkillService, type InstallSkillRequest, type InstallSkillResult, type ResolvedSkill } from "../../skills/index.js";
 import {
-  PluginService,
-  type OpenClawPluginInfoRecord,
-  type OpenClawPluginListReport,
-  type PluginInstallRequest,
-  type PluginInstallResult
-} from "../../plugins/index.js";
-import {
   SessionService,
   type SessionCompactionResult,
   type SessionHistoryResult,
@@ -57,9 +51,10 @@ interface OpenGoatServiceDeps {
   nowIso?: () => string;
   providerRegistry?: ProviderRegistry;
   commandRunner?: CommandRunnerPort;
-  pluginService?: PluginService;
   logger?: Logger;
 }
+
+const OPENCLAW_PROVIDER_ID = "openclaw";
 
 export class OpenGoatService {
   private readonly pathsProvider: OpenGoatPathsProvider;
@@ -67,10 +62,10 @@ export class OpenGoatService {
   private readonly agentManifestService: AgentManifestService;
   private readonly bootstrapService: BootstrapService;
   private readonly providerService: ProviderService;
-  private readonly pluginService: PluginService;
   private readonly skillService: SkillService;
   private readonly sessionService: SessionService;
   private readonly orchestrationService: OrchestrationService;
+  private readonly commandRunner?: CommandRunnerPort;
 
   public constructor(deps: OpenGoatServiceDeps) {
     const nowIso = deps.nowIso ?? (() => new Date().toISOString());
@@ -99,17 +94,9 @@ export class OpenGoatService {
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort
     });
-    this.pluginService =
-      deps.pluginService ??
-      new PluginService({
-        fileSystem: deps.fileSystem,
-        pathPort: deps.pathPort,
-        commandRunner: deps.commandRunner
-      });
     this.skillService = new SkillService({
       fileSystem: deps.fileSystem,
-      pathPort: deps.pathPort,
-      pluginSkillDirsProvider: (paths) => this.pluginService.resolvePluginSkillDirectories(paths)
+      pathPort: deps.pathPort
     });
     this.providerService = new ProviderService({
       fileSystem: deps.fileSystem,
@@ -127,12 +114,11 @@ export class OpenGoatService {
       nowIso,
       nowMs: () => Date.now()
     });
+    this.commandRunner = deps.commandRunner;
     this.orchestrationService = new OrchestrationService({
       providerService: this.providerService,
-      skillService: this.skillService,
       agentManifestService: this.agentManifestService,
       sessionService: this.sessionService,
-      commandRunner: deps.commandRunner,
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       nowIso,
@@ -145,122 +131,43 @@ export class OpenGoatService {
   }
 
   public async createAgent(rawName: string, options: CreateAgentOptions = {}): Promise<AgentCreationResult> {
-    const requestedProviderId = options.providerId?.trim();
-    if (requestedProviderId && options.createExternalAgent === true) {
-      const supportsRequestedProvider = await this.providerSupportsExternalAgentCreation(
-        requestedProviderId
-      );
-      if (!supportsRequestedProvider) {
-        throw new Error(
-          `Provider "${requestedProviderId}" does not support external agent creation.`
-        );
-      }
-    }
-
     const identity = this.agentService.normalizeAgentName(rawName);
     const paths = this.pathsProvider.getPaths();
-    const created = await this.agentService.ensureAgent(paths, identity);
-    let binding: AgentProviderBinding | undefined;
+    const created = await this.agentService.ensureAgent(paths, identity, {
+      type: options.type,
+      reportsTo: options.reportsTo,
+      skills: options.skills
+    });
 
-    if (requestedProviderId) {
-      binding = await this.providerService.setAgentProvider(paths, created.agent.id, requestedProviderId);
-      await this.agentManifestService.syncManifestProvider(paths, created.agent.id, binding.providerId);
-    }
-
-    const shouldCreateExternalAgentByDefault = Boolean(requestedProviderId)
-      ? options.createExternalAgent !== false
-      : false;
-    const shouldCreateExternalAgentExplicitlyWithoutProvider =
-      !requestedProviderId && options.createExternalAgent === true;
-    if (!shouldCreateExternalAgentByDefault && !shouldCreateExternalAgentExplicitlyWithoutProvider) {
+    if (created.alreadyExisted) {
       return created;
     }
 
-    const resolvedBinding =
-      binding ?? (await this.providerService.getAgentProvider(paths, created.agent.id));
-    const supportsExternalAgentCreation = await this.providerSupportsExternalAgentCreation(
-      resolvedBinding.providerId
-    );
-    if (options.createExternalAgent === true && !supportsExternalAgentCreation) {
-      throw new Error(
-        `Provider "${resolvedBinding.providerId}" does not support external agent creation.`
-      );
-    }
-    if (!supportsExternalAgentCreation) {
-      return created;
-    }
-
-    const externalAgentCreation = await this.providerService.createProviderAgent(paths, created.agent.id, {
-      providerId: resolvedBinding.providerId,
+    const runtimeSync = await this.providerService.createProviderAgent(paths, created.agent.id, {
+      providerId: OPENCLAW_PROVIDER_ID,
       displayName: created.agent.displayName,
       workspaceDir: created.agent.workspaceDir,
       internalConfigDir: created.agent.internalConfigDir
     });
 
-    return {
-      ...created,
-      externalAgentCreation: {
-        providerId: externalAgentCreation.providerId,
-        code: externalAgentCreation.code,
-        stdout: externalAgentCreation.stdout,
-        stderr: externalAgentCreation.stderr
-      }
-    };
-  }
-
-  public async createExternalAgent(
-    rawAgentId: string,
-    options: {
-      providerId?: string;
-    } = {}
-  ): Promise<{
-    providerId: string;
-    code: number;
-    stdout: string;
-    stderr: string;
-  }> {
-    const paths = this.pathsProvider.getPaths();
-    const agentId = normalizeAgentId(rawAgentId);
-    if (!agentId) {
-      throw new Error("Agent id cannot be empty.");
-    }
-
-    const agent = (await this.agentService.listAgents(paths)).find((entry) => entry.id === agentId);
-    if (!agent) {
-      throw new Error(`Agent "${agentId}" was not found.`);
-    }
-
-    const resolvedProviderId =
-      options.providerId?.trim().toLowerCase() ??
-      (await this.providerService.getAgentProvider(paths, agentId)).providerId;
-    const supportsExternalAgentCreation = await this.providerSupportsExternalAgentCreation(
-      resolvedProviderId
-    );
-    if (!supportsExternalAgentCreation) {
+    if (runtimeSync.code !== 0) {
+      await this.agentService.removeAgent(paths, created.agent.id);
       throw new Error(
-        `Provider "${resolvedProviderId}" does not support external agent creation.`
+        `OpenClaw agent creation failed for "${created.agent.id}" (exit ${runtimeSync.code}). ${
+          runtimeSync.stderr.trim() || runtimeSync.stdout.trim() || ""
+        }`.trim()
       );
     }
 
-    const externalAgentCreation = await this.providerService.createProviderAgent(paths, agentId, {
-      providerId: resolvedProviderId,
-      displayName: agent.displayName,
-      workspaceDir: agent.workspaceDir,
-      internalConfigDir: agent.internalConfigDir
-    });
-
     return {
-      providerId: externalAgentCreation.providerId,
-      code: externalAgentCreation.code,
-      stdout: externalAgentCreation.stdout,
-      stderr: externalAgentCreation.stderr
+      ...created,
+      runtimeSync: {
+        runtimeId: runtimeSync.providerId,
+        code: runtimeSync.code,
+        stdout: runtimeSync.stdout,
+        stderr: runtimeSync.stderr
+      }
     };
-  }
-
-  private async providerSupportsExternalAgentCreation(providerId: string): Promise<boolean> {
-    const providers = await this.providerService.listProviders();
-    const provider = providers.find((entry) => entry.id === providerId);
-    return Boolean(provider?.capabilities.agentCreate);
   }
 
   public async deleteAgent(rawAgentId: string, options: DeleteAgentOptions = {}): Promise<AgentDeletionResult> {
@@ -270,28 +177,30 @@ export class OpenGoatService {
       throw new Error("Agent id cannot be empty.");
     }
 
-    let externalProviderId = options.providerId?.trim().toLowerCase();
-    if (options.deleteExternalAgent && !externalProviderId) {
-      const binding = await this.providerService.getAgentProvider(paths, agentId);
-      externalProviderId = binding.providerId;
+    const existing = (await this.agentService.listAgents(paths)).find((entry) => entry.id === agentId);
+    if (!existing) {
+      return this.agentService.removeAgent(paths, agentId);
+    }
+
+    const runtimeSync = await this.providerService.deleteProviderAgent(paths, agentId, {
+      providerId: OPENCLAW_PROVIDER_ID
+    });
+    if (runtimeSync.code !== 0 && !options.force) {
+      throw new Error(
+        `OpenClaw agent deletion failed for "${agentId}" (exit ${runtimeSync.code}). ${
+          runtimeSync.stderr.trim() || runtimeSync.stdout.trim() || ""
+        }`.trim()
+      );
     }
 
     const removed = await this.agentService.removeAgent(paths, agentId);
-    if (!options.deleteExternalAgent) {
-      return removed;
-    }
-
-    const externalAgentDeletion = await this.providerService.deleteProviderAgent(paths, agentId, {
-      providerId: externalProviderId
-    });
-
     return {
       ...removed,
-      externalAgentDeletion: {
-        providerId: externalAgentDeletion.providerId,
-        code: externalAgentDeletion.code,
-        stdout: externalAgentDeletion.stdout,
-        stderr: externalAgentDeletion.stderr
+      runtimeSync: {
+        runtimeId: runtimeSync.providerId,
+        code: runtimeSync.code,
+        stdout: runtimeSync.stdout,
+        stderr: runtimeSync.stderr
       }
     };
   }
@@ -334,9 +243,17 @@ export class OpenGoatService {
 
   public async setAgentProvider(agentId: string, providerId: string): Promise<AgentProviderBinding> {
     const paths = this.pathsProvider.getPaths();
-    const binding = await this.providerService.setAgentProvider(paths, agentId, providerId);
-    await this.agentManifestService.syncManifestProvider(paths, binding.agentId, binding.providerId);
-    return binding;
+    return this.providerService.setAgentProvider(paths, agentId, providerId);
+  }
+
+  public async getOpenClawGatewayConfig(): Promise<OpenClawGatewayConfig> {
+    const paths = this.pathsProvider.getPaths();
+    return this.providerService.getOpenClawGatewayConfig(paths);
+  }
+
+  public async setOpenClawGatewayConfig(config: OpenClawGatewayConfig): Promise<OpenClawGatewayConfig> {
+    const paths = this.pathsProvider.getPaths();
+    return this.providerService.setOpenClawGatewayConfig(paths, config);
   }
 
   public async routeMessage(agentId: string, message: string): Promise<RoutingDecision> {
@@ -367,38 +284,22 @@ export class OpenGoatService {
     return this.skillService.installSkill(paths, request);
   }
 
-  public async listPlugins(options: {
-    enabledOnly?: boolean;
-    verbose?: boolean;
-    includeBundled?: boolean;
-  } = {}): Promise<OpenClawPluginListReport> {
-    const paths = this.pathsProvider.getPaths();
-    return this.pluginService.listPlugins(paths, options);
-  }
+  public async runOpenClaw(args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Promise<CommandRunResult> {
+    if (!this.commandRunner) {
+      throw new Error("OpenClaw passthrough is unavailable: command runner was not configured.");
+    }
 
-  public async getPluginInfo(pluginId: string): Promise<OpenClawPluginInfoRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.pluginService.getPluginInfo(paths, pluginId);
-  }
+    const sanitized = args.map((value) => value.trim()).filter(Boolean);
+    if (sanitized.length === 0) {
+      throw new Error("OpenClaw passthrough requires at least one argument.");
+    }
 
-  public async installPlugin(request: PluginInstallRequest): Promise<PluginInstallResult> {
-    const paths = this.pathsProvider.getPaths();
-    return this.pluginService.installPlugin(paths, request);
-  }
-
-  public async enablePlugin(pluginId: string): Promise<void> {
-    const paths = this.pathsProvider.getPaths();
-    await this.pluginService.enablePlugin(paths, pluginId);
-  }
-
-  public async disablePlugin(pluginId: string): Promise<void> {
-    const paths = this.pathsProvider.getPaths();
-    await this.pluginService.disablePlugin(paths, pluginId);
-  }
-
-  public async pluginDoctor(): Promise<CommandRunResult> {
-    const paths = this.pathsProvider.getPaths();
-    return this.pluginService.doctor(paths);
+    return this.commandRunner.run({
+      command: process.env.OPENGOAT_OPENCLAW_CMD?.trim() || "openclaw",
+      args: sanitized,
+      cwd: options.cwd,
+      env: options.env
+    });
   }
 
   public async listSessions(agentId = DEFAULT_AGENT_ID, options: { activeMinutes?: number } = {}): Promise<SessionSummary[]> {

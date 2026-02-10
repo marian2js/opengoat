@@ -20,38 +20,38 @@ afterEach(async () => {
 });
 
 describe("BootstrapService", () => {
-  it("initializes the full OpenGoat home and orchestrator agent", async () => {
+  it("initializes the full OpenGoat home and goat manager agent", async () => {
     const { service, paths } = await createBootstrapService();
 
     const result = await service.initialize();
 
     expect(result.paths.homeDir).toBe(paths.homeDir);
-    expect(result.defaultAgent).toBe("orchestrator");
+    expect(result.defaultAgent).toBe("goat");
     expect(result.createdPaths.length).toBeGreaterThan(0);
 
     const config = JSON.parse(await readFile(paths.globalConfigJsonPath, "utf-8")) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("orchestrator");
+    expect(config.defaultAgent).toBe("goat");
 
     const orchestratorConfig = JSON.parse(
-      await readFile(path.join(paths.agentsDir, "orchestrator", "config.json"), "utf-8")
-    ) as { provider?: { id?: string } };
-    expect(orchestratorConfig.provider?.id).toBe("codex");
+      await readFile(path.join(paths.agentsDir, "goat", "config.json"), "utf-8")
+    ) as { runtime?: { adapter?: string } };
+    expect(orchestratorConfig.runtime?.adapter).toBe("openclaw");
 
     const orchestratorAgents = await readFile(
-      path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"),
+      path.join(paths.workspacesDir, "goat", "AGENTS.md"),
       "utf-8"
     );
-    expect(orchestratorAgents).toContain("# Orchestrator (OpenGoat Agent)");
+    expect(orchestratorAgents).toContain("# Goat (OpenGoat Agent)");
     expect(
-      await readFile(path.join(paths.workspacesDir, "orchestrator", "BOOTSTRAP.md"), "utf-8")
+      await readFile(path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md"), "utf-8")
     ).toContain("First-run checklist");
     const defaultSkill = await readFile(
-      path.join(paths.workspacesDir, "orchestrator", "skills", "opengoat-skill", "SKILL.md"),
+      path.join(paths.skillsDir, "manager", "SKILL.md"),
       "utf-8"
     );
-    expect(defaultSkill).toContain("# OpenGoat Skill");
+    expect(defaultSkill).toContain("# Manager");
   });
 
   it("is idempotent on repeated initialize", async () => {
@@ -65,7 +65,7 @@ describe("BootstrapService", () => {
     expect(second.skippedPaths.length).toBeGreaterThan(0);
   });
 
-  it("forces orchestrator as default even when config was changed", async () => {
+  it("forces goat as default even when config was changed", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     await fileSystem.ensureDir(paths.homeDir);
@@ -91,7 +91,7 @@ describe("BootstrapService", () => {
       defaultAgent: string;
     };
 
-    expect(config.defaultAgent).toBe("orchestrator");
+    expect(config.defaultAgent).toBe("goat");
   });
 
   it("repairs config when it is malformed", async () => {
@@ -107,10 +107,10 @@ describe("BootstrapService", () => {
     const config = JSON.parse(await readFile(paths.globalConfigJsonPath, "utf-8")) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("orchestrator");
+    expect(config.defaultAgent).toBe("goat");
   });
 
-  it("ensures agents index always includes orchestrator", async () => {
+  it("ensures agents index always includes goat", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     await fileSystem.ensureDir(paths.homeDir);
@@ -134,7 +134,7 @@ describe("BootstrapService", () => {
     const index = JSON.parse(await readFile(paths.agentsIndexJsonPath, "utf-8")) as {
       agents: string[];
     };
-    expect(index.agents).toEqual(["orchestrator", "research"]);
+    expect(index.agents).toEqual(["goat", "research"]);
   });
 });
 

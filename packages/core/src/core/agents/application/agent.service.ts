@@ -18,7 +18,7 @@ import {
   renderWorkspaceContextMarkdown,
   renderWorkspaceHeartbeatMarkdown,
   renderWorkspaceIdentityMarkdown,
-  renderDefaultOrchestratorSkillMarkdown,
+  type AgentTemplateOptions,
   renderWorkspaceSoulMarkdown,
   renderWorkspaceToolsMarkdown,
   renderWorkspaceUserMarkdown,
@@ -29,6 +29,12 @@ interface AgentServiceDeps {
   fileSystem: FileSystemPort;
   pathPort: PathPort;
   nowIso: () => string;
+}
+
+interface EnsureAgentOptions {
+  type?: "manager" | "individual";
+  reportsTo?: string | null;
+  skills?: string[];
 }
 
 export class AgentService {
@@ -59,18 +65,19 @@ export class AgentService {
 
   public async ensureAgent(
     paths: OpenGoatPaths,
-    identity: AgentIdentity
+    identity: AgentIdentity,
+    options: EnsureAgentOptions = {}
   ): Promise<AgentCreationResult> {
     const workspaceDir = this.pathPort.join(paths.workspacesDir, identity.id);
-    const workspaceSkillsDir = this.pathPort.join(workspaceDir, "skills");
     const internalConfigDir = this.pathPort.join(paths.agentsDir, identity.id);
     const sessionsDir = this.pathPort.join(internalConfigDir, "sessions");
+    const templateOptions = toAgentTemplateOptions(identity.id, options);
 
     const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
+    const workspaceExisted = await this.fileSystem.exists(workspaceDir);
 
     await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
-    await this.ensureDirectory(workspaceSkillsDir, createdPaths, skippedPaths);
     await this.ensureDirectory(internalConfigDir, createdPaths, skippedPaths);
     await this.ensureDirectory(sessionsDir, createdPaths, skippedPaths);
 
@@ -84,7 +91,7 @@ export class AgentService {
     );
     await this.writeMarkdownIfMissing(
       this.pathPort.join(workspaceDir, "AGENTS.md"),
-      renderWorkspaceAgentsMarkdown(identity),
+      renderWorkspaceAgentsMarkdown(identity, templateOptions),
       createdPaths,
       skippedPaths
     );
@@ -132,20 +139,25 @@ export class AgentService {
         skippedPaths
       );
     }
-    if (isDefaultAgentId(identity.id)) {
-      const orchestratorSkillDir = this.pathPort.join(workspaceSkillsDir, "opengoat-skill");
-      await this.ensureDirectory(orchestratorSkillDir, createdPaths, skippedPaths);
-      await this.writeMarkdownIfMissing(
-        this.pathPort.join(orchestratorSkillDir, "SKILL.md"),
-        renderDefaultOrchestratorSkillMarkdown(),
-        createdPaths,
-        skippedPaths
-      );
+    const internalConfig = renderInternalAgentConfig(identity) as {
+      organization?: { type?: string; reportsTo?: string | null };
+      runtime?: { skills?: { assigned?: string[] } };
+    };
+    if (internalConfig.organization) {
+      const resolvedType = templateOptions.type ?? internalConfig.organization.type;
+      if (resolvedType) {
+        internalConfig.organization.type = resolvedType;
+      }
+      if (options.reportsTo !== undefined) {
+        internalConfig.organization.reportsTo = options.reportsTo;
+      }
     }
-
+    if (internalConfig.runtime?.skills) {
+      internalConfig.runtime.skills.assigned = templateOptions.skills;
+    }
     await this.writeJsonIfMissing(
       this.pathPort.join(internalConfigDir, "config.json"),
-      renderInternalAgentConfig(identity),
+      internalConfig,
       createdPaths,
       skippedPaths
     );
@@ -182,6 +194,7 @@ export class AgentService {
         workspaceDir,
         internalConfigDir
       },
+      alreadyExisted: workspaceExisted,
       createdPaths,
       skippedPaths
     };
@@ -214,7 +227,7 @@ export class AgentService {
       throw new Error("Agent id cannot be empty.");
     }
     if (isDefaultAgentId(agentId)) {
-      throw new Error("Cannot delete orchestrator. It is the immutable default entry agent.");
+      throw new Error("Cannot delete goat. It is the immutable default entry agent.");
     }
 
     const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
@@ -331,6 +344,16 @@ export class AgentService {
       return null;
     }
   }
+}
+
+function toAgentTemplateOptions(agentId: string, options: EnsureAgentOptions): AgentTemplateOptions {
+  const type = options.type ?? (isDefaultAgentId(agentId) ? "manager" : "individual");
+  const skills = dedupe(options.skills ?? (type === "manager" ? ["manager"] : []));
+  return {
+    type,
+    reportsTo: options.reportsTo,
+    skills
+  };
 }
 
 function dedupe(values: string[]): string[] {

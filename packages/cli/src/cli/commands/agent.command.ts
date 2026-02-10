@@ -4,7 +4,7 @@ import { executeAgentRun } from "./agent-run.shared.js";
 
 export const agentCommand: CliCommand = {
   path: ["agent"],
-  description: "Send a message to an agent (default: orchestrator).",
+  description: "Send a message to an agent (default: goat).",
   async run(args, context): Promise<number> {
     if (isHelpRequest(args)) {
       printHelp(context.stdout);
@@ -33,7 +33,6 @@ type AgentArgsResult =
       sessionRef?: string;
       forceNewSession: boolean;
       disableSession: boolean;
-      directAgentSession: boolean;
       passthroughArgs: string[];
       stream: boolean;
     }
@@ -63,7 +62,6 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
   let sessionRef: string | undefined;
   let forceNewSession = false;
   let disableSession = false;
-  let directAgentSession = false;
   let stream = true;
 
   for (let index = 0; index < known.length; index += 1) {
@@ -114,11 +112,6 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
       continue;
     }
 
-    if (token === "--direct-session") {
-      directAgentSession = true;
-      continue;
-    }
-
     if (token === "--model") {
       const value = known[index + 1];
       if (!value) {
@@ -148,10 +141,6 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
   if (forceNewSession && disableSession) {
     return { ok: false, error: "Use either --new-session or --no-session, not both." };
   }
-  if (disableSession && directAgentSession) {
-    return { ok: false, error: "Use either --direct-session or --no-session, not both." };
-  }
-
   return {
     ok: true,
     agentId,
@@ -162,7 +151,6 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
     sessionRef,
     forceNewSession,
     disableSession,
-    directAgentSession,
     passthroughArgs,
     stream
   };
@@ -186,18 +174,16 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write(
     "  opengoat agent [agent-id] --message <text> [--image <path>] [--session <key|id>] [--new-session|--no-session]\n"
   );
-  output.write(
-    "                [--direct-session] [--model <model>] [--cwd <path>] [--no-stream] [-- <provider-args>]\n"
-  );
+  output.write("                [--model <model>] [--cwd <path>] [--no-stream] [-- <runtime-args>]\n");
   output.write("\n");
   output.write("Defaults:\n");
   output.write(`  agent-id defaults to ${DEFAULT_AGENT_ID}\n`);
   output.write("\n");
   output.write("Subcommands:\n");
-  output.write("  agent create        Create an agent workspace and internal config.\n");
-  output.write("  agent delete        Delete an agent workspace and internal config.\n");
+  output.write("  agent create        Create an OpenClaw-backed agent.\n");
+  output.write("  agent delete        Delete an agent locally and in OpenClaw.\n");
   output.write("  agent list          List known agents.\n");
-  output.write("  agent provider get  Show which provider is assigned to an agent.\n");
-  output.write("  agent provider set  Assign one provider to an agent.\n");
+  output.write("  agent provider get  OpenClaw passthrough for provider binding lookup.\n");
+  output.write("  agent provider set  OpenClaw passthrough for provider binding update.\n");
   output.write("  agent run           Explicit run command (requires <agent-id>).\n");
 }

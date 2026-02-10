@@ -1,6 +1,6 @@
 import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
 
-export type SkillSource = "workspace" | "managed" | "plugin" | "extra";
+export type SkillSource = "managed" | "extra";
 export type SkillScope = "agent" | "global";
 
 export interface AgentSkillsLoadConfig {
@@ -16,8 +16,8 @@ export interface AgentSkillsPromptConfig {
 
 export interface AgentSkillsConfig {
   enabled?: boolean;
-  includeWorkspace?: boolean;
   includeManaged?: boolean;
+  assigned?: string[];
   load?: AgentSkillsLoadConfig;
   prompt?: AgentSkillsPromptConfig;
 }
@@ -70,8 +70,8 @@ export const DEFAULT_SKILLS_CONFIG: Required<Omit<AgentSkillsConfig, "load" | "p
   prompt: Required<AgentSkillsPromptConfig>;
 } = {
   enabled: true,
-  includeWorkspace: true,
   includeManaged: true,
+  assigned: [],
   load: {
     extraDirs: []
   },
@@ -88,8 +88,10 @@ export function resolveSkillsConfig(input: AgentSkillsConfig | undefined): typeo
   const load = input?.load;
   return {
     enabled: input?.enabled ?? DEFAULT_SKILLS_CONFIG.enabled,
-    includeWorkspace: input?.includeWorkspace ?? DEFAULT_SKILLS_CONFIG.includeWorkspace,
     includeManaged: input?.includeManaged ?? DEFAULT_SKILLS_CONFIG.includeManaged,
+    assigned: Array.isArray(input?.assigned)
+      ? [...new Set(input.assigned.map((value) => value.trim().toLowerCase()).filter(Boolean))]
+      : DEFAULT_SKILLS_CONFIG.assigned,
     load: {
       extraDirs: Array.isArray(load?.extraDirs)
         ? load.extraDirs.map((value) => value.trim()).filter(Boolean)

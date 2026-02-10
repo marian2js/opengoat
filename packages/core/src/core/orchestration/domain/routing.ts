@@ -1,6 +1,25 @@
 import type { AgentProviderBinding, ProviderExecutionResult } from "../../providers/types.js";
 import type { SessionCompactionResult, SessionRunInfo } from "../../sessions/index.js";
-import type { OrchestrationRunLedger, OrchestrationStepLog } from "./loop.js";
+
+export interface ManagerRuntimeStep {
+  step: number;
+  note: string;
+}
+
+export interface ManagerRuntimeSessionGraph {
+  nodes: Array<{
+    agentId: string;
+    providerId?: string;
+    sessionKey?: string;
+    sessionId?: string;
+    providerSessionId?: string;
+  }>;
+  edges: Array<{
+    fromAgentId: string;
+    toAgentId: string;
+    reason?: string;
+  }>;
+}
 
 export interface RoutingCandidate {
   agentId: string;
@@ -37,11 +56,10 @@ export interface AgentRunTrace {
       durationMs: number;
     };
   orchestration?: {
-    mode: "ai-loop" | "single-agent";
-    steps: OrchestrationStepLog[];
+    mode: "single-agent";
+    steps: ManagerRuntimeStep[];
     finalMessage: string;
-    sessionGraph: OrchestrationRunLedger["sessionGraph"];
-    taskThreads?: OrchestrationRunLedger["taskThreads"];
+    sessionGraph: ManagerRuntimeSessionGraph;
   };
 }
 
@@ -49,13 +67,12 @@ export type OrchestrationRunResult = ProviderExecutionResult &
   AgentProviderBinding & {
     entryAgentId: string;
     routing: RoutingDecision;
-    tracePath: string;
-    orchestration?: {
-      mode: "ai-loop" | "single-agent";
-      steps: OrchestrationStepLog[];
+  tracePath: string;
+  orchestration?: {
+      mode: "single-agent";
+      steps: ManagerRuntimeStep[];
       finalMessage: string;
-      sessionGraph: OrchestrationRunLedger["sessionGraph"];
-      taskThreads?: OrchestrationRunLedger["taskThreads"];
+      sessionGraph: ManagerRuntimeSessionGraph;
     };
     session?: SessionRunInfo & {
       preRunCompactionApplied: boolean;

@@ -14,10 +14,6 @@
     "test:watch": "vitest",
     "test:providers:live": "vitest run test/live/provider-smoke.live.test.ts",
     "typecheck": "pnpm --filter @opengoat/core typecheck && pnpm --filter @opengoat/cli typecheck",
-    "desktop:dev": "pnpm --filter @opengoat/desktop start",
-    "desktop:lint": "pnpm --filter @opengoat/desktop lint",
-    "desktop:package": "pnpm --filter @opengoat/desktop package",
-    "desktop:make": "pnpm --filter @opengoat/desktop make",
     "changeset": "changeset",
     "version-packages": "node scripts/release.mjs",
     "release": "node scripts/release.mjs"
@@ -31,17 +27,12 @@
       "@trpc/server": "10.45.4"
     },
     "onlyBuiltDependencies": [
-      "electron",
-      "electron-winstaller",
       "esbuild"
     ]
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.13.4",
-    "happy-dom": "^20.5.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.5"
   }

@@ -4,10 +4,6 @@ packages/*/node_modules
 coverage
 dist
 packages/*/dist
-packages/electron/.vite
-packages/electron/src/renderer/.vite
-packages/electron/out
-packages/electron/make
 .DS_Store
 *.log
 .env

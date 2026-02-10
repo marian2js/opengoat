@@ -1,5 +1,11 @@
 import os from "node:os";
 import path from "node:path";
+import {
+  formatAgentManifestMarkdown,
+  MANAGER_SKILL_ID,
+  normalizeAgentManifestMetadata,
+  parseAgentManifestMarkdown
+} from "../../agents/domain/agent-manifest.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
@@ -17,24 +23,22 @@ import {
 interface SkillServiceDeps {
   fileSystem: FileSystemPort;
   pathPort: PathPort;
-  pluginSkillDirsProvider?: (paths: OpenGoatPaths) => Promise<string[]>;
 }
 
 interface AgentConfigShape {
   runtime?: {
     skills?: AgentSkillsConfig;
   };
+  [key: string]: unknown;
 }
 
 export class SkillService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
-  private readonly pluginSkillDirsProvider?: (paths: OpenGoatPaths) => Promise<string[]>;
 
   public constructor(deps: SkillServiceDeps) {
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
-    this.pluginSkillDirsProvider = deps.pluginSkillDirsProvider;
   }
 
   public async listSkills(
@@ -50,8 +54,10 @@ export class SkillService {
       return [];
     }
 
-    const discovered = await this.loadSkillsWithPrecedence(paths, normalizedAgentId, resolvedConfig);
-    return [...discovered].sort((left, right) => left.id.localeCompare(right.id));
+    const discovered = await this.loadSkillsWithPrecedence(paths, resolvedConfig);
+    const assigned = new Set(resolvedConfig.assigned);
+    const filtered = assigned.size > 0 ? discovered.filter((skill) => assigned.has(skill.id)) : discovered;
+    return [...filtered].sort((left, right) => left.id.localeCompare(right.id));
   }
 
   public async listGlobalSkills(paths: OpenGoatPaths): Promise<ResolvedSkill[]> {
@@ -99,7 +105,7 @@ export class SkillService {
       "- If exactly one skill clearly applies, follow that skill.",
       "- If multiple skills could apply, choose the most specific.",
       "- If none apply, continue without using a skill.",
-      "Self-install/update: create or edit `skills/<skill-id>/SKILL.md` in this workspace.",
+      "Skill definitions are centralized under the global skills store.",
       ""
     ];
 
@@ -142,8 +148,7 @@ export class SkillService {
       throw new Error("Skill name must contain at least one alphanumeric character.");
     }
 
-    const baseDir =
-      scope === "global" ? paths.skillsDir : this.pathPort.join(paths.workspacesDir, normalizedAgentId, "skills");
+    const baseDir = paths.skillsDir;
     const targetDir = this.pathPort.join(baseDir, skillId);
     const targetSkillFile = this.pathPort.join(targetDir, "SKILL.md");
     const replaced = await this.fileSystem.exists(targetDir);
@@ -164,6 +169,10 @@ export class SkillService {
 
       await this.fileSystem.removeDir(targetDir);
       await this.fileSystem.copyDir(sourceDir, targetDir);
+      if (scope === "agent") {
+        await this.assignSkillToAgent(paths, normalizedAgentId, skillId);
+        await this.promoteManagerIfNeeded(paths, normalizedAgentId, skillId);
+      }
 
       return {
         scope,
@@ -176,35 +185,29 @@ export class SkillService {
       };
     }
 
-    if (scope === "agent") {
-      const managedDir = this.pathPort.join(paths.skillsDir, skillId);
-      const managedSkillFile = this.pathPort.join(managedDir, "SKILL.md");
-      if (await this.fileSystem.exists(managedSkillFile)) {
-        await this.fileSystem.removeDir(targetDir);
-        await this.fileSystem.copyDir(managedDir, targetDir);
-        return {
-          scope,
-          agentId: normalizedAgentId,
-          skillId,
-          skillName: request.skillName.trim(),
-          source: "managed",
-          installedPath: targetSkillFile,
-          replaced
-        };
-      }
+    let source: InstallSkillResult["source"] = "generated";
+    const existingGlobalSkill = this.pathPort.join(paths.skillsDir, skillId, "SKILL.md");
+    if (scope === "agent" && (await this.fileSystem.exists(existingGlobalSkill))) {
+      source = "managed";
+    } else {
+      const description = request.description?.trim() || `Skill instructions for ${request.skillName.trim()}.`;
+      const content = request.content?.trim() || renderSkillMarkdown({ skillId, description });
+      await this.fileSystem.ensureDir(targetDir);
+      await this.fileSystem.writeFile(targetSkillFile, ensureTrailingNewline(content));
+      source = "generated";
     }
 
-    const description = request.description?.trim() || `Skill instructions for ${request.skillName.trim()}.`;
-    const content = request.content?.trim() || renderSkillMarkdown({ skillId, description });
-    await this.fileSystem.ensureDir(targetDir);
-    await this.fileSystem.writeFile(targetSkillFile, ensureTrailingNewline(content));
+    if (scope === "agent") {
+      await this.assignSkillToAgent(paths, normalizedAgentId, skillId);
+      await this.promoteManagerIfNeeded(paths, normalizedAgentId, skillId);
+    }
 
     return {
       scope,
       agentId: scope === "agent" ? normalizedAgentId : undefined,
       skillId,
       skillName: request.skillName.trim(),
-      source: "generated",
+      source,
       installedPath: targetSkillFile,
       replaced
     };
@@ -212,17 +215,12 @@ export class SkillService {
 
   private async loadSkillsWithPrecedence(
     paths: OpenGoatPaths,
-    agentId: string,
     config: ReturnType<typeof resolveSkillsConfig>
   ): Promise<ResolvedSkill[]> {
-    const workspaceSkillsDir = this.pathPort.join(paths.workspacesDir, agentId, "skills");
-    const pluginDirs = await this.resolvePluginSkillDirs(paths);
     const extraDirs = config.load.extraDirs.map(resolveUserPath);
     const sources: Array<{ source: ResolvedSkill["source"]; dir: string; enabled: boolean }> = [
       { source: "managed", dir: paths.skillsDir, enabled: config.includeManaged },
-      ...pluginDirs.map((dir) => ({ source: "plugin" as const, dir, enabled: true })),
-      ...extraDirs.map((dir) => ({ source: "extra" as const, dir, enabled: true })),
-      { source: "workspace", dir: workspaceSkillsDir, enabled: config.includeWorkspace }
+      ...extraDirs.map((dir) => ({ source: "extra" as const, dir, enabled: true }))
     ];
 
     const merged = new Map<string, ResolvedSkill>();
@@ -298,16 +296,64 @@ export class SkillService {
     }
   }
 
-  private async resolvePluginSkillDirs(paths: OpenGoatPaths): Promise<string[]> {
-    if (!this.pluginSkillDirsProvider) {
-      return [];
+  private async assignSkillToAgent(paths: OpenGoatPaths, agentId: string, skillId: string): Promise<void> {
+    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+    if (!(await this.fileSystem.exists(configPath))) {
+      return;
     }
 
-    try {
-      const loaded = await this.pluginSkillDirsProvider(paths);
-      return loaded.map((entry) => entry.trim()).filter(Boolean);
-    } catch {
-      return [];
+    const raw = await this.fileSystem.readFile(configPath);
+    const parsed = JSON.parse(raw) as AgentConfigShape;
+    const runtimeRecord =
+      parsed.runtime && typeof parsed.runtime === "object" && !Array.isArray(parsed.runtime)
+        ? (parsed.runtime as Record<string, unknown>)
+        : {};
+    const skillsRecord =
+      runtimeRecord.skills && typeof runtimeRecord.skills === "object" && !Array.isArray(runtimeRecord.skills)
+        ? (runtimeRecord.skills as Record<string, unknown>)
+        : {};
+    const assignedRaw = Array.isArray(skillsRecord.assigned) ? skillsRecord.assigned : [];
+    const assigned = [...new Set(assignedRaw.map((value) => String(value).trim().toLowerCase()).filter(Boolean))];
+    if (!assigned.includes(skillId)) {
+      assigned.push(skillId);
+    }
+
+    skillsRecord.assigned = assigned;
+    runtimeRecord.skills = skillsRecord;
+    parsed.runtime = runtimeRecord as AgentConfigShape["runtime"];
+    await this.fileSystem.writeFile(configPath, `${JSON.stringify(parsed, null, 2)}\n`);
+  }
+
+  private async promoteManagerIfNeeded(paths: OpenGoatPaths, agentId: string, skillId: string): Promise<void> {
+    const normalizedSkill = skillId.trim().toLowerCase();
+    if (normalizedSkill !== MANAGER_SKILL_ID) {
+      return;
+    }
+
+    const manifestPath = this.pathPort.join(paths.workspacesDir, agentId, "AGENTS.md");
+    if (!(await this.fileSystem.exists(manifestPath))) {
+      return;
+    }
+
+    const raw = await this.fileSystem.readFile(manifestPath);
+    const parsed = parseAgentManifestMarkdown(raw);
+    const metadata = normalizeAgentManifestMetadata({
+      agentId,
+      displayName: parsed.data.name?.trim() || agentId,
+      metadata: {
+        ...parsed.data,
+        type: "manager",
+        skills: [...(parsed.data.skills ?? []), MANAGER_SKILL_ID],
+        delegation: {
+          canReceive: parsed.data.delegation?.canReceive ?? true,
+          canDelegate: true
+        }
+      }
+    });
+
+    const next = formatAgentManifestMarkdown(metadata, parsed.body);
+    if (next !== raw) {
+      await this.fileSystem.writeFile(manifestPath, next);
     }
   }
 }

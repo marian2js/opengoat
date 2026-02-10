@@ -2,9 +2,6 @@ import type { ProviderInvokeOptions } from "../../providers/index.js";
 
 export type OrchestrationRunStage =
   | "run_started"
-  | "planner_started"
-  | "planner_decision"
-  | "delegation_started"
   | "provider_invocation_started"
   | "provider_invocation_completed"
   | "run_completed";

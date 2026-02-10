@@ -3,12 +3,12 @@ import { RoutingService } from "../../packages/core/src/core/orchestration/index
 import type { AgentManifest } from "../../packages/core/src/core/agents/index.js";
 
 describe("RoutingService", () => {
-  it("routes orchestrator traffic to best matching specialized agent", () => {
+  it("routes goat manager traffic to best matching direct report", () => {
     const service = new RoutingService();
     const manifests = createManifests();
 
     const decision = service.decide({
-      entryAgentId: "orchestrator",
+      entryAgentId: "goat",
       message: "Please research API docs and summarize findings.",
       manifests
     });
@@ -18,7 +18,7 @@ describe("RoutingService", () => {
     expect(decision.candidates.length).toBeGreaterThan(0);
   });
 
-  it("keeps direct invocation when entry agent is not orchestrator", () => {
+  it("keeps direct invocation when entry agent is not a manager", () => {
     const service = new RoutingService();
     const manifests = createManifests();
 
@@ -29,10 +29,10 @@ describe("RoutingService", () => {
     });
 
     expect(decision.targetAgentId).toBe("writer");
-    expect(decision.reason).toContain("Direct invocation");
+    expect(decision.reason).toContain("not a manager");
   });
 
-  it("does not route orchestrator traffic to non-discoverable agents", () => {
+  it("does not route manager traffic to non-discoverable direct reports", () => {
     const service = new RoutingService();
     const manifests = createManifests().map((manifest) =>
       manifest.agentId === "researcher"
@@ -47,30 +47,32 @@ describe("RoutingService", () => {
     );
 
     const decision = service.decide({
-      entryAgentId: "orchestrator",
+      entryAgentId: "goat",
       message: "Please research API docs and summarize findings.",
       manifests
     });
 
-    expect(decision.targetAgentId).toBe("orchestrator");
+    expect(decision.targetAgentId).toBe("goat");
   });
 });
 
 function createManifests(): AgentManifest[] {
   return [
     {
-      agentId: "orchestrator",
-      filePath: "/tmp/orchestrator/AGENTS.md",
-      workspaceDir: "/tmp/orchestrator",
+      agentId: "goat",
+      filePath: "/tmp/goat/AGENTS.md",
+      workspaceDir: "/tmp/goat",
       source: "frontmatter",
-      body: "# Orchestrator",
+      body: "# Goat",
       metadata: {
-        id: "orchestrator",
-        name: "Orchestrator",
+        id: "goat",
+        name: "Goat",
         description: "Routes tasks to specialists",
-        provider: "openai",
+        type: "manager",
+        reportsTo: null,
         discoverable: true,
-        tags: ["orchestration", "routing"],
+        tags: ["management", "routing"],
+        skills: ["manager"],
         delegation: { canReceive: true, canDelegate: true },
         priority: 100
       }
@@ -85,9 +87,11 @@ function createManifests(): AgentManifest[] {
         id: "researcher",
         name: "Research Agent",
         description: "Researches documentation and technical topics",
-        provider: "openai",
+        type: "individual",
+        reportsTo: "goat",
         discoverable: true,
         tags: ["research", "docs"],
+        skills: [],
         delegation: { canReceive: true, canDelegate: false },
         priority: 70
       }
@@ -102,9 +106,11 @@ function createManifests(): AgentManifest[] {
         id: "writer",
         name: "Writer Agent",
         description: "Creates polished written content",
-        provider: "openai",
+        type: "individual",
+        reportsTo: "goat",
         discoverable: true,
         tags: ["writing", "content"],
+        skills: [],
         delegation: { canReceive: true, canDelegate: false },
         priority: 60
       }

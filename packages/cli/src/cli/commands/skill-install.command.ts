@@ -3,7 +3,7 @@ import type { CliCommand } from "../framework/command.js";
 
 export const skillInstallCommand: CliCommand = {
   path: ["skill", "install"],
-  description: "Install one skill into an agent workspace or global skills store.",
+  description: "Install a centralized skill definition and optionally assign it to an agent.",
   async run(args, context): Promise<number> {
     const parsed = parseInstallArgs(args);
     if (!parsed.ok) {
@@ -30,7 +30,7 @@ export const skillInstallCommand: CliCommand = {
     context.stdout.write(`Installed skill: ${result.skillId}\n`);
     context.stdout.write(`Scope: ${result.scope}\n`);
     if (result.agentId) {
-      context.stdout.write(`Agent: ${result.agentId}\n`);
+      context.stdout.write(`Assigned to agent: ${result.agentId}\n`);
     }
     context.stdout.write(`Source: ${result.source}\n`);
     context.stdout.write(`Path: ${result.installedPath}\n`);

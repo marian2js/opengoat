@@ -7,6 +7,7 @@ import {
   ProviderRegistry,
   type ProviderCreateAgentOptions,
   type ProviderDeleteAgentOptions,
+  type ProviderExecutionResult,
   type ProviderInvokeOptions
 } from "../packages/core/src/index.js";
 import { NodeFileSystem } from "../packages/core/src/platform/node/node-file-system.js";
@@ -25,181 +26,133 @@ afterEach(async () => {
 });
 
 describe("OpenGoatService", () => {
-  it("exposes home path and performs end-to-end bootstrap", async () => {
+  it("exposes home path and bootstraps goat as default agent", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
-    const service = createService(root);
-
+    const service = createService(root).service;
     expect(service.getHomeDir()).toBe(root);
 
     const result = await service.initialize();
-    expect(result.defaultAgent).toBe("orchestrator");
+    expect(result.defaultAgent).toBe("goat");
 
     const config = JSON.parse(await readFile(path.join(root, "config.json"), "utf-8")) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("orchestrator");
+    expect(config.defaultAgent).toBe("goat");
   });
 
   it("creates and lists agents through the facade", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
-    const service = createService(root);
-    await service.initialize();
-
-    await service.createAgent("Research Analyst");
-
-    const agents = await service.listAgents();
-    expect(agents.map((agent) => agent.id)).toEqual(["orchestrator", "research-analyst"]);
-
-    const config = JSON.parse(await readFile(path.join(root, "config.json"), "utf-8")) as {
-      defaultAgent: string;
-    };
-    expect(config.defaultAgent).toBe("orchestrator");
-  });
-
-  it("gets and sets provider binding for an agent", async () => {
-    const root = await createTempDir("opengoat-service-");
-    roots.push(root);
-
-    const service = createService(root);
-    await service.initialize();
-
-    const before = await service.getAgentProvider("orchestrator");
-    expect(before.providerId).toBe("codex");
-
-    const after = await service.setAgentProvider("orchestrator", "claude");
-    expect(after.providerId).toBe("claude");
-  });
-
-  it("creates an external provider agent by default when provider supports it", async () => {
-    const root = await createTempDir("opengoat-service-");
-    roots.push(root);
-
-    const provider = new AgentCreateProvider();
-    const registry = new ProviderRegistry();
-    registry.register("agent-create-provider", () => provider);
-    const service = createService(root, registry);
+    const { service } = createService(root);
     await service.initialize();
 
     const created = await service.createAgent("Research Analyst", {
-      providerId: "agent-create-provider"
-    });
-
-    expect(created.externalAgentCreation?.providerId).toBe("agent-create-provider");
-    expect(created.externalAgentCreation?.code).toBe(0);
-    expect(provider.createdAgents[0]?.agentId).toBe("research-analyst");
-  });
-
-  it("allows disabling external provider creation explicitly", async () => {
-    const root = await createTempDir("opengoat-service-");
-    roots.push(root);
-
-    const provider = new AgentCreateProvider();
-    const registry = new ProviderRegistry();
-    registry.register("agent-create-provider", () => provider);
-    const service = createService(root, registry);
-    await service.initialize();
-
-    const created = await service.createAgent("Research Analyst", {
-      providerId: "agent-create-provider",
-      createExternalAgent: false
-    });
-
-    expect(created.externalAgentCreation).toBeUndefined();
-    expect(provider.createdAgents).toHaveLength(0);
-  });
-
-  it("throws when external provider creation is forced for unsupported providers", async () => {
-    const root = await createTempDir("opengoat-service-");
-    roots.push(root);
-
-    const registry = new ProviderRegistry();
-    registry.register("no-agent-create-provider", () => new NoAgentCreateProvider());
-    const service = createService(root, registry);
-    await service.initialize();
-
-    await expect(
-      service.createAgent("Research Analyst", {
-        providerId: "no-agent-create-provider",
-        createExternalAgent: true
-      })
-    ).rejects.toThrow('Provider "no-agent-create-provider" does not support external agent creation.');
-  });
-
-  it("skips provider-side create by default when provider does not support it", async () => {
-    const root = await createTempDir("opengoat-service-");
-    roots.push(root);
-
-    const registry = new ProviderRegistry();
-    registry.register("no-agent-create-provider", () => new NoAgentCreateProvider());
-    const service = createService(root, registry);
-    await service.initialize();
-
-    const created = await service.createAgent("Research Analyst", {
-      providerId: "no-agent-create-provider"
+      type: "individual",
+      reportsTo: "goat",
+      skills: ["research"]
     });
 
     expect(created.agent.id).toBe("research-analyst");
-    expect(created.externalAgentCreation).toBeUndefined();
+    expect(created.runtimeSync?.runtimeId).toBe("openclaw");
+    expect(created.runtimeSync?.code).toBe(0);
+
+    const agents = await service.listAgents();
+    expect(agents.map((agent) => agent.id)).toEqual(["goat", "research-analyst"]);
   });
 
-  it("deletes local and external provider agent when requested", async () => {
+  it("rolls back local files when OpenClaw create fails", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
-    const provider = new AgentCreateProvider();
-    const registry = new ProviderRegistry();
-    registry.register("agent-create-provider", () => provider);
-    const service = createService(root, registry);
+    const fakeProvider = new FakeOpenClawProvider();
+    fakeProvider.failCreate = true;
+    const { service } = createService(root, fakeProvider);
     await service.initialize();
-    await service.createAgent("Research Analyst", { providerId: "agent-create-provider" });
 
-    const deleted = await service.deleteAgent("research-analyst", {
-      deleteExternalAgent: true
-    });
+    await expect(service.createAgent("Broken Agent")).rejects.toThrow("OpenClaw agent creation failed");
 
-    expect(deleted.agentId).toBe("research-analyst");
+    const agents = await service.listAgents();
+    expect(agents.map((agent) => agent.id)).toEqual(["goat"]);
+  });
+
+  it("deletes local and OpenClaw runtime agents", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service, provider } = createService(root);
+    await service.initialize();
+    await service.createAgent("Research Analyst");
+
+    const deleted = await service.deleteAgent("research-analyst");
+
     expect(deleted.existed).toBe(true);
-    expect(deleted.externalAgentDeletion?.providerId).toBe("agent-create-provider");
-    expect(deleted.externalAgentDeletion?.code).toBe(0);
-    expect(provider.deletedAgents[0]?.agentId).toBe("research-analyst");
+    expect(deleted.runtimeSync?.runtimeId).toBe("openclaw");
+    expect(provider.deletedAgents.map((entry) => entry.agentId)).toContain("research-analyst");
+  });
+
+  it("supports force delete when OpenClaw delete fails", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const fakeProvider = new FakeOpenClawProvider();
+    fakeProvider.failDelete = true;
+    const { service } = createService(root, fakeProvider);
+    await service.initialize();
+    await service.createAgent("Research Analyst");
+
+    await expect(service.deleteAgent("research-analyst")).rejects.toThrow("OpenClaw agent deletion failed");
+
+    const forced = await service.deleteAgent("research-analyst", { force: true });
+    expect(forced.existed).toBe(true);
   });
 });
 
-function createService(root: string, registry?: ProviderRegistry): OpenGoatService {
-  return new OpenGoatService({
+function createService(
+  root: string,
+  provider: FakeOpenClawProvider = new FakeOpenClawProvider()
+): { service: OpenGoatService; provider: FakeOpenClawProvider } {
+  const registry = new ProviderRegistry();
+  registry.register("openclaw", () => provider);
+
+  const service = new OpenGoatService({
     fileSystem: new NodeFileSystem(),
     pathPort: new NodePathPort(),
     pathsProvider: new TestPathsProvider(root),
     providerRegistry: registry,
     nowIso: () => "2026-02-06T00:00:00.000Z"
   });
+  return {
+    service,
+    provider
+  };
 }
 
-class AgentCreateProvider extends BaseProvider {
+class FakeOpenClawProvider extends BaseProvider {
   public readonly createdAgents: ProviderCreateAgentOptions[] = [];
-  public readonly deletedAgents: Array<{ agentId: string }> = [];
+  public readonly deletedAgents: ProviderDeleteAgentOptions[] = [];
+  public failCreate = false;
+  public failDelete = false;
 
   public constructor() {
     super({
-      id: "agent-create-provider",
-      displayName: "Agent Create Provider",
+      id: "openclaw",
+      displayName: "OpenClaw",
       kind: "cli",
       capabilities: {
         agent: true,
         model: true,
-        auth: false,
-        passthrough: false,
+        auth: true,
+        passthrough: true,
         agentCreate: true,
         agentDelete: true
       }
     });
   }
 
-  public async invoke(_options: ProviderInvokeOptions) {
+  public async invoke(_options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
     return {
       code: 0,
       stdout: "ok\n",
@@ -207,8 +160,15 @@ class AgentCreateProvider extends BaseProvider {
     };
   }
 
-  public override async createAgent(options: ProviderCreateAgentOptions) {
+  public override async createAgent(options: ProviderCreateAgentOptions): Promise<ProviderExecutionResult> {
     this.createdAgents.push(options);
+    if (this.failCreate) {
+      return {
+        code: 1,
+        stdout: "",
+        stderr: "create failed"
+      };
+    }
     return {
       code: 0,
       stdout: "created\n",
@@ -216,37 +176,18 @@ class AgentCreateProvider extends BaseProvider {
     };
   }
 
-  public override async deleteAgent(options: ProviderDeleteAgentOptions) {
-    this.deletedAgents.push({ agentId: options.agentId });
+  public override async deleteAgent(options: ProviderDeleteAgentOptions): Promise<ProviderExecutionResult> {
+    this.deletedAgents.push(options);
+    if (this.failDelete) {
+      return {
+        code: 1,
+        stdout: "",
+        stderr: "delete failed"
+      };
+    }
     return {
       code: 0,
       stdout: "deleted\n",
-      stderr: ""
-    };
-  }
-}
-
-class NoAgentCreateProvider extends BaseProvider {
-  public constructor() {
-    super({
-      id: "no-agent-create-provider",
-      displayName: "No Agent Create Provider",
-      kind: "cli",
-      capabilities: {
-        agent: true,
-        model: true,
-        auth: false,
-        passthrough: false,
-        agentCreate: false,
-        agentDelete: false
-      }
-    });
-  }
-
-  public async invoke(_options: ProviderInvokeOptions) {
-    return {
-      code: 0,
-      stdout: "ok\n",
       stderr: ""
     };
   }

@@ -1,9 +1,14 @@
 import type { AgentIdentity } from "../domain/agent.js";
 import { DEFAULT_AGENT_ID, isDefaultAgentId } from "../domain/agent-id.js";
 import type { AgentsIndex, OpenGoatConfig } from "../domain/opengoat-paths.js";
-import { DEFAULT_PROVIDER_ID } from "../providers/index.js";
 
 export { DEFAULT_AGENT_ID } from "../domain/agent-id.js";
+
+export interface AgentTemplateOptions {
+  type?: "manager" | "individual";
+  reportsTo?: string | null;
+  skills?: string[];
+}
 
 export function renderGlobalConfig(nowIso: string): OpenGoatConfig {
   return {
@@ -28,36 +33,43 @@ export function renderGlobalConfigMarkdown(): string {
     "",
     "This directory is OpenGoat runtime state.",
     "",
-    "- `config.json`: global orchestrator settings",
+    "- `config.json`: global organization settings",
     "- `agents.json`: registered agent ids",
     "- `workspaces/`: user-visible agent workspaces",
     "- `agents/`: internal per-agent configuration",
-    "- `skills/`: managed shared skills (optional source for agent installs)",
-    "- `providers/`: provider credentials and endpoint settings",
-    "- `sessions/`: transient per-run orchestration working files",
+    "- `skills/`: centralized skill definitions",
+    "- `providers/`: runtime gateway settings (OpenClaw)",
+    "- `sessions/`: transient per-run coordination working files",
     "- `runs/`: run traces (routing + execution history)",
     "",
     "Only Markdown and JSON files are used for OpenGoat configuration and state."
   ].join("\n");
 }
 
-export function renderWorkspaceAgentsMarkdown(agent: AgentIdentity, providerId = DEFAULT_PROVIDER_ID): string {
+export function renderWorkspaceAgentsMarkdown(agent: AgentIdentity, options: AgentTemplateOptions = {}): string {
+  const isGoat = isDefaultAgentId(agent.id);
+  const type = options.type ?? (isGoat ? "manager" : "individual");
+  const reportsTo = options.reportsTo === undefined ? (isGoat ? null : DEFAULT_AGENT_ID) : options.reportsTo;
+  const skills = dedupe(options.skills ?? (isGoat ? ["manager"] : []));
   const description =
-    isDefaultAgentId(agent.id)
-      ? "Primary orchestration agent that routes work to specialized agents."
-      : `Specialized agent for ${agent.displayName}.`;
-  const tags = isDefaultAgentId(agent.id) ? "orchestration, routing" : "specialized, delegated";
-  const canDelegate = isDefaultAgentId(agent.id) ? "true" : "false";
-  const priority = isDefaultAgentId(agent.id) ? "100" : "50";
+    type === "manager"
+      ? `Manager agent responsible for leading direct reports.`
+      : `Specialized OpenClaw agent for ${agent.displayName}.`;
+  const tags = type === "manager" ? "manager, leadership" : "specialized, delegated";
+  const canDelegate = type === "manager" ? "true" : "false";
+  const priority = type === "manager" ? "100" : "50";
+  const reportsToValue = reportsTo ? reportsTo : "null";
 
   return [
     "---",
     `id: ${agent.id}`,
     `name: ${agent.displayName}`,
     `description: ${description}`,
-    `provider: ${providerId}`,
+    `type: ${type}`,
+    `reportsTo: ${reportsToValue}`,
     "discoverable: true",
     `tags: [${tags}]`,
+    `skills: [${skills.join(", ")}]`,
     "delegation:",
     "  canReceive: true",
     `  canDelegate: ${canDelegate}`,
@@ -67,7 +79,13 @@ export function renderWorkspaceAgentsMarkdown(agent: AgentIdentity, providerId =
     `# ${agent.displayName} (OpenGoat Agent)`,
     "",
     "## Role",
-    "You are an autonomous agent managed by OpenGoat.",
+    type === "manager"
+      ? "You are an OpenGoat manager. Message only your direct reportees."
+      : "You are an autonomous OpenClaw-backed specialist managed by OpenGoat.",
+    "",
+    "## Runtime",
+    "- Every OpenGoat agent maps 1:1 to an OpenClaw agent.",
+    "- OpenGoat is the source of truth for agent definitions and hierarchy.",
     "",
     "## Workspace Contract",
     "- The workspace is your writable environment.",
@@ -150,38 +168,39 @@ export function renderWorkspaceBootstrapMarkdown(agent: AgentIdentity): string {
   ].join("\n");
 }
 
-export function renderDefaultOrchestratorSkillMarkdown(): string {
+export function renderDefaultManagerSkillMarkdown(): string {
   return [
     "---",
-    "name: OpenGoat Skill",
-    "description: Use the OpenGoat CLI to orchestrate agents, providers, sessions, skills, and plugins.",
+    "name: Manager",
+    "description: Lead OpenGoat agents as a manager in the organization.",
     "user-invocable: true",
     "---",
     "",
-    "# OpenGoat Skill",
+    "# Manager",
     "",
-    "## When to Use",
-    "- Use this skill when the task requires OpenGoat platform operations.",
-    "- Use it for agent lifecycle, provider setup, routing checks, and session inspection.",
+    "## Mission",
+    "- Lead your direct reportees to complete user goals.",
+    "- Message only direct reportees.",
     "",
     "## Command Playbook",
-    "- Send message to default orchestrator: `opengoat agent --message \"<text>\"`",
+    "- Send message to the default manager (CEO): `opengoat agent --message \"<text>\"`",
     "- Send message to specific agent: `opengoat agent <agent-id> --message \"<text>\"`",
-    "- Create agent: `opengoat agent create --name \"<name>\"`",
+    "- Create agent: `opengoat agent create <name>`",
     "- List agents: `opengoat agent list`",
-    "- Inspect/set provider: `opengoat agent provider get --agent <agent-id>` / `opengoat agent provider set --agent <agent-id> --provider <provider-id>`",
-    "- List providers: `opengoat provider list`",
-    "- Configure providers and credentials: `opengoat onboard`",
+    "- Configure OpenClaw gateway: `opengoat onboard`",
     "- Inspect routing: `opengoat route --message \"<text>\"`",
     "- Manage sessions: `opengoat session list|history|reset|compact ...`",
     "- Manage skills: `opengoat skill list|install ...`",
-    "- Manage plugins: `opengoat plugin list|install|enable|disable|doctor ...`",
     "",
     "## Rules",
-    "- Treat `orchestrator` as the default entry agent unless explicitly overridden.",
-    "- Prefer non-destructive inspection commands before changing provider or plugin state.",
+    "- Treat `goat` as the default entry manager unless explicitly overridden.",
+    "- Message only direct reportees.",
     "- After CLI actions, report what changed and where."
   ].join("\n");
+}
+
+export function renderDefaultOrchestratorSkillMarkdown(): string {
+  return renderDefaultManagerSkillMarkdown();
 }
 
 export function renderWorkspaceMetadata(agent: AgentIdentity): Record<string, unknown> {
@@ -195,17 +214,18 @@ export function renderWorkspaceMetadata(agent: AgentIdentity): Record<string, un
 }
 
 export function renderInternalAgentConfig(agent: AgentIdentity): Record<string, unknown> {
-  const workspaceAccess = isDefaultAgentId(agent.id) ? "internal" : "auto";
+  const isGoat = isDefaultAgentId(agent.id);
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: agent.id,
     displayName: agent.displayName,
-    provider: {
-      id: DEFAULT_PROVIDER_ID
+    organization: {
+      type: isGoat ? "manager" : "individual",
+      reportsTo: isGoat ? null : DEFAULT_AGENT_ID
     },
     runtime: {
-      mode: "orchestrated",
-      workspaceAccess,
+      adapter: "openclaw",
+      mode: "organization",
       contextBudgetTokens: 128_000,
       bootstrapMaxChars: 20_000,
       sessions: {
@@ -227,20 +247,21 @@ export function renderInternalAgentConfig(agent: AgentIdentity): Record<string, 
           triggerChars: 32_000,
           keepRecentMessages: 20,
           summaryMaxChars: 4_000
+        }
+      },
+      skills: {
+        enabled: true,
+        includeWorkspace: false,
+        includeManaged: true,
+        assigned: isGoat ? ["manager"] : [],
+        load: {
+          extraDirs: []
         },
-        skills: {
-          enabled: true,
-          includeWorkspace: true,
-          includeManaged: true,
-          load: {
-            extraDirs: []
-          },
-          prompt: {
-            maxSkills: 12,
-            maxCharsPerSkill: 6_000,
-            maxTotalChars: 36_000,
-            includeContent: true
-          }
+        prompt: {
+          maxSkills: 12,
+          maxCharsPerSkill: 6_000,
+          maxTotalChars: 36_000,
+          includeContent: true
         }
       }
     },
@@ -276,4 +297,8 @@ export function renderInternalAgentState(): Record<string, unknown> {
     status: "idle",
     lastRunAt: null
   };
+}
+
+function dedupe(values: string[]): string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }

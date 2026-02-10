@@ -24,10 +24,7 @@ export interface ProviderInvokeOptions {
   sessionRef?: string;
   forceNewSession?: boolean;
   disableSession?: boolean;
-  directAgentSession?: boolean;
   providerSessionId?: string;
-  forceNewProviderSession?: boolean;
-  sessionContext?: string;
   agent?: string;
   model?: string;
   passthroughArgs?: string[];

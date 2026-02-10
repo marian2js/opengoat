@@ -1,29 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ProviderRegistry } from "./registry.js";
-
-vi.mock("node:fs/promises", async () => {
-  const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
-  return {
-    ...actual,
-    readdir: vi.fn(async () => {
-      const error = new Error("no providers directory") as Error & { code?: string };
-      error.code = "ENOENT";
-      throw error;
-    })
-  };
-});
+import { loadProviderModules } from "./loader.js";
 
 describe("provider loader", () => {
-  it("falls back to statically imported providers when providers dir is unavailable", async () => {
-    const { loadProviderModules } = await import("./loader.js");
+  it("registers OpenClaw provider module", async () => {
     const registry = new ProviderRegistry();
-
     await loadProviderModules(registry);
 
-    const ids = registry.listProviderIds();
-    expect(ids).toContain("codex");
-    expect(ids).toContain("openai");
-    expect(ids).toContain("anthropic");
-    expect(ids).toContain("vercel-ai-gateway");
+    expect(registry.listProviderIds()).toEqual(["openclaw"]);
   });
 });

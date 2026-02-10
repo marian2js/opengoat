@@ -33,7 +33,7 @@ describe("scenario run command", () => {
         stdout: "ok\n",
         stderr: "",
         agentId: "orchestrator",
-        providerId: "openai",
+        providerId: "openclaw",
         entryAgentId: "orchestrator",
         routing: {
           entryAgentId: "orchestrator",
@@ -68,7 +68,7 @@ describe("scenario run command", () => {
         stdout: "done\n",
         stderr: "",
         agentId: "orchestrator",
-        providerId: "openai",
+        providerId: "openclaw",
         entryAgentId: "orchestrator",
         routing: {
           entryAgentId: "orchestrator",
@@ -80,7 +80,7 @@ describe("scenario run command", () => {
         },
         tracePath: "/tmp/trace.json",
         orchestration: {
-          mode: "ai-loop",
+          mode: "single-agent",
           finalMessage: "done",
           steps: [],
           sessionGraph: { nodes: [], edges: [] }
@@ -105,34 +105,13 @@ describe("scenario run command", () => {
         { id: "worker", name: "Worker", description: "Does work" }
       ],
       scripted: {
-        orchestratorActions: [
-          {
-            rationale: "delegate",
-            action: {
-              type: "delegate_to_agent",
-              mode: "hybrid",
-              targetAgentId: "worker",
-              message: "Do work",
-              expectedOutput: "Work result"
-            }
-          },
-          {
-            rationale: "finish",
-            action: {
-              type: "finish",
-              mode: "direct",
-              message: "Scenario complete"
-            }
-          }
-        ],
         agentReplies: {
+          goat: "Scenario complete",
           worker: "WORK DONE"
         }
       },
       assertions: {
-        delegatedAgents: ["worker"],
-        stdoutIncludes: ["Scenario complete"],
-        minSteps: 2
+        stdoutIncludes: ["Scenario complete"]
       }
     });
 

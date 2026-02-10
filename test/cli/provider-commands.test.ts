@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { agentProviderGetCommand } from "../../packages/cli/src/cli/commands/agent-provider-get.command.js";
 import { agentProviderSetCommand } from "../../packages/cli/src/cli/commands/agent-provider-set.command.js";
 import { agentRunCommand } from "../../packages/cli/src/cli/commands/agent-run.command.js";
+import { providerCommand } from "../../packages/cli/src/cli/commands/provider.command.js";
 import { providerListCommand } from "../../packages/cli/src/cli/commands/provider-list.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
@@ -21,46 +22,58 @@ function createContext(service: unknown) {
 }
 
 describe("provider CLI commands", () => {
-  it("provider list prints capability rows", async () => {
-    const listProviders = vi.fn(() => [
-      {
-        id: "codex",
-        kind: "cli",
-        capabilities: { agent: false, model: true, auth: true, agentCreate: false, agentDelete: false }
-      }
-    ]);
-
-    const { context, stdout } = createContext({ listProviders });
-
-    const code = await providerListCommand.run([], context);
-
+  it("provider command prints help", async () => {
+    const { context, stdout } = createContext({});
+    const code = await providerCommand.run([], context);
     expect(code).toBe(0);
-    expect(stdout.output()).toContain("codex\tcli\tagent=false model=true auth=true agentCreate=false agentDelete=false");
+    expect(stdout.output()).toContain("opengoat provider list");
   });
 
-  it("agent provider get validates and prints binding", async () => {
-    const getAgentProvider = vi.fn(async () => ({ agentId: "orchestrator", providerId: "codex" }));
-    const { context, stdout, stderr } = createContext({ getAgentProvider });
+  it("provider list passes through to OpenClaw CLI", async () => {
+    const runOpenClaw = vi.fn(async () => ({
+      code: 0,
+      stdout: "openclaw\tconfigured\n",
+      stderr: ""
+    }));
+    const { context, stdout } = createContext({ runOpenClaw });
+    const code = await providerListCommand.run([], context);
+    expect(code).toBe(0);
+    expect(runOpenClaw).toHaveBeenCalledWith(["providers", "list"]);
+    expect(stdout.output()).toContain("openclaw\tconfigured");
+  });
+
+  it("agent provider get validates and passes through", async () => {
+    const runOpenClaw = vi.fn(async () => ({
+      code: 0,
+      stdout: "goat\topenclaw\n",
+      stderr: ""
+    }));
+    const { context, stderr } = createContext({ runOpenClaw });
 
     expect(await agentProviderGetCommand.run([], context)).toBe(1);
     expect(stderr.output()).toContain("Usage: opengoat agent provider get");
 
-    const ok = createContext({ getAgentProvider });
-    expect(await agentProviderGetCommand.run(["orchestrator"], ok.context)).toBe(0);
-    expect(ok.stdout.output()).toContain("orchestrator\tcodex");
+    const ok = createContext({ runOpenClaw });
+    expect(await agentProviderGetCommand.run(["goat"], ok.context)).toBe(0);
+    expect(runOpenClaw).toHaveBeenLastCalledWith(["agents", "provider", "get", "goat"]);
+    expect(ok.stdout.output()).toContain("goat\topenclaw");
   });
 
-  it("agent provider set validates and persists binding", async () => {
-    const setAgentProvider = vi.fn(async () => ({ agentId: "orchestrator", providerId: "claude" }));
+  it("agent provider set validates and passes through", async () => {
+    const runOpenClaw = vi.fn(async () => ({
+      code: 0,
+      stdout: "updated\n",
+      stderr: ""
+    }));
 
-    const first = createContext({ setAgentProvider });
-    expect(await agentProviderSetCommand.run(["orchestrator"], first.context)).toBe(1);
+    const first = createContext({ runOpenClaw });
+    expect(await agentProviderSetCommand.run(["goat"], first.context)).toBe(1);
     expect(first.stderr.output()).toContain("Usage: opengoat agent provider set");
 
-    const second = createContext({ setAgentProvider });
-    expect(await agentProviderSetCommand.run(["orchestrator", "claude"], second.context)).toBe(0);
-    expect(setAgentProvider).toHaveBeenCalledWith("orchestrator", "claude");
-    expect(second.stdout.output()).toContain("Provider for orchestrator set to claude");
+    const second = createContext({ runOpenClaw });
+    expect(await agentProviderSetCommand.run(["goat", "openclaw"], second.context)).toBe(0);
+    expect(runOpenClaw).toHaveBeenLastCalledWith(["agents", "provider", "set", "goat", "openclaw"]);
+    expect(second.stdout.output()).toContain("updated");
   });
 
   it("agent run validates required flags", async () => {
@@ -82,19 +95,19 @@ describe("provider CLI commands", () => {
       code: 0,
       stdout: "done\n",
       stderr: "",
-      agentId: "orchestrator",
-      providerId: "codex"
+      agentId: "goat",
+      providerId: "openclaw"
     }));
 
     const first = createContext({ runAgent });
     const code = await agentRunCommand.run(
-      ["orchestrator", "--message", "hi", "--model", "o3", "--cwd", "/tmp/project", "--", "--foo", "bar"],
+      ["goat", "--message", "hi", "--model", "o3", "--cwd", "/tmp/project", "--", "--foo", "bar"],
       first.context
     );
 
     expect(code).toBe(0);
     expect(runAgent).toHaveBeenCalledWith(
-      "orchestrator",
+      "goat",
       expect.objectContaining({
         message: "hi",
         model: "o3",
@@ -107,15 +120,15 @@ describe("provider CLI commands", () => {
       code: 2,
       stdout: "",
       stderr: "failed\n",
-      agentId: "orchestrator",
-      providerId: "codex"
+      agentId: "goat",
+      providerId: "openclaw"
     }));
 
     const second = createContext({ runAgent: failingRunAgent });
-    const failCode = await agentRunCommand.run(["orchestrator", "--message", "hi", "--no-stream"], second.context);
+    const failCode = await agentRunCommand.run(["goat", "--message", "hi", "--no-stream"], second.context);
 
     expect(failCode).toBe(2);
-    expect(second.stderr.output()).toContain("Provider run failed");
+    expect(second.stderr.output()).toContain("Runtime run failed");
   });
 
   it("agent run prints provider stderr in stream mode when provider returns final output only", async () => {
@@ -123,15 +136,15 @@ describe("provider CLI commands", () => {
       code: 1,
       stdout: "",
       stderr: "HTTP 401: invalid_api_key\n",
-      agentId: "orchestrator",
-      providerId: "openai"
+      agentId: "goat",
+      providerId: "openclaw"
     }));
 
     const { context, stderr } = createContext({ runAgent });
-    const code = await agentRunCommand.run(["orchestrator", "--message", "hi"], context);
+    const code = await agentRunCommand.run(["goat", "--message", "hi"], context);
 
     expect(code).toBe(1);
     expect(stderr.output()).toContain("HTTP 401: invalid_api_key");
-    expect(stderr.output()).toContain("Provider run failed for orchestrator (openai).");
+    expect(stderr.output()).toContain("Runtime run failed for goat (openclaw).");
   });
 });

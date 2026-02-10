@@ -25,7 +25,7 @@ describe("CLI commands", () => {
   it("init command prints initialization result", async () => {
     const initialize = vi.fn(async () => ({
       paths: { homeDir: "/tmp/opengoat" },
-      defaultAgent: "orchestrator",
+      defaultAgent: "goat",
       createdPaths: ["/tmp/opengoat/config.json"],
       skippedPaths: []
     }));
@@ -36,7 +36,7 @@ describe("CLI commands", () => {
     expect(code).toBe(0);
     expect(initialize).toHaveBeenCalledOnce();
     expect(stdout.output()).toContain("OpenGoat home: /tmp/opengoat");
-    expect(stdout.output()).toContain("Default agent: orchestrator");
+    expect(stdout.output()).toContain("Default agent: goat");
   });
 
   it("agent create validates usage", async () => {
@@ -50,31 +50,7 @@ describe("CLI commands", () => {
     expect(stderr.output()).toContain("Usage: opengoat agent create");
   });
 
-  it("agent create passes agent name to service", async () => {
-    const createAgent = vi.fn(async () => ({
-      agent: {
-        id: "research-analyst",
-        displayName: "Research Analyst",
-        workspaceDir: "/tmp/workspaces/research-analyst",
-        internalConfigDir: "/tmp/agents/research-analyst"
-      },
-      createdPaths: ["a", "b"],
-      skippedPaths: []
-    }));
-
-    const { context, stdout } = createContext({ createAgent });
-
-    const code = await agentCreateCommand.run(["Research", "Analyst"], context);
-
-    expect(code).toBe(0);
-    expect(createAgent).toHaveBeenCalledWith("Research Analyst", {
-      providerId: undefined,
-      createExternalAgent: undefined
-    });
-    expect(stdout.output()).toContain("Agent created: Research Analyst (research-analyst)");
-  });
-
-  it("agent create supports provider binding and optional external creation", async () => {
+  it("agent create passes type, reports-to, and skills", async () => {
     const createAgent = vi.fn(async () => ({
       agent: {
         id: "research-analyst",
@@ -84,76 +60,49 @@ describe("CLI commands", () => {
       },
       createdPaths: ["a", "b"],
       skippedPaths: [],
-      externalAgentCreation: {
-        providerId: "openclaw",
+      alreadyExisted: false,
+      runtimeSync: {
+        runtimeId: "openclaw",
         code: 0,
-        stdout: "created",
+        stdout: "",
         stderr: ""
       }
     }));
 
     const { context, stdout } = createContext({ createAgent });
     const code = await agentCreateCommand.run(
-      ["Research", "Analyst", "--provider", "openclaw", "--create-external"],
+      ["Research", "Analyst", "--individual", "--reports-to", "goat", "--skill", "research", "--skill", "docs"],
       context
     );
 
     expect(code).toBe(0);
     expect(createAgent).toHaveBeenCalledWith("Research Analyst", {
-      providerId: "openclaw",
-      createExternalAgent: true
+      type: "individual",
+      reportsTo: "goat",
+      skills: ["docs", "research"]
     });
-    expect(stdout.output()).toContain("External agent creation (openclaw): code 0");
+    expect(stdout.output()).toContain("Agent ready: Research Analyst (research-analyst)");
+    expect(stdout.output()).toContain("OpenClaw sync: openclaw (code 0)");
   });
 
-  it("agent create supports disabling provider-side creation", async () => {
+  it("agent create prints already-existed note", async () => {
     const createAgent = vi.fn(async () => ({
       agent: {
-        id: "research-analyst",
-        displayName: "Research Analyst",
-        workspaceDir: "/tmp/workspaces/research-analyst",
-        internalConfigDir: "/tmp/agents/research-analyst"
+        id: "developer",
+        displayName: "Developer",
+        workspaceDir: "/tmp/workspaces/developer",
+        internalConfigDir: "/tmp/agents/developer"
       },
-      createdPaths: ["a", "b"],
-      skippedPaths: []
+      createdPaths: [],
+      skippedPaths: [],
+      alreadyExisted: true
     }));
-    const { context } = createContext({ createAgent });
+    const { context, stdout } = createContext({ createAgent });
 
-    const code = await agentCreateCommand.run(
-      ["Research", "Analyst", "--provider", "openclaw", "--no-create-external"],
-      context
-    );
+    const code = await agentCreateCommand.run(["Developer"], context);
 
     expect(code).toBe(0);
-    expect(createAgent).toHaveBeenCalledWith("Research Analyst", {
-      providerId: "openclaw",
-      createExternalAgent: false
-    });
-  });
-
-  it("agent create rejects conflicting external-create flags", async () => {
-    const createAgent = vi.fn();
-    const { context, stderr } = createContext({ createAgent });
-
-    const code = await agentCreateCommand.run(
-      ["Research", "--create-external", "--no-create-external"],
-      context
-    );
-
-    expect(code).toBe(1);
-    expect(createAgent).not.toHaveBeenCalled();
-    expect(stderr.output()).toContain("Cannot combine --create-external with --no-create-external");
-  });
-
-  it("agent create rejects --set-default because orchestrator is always default", async () => {
-    const createAgent = vi.fn();
-    const { context, stderr } = createContext({ createAgent });
-
-    const code = await agentCreateCommand.run(["Research", "--set-default"], context);
-
-    expect(code).toBe(1);
-    expect(createAgent).not.toHaveBeenCalled();
-    expect(stderr.output()).toContain("Orchestrator is always the default agent");
+    expect(stdout.output()).toContain("Local agent already existed; OpenClaw sync skipped.");
   });
 
   it("agent delete validates usage", async () => {
@@ -167,74 +116,68 @@ describe("CLI commands", () => {
     expect(stderr.output()).toContain("Usage: opengoat agent delete");
   });
 
-  it("agent delete passes options to service and supports external deletion", async () => {
+  it("agent delete passes --force and prints runtime sync", async () => {
     const deleteAgent = vi.fn(async () => ({
       agentId: "research-analyst",
       existed: true,
       removedPaths: ["/tmp/workspaces/research-analyst", "/tmp/agents/research-analyst"],
       skippedPaths: [],
-      externalAgentDeletion: {
-        providerId: "openclaw",
+      runtimeSync: {
+        runtimeId: "openclaw",
         code: 0,
-        stdout: "deleted",
+        stdout: "",
         stderr: ""
       }
     }));
     const { context, stdout } = createContext({ deleteAgent });
 
-    const code = await agentDeleteCommand.run(
-      ["research-analyst", "--delete-external", "--provider", "openclaw"],
-      context
-    );
+    const code = await agentDeleteCommand.run(["research-analyst", "--force"], context);
 
     expect(code).toBe(0);
     expect(deleteAgent).toHaveBeenCalledWith("research-analyst", {
-      providerId: "openclaw",
-      deleteExternalAgent: true
+      force: true
     });
-    expect(stdout.output()).toContain("Agent deleted locally: research-analyst");
-    expect(stdout.output()).toContain("External agent deletion (openclaw): code 0");
+    expect(stdout.output()).toContain("Agent deleted: research-analyst");
+    expect(stdout.output()).toContain("OpenClaw sync: openclaw (code 0)");
+    expect(stdout.output()).toContain("Removed paths: 2");
   });
 
-  it("agent list prints empty state and non-empty rows", async () => {
+  it("agent list prints empty state and rows", async () => {
     const listAgents = vi
       .fn()
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
-        { id: "orchestrator", displayName: "Orchestrator" },
+        { id: "goat", displayName: "Goat" },
         { id: "research", displayName: "research" }
       ]);
 
     const first = createContext({ listAgents });
     const firstCode = await agentListCommand.run([], first.context);
-
     expect(firstCode).toBe(0);
     expect(first.stdout.output()).toContain("No agents found. Run: opengoat onboard");
 
     const second = createContext({ listAgents });
     const secondCode = await agentListCommand.run([], second.context);
-
     expect(secondCode).toBe(0);
-    expect(second.stdout.output()).toContain("orchestrator\n");
+    expect(second.stdout.output()).toContain("goat\n");
     expect(second.stdout.output()).toContain("research\n");
   });
 
-  it("agent command defaults to orchestrator when agent id is omitted", async () => {
+  it("agent command defaults to goat when agent id is omitted", async () => {
     const runAgent = vi.fn(async () => ({
       code: 0,
       stdout: "ok\n",
       stderr: "",
-      agentId: "orchestrator",
-      providerId: "codex"
+      agentId: "goat",
+      providerId: "openclaw"
     }));
 
     const { context } = createContext({ runAgent });
-
     const code = await agentCommand.run(["--message", "hello"], context);
 
     expect(code).toBe(0);
     expect(runAgent).toHaveBeenCalledWith(
-      "orchestrator",
+      "goat",
       expect.objectContaining({
         message: "hello"
       })
@@ -247,7 +190,7 @@ describe("CLI commands", () => {
       stdout: "",
       stderr: "",
       agentId: "research",
-      providerId: "codex"
+      providerId: "openclaw"
     }));
 
     const first = createContext({ runAgent });
@@ -260,33 +203,32 @@ describe("CLI commands", () => {
       })
     );
 
-    const second = createContext({ runAgent });
+    const second = createContext({ runAgent: vi.fn() });
     const secondCode = await agentCommand.run(["--help"], second.context);
     expect(secondCode).toBe(0);
-    expect(second.stdout.output()).toContain("Usage:");
-    expect(second.stdout.output()).toContain("defaults to orchestrator");
+    expect(second.stdout.output()).toContain("opengoat agent [agent-id]");
+    expect(second.stdout.output()).toContain("agent-id defaults to goat");
   });
 
   it("agent command passes --cwd to service run options", async () => {
     const runAgent = vi.fn(async () => ({
       code: 0,
-      stdout: "ok\n",
+      stdout: "",
       stderr: "",
-      agentId: "research",
-      providerId: "codex"
+      agentId: "goat",
+      providerId: "openclaw"
     }));
 
     const { context } = createContext({ runAgent });
     const code = await agentCommand.run(
-      ["research", "--message", "hello", "--cwd", "/tmp/project"],
+      ["--message", "check", "--cwd", "/tmp/project"],
       context
     );
 
     expect(code).toBe(0);
     expect(runAgent).toHaveBeenCalledWith(
-      "research",
+      "goat",
       expect.objectContaining({
-        message: "hello",
         cwd: "/tmp/project"
       })
     );

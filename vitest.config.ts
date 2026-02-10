@@ -5,15 +5,11 @@ export default defineConfig({
   resolve: {
     dedupe: ["react", "react-dom"],
     alias: {
-      "@": path.resolve(__dirname, "packages/electron/src/renderer/src"),
       "@cli/onboard-guided-auth": path.resolve(
         __dirname,
         "packages/cli/src/cli/commands/onboard-guided-auth.ts"
       ),
-      "@opengoat/core": path.resolve(__dirname, "packages/core/src/index.ts"),
-      "@main": path.resolve(__dirname, "packages/electron/src/main"),
-      "@renderer": path.resolve(__dirname, "packages/electron/src/renderer/src"),
-      "@shared": path.resolve(__dirname, "packages/electron/src/shared")
+      "@opengoat/core": path.resolve(__dirname, "packages/core/src/index.ts")
     }
   },
   test: {
@@ -24,7 +20,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "html"],
       include: ["packages/**/src/**/*.ts"],
-      exclude: ["packages/cli/src/**/*.ts", "packages/electron/src/**/*.ts", "packages/electron/src/**/*.tsx"]
+      exclude: ["packages/cli/src/**/*.ts"]
     }
   }
 });

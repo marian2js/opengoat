@@ -4,10 +4,10 @@ Core OpenGoat runtime package.
 
 Includes:
 
-- orchestration engine
-- providers + registry
+- manager runtime service
+- OpenClaw runtime adapter + registry boundary
 - sessions + transcripts
-- skills + plugins
+- skills
 - ACP integration
 - Node platform adapters
 

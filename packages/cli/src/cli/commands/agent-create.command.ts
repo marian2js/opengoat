@@ -2,81 +2,35 @@ import type { CliCommand } from "../framework/command.js";
 
 export const agentCreateCommand: CliCommand = {
   path: ["agent", "create"],
-  description: "Create an agent workspace and internal config (Markdown + JSON).",
+  description: "Create an OpenClaw-backed agent in OpenGoat.",
   async run(args, context): Promise<number> {
-    if (args.includes("--set-default")) {
-      context.stderr.write("`--set-default` is not supported. Orchestrator is always the default agent.\n");
-      return 1;
-    }
-
     const parsed = parseAgentCreateArgs(args);
     if (!parsed.ok) {
       context.stderr.write(`${parsed.error}\n`);
-      context.stderr.write(
-        "Usage: opengoat agent create <name> [--provider <id>] [--create-external | --no-create-external]\n"
-      );
+      printHelp(context.stderr);
       return 1;
     }
 
     if (parsed.help) {
-      context.stdout.write(
-        "Usage: opengoat agent create <name> [--provider <id>] [--create-external | --no-create-external]\n"
-      );
-      context.stdout.write("\n");
-      context.stdout.write("Options:\n");
-      context.stdout.write("  --provider <id>       Set the agent provider after creation.\n");
-      context.stdout.write(
-        "  --create-external     Force provider-side creation when supported.\n"
-      );
-      context.stdout.write(
-        "  --no-create-external  Disable provider-side creation (enabled by default when supported).\n"
-      );
+      printHelp(context.stdout);
       return 0;
     }
 
-    const name = parsed.name;
-
-    if (!name) {
-      context.stderr.write("Usage: opengoat agent create <name>\n");
-      return 1;
-    }
-
-    const result = await context.service.createAgent(name, {
-      providerId: parsed.providerId,
-      createExternalAgent: parsed.createExternal
+    const result = await context.service.createAgent(parsed.name, {
+      type: parsed.type,
+      reportsTo: parsed.reportsTo,
+      skills: parsed.skills
     });
 
-    context.stdout.write(`Agent created: ${result.agent.displayName} (${result.agent.id})\n`);
+    context.stdout.write(`Agent ready: ${result.agent.displayName} (${result.agent.id})\n`);
     context.stdout.write(`Workspace: ${result.agent.workspaceDir}\n`);
     context.stdout.write(`Internal config: ${result.agent.internalConfigDir}\n`);
-    context.stdout.write(`Created: ${result.createdPaths.length} path(s)\n`);
-    if (parsed.providerId) {
-      context.stdout.write(`Provider: ${parsed.providerId}\n`);
+    if (result.alreadyExisted) {
+      context.stdout.write("Local agent already existed; OpenClaw sync skipped.\n");
     }
-
-    if (result.externalAgentCreation) {
-      context.stdout.write(
-        `External agent creation (${result.externalAgentCreation.providerId}): code ${result.externalAgentCreation.code}\n`
-      );
-      if (result.externalAgentCreation.stdout.trim()) {
-        context.stdout.write(result.externalAgentCreation.stdout);
-        if (!result.externalAgentCreation.stdout.endsWith("\n")) {
-          context.stdout.write("\n");
-        }
-      }
-      if (result.externalAgentCreation.stderr.trim()) {
-        context.stderr.write(result.externalAgentCreation.stderr);
-        if (!result.externalAgentCreation.stderr.endsWith("\n")) {
-          context.stderr.write("\n");
-        }
-      }
-
-      if (result.externalAgentCreation.code !== 0) {
-        context.stderr.write("Local agent was created, but external provider agent creation failed.\n");
-        return result.externalAgentCreation.code;
-      }
+    if (result.runtimeSync) {
+      context.stdout.write(`OpenClaw sync: ${result.runtimeSync.runtimeId} (code ${result.runtimeSync.code})\n`);
     }
-
     return 0;
   }
 };
@@ -86,14 +40,16 @@ interface ParsedAgentCreateArgs {
   error?: string;
   help?: boolean;
   name: string;
-  providerId?: string;
-  createExternal?: boolean;
+  type?: "manager" | "individual";
+  reportsTo?: string | null;
+  skills?: string[];
 }
 
 function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
   const nameParts: string[] = [];
-  let providerId: string | undefined;
-  let createExternal: boolean | undefined;
+  let type: "manager" | "individual" | undefined;
+  let reportsTo: string | null | undefined;
+  const skills: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index];
@@ -105,63 +61,45 @@ function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
       return {
         ok: true,
         help: true,
-        name: "",
-        createExternal: undefined
+        name: ""
       };
     }
 
-    if (token === "--create-external") {
-      if (createExternal === false) {
-        return {
-          ok: false,
-          error: "Cannot combine --create-external with --no-create-external.",
-          name: "",
-          createExternal: undefined
-        };
-      }
-      createExternal = true;
+    if (token === "--manager") {
+      type = "manager";
       continue;
     }
 
-    if (token === "--no-create-external") {
-      if (createExternal === true) {
-        return {
-          ok: false,
-          error: "Cannot combine --create-external with --no-create-external.",
-          name: "",
-          createExternal: undefined
-        };
-      }
-      createExternal = false;
+    if (token === "--individual" || token === "--specialist") {
+      type = "individual";
       continue;
     }
 
-    if (token === "--provider") {
+    if (token === "--reports-to") {
       const value = args[index + 1]?.trim();
       if (!value || value.startsWith("--")) {
         return {
           ok: false,
-          error: "Missing value for --provider.",
-          name: "",
-          createExternal: undefined
+          error: "Missing value for --reports-to.",
+          name: ""
         };
       }
-      providerId = value;
+      reportsTo = value.toLowerCase() === "none" ? null : value.toLowerCase();
       index += 1;
       continue;
     }
 
-    if (token.startsWith("--provider=")) {
-      const value = token.slice("--provider=".length).trim();
-      if (!value) {
+    if (token === "--skill") {
+      const value = args[index + 1]?.trim();
+      if (!value || value.startsWith("--")) {
         return {
           ok: false,
-          error: "Missing value for --provider.",
-          name: "",
-          createExternal: undefined
+          error: "Missing value for --skill.",
+          name: ""
         };
       }
-      providerId = value;
+      skills.push(value.toLowerCase());
+      index += 1;
       continue;
     }
 
@@ -169,18 +107,42 @@ function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
       return {
         ok: false,
         error: `Unknown option: ${token}`,
-        name: "",
-        createExternal: undefined
+        name: ""
       };
     }
 
     nameParts.push(token);
   }
 
+  const name = nameParts.join(" ").trim();
+  if (!name) {
+    return {
+      ok: false,
+      error: "Missing required <name>.",
+      name: ""
+    };
+  }
+
   return {
     ok: true,
-    name: nameParts.join(" ").trim(),
-    providerId,
-    createExternal
+    name,
+    type,
+    reportsTo,
+    skills: dedupeSkills(type, skills)
   };
+}
+
+function printHelp(output: NodeJS.WritableStream): void {
+  output.write("Usage: opengoat agent create <name> [--manager|--individual] [--reports-to <agent-id|none>] [--skill <skill-id>]\n");
+}
+
+function dedupeSkills(type: "manager" | "individual" | undefined, input: string[]): string[] | undefined {
+  const merged = [...input];
+  if (type === "manager" && !merged.includes("manager")) {
+    merged.push("manager");
+  }
+  if (merged.length === 0) {
+    return undefined;
+  }
+  return [...new Set(merged)].sort((left, right) => left.localeCompare(right));
 }

@@ -2,17 +2,14 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { WorkspaceContextService } from "../../packages/core/src/core/agents/index.js";
 import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
-import {
-  InvalidAgentConfigError,
-  InvalidProviderConfigError,
-  ProviderService
-} from "../../packages/core/src/core/providers/index.js";
+import { InvalidProviderConfigError, ProviderService } from "../../packages/core/src/core/providers/index.js";
 import { SkillService } from "../../packages/core/src/core/skills/index.js";
 import { ProviderRegistry } from "../../packages/core/src/core/providers/registry.js";
 import type {
   Provider,
   ProviderCreateAgentOptions,
   ProviderDeleteAgentOptions,
+  ProviderExecutionResult,
   ProviderInvokeOptions
 } from "../../packages/core/src/core/providers/types.js";
 import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
@@ -30,521 +27,117 @@ afterEach(async () => {
   }
 });
 
-describe("ProviderService", () => {
-  it("loads provider registry lazily only when first provider operation is requested", async () => {
+describe("ProviderService (OpenClaw runtime)", () => {
+  it("lists only openclaw provider", async () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
     const { fileSystem } = await createPaths(root);
+    const registry = createRegistry(new FakeOpenClawProvider());
+    const service = createProviderService(fileSystem, registry);
 
-    const registry = new ProviderRegistry();
-    registry.register("fake", () =>
-      createProvider({
-        id: "fake",
-        kind: "cli",
-        capabilities: { agent: false, model: true, auth: false, passthrough: false },
-        onInvoke: () => undefined
-      })
-    );
-
-    let loadCount = 0;
-    const service = new ProviderService({
-      fileSystem,
-      pathPort: new NodePathPort(),
-      providerRegistry: () => {
-        loadCount += 1;
-        return registry;
-      },
-      workspaceContextService: new WorkspaceContextService({
-        fileSystem,
-        pathPort: new NodePathPort()
-      }),
-      skillService: new SkillService({
-        fileSystem,
-        pathPort: new NodePathPort()
-      }),
-      nowIso: () => "2026-02-06T00:00:00.000Z"
-    });
-
-    expect(loadCount).toBe(0);
-    await service.listProviders();
-    expect(loadCount).toBe(1);
-    await service.listProviders();
-    expect(loadCount).toBe(1);
+    const providers = await service.listProviders();
+    expect(providers).toHaveLength(1);
+    expect(providers[0]?.id).toBe("openclaw");
   });
 
-  it("injects workspace context into system prompt and defaults cwd to workspace", async () => {
+  it("invokes agent with injected workspace context", async () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
-
     const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, {
-      agentId: "orchestrator",
-      providerId: "fake",
-      bootstrapFiles: ["AGENTS.md", "MISSING.md"]
-    });
+    await seedAgent(fileSystem, paths, "goat");
 
-    await fileSystem.writeFile(path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"), "# Rules\n");
+    const provider = new FakeOpenClawProvider();
+    const service = createProviderService(fileSystem, createRegistry(provider));
 
-    const captured: ProviderInvokeOptions[] = [];
-    const provider = createProvider({
-      id: "fake",
-      kind: "cli",
-      capabilities: { agent: true, model: true, auth: false, passthrough: false },
-      onInvoke: (options) => captured.push(options)
-    });
+    const result = await service.invokeAgent(paths, "goat", { message: "hello" });
 
-    const registry = new ProviderRegistry();
-    registry.register("fake", () => provider);
-
-    const service = createProviderService(fileSystem, registry);
-    const result = await service.invokeAgent(paths, "orchestrator", { message: "hello" });
-
-    expect(result.providerId).toBe("fake");
-    expect(captured[0]?.cwd).toBe(path.join(paths.workspacesDir, "orchestrator"));
-    expect(captured[0]?.agent).toBe("orchestrator");
-    expect(captured[0]?.message).toBe("hello");
-    expect(captured[0]?.systemPrompt).toContain("# Project Context");
-    expect(captured[0]?.systemPrompt).toContain("## AGENTS.md");
-    expect(captured[0]?.systemPrompt).toContain("## Skills");
-    expect(captured[0]?.systemPrompt).toContain("[MISSING] Expected at:");
+    expect(result.providerId).toBe("openclaw");
+    expect(provider.lastInvoke?.cwd).toBe(path.join(paths.workspacesDir, "goat"));
+    expect(provider.lastInvoke?.systemPrompt).toContain("# Project Context");
+    expect(provider.lastInvoke?.message).toBe("hello");
+    expect(provider.lastInvoke?.agent).toBe("goat");
   });
 
-  it("uses skillsPromptOverride when provided by orchestration runtime", async () => {
+  it("stores and resolves external gateway config", async () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
-
     const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, {
-      agentId: "orchestrator",
-      providerId: "fake",
-      bootstrapFiles: ["AGENTS.md"]
-    });
-    await fileSystem.writeFile(path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"), "# Rules\n");
+    const service = createProviderService(fileSystem, createRegistry(new FakeOpenClawProvider()));
 
-    const captured: ProviderInvokeOptions[] = [];
-    const provider = createProvider({
-      id: "fake",
-      kind: "http",
-      capabilities: { agent: false, model: true, auth: false, passthrough: false },
-      onInvoke: (options) => captured.push(options)
+    await service.setOpenClawGatewayConfig(paths, {
+      mode: "external",
+      gatewayUrl: "ws://remote-host:18789",
+      gatewayToken: "secret-token"
     });
 
-    const registry = new ProviderRegistry();
-    registry.register("fake", () => provider);
-
-    const service = createProviderService(fileSystem, registry);
-    await service.invokeAgent(paths, "orchestrator", {
-      message: "hello",
-      skillsPromptOverride: "## Skills\n<available_skills>\n  <skill><id>x</id></skill>\n</available_skills>"
+    const resolved = await service.getOpenClawGatewayConfig(paths);
+    expect(resolved).toEqual({
+      mode: "external",
+      gatewayUrl: "ws://remote-host:18789",
+      gatewayToken: "secret-token"
     });
 
-    expect(captured[0]?.systemPrompt).toContain("<available_skills>");
-    expect(captured[0]?.systemPrompt).toContain("<id>x</id>");
+    const config = await service.getProviderConfig(paths, "openclaw");
+    expect(config?.env.OPENCLAW_ARGUMENTS).toContain("--remote ws://remote-host:18789");
+    expect(config?.env.OPENCLAW_ARGUMENTS).toContain("--token secret-token");
+
+    await service.setOpenClawGatewayConfig(paths, { mode: "local" });
+    const local = await service.getOpenClawGatewayConfig(paths);
+    expect(local.mode).toBe("local");
   });
 
-  it("does not force agent option for providers without agent capability", async () => {
+  it("throws InvalidProviderConfigError for invalid stored config", async () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
-
     const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, {
-      agentId: "orchestrator",
-      providerId: "no-agent",
-      bootstrapFiles: ["AGENTS.md"]
-    });
-    await fileSystem.writeFile(path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"), "# Rules\n");
+    await fileSystem.ensureDir(path.join(paths.providersDir, "openclaw"));
+    await fileSystem.writeFile(path.join(paths.providersDir, "openclaw", "config.json"), "{ bad json");
 
-    const captured: ProviderInvokeOptions[] = [];
-    const provider = createProvider({
-      id: "no-agent",
-      kind: "cli",
-      capabilities: { agent: false, model: true, auth: false, passthrough: false },
-      onInvoke: (options) => captured.push(options)
-    });
-
-    const registry = new ProviderRegistry();
-    registry.register("no-agent", () => provider);
-
-    const service = createProviderService(fileSystem, registry);
-    await service.invokeAgent(paths, "orchestrator", { message: "hello" });
-
-    expect(captured[0]?.agent).toBeUndefined();
+    const service = createProviderService(fileSystem, createRegistry(new FakeOpenClawProvider()));
+    await expect(service.getProviderConfig(paths, "openclaw")).rejects.toBeInstanceOf(InvalidProviderConfigError);
   });
 
-  it("persists provider config and injects it into provider invoke env", async () => {
+  it("syncs agent lifecycle through create/delete provider hooks", async () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
-
     const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, {
-      agentId: "orchestrator",
-      providerId: "fake",
-      bootstrapFiles: ["AGENTS.md"]
+    const provider = new FakeOpenClawProvider();
+    const service = createProviderService(fileSystem, createRegistry(provider));
+
+    await service.createProviderAgent(paths, "developer", {
+      displayName: "Developer",
+      workspaceDir: "/tmp/workspaces/developer",
+      internalConfigDir: "/tmp/agents/developer"
     });
-    await fileSystem.writeFile(path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"), "# Rules\n");
+    await service.deleteProviderAgent(paths, "developer", {});
 
-    const captured: ProviderInvokeOptions[] = [];
-    const provider = createProvider({
-      id: "fake",
-      kind: "cli",
-      capabilities: { agent: false, model: true, auth: false, passthrough: false },
-      onInvoke: (options) => captured.push(options)
-    });
-
-    const registry = new ProviderRegistry();
-    registry.register("fake", () => provider);
-
-    const service = createProviderService(fileSystem, registry);
-    await service.setProviderConfig(paths, "fake", {
-      FAKE_PROVIDER_TOKEN: "stored-token"
-    });
-
-    await service.invokeAgent(paths, "orchestrator", {
-      message: "hello",
-      env: {
-        EXTRA_FLAG: "1"
-      }
-    });
-
-    expect(captured[0]?.env?.FAKE_PROVIDER_TOKEN).toBe("stored-token");
-    expect(captured[0]?.env?.EXTRA_FLAG).toBe("1");
-  });
-
-  it("allows runtime env to override stored provider config", async () => {
-    const root = await createTempDir("opengoat-provider-service-");
-    roots.push(root);
-
-    const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, {
-      agentId: "orchestrator",
-      providerId: "fake",
-      bootstrapFiles: ["AGENTS.md"]
-    });
-    await fileSystem.writeFile(path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"), "# Rules\n");
-
-    const captured: ProviderInvokeOptions[] = [];
-    const provider = createProvider({
-      id: "fake",
-      kind: "cli",
-      capabilities: { agent: false, model: true, auth: false, passthrough: false },
-      onInvoke: (options) => captured.push(options)
-    });
-
-    const registry = new ProviderRegistry();
-    registry.register("fake", () => provider);
-
-    const service = createProviderService(fileSystem, registry);
-    await service.setProviderConfig(paths, "fake", {
-      FAKE_PROVIDER_TOKEN: "stored-token"
-    });
-
-    await service.invokeAgent(paths, "orchestrator", {
-      message: "hello",
-      env: {
-        FAKE_PROVIDER_TOKEN: "runtime-token"
-      }
-    });
-
-    expect(captured[0]?.env?.FAKE_PROVIDER_TOKEN).toBe("runtime-token");
-  });
-
-  it("throws InvalidAgentConfigError when agent config json is malformed", async () => {
-    const root = await createTempDir("opengoat-provider-service-");
-    roots.push(root);
-
-    const { paths, fileSystem } = await createPaths(root);
-    await fileSystem.writeFile(path.join(paths.agentsDir, "orchestrator", "config.json"), "{not-json");
-    await fileSystem.writeFile(path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"), "# Rules\n");
-
-    const registry = new ProviderRegistry();
-    registry.register("fake", () =>
-      createProvider({
-        id: "fake",
-        kind: "cli",
-        capabilities: { agent: false, model: true, auth: false, passthrough: false },
-        onInvoke: () => undefined
-      })
-    );
-
-    const service = createProviderService(fileSystem, registry);
-    await expect(service.invokeAgent(paths, "orchestrator", { message: "hello" })).rejects.toBeInstanceOf(
-      InvalidAgentConfigError
-    );
-  });
-
-  it("throws InvalidProviderConfigError when provider config schema is invalid", async () => {
-    const root = await createTempDir("opengoat-provider-service-");
-    roots.push(root);
-
-    const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, {
-      agentId: "orchestrator",
-      providerId: "fake",
-      bootstrapFiles: ["AGENTS.md"]
-    });
-    await fileSystem.writeFile(path.join(paths.workspacesDir, "orchestrator", "AGENTS.md"), "# Rules\n");
-    await fileSystem.ensureDir(path.join(paths.providersDir, "fake"));
-    await fileSystem.writeFile(
-      path.join(paths.providersDir, "fake", "config.json"),
-      JSON.stringify({ schemaVersion: 999, providerId: "fake", env: {}, updatedAt: "2026-02-06T00:00:00.000Z" })
-    );
-
-    const registry = new ProviderRegistry();
-    registry.register("fake", () =>
-      createProvider({
-        id: "fake",
-        kind: "cli",
-        capabilities: { agent: false, model: true, auth: false, passthrough: false },
-        onInvoke: () => undefined
-      })
-    );
-
-    const service = createProviderService(fileSystem, registry);
-    await expect(service.invokeAgent(paths, "orchestrator", { message: "hello" })).rejects.toBeInstanceOf(
-      InvalidProviderConfigError
-    );
-  });
-
-  it("runs external agents in caller cwd without injecting workspace prompt", async () => {
-    const root = await createTempDir("opengoat-provider-service-");
-    roots.push(root);
-
-    const { paths, fileSystem } = await createPaths(root);
-    await fileSystem.ensureDir(path.join(paths.workspacesDir, "developer"));
-    await fileSystem.ensureDir(path.join(paths.agentsDir, "developer"));
-    await seedAgent(fileSystem, paths, {
-      agentId: "developer",
-      providerId: "ext-cli",
-      bootstrapFiles: ["AGENTS.md"]
-    });
-
-    const captured: ProviderInvokeOptions[] = [];
-    const provider = createProvider({
-      id: "ext-cli",
-      kind: "cli",
-      capabilities: { agent: true, model: true, auth: false, passthrough: false },
-      onInvoke: (options) => captured.push(options)
-    });
-
-    const registry = new ProviderRegistry();
-    registry.register("ext-cli", () => provider);
-
-    const service = createProviderService(fileSystem, registry);
-    await service.invokeAgent(paths, "developer", { message: "hello" });
-    expect(captured[0]?.cwd).toBe(process.cwd());
-    expect(captured[0]?.systemPrompt).toBeUndefined();
-
-    const requestedCwd = path.join(root, "target-project");
-    await fileSystem.ensureDir(requestedCwd);
-    await service.invokeAgent(paths, "developer", { message: "hello", cwd: requestedCwd });
-    expect(captured[1]?.cwd).toBe(requestedCwd);
-    expect(captured[1]?.systemPrompt).toBeUndefined();
-  });
-
-  it("keeps non-orchestrator HTTP agents internal by default", async () => {
-    const root = await createTempDir("opengoat-provider-service-");
-    roots.push(root);
-
-    const { paths, fileSystem } = await createPaths(root);
-    await fileSystem.ensureDir(path.join(paths.workspacesDir, "research"));
-    await fileSystem.ensureDir(path.join(paths.agentsDir, "research"));
-    await seedAgent(fileSystem, paths, {
-      agentId: "research",
-      providerId: "http-provider",
-      bootstrapFiles: ["AGENTS.md"]
-    });
-    await fileSystem.writeFile(path.join(paths.workspacesDir, "research", "AGENTS.md"), "# Research Rules\n");
-
-    const captured: ProviderInvokeOptions[] = [];
-    const provider = createProvider({
-      id: "http-provider",
-      kind: "http",
-      capabilities: { agent: false, model: true, auth: false, passthrough: false },
-      onInvoke: (options) => captured.push(options)
-    });
-
-    const registry = new ProviderRegistry();
-    registry.register("http-provider", () => provider);
-
-    const service = createProviderService(fileSystem, registry);
-    await service.invokeAgent(paths, "research", { message: "hello" });
-
-    expect(captured[0]?.cwd).toBe(path.join(paths.workspacesDir, "research"));
-    expect(captured[0]?.systemPrompt).toContain("# Project Context");
-    expect(captured[0]?.systemPrompt).toContain("## AGENTS.md");
-  });
-
-  it("creates provider-managed external agent when provider supports agentCreate", async () => {
-    const root = await createTempDir("opengoat-provider-service-");
-    roots.push(root);
-
-    const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, {
-      agentId: "research",
-      providerId: "external-provider",
-      bootstrapFiles: ["AGENTS.md"]
-    });
-
-    const captured: ProviderCreateAgentOptions[] = [];
-    const provider = createProvider({
-      id: "external-provider",
-      kind: "cli",
-      capabilities: { agent: true, model: true, auth: false, passthrough: false, agentCreate: true },
-      onInvoke: () => undefined,
-      onCreateAgent: (options) => captured.push(options)
-    });
-
-    const registry = new ProviderRegistry();
-    registry.register("external-provider", () => provider);
-
-    const service = createProviderService(fileSystem, registry);
-    const result = await service.createProviderAgent(paths, "research", {
-      displayName: "Research",
-      workspaceDir: path.join(paths.workspacesDir, "research"),
-      internalConfigDir: path.join(paths.agentsDir, "research")
-    });
-
-    expect(result.providerId).toBe("external-provider");
-    expect(result.code).toBe(0);
-    expect(captured[0]?.agentId).toBe("research");
-    expect(captured[0]?.workspaceDir).toBe(path.join(paths.workspacesDir, "research"));
-  });
-
-  it("throws when provider does not support external agent creation", async () => {
-    const root = await createTempDir("opengoat-provider-service-");
-    roots.push(root);
-
-    const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, {
-      agentId: "research",
-      providerId: "unsupported-provider",
-      bootstrapFiles: ["AGENTS.md"]
-    });
-
-    const registry = new ProviderRegistry();
-    registry.register("unsupported-provider", () =>
-      createProvider({
-        id: "unsupported-provider",
-        kind: "cli",
-        capabilities: { agent: true, model: true, auth: false, passthrough: false },
-        onInvoke: () => undefined
-      })
-    );
-
-    const service = createProviderService(fileSystem, registry);
-    await expect(
-      service.createProviderAgent(paths, "research", {
-        displayName: "Research",
-        workspaceDir: path.join(paths.workspacesDir, "research"),
-        internalConfigDir: path.join(paths.agentsDir, "research")
-      })
-    ).rejects.toThrow('Provider "unsupported-provider" does not support action "create_agent".');
-  });
-
-  it("deletes provider-managed external agent when provider supports agentDelete", async () => {
-    const root = await createTempDir("opengoat-provider-service-");
-    roots.push(root);
-
-    const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, {
-      agentId: "research",
-      providerId: "external-provider",
-      bootstrapFiles: ["AGENTS.md"]
-    });
-
-    const captured: ProviderDeleteAgentOptions[] = [];
-    const provider = createProvider({
-      id: "external-provider",
-      kind: "cli",
-      capabilities: {
-        agent: true,
-        model: true,
-        auth: false,
-        passthrough: false,
-        agentCreate: true,
-        agentDelete: true
-      },
-      onInvoke: () => undefined,
-      onDeleteAgent: (options) => captured.push(options)
-    });
-
-    const registry = new ProviderRegistry();
-    registry.register("external-provider", () => provider);
-
-    const service = createProviderService(fileSystem, registry);
-    const result = await service.deleteProviderAgent(paths, "research", {});
-
-    expect(result.providerId).toBe("external-provider");
-    expect(result.code).toBe(0);
-    expect(captured[0]?.agentId).toBe("research");
-  });
-
-  it("throws when provider does not support external agent deletion", async () => {
-    const root = await createTempDir("opengoat-provider-service-");
-    roots.push(root);
-
-    const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, {
-      agentId: "research",
-      providerId: "unsupported-provider",
-      bootstrapFiles: ["AGENTS.md"]
-    });
-
-    const registry = new ProviderRegistry();
-    registry.register("unsupported-provider", () =>
-      createProvider({
-        id: "unsupported-provider",
-        kind: "cli",
-        capabilities: { agent: true, model: true, auth: false, passthrough: false },
-        onInvoke: () => undefined
-      })
-    );
-
-    const service = createProviderService(fileSystem, registry);
-    await expect(service.deleteProviderAgent(paths, "research", {})).rejects.toThrow(
-      'Provider "unsupported-provider" does not support action "delete_agent".'
-    );
+    expect(provider.lastCreate?.agentId).toBe("developer");
+    expect(provider.lastDelete?.agentId).toBe("developer");
   });
 });
 
-function createProvider(params: {
-  id: string;
-  kind: Provider["kind"];
-  capabilities: Provider["capabilities"];
-  onInvoke: (options: ProviderInvokeOptions) => void;
-  onCreateAgent?: (options: ProviderCreateAgentOptions) => void;
-  onDeleteAgent?: (options: ProviderDeleteAgentOptions) => void;
-}): Provider {
-  return {
-    id: params.id,
-    displayName: params.id,
-    kind: params.kind,
-    capabilities: params.capabilities,
-    async invoke(options) {
-      params.onInvoke(options);
-      return {
-        code: 0,
-        stdout: "ok\n",
-        stderr: ""
-      };
-    },
-    async createAgent(options) {
-      params.onCreateAgent?.(options);
-      return {
-        code: 0,
-        stdout: "created\n",
-        stderr: ""
-      };
-    },
-    async deleteAgent(options) {
-      params.onDeleteAgent?.(options);
-      return {
-        code: 0,
-        stdout: "deleted\n",
-        stderr: ""
-      };
+function createRegistry(provider: Provider): ProviderRegistry {
+  const registry = new ProviderRegistry();
+  registry.register("openclaw", () => provider, {
+    id: "openclaw",
+    create: () => provider,
+    onboarding: {
+      env: []
     }
-  };
+  });
+  return registry;
+}
+
+function createProviderService(fileSystem: NodeFileSystem, registry: ProviderRegistry): ProviderService {
+  const pathPort = new NodePathPort();
+  return new ProviderService({
+    fileSystem,
+    pathPort,
+    providerRegistry: registry,
+    workspaceContextService: new WorkspaceContextService({ fileSystem, pathPort }),
+    skillService: new SkillService({ fileSystem, pathPort }),
+    nowIso: () => "2026-02-06T00:00:00.000Z"
+  });
 }
 
 async function createPaths(root: string): Promise<{ paths: OpenGoatPaths; fileSystem: NodeFileSystem }> {
@@ -562,56 +155,112 @@ async function createPaths(root: string): Promise<{ paths: OpenGoatPaths; fileSy
     agentsIndexJsonPath: path.join(root, "agents.json")
   };
 
+  await fileSystem.ensureDir(paths.homeDir);
   await fileSystem.ensureDir(paths.workspacesDir);
   await fileSystem.ensureDir(paths.agentsDir);
   await fileSystem.ensureDir(paths.skillsDir);
   await fileSystem.ensureDir(paths.providersDir);
   await fileSystem.ensureDir(paths.sessionsDir);
   await fileSystem.ensureDir(paths.runsDir);
-  await fileSystem.ensureDir(path.join(paths.workspacesDir, "orchestrator"));
-  await fileSystem.ensureDir(path.join(paths.agentsDir, "orchestrator"));
 
   return { paths, fileSystem };
 }
 
-async function seedAgent(
-  fileSystem: NodeFileSystem,
-  paths: OpenGoatPaths,
-  params: { agentId: string; providerId: string; bootstrapFiles: string[] }
-): Promise<void> {
-  await fileSystem.ensureDir(path.join(paths.agentsDir, params.agentId));
-  await fileSystem.ensureDir(path.join(paths.workspacesDir, params.agentId));
+async function seedAgent(fileSystem: NodeFileSystem, paths: OpenGoatPaths, agentId: string): Promise<void> {
+  await fileSystem.ensureDir(path.join(paths.workspacesDir, agentId));
+  await fileSystem.ensureDir(path.join(paths.agentsDir, agentId));
   await fileSystem.writeFile(
-    path.join(paths.agentsDir, params.agentId, "config.json"),
+    path.join(paths.workspacesDir, agentId, "AGENTS.md"),
+    [
+      "---",
+      `id: ${agentId}`,
+      "name: Goat",
+      "description: Main manager.",
+      "type: manager",
+      "reportsTo: null",
+      "discoverable: true",
+      "tags: [manager]",
+      "skills: [manager]",
+      "delegation:",
+      "  canReceive: true",
+      "  canDelegate: true",
+      "priority: 100",
+      "---",
+      "",
+      "# Goat"
+    ].join("\n")
+  );
+  await fileSystem.writeFile(
+    path.join(paths.agentsDir, agentId, "config.json"),
     JSON.stringify(
       {
-        schemaVersion: 1,
-        id: params.agentId,
-        displayName: params.agentId,
-        provider: {
-          id: params.providerId
-        },
+        displayName: "Goat",
         prompt: {
-          bootstrapFiles: params.bootstrapFiles
+          bootstrapFiles: ["AGENTS.md"]
         },
         runtime: {
-          bootstrapMaxChars: 1000
+          skills: {
+            enabled: true,
+            includeManaged: true,
+            assigned: []
+          }
         }
       },
       null,
       2
-    ) + "\n"
+    )
   );
 }
 
-function createProviderService(fileSystem: NodeFileSystem, registry: ProviderRegistry): ProviderService {
-  const pathPort = new NodePathPort();
-  return new ProviderService({
-    fileSystem,
-    pathPort,
-    providerRegistry: registry,
-    workspaceContextService: new WorkspaceContextService({ fileSystem, pathPort }),
-    skillService: new SkillService({ fileSystem, pathPort }),
-    nowIso: () => "2026-02-06T00:00:00.000Z"
-  });
+class FakeOpenClawProvider implements Provider {
+  public readonly id = "openclaw";
+  public readonly displayName = "OpenClaw";
+  public readonly kind = "cli" as const;
+  public readonly capabilities = {
+    agent: true,
+    model: true,
+    auth: true,
+    passthrough: true,
+    agentCreate: true,
+    agentDelete: true
+  };
+
+  public lastInvoke?: ProviderInvokeOptions;
+  public lastCreate?: ProviderCreateAgentOptions;
+  public lastDelete?: ProviderDeleteAgentOptions;
+
+  public async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
+    this.lastInvoke = options;
+    return {
+      code: 0,
+      stdout: "ok\n",
+      stderr: ""
+    };
+  }
+
+  public async invokeAuth(): Promise<ProviderExecutionResult> {
+    return {
+      code: 0,
+      stdout: "auth\n",
+      stderr: ""
+    };
+  }
+
+  public async createAgent(options: ProviderCreateAgentOptions): Promise<ProviderExecutionResult> {
+    this.lastCreate = options;
+    return {
+      code: 0,
+      stdout: "created\n",
+      stderr: ""
+    };
+  }
+
+  public async deleteAgent(options: ProviderDeleteAgentOptions): Promise<ProviderExecutionResult> {
+    this.lastDelete = options;
+    return {
+      code: 0,
+      stdout: "deleted\n",
+      stderr: ""
+    };
+  }
 }

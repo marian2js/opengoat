@@ -31,14 +31,14 @@ describe("openclaw provider", () => {
     expect(defaultInvocation.args).toEqual(["onboard"]);
 
     const passthroughInvocation = provider.buildAuthInvocation({
-      passthroughArgs: ["--provider", "openai-codex"],
+      passthroughArgs: ["--provider", "goat-model"],
     });
     expect(passthroughInvocation.args).toEqual([
       "models",
       "auth",
       "login",
       "--provider",
-      "openai-codex",
+      "goat-model",
     ]);
   });
 
@@ -90,7 +90,7 @@ describe("openclaw provider", () => {
       workspaceDir: "/tmp/workspaces/research-analyst",
       internalConfigDir: "/tmp/agents/research-analyst",
       env: {
-        OPENGOAT_OPENCLAW_MODEL: "openai-codex",
+        OPENGOAT_OPENCLAW_MODEL: "goat-model",
       },
     });
 
@@ -104,7 +104,7 @@ describe("openclaw provider", () => {
       "/tmp/agents/research-analyst",
       "--non-interactive",
       "--model",
-      "openai-codex",
+      "goat-model",
     ]);
   });
 

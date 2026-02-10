@@ -37,29 +37,22 @@ describe("AgentService", () => {
     const { service, paths } = await createAgentServiceWithPaths();
 
     const result = await service.ensureAgent(paths, {
-      id: "orchestrator",
-      displayName: "Orchestrator"
+      id: "goat",
+      displayName: "Goat"
     });
 
-    expect(result.agent.workspaceDir).toBe(path.join(paths.workspacesDir, "orchestrator"));
+    expect(result.agent.workspaceDir).toBe(path.join(paths.workspacesDir, "goat"));
     expect(result.createdPaths.length).toBeGreaterThan(0);
 
     const agentsMd = await readFile(path.join(result.agent.workspaceDir, "AGENTS.md"), "utf-8");
-    expect(agentsMd).toContain("# Orchestrator (OpenGoat Agent)");
+    expect(agentsMd).toContain("# Goat (OpenGoat Agent)");
     expect(await readFile(path.join(result.agent.workspaceDir, "SOUL.md"), "utf-8")).toContain("# Soul");
     expect(await readFile(path.join(result.agent.workspaceDir, "IDENTITY.md"), "utf-8")).toContain(
-      "- id: orchestrator"
+      "- id: goat"
     );
     expect(await readFile(path.join(result.agent.workspaceDir, "BOOTSTRAP.md"), "utf-8")).toContain(
       "First-run checklist"
     );
-    const defaultSkill = await readFile(
-      path.join(result.agent.workspaceDir, "skills", "opengoat-skill", "SKILL.md"),
-      "utf-8"
-    );
-    expect(defaultSkill).toContain("name: OpenGoat Skill");
-    expect(defaultSkill).toContain("opengoat onboard");
-
     const internalState = JSON.parse(
       await readFile(path.join(result.agent.internalConfigDir, "state.json"), "utf-8")
     ) as { status: string };
@@ -68,7 +61,7 @@ describe("AgentService", () => {
     const index = JSON.parse(await readFile(paths.agentsIndexJsonPath, "utf-8")) as {
       agents: string[];
     };
-    expect(index.agents).toEqual(["orchestrator"]);
+    expect(index.agents).toEqual(["goat"]);
   });
 
   it("does not seed orchestrator default skill for non-default agents", async () => {
@@ -91,7 +84,7 @@ describe("AgentService", () => {
       JSON.stringify(
         {
           schemaVersion: 1,
-          defaultAgent: "orchestrator",
+          defaultAgent: "goat",
           createdAt: "2026-02-01T00:00:00.000Z",
           updatedAt: "2026-02-01T00:00:00.000Z"
         },
@@ -111,7 +104,7 @@ describe("AgentService", () => {
       updatedAt: string;
     };
 
-    expect(config.defaultAgent).toBe("orchestrator");
+    expect(config.defaultAgent).toBe("goat");
     expect(config.createdAt).toBe("2026-02-01T00:00:00.000Z");
     expect(config.updatedAt).toBe("2026-02-01T00:00:00.000Z");
   });
@@ -164,12 +157,12 @@ describe("AgentService", () => {
   it("is idempotent and does not overwrite existing AGENTS.md", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
 
-    await service.ensureAgent(paths, { id: "orchestrator", displayName: "Orchestrator" });
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
-    const agentsMdPath = path.join(paths.workspacesDir, "orchestrator", "AGENTS.md");
+    const agentsMdPath = path.join(paths.workspacesDir, "goat", "AGENTS.md");
     await fileSystem.writeFile(agentsMdPath, "# Custom\n");
 
-    const second = await service.ensureAgent(paths, { id: "orchestrator", displayName: "Orchestrator" });
+    const second = await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
     expect(second.createdPaths).toEqual([]);
     expect(second.skippedPaths.length).toBeGreaterThan(0);
@@ -179,12 +172,12 @@ describe("AgentService", () => {
   it("does not recreate BOOTSTRAP.md when workspace is already established", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
 
-    const workspaceDir = path.join(paths.workspacesDir, "orchestrator");
+    const workspaceDir = path.join(paths.workspacesDir, "goat");
     await fileSystem.ensureDir(workspaceDir);
     await fileSystem.writeFile(path.join(workspaceDir, "AGENTS.md"), "# Existing\n");
     await fileSystem.writeFile(path.join(workspaceDir, "CONTEXT.md"), "# Existing context\n");
 
-    await service.ensureAgent(paths, { id: "orchestrator", displayName: "Orchestrator" });
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
     const bootstrapPath = path.join(workspaceDir, "BOOTSTRAP.md");
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
@@ -206,12 +199,12 @@ describe("AgentService", () => {
     expect(await fileSystem.exists(path.join(paths.agentsDir, "developer"))).toBe(false);
   });
 
-  it("prevents deleting orchestrator", async () => {
+  it("prevents deleting goat", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "orchestrator", displayName: "Orchestrator" });
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
-    await expect(service.removeAgent(paths, "orchestrator")).rejects.toThrow(
-      "Cannot delete orchestrator"
+    await expect(service.removeAgent(paths, "goat")).rejects.toThrow(
+      "Cannot delete goat"
     );
   });
 });

@@ -1,113 +1,67 @@
 # OpenGoat ACP Integration
 
-This document explains OpenGoat's Agent Client Protocol (ACP) integration.
+This document explains OpenGoat Agent Client Protocol (ACP) support.
 
 ## What ACP Is
 
-ACP is a protocol for connecting an AI coding agent to a client (typically an editor/IDE) over JSON-RPC.
+ACP is a protocol for connecting an AI agent runtime to clients (editors/IDEs) over JSON-RPC.
 
-- Client side: editor/IDE
-- Agent side: OpenGoat
-- Transport: stdio stream (NDJSON framing)
+- client side: editor/IDE
+- agent side: OpenGoat
+- transport: stdio NDJSON framing
 
 Reference: [Agent Client Protocol](https://agentclientprotocol.com/get-started/introduction)
 
-## Why ACP Matters for OpenGoat
+## OpenGoat Context
 
-OpenGoat is an orchestrator that can route work across multiple agents and providers. ACP gives it:
+OpenGoat remains a manager runtime with ACP surface, now OpenClaw-first:
 
-- a standard integration point for external clients
-- reusable session semantics (`new`, `load`, `list`, `resume`)
-- consistent cancel/prompt behavior across tools
-- less custom glue code per editor integration
+- default entry agent is `goat`
+- agent execution runtime is OpenClaw
+- direct agent invocation + session semantics are preserved
 
-## Implementation Overview
+ACP gives OpenGoat a stable integration contract for external tooling without custom editor-specific glue.
 
-### Core
+## Implementation
 
-- ACP adapter:
-  - `./packages/core/src/core/acp/application/acp-agent.ts`
-- ACP session store:
-  - `./packages/core/src/core/acp/application/session-store.ts`
-- ACP metadata parsing:
-  - `./packages/core/src/core/acp/domain/meta.ts`
+Core:
 
-### Transport
+- `packages/core/src/core/acp/application/acp-agent.ts`
+- `packages/core/src/core/acp/application/session-store.ts`
+- `packages/core/src/core/acp/domain/meta.ts`
 
-- Node stdio server wiring:
-  - `./packages/core/src/platform/node/acp-server.ts`
+Node transport:
 
-### CLI
+- `packages/core/src/platform/node/acp-server.ts`
 
-- ACP entry command:
-  - `./packages/cli/src/cli/commands/acp.command.ts`
+CLI command:
 
-## Supported Protocol Flow
+- `packages/cli/src/cli/commands/acp.command.ts`
 
-### `initialize`
+## Supported Flows
 
-Advertises:
+- `initialize`
+- `session/new`
+- `session/load`
+- `session/resume`
+- `session/list`
+- `session/prompt`
+- `session/cancel`
 
-- `loadSession` capability
-- `session.list` and `session.resume` capabilities
-- prompt capabilities for text/resource/image content
+`session/prompt` maps into `OpenGoatService.runAgent(...)` and streams assistant updates back through ACP session events.
 
-### `session/new`
+## OpenGoat `_meta` Aliases
 
-Creates an ACP session mapped to:
-
-- target OpenGoat agent
-- OpenGoat session reference key
-- working directory context
-
-Returns session mode state where available modes are mapped from OpenGoat agents.
-
-### `session/load` and `session/resume`
-
-- Re-associates an ACP session with an OpenGoat session reference.
-- `load` replays recent session history as ACP session updates.
-- `resume` reconnects without replay.
-
-### `session/list`
-
-Lists OpenGoat sessions for the selected/default agent and exposes ACP session info objects.
-
-### `session/prompt`
-
-Extracts text/resource content from ACP prompt blocks and executes:
-
-- `OpenGoatService.runAgent(...)`
-
-with mapped ACP session metadata:
-
-- `agentId`
-- `sessionKey`
-- `forceNewSession`
-- `disableSession`
-
-Emits assistant output via `session/update` (`agent_message_chunk`) and returns ACP stop reason.
-
-### `session/cancel`
-
-Supports protocol-level cancellation:
-
-- active prompt is marked cancelled
-- prompt request resolves with `stopReason: "cancelled"`
-
-## OpenGoat-Specific `_meta` Keys
-
-The ACP adapter accepts the following aliases in request `_meta`:
+Accepted aliases in request `_meta`:
 
 - agent selection: `agentId`, `agent`, `targetAgent`
 - session key/ref: `sessionKey`, `sessionRef`, `session`
 - force new session: `forceNewSession`, `newSession`
 - disable session: `disableSession`, `noSession`
 
-## Running
+## Run
 
 ```bash
 ./bin/opengoat acp --help
-./bin/opengoat acp --agent orchestrator --verbose
+./bin/opengoat acp --agent goat --verbose
 ```
-
-Use stdio from an ACP-capable client/editor to connect.

@@ -9,7 +9,6 @@ export interface AgentRunRequest {
   sessionRef?: string;
   forceNewSession?: boolean;
   disableSession?: boolean;
-  directAgentSession?: boolean;
   passthroughArgs: string[];
   stream: boolean;
 }
@@ -30,7 +29,6 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
       sessionRef: request.sessionRef,
       forceNewSession: request.forceNewSession,
       disableSession: request.disableSession,
-      directAgentSession: request.directAgentSession,
       passthroughArgs: request.passthroughArgs,
       env: process.env,
       onStdout: request.stream
@@ -84,7 +82,7 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
       context.stderr.write(stderr);
     }
   } else {
-    // HTTP/API providers often return final stdout/stderr without streaming callbacks.
+    // Some runtimes return final stdout/stderr without streaming callbacks.
     if (!sawStdoutChunk && result.stdout) {
       context.stdout.write(result.stdout);
     }
@@ -94,7 +92,7 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
   }
 
   if (result.code !== 0) {
-    context.stderr.write(`Provider run failed for ${result.agentId} (${result.providerId}).\n`);
+    context.stderr.write(`Runtime run failed for ${result.agentId} (${result.providerId}).\n`);
     return result.code;
   }
 
