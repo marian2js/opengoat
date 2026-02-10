@@ -126,6 +126,9 @@ opengoat agent create "Developer" --individual --reports-to goat --skill coding 
 # create a manager
 opengoat agent create "Team Lead" --manager --reports-to goat --skill manager
 
+# if --reports-to is omitted, new agents default to goat
+opengoat agent create "QA Engineer" --individual
+
 # delete agent (also synced to OpenClaw)
 opengoat agent delete developer
 opengoat agent delete developer --force

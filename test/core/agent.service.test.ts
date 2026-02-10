@@ -64,6 +64,46 @@ describe("AgentService", () => {
     expect(index.agents).toEqual(["goat"]);
   });
 
+  it("defaults non-goat reportsTo to goat when omitted", async () => {
+    const { service, paths } = await createAgentServiceWithPaths();
+
+    const result = await service.ensureAgent(paths, {
+      id: "developer",
+      displayName: "Developer"
+    });
+
+    const agentsMd = await readFile(path.join(result.agent.workspaceDir, "AGENTS.md"), "utf-8");
+    expect(agentsMd).toContain("reportsTo: goat");
+
+    const config = JSON.parse(await readFile(path.join(result.agent.internalConfigDir, "config.json"), "utf-8")) as {
+      organization?: { reportsTo?: string | null };
+    };
+    expect(config.organization?.reportsTo).toBe("goat");
+  });
+
+  it("supports explicit reportsTo manager when creating an agent", async () => {
+    const { service, paths } = await createAgentServiceWithPaths();
+
+    const result = await service.ensureAgent(
+      paths,
+      {
+        id: "engineer",
+        displayName: "Engineer"
+      },
+      {
+        reportsTo: "CTO"
+      }
+    );
+
+    const agentsMd = await readFile(path.join(result.agent.workspaceDir, "AGENTS.md"), "utf-8");
+    expect(agentsMd).toContain("reportsTo: cto");
+
+    const config = JSON.parse(await readFile(path.join(result.agent.internalConfigDir, "config.json"), "utf-8")) as {
+      organization?: { reportsTo?: string | null };
+    };
+    expect(config.organization?.reportsTo).toBe("cto");
+  });
+
   it("does not seed orchestrator default skill for non-default agents", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
 

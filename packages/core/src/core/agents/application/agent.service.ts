@@ -4,7 +4,7 @@ import type {
   AgentDescriptor,
   AgentIdentity
 } from "../../domain/agent.js";
-import { isDefaultAgentId, normalizeAgentId } from "../../domain/agent-id.js";
+import { DEFAULT_AGENT_ID, isDefaultAgentId, normalizeAgentId } from "../../domain/agent-id.js";
 import type { AgentsIndex, OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
@@ -148,9 +148,7 @@ export class AgentService {
       if (resolvedType) {
         internalConfig.organization.type = resolvedType;
       }
-      if (options.reportsTo !== undefined) {
-        internalConfig.organization.reportsTo = options.reportsTo;
-      }
+      internalConfig.organization.reportsTo = templateOptions.reportsTo;
     }
     if (internalConfig.runtime?.skills) {
       internalConfig.runtime.skills.assigned = templateOptions.skills;
@@ -348,12 +346,30 @@ export class AgentService {
 
 function toAgentTemplateOptions(agentId: string, options: EnsureAgentOptions): AgentTemplateOptions {
   const type = options.type ?? (isDefaultAgentId(agentId) ? "manager" : "individual");
+  const reportsTo = resolveReportsTo(agentId, options.reportsTo);
   const skills = dedupe(options.skills ?? (type === "manager" ? ["manager"] : []));
   return {
     type,
-    reportsTo: options.reportsTo,
+    reportsTo,
     skills
   };
+}
+
+function resolveReportsTo(agentId: string, reportsTo: string | null | undefined): string | null {
+  if (isDefaultAgentId(agentId)) {
+    return null;
+  }
+
+  if (reportsTo === null || reportsTo === undefined) {
+    return DEFAULT_AGENT_ID;
+  }
+
+  const normalized = normalizeAgentId(reportsTo);
+  if (!normalized || normalized === agentId) {
+    return DEFAULT_AGENT_ID;
+  }
+
+  return normalized;
 }
 
 function dedupe(values: string[]): string[] {
