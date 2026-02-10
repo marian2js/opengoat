@@ -4,16 +4,14 @@ import { CommandRouter } from "../../packages/cli/src/cli/framework/router.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
 describe("CommandRouter", () => {
-  it("routes empty argv to init command", async () => {
+  it("prints help for empty argv", async () => {
     const stdout = createStreamCapture();
     const stderr = createStreamCapture();
 
-    let called = false;
     const init: CliCommand = {
       path: ["init"],
       description: "init",
-      async run() {
-        called = true;
+      async run(_args, _context) {
         return 0;
       }
     };
@@ -26,7 +24,8 @@ describe("CommandRouter", () => {
 
     const code = await router.dispatch([]);
     expect(code).toBe(0);
-    expect(called).toBe(true);
+    expect(stdout.output()).toContain("OpenGoat CLI");
+    expect(stdout.output()).toContain("Commands:");
   });
 
   it("prints help and returns 0 for help commands", async () => {

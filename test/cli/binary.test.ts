@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +20,26 @@ afterEach(async () => {
 });
 
 describe("opengoat binary", () => {
+  it("shows help and does not bootstrap when no args are provided", async () => {
+    const root = await createTempDir("opengoat-bin-");
+    roots.push(root);
+
+    const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const binaryPath = path.join(projectRoot, "bin", "opengoat");
+
+    const { stdout } = await execFileAsync(binaryPath, [], {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        OPENGOAT_HOME: root
+      }
+    });
+
+    expect(stdout).toContain("OpenGoat CLI");
+
+    await expect(access(path.join(root, "config.json"), constants.F_OK)).rejects.toBeTruthy();
+  });
+
   it("runs onboard on a fresh home and bootstraps config files", async () => {
     const root = await createTempDir("opengoat-bin-");
     roots.push(root);

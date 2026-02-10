@@ -11,11 +11,8 @@ export class CommandRouter {
 
   public async dispatch(argv: string[]): Promise<number> {
     if (argv.length === 0) {
-      const initCommand = this.commands.find((command) => command.path.join(" ") === "init");
-      if (!initCommand) {
-        throw new Error("Missing default init command.");
-      }
-      return initCommand.run([], this.context);
+      this.printHelp();
+      return 0;
     }
 
     if (argv[0] === "help" || argv[0] === "--help" || argv[0] === "-h") {

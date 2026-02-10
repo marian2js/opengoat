@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCli } from "../../packages/cli/src/cli/cli.js";
@@ -23,6 +24,17 @@ afterEach(async () => {
 });
 
 describe("runCli", () => {
+  it("shows help and does not bootstrap when no args are provided", async () => {
+    const root = await createTempDir("opengoat-runcli-");
+    roots.push(root);
+    process.env.OPENGOAT_HOME = root;
+
+    const code = await runCli([]);
+
+    expect(code).toBe(0);
+    await expect(access(path.join(root, "config.json"), constants.F_OK)).rejects.toBeTruthy();
+  });
+
   it("bootstraps through CLI onboard command on a fresh home", async () => {
     const root = await createTempDir("opengoat-runcli-");
     roots.push(root);
