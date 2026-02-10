@@ -5,7 +5,6 @@ import {
   Background,
   Controls,
   Handle,
-  MiniMap,
   Position,
   ReactFlow,
   type Edge,
@@ -478,7 +477,7 @@ export function App(): ReactElement {
                       })}
                     </div>
 
-                    <OrganizationChartPanel agents={agents} />
+                    {agents.length >= 2 ? <OrganizationChartPanel agents={agents} /> : null}
                   </>
                 ) : null}
 
@@ -527,7 +526,11 @@ export function App(): ReactElement {
                             <p className="text-xs text-muted-foreground">You can only assign existing agents as manager.</p>
                           </div>
 
-                          <Button className="w-full" disabled={isMutating || agents.length === 0} type="submit">
+                          <Button
+                            className="w-full"
+                            disabled={isMutating || agents.length === 0 || !createForm.name.trim()}
+                            type="submit"
+                          >
                             Create Agent
                           </Button>
                         </form>
@@ -761,16 +764,6 @@ function OrganizationChartPanel({ agents }: { agents: Agent[] }): ReactElement {
             >
               <Background color="hsl(var(--border))" gap={20} size={1} />
               <Controls showInteractive={false} position="bottom-left" />
-              <MiniMap
-                zoomable
-                pannable
-                position="bottom-right"
-                nodeColor={(node) => {
-                  const data = node.data as unknown as OrgNodeData;
-                  return data.type === "manager" ? "#334155" : "#1f2937";
-                }}
-                className="!border !border-border !bg-card"
-              />
             </ReactFlow>
           </div>
         )}
