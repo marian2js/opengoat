@@ -179,6 +179,23 @@ opengoat scenario run --file ./scenario.json --mode live
 opengoat acp
 ```
 
+## Optional Gateway (Remote Control)
+
+OpenGoat Gateway is optional and separate from OpenClaw runtime gateway connectivity.
+
+See `docs/gateway.md`.
+
+## Optional UI Extension
+
+OpenGoat remains CLI-first. A separate optional extension package is available:
+
+- `packages/ui` - React/Vite + Fastify management UI (single port, default `19123`)
+
+Run it locally:
+
+```bash
+pnpm --filter @opengoat/ui dev
+```
 ## Architecture Snapshot
 
 ```
@@ -190,6 +207,10 @@ packages/
 │       └── apps/runtime/ # shared runtime factory
 ├── cli/
 │   └── src/cli/
+└── ui/
+    └── src/
+        ├── server/       # Fastify API + single-port Vite/static hosting
+        └── client/       # React UI (shadcn-style components)
 ```
 
 ## Breaking Changes From Legacy Model
