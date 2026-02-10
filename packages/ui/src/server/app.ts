@@ -3,6 +3,8 @@ import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import cors from "@fastify/cors";
 import middie from "@fastify/middie";
@@ -11,6 +13,7 @@ import { createServer as createViteServer } from "vite";
 import { createOpenGoatRuntime } from "@opengoat/core";
 
 const DEFAULT_AGENT_ID = "goat";
+const execFileAsync = promisify(execFile);
 
 interface AgentDescriptor {
   id: string;
@@ -267,6 +270,15 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   });
 
+  app.post("/api/projects/pick", async (_request, reply) => {
+    return safeReply(reply, async () => {
+      const project = await pickProjectFolderFromSystem();
+      return {
+        project
+      };
+    });
+  });
+
 }
 
 interface FrontendOptions {
@@ -480,6 +492,32 @@ function normalizeProjectSegment(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return normalized || "project";
+}
+
+async function pickProjectFolderFromSystem(): Promise<{ name: string; path: string }> {
+  if (process.platform === "darwin") {
+    const script = 'POSIX path of (choose folder with prompt "Select a project folder")';
+    const { stdout } = await execFileAsync("osascript", ["-e", script], {
+      timeout: 120_000
+    });
+    const selectedPath = stdout.trim().replace(/[\\/]+$/, "");
+    if (!selectedPath) {
+      throw new Error("No folder was selected.");
+    }
+    const resolvedPath = path.resolve(selectedPath);
+    const stats = await stat(resolvedPath).catch(() => {
+      return null;
+    });
+    if (!stats || !stats.isDirectory()) {
+      throw new Error(`Selected folder is not accessible: ${resolvedPath}`);
+    }
+    return {
+      name: path.basename(resolvedPath),
+      path: resolvedPath
+    };
+  }
+
+  throw new Error("Native folder picker is currently supported on macOS only.");
 }
 
 async function resolveOrganizationAgents(service: OpenClawUiService): Promise<OrganizationAgent[]> {

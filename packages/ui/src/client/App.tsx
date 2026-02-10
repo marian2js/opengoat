@@ -119,9 +119,11 @@ interface CreateProjectResponse {
   message?: string;
 }
 
-interface ProjectSelection {
-  folderName: string;
-  folderPath: string;
+interface PickProjectResponse {
+  project: {
+    name: string;
+    path: string;
+  };
 }
 
 interface CreateAgentForm {
@@ -406,15 +408,14 @@ export function App(): ReactElement {
   }
 
   async function handleAddProject(): Promise<void> {
-    const selectedProject = await pickProjectFolder();
-    if (!selectedProject) {
-      return;
-    }
-
     setMutating(true);
     setActionMessage(null);
 
     try {
+      const picked = await fetchJson<PickProjectResponse>("/api/projects/pick", {
+        method: "POST"
+      });
+
       const response = await fetchJson<CreateProjectResponse>("/api/projects", {
         method: "POST",
         headers: {
@@ -422,8 +423,8 @@ export function App(): ReactElement {
         },
         body: JSON.stringify({
           agentId: "goat",
-          folderName: selectedProject.folderName,
-          folderPath: selectedProject.folderPath
+          folderName: picked.project.name,
+          folderPath: picked.project.path
         })
       });
 
@@ -1174,86 +1175,6 @@ function normalizeReportsTo(value: string | null | undefined): string | null {
     return null;
   }
   return normalized;
-}
-
-async function pickProjectFolder(): Promise<ProjectSelection | null> {
-  const pickerWindow = window as Window & {
-    showDirectoryPicker?: (options?: {
-      mode?: "read" | "readwrite";
-      startIn?: "desktop" | "documents" | "downloads" | "music" | "pictures" | "videos";
-    }) => Promise<{ name?: string; path?: string; fullPath?: string; nativePath?: string }>;
-  };
-
-  if (typeof pickerWindow.showDirectoryPicker === "function") {
-    try {
-      const selected = await pickerWindow.showDirectoryPicker({
-        mode: "read",
-        startIn: "desktop"
-      });
-      const folderName = selected.name?.trim();
-      if (!folderName) {
-        return null;
-      }
-
-      const discoveredPath = extractDirectoryPath(selected);
-      if (discoveredPath) {
-        return {
-          folderName,
-          folderPath: discoveredPath
-        };
-      }
-
-      const promptPath = window.prompt(
-        `Selected \"${folderName}\". Enter the full folder path (for example /Users/you/workspace/${folderName}):`
-      );
-      const folderPath = promptPath?.trim();
-      if (!folderPath) {
-        return null;
-      }
-
-      return {
-        folderName,
-        folderPath
-      };
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return null;
-      }
-      throw error;
-    }
-  }
-
-  const pathInput = window.prompt("Enter the full project folder path (for example /Users/you/workspace/my-project):");
-  const folderPath = pathInput?.trim();
-  if (!folderPath) {
-    return null;
-  }
-
-  const normalizedPath = folderPath.replace(/[\\/]+$/, "");
-  const parts = normalizedPath.split(/[\\/]/).filter(Boolean);
-  const folderName = parts.at(-1)?.trim() || "project";
-  return {
-    folderName,
-    folderPath
-  };
-}
-
-function extractDirectoryPath(
-  value: { path?: string; fullPath?: string; nativePath?: string } | null | undefined
-): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const candidates = [value.path, value.fullPath, value.nativePath];
-  for (const candidate of candidates) {
-    const trimmed = candidate?.trim();
-    if (trimmed) {
-      return trimmed;
-    }
-  }
-
-  return null;
 }
 
 async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
