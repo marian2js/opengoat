@@ -86,6 +86,10 @@ export interface OpenClawUiService {
     agentId?: string,
     options?: { sessionRef?: string; workingPath?: string; forceNew?: boolean }
   ) => Promise<SessionRunInfo>;
+  runAgent?: (
+    agentId: string,
+    options: { message: string; sessionRef?: string; cwd?: string }
+  ) => Promise<AgentRunResult>;
   renameSession?: (agentId?: string, title?: string, sessionRef?: string) => Promise<SessionSummary>;
   removeSession?: (agentId?: string, sessionRef?: string) => Promise<SessionRemoveResult>;
 }
@@ -110,6 +114,21 @@ interface SessionRemoveResult {
   sessionId: string;
   title: string;
   transcriptPath: string;
+}
+
+interface AgentRunResult {
+  code: number;
+  stdout: string;
+  stderr: string;
+  providerId: string;
+  providerSessionId?: string;
+  session?: SessionRunInfo & {
+    preRunCompactionApplied: boolean;
+    postRunCompaction: {
+      compactedMessages: number;
+      summary?: string;
+    };
+  };
 }
 
 export interface OpenGoatUiServerOptions {
@@ -401,6 +420,52 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   });
 
+  app.post<{ Body: { agentId?: string; sessionRef?: string; workingPath?: string; message?: string } }>(
+    "/api/sessions/message",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
+        const sessionRef = request.body?.sessionRef?.trim();
+        const message = request.body?.message?.trim();
+        const workingPath = request.body?.workingPath?.trim();
+
+        if (!sessionRef) {
+          reply.code(400);
+          return {
+            error: "sessionRef is required"
+          };
+        }
+
+        if (!message) {
+          reply.code(400);
+          return {
+            error: "message is required"
+          };
+        }
+
+        const result = await runUiSessionMessage(service, agentId, {
+          sessionRef,
+          workingPath,
+          message
+        });
+
+        const output = result.stdout.trim() || result.stderr.trim();
+
+        return {
+          agentId,
+          sessionRef,
+          output,
+          result: {
+            code: result.code,
+            stdout: result.stdout,
+            stderr: result.stderr
+          },
+          message: result.code === 0 ? "Message sent." : "Message completed with non-zero exit code."
+        };
+      });
+    }
+  );
+
 }
 
 interface FrontendOptions {
@@ -586,6 +651,26 @@ async function removeUiSession(
   }
 
   throw new Error("Session removal is unavailable on this runtime.");
+}
+
+async function runUiSessionMessage(
+  service: OpenClawUiService,
+  agentId: string,
+  options: {
+    sessionRef: string;
+    workingPath?: string;
+    message: string;
+  }
+): Promise<AgentRunResult> {
+  if (typeof service.runAgent === "function") {
+    return service.runAgent(agentId, {
+      message: options.message,
+      sessionRef: options.sessionRef,
+      cwd: options.workingPath
+    });
+  }
+
+  throw new Error("Session messaging is unavailable on this runtime.");
 }
 
 async function resolveProjectFolder(

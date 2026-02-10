@@ -1,3 +1,4 @@
+import type { ChatStatus } from "ai";
 import type { ComponentType, FormEvent, ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dagre from "@dagrejs/dagre";
@@ -22,12 +23,16 @@ import {
   FolderPlus,
   Home,
   MoreHorizontal,
+  MessageSquare,
   Plus,
   RefreshCw,
   Sparkles,
   UsersRound,
   X
 } from "lucide-react";
+import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from "@/components/ai-elements/conversation";
+import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import { PromptInput, PromptInputBody, PromptInputFooter, type PromptInputMessage, PromptInputSubmit, PromptInputTextarea } from "@/components/ai-elements/prompt-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -188,6 +193,24 @@ interface SessionRemoveResponse {
   message?: string;
 }
 
+interface SessionSendMessageResponse {
+  agentId: string;
+  sessionRef: string;
+  output: string;
+  result: {
+    code: number;
+    stdout: string;
+    stderr: string;
+  };
+  message?: string;
+}
+
+interface SessionChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
+
 interface CreateAgentForm {
   name: string;
   reportsTo: string;
@@ -256,6 +279,8 @@ export function App(): ReactElement {
   const [openWorkspaceMenuId, setOpenWorkspaceMenuId] = useState<string | null>(null);
   const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(null);
   const [collapsedWorkspaceIds, setCollapsedWorkspaceIds] = useState<Set<string>>(() => new Set());
+  const [sessionChatStatus, setSessionChatStatus] = useState<ChatStatus>("ready");
+  const [sessionMessagesById, setSessionMessagesById] = useState<Record<string, SessionChatMessage[]>>({});
 
   const navigateToRoute = useCallback((nextRoute: AppRoute) => {
     const nextPath = routeToPath(nextRoute);
@@ -306,6 +331,10 @@ export function App(): ReactElement {
     if (window.location.pathname !== canonicalPath) {
       window.history.replaceState({}, "", canonicalPath);
     }
+  }, [route]);
+
+  useEffect(() => {
+    setSessionChatStatus("ready");
   }, [route]);
 
   const loadData = useCallback(async () => {
@@ -396,6 +425,12 @@ export function App(): ReactElement {
     }
     return sessions.find((session) => session.sessionId === route.sessionId) ?? null;
   }, [route, sessions]);
+  const sessionMessages = useMemo(() => {
+    if (!selectedSession) {
+      return [];
+    }
+    return sessionMessagesById[selectedSession.sessionId] ?? [];
+  }, [selectedSession, sessionMessagesById]);
   const projects = useMemo<Project[]>(() => {
     return sessions
       .filter((session) => session.sessionKey.startsWith("project:") && typeof session.workingPath === "string")
@@ -747,6 +782,67 @@ export function App(): ReactElement {
       setActionMessage(message);
     } finally {
       setMutating(false);
+    }
+  }
+
+  function appendSessionMessage(sessionId: string, message: SessionChatMessage): void {
+    setSessionMessagesById((current) => {
+      const next = current[sessionId] ? [...current[sessionId], message] : [message];
+      return {
+        ...current,
+        [sessionId]: next
+      };
+    });
+  }
+
+  async function handleSessionPromptSubmit(promptMessage: PromptInputMessage): Promise<void> {
+    if (!selectedSession) {
+      return;
+    }
+
+    const text = promptMessage.text.trim();
+    if (!text) {
+      return;
+    }
+
+    const sessionId = selectedSession.sessionId;
+    appendSessionMessage(sessionId, {
+      id: `${sessionId}:user:${Date.now()}`,
+      role: "user",
+      content: text
+    });
+    setSessionChatStatus("streaming");
+    setActionMessage(null);
+
+    try {
+      const response = await fetchJson<SessionSendMessageResponse>("/api/sessions/message", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          agentId: "goat",
+          sessionRef: selectedSession.sessionKey,
+          workingPath: selectedSession.workingPath,
+          message: text
+        })
+      });
+
+      const assistantReply = response.output.trim() || "No output was returned.";
+      appendSessionMessage(sessionId, {
+        id: `${sessionId}:assistant:${Date.now()}`,
+        role: "assistant",
+        content: assistantReply
+      });
+      setSessionChatStatus(response.result.code === 0 ? "ready" : "error");
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "Unable to send session message.";
+      appendSessionMessage(sessionId, {
+        id: `${sessionId}:assistant-error:${Date.now()}`,
+        role: "assistant",
+        content: message
+      });
+      setSessionChatStatus("error");
     }
   }
 
@@ -1218,15 +1314,53 @@ export function App(): ReactElement {
                       <CardTitle>{selectedSession?.title ?? "Session Not Found"}</CardTitle>
                       <CardDescription>
                         {selectedSession
-                          ? "Session detail placeholder. Chat view will be wired next."
+                          ? "Send messages directly into this session."
                           : `No saved session was found for id ${route.sessionId}.`}
                       </CardDescription>
                     </CardHeader>
                     {selectedSession ? (
-                      <CardContent className="space-y-2 text-sm text-muted-foreground">
-                        <p>Session ID: {selectedSession.sessionId}</p>
-                        <p>Key: {selectedSession.sessionKey}</p>
-                        <p>Updated: {new Date(selectedSession.updatedAt).toLocaleString()}</p>
+                      <CardContent className="space-y-4">
+                        <div className="rounded-lg border border-border/70 bg-background/30 p-2">
+                          <Conversation className="h-[440px]">
+                            <ConversationContent className="gap-4 p-3">
+                              {sessionMessages.length === 0 ? (
+                                <ConversationEmptyState
+                                  icon={<MessageSquare className="size-10" />}
+                                  title="Start this session"
+                                  description="Send your first message below."
+                                />
+                              ) : (
+                                sessionMessages.map((message) => (
+                                  <Message from={message.role} key={message.id}>
+                                    <MessageContent>
+                                      <MessageResponse>{message.content}</MessageResponse>
+                                    </MessageContent>
+                                  </Message>
+                                ))
+                              )}
+                            </ConversationContent>
+                            <ConversationScrollButton />
+                          </Conversation>
+                        </div>
+
+                        <PromptInput
+                          onSubmit={(message) => {
+                            void handleSessionPromptSubmit(message);
+                          }}
+                        >
+                          <PromptInputBody>
+                            <PromptInputTextarea
+                              placeholder="Message this session..."
+                              disabled={sessionChatStatus === "streaming" || isLoading || isMutating}
+                            />
+                          </PromptInputBody>
+                          <PromptInputFooter>
+                            <PromptInputSubmit
+                              status={sessionChatStatus}
+                              disabled={sessionChatStatus === "streaming" || isLoading || isMutating}
+                            />
+                          </PromptInputFooter>
+                        </PromptInput>
                       </CardContent>
                     ) : null}
                   </Card>

@@ -123,7 +123,7 @@ describe("OpenGoat UI server API", () => {
   });
 
   it("creates project session through the api", async () => {
-    const prepareSession = vi.fn<OpenClawUiService["prepareSession"]>(
+    const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(
       async (): Promise<SessionRunInfo> => {
         return {
           agentId: "goat",
@@ -239,7 +239,7 @@ describe("OpenGoat UI server API", () => {
   });
 
   it("creates a nested workspace session and assigns a default title", async () => {
-    const prepareSession = vi.fn<OpenClawUiService["prepareSession"]>(async (): Promise<SessionRunInfo> => {
+    const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(async (): Promise<SessionRunInfo> => {
       return {
         agentId: "goat",
         sessionKey: "workspace:tmp",
@@ -250,7 +250,7 @@ describe("OpenGoat UI server API", () => {
         isNewSession: true
       };
     });
-    const renameSession = vi.fn<OpenClawUiService["renameSession"]>(async (): Promise<SessionSummary> => {
+    const renameSession = vi.fn<NonNullable<OpenClawUiService["renameSession"]>>(async (): Promise<SessionSummary> => {
       return {
         sessionKey: "workspace:tmp",
         sessionId: "session-2",
@@ -291,7 +291,7 @@ describe("OpenGoat UI server API", () => {
   });
 
   it("renames and removes workspace entries", async () => {
-    const renameSession = vi.fn<OpenClawUiService["renameSession"]>(async (): Promise<SessionSummary> => {
+    const renameSession = vi.fn<NonNullable<OpenClawUiService["renameSession"]>>(async (): Promise<SessionSummary> => {
       return {
         sessionKey: "project:tmp",
         sessionId: "session-1",
@@ -306,7 +306,7 @@ describe("OpenGoat UI server API", () => {
         compactionCount: 0
       };
     });
-    const removeSession = vi.fn<OpenClawUiService["removeSession"]>(async (): Promise<{
+    const removeSession = vi.fn<NonNullable<OpenClawUiService["removeSession"]>>(async (): Promise<{
       sessionKey: string;
       sessionId: string;
       title: string;
@@ -360,6 +360,55 @@ describe("OpenGoat UI server API", () => {
     });
     expect(removeSessionResponse.statusCode).toBe(200);
     expect(removeSession).toHaveBeenCalledWith("goat", "agent:goat:main");
+  });
+
+  it("sends a message to an existing session", async () => {
+    const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(async (): Promise<{
+      code: number;
+      stdout: string;
+      stderr: string;
+      providerId: string;
+    }> => {
+      return {
+        code: 0,
+        stdout: "assistant response",
+        stderr: "",
+        providerId: "openclaw"
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        runAgent
+      }
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message",
+      payload: {
+        agentId: "goat",
+        sessionRef: "workspace:tmp",
+        workingPath: "/tmp",
+        message: "hello"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(runAgent).toHaveBeenCalledWith("goat", {
+      message: "hello",
+      sessionRef: "workspace:tmp",
+      cwd: "/tmp"
+    });
+    expect(response.json()).toMatchObject({
+      output: "assistant response",
+      result: {
+        code: 0
+      }
+    });
   });
 });
 
@@ -430,6 +479,19 @@ function createMockService(): OpenClawUiService {
         workspacePath: "/tmp/workspace",
         workingPath: "/tmp",
         isNewSession: true
+      };
+    },
+    runAgent: async (): Promise<{
+      code: number;
+      stdout: string;
+      stderr: string;
+      providerId: string;
+    }> => {
+      return {
+        code: 0,
+        stdout: "ok",
+        stderr: "",
+        providerId: "openclaw"
       };
     }
   };
