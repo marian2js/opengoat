@@ -12,6 +12,7 @@ import type { PathPort } from "../../ports/path.port.js";
 import {
   renderAgentsIndex,
   renderGoatAgentsMarkdown,
+  renderManagerSkillMarkdown,
   renderGoatSoulMarkdown,
   renderInternalAgentConfig,
   resolveAgentRole,
@@ -141,6 +142,8 @@ export class AgentService {
     const workspaceDir = this.pathPort.join(paths.workspacesDir, DEFAULT_AGENT_ID);
     const agentsPath = this.pathPort.join(workspaceDir, "AGENTS.md");
     const soulPath = this.pathPort.join(workspaceDir, "SOUL.md");
+    const managerSkillDir = this.pathPort.join(workspaceDir, "skills", "manager");
+    const managerSkillPath = this.pathPort.join(managerSkillDir, "SKILL.md");
     const bootstrapPath = this.pathPort.join(workspaceDir, "BOOTSTRAP.md");
     const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
@@ -163,6 +166,8 @@ export class AgentService {
       skippedPaths,
       { overwrite: shouldOverwrite }
     );
+    await this.ensureDirectory(managerSkillDir, createdPaths, skippedPaths);
+    await this.writeMarkdown(managerSkillPath, renderManagerSkillMarkdown(), createdPaths, skippedPaths);
 
     if (shouldOverwrite) {
       await this.fileSystem.removeDir(bootstrapPath);

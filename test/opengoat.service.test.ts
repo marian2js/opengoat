@@ -190,8 +190,10 @@ describe("OpenGoatService", () => {
 
     const agentsMarkdown = await readFile(path.join(goatWorkspace, "AGENTS.md"), "utf-8");
     const soulMarkdown = await readFile(path.join(goatWorkspace, "SOUL.md"), "utf-8");
+    const managerSkillMarkdown = await readFile(path.join(goatWorkspace, "skills", "manager", "SKILL.md"), "utf-8");
     expect(agentsMarkdown).toContain("OpenGoat Goat Workspace");
     expect(soulMarkdown).toContain("You are `goat`, the OpenGoat head manager.");
+    expect(managerSkillMarkdown).toContain("name: manager");
   });
 
   it("updates who an agent reports to", async () => {

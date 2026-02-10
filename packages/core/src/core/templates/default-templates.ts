@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { AgentIdentity } from "../domain/agent.js";
 import { DEFAULT_AGENT_ID, isDefaultAgentId } from "../domain/agent-id.js";
 import type { AgentsIndex, OpenGoatConfig } from "../domain/opengoat-paths.js";
@@ -29,65 +30,19 @@ export function renderAgentsIndex(nowIso: string, agents: string[]): AgentsIndex
 }
 
 export function renderGlobalConfigMarkdown(): string {
-  return [
-    "# OpenGoat Home",
-    "",
-    "This directory stores OpenGoat organization state.",
-    "",
-    "- `config.json`: global organization settings",
-    "- `agents.json`: registered agent ids",
-    "- `agents/`: per-agent OpenGoat config + session store",
-    "- `skills/`: optional OpenGoat compatibility skill store (created on first install)",
-    "- `providers/`: OpenClaw runtime connectivity config",
-    "- `runs/`: run traces (routing + execution history)",
-    "",
-    "OpenClaw owns runtime skill loading and workspace bootstrap markdown files."
-  ].join("\n");
+  return readMarkdownTemplate("global/CONFIG.md");
 }
 
 export function renderGoatAgentsMarkdown(): string {
-  return [
-    "# AGENTS.md - OpenGoat Goat Workspace",
-    "",
-    "This workspace is pre-seeded by OpenGoat so `goat` can run immediately without first-run bootstrap prompts.",
-    "",
-    "## Role",
-    "",
-    "- Agent id: `goat`",
-    "- Role: Head of Organization",
-    "- Runtime: OpenClaw",
-    "",
-    "## Operating Defaults",
-    "",
-    "- Coordinate work through direct reportees.",
-    "- Keep plans explicit, actionable, and task-focused.",
-    "- Summarize decisions and next steps clearly.",
-    "",
-    "## Notes",
-    "",
-    "- Keep this file and `SOUL.md` aligned when role/behavior changes.",
-    "- `BOOTSTRAP.md` is intentionally removed for pre-seeded deployments."
-  ].join("\n");
+  return readMarkdownTemplate("goat/AGENTS.md");
 }
 
 export function renderGoatSoulMarkdown(): string {
-  return [
-    "# SOUL.md - Goat",
-    "",
-    "You are `goat`, the OpenGoat head manager.",
-    "",
-    "## Core Behavior",
-    "",
-    "- Be pragmatic, direct, and delegation-first.",
-    "- Route specialized work to reportees when possible.",
-    "- Keep responses concise unless detail is requested.",
-    "",
-    "## Guardrails",
-    "",
-    "- Confirm destructive or external high-risk actions before execution.",
-    "- Preserve user intent and repository conventions.",
-    "- Prefer verifiable outcomes (tests, command output, file references)."
-  ].join("\n");
+  return readMarkdownTemplate("goat/SOUL.md");
+}
+
+export function renderManagerSkillMarkdown(): string {
+  return readMarkdownTemplate("goat/skills/manager/SKILL.md");
 }
 
 export function renderInternalAgentConfig(
@@ -179,4 +134,19 @@ export function resolveAgentRole(
 
 function dedupe(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+const markdownTemplateCache = new Map<string, string>();
+
+function readMarkdownTemplate(relativePath: string): string {
+  const cached = markdownTemplateCache.get(relativePath);
+  if (cached) {
+    return cached;
+  }
+
+  const content = readFileSync(new URL(`./assets/${relativePath}`, import.meta.url), "utf-8")
+    .replace(/\r\n/g, "\n")
+    .trimEnd();
+  markdownTemplateCache.set(relativePath, content);
+  return content;
 }

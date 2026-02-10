@@ -66,7 +66,8 @@ Assignment model:
 
 Agent runtime config stores assignment under `runtime.skills.assigned`.
 
-OpenGoat does not scaffold default skill files during bootstrap.
+OpenGoat pre-installs the `manager` skill for `goat` in `workspaces/goat/skills/manager/SKILL.md`
+so OpenClaw can resolve it from the agent workspace.
 
 ## 6) OpenClaw Integration
 
