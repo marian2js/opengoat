@@ -47,10 +47,10 @@ It does not execute delegated calls.
 
 ## Skills
 
-Skills are centralized and assigned.
+Skills are delegated to OpenClaw.
 
-- managed skills: `~/.opengoat/skills`
-- optional extra skill dirs from runtime config
+- OpenClaw loads bundled skills, managed skills (`~/.openclaw/skills`), and workspace-local `skills/`
+- OpenGoat stores per-agent skill assignment metadata
 - manager capability is represented by assigned `manager` skill
 
 ## Sessions

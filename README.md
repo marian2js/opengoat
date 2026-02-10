@@ -24,7 +24,7 @@ OpenGoat keeps your org structure as source-of-truth and syncs agent lifecycle t
 
 - `goat` as the default head of organization (CEO entry point).
 - Hierarchical teams via `reportsTo`.
-- Centralized skills with per-agent assignment.
+- OpenClaw-managed skills with OpenGoat-side assignment metadata.
 - CLI-first workflows for create, run, restructure, and audit sessions.
 - OpenClaw-owned workspace bootstrap files (no duplicate OpenGoat scaffolding).
 
@@ -80,10 +80,9 @@ opengoat agent list
 
 ## Skills
 
-Skills are centralized and can be assigned to any agent.
+Skills are owned by OpenClaw (bundled + `~/.openclaw/skills` + workspace-local `skills/`).
 
-- Default manager skill path: `~/.opengoat/skills/manager/SKILL.md`
-- Install and assign:
+OpenGoat keeps per-agent skill assignment metadata and includes compatibility install/list commands:
 
 ```bash
 opengoat skill install manager --from /path/to/skill

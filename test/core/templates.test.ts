@@ -47,6 +47,6 @@ describe("default templates", () => {
     expect(markdown).toContain("# OpenGoat Home");
     expect(markdown).toContain("`config.json`");
     expect(markdown).toContain("`agents/`");
-    expect(markdown).toContain("OpenClaw remains the source");
+    expect(markdown).toContain("OpenClaw owns runtime skill loading");
   });
 });

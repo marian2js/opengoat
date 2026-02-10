@@ -37,42 +37,11 @@ export function renderGlobalConfigMarkdown(): string {
     "- `config.json`: global organization settings",
     "- `agents.json`: registered agent ids",
     "- `agents/`: per-agent OpenGoat config + session store",
-    "- `skills/`: centralized skill definitions",
+    "- `skills/`: optional OpenGoat compatibility skill store (created on first install)",
     "- `providers/`: OpenClaw runtime connectivity config",
     "- `runs/`: run traces (routing + execution history)",
     "",
-    "OpenClaw remains the source for agent workspace bootstrap markdown files."
-  ].join("\n");
-}
-
-export function renderDefaultManagerSkillMarkdown(): string {
-  return [
-    "---",
-    "name: Manager",
-    "description: Lead OpenGoat agents as a manager in the organization.",
-    "user-invocable: true",
-    "---",
-    "",
-    "# Manager",
-    "",
-    "## Mission",
-    "- Lead your direct reportees to complete user goals.",
-    "- Message only direct reportees.",
-    "",
-    "## Command Playbook",
-    "- Send message to the default manager (CEO): `opengoat agent --message \"<text>\"`",
-    "- Send message to specific agent: `opengoat agent <agent-id> --message \"<text>\"`",
-    "- Create agent: `opengoat agent create <name>`",
-    "- List agents: `opengoat agent list`",
-    "- Configure OpenClaw gateway: `opengoat onboard`",
-    "- Inspect routing: `opengoat route --message \"<text>\"`",
-    "- Manage sessions: `opengoat session list|history|reset|compact ...`",
-    "- Manage skills: `opengoat skill list|install ...`",
-    "",
-    "## Rules",
-    "- Treat `goat` as the default entry manager unless explicitly overridden.",
-    "- Message only direct reportees.",
-    "- After CLI actions, report what changed and where."
+    "OpenClaw owns runtime skill loading and workspace bootstrap markdown files."
   ].join("\n");
 }
 

@@ -6,8 +6,7 @@ import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import {
   renderAgentsIndex,
   renderGlobalConfig,
-  renderGlobalConfigMarkdown,
-  renderDefaultManagerSkillMarkdown
+  renderGlobalConfigMarkdown
 } from "../../templates/default-templates.js";
 import { AgentService } from "../../agents/application/agent.service.js";
 
@@ -39,7 +38,6 @@ export class BootstrapService {
     await this.ensureDirectory(paths.homeDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.workspacesDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.agentsDir, createdPaths, skippedPaths);
-    await this.ensureDirectory(paths.skillsDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.providersDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.runsDir, createdPaths, skippedPaths);
 
@@ -68,17 +66,6 @@ export class BootstrapService {
 
     createdPaths.push(...agentResult.createdPaths);
     skippedPaths.push(...agentResult.skippedPaths);
-
-    const managerSkillDir = `${paths.skillsDir}/manager`;
-    const managerSkillFile = `${managerSkillDir}/SKILL.md`;
-    const managerSkillExists = await this.fileSystem.exists(managerSkillFile);
-    await this.fileSystem.ensureDir(managerSkillDir);
-    if (!managerSkillExists) {
-      await this.fileSystem.writeFile(managerSkillFile, `${renderDefaultManagerSkillMarkdown()}\n`);
-      createdPaths.push(managerSkillFile);
-    } else {
-      skippedPaths.push(managerSkillFile);
-    }
 
     return {
       paths,

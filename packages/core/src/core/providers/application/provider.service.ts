@@ -2,10 +2,7 @@ import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
-import type { AgentSkillsConfig, SkillService } from "../../skills/index.js";
 import {
-  AgentConfigNotFoundError,
-  InvalidAgentConfigError,
   InvalidProviderConfigError,
   UnsupportedProviderActionError,
   type AgentProviderBinding,
@@ -27,17 +24,8 @@ interface ProviderServiceDeps {
     | Promise<ProviderRegistry>
     | ProviderRegistry
     | (() => Promise<ProviderRegistry> | ProviderRegistry);
-  skillService: SkillService;
   nowIso: () => string;
   logger?: Logger;
-}
-
-interface AgentConfigShape {
-  displayName?: string;
-  runtime?: {
-    skills?: AgentSkillsConfig;
-  };
-  [key: string]: unknown;
 }
 
 export interface AgentRuntimeProfile {
@@ -70,7 +58,6 @@ export class ProviderService {
     | ProviderRegistry
     | (() => Promise<ProviderRegistry> | ProviderRegistry);
   private providerRegistryPromise?: Promise<ProviderRegistry>;
-  private readonly skillService: SkillService;
   private readonly nowIso: () => string;
   private readonly logger: Logger;
 
@@ -78,7 +65,6 @@ export class ProviderService {
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
     this.providerRegistryInput = deps.providerRegistry;
-    this.skillService = deps.skillService;
     this.nowIso = deps.nowIso;
     this.logger = (deps.logger ?? createNoopLogger()).child({ scope: "provider-service" });
   }
@@ -253,17 +239,7 @@ export class ProviderService {
   ): Promise<ProviderExecutionResult & AgentProviderBinding> {
     const registry = await this.getProviderRegistry();
     const provider = registry.create(OPENCLAW_PROVIDER_ID);
-    const config = await this.readAgentConfig(paths, agentId);
-    const skillsPrompt =
-      typeof options.skillsPromptOverride === "string" && options.skillsPromptOverride.trim().length > 0
-        ? options.skillsPromptOverride.trim()
-        : (await this.skillService.buildSkillsPrompt(paths, agentId, config.runtime?.skills)).prompt.trim();
-    const mergedSystemPrompt = [
-      options.systemPrompt?.trim() || "",
-      skillsPrompt
-    ]
-      .filter(Boolean)
-      .join("\n\n");
+    const mergedSystemPrompt = options.systemPrompt?.trim();
 
     const invokeOptions: ProviderInvokeOptions = {
       ...options,
@@ -376,32 +352,6 @@ export class ProviderService {
       providerKind: provider.kind,
       workspaceAccess: "internal"
     };
-  }
-
-  private async readAgentConfig(paths: OpenGoatPaths, agentId: string): Promise<AgentConfigShape> {
-    const configPath = this.getAgentConfigPath(paths, agentId);
-    const exists = await this.fileSystem.exists(configPath);
-    if (!exists) {
-      throw new AgentConfigNotFoundError(agentId);
-    }
-
-    const raw = await this.fileSystem.readFile(configPath);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw) as unknown;
-    } catch {
-      throw new InvalidAgentConfigError(agentId, configPath);
-    }
-
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new InvalidAgentConfigError(agentId, configPath, "expected JSON object");
-    }
-
-    return parsed as AgentConfigShape;
-  }
-
-  private getAgentConfigPath(paths: OpenGoatPaths, agentId: string): string {
-    return this.pathPort.join(paths.agentsDir, agentId, "config.json");
   }
 
   private getProviderConfigPath(paths: OpenGoatPaths): string {

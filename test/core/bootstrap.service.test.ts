@@ -41,11 +41,7 @@ describe("BootstrapService", () => {
 
     expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "AGENTS.md"))).toBe(false);
     expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md"))).toBe(false);
-    const defaultSkill = await readFile(
-      path.join(paths.skillsDir, "manager", "SKILL.md"),
-      "utf-8"
-    );
-    expect(defaultSkill).toContain("# Manager");
+    expect(await fileSystem.exists(paths.skillsDir)).toBe(false);
   });
 
   it("is idempotent on repeated initialize", async () => {

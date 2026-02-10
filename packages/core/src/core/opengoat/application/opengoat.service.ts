@@ -138,7 +138,6 @@ export class OpenGoatService {
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       providerRegistry: providerRegistryFactory,
-      skillService: this.skillService,
       nowIso,
       logger: rootLogger.child({ scope: "provider" })
     });

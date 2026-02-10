@@ -2,7 +2,6 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
 import { InvalidProviderConfigError, ProviderService } from "../../packages/core/src/core/providers/index.js";
-import { SkillService } from "../../packages/core/src/core/skills/index.js";
 import { ProviderRegistry } from "../../packages/core/src/core/providers/registry.js";
 import type {
   Provider,
@@ -39,7 +38,7 @@ describe("ProviderService (OpenClaw runtime)", () => {
     expect(providers[0]?.id).toBe("openclaw");
   });
 
-  it("invokes agent with OpenGoat skill prompt context", async () => {
+  it("invokes agent without overriding OpenClaw-managed skills context", async () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
     const { paths, fileSystem } = await createPaths(root);
@@ -52,7 +51,7 @@ describe("ProviderService (OpenClaw runtime)", () => {
 
     expect(result.providerId).toBe("openclaw");
     expect(provider.lastInvoke?.cwd).toBeUndefined();
-    expect(provider.lastInvoke?.systemPrompt).toContain("## Skills");
+    expect(provider.lastInvoke?.systemPrompt).toBeUndefined();
     expect(provider.lastInvoke?.message).toBe("hello");
     expect(provider.lastInvoke?.agent).toBe("goat");
   });
@@ -133,7 +132,6 @@ function createProviderService(fileSystem: NodeFileSystem, registry: ProviderReg
     fileSystem,
     pathPort,
     providerRegistry: registry,
-    skillService: new SkillService({ fileSystem, pathPort }),
     nowIso: () => "2026-02-06T00:00:00.000Z"
   });
 }

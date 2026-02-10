@@ -57,16 +57,16 @@ Important change:
 
 ## 5) Skills
 
-Skills are centralized under `~/.opengoat/skills`.
+OpenClaw is the skills runtime authority.
 
 Assignment model:
 
-- install globally (catalog entry)
-- install and assign to one agent
+- OpenClaw loads bundled skills, managed skills (`~/.openclaw/skills`), and workspace `skills/`
+- OpenGoat stores assignment metadata per agent
 
 Agent runtime config stores assignment under `runtime.skills.assigned`.
 
-The `manager` skill encodes manager behavior.
+OpenGoat does not scaffold default skill files during bootstrap.
 
 ## 6) OpenClaw Integration
 
@@ -115,7 +115,7 @@ Main structure:
 - `CONFIG.md`
 - `workspaces/` (OpenClaw workspace paths)
 - `agents/`
-- `skills/`
+- `skills/` (optional compatibility store; created on first `opengoat skill install`)
 - `providers/` (OpenClaw runtime connectivity config)
 - `runs/`
 
@@ -154,7 +154,7 @@ Optional UI extension module:
 
 If rebuilding from scratch, preserve these behaviors:
 
-1. bootstrap creates `goat` + manager skill.
+1. bootstrap creates `goat` and core OpenGoat state only (no local skill scaffolding).
 2. `agent create` creates local state and syncs OpenClaw create.
 3. `agent delete` syncs OpenClaw delete and removes local state.
 4. `goat` is undeletable.
