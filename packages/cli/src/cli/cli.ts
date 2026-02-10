@@ -11,7 +11,6 @@ import { agentProviderSetCommand } from "./commands/agent-provider-set.command.j
 import { agentRunCommand } from "./commands/agent-run.command.js";
 import { initCommand } from "./commands/init.command.js";
 import { onboardCommand } from "./commands/onboard.command.js";
-import { gatewayCommand } from "./commands/gateway.command.js";
 import { providerCommand } from "./commands/provider.command.js";
 import { providerListCommand } from "./commands/provider-list.command.js";
 import { routeCommand } from "./commands/route.command.js";
@@ -45,7 +44,6 @@ export async function runCli(argv: string[]): Promise<number> {
     [
       initCommand,
       acpCommand,
-      gatewayCommand,
       onboardCommand,
       routeCommand,
       scenarioCommand,

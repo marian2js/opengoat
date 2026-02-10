@@ -177,14 +177,7 @@ These commands do not implement custom provider logic in OpenGoat; they pass thr
 opengoat route --message "Who should handle API test coverage?"
 opengoat scenario run --file ./scenario.json --mode live
 opengoat acp
-opengoat gateway
 ```
-
-## Optional Gateway (Remote Control)
-
-OpenGoat Gateway is optional and separate from OpenClaw runtime gateway connectivity.
-
-See `docs/gateway.md`.
 
 ## Architecture Snapshot
 
@@ -193,7 +186,7 @@ packages/
 ├── core/
 │   └── src/
 │       ├── core/         # agents, manager runtime, sessions, skills, OpenClaw runtime adapter modules
-│       ├── platform/     # node adapters (fs, paths, command runner, gateway/acp transport)
+│       ├── platform/     # node adapters (fs, paths, command runner, acp transport)
 │       └── apps/runtime/ # shared runtime factory
 ├── cli/
 │   └── src/cli/
@@ -212,7 +205,6 @@ packages/
 ## Documentation
 
 - `docs/organization-runtime.md` - current manager/reportee runtime model (skill-driven)
-- `docs/gateway.md` - optional gateway protocol and security posture
 - `docs/acp.md` - ACP integration
 - `ABOUT.md` - full architecture context
 

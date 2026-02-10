@@ -134,7 +134,6 @@ Core modules:
 - `core/skills`
 - `core/providers` (OpenClaw runtime adapter)
 - `core/acp`
-- `core/gateway`
 
 CLI module:
 

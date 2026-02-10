@@ -69,7 +69,7 @@ interface PendingPrompt {
 
 const ACP_AGENT_INFO = {
   name: "opengoat-acp",
-  title: "OpenGoat ACP Gateway",
+  title: "OpenGoat ACP Agent",
   version: "0.1.0"
 };
 

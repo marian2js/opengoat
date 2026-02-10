@@ -80,15 +80,6 @@ describe("runCli", () => {
     expect(code).toBe(0);
   });
 
-  it("supports gateway --help", async () => {
-    const root = await createTempDir("opengoat-runcli-");
-    roots.push(root);
-    process.env.OPENGOAT_HOME = root;
-
-    const code = await runCli(["gateway", "--help"]);
-    expect(code).toBe(0);
-  });
-
   it("supports global log flags before command", async () => {
     const root = await createTempDir("opengoat-runcli-");
     roots.push(root);
