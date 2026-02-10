@@ -32,7 +32,7 @@ export class OpenClawProvider extends BaseCliProvider {
     const args = ["agent"];
 
     if (options.agent) {
-      args.push(options.agent);
+      args.push("--agent", options.agent);
     }
 
     if (options.providerSessionId?.trim()) {
