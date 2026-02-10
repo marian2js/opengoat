@@ -199,6 +199,33 @@ describe("OpenGoatService", () => {
     expect(typeof result?.timestamp).toBe("number");
   });
 
+  it("prepares a new session for a specific working path without invoking runtime", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service, provider } = createService(root);
+    await service.initialize();
+
+    const projectPath = path.join(root, "desktop-project");
+    const fileSystem = new NodeFileSystem();
+    await fileSystem.ensureDir(projectPath);
+
+    const prepared = await service.prepareSession("goat", {
+      sessionRef: "project:desktop-project",
+      workingPath: projectPath,
+      forceNew: true
+    });
+
+    expect(prepared.agentId).toBe("goat");
+    expect(prepared.sessionKey).toBe("project:desktop-project");
+    expect(prepared.workingPath).toBe(projectPath);
+    expect(prepared.isNewSession).toBe(true);
+    expect(provider.invocations).toHaveLength(0);
+
+    const sessions = await service.listSessions("goat");
+    expect(sessions.some((session) => session.sessionKey === "project:desktop-project")).toBe(true);
+  });
+
   it("runs task cron cycle and routes todo/blocked/inactive notifications", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);

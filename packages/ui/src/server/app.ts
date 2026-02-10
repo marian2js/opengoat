@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
@@ -77,6 +78,21 @@ export interface OpenClawUiService {
   listSessions: (agentId?: string, options?: { activeMinutes?: number }) => Promise<SessionSummary[]>;
   listSkills: (agentId?: string) => Promise<ResolvedSkill[]>;
   listGlobalSkills: () => Promise<ResolvedSkill[]>;
+  prepareSession: (
+    agentId?: string,
+    options?: { sessionRef?: string; workingPath?: string; forceNew?: boolean }
+  ) => Promise<SessionRunInfo>;
+  renameSession?: (agentId?: string, title?: string, sessionRef?: string) => Promise<SessionSummary>;
+}
+
+interface SessionRunInfo {
+  agentId: string;
+  sessionKey: string;
+  sessionId: string;
+  transcriptPath: string;
+  workspacePath: string;
+  workingPath: string;
+  isNewSession: boolean;
 }
 
 export interface OpenGoatUiServerOptions {
@@ -217,6 +233,34 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   });
 
+  app.post<{ Body: { agentId?: string; folderName?: string; folderPath?: string } }>("/api/projects", async (request, reply) => {
+    return safeReply(reply, async () => {
+      const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
+      const project = await resolveProjectFolder(request.body?.folderName, request.body?.folderPath);
+      const sessionRef = buildProjectSessionRef(project.name, project.path);
+      const prepared = await service.prepareSession(agentId, {
+        sessionRef,
+        workingPath: project.path,
+        forceNew: true
+      });
+
+      if (typeof service.renameSession === "function") {
+        await service.renameSession(agentId, project.name, sessionRef);
+      }
+
+      return {
+        agentId,
+        project: {
+          name: project.name,
+          path: project.path,
+          sessionRef
+        },
+        session: prepared,
+        message: `Project \"${project.name}\" added and session created.`
+      };
+    });
+  });
+
 }
 
 interface FrontendOptions {
@@ -315,6 +359,79 @@ function normalizeSkills(value: string[] | string | undefined): string[] | undef
     .filter(Boolean);
 
   return parsed.length > 0 ? parsed : undefined;
+}
+
+async function resolveProjectFolder(
+  folderName: string | undefined,
+  folderPath: string | undefined
+): Promise<{ name: string; path: string }> {
+  const explicitPath = folderPath?.trim();
+  if (explicitPath) {
+    const resolvedPath = path.resolve(explicitPath);
+    const stats = await stat(resolvedPath).catch(() => {
+      return null;
+    });
+    if (!stats || !stats.isDirectory()) {
+      throw new Error(`Project path is not a directory: ${resolvedPath}`);
+    }
+
+    const explicitName = folderName?.trim();
+    return {
+      name: explicitName || path.basename(resolvedPath),
+      path: resolvedPath
+    };
+  }
+
+  const normalizedFolderName = normalizeDesktopFolderName(folderName);
+  if (!normalizedFolderName) {
+    throw new Error("folderName is required.");
+  }
+
+  const desktopDir = path.resolve(homedir(), "Desktop");
+  const projectPath = path.resolve(desktopDir, normalizedFolderName);
+  const stats = await stat(projectPath).catch(() => {
+    return null;
+  });
+  if (!stats || !stats.isDirectory()) {
+    throw new Error(`Desktop folder does not exist: ${projectPath}`);
+  }
+
+  return {
+    name: normalizedFolderName,
+    path: projectPath
+  };
+}
+
+function normalizeDesktopFolderName(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed === "." || trimmed === "..") {
+    return null;
+  }
+
+  if (trimmed.includes("/") || trimmed.includes("\\") || trimmed.includes("..")) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function buildProjectSessionRef(projectName: string, projectPath: string): string {
+  const segment = normalizeProjectSegment(projectName);
+  const suffix = normalizeProjectSegment(projectPath).slice(-10) || "session";
+  return `project:${segment}-${suffix}`;
+}
+
+function normalizeProjectSegment(value: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized || "project";
 }
 
 async function resolveOrganizationAgents(service: OpenClawUiService): Promise<OrganizationAgent[]> {

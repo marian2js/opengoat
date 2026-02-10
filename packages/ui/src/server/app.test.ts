@@ -42,6 +42,16 @@ interface ResolvedSkill {
   source: string;
 }
 
+interface SessionRunInfo {
+  agentId: string;
+  sessionKey: string;
+  sessionId: string;
+  transcriptPath: string;
+  workspacePath: string;
+  workingPath: string;
+  isNewSession: boolean;
+}
+
 let activeServer: Awaited<ReturnType<typeof createOpenGoatUiServer>> | undefined;
 
 afterEach(async () => {
@@ -111,6 +121,52 @@ describe("OpenGoat UI server API", () => {
       skills: ["manager", "testing"]
     });
   });
+
+  it("creates project session through the api", async () => {
+    const prepareSession = vi.fn<OpenClawUiService["prepareSession"]>(
+      async (): Promise<SessionRunInfo> => {
+        return {
+          agentId: "goat",
+          sessionKey: "project:opengoat",
+          sessionId: "session-1",
+          transcriptPath: "/tmp/transcript.jsonl",
+          workspacePath: "/tmp/workspace",
+          workingPath: "/tmp/opengoat",
+          isNewSession: true
+        };
+      }
+    );
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        prepareSession
+      }
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/projects",
+      payload: {
+        folderPath: "/tmp",
+        folderName: "tmp"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(prepareSession).toHaveBeenCalledTimes(1);
+
+    const payload = response.json() as {
+      project: { name: string; path: string; sessionRef: string };
+      session: { sessionKey: string };
+    };
+    expect(payload.project.name).toBe("tmp");
+    expect(payload.project.path).toBe("/tmp");
+    expect(payload.project.sessionRef.startsWith("project:")).toBe(true);
+    expect(payload.session.sessionKey).toBe("project:opengoat");
+  });
 });
 
 function createMockService(): OpenClawUiService {
@@ -142,6 +198,17 @@ function createMockService(): OpenClawUiService {
     },
     listSessions: async (): Promise<SessionSummary[]> => [],
     listSkills: async (): Promise<ResolvedSkill[]> => [],
-    listGlobalSkills: async (): Promise<ResolvedSkill[]> => []
+    listGlobalSkills: async (): Promise<ResolvedSkill[]> => [],
+    prepareSession: async (): Promise<SessionRunInfo> => {
+      return {
+        agentId: "goat",
+        sessionKey: "agent:goat:main",
+        sessionId: "session-1",
+        transcriptPath: "/tmp/transcript.jsonl",
+        workspacePath: "/tmp/workspace",
+        workingPath: "/tmp",
+        isNewSession: true
+      };
+    }
   };
 }

@@ -555,6 +555,29 @@ export class OpenGoatService {
     return this.sessionService.listSessions(paths, agentId, options);
   }
 
+  public async prepareSession(
+    agentId = DEFAULT_AGENT_ID,
+    options: {
+      sessionRef?: string;
+      workingPath?: string;
+      forceNew?: boolean;
+    } = {}
+  ): Promise<SessionRunInfo> {
+    const paths = this.pathsProvider.getPaths();
+    const prepared = await this.sessionService.prepareRunSession(paths, agentId, {
+      sessionRef: options.sessionRef,
+      workingPath: options.workingPath,
+      forceNew: options.forceNew,
+      userMessage: ""
+    });
+
+    if (!prepared.enabled) {
+      throw new Error("Session preparation was disabled.");
+    }
+
+    return prepared.info;
+  }
+
   public async getAgentLastAction(agentId = DEFAULT_AGENT_ID): Promise<AgentLastAction | null> {
     const paths = this.pathsProvider.getPaths();
     return this.sessionService.getLastAgentAction(paths, agentId);

@@ -18,15 +18,19 @@ import {
   ChevronRight,
   Clock3,
   Home,
+  Folder,
+  FolderPlus,
   RefreshCw,
   Sparkles,
   UserRoundPlus,
-  UsersRound
+  UsersRound,
+  X
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 type ViewKey = "overview" | "agents" | "sessions" | "skills";
@@ -91,6 +95,28 @@ interface DashboardState {
   sessions: SessionsResponse;
   agentSkills: SkillsResponse;
   globalSkills: SkillsResponse;
+}
+
+interface Project {
+  sessionKey: string;
+  sessionId: string;
+  name: string;
+  workingPath: string;
+  updatedAt: number;
+}
+
+interface CreateProjectResponse {
+  agentId: string;
+  project: {
+    name: string;
+    path: string;
+    sessionRef: string;
+  };
+  session: {
+    sessionKey: string;
+    sessionId: string;
+  };
+  message?: string;
 }
 
 interface CreateAgentForm {
@@ -159,6 +185,11 @@ export function App(): ReactElement {
   const [createForm, setCreateForm] = useState<CreateAgentForm>(DEFAULT_FORM);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
+  const handleViewChange = useCallback((nextView: ViewKey) => {
+    setActiveView(nextView);
+    setActionMessage(null);
+  }, []);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -185,6 +216,32 @@ export function App(): ReactElement {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const refreshOverview = useCallback(async () => {
+    const overview = await fetchJson<OverviewResponse>("/api/openclaw/overview");
+    setState((current) => {
+      if (!current) {
+        return current;
+      }
+      return {
+        ...current,
+        overview
+      };
+    });
+  }, []);
+
+  const refreshSessions = useCallback(async () => {
+    const sessions = await fetchJson<SessionsResponse>("/api/sessions?agentId=goat");
+    setState((current) => {
+      if (!current) {
+        return current;
+      }
+      return {
+        ...current,
+        sessions
+      };
+    });
   }, []);
 
   useEffect(() => {
@@ -215,6 +272,20 @@ export function App(): ReactElement {
 
   const agents = state?.overview.agents ?? [];
   const sessions = state?.sessions.sessions ?? [];
+  const projects = useMemo<Project[]>(() => {
+    return sessions
+      .filter((session) => session.sessionKey.startsWith("project:") && typeof session.workingPath === "string")
+      .map((session) => {
+        return {
+          sessionKey: session.sessionKey,
+          sessionId: session.sessionId,
+          name: session.title,
+          workingPath: session.workingPath ?? "",
+          updatedAt: session.updatedAt
+        };
+      })
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+  }, [sessions]);
   const healthTimestamp = state ? new Date(state.health.timestamp).toLocaleString() : "Loading...";
 
   const metrics = useMemo<MetricCard[]>(() => {
@@ -267,6 +338,9 @@ export function App(): ReactElement {
       return;
     }
 
+    const submittedName = createForm.name;
+    const submittedNameTrimmed = submittedName.trim();
+
     setMutating(true);
     setActionMessage(null);
 
@@ -282,9 +356,14 @@ export function App(): ReactElement {
         })
       });
 
-      setActionMessage(response.message ?? `Agent \"${createForm.name}\" processed.`);
-      setCreateForm((current) => ({ ...current, name: "" }));
-      await loadData();
+      setActionMessage(response.message ?? `Agent \"${submittedName}\" processed.`);
+      setCreateForm((current) => {
+        if (current.name.trim() !== submittedNameTrimmed) {
+          return current;
+        }
+        return { ...current, name: "" };
+      });
+      await refreshOverview();
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Unable to create agent.";
       setActionMessage(message);
@@ -312,9 +391,41 @@ export function App(): ReactElement {
       });
 
       setActionMessage(`Agent \"${agentId}\" removed.`);
-      await loadData();
+      await refreshOverview();
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Unable to delete agent.";
+      setActionMessage(message);
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function handleAddProject(): Promise<void> {
+    const folderName = await pickDesktopFolderName();
+    if (!folderName) {
+      return;
+    }
+
+    setMutating(true);
+    setActionMessage(null);
+
+    try {
+      const response = await fetchJson<CreateProjectResponse>("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          agentId: "goat",
+          folderName
+        })
+      });
+
+      setActionMessage(response.message ?? `Project \"${response.project.name}\" added.`);
+      await refreshSessions();
+      setActiveView("sessions");
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "Unable to add project.";
       setActionMessage(message);
     } finally {
       setMutating(false);
@@ -355,7 +466,7 @@ export function App(): ReactElement {
                   key={item.id}
                   type="button"
                   title={item.label}
-                  onClick={() => setActiveView(item.id)}
+                  onClick={() => handleViewChange(item.id)}
                   className={cn(
                     "mb-1 flex w-full items-center rounded-md px-3 py-2 text-sm transition-colors",
                     active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
@@ -367,6 +478,42 @@ export function App(): ReactElement {
                 </button>
               );
             })}
+
+            <Separator className="my-2 bg-border/70" />
+
+            <button
+              type="button"
+              title="Add Project"
+              onClick={() => {
+                void handleAddProject();
+              }}
+              className={cn(
+                "mb-1 flex w-full items-center rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
+                isSidebarCollapsed && "justify-center px-2"
+              )}
+              disabled={isMutating || isLoading}
+            >
+              <FolderPlus className="size-4 shrink-0" />
+              {!isSidebarCollapsed ? <span className="ml-2">Add Project</span> : null}
+            </button>
+
+            {projects.map((project) => (
+              <button
+                key={project.sessionId}
+                type="button"
+                title={`${project.name} (${project.workingPath})`}
+                onClick={() => {
+                  setActiveView("sessions");
+                }}
+                className={cn(
+                  "mb-1 flex w-full items-center rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
+                  isSidebarCollapsed && "justify-center px-2"
+                )}
+              >
+                <Folder className="size-4 shrink-0" />
+                {!isSidebarCollapsed ? <span className="ml-2 truncate">{project.name}</span> : null}
+              </button>
+            ))}
           </nav>
 
           <div className="border-t border-border p-3">
@@ -416,7 +563,7 @@ export function App(): ReactElement {
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setActiveView(item.id)}
+                    onClick={() => handleViewChange(item.id)}
                     className={cn(
                       "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm whitespace-nowrap",
                       active
@@ -429,6 +576,18 @@ export function App(): ReactElement {
                   </button>
                 );
               })}
+
+              <button
+                type="button"
+                onClick={() => {
+                  void handleAddProject();
+                }}
+                className="inline-flex items-center gap-2 rounded-md border border-transparent px-3 py-1.5 text-sm whitespace-nowrap text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+                disabled={isMutating || isLoading}
+              >
+                <FolderPlus className="size-4" />
+                Add Project
+              </button>
             </div>
           </div>
 
@@ -444,7 +603,18 @@ export function App(): ReactElement {
             {actionMessage ? (
               <Card className="border-border bg-accent/30">
                 <CardContent className="pt-5">
-                  <p className="text-sm">{actionMessage}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm">{actionMessage}</p>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="-mr-1 -mt-1 size-8"
+                      onClick={() => setActionMessage(null)}
+                      aria-label="Dismiss alert"
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ) : null}
@@ -998,6 +1168,35 @@ function normalizeReportsTo(value: string | null | undefined): string | null {
     return null;
   }
   return normalized;
+}
+
+async function pickDesktopFolderName(): Promise<string | null> {
+  const pickerWindow = window as Window & {
+    showDirectoryPicker?: (options?: {
+      mode?: "read" | "readwrite";
+      startIn?: "desktop" | "documents" | "downloads" | "music" | "pictures" | "videos";
+    }) => Promise<{ name?: string }>;
+  };
+
+  if (typeof pickerWindow.showDirectoryPicker === "function") {
+    try {
+      const selected = await pickerWindow.showDirectoryPicker({
+        mode: "read",
+        startIn: "desktop"
+      });
+      const name = selected.name?.trim();
+      return name || null;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  const fallback = window.prompt("Enter the Desktop folder name to add:");
+  const normalized = fallback?.trim();
+  return normalized || null;
 }
 
 async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
