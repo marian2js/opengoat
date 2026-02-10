@@ -59,6 +59,7 @@ describe("board/task CLI commands", () => {
       taskId: "task-1234abcd",
       boardId: "delivery-board",
       createdAt: "2026-02-10T00:00:00.000Z",
+      workspace: "~",
       owner: "goat",
       assignedTo: "cto",
       title: "Define API",
@@ -93,10 +94,12 @@ describe("board/task CLI commands", () => {
     expect(createTask).toHaveBeenCalledWith("goat", "delivery-board", {
       title: "Define API",
       description: "Draft API contract",
+      workspace: undefined,
       assignedTo: "cto",
       status: "doing"
     });
     expect(stdout.output()).toContain("Task created: Define API (task-1234abcd)");
+    expect(stdout.output()).toContain("Workspace: ~");
   });
 
   it("task status forwards actor and new status", async () => {
@@ -105,6 +108,7 @@ describe("board/task CLI commands", () => {
       taskId: "task-1234abcd",
       boardId: "delivery-board",
       createdAt: "2026-02-10T00:00:00.000Z",
+      workspace: "~",
       owner: "goat",
       assignedTo: "cto",
       title: "Define API",
@@ -130,6 +134,7 @@ describe("board/task CLI commands", () => {
       taskId: "task-1234abcd",
       boardId: "delivery-board",
       createdAt: "2026-02-10T00:00:00.000Z",
+      workspace: "~",
       owner: "goat",
       assignedTo: "cto",
       title: "Define API",
@@ -171,5 +176,47 @@ describe("board/task CLI commands", () => {
     expect(code).toBe(0);
     expect(runTaskCronCycle).toHaveBeenCalledWith({ inactiveMinutes: 45 });
     expect(stdout.output()).toContain("[task-cron] ran=2026-02-10T00:00:00.000Z");
+  });
+
+  it("task create forwards custom workspace", async () => {
+    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
+    const createTask = vi.fn(async () => ({
+      taskId: "task-9",
+      boardId: "delivery-board",
+      createdAt: "2026-02-10T00:00:00.000Z",
+      workspace: "/repo/service",
+      owner: "goat",
+      assignedTo: "goat",
+      title: "Review API",
+      description: "Review details",
+      status: "todo",
+      blockers: [],
+      artifacts: [],
+      worklog: []
+    }));
+
+    const { context } = createContext({ initialize, createTask });
+    const code = await taskCommand.run(
+      [
+        "create",
+        "delivery-board",
+        "--title",
+        "Review API",
+        "--description",
+        "Review details",
+        "--workspace",
+        "/repo/service"
+      ],
+      context
+    );
+
+    expect(code).toBe(0);
+    expect(createTask).toHaveBeenCalledWith("goat", "delivery-board", {
+      title: "Review API",
+      description: "Review details",
+      workspace: "/repo/service",
+      assignedTo: undefined,
+      status: undefined
+    });
   });
 });

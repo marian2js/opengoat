@@ -217,6 +217,7 @@ describe("OpenGoatService", () => {
     const blockedTask = await service.createTask("goat", board.boardId, {
       title: "Prepare release",
       description: "Finalize release notes",
+      workspace: "/workspace/release",
       assignedTo: "engineer",
       status: "blocked"
     });
@@ -232,12 +233,14 @@ describe("OpenGoatService", () => {
 
     const todoInvocation = provider.invocations.find((entry) => entry.agent === "engineer");
     expect(todoInvocation?.message).toContain(`Task ID: ${todoTask.taskId}`);
+    expect(todoInvocation?.message).toContain("Workspace: ~");
     expect(todoInvocation?.message).toContain("Status: todo");
 
     const blockedInvocation = provider.invocations.find(
       (entry) => entry.agent === "goat" && entry.message.includes(`Task #${blockedTask.taskId}`)
     );
     expect(blockedInvocation?.message).toContain('assigned to your reportee "@engineer" is blocked because of');
+    expect(blockedInvocation?.message).toContain("Workspace: /workspace/release");
     expect(blockedInvocation?.message).toContain("Waiting for production credentials");
 
     const inactivityInvocation = provider.invocations.find(

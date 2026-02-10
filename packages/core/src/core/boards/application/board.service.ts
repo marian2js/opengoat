@@ -35,6 +35,7 @@ interface TaskRow {
   task_id: string;
   board_id: string;
   created_at: string;
+  workspace: string;
   owner_agent_id: string;
   assigned_to_agent_id: string;
   title: string;
@@ -49,6 +50,7 @@ interface EntryRow {
 }
 
 const TASK_STATUSES = ["todo", "doing", "blocked", "done"] as const;
+const DEFAULT_TASK_WORKSPACE = "~";
 const require = createRequire(import.meta.url);
 
 export class BoardService {
@@ -203,6 +205,7 @@ export class BoardService {
     }
 
     const status = normalizeTaskStatus(options.status);
+    const workspace = normalizeTaskWorkspace(options.workspace);
 
     const taskId = createEntityId(`task-${title}`);
     const createdAt = this.nowIso();
@@ -212,13 +215,14 @@ export class BoardService {
          task_id,
          board_id,
          created_at,
+         workspace,
          owner_agent_id,
          assigned_to_agent_id,
          title,
          description,
          status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [taskId, normalizedBoardId, createdAt, normalizedActorId, assignedTo, title, description, status]
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [taskId, normalizedBoardId, createdAt, workspace, normalizedActorId, assignedTo, title, description, status]
     );
     await this.persistDatabase(paths, db);
 
@@ -350,7 +354,7 @@ export class BoardService {
   private async listTasksByBoardId(db: SqlJsDatabase, boardId: string): Promise<TaskRecord[]> {
     const rows = this.queryAll<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, owner_agent_id, assigned_to_agent_id, title, description, status
+      `SELECT task_id, board_id, created_at, workspace, owner_agent_id, assigned_to_agent_id, title, description, status
        FROM tasks
        WHERE board_id = ?
        ORDER BY created_at ASC`,
@@ -368,7 +372,7 @@ export class BoardService {
   private requireTask(db: SqlJsDatabase, taskId: string): TaskRecord {
     const row = this.queryOne<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, owner_agent_id, assigned_to_agent_id, title, description, status
+      `SELECT task_id, board_id, created_at, workspace, owner_agent_id, assigned_to_agent_id, title, description, status
        FROM tasks
        WHERE task_id = ?`,
       [taskId]
@@ -411,6 +415,7 @@ export class BoardService {
       taskId: row.task_id,
       boardId: row.board_id,
       createdAt: row.created_at,
+      workspace: row.workspace || DEFAULT_TASK_WORKSPACE,
       owner: row.owner_agent_id,
       assignedTo: row.assigned_to_agent_id,
       title: row.title,
@@ -471,6 +476,7 @@ export class BoardService {
          task_id TEXT PRIMARY KEY,
          board_id TEXT NOT NULL,
          created_at TEXT NOT NULL,
+         workspace TEXT NOT NULL DEFAULT '${DEFAULT_TASK_WORKSPACE}',
          owner_agent_id TEXT NOT NULL,
          assigned_to_agent_id TEXT NOT NULL,
          title TEXT NOT NULL,
@@ -479,6 +485,7 @@ export class BoardService {
          FOREIGN KEY(board_id) REFERENCES boards(board_id) ON DELETE CASCADE
        );`
     );
+    this.ensureTaskWorkspaceColumn(db);
     this.execute(
       db,
       `CREATE TABLE IF NOT EXISTS task_blockers (
@@ -563,6 +570,19 @@ export class BoardService {
     const all = this.queryAll<T>(db, sql, params);
     return all[0];
   }
+
+  private ensureTaskWorkspaceColumn(db: SqlJsDatabase): void {
+    const columns = this.queryAll<{ name: string }>(db, "PRAGMA table_info(tasks);");
+    const hasWorkspace = columns.some((column) => column.name === "workspace");
+    if (hasWorkspace) {
+      return;
+    }
+
+    this.execute(
+      db,
+      `ALTER TABLE tasks ADD COLUMN workspace TEXT NOT NULL DEFAULT '${DEFAULT_TASK_WORKSPACE}';`
+    );
+  }
 }
 
 function normalizeEntityId(value: string, label: string): string {
@@ -589,6 +609,14 @@ function normalizeTaskStatus(rawStatus: string | undefined, allowEmpty = false):
   }
   if (!TASK_STATUSES.includes(normalized as (typeof TASK_STATUSES)[number])) {
     throw new Error(`Task status must be one of: ${TASK_STATUSES.join(", ")}.`);
+  }
+  return normalized;
+}
+
+function normalizeTaskWorkspace(rawWorkspace: string | undefined): string {
+  const normalized = rawWorkspace?.trim();
+  if (!normalized) {
+    return DEFAULT_TASK_WORKSPACE;
   }
   return normalized;
 }

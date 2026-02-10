@@ -66,7 +66,9 @@ export const boardCommand: CliCommand = {
         context.stdout.write(`Created: ${board.createdAt}\n`);
         context.stdout.write(`Tasks: ${board.tasks.length}\n`);
         for (const task of board.tasks) {
-          context.stdout.write(`- ${task.taskId}: ${task.title} [${task.status}] -> ${task.assignedTo}\n`);
+          context.stdout.write(
+            `- ${task.taskId}: ${task.title} [${task.status}] workspace=${task.workspace} -> ${task.assignedTo}\n`
+          );
         }
         return 0;
       }

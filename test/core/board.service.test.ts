@@ -77,6 +77,14 @@ describe("BoardService", () => {
 
     expect(ownTask.assignedTo).toBe("engineer");
     expect(ownTask.owner).toBe("engineer");
+    expect(ownTask.workspace).toBe("~");
+
+    const customWorkspaceTask = await harness.boardService.createTask(harness.paths, "engineer", board.boardId, {
+      title: "Implement worker",
+      description: "Add worker in custom path",
+      workspace: "/workspace/project"
+    });
+    expect(customWorkspaceTask.workspace).toBe("/workspace/project");
 
     await expect(
       harness.boardService.createTask(harness.paths, "engineer", board.boardId, {

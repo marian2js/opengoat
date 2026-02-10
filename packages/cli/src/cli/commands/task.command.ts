@@ -26,12 +26,14 @@ export const taskCommand: CliCommand = {
         const task = await context.service.createTask(parsed.actorId, parsed.boardId, {
           title: parsed.title,
           description: parsed.description,
+          workspace: parsed.workspace,
           assignedTo: parsed.assignedTo,
           status: parsed.status
         });
 
         context.stdout.write(`Task created: ${task.title} (${task.taskId})\n`);
         context.stdout.write(`Board: ${task.boardId}\n`);
+        context.stdout.write(`Workspace: ${task.workspace}\n`);
         context.stdout.write(`Assigned to: ${task.assignedTo}\n`);
         context.stdout.write(`Status: ${task.status}\n`);
         return 0;
@@ -118,6 +120,7 @@ export const taskCommand: CliCommand = {
 
         context.stdout.write(`Task: ${task.title} (${task.taskId})\n`);
         context.stdout.write(`Board: ${task.boardId}\n`);
+        context.stdout.write(`Workspace: ${task.workspace}\n`);
         context.stdout.write(`Owner: ${task.owner}\n`);
         context.stdout.write(`Assigned to: ${task.assignedTo}\n`);
         context.stdout.write(`Status: ${task.status}\n`);
@@ -196,6 +199,7 @@ interface TaskCreateArgsOk {
   boardId: string;
   title: string;
   description: string;
+  workspace?: string;
   assignedTo?: string;
   status?: string;
 }
@@ -235,6 +239,7 @@ function parseCreateArgs(args: string[]): ParseCreateResult {
   let actorId = DEFAULT_AGENT_ID;
   let title: string | undefined;
   let description: string | undefined;
+  let workspace: string | undefined;
   let assignedTo: string | undefined;
   let status: string | undefined;
 
@@ -281,6 +286,16 @@ function parseCreateArgs(args: string[]): ParseCreateResult {
       continue;
     }
 
+    if (token === "--workspace") {
+      const value = args[index + 1]?.trim();
+      if (!value) {
+        return { ok: false, error: "Missing value for --workspace." };
+      }
+      workspace = value;
+      index += 1;
+      continue;
+    }
+
     if (token === "--status") {
       const value = args[index + 1]?.trim();
       if (!value) {
@@ -307,6 +322,7 @@ function parseCreateArgs(args: string[]): ParseCreateResult {
     boardId,
     title,
     description,
+    workspace,
     assignedTo,
     status
   };
@@ -446,7 +462,7 @@ function parseCronArgs(args: string[]): ParseCronResult {
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write(
-    "  opengoat task create <board-id> --title <title> --description <text> [--as <agent-id>] [--assign <agent-id>] [--status <todo|doing|blocked|done>]\n"
+    "  opengoat task create <board-id> --title <title> --description <text> [--workspace <path|~>] [--as <agent-id>] [--assign <agent-id>] [--status <todo|doing|blocked|done>]\n"
   );
   output.write("  opengoat task list <board-id> [--json]\n");
   output.write("  opengoat task show <task-id> [--json]\n");
