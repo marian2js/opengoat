@@ -195,6 +195,12 @@ export class OpenGoatService {
     }
 
     try {
+      await this.agentService.ensureGoatWorkspaceBootstrap(paths);
+    } catch (error) {
+      warnings.push(`OpenGoat workspace bootstrap for "goat" failed: ${toErrorMessage(error)}`);
+    }
+
+    try {
       const goatSync = await this.providerService.createProviderAgent(paths, DEFAULT_AGENT_ID, {
         providerId: OPENCLAW_PROVIDER_ID,
         displayName: goatDescriptor.displayName,

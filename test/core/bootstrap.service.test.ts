@@ -39,7 +39,8 @@ describe("BootstrapService", () => {
     ) as { runtime?: { adapter?: string } };
     expect(goatConfig.runtime?.adapter).toBe("openclaw");
 
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "AGENTS.md"))).toBe(false);
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "AGENTS.md"))).toBe(true);
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "SOUL.md"))).toBe(true);
     expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md"))).toBe(false);
     expect(await fileSystem.exists(paths.skillsDir)).toBe(false);
   });

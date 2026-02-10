@@ -8,7 +8,7 @@ This document describes the current organization-first runtime model.
 - `goat` is the default manager (head/CEO)
 - hierarchy is explicit in agent metadata
 - manager behavior is skill-driven (`manager` skill)
-- OpenClaw owns workspace bootstrap markdown (`AGENTS.md`, `SOUL.md`, `TOOLS.md`, etc.)
+- OpenClaw owns workspace bootstrap semantics; OpenGoat pre-seeds `goat` `AGENTS.md` + `SOUL.md` and removes `BOOTSTRAP.md`
 
 ## Execution Flow
 
