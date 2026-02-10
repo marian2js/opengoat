@@ -20,6 +20,7 @@ import {
   Home,
   Folder,
   FolderPlus,
+  Circle,
   RefreshCw,
   Sparkles,
   UserRoundPlus,
@@ -102,6 +103,21 @@ interface Project {
   sessionId: string;
   name: string;
   workingPath: string;
+  updatedAt: number;
+}
+
+interface WorkspaceSessionItem {
+  sessionId: string;
+  sessionKey: string;
+  title: string;
+  updatedAt: number;
+}
+
+interface WorkspaceNode {
+  id: string;
+  name: string;
+  workingPath: string;
+  sessions: WorkspaceSessionItem[];
   updatedAt: number;
 }
 
@@ -293,6 +309,40 @@ export function App(): ReactElement {
       })
       .sort((left, right) => right.updatedAt - left.updatedAt);
   }, [sessions]);
+  const workspaceNodes = useMemo<WorkspaceNode[]>(() => {
+    const sessionsByPath = new Map<string, WorkspaceSessionItem[]>();
+    for (const session of sessions) {
+      const workingPath = session.workingPath?.trim();
+      if (!workingPath) {
+        continue;
+      }
+
+      const items = sessionsByPath.get(workingPath) ?? [];
+      items.push({
+        sessionId: session.sessionId,
+        sessionKey: session.sessionKey,
+        title: session.title,
+        updatedAt: session.updatedAt
+      });
+      sessionsByPath.set(workingPath, items);
+    }
+
+    for (const items of sessionsByPath.values()) {
+      items.sort((left, right) => right.updatedAt - left.updatedAt);
+    }
+
+    return projects
+      .map((project) => {
+        return {
+          id: project.sessionId,
+          name: project.name,
+          workingPath: project.workingPath,
+          sessions: sessionsByPath.get(project.workingPath) ?? [],
+          updatedAt: project.updatedAt
+        };
+      })
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+  }, [projects, sessions]);
   const healthTimestamp = state ? new Date(state.health.timestamp).toLocaleString() : "Loading...";
 
   const metrics = useMemo<MetricCard[]>(() => {
@@ -504,22 +554,42 @@ export function App(): ReactElement {
               {!isSidebarCollapsed ? <span className="ml-2">Add Project</span> : null}
             </button>
 
-            {projects.map((project) => (
-              <button
-                key={project.sessionId}
-                type="button"
-                title={`${project.name} (${project.workingPath})`}
-                onClick={() => {
-                  setActiveView("sessions");
-                }}
-                className={cn(
-                  "mb-1 flex w-full items-center rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
-                  isSidebarCollapsed && "justify-center px-2"
-                )}
-              >
-                <Folder className="size-4 shrink-0" />
-                {!isSidebarCollapsed ? <span className="ml-2 truncate">{project.name}</span> : null}
-              </button>
+            {workspaceNodes.map((workspace) => (
+              <div key={workspace.id} className="mb-1">
+                <button
+                  type="button"
+                  title={`${workspace.name} (${workspace.workingPath})`}
+                  onClick={() => {
+                    setActiveView("sessions");
+                  }}
+                  className={cn(
+                    "flex w-full items-center rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
+                    isSidebarCollapsed && "justify-center px-2"
+                  )}
+                >
+                  <Folder className="size-4 shrink-0" />
+                  {!isSidebarCollapsed ? <span className="ml-2 truncate">{workspace.name}</span> : null}
+                </button>
+
+                {!isSidebarCollapsed ? (
+                  <div className="mt-0.5 space-y-0.5">
+                    {workspace.sessions.map((session) => (
+                      <button
+                        key={session.sessionId}
+                        type="button"
+                        title={`${session.title} (${session.sessionKey})`}
+                        onClick={() => {
+                          setActiveView("sessions");
+                        }}
+                        className="flex w-full items-center rounded-md py-1.5 pl-9 pr-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                      >
+                        <Circle className="mr-2 size-2 shrink-0 fill-current text-info" />
+                        <span className="truncate">{session.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             ))}
           </nav>
 
