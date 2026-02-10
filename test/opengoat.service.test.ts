@@ -198,6 +198,59 @@ describe("OpenGoatService", () => {
     expect(result?.agentId).toBe("goat");
     expect(typeof result?.timestamp).toBe("number");
   });
+
+  it("runs task cron cycle and routes todo/blocked/inactive notifications", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service, provider } = createService(root);
+    await service.initialize();
+    await service.createAgent("Engineer", { type: "individual", reportsTo: "goat" });
+
+    const board = await service.createBoard("goat", { title: "Delivery" });
+    const todoTask = await service.createTask("goat", board.boardId, {
+      title: "Implement endpoint",
+      description: "Build endpoint and tests",
+      assignedTo: "engineer",
+      status: "todo"
+    });
+    const blockedTask = await service.createTask("goat", board.boardId, {
+      title: "Prepare release",
+      description: "Finalize release notes",
+      assignedTo: "engineer",
+      status: "blocked"
+    });
+    await service.addTaskBlocker("engineer", blockedTask.taskId, "Waiting for production credentials");
+
+    const cycle = await service.runTaskCronCycle({ inactiveMinutes: 30 });
+
+    expect(cycle.todoTasks).toBe(1);
+    expect(cycle.blockedTasks).toBe(1);
+    expect(cycle.inactiveAgents).toBe(1);
+    expect(cycle.failed).toBe(0);
+    expect(cycle.dispatches.length).toBe(3);
+
+    const todoInvocation = provider.invocations.find((entry) => entry.agent === "engineer");
+    expect(todoInvocation?.message).toContain(`Task ID: ${todoTask.taskId}`);
+    expect(todoInvocation?.message).toContain("Status: todo");
+
+    const blockedInvocation = provider.invocations.find(
+      (entry) => entry.agent === "goat" && entry.message.includes(`Task #${blockedTask.taskId}`)
+    );
+    expect(blockedInvocation?.message).toContain('assigned to your reportee "@engineer" is blocked because of');
+    expect(blockedInvocation?.message).toContain("Waiting for production credentials");
+
+    const inactivityInvocation = provider.invocations.find(
+      (entry) => entry.agent === "goat" && entry.message.includes('Your reportee "@engineer"')
+    );
+    expect(inactivityInvocation?.message).toContain("no activity in the last 30 minutes");
+
+    const engineerSessions = await service.listSessions("engineer");
+    expect(engineerSessions.some((entry) => entry.sessionKey.includes(`agent_engineer_task_${todoTask.taskId}`))).toBe(true);
+
+    const goatSessions = await service.listSessions("goat");
+    expect(goatSessions.some((entry) => entry.sessionKey.includes(`agent_goat_task_${blockedTask.taskId}`))).toBe(true);
+  });
 });
 
 function createService(
@@ -223,6 +276,7 @@ function createService(
 class FakeOpenClawProvider extends BaseProvider {
   public readonly createdAgents: ProviderCreateAgentOptions[] = [];
   public readonly deletedAgents: ProviderDeleteAgentOptions[] = [];
+  public readonly invocations: ProviderInvokeOptions[] = [];
   public failCreate = false;
   public createAlreadyExists = false;
   public failDelete = false;
@@ -243,7 +297,8 @@ class FakeOpenClawProvider extends BaseProvider {
     });
   }
 
-  public async invoke(_options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
+  public async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
+    this.invocations.push(options);
     return {
       code: 0,
       stdout: "ok\n",

@@ -151,4 +151,25 @@ describe("board/task CLI commands", () => {
     expect(addTaskBlocker).toHaveBeenCalledWith("cto", "task-1234abcd", "Waiting for auth token");
     expect(stdout.output()).toContain("Blockers: 1");
   });
+
+  it("task cron --once runs one cycle", async () => {
+    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
+    const runTaskCronCycle = vi.fn(async () => ({
+      ranAt: "2026-02-10T00:00:00.000Z",
+      scannedTasks: 4,
+      todoTasks: 2,
+      blockedTasks: 1,
+      inactiveAgents: 1,
+      sent: 4,
+      failed: 0,
+      dispatches: []
+    }));
+
+    const { context, stdout } = createContext({ initialize, runTaskCronCycle });
+    const code = await taskCommand.run(["cron", "--once", "--inactive-minutes", "45"], context);
+
+    expect(code).toBe(0);
+    expect(runTaskCronCycle).toHaveBeenCalledWith({ inactiveMinutes: 45 });
+    expect(stdout.output()).toContain("[task-cron] ran=2026-02-10T00:00:00.000Z");
+  });
 });

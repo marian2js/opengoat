@@ -48,7 +48,7 @@ interface EntryRow {
   content: string;
 }
 
-const TASK_STATUSES = ["todo", "doing", "done"] as const;
+const TASK_STATUSES = ["todo", "doing", "blocked", "done"] as const;
 const require = createRequire(import.meta.url);
 
 export class BoardService {
@@ -513,6 +513,7 @@ export class BoardService {
        );`
     );
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_tasks_board_id ON tasks(board_id);");
+    this.execute(db, "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_blockers_task_id ON task_blockers(task_id);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_artifacts_task_id ON task_artifacts(task_id);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_worklog_task_id ON task_worklog(task_id);");

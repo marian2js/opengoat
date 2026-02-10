@@ -37,6 +37,45 @@ export const taskCommand: CliCommand = {
         return 0;
       }
 
+      if (command === "cron") {
+        const parsed = parseCronArgs(args.slice(1));
+        if (!parsed.ok) {
+          context.stderr.write(`${parsed.error}\n`);
+          printHelp(context.stderr);
+          return 1;
+        }
+
+        const runCycle = async (): Promise<number> => {
+          const result = await context.service.runTaskCronCycle({
+            inactiveMinutes: parsed.inactiveMinutes
+          });
+          context.stdout.write(
+            `[task-cron] ran=${result.ranAt} scanned=${result.scannedTasks} todo=${result.todoTasks} blocked=${result.blockedTasks} inactive=${result.inactiveAgents} sent=${result.sent} failed=${result.failed}\n`
+          );
+          for (const dispatch of result.dispatches) {
+            const state = dispatch.ok ? "ok" : "error";
+            const subject = dispatch.taskId ? ` task=${dispatch.taskId}` : dispatch.subjectAgentId ? ` agent=${dispatch.subjectAgentId}` : "";
+            const error = dispatch.error ? ` error=${dispatch.error}` : "";
+            context.stdout.write(
+              `[task-cron] ${state} kind=${dispatch.kind} target=${dispatch.targetAgentId}${subject} session=${dispatch.sessionRef}${error}\n`
+            );
+          }
+          return result.failed > 0 ? 1 : 0;
+        };
+
+        if (parsed.once) {
+          return runCycle();
+        }
+
+        context.stdout.write(
+          `[task-cron] started interval=${parsed.intervalMinutes}m inactive-threshold=${parsed.inactiveMinutes}m (Ctrl+C to stop)\n`
+        );
+        while (true) {
+          await runCycle();
+          await sleep(parsed.intervalMinutes * 60_000);
+        }
+      }
+
       if (command === "list") {
         const boardId = args[1]?.trim();
         if (!boardId) {
@@ -175,9 +214,17 @@ interface TaskEntryArgsOk {
   content: string;
 }
 
+interface TaskCronArgsOk {
+  ok: true;
+  once: boolean;
+  intervalMinutes: number;
+  inactiveMinutes: number;
+}
+
 type ParseCreateResult = { ok: false; error: string } | TaskCreateArgsOk;
 type ParseStatusResult = { ok: false; error: string } | TaskStatusArgsOk;
 type ParseEntryResult = { ok: false; error: string } | TaskEntryArgsOk;
+type ParseCronResult = { ok: false; error: string } | TaskCronArgsOk;
 
 function parseCreateArgs(args: string[]): ParseCreateResult {
   const boardId = args[0]?.trim();
@@ -341,17 +388,69 @@ function parseEntryArgs(args: string[], kind: "blocker" | "artifact" | "worklog"
   };
 }
 
+function parseCronArgs(args: string[]): ParseCronResult {
+  let once = false;
+  let intervalMinutes = 5;
+  let inactiveMinutes = 30;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index];
+    if (token === "--once") {
+      once = true;
+      continue;
+    }
+
+    if (token === "--interval-minutes") {
+      const value = args[index + 1]?.trim();
+      if (!value) {
+        return { ok: false, error: "Missing value for --interval-minutes." };
+      }
+      const parsed = Number.parseInt(value, 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return { ok: false, error: "--interval-minutes must be a positive integer." };
+      }
+      intervalMinutes = parsed;
+      index += 1;
+      continue;
+    }
+
+    if (token === "--inactive-minutes") {
+      const value = args[index + 1]?.trim();
+      if (!value) {
+        return { ok: false, error: "Missing value for --inactive-minutes." };
+      }
+      const parsed = Number.parseInt(value, 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return { ok: false, error: "--inactive-minutes must be a positive integer." };
+      }
+      inactiveMinutes = parsed;
+      index += 1;
+      continue;
+    }
+
+    return { ok: false, error: `Unknown option: ${token}` };
+  }
+
+  return {
+    ok: true,
+    once,
+    intervalMinutes,
+    inactiveMinutes
+  };
+}
+
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write(
-    "  opengoat task create <board-id> --title <title> --description <text> [--as <agent-id>] [--assign <agent-id>] [--status <todo|doing|done>]\n"
+    "  opengoat task create <board-id> --title <title> --description <text> [--as <agent-id>] [--assign <agent-id>] [--status <todo|doing|blocked|done>]\n"
   );
   output.write("  opengoat task list <board-id> [--json]\n");
   output.write("  opengoat task show <task-id> [--json]\n");
-  output.write("  opengoat task status <task-id> <todo|doing|done> [--as <agent-id>]\n");
+  output.write("  opengoat task status <task-id> <todo|doing|blocked|done> [--as <agent-id>]\n");
   output.write("  opengoat task blocker add <task-id> <content> [--as <agent-id>]\n");
   output.write("  opengoat task artifact add <task-id> <content> [--as <agent-id>]\n");
   output.write("  opengoat task worklog add <task-id> <content> [--as <agent-id>]\n");
+  output.write("  opengoat task cron [--once] [--interval-minutes <n>] [--inactive-minutes <n>]\n");
 }
 
 function toErrorMessage(error: unknown): string {
@@ -359,4 +458,10 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }

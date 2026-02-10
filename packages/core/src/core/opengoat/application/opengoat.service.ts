@@ -72,6 +72,27 @@ export interface RuntimeDefaultsSyncResult {
   warnings: string[];
 }
 
+export interface TaskCronDispatchResult {
+  kind: "todo" | "blocked" | "inactive";
+  targetAgentId: string;
+  sessionRef: string;
+  taskId?: string;
+  subjectAgentId?: string;
+  ok: boolean;
+  error?: string;
+}
+
+export interface TaskCronRunResult {
+  ranAt: string;
+  scannedTasks: number;
+  todoTasks: number;
+  blockedTasks: number;
+  inactiveAgents: number;
+  sent: number;
+  failed: number;
+  dispatches: TaskCronDispatchResult[];
+}
+
 export class OpenGoatService {
   private readonly pathsProvider: OpenGoatPathsProvider;
   private readonly agentService: AgentService;
@@ -83,6 +104,7 @@ export class OpenGoatService {
   private readonly orchestrationService: OrchestrationService;
   private readonly boardService: BoardService;
   private readonly commandRunner?: CommandRunnerPort;
+  private readonly nowIso: () => string;
 
   public constructor(deps: OpenGoatServiceDeps) {
     const nowIso = deps.nowIso ?? (() => new Date().toISOString());
@@ -92,6 +114,7 @@ export class OpenGoatService {
       : () => createDefaultProviderRegistry();
 
     this.pathsProvider = deps.pathsProvider;
+    this.nowIso = nowIso;
     this.agentService = new AgentService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
@@ -395,6 +418,105 @@ export class OpenGoatService {
     return this.boardService.addTaskWorklog(paths, actorId, taskId, content);
   }
 
+  public async runTaskCronCycle(options: { inactiveMinutes?: number } = {}): Promise<TaskCronRunResult> {
+    const paths = this.pathsProvider.getPaths();
+    const ranAt = this.resolveNowIso();
+    const manifests = await this.agentManifestService.listManifests(paths);
+    const manifestsById = new Map(manifests.map((manifest) => [manifest.agentId, manifest]));
+    const inactiveMinutes = resolveInactiveMinutes(options.inactiveMinutes);
+    const inactiveCandidates = await this.collectInactiveAgents(paths, manifests, inactiveMinutes);
+
+    const boards = await this.boardService.listBoards(paths);
+    const dispatches: TaskCronDispatchResult[] = [];
+    let scannedTasks = 0;
+    let todoTasks = 0;
+    let blockedTasks = 0;
+
+    for (const board of boards) {
+      const tasks = await this.boardService.listTasks(paths, board.boardId);
+      scannedTasks += tasks.length;
+
+      for (const task of tasks) {
+        if (task.status !== "todo" && task.status !== "blocked") {
+          continue;
+        }
+
+        if (task.status === "todo") {
+          todoTasks += 1;
+          const targetAgentId = task.assignedTo;
+          const sessionRef = buildTaskSessionRef(targetAgentId, task.taskId);
+          const message = buildTodoTaskMessage({
+            boardId: board.boardId,
+            boardTitle: board.title,
+            task
+          });
+          const result = await this.dispatchAutomationMessage(paths, targetAgentId, sessionRef, message);
+          dispatches.push({
+            kind: "todo",
+            targetAgentId,
+            sessionRef,
+            taskId: task.taskId,
+            ok: result.ok,
+            error: result.error
+          });
+          continue;
+        }
+
+        blockedTasks += 1;
+        const assigneeManifest = manifestsById.get(task.assignedTo);
+        const managerAgentId = normalizeAgentId(assigneeManifest?.metadata.reportsTo ?? "") || DEFAULT_AGENT_ID;
+        const sessionRef = buildTaskSessionRef(managerAgentId, task.taskId);
+        const message = buildBlockedTaskMessage({
+          boardId: board.boardId,
+          boardTitle: board.title,
+          task
+        });
+        const result = await this.dispatchAutomationMessage(paths, managerAgentId, sessionRef, message);
+        dispatches.push({
+          kind: "blocked",
+          targetAgentId: managerAgentId,
+          sessionRef,
+          taskId: task.taskId,
+          ok: result.ok,
+          error: result.error
+        });
+      }
+    }
+
+    for (const candidate of inactiveCandidates) {
+      const sessionRef = buildInactiveSessionRef(candidate.managerAgentId, candidate.subjectAgentId);
+      const message = buildInactiveAgentMessage({
+        managerAgentId: candidate.managerAgentId,
+        subjectAgentId: candidate.subjectAgentId,
+        subjectName: candidate.subjectName,
+        role: candidate.role,
+        inactiveMinutes,
+        lastActionTimestamp: candidate.lastActionTimestamp
+      });
+      const result = await this.dispatchAutomationMessage(paths, candidate.managerAgentId, sessionRef, message);
+      dispatches.push({
+        kind: "inactive",
+        targetAgentId: candidate.managerAgentId,
+        sessionRef,
+        subjectAgentId: candidate.subjectAgentId,
+        ok: result.ok,
+        error: result.error
+      });
+    }
+
+    const failed = dispatches.filter((entry) => !entry.ok).length;
+    return {
+      ranAt,
+      scannedTasks,
+      todoTasks,
+      blockedTasks,
+      inactiveAgents: inactiveCandidates.length,
+      sent: dispatches.length - failed,
+      failed,
+      dispatches
+    };
+  }
+
   public async listSkills(agentId = DEFAULT_AGENT_ID): Promise<ResolvedSkill[]> {
     const paths = this.pathsProvider.getPaths();
     return this.skillService.listSkills(paths, agentId);
@@ -477,6 +599,85 @@ export class OpenGoatService {
   public getPaths() {
     return this.pathsProvider.getPaths();
   }
+
+  private async dispatchAutomationMessage(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    agentId: string,
+    sessionRef: string,
+    message: string
+  ): Promise<{ ok: boolean; error?: string }> {
+    try {
+      const result = await this.orchestrationService.runAgent(paths, agentId, {
+        message,
+        sessionRef,
+        env: process.env
+      });
+      if (result.code !== 0) {
+        return {
+          ok: false,
+          error: (result.stderr || result.stdout || `Runtime exited with code ${result.code}.`).trim()
+        };
+      }
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        error: toErrorMessage(error)
+      };
+    }
+  }
+
+  private resolveNowIso(): string {
+    return this.nowIso();
+  }
+
+  private resolveNowMs(): number {
+    return Date.now();
+  }
+
+  private async collectInactiveAgents(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
+    inactiveMinutes: number
+  ): Promise<Array<{
+    managerAgentId: string;
+    subjectAgentId: string;
+    subjectName: string;
+    role: string;
+    lastActionTimestamp?: number;
+  }>> {
+    const nowMs = this.resolveNowMs();
+    const inactiveCutoffMs = nowMs - inactiveMinutes * 60_000;
+    const inactive: Array<{
+      managerAgentId: string;
+      subjectAgentId: string;
+      subjectName: string;
+      role: string;
+      lastActionTimestamp?: number;
+    }> = [];
+
+    for (const manifest of manifests) {
+      const managerAgentId = normalizeAgentId(manifest.metadata.reportsTo ?? "");
+      if (!managerAgentId) {
+        continue;
+      }
+
+      const lastAction = await this.sessionService.getLastAgentAction(paths, manifest.agentId);
+      if (lastAction && lastAction.timestamp >= inactiveCutoffMs) {
+        continue;
+      }
+
+      inactive.push({
+        managerAgentId,
+        subjectAgentId: manifest.agentId,
+        subjectName: manifest.metadata.name,
+        role: manifest.metadata.description,
+        lastActionTimestamp: lastAction?.timestamp
+      });
+    }
+
+    return inactive;
+  }
 }
 
 function containsAlreadyExistsMessage(stdout: string, stderr: string): boolean {
@@ -489,4 +690,111 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function resolveInactiveMinutes(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return 30;
+  }
+  return Math.floor(value);
+}
+
+function buildTaskSessionRef(agentId: string, taskId: string): string {
+  const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
+  const normalizedTaskId = normalizeAgentId(taskId) || "task";
+  return `agent:${normalizedAgentId}:agent_${normalizedAgentId}_task_${normalizedTaskId}`;
+}
+
+function buildInactiveSessionRef(managerAgentId: string, subjectAgentId: string): string {
+  const manager = normalizeAgentId(managerAgentId) || DEFAULT_AGENT_ID;
+  const subject = normalizeAgentId(subjectAgentId) || "agent";
+  return `agent:${manager}:agent_${manager}_inactive_${subject}`;
+}
+
+function buildTodoTaskMessage(params: {
+  boardId: string;
+  boardTitle: string;
+  task: TaskRecord;
+}): string {
+  const blockers = params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "None";
+  const artifacts =
+    params.task.artifacts.length > 0
+      ? params.task.artifacts.map((entry) => `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`).join("\n")
+      : "- None";
+  const worklog =
+    params.task.worklog.length > 0
+      ? params.task.worklog.map((entry) => `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`).join("\n")
+      : "- None";
+
+  return [
+    `Task #${params.task.taskId} is assigned to you and currently in TODO. Please work on it now.`,
+    "",
+    `Board: ${params.boardTitle} (${params.boardId})`,
+    `Task ID: ${params.task.taskId}`,
+    `Title: ${params.task.title}`,
+    `Description: ${params.task.description}`,
+    `Status: ${params.task.status}`,
+    `Owner: @${params.task.owner}`,
+    `Assigned to: @${params.task.assignedTo}`,
+    `Created at: ${params.task.createdAt}`,
+    `Blockers: ${blockers}`,
+    "Artifacts:",
+    artifacts,
+    "Worklog:",
+    worklog
+  ].join("\n");
+}
+
+function buildBlockedTaskMessage(params: {
+  boardId: string;
+  boardTitle: string;
+  task: TaskRecord;
+}): string {
+  const blockerReason = params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "no blocker details were provided";
+  const artifacts =
+    params.task.artifacts.length > 0
+      ? params.task.artifacts.map((entry) => `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`).join("\n")
+      : "- None";
+  const worklog =
+    params.task.worklog.length > 0
+      ? params.task.worklog.map((entry) => `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`).join("\n")
+      : "- None";
+
+  return [
+    `Task #${params.task.taskId}, assigned to your reportee "@${params.task.assignedTo}" is blocked because of ${blockerReason}. Help unblocking it.`,
+    "",
+    `Board: ${params.boardTitle} (${params.boardId})`,
+    `Task ID: ${params.task.taskId}`,
+    `Title: ${params.task.title}`,
+    `Description: ${params.task.description}`,
+    `Status: ${params.task.status}`,
+    `Owner: @${params.task.owner}`,
+    `Assigned to: @${params.task.assignedTo}`,
+    `Created at: ${params.task.createdAt}`,
+    "Artifacts:",
+    artifacts,
+    "Worklog:",
+    worklog
+  ].join("\n");
+}
+
+function buildInactiveAgentMessage(params: {
+  managerAgentId: string;
+  subjectAgentId: string;
+  subjectName: string;
+  role: string;
+  inactiveMinutes: number;
+  lastActionTimestamp?: number;
+}): string {
+  const lastAction =
+    typeof params.lastActionTimestamp === "number" && Number.isFinite(params.lastActionTimestamp)
+      ? new Date(params.lastActionTimestamp).toISOString()
+      : "No recorded assistant actions yet";
+  return [
+    `Your reportee "@${params.subjectAgentId}" (${params.subjectName}) has no activity in the last ${params.inactiveMinutes} minutes.`,
+    `Role: ${params.role}`,
+    `Last action: ${lastAction}`,
+    `Manager: @${params.managerAgentId}`,
+    "Please check in and unblock progress."
+  ].join("\n");
 }

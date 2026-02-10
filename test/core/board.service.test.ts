@@ -1,5 +1,8 @@
+import { readFile as readFileBuffer } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import initSqlJs from "sql.js";
 import { AgentManifestService, AgentService } from "../../packages/core/src/core/agents/index.js";
 import { BoardService } from "../../packages/core/src/core/boards/index.js";
 import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
@@ -8,6 +11,7 @@ import { NodePathPort } from "../../packages/core/src/platform/node/node-path.po
 import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
 const roots: string[] = [];
+const require = createRequire(import.meta.url);
 
 afterEach(async () => {
   while (roots.length > 0) {
@@ -135,7 +139,7 @@ describe("BoardService", () => {
     ).rejects.toThrow("Only board owners can update their own board");
   });
 
-  it("accepts only todo/doing/done as task status values", async () => {
+  it("accepts only todo/doing/blocked/done as task status values", async () => {
     const harness = await createHarness();
 
     const board = await harness.boardService.createBoard(harness.paths, "goat", {
@@ -150,9 +154,12 @@ describe("BoardService", () => {
     });
 
     const task = await harness.boardService.listTasks(harness.paths, board.boardId);
+    const blocked = await harness.boardService.updateTaskStatus(harness.paths, "cto", task[0]!.taskId, "blocked");
+    expect(blocked.status).toBe("blocked");
+
     await expect(
       harness.boardService.updateTaskStatus(harness.paths, "cto", task[0]!.taskId, "in-review")
-    ).rejects.toThrow("Task status must be one of: todo, doing, done.");
+    ).rejects.toThrow("Task status must be one of: todo, doing, blocked, done.");
 
     await expect(
       harness.boardService.createTask(harness.paths, "goat", board.boardId, {
@@ -161,7 +168,30 @@ describe("BoardService", () => {
         assignedTo: "cto",
         status: "in-review"
       })
-    ).rejects.toThrow("Task status must be one of: todo, doing, done.");
+    ).rejects.toThrow("Task status must be one of: todo, doing, blocked, done.");
+  });
+
+  it("creates an index for task status", async () => {
+    const harness = await createHarness();
+
+    const board = await harness.boardService.createBoard(harness.paths, "goat", {
+      title: "Index Board"
+    });
+    await harness.boardService.createTask(harness.paths, "goat", board.boardId, {
+      title: "Indexed task",
+      description: "Ensures DB is initialized"
+    });
+
+    const SQL = await initSqlJs({
+      locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm")
+    });
+    const dbPath = path.join(harness.paths.homeDir, "boards.sqlite");
+    const db = new SQL.Database(new Uint8Array(await readFileBuffer(dbPath)));
+    const rows = db.exec(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_tasks_status';"
+    );
+    expect(rows[0]?.values[0]?.[0]).toBe("idx_tasks_status");
+    db.close();
   });
 });
 
