@@ -1,5 +1,3 @@
-import { writeFile } from "node:fs/promises";
-import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   BaseProvider,
@@ -68,36 +66,7 @@ async function createScenarioHarness(): Promise<{ service: OpenGoatService; root
   await service.createAgent("Product Manager");
   await service.createAgent("Developer");
 
-  await writeAgentManifest(root, "product-manager", "Product Manager", "Creates plans and clarifies scope.");
-  await writeAgentManifest(root, "developer", "Developer", "Implements changes in code.");
-
   return { service, root };
-}
-
-async function writeAgentManifest(root: string, agentId: string, name: string, description: string): Promise<void> {
-  const content =
-    [
-      "---",
-      `id: ${agentId}`,
-      `name: ${name}`,
-      `description: ${description}`,
-      "type: individual",
-      "reportsTo: goat",
-      "discoverable: true",
-      "tags: [scenario, scripted]",
-      "skills: []",
-      "delegation:",
-      "  canReceive: true",
-      "  canDelegate: false",
-      "priority: 70",
-      "---",
-      "",
-      `# ${name}`,
-      "",
-      description
-    ].join("\n") + "\n";
-
-  await writeFile(path.join(root, "workspaces", agentId, "AGENTS.md"), content, "utf8");
 }
 
 class ScriptedProvider extends BaseProvider {

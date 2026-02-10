@@ -1,5 +1,6 @@
 export { SessionService } from "./application/session.service.js";
 export type {
+  AgentLastAction,
   PreparedSessionRun,
   PrepareSessionRunRequest,
   SessionCompactionResult,

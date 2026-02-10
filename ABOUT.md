@@ -25,21 +25,19 @@ Current policy:
 
 ## 3) Agent Model
 
-Agent metadata is stored in workspace `AGENTS.md` front matter.
+Agent metadata is stored in `agents/<agent-id>/config.json`.
 
 Canonical fields:
 
 - `id`
-- `name`
+- `displayName`
 - `description`
-- `type: manager | individual`
-- `reportsTo: <agent-id> | null`
-- `discoverable`
-- `tags`
-- `skills`
-- `delegation.canReceive`
-- `delegation.canDelegate`
-- `priority`
+- `organization.type: manager | individual`
+- `organization.reportsTo: <agent-id> | null`
+- `organization.discoverable`
+- `organization.tags`
+- `organization.priority`
+- `runtime.skills.assigned`
 
 Defaults:
 
@@ -115,12 +113,13 @@ Main structure:
 - `config.json`
 - `agents.json`
 - `CONFIG.md`
-- `workspaces/`
+- `workspaces/` (OpenClaw workspace paths)
 - `agents/`
 - `skills/`
 - `providers/` (OpenClaw runtime connectivity config)
-- `sessions/`
 - `runs/`
+
+OpenClaw owns workspace bootstrap markdown content; OpenGoat does not scaffold those files.
 
 ## 10) Module Layout
 

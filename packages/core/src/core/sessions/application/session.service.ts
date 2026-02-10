@@ -76,6 +76,14 @@ export interface SessionCompactionResult {
   compactedMessages: number;
 }
 
+export interface AgentLastAction {
+  agentId: string;
+  sessionKey: string;
+  sessionId: string;
+  transcriptPath: string;
+  timestamp: number;
+}
+
 export class SessionService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
@@ -237,6 +245,49 @@ export class SessionService {
       .sort((left, right) => right.updatedAt - left.updatedAt);
 
     return summaries;
+  }
+
+  public async getLastAgentAction(
+    paths: OpenGoatPaths,
+    agentId: string
+  ): Promise<AgentLastAction | null> {
+    const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
+    const store = await this.readStore(paths, normalizedAgentId);
+    let latest: AgentLastAction | null = null;
+
+    for (const [sessionKey, entry] of Object.entries(store.sessions)) {
+      if (typeof entry.outputChars === "number" && entry.outputChars <= 0) {
+        continue;
+      }
+
+      const sessionId = entry.sessionId?.trim();
+      if (!sessionId) {
+        continue;
+      }
+
+      const transcriptPath =
+        entry.transcriptFile?.trim() ||
+        this.pathPort.join(resolveSessionsDir(paths, normalizedAgentId), `${sessionId}.jsonl`);
+      const records = await this.readTranscriptRecords(transcriptPath);
+
+      for (const record of records) {
+        if (!isSessionTranscriptMessage(record) || record.role !== "assistant") {
+          continue;
+        }
+
+        if (!latest || record.timestamp > latest.timestamp) {
+          latest = {
+            agentId: normalizedAgentId,
+            sessionKey,
+            sessionId,
+            transcriptPath,
+            timestamp: record.timestamp
+          };
+        }
+      }
+    }
+
+    return latest;
   }
 
   public async renameSession(

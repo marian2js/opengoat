@@ -6,6 +6,7 @@ import { agentCommand } from "./commands/agent.command.js";
 import { agentCreateCommand } from "./commands/agent-create.command.js";
 import { agentDeleteCommand } from "./commands/agent-delete.command.js";
 import { agentListCommand } from "./commands/agent-list.command.js";
+import { agentLastActionCommand } from "./commands/agent-last-action.command.js";
 import { agentProviderGetCommand } from "./commands/agent-provider-get.command.js";
 import { agentProviderSetCommand } from "./commands/agent-provider-set.command.js";
 import { agentRunCommand } from "./commands/agent-run.command.js";
@@ -17,6 +18,7 @@ import { providerListCommand } from "./commands/provider-list.command.js";
 import { routeCommand } from "./commands/route.command.js";
 import { scenarioCommand } from "./commands/scenario.command.js";
 import { scenarioRunCommand } from "./commands/scenario-run.command.js";
+import { boardCommand } from "./commands/board.command.js";
 import { skillCommand } from "./commands/skill.command.js";
 import { skillInstallCommand } from "./commands/skill-install.command.js";
 import { skillListCommand } from "./commands/skill-list.command.js";
@@ -27,6 +29,7 @@ import { sessionListCommand } from "./commands/session-list.command.js";
 import { sessionRemoveCommand } from "./commands/session-remove.command.js";
 import { sessionRenameCommand } from "./commands/session-rename.command.js";
 import { sessionResetCommand } from "./commands/session-reset.command.js";
+import { taskCommand } from "./commands/task.command.js";
 import { CommandRouter } from "./framework/router.js";
 
 export async function runCli(argv: string[]): Promise<number> {
@@ -47,6 +50,8 @@ export async function runCli(argv: string[]): Promise<number> {
       acpCommand,
       onboardCommand,
       routeCommand,
+      boardCommand,
+      taskCommand,
       scenarioCommand,
       scenarioRunCommand,
       providerCommand,
@@ -68,6 +73,7 @@ export async function runCli(argv: string[]): Promise<number> {
       agentProviderGetCommand,
       agentProviderSetCommand,
       agentListCommand,
+      agentLastActionCommand,
       agentRunCommand
     ],
     {

@@ -1,4 +1,3 @@
-import { DEFAULT_BOOTSTRAP_MAX_CHARS, WorkspaceContextService } from "../../agents/index.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
@@ -28,7 +27,6 @@ interface ProviderServiceDeps {
     | Promise<ProviderRegistry>
     | ProviderRegistry
     | (() => Promise<ProviderRegistry> | ProviderRegistry);
-  workspaceContextService: WorkspaceContextService;
   skillService: SkillService;
   nowIso: () => string;
   logger?: Logger;
@@ -36,11 +34,7 @@ interface ProviderServiceDeps {
 
 interface AgentConfigShape {
   displayName?: string;
-  prompt?: {
-    bootstrapFiles?: string[];
-  };
   runtime?: {
-    bootstrapMaxChars?: number;
     skills?: AgentSkillsConfig;
   };
   [key: string]: unknown;
@@ -76,7 +70,6 @@ export class ProviderService {
     | ProviderRegistry
     | (() => Promise<ProviderRegistry> | ProviderRegistry);
   private providerRegistryPromise?: Promise<ProviderRegistry>;
-  private readonly workspaceContextService: WorkspaceContextService;
   private readonly skillService: SkillService;
   private readonly nowIso: () => string;
   private readonly logger: Logger;
@@ -85,7 +78,6 @@ export class ProviderService {
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
     this.providerRegistryInput = deps.providerRegistry;
-    this.workspaceContextService = deps.workspaceContextService;
     this.skillService = deps.skillService;
     this.nowIso = deps.nowIso;
     this.logger = (deps.logger ?? createNoopLogger()).child({ scope: "provider-service" });
@@ -262,17 +254,13 @@ export class ProviderService {
     const registry = await this.getProviderRegistry();
     const provider = registry.create(OPENCLAW_PROVIDER_ID);
     const config = await this.readAgentConfig(paths, agentId);
-    const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
-    const contextSystemPrompt = await this.buildInternalWorkspacePrompt(
-      paths,
-      agentId,
-      config,
-      workspaceDir,
-      options.skillsPromptOverride
-    );
+    const skillsPrompt =
+      typeof options.skillsPromptOverride === "string" && options.skillsPromptOverride.trim().length > 0
+        ? options.skillsPromptOverride.trim()
+        : (await this.skillService.buildSkillsPrompt(paths, agentId, config.runtime?.skills)).prompt.trim();
     const mergedSystemPrompt = [
       options.systemPrompt?.trim() || "",
-      contextSystemPrompt
+      skillsPrompt
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -280,7 +268,7 @@ export class ProviderService {
     const invokeOptions: ProviderInvokeOptions = {
       ...options,
       systemPrompt: mergedSystemPrompt || undefined,
-      cwd: options.cwd || workspaceDir,
+      cwd: options.cwd,
       env: await this.resolveProviderEnv(paths, options.env),
       agent: provider.capabilities.agent ? options.agent || agentId : options.agent
     };
@@ -390,34 +378,6 @@ export class ProviderService {
     };
   }
 
-  private async buildInternalWorkspacePrompt(
-    paths: OpenGoatPaths,
-    agentId: string,
-    config: AgentConfigShape,
-    workspaceDir: string,
-    skillsPromptOverride?: string
-  ): Promise<string> {
-    const bootstrapFiles = await this.workspaceContextService.loadWorkspaceBootstrapFiles(
-      workspaceDir,
-      this.workspaceContextService.resolveBootstrapFileNames(config.prompt?.bootstrapFiles)
-    );
-    const contextFiles = this.workspaceContextService.buildContextFiles(bootstrapFiles, {
-      maxChars: resolveBootstrapMaxChars(config.runtime?.bootstrapMaxChars)
-    });
-    const systemPrompt = this.workspaceContextService.buildSystemPrompt({
-      agentId,
-      displayName: config.displayName?.trim() || agentId,
-      workspaceDir,
-      nowIso: this.nowIso(),
-      contextFiles
-    });
-    const skillsPrompt =
-      typeof skillsPromptOverride === "string" && skillsPromptOverride.trim().length > 0
-        ? skillsPromptOverride.trim()
-        : (await this.skillService.buildSkillsPrompt(paths, agentId, config.runtime?.skills)).prompt.trim();
-    return [systemPrompt, skillsPrompt].filter(Boolean).join("\n\n");
-  }
-
   private async readAgentConfig(paths: OpenGoatPaths, agentId: string): Promise<AgentConfigShape> {
     const configPath = this.getAgentConfigPath(paths, agentId);
     const exists = await this.fileSystem.exists(configPath);
@@ -479,14 +439,6 @@ export class ProviderService {
 
     return Promise.resolve(input);
   }
-}
-
-function resolveBootstrapMaxChars(raw: number | undefined): number {
-  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
-    return Math.floor(raw);
-  }
-
-  return DEFAULT_BOOTSTRAP_MAX_CHARS;
 }
 
 function isProviderStoredConfig(value: unknown): value is ProviderStoredConfig {

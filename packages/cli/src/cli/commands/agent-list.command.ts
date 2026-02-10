@@ -2,7 +2,7 @@ import type { CliCommand } from "../framework/command.js";
 
 export const agentListCommand: CliCommand = {
   path: ["agent", "list"],
-  description: "List known agents from ~/.opengoat/workspaces.",
+  description: "List known agents from OpenGoat organization state.",
   async run(_args, context): Promise<number> {
     const agents = await context.service.listAgents();
 
@@ -13,12 +13,13 @@ export const agentListCommand: CliCommand = {
 
     for (const agent of agents) {
       const displayName = agent.displayName.trim();
+      const role = agent.role.trim();
       if (!displayName || displayName.toLowerCase() === agent.id.toLowerCase()) {
-        context.stdout.write(`${agent.id}\n`);
+        context.stdout.write(`${agent.id} [${role}]\n`);
         continue;
       }
 
-      context.stdout.write(`${agent.id} (${displayName})\n`);
+      context.stdout.write(`${agent.id} (${displayName}) [${role}]\n`);
     }
 
     return 0;

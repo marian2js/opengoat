@@ -1,9 +1,11 @@
 export interface AgentIdentity {
   id: string;
   displayName: string;
+  role?: string;
 }
 
 export interface AgentDescriptor extends AgentIdentity {
+  role: string;
   workspaceDir: string;
   internalConfigDir: string;
 }
@@ -25,6 +27,7 @@ export interface CreateAgentOptions {
   type?: "manager" | "individual";
   reportsTo?: string | null;
   skills?: string[];
+  role?: string;
 }
 
 export interface AgentManagerUpdateResult {

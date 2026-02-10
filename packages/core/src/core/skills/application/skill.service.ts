@@ -1,10 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import {
-  formatAgentManifestMarkdown,
   MANAGER_SKILL_ID,
-  normalizeAgentManifestMetadata,
-  parseAgentManifestMarkdown
 } from "../../agents/domain/agent-manifest.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
@@ -26,6 +23,10 @@ interface SkillServiceDeps {
 }
 
 interface AgentConfigShape {
+  organization?: {
+    type?: "manager" | "individual";
+    [key: string]: unknown;
+  };
   runtime?: {
     skills?: AgentSkillsConfig;
   };
@@ -330,31 +331,20 @@ export class SkillService {
       return;
     }
 
-    const manifestPath = this.pathPort.join(paths.workspacesDir, agentId, "AGENTS.md");
-    if (!(await this.fileSystem.exists(manifestPath))) {
+    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+    if (!(await this.fileSystem.exists(configPath))) {
       return;
     }
 
-    const raw = await this.fileSystem.readFile(manifestPath);
-    const parsed = parseAgentManifestMarkdown(raw);
-    const metadata = normalizeAgentManifestMetadata({
-      agentId,
-      displayName: parsed.data.name?.trim() || agentId,
-      metadata: {
-        ...parsed.data,
-        type: "manager",
-        skills: [...(parsed.data.skills ?? []), MANAGER_SKILL_ID],
-        delegation: {
-          canReceive: parsed.data.delegation?.canReceive ?? true,
-          canDelegate: true
-        }
-      }
-    });
-
-    const next = formatAgentManifestMarkdown(metadata, parsed.body);
-    if (next !== raw) {
-      await this.fileSystem.writeFile(manifestPath, next);
-    }
+    const raw = await this.fileSystem.readFile(configPath);
+    const parsed = JSON.parse(raw) as AgentConfigShape;
+    const organizationRecord =
+      parsed.organization && typeof parsed.organization === "object" && !Array.isArray(parsed.organization)
+        ? (parsed.organization as Record<string, unknown>)
+        : {};
+    organizationRecord.type = "manager";
+    parsed.organization = organizationRecord as AgentConfigShape["organization"];
+    await this.fileSystem.writeFile(configPath, `${JSON.stringify(parsed, null, 2)}\n`);
   }
 }
 

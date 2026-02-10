@@ -3,15 +3,7 @@ import {
   renderAgentsIndex,
   renderGlobalConfig,
   renderGlobalConfigMarkdown,
-  renderInternalAgentConfig,
-  renderInternalAgentMemoryMarkdown,
-  renderInternalAgentState,
-  renderWorkspaceAgentsMarkdown,
-  renderWorkspaceBootstrapMarkdown,
-  renderWorkspaceContextMarkdown,
-  renderWorkspaceHeartbeatMarkdown,
-  renderWorkspaceIdentityMarkdown,
-  renderWorkspaceMetadata
+  renderInternalAgentConfig
 } from "../../packages/core/src/core/templates/default-templates.js";
 
 describe("default templates", () => {
@@ -34,57 +26,19 @@ describe("default templates", () => {
     expect(index.updatedAt).toBe("2026-02-06T00:00:00.000Z");
   });
 
-  it("renders workspace and internal markdown/json templates", () => {
+  it("renders internal agent config templates", () => {
     const identity = { id: "goat", displayName: "Goat" };
-
-    const agentsMarkdown = renderWorkspaceAgentsMarkdown(identity);
-    expect(agentsMarkdown).toContain("# Goat (OpenGoat Agent)");
-    expect(agentsMarkdown).toContain("Record important decisions in `CONTEXT.md`.");
-
-    const contextMarkdown = renderWorkspaceContextMarkdown(identity);
-    expect(contextMarkdown).toContain("# Context (Goat)");
-
-    expect(renderWorkspaceIdentityMarkdown(identity)).toContain("- id: goat");
-    expect(renderWorkspaceHeartbeatMarkdown()).toContain("HEARTBEAT_OK");
-    expect(renderWorkspaceBootstrapMarkdown(identity)).toContain("First-run checklist:");
-
-    const metadata = renderWorkspaceMetadata(identity);
-    expect(metadata).toEqual({
-      schemaVersion: 1,
-      id: "goat",
-      displayName: "Goat",
-      kind: "workspace",
-      createdBy: "opengoat"
-    });
-
     const internalConfig = renderInternalAgentConfig(identity) as {
-      prompt: { bootstrapFiles: string[] };
-      runtime: { contextBudgetTokens: number; bootstrapMaxChars: number; adapter: string };
+      role: string;
+      organization: { type: string; reportsTo: string | null };
+      runtime: { adapter: string; sessions: { mainKey: string }; skills: { assigned: string[] } };
     };
-    expect(internalConfig.prompt.bootstrapFiles).toEqual([
-      "AGENTS.md",
-      "SOUL.md",
-      "TOOLS.md",
-      "IDENTITY.md",
-      "USER.md",
-      "HEARTBEAT.md",
-      "CONTEXT.md",
-      "BOOTSTRAP.md",
-      "MEMORY.md",
-      "memory.md"
-    ]);
-    expect(internalConfig.runtime.contextBudgetTokens).toBe(128_000);
-    expect(internalConfig.runtime.bootstrapMaxChars).toBe(20_000);
+    expect(internalConfig.role).toBe("Head of Organization");
+    expect(internalConfig.organization.type).toBe("manager");
+    expect(internalConfig.organization.reportsTo).toBeNull();
     expect(internalConfig.runtime.adapter).toBe("openclaw");
-
-    const internalMemory = renderInternalAgentMemoryMarkdown(identity);
-    expect(internalMemory).toContain("# Internal Memory (Goat)");
-
-    expect(renderInternalAgentState()).toEqual({
-      schemaVersion: 1,
-      status: "idle",
-      lastRunAt: null
-    });
+    expect(internalConfig.runtime.sessions.mainKey).toBe("main");
+    expect(internalConfig.runtime.skills.assigned).toEqual(["manager"]);
   });
 
   it("renders human-readable global config markdown", () => {
@@ -92,7 +46,7 @@ describe("default templates", () => {
 
     expect(markdown).toContain("# OpenGoat Home");
     expect(markdown).toContain("`config.json`");
-    expect(markdown).toContain("`workspaces/`");
-    expect(markdown).toContain("Markdown and JSON");
+    expect(markdown).toContain("`agents/`");
+    expect(markdown).toContain("OpenClaw remains the source");
   });
 });

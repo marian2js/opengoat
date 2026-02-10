@@ -1,6 +1,5 @@
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { WorkspaceContextService } from "../../packages/core/src/core/agents/index.js";
 import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
 import { InvalidProviderConfigError, ProviderService } from "../../packages/core/src/core/providers/index.js";
 import { SkillService } from "../../packages/core/src/core/skills/index.js";
@@ -40,7 +39,7 @@ describe("ProviderService (OpenClaw runtime)", () => {
     expect(providers[0]?.id).toBe("openclaw");
   });
 
-  it("invokes agent with injected workspace context", async () => {
+  it("invokes agent with OpenGoat skill prompt context", async () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
     const { paths, fileSystem } = await createPaths(root);
@@ -52,8 +51,8 @@ describe("ProviderService (OpenClaw runtime)", () => {
     const result = await service.invokeAgent(paths, "goat", { message: "hello" });
 
     expect(result.providerId).toBe("openclaw");
-    expect(provider.lastInvoke?.cwd).toBe(path.join(paths.workspacesDir, "goat"));
-    expect(provider.lastInvoke?.systemPrompt).toContain("# Project Context");
+    expect(provider.lastInvoke?.cwd).toBeUndefined();
+    expect(provider.lastInvoke?.systemPrompt).toContain("## Skills");
     expect(provider.lastInvoke?.message).toBe("hello");
     expect(provider.lastInvoke?.agent).toBe("goat");
   });
@@ -134,7 +133,6 @@ function createProviderService(fileSystem: NodeFileSystem, registry: ProviderReg
     fileSystem,
     pathPort,
     providerRegistry: registry,
-    workspaceContextService: new WorkspaceContextService({ fileSystem, pathPort }),
     skillService: new SkillService({ fileSystem, pathPort }),
     nowIso: () => "2026-02-06T00:00:00.000Z"
   });
@@ -167,29 +165,7 @@ async function createPaths(root: string): Promise<{ paths: OpenGoatPaths; fileSy
 }
 
 async function seedAgent(fileSystem: NodeFileSystem, paths: OpenGoatPaths, agentId: string): Promise<void> {
-  await fileSystem.ensureDir(path.join(paths.workspacesDir, agentId));
   await fileSystem.ensureDir(path.join(paths.agentsDir, agentId));
-  await fileSystem.writeFile(
-    path.join(paths.workspacesDir, agentId, "AGENTS.md"),
-    [
-      "---",
-      `id: ${agentId}`,
-      "name: Goat",
-      "description: Main manager.",
-      "type: manager",
-      "reportsTo: null",
-      "discoverable: true",
-      "tags: [manager]",
-      "skills: [manager]",
-      "delegation:",
-      "  canReceive: true",
-      "  canDelegate: true",
-      "priority: 100",
-      "---",
-      "",
-      "# Goat"
-    ].join("\n")
-  );
   await fileSystem.writeFile(
     path.join(paths.agentsDir, agentId, "config.json"),
     JSON.stringify(

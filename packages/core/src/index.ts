@@ -6,6 +6,7 @@ export * from "./core/ports/path.port.js";
 export * from "./core/ports/paths-provider.port.js";
 export * from "./core/agents/index.js";
 export * from "./core/bootstrap/index.js";
+export * from "./core/boards/index.js";
 export * from "./core/providers/index.js";
 export * from "./core/opengoat/index.js";
 export * from "./core/orchestration/index.js";

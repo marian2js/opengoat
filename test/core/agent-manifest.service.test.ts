@@ -18,31 +18,38 @@ afterEach(async () => {
 });
 
 describe("AgentManifestService", () => {
-  it("parses AGENTS.md front matter metadata", async () => {
+  it("reads metadata from internal agent config", async () => {
     const { service, fileSystem, paths } = await createHarness();
     await seedAgent(fileSystem, paths, "researcher", "Researcher");
 
     await fileSystem.writeFile(
-      path.join(paths.workspacesDir, "researcher", "AGENTS.md"),
-      [
-        "---",
-        "id: researcher",
-        "name: Researcher",
-        "description: Handles research tasks",
-        "type: specialist",
-        "reportsTo: goat",
-        "discoverable: false",
-        "tags: [research, docs]",
-        "skills: [research, citations]",
-        "delegation:",
-        "  canReceive: true",
-        "  canDelegate: false",
-        "priority: 80",
-        "---",
-        "",
-        "# Research Agent",
-        "Use citations."
-      ].join("\n") + "\n"
+      path.join(paths.agentsDir, "researcher", "config.json"),
+      JSON.stringify(
+        {
+          schemaVersion: 2,
+          id: "researcher",
+          displayName: "Researcher",
+          description: "Handles research tasks",
+          organization: {
+            type: "individual",
+            reportsTo: "goat",
+            discoverable: false,
+            tags: ["research", "docs"],
+            priority: 80,
+            delegation: {
+              canReceive: true,
+              canDelegate: false
+            }
+          },
+          runtime: {
+            skills: {
+              assigned: ["research", "citations"]
+            }
+          }
+        },
+        null,
+        2
+      ) + "\n"
     );
 
     const manifest = await service.getManifest(paths, "researcher");
@@ -54,12 +61,12 @@ describe("AgentManifestService", () => {
     expect(manifest.metadata.tags).toEqual(["research", "docs"]);
     expect(manifest.metadata.skills).toEqual(["research", "citations"]);
     expect(manifest.metadata.priority).toBe(80);
-    expect(manifest.source).toBe("frontmatter");
+    expect(manifest.source).toBe("config");
   });
 
-  it("derives defaults when AGENTS.md is missing", async () => {
+  it("derives defaults when config is missing", async () => {
     const { service, fileSystem, paths } = await createHarness();
-    await seedAgent(fileSystem, paths, "developer", "Developer");
+    await fileSystem.ensureDir(path.join(paths.agentsDir, "developer"));
 
     const manifest = await service.getManifest(paths, "developer");
     expect(manifest.source).toBe("derived");
@@ -113,10 +120,9 @@ async function seedAgent(
   agentId: string,
   displayName: string
 ): Promise<void> {
-  await fileSystem.ensureDir(path.join(paths.workspacesDir, agentId));
   await fileSystem.ensureDir(path.join(paths.agentsDir, agentId));
   await fileSystem.writeFile(
-    path.join(paths.workspacesDir, agentId, "workspace.json"),
-    JSON.stringify({ displayName }, null, 2) + "\n"
+    path.join(paths.agentsDir, agentId, "config.json"),
+    JSON.stringify({ schemaVersion: 2, id: agentId, displayName }, null, 2) + "\n"
   );
 }

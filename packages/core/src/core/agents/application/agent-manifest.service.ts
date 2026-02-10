@@ -1,9 +1,9 @@
+import { normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import {
   normalizeAgentManifestMetadata,
-  parseAgentManifestMarkdown,
   type AgentManifest
 } from "../domain/agent-manifest.js";
 
@@ -12,8 +12,25 @@ interface AgentManifestServiceDeps {
   pathPort: PathPort;
 }
 
-interface WorkspaceMetadataShape {
+interface AgentConfigShape {
   displayName?: string;
+  description?: string;
+  organization?: {
+    type?: "manager" | "individual";
+    reportsTo?: string | null;
+    discoverable?: boolean;
+    tags?: string[];
+    priority?: number;
+    delegation?: {
+      canReceive?: boolean;
+      canDelegate?: boolean;
+    };
+  };
+  runtime?: {
+    skills?: {
+      assigned?: string[];
+    };
+  };
 }
 
 export class AgentManifestService {
@@ -26,54 +43,50 @@ export class AgentManifestService {
   }
 
   public async listManifests(paths: OpenGoatPaths): Promise<AgentManifest[]> {
-    const agentIds = await this.fileSystem.listDirectories(paths.workspacesDir);
+    const agentIds = await this.fileSystem.listDirectories(paths.agentsDir);
     const manifests = await Promise.all(agentIds.map((agentId) => this.getManifest(paths, agentId)));
     return manifests.sort((left, right) => left.agentId.localeCompare(right.agentId));
   }
 
-  public async getManifest(paths: OpenGoatPaths, agentId: string): Promise<AgentManifest> {
+  public async getManifest(paths: OpenGoatPaths, rawAgentId: string): Promise<AgentManifest> {
+    const agentId = normalizeAgentId(rawAgentId) || rawAgentId.trim().toLowerCase();
     const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
-    const manifestPath = this.pathPort.join(workspaceDir, "AGENTS.md");
-    const displayName = await this.readAgentDisplayName(workspaceDir, agentId);
+    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+    const config = await this.readJsonIfPresent<AgentConfigShape>(configPath);
 
-    const exists = await this.fileSystem.exists(manifestPath);
-    if (!exists) {
-      const metadata = normalizeAgentManifestMetadata({
-        agentId,
-        displayName
-      });
-      return {
-        agentId,
-        filePath: manifestPath,
-        workspaceDir,
-        metadata,
-        body: "",
-        source: "derived"
-      };
-    }
+    const displayName = config?.displayName?.trim() || agentId;
+    const assignedSkills = Array.isArray(config?.runtime?.skills?.assigned)
+      ? config.runtime?.skills?.assigned ?? []
+      : [];
 
-    const markdown = await this.fileSystem.readFile(manifestPath);
-    const parsed = parseAgentManifestMarkdown(markdown);
     const metadata = normalizeAgentManifestMetadata({
       agentId,
       displayName,
-      metadata: parsed.data
+      metadata: {
+        id: agentId,
+        name: displayName,
+        description: config?.description,
+        type: config?.organization?.type,
+        reportsTo: normalizeReportsTo(config?.organization?.reportsTo),
+        discoverable: config?.organization?.discoverable,
+        tags: config?.organization?.tags,
+        skills: assignedSkills,
+        delegation: {
+          canReceive: config?.organization?.delegation?.canReceive,
+          canDelegate: config?.organization?.delegation?.canDelegate
+        },
+        priority: config?.organization?.priority
+      }
     });
 
     return {
       agentId,
-      filePath: manifestPath,
+      filePath: configPath,
       workspaceDir,
       metadata,
-      body: parsed.body,
-      source: parsed.hasFrontMatter ? "frontmatter" : "derived"
+      body: "",
+      source: config ? "config" : "derived"
     };
-  }
-
-  private async readAgentDisplayName(workspaceDir: string, agentId: string): Promise<string> {
-    const workspaceMetadataPath = this.pathPort.join(workspaceDir, "workspace.json");
-    const workspaceMetadata = await this.readJsonIfPresent<WorkspaceMetadataShape>(workspaceMetadataPath);
-    return workspaceMetadata?.displayName?.trim() || agentId;
   }
 
   private async readJsonIfPresent<T>(filePath: string): Promise<T | null> {
@@ -89,4 +102,16 @@ export class AgentManifestService {
       return null;
     }
   }
+}
+
+function normalizeReportsTo(value: string | null | undefined): string | null | undefined {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = normalizeAgentId(value);
+  return normalized || null;
 }

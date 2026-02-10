@@ -11,8 +11,6 @@ import {
 } from "../../templates/default-templates.js";
 import { AgentService } from "../../agents/application/agent.service.js";
 
-const LEGACY_ORCHESTRATOR_AGENT_ID = "orchestrator";
-
 interface BootstrapServiceDeps {
   fileSystem: FileSystemPort;
   pathsProvider: OpenGoatPathsProvider;
@@ -43,7 +41,6 @@ export class BootstrapService {
     await this.ensureDirectory(paths.agentsDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.skillsDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.providersDir, createdPaths, skippedPaths);
-    await this.ensureDirectory(paths.sessionsDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.runsDir, createdPaths, skippedPaths);
 
     const now = this.nowIso();
@@ -65,13 +62,12 @@ export class BootstrapService {
     const agentResult = await this.agentService.ensureAgent(paths, ceo, {
       type: "manager",
       reportsTo: null,
-      skills: ["manager"]
+      skills: ["manager"],
+      role: "Head of Organization"
     });
 
     createdPaths.push(...agentResult.createdPaths);
     skippedPaths.push(...agentResult.skippedPaths);
-
-    await this.cleanupLegacyOrchestrator(paths, skippedPaths);
 
     const managerSkillDir = `${paths.skillsDir}/manager`;
     const managerSkillFile = `${managerSkillDir}/SKILL.md`;
@@ -187,20 +183,6 @@ export class BootstrapService {
     }
   }
 
-  private async cleanupLegacyOrchestrator(
-    paths: InitializationResult["paths"],
-    skippedPaths: string[]
-  ): Promise<void> {
-    const agents = await this.agentService.listAgents(paths);
-    const hasLegacyOrchestrator = agents.some((agent) => agent.id === LEGACY_ORCHESTRATOR_AGENT_ID);
-    if (!hasLegacyOrchestrator) {
-      return;
-    }
-
-    const removal = await this.agentService.removeAgent(paths, LEGACY_ORCHESTRATOR_AGENT_ID);
-    skippedPaths.push(...removal.removedPaths);
-    skippedPaths.push(...removal.skippedPaths);
-  }
 }
 
 function dedupe(values: string[]): string[] {

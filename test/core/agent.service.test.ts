@@ -26,6 +26,14 @@ describe("AgentService", () => {
       id: "research-analyst",
       displayName: "Research Analyst"
     });
+    expect(service.normalizeAgentName("John Doe")).toEqual({
+      id: "john-doe",
+      displayName: "John Doe"
+    });
+    expect(service.normalizeAgentName("Developer")).toEqual({
+      id: "developer",
+      displayName: "Developer"
+    });
 
     expect(() => service.normalizeAgentName("   ")).toThrowError("Agent name cannot be empty.");
     expect(() => service.normalizeAgentName("***")).toThrowError(
@@ -33,7 +41,7 @@ describe("AgentService", () => {
     );
   });
 
-  it("creates workspace and internal files for an agent", async () => {
+  it("creates internal agent config for an agent", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
 
     const result = await service.ensureAgent(paths, {
@@ -44,24 +52,20 @@ describe("AgentService", () => {
     expect(result.agent.workspaceDir).toBe(path.join(paths.workspacesDir, "goat"));
     expect(result.createdPaths.length).toBeGreaterThan(0);
 
-    const agentsMd = await readFile(path.join(result.agent.workspaceDir, "AGENTS.md"), "utf-8");
-    expect(agentsMd).toContain("# Goat (OpenGoat Agent)");
-    expect(await readFile(path.join(result.agent.workspaceDir, "SOUL.md"), "utf-8")).toContain("# Soul");
-    expect(await readFile(path.join(result.agent.workspaceDir, "IDENTITY.md"), "utf-8")).toContain(
-      "- id: goat"
-    );
-    expect(await readFile(path.join(result.agent.workspaceDir, "BOOTSTRAP.md"), "utf-8")).toContain(
-      "First-run checklist"
-    );
-    const internalState = JSON.parse(
-      await readFile(path.join(result.agent.internalConfigDir, "state.json"), "utf-8")
-    ) as { status: string };
-    expect(internalState.status).toBe("idle");
+    const config = JSON.parse(
+      await readFile(path.join(result.agent.internalConfigDir, "config.json"), "utf-8")
+    ) as { role?: string; runtime?: { adapter?: string }; organization?: { type?: string; reportsTo?: string | null } };
+    expect(config.role).toBe("Head of Organization");
+    expect(config.runtime?.adapter).toBe("openclaw");
+    expect(config.organization?.type).toBe("manager");
+    expect(config.organization?.reportsTo).toBeNull();
+    expect(result.agent.role).toBe("Head of Organization");
 
     const index = JSON.parse(await readFile(paths.agentsIndexJsonPath, "utf-8")) as {
       agents: string[];
     };
     expect(index.agents).toEqual(["goat"]);
+    expect(result.createdPaths).not.toContain(path.join(result.agent.workspaceDir, "AGENTS.md"));
   });
 
   it("defaults non-goat reportsTo to goat when omitted", async () => {
@@ -71,9 +75,6 @@ describe("AgentService", () => {
       id: "developer",
       displayName: "Developer"
     });
-
-    const agentsMd = await readFile(path.join(result.agent.workspaceDir, "AGENTS.md"), "utf-8");
-    expect(agentsMd).toContain("reportsTo: goat");
 
     const config = JSON.parse(await readFile(path.join(result.agent.internalConfigDir, "config.json"), "utf-8")) as {
       organization?: { reportsTo?: string | null };
@@ -95,16 +96,34 @@ describe("AgentService", () => {
       }
     );
 
-    const agentsMd = await readFile(path.join(result.agent.workspaceDir, "AGENTS.md"), "utf-8");
-    expect(agentsMd).toContain("reportsTo: cto");
-
     const config = JSON.parse(await readFile(path.join(result.agent.internalConfigDir, "config.json"), "utf-8")) as {
       organization?: { reportsTo?: string | null };
     };
     expect(config.organization?.reportsTo).toBe("cto");
   });
 
-  it("does not seed orchestrator default skill for non-default agents", async () => {
+  it("stores explicit role when provided during creation", async () => {
+    const { service, paths } = await createAgentServiceWithPaths();
+
+    const result = await service.ensureAgent(
+      paths,
+      {
+        id: "neo",
+        displayName: "Neo"
+      },
+      {
+        role: "Developer"
+      }
+    );
+
+    const config = JSON.parse(await readFile(path.join(result.agent.internalConfigDir, "config.json"), "utf-8")) as {
+      role?: string;
+    };
+    expect(config.role).toBe("Developer");
+    expect(result.agent.role).toBe("Developer");
+  });
+
+  it("does not create workspace bootstrap markdown for non-default agents", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
 
     const result = await service.ensureAgent(paths, {
@@ -112,8 +131,8 @@ describe("AgentService", () => {
       displayName: "Developer"
     });
 
-    const defaultSkillPath = path.join(result.agent.workspaceDir, "skills", "opengoat-skill", "SKILL.md");
-    expect(await fileSystem.exists(defaultSkillPath)).toBe(false);
+    expect(await fileSystem.exists(path.join(result.agent.workspaceDir, "AGENTS.md"))).toBe(false);
+    expect(await fileSystem.exists(path.join(result.agent.workspaceDir, "SOUL.md"))).toBe(false);
   });
 
   it("never changes global default agent during agent creation", async () => {
@@ -176,54 +195,42 @@ describe("AgentService", () => {
     expect(index.agents).toEqual(["alpha", "beta", "zeta"]);
   });
 
-  it("lists agents sorted and falls back to id when metadata is unreadable", async () => {
+  it("lists agents sorted and falls back to id when config is unreadable", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
 
-    await fileSystem.ensureDir(path.join(paths.workspacesDir, "z-agent"));
+    await fileSystem.ensureDir(path.join(paths.agentsDir, "z-agent"));
     await fileSystem.writeFile(
-      path.join(paths.workspacesDir, "z-agent", "workspace.json"),
+      path.join(paths.agentsDir, "z-agent", "config.json"),
       JSON.stringify({ displayName: "Zed" }, null, 2) + "\n"
     );
-    await fileSystem.ensureDir(path.join(paths.workspacesDir, "a-agent"));
-    await fileSystem.writeFile(path.join(paths.workspacesDir, "a-agent", "workspace.json"), "{bad json");
+    await fileSystem.ensureDir(path.join(paths.agentsDir, "a-agent"));
+    await fileSystem.writeFile(path.join(paths.agentsDir, "a-agent", "config.json"), "{bad json");
 
     const agents = await service.listAgents(paths);
 
     expect(agents.map((agent) => agent.id)).toEqual(["a-agent", "z-agent"]);
     expect(agents[0]?.displayName).toBe("a-agent");
+    expect(agents[0]?.role).toBe("Individual Contributor");
     expect(agents[1]?.displayName).toBe("Zed");
+    expect(agents[1]?.role).toBe("Individual Contributor");
   });
 
-  it("is idempotent and does not overwrite existing AGENTS.md", async () => {
+  it("is idempotent and does not overwrite existing config.json", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
 
     await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
-    const agentsMdPath = path.join(paths.workspacesDir, "goat", "AGENTS.md");
-    await fileSystem.writeFile(agentsMdPath, "# Custom\n");
+    const configPath = path.join(paths.agentsDir, "goat", "config.json");
+    await fileSystem.writeFile(configPath, JSON.stringify({ displayName: "Custom Goat" }, null, 2) + "\n");
 
     const second = await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
     expect(second.createdPaths).toEqual([]);
     expect(second.skippedPaths.length).toBeGreaterThan(0);
-    expect(await readFile(agentsMdPath, "utf-8")).toBe("# Custom\n");
+    expect(await readFile(configPath, "utf-8")).toContain("Custom Goat");
   });
 
-  it("does not recreate BOOTSTRAP.md when workspace is already established", async () => {
-    const { service, paths, fileSystem } = await createAgentServiceWithPaths();
-
-    const workspaceDir = path.join(paths.workspacesDir, "goat");
-    await fileSystem.ensureDir(workspaceDir);
-    await fileSystem.writeFile(path.join(workspaceDir, "AGENTS.md"), "# Existing\n");
-    await fileSystem.writeFile(path.join(workspaceDir, "CONTEXT.md"), "# Existing context\n");
-
-    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
-
-    const bootstrapPath = path.join(workspaceDir, "BOOTSTRAP.md");
-    expect(await fileSystem.exists(bootstrapPath)).toBe(false);
-  });
-
-  it("updates manager relationship in AGENTS.md and config.json", async () => {
+  it("updates manager relationship in config.json", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
     await service.ensureAgent(paths, { id: "cto", displayName: "CTO" }, { type: "manager", reportsTo: "goat" });
@@ -235,12 +242,11 @@ describe("AgentService", () => {
     expect(result.previousReportsTo).toBe("goat");
     expect(result.reportsTo).toBe("cto");
 
-    const agentsMd = await readFile(path.join(paths.workspacesDir, "engineer", "AGENTS.md"), "utf-8");
-    expect(agentsMd).toContain("reportsTo: cto");
     const config = JSON.parse(await readFile(path.join(paths.agentsDir, "engineer", "config.json"), "utf-8")) as {
       organization?: { reportsTo?: string | null };
     };
     expect(config.organization?.reportsTo).toBe("cto");
+    expect(result.updatedPaths).toEqual([path.join(paths.agentsDir, "engineer", "config.json")]);
   });
 
   it("rejects manager reassignment that would create a cycle", async () => {
@@ -252,7 +258,7 @@ describe("AgentService", () => {
     await expect(service.setAgentManager(paths, "cto", "engineer")).rejects.toThrow("create a cycle");
   });
 
-  it("removes a non-default agent workspace and internal config", async () => {
+  it("removes a non-default agent internal config and prunes optional workspace dir", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "developer", displayName: "Developer" });
 
@@ -260,10 +266,7 @@ describe("AgentService", () => {
 
     expect(deletion.agentId).toBe("developer");
     expect(deletion.existed).toBe(true);
-    expect(deletion.removedPaths).toEqual([
-      path.join(paths.workspacesDir, "developer"),
-      path.join(paths.agentsDir, "developer")
-    ]);
+    expect(deletion.removedPaths).toEqual([path.join(paths.agentsDir, "developer")]);
     expect(await fileSystem.exists(path.join(paths.workspacesDir, "developer"))).toBe(false);
     expect(await fileSystem.exists(path.join(paths.agentsDir, "developer"))).toBe(false);
   });

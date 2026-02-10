@@ -26,6 +26,7 @@ OpenGoat keeps your org structure as source-of-truth and syncs agent lifecycle t
 - Hierarchical teams via `reportsTo`.
 - Centralized skills with per-agent assignment.
 - CLI-first workflows for create, run, restructure, and audit sessions.
+- OpenClaw-owned workspace bootstrap files (no duplicate OpenGoat scaffolding).
 
 ## Install
 

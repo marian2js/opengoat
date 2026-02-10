@@ -112,7 +112,7 @@ describe("CommandRouter", () => {
       { service: {} as never, stdout: stdout.stream, stderr: stderr.stream }
     );
 
-    const code = await router.dispatch(["agent", "create", "orchestrator"]);
+    const code = await router.dispatch(["agent", "create", "goat"]);
 
     expect(code).toBe(0);
     expect(called).toEqual(["specific"]);

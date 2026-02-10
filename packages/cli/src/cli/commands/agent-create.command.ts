@@ -19,10 +19,12 @@ export const agentCreateCommand: CliCommand = {
     const result = await context.service.createAgent(parsed.name, {
       type: parsed.type,
       reportsTo: parsed.reportsTo,
-      skills: parsed.skills
+      skills: parsed.skills,
+      role: parsed.role
     });
 
     context.stdout.write(`Agent ready: ${result.agent.displayName} (${result.agent.id})\n`);
+    context.stdout.write(`Role: ${result.agent.role}\n`);
     context.stdout.write(`Workspace: ${result.agent.workspaceDir}\n`);
     context.stdout.write(`Internal config: ${result.agent.internalConfigDir}\n`);
     if (result.alreadyExisted) {
@@ -43,6 +45,7 @@ interface ParsedAgentCreateArgs {
   type?: "manager" | "individual";
   reportsTo?: string | null;
   skills?: string[];
+  role?: string;
 }
 
 function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
@@ -50,6 +53,7 @@ function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
   let type: "manager" | "individual" | undefined;
   let reportsTo: string | null | undefined;
   const skills: string[] = [];
+  let role: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index];
@@ -103,6 +107,20 @@ function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
       continue;
     }
 
+    if (token === "--role") {
+      const value = args[index + 1]?.trim();
+      if (!value || value.startsWith("--")) {
+        return {
+          ok: false,
+          error: "Missing value for --role.",
+          name: ""
+        };
+      }
+      role = value;
+      index += 1;
+      continue;
+    }
+
     if (token.startsWith("--")) {
       return {
         ok: false,
@@ -128,12 +146,13 @@ function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
     name,
     type,
     reportsTo,
-    skills: dedupeSkills(type, skills)
+    skills: dedupeSkills(type, skills),
+    role
   };
 }
 
 function printHelp(output: NodeJS.WritableStream): void {
-  output.write("Usage: opengoat agent create <name> [--manager|--individual] [--reports-to <agent-id|none>] [--skill <skill-id>]\n");
+  output.write("Usage: opengoat agent create <name> [--manager|--individual] [--role <title>] [--reports-to <agent-id|none>] [--skill <skill-id>]\n");
   output.write("Defaults: new agents report to goat when --reports-to is omitted.\n");
 }
 

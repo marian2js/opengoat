@@ -8,6 +8,7 @@ This document describes the current organization-first runtime model.
 - `goat` is the default manager (head/CEO)
 - hierarchy is explicit in agent metadata
 - manager behavior is skill-driven (`manager` skill)
+- OpenClaw owns workspace bootstrap markdown (`AGENTS.md`, `SOUL.md`, `TOOLS.md`, etc.)
 
 ## Execution Flow
 
@@ -23,10 +24,10 @@ OpenGoat does not run an internal delegation/planner loop.
 
 ## Organization Hierarchy
 
-Hierarchy lives in `AGENTS.md` front matter:
+Hierarchy lives in `agents/<agent-id>/config.json`:
 
-- `type: manager | individual`
-- `reportsTo: <agent-id> | null`
+- `organization.type: manager | individual`
+- `organization.reportsTo: <agent-id> | null`
 
 OpenGoat maintains this hierarchy as source-of-truth and syncs agent lifecycle with OpenClaw.
 
@@ -70,6 +71,6 @@ Storage:
 
 - manager runtime service: `packages/core/src/core/orchestration/application/orchestration.service.ts`
 - routing helper: `packages/core/src/core/orchestration/application/routing.service.ts`
-- agent manifest parsing: `packages/core/src/core/agents/domain/agent-manifest.ts`
+- agent manifest derivation: `packages/core/src/core/agents/application/agent-manifest.service.ts`
 - skill resolution/install: `packages/core/src/core/skills/application/skill.service.ts`
 - session lifecycle: `packages/core/src/core/sessions/application/session.service.ts`

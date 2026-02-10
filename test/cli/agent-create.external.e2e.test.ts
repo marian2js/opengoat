@@ -19,6 +19,42 @@ afterEach(async () => {
 });
 
 describe("agent create OpenClaw sync e2e", () => {
+  it("uses normalized id for multi-word names when creating in OpenClaw", async () => {
+    const root = await createTempDir("opengoat-agent-create-e2e-");
+    roots.push(root);
+
+    const opengoatHome = path.join(root, "opengoat-home");
+    await mkdir(opengoatHome, { recursive: true });
+    const { stubPath, stubLogPath } = await createOpenClawStub(root);
+
+    const result = await runBinary(
+      ["agent", "create", "John Doe"],
+      opengoatHome,
+      {
+        OPENCLAW_CMD: stubPath,
+        OPENCLAW_STUB_LOG: stubLogPath
+      }
+    );
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("Agent ready: John Doe (john-doe)");
+
+    const calls = await readStubCalls(stubLogPath);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual(
+      expect.arrayContaining([
+        "agents",
+        "add",
+        "john-doe",
+        "--workspace",
+        path.join(opengoatHome, "workspaces", "john-doe"),
+        "--agent-dir",
+        path.join(opengoatHome, "agents", "john-doe"),
+        "--non-interactive"
+      ])
+    );
+  });
+
   it("creates an agent and syncs it to OpenClaw", async () => {
     const root = await createTempDir("opengoat-agent-create-e2e-");
     roots.push(root);

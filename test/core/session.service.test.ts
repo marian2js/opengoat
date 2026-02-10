@@ -24,12 +24,12 @@ describe("SessionService", () => {
     roots.push(root);
 
     const { fileSystem, paths } = await createPaths(root);
-    await seedAgentConfig(fileSystem, paths, "orchestrator", {});
+    await seedAgentConfig(fileSystem, paths, "goat", {});
 
     const now = { value: Date.parse("2026-02-07T00:00:00.000Z") };
     const service = createService(now);
 
-    const first = await service.prepareRunSession(paths, "orchestrator", {
+    const first = await service.prepareRunSession(paths, "goat", {
       userMessage: "hello from user"
     });
     expect(first.enabled).toBe(true);
@@ -38,12 +38,12 @@ describe("SessionService", () => {
     }
 
     expect(first.info.isNewSession).toBe(true);
-    expect(first.info.sessionKey).toBe("agent:orchestrator:main");
+    expect(first.info.sessionKey).toBe("agent:goat:main");
 
     await service.recordAssistantReply(paths, first.info, "hello from assistant");
 
     now.value += 1_000;
-    const second = await service.prepareRunSession(paths, "orchestrator", {
+    const second = await service.prepareRunSession(paths, "goat", {
       userMessage: "follow-up request"
     });
     expect(second.enabled).toBe(true);
@@ -52,10 +52,10 @@ describe("SessionService", () => {
     }
     expect(second.info.isNewSession).toBe(false);
 
-    const history = await service.getSessionHistory(paths, "orchestrator", {
+    const history = await service.getSessionHistory(paths, "goat", {
       includeCompaction: true
     });
-    expect(history.sessionKey).toBe("agent:orchestrator:main");
+    expect(history.sessionKey).toBe("agent:goat:main");
     expect(history.messages.filter((message) => message.type === "message")).toHaveLength(3);
   });
 
@@ -64,14 +64,14 @@ describe("SessionService", () => {
     roots.push(root);
 
     const { fileSystem, paths } = await createPaths(root);
-    await seedAgentConfig(fileSystem, paths, "orchestrator", {
+    await seedAgentConfig(fileSystem, paths, "goat", {
       reset: { mode: "idle", idleMinutes: 1, atHour: 4 }
     });
 
     const now = { value: Date.parse("2026-02-07T00:00:00.000Z") };
     const service = createService(now);
 
-    const first = await service.prepareRunSession(paths, "orchestrator", {
+    const first = await service.prepareRunSession(paths, "goat", {
       userMessage: "first"
     });
     expect(first.enabled).toBe(true);
@@ -82,7 +82,7 @@ describe("SessionService", () => {
     const firstSessionId = first.info.sessionId;
     now.value += 61_000;
 
-    const second = await service.prepareRunSession(paths, "orchestrator", {
+    const second = await service.prepareRunSession(paths, "goat", {
       userMessage: "after idle window"
     });
     expect(second.enabled).toBe(true);
@@ -94,17 +94,60 @@ describe("SessionService", () => {
     expect(second.info.sessionId).not.toBe(firstSessionId);
   });
 
+  it("returns the latest assistant action timestamp for an agent", async () => {
+    const root = await createTempDir("opengoat-session-");
+    roots.push(root);
+
+    const { fileSystem, paths } = await createPaths(root);
+    await seedAgentConfig(fileSystem, paths, "goat", {});
+
+    const now = { value: Date.parse("2026-02-07T00:00:00.000Z") };
+    const service = createService(now);
+
+    const first = await service.prepareRunSession(paths, "goat", {
+      sessionRef: "alpha",
+      userMessage: "first"
+    });
+    if (!first.enabled) {
+      throw new Error("Expected session-enabled run.");
+    }
+    await service.recordAssistantReply(paths, first.info, "assistant-first");
+
+    now.value += 1_000;
+    const second = await service.prepareRunSession(paths, "goat", {
+      sessionRef: "beta",
+      userMessage: "second"
+    });
+    if (!second.enabled) {
+      throw new Error("Expected session-enabled run.");
+    }
+    await service.recordAssistantReply(paths, second.info, "assistant-second");
+    const expectedTimestamp = now.value;
+
+    now.value += 1_000;
+    await service.prepareRunSession(paths, "goat", {
+      sessionRef: "gamma",
+      userMessage: "user-only"
+    });
+
+    const lastAction = await service.getLastAgentAction(paths, "goat");
+    expect(lastAction).not.toBeNull();
+    expect(lastAction?.agentId).toBe("goat");
+    expect(lastAction?.sessionId).toBe(second.info.sessionId);
+    expect(lastAction?.timestamp).toBe(expectedTimestamp);
+  });
+
   it("enforces one working path per session by rotating session id when working path changes", async () => {
     const root = await createTempDir("opengoat-session-");
     roots.push(root);
 
     const { fileSystem, paths } = await createPaths(root);
-    await seedAgentConfig(fileSystem, paths, "orchestrator", {});
+    await seedAgentConfig(fileSystem, paths, "goat", {});
 
     const now = { value: Date.parse("2026-02-07T00:00:00.000Z") };
     const service = createService(now);
 
-    const first = await service.prepareRunSession(paths, "orchestrator", {
+    const first = await service.prepareRunSession(paths, "goat", {
       workingPath: "/tmp/project-a",
       userMessage: "first"
     });
@@ -114,10 +157,10 @@ describe("SessionService", () => {
     }
     const firstSessionId = first.info.sessionId;
     expect(first.info.workingPath).toBe(path.resolve("/tmp/project-a"));
-    expect(first.info.workspacePath).toBe(path.join(paths.workspacesDir, "orchestrator"));
+    expect(first.info.workspacePath).toBe(path.join(paths.workspacesDir, "goat"));
 
     now.value += 1_000;
-    const second = await service.prepareRunSession(paths, "orchestrator", {
+    const second = await service.prepareRunSession(paths, "goat", {
       workingPath: "/tmp/project-a",
       userMessage: "second"
     });
@@ -128,7 +171,7 @@ describe("SessionService", () => {
     expect(second.info.sessionId).toBe(firstSessionId);
 
     now.value += 1_000;
-    const third = await service.prepareRunSession(paths, "orchestrator", {
+    const third = await service.prepareRunSession(paths, "goat", {
       workingPath: "/tmp/project-b",
       userMessage: "third"
     });
@@ -146,7 +189,7 @@ describe("SessionService", () => {
     roots.push(root);
 
     const { fileSystem, paths } = await createPaths(root);
-    await seedAgentConfig(fileSystem, paths, "orchestrator", {
+    await seedAgentConfig(fileSystem, paths, "goat", {
       compaction: {
         enabled: false,
         triggerMessageCount: 999,
@@ -160,7 +203,7 @@ describe("SessionService", () => {
     const service = createService(now);
 
     for (const turn of [1, 2, 3]) {
-      const prepared = await service.prepareRunSession(paths, "orchestrator", {
+      const prepared = await service.prepareRunSession(paths, "goat", {
         userMessage: `user message ${turn}`
       });
       if (!prepared.enabled) {
@@ -170,18 +213,18 @@ describe("SessionService", () => {
       now.value += 1_000;
     }
 
-    const compacted = await service.compactSession(paths, "orchestrator");
+    const compacted = await service.compactSession(paths, "goat");
     expect(compacted.applied).toBe(true);
     expect(compacted.compactedMessages).toBeGreaterThan(0);
     expect(compacted.summary).toContain("Compaction summary");
 
-    const history = await service.getSessionHistory(paths, "orchestrator", {
+    const history = await service.getSessionHistory(paths, "goat", {
       includeCompaction: true
     });
     expect(history.messages.some((message) => message.type === "compaction")).toBe(true);
     expect(history.messages.filter((message) => message.type === "message")).toHaveLength(2);
 
-    const sessions = await service.listSessions(paths, "orchestrator");
+    const sessions = await service.listSessions(paths, "goat");
     expect(sessions[0]?.compactionCount).toBeGreaterThan(0);
   });
 
@@ -190,28 +233,28 @@ describe("SessionService", () => {
     roots.push(root);
 
     const { fileSystem, paths } = await createPaths(root);
-    await seedAgentConfig(fileSystem, paths, "orchestrator", {});
+    await seedAgentConfig(fileSystem, paths, "goat", {});
 
     const now = { value: Date.parse("2026-02-07T00:00:00.000Z") };
     const service = createService(now);
 
-    const prepared = await service.prepareRunSession(paths, "orchestrator", {
+    const prepared = await service.prepareRunSession(paths, "goat", {
       userMessage: "hello"
     });
     if (!prepared.enabled) {
       throw new Error("Expected session-enabled run.");
     }
 
-    const renamed = await service.renameSession(paths, "orchestrator", "Roadmap Draft");
+    const renamed = await service.renameSession(paths, "goat", "Roadmap Draft");
     expect(renamed.title).toBe("Roadmap Draft");
 
-    const listed = await service.listSessions(paths, "orchestrator");
+    const listed = await service.listSessions(paths, "goat");
     expect(listed[0]?.title).toBe("Roadmap Draft");
 
-    const removed = await service.removeSession(paths, "orchestrator");
+    const removed = await service.removeSession(paths, "goat");
     expect(removed.title).toBe("Roadmap Draft");
 
-    const remaining = await service.listSessions(paths, "orchestrator");
+    const remaining = await service.listSessions(paths, "goat");
     expect(remaining).toHaveLength(0);
   });
 
@@ -220,7 +263,7 @@ describe("SessionService", () => {
     roots.push(root);
 
     const { fileSystem, paths } = await createPaths(root);
-    await seedAgentConfig(fileSystem, paths, "orchestrator", {});
+    await seedAgentConfig(fileSystem, paths, "goat", {});
     const projectDir = path.join(root, "project");
     await fileSystem.ensureDir(projectDir);
 
@@ -245,7 +288,7 @@ describe("SessionService", () => {
     const now = { value: Date.parse("2026-02-07T00:00:00.000Z") };
     const service = createService(now, commandRunner);
 
-    const prepared = await service.prepareRunSession(paths, "orchestrator", {
+    const prepared = await service.prepareRunSession(paths, "goat", {
       workingPath: projectDir,
       userMessage: "hello"
     });
@@ -286,7 +329,7 @@ async function createPaths(root: string): Promise<{ paths: OpenGoatPaths; fileSy
   await fileSystem.ensureDir(paths.providersDir);
   await fileSystem.ensureDir(paths.sessionsDir);
   await fileSystem.ensureDir(paths.runsDir);
-  await fileSystem.ensureDir(path.join(paths.agentsDir, "orchestrator"));
+  await fileSystem.ensureDir(path.join(paths.agentsDir, "goat"));
 
   return { paths, fileSystem };
 }
@@ -304,7 +347,7 @@ async function seedAgentConfig(
       {
         schemaVersion: 1,
         id: agentId,
-        displayName: "Orchestrator",
+        displayName: "Goat",
         provider: { id: "openclaw" },
         runtime: {
           sessions: {

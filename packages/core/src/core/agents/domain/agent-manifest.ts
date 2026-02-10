@@ -28,7 +28,7 @@ export interface AgentManifest {
   workspaceDir: string;
   metadata: AgentManifestMetadata;
   body: string;
-  source: "frontmatter" | "derived";
+  source: "frontmatter" | "config" | "derived";
 }
 
 export function isDiscoverableByManager(manifest: AgentManifest): boolean {

@@ -12,24 +12,9 @@ import type { PathPort } from "../../ports/path.port.js";
 import {
   renderAgentsIndex,
   renderInternalAgentConfig,
-  renderInternalAgentMemoryMarkdown,
-  renderInternalAgentState,
-  renderWorkspaceAgentsMarkdown,
-  renderWorkspaceBootstrapMarkdown,
-  renderWorkspaceContextMarkdown,
-  renderWorkspaceHeartbeatMarkdown,
-  renderWorkspaceIdentityMarkdown,
-  type AgentTemplateOptions,
-  renderWorkspaceSoulMarkdown,
-  renderWorkspaceToolsMarkdown,
-  renderWorkspaceUserMarkdown,
-  renderWorkspaceMetadata
+  resolveAgentRole,
+  type AgentTemplateOptions
 } from "../../templates/default-templates.js";
-import {
-  formatAgentManifestMarkdown,
-  normalizeAgentManifestMetadata,
-  parseAgentManifestMarkdown
-} from "../domain/agent-manifest.js";
 
 interface AgentServiceDeps {
   fileSystem: FileSystemPort;
@@ -41,6 +26,17 @@ interface EnsureAgentOptions {
   type?: "manager" | "individual";
   reportsTo?: string | null;
   skills?: string[];
+  role?: string;
+}
+
+interface AgentConfigShape {
+  id?: string;
+  displayName?: string;
+  role?: string;
+  organization?: {
+    type?: "manager" | "individual";
+    reportsTo?: string | null;
+  };
 }
 
 export class AgentService {
@@ -76,116 +72,23 @@ export class AgentService {
   ): Promise<AgentCreationResult> {
     const workspaceDir = this.pathPort.join(paths.workspacesDir, identity.id);
     const internalConfigDir = this.pathPort.join(paths.agentsDir, identity.id);
-    const sessionsDir = this.pathPort.join(internalConfigDir, "sessions");
+    const configPath = this.pathPort.join(internalConfigDir, "config.json");
     const templateOptions = toAgentTemplateOptions(identity.id, options);
 
     const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
-    const workspaceExisted = await this.fileSystem.exists(workspaceDir);
 
-    await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
+    const configExisted = await this.fileSystem.exists(configPath);
+
     await this.ensureDirectory(internalConfigDir, createdPaths, skippedPaths);
-    await this.ensureDirectory(sessionsDir, createdPaths, skippedPaths);
-
-    const shouldCreateBootstrapFile = await this.isBrandNewWorkspace(workspaceDir);
 
     await this.writeJsonIfMissing(
-      this.pathPort.join(workspaceDir, "workspace.json"),
-      renderWorkspaceMetadata(identity),
+      configPath,
+      renderInternalAgentConfig(identity, templateOptions),
       createdPaths,
       skippedPaths
     );
-    await this.writeMarkdownIfMissing(
-      this.pathPort.join(workspaceDir, "AGENTS.md"),
-      renderWorkspaceAgentsMarkdown(identity, templateOptions),
-      createdPaths,
-      skippedPaths
-    );
-    await this.writeMarkdownIfMissing(
-      this.pathPort.join(workspaceDir, "CONTEXT.md"),
-      renderWorkspaceContextMarkdown(identity),
-      createdPaths,
-      skippedPaths
-    );
-    await this.writeMarkdownIfMissing(
-      this.pathPort.join(workspaceDir, "SOUL.md"),
-      renderWorkspaceSoulMarkdown(identity),
-      createdPaths,
-      skippedPaths
-    );
-    await this.writeMarkdownIfMissing(
-      this.pathPort.join(workspaceDir, "TOOLS.md"),
-      renderWorkspaceToolsMarkdown(),
-      createdPaths,
-      skippedPaths
-    );
-    await this.writeMarkdownIfMissing(
-      this.pathPort.join(workspaceDir, "IDENTITY.md"),
-      renderWorkspaceIdentityMarkdown(identity),
-      createdPaths,
-      skippedPaths
-    );
-    await this.writeMarkdownIfMissing(
-      this.pathPort.join(workspaceDir, "USER.md"),
-      renderWorkspaceUserMarkdown(),
-      createdPaths,
-      skippedPaths
-    );
-    await this.writeMarkdownIfMissing(
-      this.pathPort.join(workspaceDir, "HEARTBEAT.md"),
-      renderWorkspaceHeartbeatMarkdown(),
-      createdPaths,
-      skippedPaths
-    );
-    if (shouldCreateBootstrapFile) {
-      await this.writeMarkdownIfMissing(
-        this.pathPort.join(workspaceDir, "BOOTSTRAP.md"),
-        renderWorkspaceBootstrapMarkdown(identity),
-        createdPaths,
-        skippedPaths
-      );
-    }
-    const internalConfig = renderInternalAgentConfig(identity) as {
-      organization?: { type?: string; reportsTo?: string | null };
-      runtime?: { skills?: { assigned?: string[] } };
-    };
-    if (internalConfig.organization) {
-      const resolvedType = templateOptions.type ?? internalConfig.organization.type;
-      if (resolvedType) {
-        internalConfig.organization.type = resolvedType;
-      }
-      internalConfig.organization.reportsTo = templateOptions.reportsTo;
-    }
-    if (internalConfig.runtime?.skills) {
-      internalConfig.runtime.skills.assigned = templateOptions.skills;
-    }
-    await this.writeJsonIfMissing(
-      this.pathPort.join(internalConfigDir, "config.json"),
-      internalConfig,
-      createdPaths,
-      skippedPaths
-    );
-    await this.writeJsonIfMissing(
-      this.pathPort.join(internalConfigDir, "state.json"),
-      renderInternalAgentState(),
-      createdPaths,
-      skippedPaths
-    );
-    await this.writeMarkdownIfMissing(
-      this.pathPort.join(internalConfigDir, "memory.md"),
-      renderInternalAgentMemoryMarkdown(identity),
-      createdPaths,
-      skippedPaths
-    );
-    await this.writeJsonIfMissing(
-      this.pathPort.join(sessionsDir, "sessions.json"),
-      {
-        schemaVersion: 1,
-        sessions: {}
-      },
-      createdPaths,
-      skippedPaths
-    );
+    const role = await this.readAgentRole(paths, identity.id);
 
     const existingIndex = await this.readJsonIfPresent<AgentsIndex>(paths.agentsIndexJsonPath);
     const agents = dedupe([...(existingIndex?.agents ?? []), identity.id]);
@@ -195,28 +98,29 @@ export class AgentService {
     return {
       agent: {
         ...identity,
+        role,
         workspaceDir,
         internalConfigDir
       },
-      alreadyExisted: workspaceExisted,
+      alreadyExisted: configExisted,
       createdPaths,
       skippedPaths
     };
   }
 
   public async listAgents(paths: OpenGoatPaths): Promise<AgentDescriptor[]> {
-    const ids = await this.fileSystem.listDirectories(paths.workspacesDir);
+    const ids = await this.fileSystem.listDirectories(paths.agentsDir);
     const descriptors: AgentDescriptor[] = [];
 
     for (const id of ids) {
       const workspaceDir = this.pathPort.join(paths.workspacesDir, id);
       const internalConfigDir = this.pathPort.join(paths.agentsDir, id);
-      const metadataPath = this.pathPort.join(workspaceDir, "workspace.json");
-
-      const metadata = await this.readJsonIfPresent<{ displayName?: string }>(metadataPath);
+      const displayName = await this.readAgentDisplayName(paths, id);
+      const role = await this.readAgentRole(paths, id);
       descriptors.push({
         id,
-        displayName: metadata?.displayName ?? id,
+        displayName,
+        role,
         workspaceDir,
         internalConfigDir
       });
@@ -280,7 +184,8 @@ export class AgentService {
       throw new Error("Agent id cannot be empty.");
     }
 
-    const explicitReportsTo = rawReportsTo === null || rawReportsTo === undefined ? null : normalizeAgentId(rawReportsTo);
+    const explicitReportsTo =
+      rawReportsTo === null || rawReportsTo === undefined ? null : normalizeAgentId(rawReportsTo);
     if (explicitReportsTo === agentId) {
       throw new Error(`Agent "${agentId}" cannot report to itself.`);
     }
@@ -289,7 +194,7 @@ export class AgentService {
     }
     const reportsTo = resolveReportsTo(agentId, rawReportsTo);
 
-    const knownAgents = await this.fileSystem.listDirectories(paths.workspacesDir);
+    const knownAgents = await this.fileSystem.listDirectories(paths.agentsDir);
     if (!knownAgents.includes(agentId)) {
       throw new Error(`Agent "${agentId}" does not exist.`);
     }
@@ -299,68 +204,36 @@ export class AgentService {
 
     await this.assertNoReportingCycle(paths, agentId, reportsTo, knownAgents);
 
-    const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
-    const agentsPath = this.pathPort.join(workspaceDir, "AGENTS.md");
-    const displayName = await this.readDisplayName(workspaceDir, agentId);
-
-    const manifestRaw = await this.readFileIfPresent(agentsPath);
-    const parsedManifest = parseAgentManifestMarkdown(manifestRaw ?? "");
-    const currentMetadata = normalizeAgentManifestMetadata({
-      agentId,
-      displayName,
-      metadata: parsedManifest.data
-    });
-    const normalizedMetadata = normalizeAgentManifestMetadata({
-      agentId,
-      displayName,
-      metadata: {
-        ...parsedManifest.data,
-        reportsTo
-      }
-    });
-    const nextManifestMarkdown = formatAgentManifestMarkdown(normalizedMetadata, parsedManifest.body);
-    await this.fileSystem.writeFile(agentsPath, nextManifestMarkdown);
-
     const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
-    const existingConfig = (await this.readJsonIfPresent<Record<string, unknown>>(configPath)) ?? {};
+    const displayName = await this.readAgentDisplayName(paths, agentId);
+    const role = await this.readAgentRole(paths, agentId);
+    const existingConfig = (await this.readJsonIfPresent<Record<string, unknown>>(configPath)) ??
+      (renderInternalAgentConfig({ id: agentId, displayName, role }) as Record<string, unknown>);
     const existingOrganization = toObject(existingConfig.organization);
+
+    const previousReportsTo = normalizeReportsToValue(existingOrganization.reportsTo);
     const nextOrganization: Record<string, unknown> = {
       ...existingOrganization,
-      reportsTo: normalizedMetadata.reportsTo
+      reportsTo
     };
-    if (normalizedMetadata.type) {
-      nextOrganization.type = normalizedMetadata.type;
+
+    if (typeof existingOrganization.type !== "string") {
+      nextOrganization.type = isDefaultAgentId(agentId) ? "manager" : "individual";
     }
+
     const nextConfig = {
       ...existingConfig,
       organization: nextOrganization
     };
+
     await this.fileSystem.writeFile(configPath, toJson(nextConfig));
 
     return {
       agentId,
-      previousReportsTo: currentMetadata.reportsTo,
-      reportsTo: normalizedMetadata.reportsTo,
-      updatedPaths: [agentsPath, configPath]
+      previousReportsTo,
+      reportsTo,
+      updatedPaths: [configPath]
     };
-  }
-
-  private async isBrandNewWorkspace(workspaceDir: string): Promise<boolean> {
-    const firstRunFiles = [
-      "AGENTS.md",
-      "CONTEXT.md",
-      "SOUL.md",
-      "TOOLS.md",
-      "IDENTITY.md",
-      "USER.md",
-      "HEARTBEAT.md"
-    ];
-
-    const existence = await Promise.all(
-      firstRunFiles.map((fileName) => this.fileSystem.exists(this.pathPort.join(workspaceDir, fileName)))
-    );
-
-    return existence.every((value) => !value);
   }
 
   private async ensureDirectory(
@@ -393,23 +266,6 @@ export class AgentService {
     createdPaths.push(filePath);
   }
 
-  private async writeMarkdownIfMissing(
-    filePath: string,
-    content: string,
-    createdPaths: string[],
-    skippedPaths: string[]
-  ): Promise<void> {
-    const exists = await this.fileSystem.exists(filePath);
-    if (exists) {
-      skippedPaths.push(filePath);
-      return;
-    }
-
-    const markdown = content.endsWith("\n") ? content : `${content}\n`;
-    await this.fileSystem.writeFile(filePath, markdown);
-    createdPaths.push(filePath);
-  }
-
   private async readJsonIfPresent<T>(filePath: string): Promise<T | null> {
     const exists = await this.fileSystem.exists(filePath);
     if (!exists) {
@@ -424,18 +280,17 @@ export class AgentService {
     }
   }
 
-  private async readFileIfPresent(filePath: string): Promise<string | null> {
-    const exists = await this.fileSystem.exists(filePath);
-    if (!exists) {
-      return null;
-    }
-    return this.fileSystem.readFile(filePath);
+  private async readAgentDisplayName(paths: OpenGoatPaths, agentId: string): Promise<string> {
+    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+    const config = await this.readJsonIfPresent<AgentConfigShape>(configPath);
+    return config?.displayName?.trim() || agentId;
   }
 
-  private async readDisplayName(workspaceDir: string, fallbackAgentId: string): Promise<string> {
-    const metadataPath = this.pathPort.join(workspaceDir, "workspace.json");
-    const metadata = await this.readJsonIfPresent<{ displayName?: string }>(metadataPath);
-    return metadata?.displayName?.trim() || fallbackAgentId;
+  private async readAgentRole(paths: OpenGoatPaths, agentId: string): Promise<string> {
+    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+    const config = await this.readJsonIfPresent<AgentConfigShape>(configPath);
+    const type = config?.organization?.type ?? (isDefaultAgentId(agentId) ? "manager" : "individual");
+    return resolveAgentRole(agentId, type, config?.role);
   }
 
   private async assertNoReportingCycle(
@@ -451,17 +306,7 @@ export class AgentService {
     const reportsToByAgent = new Map<string, string | null>();
     await Promise.all(
       knownAgentIds.map(async (candidateAgentId) => {
-        const workspaceDir = this.pathPort.join(paths.workspacesDir, candidateAgentId);
-        const agentsPath = this.pathPort.join(workspaceDir, "AGENTS.md");
-        const displayName = await this.readDisplayName(workspaceDir, candidateAgentId);
-        const markdown = await this.readFileIfPresent(agentsPath);
-        const parsed = parseAgentManifestMarkdown(markdown ?? "");
-        const normalized = normalizeAgentManifestMetadata({
-          agentId: candidateAgentId,
-          displayName,
-          metadata: parsed.data
-        });
-        reportsToByAgent.set(candidateAgentId, normalized.reportsTo);
+        reportsToByAgent.set(candidateAgentId, await this.readAgentReportsTo(paths, candidateAgentId));
       })
     );
 
@@ -477,16 +322,34 @@ export class AgentService {
       cursor = reportsToByAgent.get(cursor) ?? null;
     }
   }
+
+  private async readAgentReportsTo(paths: OpenGoatPaths, agentId: string): Promise<string | null> {
+    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+    const config = await this.readJsonIfPresent<AgentConfigShape>(configPath);
+    const reportsTo = normalizeReportsToValue(config?.organization?.reportsTo);
+
+    if (isDefaultAgentId(agentId)) {
+      return null;
+    }
+
+    if (reportsTo === undefined) {
+      return DEFAULT_AGENT_ID;
+    }
+
+    return reportsTo;
+  }
 }
 
 function toAgentTemplateOptions(agentId: string, options: EnsureAgentOptions): AgentTemplateOptions {
   const type = options.type ?? (isDefaultAgentId(agentId) ? "manager" : "individual");
   const reportsTo = resolveReportsTo(agentId, options.reportsTo);
   const skills = dedupe(options.skills ?? (type === "manager" ? ["manager"] : []));
+  const role = resolveAgentRole(agentId, type, options.role);
   return {
     type,
     reportsTo,
-    skills
+    skills,
+    role
   };
 }
 
@@ -504,6 +367,20 @@ function resolveReportsTo(agentId: string, reportsTo: string | null | undefined)
     return DEFAULT_AGENT_ID;
   }
 
+  return normalized;
+}
+
+function normalizeReportsToValue(value: unknown): string | null | undefined {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = normalizeAgentId(value);
+  if (!normalized) {
+    return null;
+  }
   return normalized;
 }
 

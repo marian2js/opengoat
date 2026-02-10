@@ -84,7 +84,7 @@ describe("provider CLI commands", () => {
     expect(noArgs.stderr.output()).toContain("Missing <agent-id>");
 
     const missingMessage = createContext({ runAgent });
-    expect(await agentRunCommand.run(["orchestrator"], missingMessage.context)).toBe(1);
+    expect(await agentRunCommand.run(["goat"], missingMessage.context)).toBe(1);
     expect(missingMessage.stderr.output()).toContain("--message is required");
 
     expect(runAgent).not.toHaveBeenCalled();

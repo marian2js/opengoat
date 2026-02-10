@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New visual design system with updated colors, animations, and interactive UI effects.
   - Guided, multi-step onboarding flow for provider setup.
   - Dedicated panel for agent management (list, create, delete).
-  - In-chat orchestrator progress timeline and live activity display.
+  - In-chat manager progress timeline and live activity display.
   - AI-specific UI components and streamlined chat panel layout with `useChat` integration.
   - Native application menu with project, session, and provider settings.
   - Sidebar improvements: project/session renaming, removal, and default "Home" project.
@@ -50,11 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Testing**:
   - End-to-end tests for `onboard` CLI command.
   - End-to-end tests for Electron onboarding and agent management.
-  - Comprehensive suite for orchestrator flow and tRPC procedure fallback.
+  - Comprehensive suite for manager flow and tRPC procedure fallback.
 
 ### Fixed
 - Improved chat error summaries for provider failures.
-- Resolved redundant orchestrator planning steps.
+- Resolved redundant manager planning steps.
 - Fixed stalled delegations and enabled Gemini approvals.
 - Hardened OpenAI-compatible runtime timeouts (reduced to 60s) and improved compatibility.
 - Resolved build issues in monorepo structure and updated tRPC dependencies.

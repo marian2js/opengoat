@@ -52,15 +52,19 @@ describe("OpenGoatService", () => {
     const created = await service.createAgent("Research Analyst", {
       type: "individual",
       reportsTo: "goat",
-      skills: ["research"]
+      skills: ["research"],
+      role: "Developer"
     });
 
     expect(created.agent.id).toBe("research-analyst");
+    expect(created.agent.role).toBe("Developer");
     expect(created.runtimeSync?.runtimeId).toBe("openclaw");
     expect(created.runtimeSync?.code).toBe(0);
 
     const agents = await service.listAgents();
     expect(agents.map((agent) => agent.id)).toEqual(["goat", "research-analyst"]);
+    expect(agents.find((agent) => agent.id === "goat")?.role).toBe("Head of Organization");
+    expect(agents.find((agent) => agent.id === "research-analyst")?.role).toBe("Developer");
   });
 
   it("still syncs OpenClaw when the local agent already exists", async () => {
@@ -153,7 +157,7 @@ describe("OpenGoatService", () => {
     expect(forced.existed).toBe(true);
   });
 
-  it("syncs runtime defaults with goat and cleans legacy orchestrator", async () => {
+  it("syncs runtime defaults with goat", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -163,9 +167,8 @@ describe("OpenGoatService", () => {
     const result = await service.syncRuntimeDefaults();
 
     expect(result.goatSynced).toBe(true);
-    expect(result.legacyOrchestratorRemoved).toBe(true);
     expect(provider.createdAgents.some((entry) => entry.agentId === "goat")).toBe(true);
-    expect(provider.deletedAgents.some((entry) => entry.agentId === "orchestrator")).toBe(true);
+    expect(provider.deletedAgents).toHaveLength(0);
   });
 
   it("updates who an agent reports to", async () => {
@@ -180,6 +183,20 @@ describe("OpenGoatService", () => {
     const updated = await service.setAgentManager("engineer", "cto");
     expect(updated.previousReportsTo).toBe("goat");
     expect(updated.reportsTo).toBe("cto");
+  });
+
+  it("returns the latest agent AI action timestamp", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.runAgent("goat", { message: "hello" });
+
+    const result = await service.getAgentLastAction("goat");
+    expect(result).not.toBeNull();
+    expect(result?.agentId).toBe("goat");
+    expect(typeof result?.timestamp).toBe("number");
   });
 });
 

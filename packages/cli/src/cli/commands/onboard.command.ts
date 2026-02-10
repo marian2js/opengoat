@@ -101,13 +101,6 @@ export const onboardCommand: CliCommand = {
           context.stdout.write(` (code ${runtimeSync.goatSyncCode})`);
         }
         context.stdout.write("\n");
-        context.stdout.write(
-          `OpenClaw legacy cleanup: orchestrator=${runtimeSync.legacyOrchestratorRemoved ? "ok" : "failed"}`
-        );
-        if (typeof runtimeSync.legacyOrchestratorDeleteCode === "number") {
-          context.stdout.write(` (code ${runtimeSync.legacyOrchestratorDeleteCode})`);
-        }
-        context.stdout.write("\n");
         for (const warning of runtimeSync.warnings) {
           context.stderr.write(`${warning}\n`);
         }

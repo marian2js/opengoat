@@ -21,7 +21,7 @@ afterEach(async () => {
 
 describe("BootstrapService", () => {
   it("initializes the full OpenGoat home and goat manager agent", async () => {
-    const { service, paths } = await createBootstrapService();
+    const { service, paths, fileSystem } = await createBootstrapService();
 
     const result = await service.initialize();
 
@@ -34,19 +34,13 @@ describe("BootstrapService", () => {
     };
     expect(config.defaultAgent).toBe("goat");
 
-    const orchestratorConfig = JSON.parse(
+    const goatConfig = JSON.parse(
       await readFile(path.join(paths.agentsDir, "goat", "config.json"), "utf-8")
     ) as { runtime?: { adapter?: string } };
-    expect(orchestratorConfig.runtime?.adapter).toBe("openclaw");
+    expect(goatConfig.runtime?.adapter).toBe("openclaw");
 
-    const orchestratorAgents = await readFile(
-      path.join(paths.workspacesDir, "goat", "AGENTS.md"),
-      "utf-8"
-    );
-    expect(orchestratorAgents).toContain("# Goat (OpenGoat Agent)");
-    expect(
-      await readFile(path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md"), "utf-8")
-    ).toContain("First-run checklist");
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "AGENTS.md"))).toBe(false);
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md"))).toBe(false);
     const defaultSkill = await readFile(
       path.join(paths.skillsDir, "manager", "SKILL.md"),
       "utf-8"
@@ -137,40 +131,6 @@ describe("BootstrapService", () => {
     expect(index.agents).toEqual(["goat", "research"]);
   });
 
-  it("removes legacy orchestrator agent during bootstrap", async () => {
-    const { service, paths, fileSystem } = await createBootstrapService();
-
-    const legacyWorkspaceDir = path.join(paths.workspacesDir, "orchestrator");
-    const legacyAgentDir = path.join(paths.agentsDir, "orchestrator");
-    await fileSystem.ensureDir(paths.homeDir);
-    await fileSystem.ensureDir(paths.workspacesDir);
-    await fileSystem.ensureDir(paths.agentsDir);
-    await fileSystem.ensureDir(legacyWorkspaceDir);
-    await fileSystem.ensureDir(legacyAgentDir);
-    await fileSystem.writeFile(
-      path.join(legacyWorkspaceDir, "workspace.json"),
-      JSON.stringify({ id: "orchestrator", displayName: "Orchestrator" }, null, 2) + "\n"
-    );
-    await fileSystem.writeFile(
-      paths.agentsIndexJsonPath,
-      JSON.stringify(
-        {
-          schemaVersion: 1,
-          agents: ["orchestrator"],
-          updatedAt: "2026-01-01T00:00:00.000Z"
-        },
-        null,
-        2
-      ) + "\n"
-    );
-
-    await service.initialize();
-
-    expect(await fileSystem.exists(legacyWorkspaceDir)).toBe(false);
-    expect(await fileSystem.exists(legacyAgentDir)).toBe(false);
-    const index = JSON.parse(await readFile(paths.agentsIndexJsonPath, "utf-8")) as { agents: string[] };
-    expect(index.agents).toEqual(["goat"]);
-  });
 });
 
 async function createBootstrapService(): Promise<{

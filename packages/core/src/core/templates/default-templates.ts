@@ -8,6 +8,7 @@ export interface AgentTemplateOptions {
   type?: "manager" | "individual";
   reportsTo?: string | null;
   skills?: string[];
+  role?: string;
 }
 
 export function renderGlobalConfig(nowIso: string): OpenGoatConfig {
@@ -31,140 +32,16 @@ export function renderGlobalConfigMarkdown(): string {
   return [
     "# OpenGoat Home",
     "",
-    "This directory is OpenGoat runtime state.",
+    "This directory stores OpenGoat organization state.",
     "",
     "- `config.json`: global organization settings",
     "- `agents.json`: registered agent ids",
-    "- `workspaces/`: user-visible agent workspaces",
-    "- `agents/`: internal per-agent configuration",
+    "- `agents/`: per-agent OpenGoat config + session store",
     "- `skills/`: centralized skill definitions",
-    "- `providers/`: runtime gateway settings (OpenClaw)",
-    "- `sessions/`: transient per-run coordination working files",
+    "- `providers/`: OpenClaw runtime connectivity config",
     "- `runs/`: run traces (routing + execution history)",
     "",
-    "Only Markdown and JSON files are used for OpenGoat configuration and state."
-  ].join("\n");
-}
-
-export function renderWorkspaceAgentsMarkdown(agent: AgentIdentity, options: AgentTemplateOptions = {}): string {
-  const isGoat = isDefaultAgentId(agent.id);
-  const type = options.type ?? (isGoat ? "manager" : "individual");
-  const reportsTo = options.reportsTo === undefined ? (isGoat ? null : DEFAULT_AGENT_ID) : options.reportsTo;
-  const skills = dedupe(options.skills ?? (isGoat ? ["manager"] : []));
-  const description =
-    type === "manager"
-      ? `Manager agent responsible for leading direct reports.`
-      : `Specialized OpenClaw agent for ${agent.displayName}.`;
-  const tags = type === "manager" ? "manager, leadership" : "specialized, delegated";
-  const canDelegate = type === "manager" ? "true" : "false";
-  const priority = type === "manager" ? "100" : "50";
-  const reportsToValue = reportsTo ? reportsTo : "null";
-
-  return [
-    "---",
-    `id: ${agent.id}`,
-    `name: ${agent.displayName}`,
-    `description: ${description}`,
-    `type: ${type}`,
-    `reportsTo: ${reportsToValue}`,
-    "discoverable: true",
-    `tags: [${tags}]`,
-    `skills: [${skills.join(", ")}]`,
-    "delegation:",
-    "  canReceive: true",
-    `  canDelegate: ${canDelegate}`,
-    `priority: ${priority}`,
-    "---",
-    "",
-    `# ${agent.displayName} (OpenGoat Agent)`,
-    "",
-    "## Role",
-    type === "manager"
-      ? "You are an OpenGoat manager. Message only your direct reportees."
-      : "You are an autonomous OpenClaw-backed specialist managed by OpenGoat.",
-    "",
-    "## Runtime",
-    "- Every OpenGoat agent maps 1:1 to an OpenClaw agent.",
-    "- OpenGoat is the source of truth for agent definitions and hierarchy.",
-    "",
-    "## Workspace Contract",
-    "- The workspace is your writable environment.",
-    "- Keep durable user-facing guidance in Markdown files.",
-    "- Keep structured settings in JSON files.",
-    "",
-    "## Operational Rules",
-    "- Prefer explicit planning before major actions.",
-    "- Keep logs concise and actionable.",
-    "- Record important decisions in `CONTEXT.md`.",
-    "",
-    "## Memory",
-    "Use `CONTEXT.md` for rolling context and handoff notes."
-  ].join("\n");
-}
-
-export function renderWorkspaceContextMarkdown(agent: AgentIdentity): string {
-  return [
-    `# Context (${agent.displayName})`,
-    "",
-    "- Created by OpenGoat during workspace bootstrap.",
-    "- Use this file to capture current goals, constraints, and pending work."
-  ].join("\n");
-}
-
-export function renderWorkspaceSoulMarkdown(agent: AgentIdentity): string {
-  return [
-    `# Soul (${agent.displayName})`,
-    "",
-    "- Define tone, style, and non-negotiable guardrails here.",
-    "- Keep this file concise and stable across runs."
-  ].join("\n");
-}
-
-export function renderWorkspaceToolsMarkdown(): string {
-  return [
-    "# Tools",
-    "",
-    "- Document local tool conventions and execution preferences.",
-    "- This file is guidance only; it does not grant tool permissions."
-  ].join("\n");
-}
-
-export function renderWorkspaceIdentityMarkdown(agent: AgentIdentity): string {
-  return [
-    "# Identity",
-    "",
-    `- id: ${agent.id}`,
-    `- displayName: ${agent.displayName}`,
-    "- role: OpenGoat agent"
-  ].join("\n");
-}
-
-export function renderWorkspaceUserMarkdown(): string {
-  return [
-    "# User",
-    "",
-    "- Capture durable user preferences here.",
-    "- Avoid secrets; reference secure storage instead."
-  ].join("\n");
-}
-
-export function renderWorkspaceHeartbeatMarkdown(): string {
-  return [
-    "# Heartbeat",
-    "",
-    "Read this file when asked to perform heartbeat checks.",
-    "If nothing needs attention, return HEARTBEAT_OK."
-  ].join("\n");
-}
-
-export function renderWorkspaceBootstrapMarkdown(agent: AgentIdentity): string {
-  return [
-    `# Bootstrap (${agent.displayName})`,
-    "",
-    "First-run checklist:",
-    "- Review AGENTS.md, SOUL.md, and IDENTITY.md.",
-    "- Confirm USER.md and CONTEXT.md reflect current goals.",
-    "- Delete this file after the bootstrap ritual is complete."
+    "OpenClaw remains the source for agent workspace bootstrap markdown files."
   ].join("\n");
 }
 
@@ -199,35 +76,36 @@ export function renderDefaultManagerSkillMarkdown(): string {
   ].join("\n");
 }
 
-export function renderDefaultOrchestratorSkillMarkdown(): string {
-  return renderDefaultManagerSkillMarkdown();
-}
-
-export function renderWorkspaceMetadata(agent: AgentIdentity): Record<string, unknown> {
-  return {
-    schemaVersion: 1,
-    id: agent.id,
-    displayName: agent.displayName,
-    kind: "workspace",
-    createdBy: "opengoat"
-  };
-}
-
-export function renderInternalAgentConfig(agent: AgentIdentity): Record<string, unknown> {
+export function renderInternalAgentConfig(
+  agent: AgentIdentity,
+  options: AgentTemplateOptions = {}
+): Record<string, unknown> {
   const isGoat = isDefaultAgentId(agent.id);
+  const type = options.type ?? (isGoat ? "manager" : "individual");
+  const role = resolveAgentRole(agent.id, type, options.role ?? agent.role);
+  const reportsTo =
+    options.reportsTo === undefined ? (isGoat ? null : DEFAULT_AGENT_ID) : options.reportsTo;
+  const assignedSkills = dedupe(options.skills ?? (type === "manager" ? ["manager"] : []));
+
   return {
     schemaVersion: 2,
     id: agent.id,
     displayName: agent.displayName,
+    role,
+    description:
+      type === "manager"
+        ? `${role} coordinating direct reports.`
+        : `${role} OpenClaw agent for ${agent.displayName}.`,
     organization: {
-      type: isGoat ? "manager" : "individual",
-      reportsTo: isGoat ? null : DEFAULT_AGENT_ID
+      type,
+      reportsTo,
+      discoverable: true,
+      tags: type === "manager" ? ["manager", "leadership"] : ["specialized"],
+      priority: type === "manager" ? 100 : 50
     },
     runtime: {
       adapter: "openclaw",
       mode: "organization",
-      contextBudgetTokens: 128_000,
-      bootstrapMaxChars: 20_000,
       sessions: {
         mainKey: "main",
         contextMaxChars: 12_000,
@@ -253,7 +131,7 @@ export function renderInternalAgentConfig(agent: AgentIdentity): Record<string, 
         enabled: true,
         includeWorkspace: false,
         includeManaged: true,
-        assigned: isGoat ? ["manager"] : [],
+        assigned: assignedSkills,
         load: {
           extraDirs: []
         },
@@ -264,39 +142,25 @@ export function renderInternalAgentConfig(agent: AgentIdentity): Record<string, 
           includeContent: true
         }
       }
-    },
-    prompt: {
-      bootstrapFiles: [
-        "AGENTS.md",
-        "SOUL.md",
-        "TOOLS.md",
-        "IDENTITY.md",
-        "USER.md",
-        "HEARTBEAT.md",
-        "CONTEXT.md",
-        "BOOTSTRAP.md",
-        "MEMORY.md",
-        "memory.md"
-      ]
     }
   };
 }
 
-export function renderInternalAgentMemoryMarkdown(agent: AgentIdentity): string {
-  return [
-    `# Internal Memory (${agent.displayName})`,
-    "",
-    "This file is for OpenGoat internal memory and diagnostic notes.",
-    "It should remain machine-writable and human-readable."
-  ].join("\n");
-}
+export function resolveAgentRole(
+  agentId: string,
+  type: "manager" | "individual",
+  rawRole?: string
+): string {
+  const explicitRole = rawRole?.trim();
+  if (explicitRole) {
+    return explicitRole;
+  }
 
-export function renderInternalAgentState(): Record<string, unknown> {
-  return {
-    schemaVersion: 1,
-    status: "idle",
-    lastRunAt: null
-  };
+  if (isDefaultAgentId(agentId)) {
+    return "Head of Organization";
+  }
+
+  return type === "manager" ? "Manager" : "Individual Contributor";
 }
 
 function dedupe(values: string[]): string[] {

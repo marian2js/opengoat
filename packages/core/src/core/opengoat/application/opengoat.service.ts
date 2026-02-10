@@ -26,8 +26,16 @@ import type {
 import { createDefaultProviderRegistry } from "../../providers/index.js";
 import { AgentManifestService } from "../../agents/application/agent-manifest.service.js";
 import { AgentService } from "../../agents/application/agent.service.js";
-import { WorkspaceContextService } from "../../agents/application/workspace-context.service.js";
 import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
+import {
+  BoardService,
+  type BoardRecord,
+  type BoardSummary,
+  type CreateBoardOptions,
+  type CreateTaskOptions,
+  type TaskRecord,
+  type UpdateBoardOptions
+} from "../../boards/index.js";
 import {
   OrchestrationService,
   type OrchestrationRunOptions,
@@ -38,6 +46,7 @@ import { ProviderService } from "../../providers/application/provider.service.js
 import { SkillService, type InstallSkillRequest, type InstallSkillResult, type ResolvedSkill } from "../../skills/index.js";
 import {
   SessionService,
+  type AgentLastAction,
   type SessionCompactionResult,
   type SessionHistoryResult,
   type SessionRemoveResult,
@@ -56,13 +65,10 @@ interface OpenGoatServiceDeps {
 }
 
 const OPENCLAW_PROVIDER_ID = "openclaw";
-const LEGACY_ORCHESTRATOR_AGENT_ID = "orchestrator";
 
 export interface RuntimeDefaultsSyncResult {
   goatSyncCode?: number;
   goatSynced: boolean;
-  legacyOrchestratorDeleteCode?: number;
-  legacyOrchestratorRemoved: boolean;
   warnings: string[];
 }
 
@@ -75,6 +81,7 @@ export class OpenGoatService {
   private readonly skillService: SkillService;
   private readonly sessionService: SessionService;
   private readonly orchestrationService: OrchestrationService;
+  private readonly boardService: BoardService;
   private readonly commandRunner?: CommandRunnerPort;
 
   public constructor(deps: OpenGoatServiceDeps) {
@@ -100,10 +107,6 @@ export class OpenGoatService {
       agentService: this.agentService,
       nowIso
     });
-    const workspaceContextService = new WorkspaceContextService({
-      fileSystem: deps.fileSystem,
-      pathPort: deps.pathPort
-    });
     this.skillService = new SkillService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort
@@ -112,7 +115,6 @@ export class OpenGoatService {
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       providerRegistry: providerRegistryFactory,
-      workspaceContextService,
       skillService: this.skillService,
       nowIso,
       logger: rootLogger.child({ scope: "provider" })
@@ -134,6 +136,12 @@ export class OpenGoatService {
       nowIso,
       logger: rootLogger.child({ scope: "orchestration" })
     });
+    this.boardService = new BoardService({
+      fileSystem: deps.fileSystem,
+      pathPort: deps.pathPort,
+      nowIso,
+      agentManifestService: this.agentManifestService
+    });
   }
 
   public initialize(): Promise<InitializationResult> {
@@ -145,8 +153,6 @@ export class OpenGoatService {
     const warnings: string[] = [];
     let goatSynced = false;
     let goatSyncCode: number | undefined;
-    let legacyOrchestratorRemoved = false;
-    let legacyOrchestratorDeleteCode: number | undefined;
 
     let goatDescriptor = (await this.agentService.listAgents(paths)).find((agent) => agent.id === DEFAULT_AGENT_ID);
     if (!goatDescriptor) {
@@ -159,7 +165,8 @@ export class OpenGoatService {
         {
           type: "manager",
           reportsTo: null,
-          skills: ["manager"]
+          skills: ["manager"],
+          role: "Head of Organization"
         }
       );
       goatDescriptor = created.agent;
@@ -183,26 +190,9 @@ export class OpenGoatService {
       warnings.push(`OpenClaw sync for "goat" failed: ${toErrorMessage(error)}`);
     }
 
-    try {
-      const cleanup = await this.providerService.deleteProviderAgent(paths, LEGACY_ORCHESTRATOR_AGENT_ID, {
-        providerId: OPENCLAW_PROVIDER_ID
-      });
-      legacyOrchestratorDeleteCode = cleanup.code;
-      legacyOrchestratorRemoved = cleanup.code === 0 || containsNotFoundMessage(cleanup.stdout, cleanup.stderr);
-      if (!legacyOrchestratorRemoved) {
-        warnings.push(
-          `OpenClaw cleanup for legacy "orchestrator" failed (code ${cleanup.code}). ${(cleanup.stderr || cleanup.stdout).trim()}`
-        );
-      }
-    } catch (error) {
-      warnings.push(`OpenClaw cleanup for legacy "orchestrator" failed: ${toErrorMessage(error)}`);
-    }
-
     return {
       goatSyncCode,
       goatSynced,
-      legacyOrchestratorDeleteCode,
-      legacyOrchestratorRemoved,
       warnings
     };
   }
@@ -213,7 +203,8 @@ export class OpenGoatService {
     const created = await this.agentService.ensureAgent(paths, identity, {
       type: options.type,
       reportsTo: options.reportsTo,
-      skills: options.skills
+      skills: options.skills,
+      role: options.role
     });
 
     const runtimeSync = await this.providerService.createProviderAgent(paths, created.agent.id, {
@@ -349,6 +340,61 @@ export class OpenGoatService {
     return this.orchestrationService.runAgent(paths, agentId, options);
   }
 
+  public async createBoard(actorId: string, options: CreateBoardOptions): Promise<BoardSummary> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.createBoard(paths, actorId, options);
+  }
+
+  public async listBoards(): Promise<BoardSummary[]> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.listBoards(paths);
+  }
+
+  public async getBoard(boardId: string): Promise<BoardRecord> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.getBoard(paths, boardId);
+  }
+
+  public async updateBoard(actorId: string, boardId: string, options: UpdateBoardOptions): Promise<BoardSummary> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.updateBoard(paths, actorId, boardId, options);
+  }
+
+  public async createTask(actorId: string, boardId: string, options: CreateTaskOptions): Promise<TaskRecord> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.createTask(paths, actorId, boardId, options);
+  }
+
+  public async listTasks(boardId: string): Promise<TaskRecord[]> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.listTasks(paths, boardId);
+  }
+
+  public async getTask(taskId: string): Promise<TaskRecord> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.getTask(paths, taskId);
+  }
+
+  public async updateTaskStatus(actorId: string, taskId: string, status: string): Promise<TaskRecord> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.updateTaskStatus(paths, actorId, taskId, status);
+  }
+
+  public async addTaskBlocker(actorId: string, taskId: string, blocker: string): Promise<TaskRecord> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.addTaskBlocker(paths, actorId, taskId, blocker);
+  }
+
+  public async addTaskArtifact(actorId: string, taskId: string, content: string): Promise<TaskRecord> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.addTaskArtifact(paths, actorId, taskId, content);
+  }
+
+  public async addTaskWorklog(actorId: string, taskId: string, content: string): Promise<TaskRecord> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.addTaskWorklog(paths, actorId, taskId, content);
+  }
+
   public async listSkills(agentId = DEFAULT_AGENT_ID): Promise<ResolvedSkill[]> {
     const paths = this.pathsProvider.getPaths();
     return this.skillService.listSkills(paths, agentId);
@@ -385,6 +431,11 @@ export class OpenGoatService {
   public async listSessions(agentId = DEFAULT_AGENT_ID, options: { activeMinutes?: number } = {}): Promise<SessionSummary[]> {
     const paths = this.pathsProvider.getPaths();
     return this.sessionService.listSessions(paths, agentId, options);
+  }
+
+  public async getAgentLastAction(agentId = DEFAULT_AGENT_ID): Promise<AgentLastAction | null> {
+    const paths = this.pathsProvider.getPaths();
+    return this.sessionService.getLastAgentAction(paths, agentId);
   }
 
   public async getSessionHistory(
@@ -431,11 +482,6 @@ export class OpenGoatService {
 function containsAlreadyExistsMessage(stdout: string, stderr: string): boolean {
   const text = `${stdout}\n${stderr}`.toLowerCase();
   return text.includes("already exists") || text.includes("exists");
-}
-
-function containsNotFoundMessage(stdout: string, stderr: string): boolean {
-  const text = `${stdout}\n${stderr}`.toLowerCase();
-  return text.includes("not found") || text.includes("does not exist");
 }
 
 function toErrorMessage(error: unknown): string {

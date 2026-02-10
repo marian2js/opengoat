@@ -61,12 +61,7 @@ export class ScenarioRunnerService {
 
     await service.initialize();
     for (const agent of scenario.agents ?? []) {
-      const created = await service.createAgent(agent.name);
-      await this.writeAgentManifest(
-        created.agent.id,
-        agent.name,
-        agent.description,
-      );
+      await service.createAgent(agent.name);
     }
 
     const result = await service.runAgent(scenario.entryAgentId ?? "goat", {
@@ -104,40 +99,6 @@ export class ScenarioRunnerService {
     };
   }
 
-  private async writeAgentManifest(
-    agentId: string,
-    name: string,
-    description: string,
-  ): Promise<void> {
-    const paths = this.pathsProvider.getPaths();
-    const manifestPath = this.pathPort.join(
-      paths.workspacesDir,
-      agentId,
-      "AGENTS.md",
-    );
-    const content =
-      [
-        "---",
-        `id: ${agentId}`,
-        `name: ${name}`,
-        `description: ${description}`,
-        "type: individual",
-        "reportsTo: goat",
-        "discoverable: true",
-        "tags: [scenario, scripted]",
-        "skills: []",
-        "delegation:",
-        "  canReceive: true",
-        "  canDelegate: false",
-        "priority: 70",
-        "---",
-        "",
-        `# ${name}`,
-        "",
-        description,
-      ].join("\n") + "\n";
-    await this.fileSystem.writeFile(manifestPath, content);
-  }
 }
 
 class ScenarioScriptedProvider extends BaseProvider {
