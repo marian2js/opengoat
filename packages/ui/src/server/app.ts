@@ -87,6 +87,7 @@ export interface OpenClawUiService {
     options?: { sessionRef?: string; workingPath?: string; forceNew?: boolean }
   ) => Promise<SessionRunInfo>;
   renameSession?: (agentId?: string, title?: string, sessionRef?: string) => Promise<SessionSummary>;
+  removeSession?: (agentId?: string, sessionRef?: string) => Promise<SessionRemoveResult>;
 }
 
 interface SessionRunInfo {
@@ -102,6 +103,13 @@ interface SessionRunInfo {
 interface LegacyPreparedSessionRun {
   enabled: boolean;
   info?: SessionRunInfo;
+}
+
+interface SessionRemoveResult {
+  sessionKey: string;
+  sessionId: string;
+  title: string;
+  transcriptPath: string;
 }
 
 export interface OpenGoatUiServerOptions {
@@ -253,9 +261,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
         forceNew: true
       });
 
-      if (typeof service.renameSession === "function") {
-        await service.renameSession(agentId, project.name, sessionRef);
-      }
+      await renameUiSession(service, agentId, project.name, sessionRef);
 
       return {
         agentId,
@@ -275,6 +281,108 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
       const project = await pickProjectFolderFromSystem();
       return {
         project
+      };
+    });
+  });
+
+  app.post<{ Body: { agentId?: string; workingPath?: string; workspaceName?: string } }>(
+    "/api/workspaces/session",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
+        const workingPath = request.body?.workingPath?.trim();
+        if (!workingPath) {
+          reply.code(400);
+          return {
+            error: "workingPath is required"
+          };
+        }
+
+        const resolvedWorkingPath = path.resolve(workingPath);
+        const stats = await stat(resolvedWorkingPath).catch(() => {
+          return null;
+        });
+        if (!stats || !stats.isDirectory()) {
+          throw new Error(`Workspace path is not a directory: ${resolvedWorkingPath}`);
+        }
+
+        const workspaceName = request.body?.workspaceName?.trim() || path.basename(resolvedWorkingPath);
+        const sessionRef = buildWorkspaceSessionRef(workspaceName, resolvedWorkingPath);
+        const prepared = await prepareProjectSession(service, agentId, {
+          sessionRef,
+          workingPath: resolvedWorkingPath,
+          forceNew: true
+        });
+
+        const summary = await renameUiSession(service, agentId, resolveDefaultWorkspaceSessionTitle(), sessionRef);
+
+        return {
+          agentId,
+          session: prepared,
+          summary,
+          message: `Session created in \"${workspaceName}\".`
+        };
+      });
+    }
+  );
+
+  app.post<{ Body: { agentId?: string; sessionRef?: string; name?: string } }>("/api/workspaces/rename", async (request, reply) => {
+    return safeReply(reply, async () => {
+      const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
+      const sessionRef = request.body?.sessionRef?.trim();
+      const name = request.body?.name?.trim();
+      if (!sessionRef) {
+        reply.code(400);
+        return {
+          error: "sessionRef is required"
+        };
+      }
+      if (!name) {
+        reply.code(400);
+        return {
+          error: "name is required"
+        };
+      }
+
+      const renamed = await renameUiSession(service, agentId, name, sessionRef);
+      return {
+        agentId,
+        workspace: {
+          name: renamed.title,
+          sessionRef
+        },
+        message: `Workspace renamed to \"${renamed.title}\".`
+      };
+    });
+  });
+
+  app.post<{ Body: { agentId?: string; workingPath?: string } }>("/api/workspaces/delete", async (request, reply) => {
+    return safeReply(reply, async () => {
+      const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
+      const workingPath = request.body?.workingPath?.trim();
+      if (!workingPath) {
+        reply.code(400);
+        return {
+          error: "workingPath is required"
+        };
+      }
+
+      const resolvedWorkingPath = path.resolve(workingPath);
+      const sessions = await service.listSessions(agentId);
+      const targets = sessions.filter((session) => {
+        const sessionPath = session.workingPath?.trim();
+        return sessionPath ? path.resolve(sessionPath) === resolvedWorkingPath : false;
+      });
+
+      for (const session of targets) {
+        await removeUiSession(service, agentId, session.sessionKey);
+      }
+
+      return {
+        agentId,
+        deletedSessions: targets.length,
+        workingPath: resolvedWorkingPath,
+        message: `Removed ${targets.length} session${targets.length === 1 ? "" : "s"} for workspace.`
       };
     });
   });
@@ -401,6 +509,8 @@ async function prepareProjectSession(
         legacyAgentId: string,
         request: { sessionRef?: string; forceNew?: boolean; workingPath?: string; userMessage: string }
       ) => Promise<LegacyPreparedSessionRun>;
+      renameSession?: (paths: unknown, legacyAgentId: string, title: string, sessionRef?: string) => Promise<SessionSummary>;
+      removeSession?: (paths: unknown, legacyAgentId: string, sessionRef?: string) => Promise<SessionRemoveResult>;
     };
   };
 
@@ -419,6 +529,49 @@ async function prepareProjectSession(
   }
 
   throw new Error("Project session preparation is unavailable. Restart the UI server after updating dependencies.");
+}
+
+async function renameUiSession(
+  service: OpenClawUiService,
+  agentId: string,
+  title: string,
+  sessionRef: string
+): Promise<SessionSummary> {
+  if (typeof service.renameSession === "function") {
+    return service.renameSession(agentId, title, sessionRef);
+  }
+
+  const legacy = service as OpenClawUiService & {
+    sessionService?: {
+      renameSession?: (paths: unknown, legacyAgentId: string, nextTitle: string, legacySessionRef?: string) => Promise<SessionSummary>;
+    };
+  };
+  if (typeof legacy.getPaths === "function" && typeof legacy.sessionService?.renameSession === "function") {
+    return legacy.sessionService.renameSession(legacy.getPaths(), agentId, title, sessionRef);
+  }
+
+  throw new Error("Session rename is unavailable on this runtime.");
+}
+
+async function removeUiSession(
+  service: OpenClawUiService,
+  agentId: string,
+  sessionRef: string
+): Promise<SessionRemoveResult> {
+  if (typeof service.removeSession === "function") {
+    return service.removeSession(agentId, sessionRef);
+  }
+
+  const legacy = service as OpenClawUiService & {
+    sessionService?: {
+      removeSession?: (paths: unknown, legacyAgentId: string, legacySessionRef?: string) => Promise<SessionRemoveResult>;
+    };
+  };
+  if (typeof legacy.getPaths === "function" && typeof legacy.sessionService?.removeSession === "function") {
+    return legacy.sessionService.removeSession(legacy.getPaths(), agentId, sessionRef);
+  }
+
+  throw new Error("Session removal is unavailable on this runtime.");
 }
 
 async function resolveProjectFolder(
@@ -483,6 +636,19 @@ function buildProjectSessionRef(projectName: string, projectPath: string): strin
   const segment = normalizeProjectSegment(projectName);
   const suffix = normalizeProjectSegment(projectPath).slice(-10) || "session";
   return `project:${segment}-${suffix}`;
+}
+
+function buildWorkspaceSessionRef(workspaceName: string, workspacePath: string): string {
+  const segment = normalizeProjectSegment(workspaceName);
+  const suffix = normalizeProjectSegment(workspacePath).slice(-10) || "workspace";
+  const nonce = `${Date.now().toString(36)}${Math.floor(Math.random() * 1296)
+    .toString(36)
+    .padStart(2, "0")}`;
+  return `workspace:${segment}-${suffix}-${nonce}`;
+}
+
+function resolveDefaultWorkspaceSessionTitle(): string {
+  return "New Session";
 }
 
 function normalizeProjectSegment(value: string): string {

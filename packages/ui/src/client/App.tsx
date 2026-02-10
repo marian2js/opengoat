@@ -21,6 +21,8 @@ import {
   Folder,
   FolderPlus,
   Circle,
+  MoreHorizontal,
+  Plus,
   RefreshCw,
   Sparkles,
   UserRoundPlus,
@@ -116,6 +118,7 @@ interface WorkspaceSessionItem {
 interface WorkspaceNode {
   id: string;
   name: string;
+  projectSessionKey: string;
   workingPath: string;
   sessions: WorkspaceSessionItem[];
   updatedAt: number;
@@ -140,6 +143,31 @@ interface PickProjectResponse {
     name: string;
     path: string;
   };
+}
+
+interface WorkspaceSessionResponse {
+  agentId: string;
+  session: {
+    sessionKey: string;
+    sessionId: string;
+  };
+  summary?: {
+    title: string;
+  };
+  message?: string;
+}
+
+interface WorkspaceRenameResponse {
+  workspace: {
+    name: string;
+    sessionRef: string;
+  };
+  message?: string;
+}
+
+interface WorkspaceDeleteResponse {
+  deletedSessions: number;
+  message?: string;
 }
 
 interface CreateAgentForm {
@@ -207,10 +235,12 @@ export function App(): ReactElement {
   const [isMutating, setMutating] = useState(false);
   const [createForm, setCreateForm] = useState<CreateAgentForm>(DEFAULT_FORM);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [openWorkspaceMenuId, setOpenWorkspaceMenuId] = useState<string | null>(null);
 
   const handleViewChange = useCallback((nextView: ViewKey) => {
     setActiveView(nextView);
     setActionMessage(null);
+    setOpenWorkspaceMenuId(null);
   }, []);
 
   const loadData = useCallback(async () => {
@@ -336,6 +366,7 @@ export function App(): ReactElement {
         return {
           id: project.sessionId,
           name: project.name,
+          projectSessionKey: project.sessionKey,
           workingPath: project.workingPath,
           sessions: sessionsByPath.get(project.workingPath) ?? [],
           updatedAt: project.updatedAt
@@ -489,6 +520,100 @@ export function App(): ReactElement {
     }
   }
 
+  async function handleCreateWorkspaceSession(workspace: WorkspaceNode): Promise<void> {
+    setMutating(true);
+    setActionMessage(null);
+    setOpenWorkspaceMenuId(null);
+
+    try {
+      const response = await fetchJson<WorkspaceSessionResponse>("/api/workspaces/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          agentId: "goat",
+          workingPath: workspace.workingPath,
+          workspaceName: workspace.name
+        })
+      });
+
+      setActionMessage(response.message ?? `Session created in \"${workspace.name}\".`);
+      await refreshSessions();
+      setActiveView("sessions");
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "Unable to create workspace session.";
+      setActionMessage(message);
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function handleRenameWorkspace(workspace: WorkspaceNode): Promise<void> {
+    const nextName = window.prompt(`Rename workspace \"${workspace.name}\"`, workspace.name)?.trim();
+    if (!nextName || nextName === workspace.name) {
+      return;
+    }
+
+    setMutating(true);
+    setActionMessage(null);
+    setOpenWorkspaceMenuId(null);
+
+    try {
+      const response = await fetchJson<WorkspaceRenameResponse>("/api/workspaces/rename", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          agentId: "goat",
+          sessionRef: workspace.projectSessionKey,
+          name: nextName
+        })
+      });
+
+      setActionMessage(response.message ?? `Workspace renamed to \"${nextName}\".`);
+      await refreshSessions();
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "Unable to rename workspace.";
+      setActionMessage(message);
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function handleDeleteWorkspace(workspace: WorkspaceNode): Promise<void> {
+    const confirmed = window.confirm(`Delete all sessions for workspace \"${workspace.name}\"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setMutating(true);
+    setActionMessage(null);
+    setOpenWorkspaceMenuId(null);
+
+    try {
+      const response = await fetchJson<WorkspaceDeleteResponse>("/api/workspaces/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          agentId: "goat",
+          workingPath: workspace.workingPath
+        })
+      });
+
+      setActionMessage(response.message ?? `Deleted workspace sessions for \"${workspace.name}\".`);
+      await refreshSessions();
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "Unable to delete workspace sessions.";
+      setActionMessage(message);
+    } finally {
+      setMutating(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex min-h-screen">
@@ -555,7 +680,7 @@ export function App(): ReactElement {
             </button>
 
             {workspaceNodes.map((workspace) => (
-              <div key={workspace.id} className="mb-1">
+              <div key={workspace.id} className="group relative mb-1">
                 <button
                   type="button"
                   title={`${workspace.name} (${workspace.workingPath})`}
@@ -563,13 +688,73 @@ export function App(): ReactElement {
                     setActiveView("sessions");
                   }}
                   className={cn(
-                    "flex w-full items-center rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
-                    isSidebarCollapsed && "justify-center px-2"
+                    "flex w-full items-center rounded-md px-3 py-2 pr-16 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
+                    isSidebarCollapsed && "justify-center px-2 pr-2"
                   )}
                 >
                   <Folder className="size-4 shrink-0" />
                   {!isSidebarCollapsed ? <span className="ml-2 truncate">{workspace.name}</span> : null}
                 </button>
+
+                {!isSidebarCollapsed ? (
+                  <div className="absolute right-2 top-2 z-10 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      aria-label={`New session in ${workspace.name}`}
+                      title="New Session"
+                      disabled={isMutating}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void handleCreateWorkspaceSession(workspace);
+                      }}
+                      className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                    >
+                      <Plus className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Workspace menu for ${workspace.name}`}
+                      title="More"
+                      disabled={isMutating}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setOpenWorkspaceMenuId((current) => (current === workspace.id ? null : workspace.id));
+                      }}
+                      className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                    >
+                      <MoreHorizontal className="size-3.5" />
+                    </button>
+                  </div>
+                ) : null}
+
+                {!isSidebarCollapsed && openWorkspaceMenuId === workspace.id ? (
+                  <div className="absolute right-2 top-9 z-20 min-w-[140px] rounded-md border border-border bg-card p-1 shadow-lg">
+                    <button
+                      type="button"
+                      className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent/80"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void handleRenameWorkspace(workspace);
+                      }}
+                    >
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-danger hover:bg-danger/10"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void handleDeleteWorkspace(workspace);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : null}
 
                 {!isSidebarCollapsed ? (
                   <div className="mt-0.5 space-y-0.5">
