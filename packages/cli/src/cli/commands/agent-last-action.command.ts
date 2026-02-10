@@ -41,15 +41,15 @@ export const agentLastActionCommand: CliCommand = {
 
 type Parsed =
   | {
-      ok: true;
-      help: boolean;
-      json: boolean;
-      agentId: string;
-    }
+    ok: true;
+    help: boolean;
+    json: boolean;
+    agentId: string;
+  }
   | {
-      ok: false;
-      error: string;
-    };
+    ok: false;
+    error: string;
+  };
 
 function parseArgs(args: string[]): Parsed {
   let help = false;
@@ -59,6 +59,10 @@ function parseArgs(args: string[]): Parsed {
 
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index];
+
+    if (!token) {
+      continue;
+    }
 
     if (token === "--help" || token === "-h" || token === "help") {
       help = true;

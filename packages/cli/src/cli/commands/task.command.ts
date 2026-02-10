@@ -358,6 +358,10 @@ function parseEntryArgs(args: string[], kind: "blocker" | "artifact" | "worklog"
 
   for (let index = 2; index < args.length; index += 1) {
     const token = args[index];
+    if (!token) {
+      continue;
+    }
+
     if (token === "--as") {
       const value = args[index + 1]?.trim();
       if (!value) {

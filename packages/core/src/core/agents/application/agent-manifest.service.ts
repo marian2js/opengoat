@@ -72,8 +72,8 @@ export class AgentManifestService {
         tags: config?.organization?.tags,
         skills: assignedSkills,
         delegation: {
-          canReceive: config?.organization?.delegation?.canReceive,
-          canDelegate: config?.organization?.delegation?.canDelegate
+          canReceive: config?.organization?.delegation?.canReceive ?? false,
+          canDelegate: config?.organization?.delegation?.canDelegate ?? false
         },
         priority: config?.organization?.priority
       }

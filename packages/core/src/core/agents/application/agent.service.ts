@@ -230,7 +230,7 @@ export class AgentService {
 
     return {
       agentId,
-      previousReportsTo,
+      previousReportsTo: previousReportsTo ?? null,
       reportsTo,
       updatedPaths: [configPath]
     };
