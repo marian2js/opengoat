@@ -119,7 +119,10 @@ Main structure:
 - `providers/` (OpenClaw runtime connectivity config)
 - `runs/`
 
-OpenClaw owns workspace bootstrap markdown content; OpenGoat does not scaffold those files.
+OpenClaw owns workspace bootstrap markdown semantics.
+
+OpenGoat pre-seeds `workspaces/goat/AGENTS.md` and `workspaces/goat/SOUL.md` and removes `BOOTSTRAP.md`
+to avoid first-run bootstrap prompts for the default manager.
 
 ## 10) Module Layout
 
@@ -154,7 +157,7 @@ Optional UI extension module:
 
 If rebuilding from scratch, preserve these behaviors:
 
-1. bootstrap creates `goat` and core OpenGoat state only (no local skill scaffolding).
+1. bootstrap creates `goat`, core OpenGoat state, and pre-seeded `goat` workspace markdown (`AGENTS.md` + `SOUL.md`).
 2. `agent create` creates local state and syncs OpenClaw create.
 3. `agent delete` syncs OpenClaw delete and removes local state.
 4. `goat` is undeletable.

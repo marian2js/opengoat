@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -169,6 +170,28 @@ describe("OpenGoatService", () => {
     expect(result.goatSynced).toBe(true);
     expect(provider.createdAgents.some((entry) => entry.agentId === "goat")).toBe(true);
     expect(provider.deletedAgents).toHaveLength(0);
+  });
+
+  it("pre-seeds goat workspace and removes BOOTSTRAP before runtime sync", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+
+    const goatWorkspace = path.join(root, "workspaces", "goat");
+    const bootstrapPath = path.join(goatWorkspace, "BOOTSTRAP.md");
+    await writeFile(bootstrapPath, "# legacy bootstrap\n", "utf-8");
+
+    const result = await service.syncRuntimeDefaults();
+
+    expect(result.goatSynced).toBe(true);
+    await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
+
+    const agentsMarkdown = await readFile(path.join(goatWorkspace, "AGENTS.md"), "utf-8");
+    const soulMarkdown = await readFile(path.join(goatWorkspace, "SOUL.md"), "utf-8");
+    expect(agentsMarkdown).toContain("OpenGoat Goat Workspace");
+    expect(soulMarkdown).toContain("You are `goat`, the OpenGoat head manager.");
   });
 
   it("updates who an agent reports to", async () => {

@@ -63,9 +63,13 @@ export class BootstrapService {
       skills: ["manager"],
       role: "Head of Organization"
     });
+    const workspaceBootstrapResult = await this.agentService.ensureGoatWorkspaceBootstrap(paths);
 
     createdPaths.push(...agentResult.createdPaths);
     skippedPaths.push(...agentResult.skippedPaths);
+    createdPaths.push(...workspaceBootstrapResult.createdPaths);
+    skippedPaths.push(...workspaceBootstrapResult.skippedPaths);
+    skippedPaths.push(...workspaceBootstrapResult.removedPaths);
 
     return {
       paths,

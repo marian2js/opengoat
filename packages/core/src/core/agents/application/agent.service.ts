@@ -11,6 +11,8 @@ import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import {
   renderAgentsIndex,
+  renderGoatAgentsMarkdown,
+  renderGoatSoulMarkdown,
   renderInternalAgentConfig,
   resolveAgentRole,
   type AgentTemplateOptions
@@ -37,6 +39,12 @@ interface AgentConfigShape {
     type?: "manager" | "individual";
     reportsTo?: string | null;
   };
+}
+
+export interface GoatWorkspaceBootstrapResult {
+  createdPaths: string[];
+  skippedPaths: string[];
+  removedPaths: string[];
 }
 
 export class AgentService {
@@ -127,6 +135,47 @@ export class AgentService {
     }
 
     return descriptors.sort((left, right) => left.id.localeCompare(right.id));
+  }
+
+  public async ensureGoatWorkspaceBootstrap(paths: OpenGoatPaths): Promise<GoatWorkspaceBootstrapResult> {
+    const workspaceDir = this.pathPort.join(paths.workspacesDir, DEFAULT_AGENT_ID);
+    const agentsPath = this.pathPort.join(workspaceDir, "AGENTS.md");
+    const soulPath = this.pathPort.join(workspaceDir, "SOUL.md");
+    const bootstrapPath = this.pathPort.join(workspaceDir, "BOOTSTRAP.md");
+    const createdPaths: string[] = [];
+    const skippedPaths: string[] = [];
+    const removedPaths: string[] = [];
+
+    await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
+
+    const shouldOverwrite = await this.fileSystem.exists(bootstrapPath);
+    await this.writeMarkdown(
+      agentsPath,
+      renderGoatAgentsMarkdown(),
+      createdPaths,
+      skippedPaths,
+      { overwrite: shouldOverwrite }
+    );
+    await this.writeMarkdown(
+      soulPath,
+      renderGoatSoulMarkdown(),
+      createdPaths,
+      skippedPaths,
+      { overwrite: shouldOverwrite }
+    );
+
+    if (shouldOverwrite) {
+      await this.fileSystem.removeDir(bootstrapPath);
+      removedPaths.push(bootstrapPath);
+    } else {
+      skippedPaths.push(bootstrapPath);
+    }
+
+    return {
+      createdPaths,
+      skippedPaths,
+      removedPaths
+    };
   }
 
   public async removeAgent(paths: OpenGoatPaths, rawAgentId: string): Promise<AgentDeletionResult> {
@@ -263,6 +312,28 @@ export class AgentService {
     }
 
     await this.fileSystem.writeFile(filePath, toJson(payload));
+    createdPaths.push(filePath);
+  }
+
+  private async writeMarkdown(
+    filePath: string,
+    content: string,
+    createdPaths: string[],
+    skippedPaths: string[],
+    options: { overwrite?: boolean } = {}
+  ): Promise<void> {
+    const exists = await this.fileSystem.exists(filePath);
+    if (exists && !options.overwrite) {
+      skippedPaths.push(filePath);
+      return;
+    }
+
+    const markdown = content.endsWith("\n") ? content : `${content}\n`;
+    await this.fileSystem.writeFile(filePath, markdown);
+    if (exists) {
+      skippedPaths.push(filePath);
+      return;
+    }
     createdPaths.push(filePath);
   }
 
