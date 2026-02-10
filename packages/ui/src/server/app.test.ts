@@ -215,6 +215,28 @@ describe("OpenGoat UI server API", () => {
     const payload = response.json() as { session: { sessionKey: string } };
     expect(payload.session.sessionKey).toBe("project:legacy");
   });
+
+  it("returns unsupported for native picker on non-macos platforms", async () => {
+    if (process.platform === "darwin") {
+      return;
+    }
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService()
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/projects/pick"
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toMatchObject({
+      error: "Native folder picker is currently supported on macOS only."
+    });
+  });
 });
 
 function createMockService(): OpenClawUiService {
