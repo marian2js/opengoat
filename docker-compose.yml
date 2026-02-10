@@ -1,0 +1,19 @@
+services:
+  opengoat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: opengoat:latest
+    command: ["ui"]
+    environment:
+      OPENGOAT_UI_HOST: "0.0.0.0"
+      OPENGOAT_UI_PORT: "19123"
+      OPENGOAT_HOME: "/data/opengoat"
+      OPENGOAT_USE_DIST: "1"
+    ports:
+      - "19123:19123"
+    volumes:
+      - opengoat-data:/data/opengoat
+
+volumes:
+  opengoat-data:

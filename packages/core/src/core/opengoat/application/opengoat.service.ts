@@ -1,4 +1,5 @@
 import type {
+  AgentManagerUpdateResult,
   AgentCreationResult,
   AgentDeletionResult,
   AgentDescriptor,
@@ -203,6 +204,11 @@ export class OpenGoatService {
         stderr: runtimeSync.stderr
       }
     };
+  }
+
+  public async setAgentManager(rawAgentId: string, rawReportsTo: string | null): Promise<AgentManagerUpdateResult> {
+    const paths = this.pathsProvider.getPaths();
+    return this.agentService.setAgentManager(paths, rawAgentId, rawReportsTo);
   }
 
   public async listAgents(): Promise<AgentDescriptor[]> {

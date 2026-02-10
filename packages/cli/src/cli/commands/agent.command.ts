@@ -183,6 +183,7 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("  agent create        Create an OpenClaw-backed agent.\n");
   output.write("  agent delete        Delete an agent locally and in OpenClaw.\n");
   output.write("  agent list          List known agents.\n");
+  output.write("  agent set-manager   Reassign who an agent reports to.\n");
   output.write("  agent provider get  OpenClaw passthrough for provider binding lookup.\n");
   output.write("  agent provider set  OpenClaw passthrough for provider binding update.\n");
   output.write("  agent run           Explicit run command (requires <agent-id>).\n");

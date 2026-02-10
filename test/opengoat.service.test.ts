@@ -108,6 +108,20 @@ describe("OpenGoatService", () => {
     const forced = await service.deleteAgent("research-analyst", { force: true });
     expect(forced.existed).toBe(true);
   });
+
+  it("updates who an agent reports to", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("CTO", { type: "manager", reportsTo: "goat" });
+    await service.createAgent("Engineer");
+
+    const updated = await service.setAgentManager("engineer", "cto");
+    expect(updated.previousReportsTo).toBe("goat");
+    expect(updated.reportsTo).toBe("cto");
+  });
 });
 
 function createService(

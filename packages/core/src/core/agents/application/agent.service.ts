@@ -1,4 +1,5 @@
 import type {
+  AgentManagerUpdateResult,
   AgentDeletionResult,
   AgentCreationResult,
   AgentDescriptor,
@@ -24,6 +25,11 @@ import {
   renderWorkspaceUserMarkdown,
   renderWorkspaceMetadata
 } from "../../templates/default-templates.js";
+import {
+  formatAgentManifestMarkdown,
+  normalizeAgentManifestMetadata,
+  parseAgentManifestMarkdown
+} from "../domain/agent-manifest.js";
 
 interface AgentServiceDeps {
   fileSystem: FileSystemPort;
@@ -264,6 +270,81 @@ export class AgentService {
     };
   }
 
+  public async setAgentManager(
+    paths: OpenGoatPaths,
+    rawAgentId: string,
+    rawReportsTo: string | null | undefined
+  ): Promise<AgentManagerUpdateResult> {
+    const agentId = normalizeAgentId(rawAgentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const explicitReportsTo = rawReportsTo === null || rawReportsTo === undefined ? null : normalizeAgentId(rawReportsTo);
+    if (explicitReportsTo === agentId) {
+      throw new Error(`Agent "${agentId}" cannot report to itself.`);
+    }
+    if (isDefaultAgentId(agentId) && explicitReportsTo) {
+      throw new Error("goat is the head of the organization and cannot report to another agent.");
+    }
+    const reportsTo = resolveReportsTo(agentId, rawReportsTo);
+
+    const knownAgents = await this.fileSystem.listDirectories(paths.workspacesDir);
+    if (!knownAgents.includes(agentId)) {
+      throw new Error(`Agent "${agentId}" does not exist.`);
+    }
+    if (reportsTo && !knownAgents.includes(reportsTo)) {
+      throw new Error(`Manager "${reportsTo}" does not exist.`);
+    }
+
+    await this.assertNoReportingCycle(paths, agentId, reportsTo, knownAgents);
+
+    const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
+    const agentsPath = this.pathPort.join(workspaceDir, "AGENTS.md");
+    const displayName = await this.readDisplayName(workspaceDir, agentId);
+
+    const manifestRaw = await this.readFileIfPresent(agentsPath);
+    const parsedManifest = parseAgentManifestMarkdown(manifestRaw ?? "");
+    const currentMetadata = normalizeAgentManifestMetadata({
+      agentId,
+      displayName,
+      metadata: parsedManifest.data
+    });
+    const normalizedMetadata = normalizeAgentManifestMetadata({
+      agentId,
+      displayName,
+      metadata: {
+        ...parsedManifest.data,
+        reportsTo
+      }
+    });
+    const nextManifestMarkdown = formatAgentManifestMarkdown(normalizedMetadata, parsedManifest.body);
+    await this.fileSystem.writeFile(agentsPath, nextManifestMarkdown);
+
+    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+    const existingConfig = (await this.readJsonIfPresent<Record<string, unknown>>(configPath)) ?? {};
+    const existingOrganization = toObject(existingConfig.organization);
+    const nextOrganization: Record<string, unknown> = {
+      ...existingOrganization,
+      reportsTo: normalizedMetadata.reportsTo
+    };
+    if (normalizedMetadata.type) {
+      nextOrganization.type = normalizedMetadata.type;
+    }
+    const nextConfig = {
+      ...existingConfig,
+      organization: nextOrganization
+    };
+    await this.fileSystem.writeFile(configPath, toJson(nextConfig));
+
+    return {
+      agentId,
+      previousReportsTo: currentMetadata.reportsTo,
+      reportsTo: normalizedMetadata.reportsTo,
+      updatedPaths: [agentsPath, configPath]
+    };
+  }
+
   private async isBrandNewWorkspace(workspaceDir: string): Promise<boolean> {
     const firstRunFiles = [
       "AGENTS.md",
@@ -342,6 +423,60 @@ export class AgentService {
       return null;
     }
   }
+
+  private async readFileIfPresent(filePath: string): Promise<string | null> {
+    const exists = await this.fileSystem.exists(filePath);
+    if (!exists) {
+      return null;
+    }
+    return this.fileSystem.readFile(filePath);
+  }
+
+  private async readDisplayName(workspaceDir: string, fallbackAgentId: string): Promise<string> {
+    const metadataPath = this.pathPort.join(workspaceDir, "workspace.json");
+    const metadata = await this.readJsonIfPresent<{ displayName?: string }>(metadataPath);
+    return metadata?.displayName?.trim() || fallbackAgentId;
+  }
+
+  private async assertNoReportingCycle(
+    paths: OpenGoatPaths,
+    agentId: string,
+    reportsTo: string | null,
+    knownAgentIds: string[]
+  ): Promise<void> {
+    if (!reportsTo) {
+      return;
+    }
+
+    const reportsToByAgent = new Map<string, string | null>();
+    await Promise.all(
+      knownAgentIds.map(async (candidateAgentId) => {
+        const workspaceDir = this.pathPort.join(paths.workspacesDir, candidateAgentId);
+        const agentsPath = this.pathPort.join(workspaceDir, "AGENTS.md");
+        const displayName = await this.readDisplayName(workspaceDir, candidateAgentId);
+        const markdown = await this.readFileIfPresent(agentsPath);
+        const parsed = parseAgentManifestMarkdown(markdown ?? "");
+        const normalized = normalizeAgentManifestMetadata({
+          agentId: candidateAgentId,
+          displayName,
+          metadata: parsed.data
+        });
+        reportsToByAgent.set(candidateAgentId, normalized.reportsTo);
+      })
+    );
+
+    reportsToByAgent.set(agentId, reportsTo);
+    const visited = new Set<string>([agentId]);
+    let cursor: string | null = reportsTo;
+
+    while (cursor) {
+      if (visited.has(cursor)) {
+        throw new Error(`Cannot set "${agentId}" to report to "${reportsTo}" because it would create a cycle.`);
+      }
+      visited.add(cursor);
+      cursor = reportsToByAgent.get(cursor) ?? null;
+    }
+  }
 }
 
 function toAgentTemplateOptions(agentId: string, options: EnsureAgentOptions): AgentTemplateOptions {
@@ -378,4 +513,11 @@ function dedupe(values: string[]): string[] {
 
 function toJson(payload: unknown): string {
   return `${JSON.stringify(payload, null, 2)}\n`;
+}
+
+function toObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
 }

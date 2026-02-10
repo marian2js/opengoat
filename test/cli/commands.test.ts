@@ -3,6 +3,7 @@ import { agentCommand } from "../../packages/cli/src/cli/commands/agent.command.
 import { agentCreateCommand } from "../../packages/cli/src/cli/commands/agent-create.command.js";
 import { agentDeleteCommand } from "../../packages/cli/src/cli/commands/agent-delete.command.js";
 import { agentListCommand } from "../../packages/cli/src/cli/commands/agent-list.command.js";
+import { agentSetManagerCommand } from "../../packages/cli/src/cli/commands/agent-set-manager.command.js";
 import { initCommand } from "../../packages/cli/src/cli/commands/init.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
@@ -140,6 +141,35 @@ describe("CLI commands", () => {
     expect(stdout.output()).toContain("Agent deleted: research-analyst");
     expect(stdout.output()).toContain("OpenClaw sync: openclaw (code 0)");
     expect(stdout.output()).toContain("Removed paths: 2");
+  });
+
+  it("agent set-manager validates usage", async () => {
+    const setAgentManager = vi.fn();
+    const { context, stderr } = createContext({ setAgentManager });
+
+    const code = await agentSetManagerCommand.run([], context);
+
+    expect(code).toBe(1);
+    expect(setAgentManager).not.toHaveBeenCalled();
+    expect(stderr.output()).toContain("Usage: opengoat agent set-manager");
+  });
+
+  it("agent set-manager updates reports-to relationship", async () => {
+    const setAgentManager = vi.fn(async () => ({
+      agentId: "engineer",
+      previousReportsTo: "goat",
+      reportsTo: "cto",
+      updatedPaths: ["/tmp/workspaces/engineer/AGENTS.md", "/tmp/agents/engineer/config.json"]
+    }));
+    const { context, stdout } = createContext({ setAgentManager });
+
+    const code = await agentSetManagerCommand.run(["engineer", "cto"], context);
+
+    expect(code).toBe(0);
+    expect(setAgentManager).toHaveBeenCalledWith("engineer", "cto");
+    expect(stdout.output()).toContain("Updated manager: engineer");
+    expect(stdout.output()).toContain("Previous reports-to: goat");
+    expect(stdout.output()).toContain("Current reports-to: cto");
   });
 
   it("agent list prints empty state and rows", async () => {

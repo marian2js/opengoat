@@ -78,6 +78,30 @@ opengoat onboard
 opengoat agent --message "Plan and implement auth refactor"
 ```
 
+## Docker
+
+Build and run OpenGoat (UI + CLI) in Docker:
+
+```bash
+docker build -t opengoat:latest .
+
+# launch UI (Fastify + React assets) on port 19123
+docker run --rm -p 19123:19123 -v opengoat-data:/data/opengoat opengoat:latest
+
+# run CLI inside the same image
+docker run --rm -v opengoat-data:/data/opengoat opengoat:latest cli --help
+
+# verify bundled OpenClaw binary (installed via npm @latest during image build)
+docker run --rm opengoat:latest openclaw --version
+```
+
+Using Compose:
+
+```bash
+docker compose up --build
+docker compose run --rm opengoat cli --help
+```
+
 ### OpenClaw references
 
 - [Getting Started](https://docs.openclaw.ai/start/getting-started)
@@ -128,6 +152,10 @@ opengoat agent create "Team Lead" --manager --reports-to goat --skill manager
 
 # if --reports-to is omitted, new agents default to goat
 opengoat agent create "QA Engineer" --individual
+
+# restructure reporting lines
+opengoat agent set-manager engineer cto
+opengoat agent set-manager cto goat
 
 # delete agent (also synced to OpenClaw)
 opengoat agent delete developer
@@ -230,6 +258,7 @@ packages/
 
 - `docs/organization-runtime.md` - current manager/reportee runtime model (skill-driven)
 - `docs/acp.md` - ACP integration
+- `docs/docker.md` - container image/runtime usage
 - `ABOUT.md` - full architecture context
 
 ## Contributing
