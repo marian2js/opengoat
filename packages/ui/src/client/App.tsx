@@ -560,7 +560,7 @@ export function App(): ReactElement {
                                   <p className="truncate text-xs text-muted-foreground">{agent.id}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  {agent.id === "goat" ? <Badge variant="secondary">Default</Badge> : null}
+                                  {agent.id === "goat" ? <Badge variant="secondary">Head of Org</Badge> : null}
                                   <Button
                                     size="sm"
                                     variant="ghost"
