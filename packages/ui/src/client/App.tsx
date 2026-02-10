@@ -25,7 +25,6 @@ import {
   Plus,
   RefreshCw,
   Sparkles,
-  UserRoundPlus,
   UsersRound,
   X
 } from "lucide-react";
@@ -36,7 +35,17 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-type ViewKey = "overview" | "agents" | "sessions" | "skills";
+type PageView = "overview" | "agents" | "skills";
+
+type AppRoute =
+  | {
+      kind: "page";
+      view: PageView;
+    }
+  | {
+      kind: "session";
+      sessionId: string;
+    };
 
 interface HealthResponse {
   ok: boolean;
@@ -185,7 +194,7 @@ interface CreateAgentForm {
 }
 
 interface SidebarItem {
-  id: ViewKey;
+  id: PageView;
   label: string;
   icon: ComponentType<{ className?: string }>;
 }
@@ -220,7 +229,6 @@ const NODE_HEIGHT = 108;
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
   { id: "agents", label: "Agents", icon: UsersRound },
-  { id: "sessions", label: "Sessions", icon: UserRoundPlus },
   { id: "skills", label: "Skills", icon: Boxes }
 ];
 
@@ -236,7 +244,7 @@ const orgChartNodeTypes = {
 } satisfies NodeTypes;
 
 export function App(): ReactElement {
-  const [activeView, setActiveView] = useState<ViewKey>("overview");
+  const [route, setRoute] = useState<AppRoute>(() => getInitialRoute());
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [state, setState] = useState<DashboardState | null>(null);
   const [isLoading, setLoading] = useState(true);
@@ -249,13 +257,56 @@ export function App(): ReactElement {
   const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(null);
   const [collapsedWorkspaceIds, setCollapsedWorkspaceIds] = useState<Set<string>>(() => new Set());
 
-  const handleViewChange = useCallback((nextView: ViewKey) => {
-    setActiveView(nextView);
-    setActionMessage(null);
+  const navigateToRoute = useCallback((nextRoute: AppRoute) => {
+    const nextPath = routeToPath(nextRoute);
+    if (typeof window !== "undefined" && window.location.pathname !== nextPath) {
+      window.history.pushState({}, "", nextPath);
+    }
+    setRoute(nextRoute);
     setHoveredWorkspaceId(null);
     setOpenWorkspaceMenuId(null);
     setOpenSessionMenuId(null);
   }, []);
+
+  const handleViewChange = useCallback(
+    (nextView: PageView) => {
+      setActionMessage(null);
+      navigateToRoute({
+        kind: "page",
+        view: nextView
+      });
+    },
+    [navigateToRoute]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const onPopState = (): void => {
+      setRoute(parseRoute(window.location.pathname));
+      setHoveredWorkspaceId(null);
+      setOpenWorkspaceMenuId(null);
+      setOpenSessionMenuId(null);
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const canonicalPath = routeToPath(route);
+    if (window.location.pathname !== canonicalPath) {
+      window.history.replaceState({}, "", canonicalPath);
+    }
+  }, [route]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -339,6 +390,12 @@ export function App(): ReactElement {
 
   const agents = state?.overview.agents ?? [];
   const sessions = state?.sessions.sessions ?? [];
+  const selectedSession = useMemo(() => {
+    if (route.kind !== "session") {
+      return null;
+    }
+    return sessions.find((session) => session.sessionId === route.sessionId) ?? null;
+  }, [route, sessions]);
   const projects = useMemo<Project[]>(() => {
     return sessions
       .filter((session) => session.sessionKey.startsWith("project:") && typeof session.workingPath === "string")
@@ -542,7 +599,10 @@ export function App(): ReactElement {
 
       setActionMessage(response.message ?? `Project \"${response.project.name}\" added.`);
       await refreshSessions();
-      setActiveView("sessions");
+      navigateToRoute({
+        kind: "session",
+        sessionId: response.session.sessionId
+      });
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Unable to add project.";
       setActionMessage(message);
@@ -572,7 +632,10 @@ export function App(): ReactElement {
 
       setActionMessage(response.message ?? `Session created in \"${workspace.name}\".`);
       await refreshSessions();
-      setActiveView("sessions");
+      navigateToRoute({
+        kind: "session",
+        sessionId: response.session.sessionId
+      });
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Unable to create workspace session.";
       setActionMessage(message);
@@ -673,6 +736,12 @@ export function App(): ReactElement {
 
       setActionMessage(response.message ?? `Session \"${session.title}\" removed.`);
       await refreshSessions();
+      if (route.kind === "session" && route.sessionId === session.sessionId) {
+        navigateToRoute({
+          kind: "page",
+          view: "overview"
+        });
+      }
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Unable to remove session.";
       setActionMessage(message);
@@ -708,7 +777,7 @@ export function App(): ReactElement {
           <nav className="flex-1 p-2">
             {SIDEBAR_ITEMS.map((item) => {
               const Icon = item.icon;
-              const active = item.id === activeView;
+              const active = route.kind === "page" && item.id === route.view;
 
               return (
                 <button
@@ -855,7 +924,10 @@ export function App(): ReactElement {
                             type="button"
                             title={`${session.title} (${session.sessionKey})`}
                             onClick={() => {
-                              setActiveView("sessions");
+                              navigateToRoute({
+                                kind: "session",
+                                sessionId: session.sessionId
+                              });
                               setOpenWorkspaceMenuId(null);
                             }}
                             className="flex w-full items-center rounded-md py-1.5 pl-9 pr-8 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
@@ -921,8 +993,8 @@ export function App(): ReactElement {
           <header className="border-b border-border bg-background/95 px-4 py-4 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{viewTitle(activeView)}</h1>
-                <p className="mt-1 text-sm text-muted-foreground">{viewDescription(activeView)}</p>
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{viewTitle(route, selectedSession)}</h1>
+                <p className="mt-1 text-sm text-muted-foreground">{viewDescription(route, selectedSession)}</p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -946,7 +1018,7 @@ export function App(): ReactElement {
             <div className="flex gap-1 overflow-x-auto">
               {SIDEBAR_ITEMS.map((item) => {
                 const Icon = item.icon;
-                const active = item.id === activeView;
+                const active = route.kind === "page" && item.id === route.view;
 
                 return (
                   <button
@@ -1012,7 +1084,7 @@ export function App(): ReactElement {
 
             {state ? (
               <div className="space-y-4">
-                {activeView === "overview" ? (
+                {route.kind === "page" && route.view === "overview" ? (
                   <>
                     <div className="grid gap-4 xl:grid-cols-3">
                       {metrics.map((metric) => {
@@ -1040,7 +1112,7 @@ export function App(): ReactElement {
                   </>
                 ) : null}
 
-                {activeView === "agents" ? (
+                {route.kind === "page" && route.view === "agents" ? (
                   <div className="grid gap-4 xl:grid-cols-[390px_1fr]">
                     <Card>
                       <CardHeader>
@@ -1140,36 +1212,27 @@ export function App(): ReactElement {
                   </div>
                 ) : null}
 
-                {activeView === "sessions" ? (
+                {route.kind === "session" ? (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Goat Sessions</CardTitle>
-                      <CardDescription>Saved sessions for the default manager.</CardDescription>
+                      <CardTitle>{selectedSession?.title ?? "Session Not Found"}</CardTitle>
+                      <CardDescription>
+                        {selectedSession
+                          ? "Session detail placeholder. Chat view will be wired next."
+                          : `No saved session was found for id ${route.sessionId}.`}
+                      </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      {sessions.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No sessions available.</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {sessions.map((session) => (
-                            <div key={session.sessionId} className="rounded-md border border-border/80 bg-background/30 p-3">
-                              <div className="mb-1 flex items-start justify-between gap-3">
-                                <p className="font-medium">{session.title}</p>
-                                <Badge variant="secondary">{session.compactionCount} compact</Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground">{session.sessionId}</p>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {new Date(session.updatedAt).toLocaleString()} | {session.totalChars.toLocaleString()} chars
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
+                    {selectedSession ? (
+                      <CardContent className="space-y-2 text-sm text-muted-foreground">
+                        <p>Session ID: {selectedSession.sessionId}</p>
+                        <p>Key: {selectedSession.sessionKey}</p>
+                        <p>Updated: {new Date(selectedSession.updatedAt).toLocaleString()}</p>
+                      </CardContent>
+                    ) : null}
                   </Card>
                 ) : null}
 
-                {activeView === "skills" ? (
+                {route.kind === "page" && route.view === "skills" ? (
                   <div className="grid gap-4 xl:grid-cols-2">
                     <Card>
                       <CardHeader>
@@ -1576,14 +1639,16 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
-function viewTitle(view: ViewKey): string {
-  switch (view) {
+function viewTitle(route: AppRoute, selectedSession: Session | null): string {
+  if (route.kind === "session") {
+    return selectedSession?.title ?? "Session";
+  }
+
+  switch (route.view) {
     case "overview":
       return "Dashboard";
     case "agents":
       return "Agents";
-    case "sessions":
-      return "Sessions";
     case "skills":
       return "Skills";
     default:
@@ -1591,17 +1656,69 @@ function viewTitle(view: ViewKey): string {
   }
 }
 
-function viewDescription(view: ViewKey): string {
-  switch (view) {
+function viewDescription(route: AppRoute, selectedSession: Session | null): string {
+  if (route.kind === "session") {
+    return selectedSession
+      ? `Viewing session ${selectedSession.sessionId}.`
+      : `Session id ${route.sessionId} was not found.`;
+  }
+
+  switch (route.view) {
     case "overview":
       return "Operational summary for your OpenGoat runtime.";
     case "agents":
       return "Create and maintain your organization hierarchy.";
-    case "sessions":
-      return "Inspect saved session continuity for the default manager.";
     case "skills":
       return "Review assigned and global skill coverage.";
     default:
       return "";
   }
+}
+
+function getInitialRoute(): AppRoute {
+  if (typeof window === "undefined") {
+    return { kind: "page", view: "overview" };
+  }
+
+  return parseRoute(window.location.pathname);
+}
+
+function parseRoute(pathname: string): AppRoute {
+  const normalized = pathname.trim() || "/";
+
+  if (normalized === "/" || normalized === "/overview") {
+    return { kind: "page", view: "overview" };
+  }
+
+  if (normalized === "/agents") {
+    return { kind: "page", view: "agents" };
+  }
+
+  if (normalized === "/skills") {
+    return { kind: "page", view: "skills" };
+  }
+
+  if (normalized.startsWith("/sessions/")) {
+    const sessionId = decodeURIComponent(normalized.slice("/sessions/".length)).trim();
+    if (sessionId) {
+      return {
+        kind: "session",
+        sessionId
+      };
+    }
+  }
+
+  return { kind: "page", view: "overview" };
+}
+
+function routeToPath(route: AppRoute): string {
+  if (route.kind === "session") {
+    return `/sessions/${encodeURIComponent(route.sessionId)}`;
+  }
+
+  if (route.view === "overview") {
+    return "/overview";
+  }
+
+  return `/${route.view}`;
 }
