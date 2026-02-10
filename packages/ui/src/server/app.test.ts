@@ -409,6 +409,18 @@ describe("OpenGoat UI server API", () => {
         code: 0
       }
     });
+
+    const aliasResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/session/message",
+      payload: {
+        agentId: "goat",
+        sessionRef: "workspace:tmp",
+        workingPath: "/tmp",
+        message: "hello alias"
+      }
+    });
+    expect(aliasResponse.statusCode).toBe(200);
   });
 });
 

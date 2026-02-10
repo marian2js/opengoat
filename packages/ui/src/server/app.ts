@@ -420,50 +420,59 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   });
 
+  const handleSessionMessage = async (
+    request: { body?: { agentId?: string; sessionRef?: string; workingPath?: string; message?: string } },
+    reply: FastifyReply
+  ): Promise<unknown> => {
+    return safeReply(reply, async () => {
+      const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
+      const sessionRef = request.body?.sessionRef?.trim();
+      const message = request.body?.message?.trim();
+      const workingPath = request.body?.workingPath?.trim();
+
+      if (!sessionRef) {
+        reply.code(400);
+        return {
+          error: "sessionRef is required"
+        };
+      }
+
+      if (!message) {
+        reply.code(400);
+        return {
+          error: "message is required"
+        };
+      }
+
+      const result = await runUiSessionMessage(service, agentId, {
+        sessionRef,
+        workingPath,
+        message
+      });
+
+      const output = result.stdout.trim() || result.stderr.trim();
+
+      return {
+        agentId,
+        sessionRef,
+        output,
+        result: {
+          code: result.code,
+          stdout: result.stdout,
+          stderr: result.stderr
+        },
+        message: result.code === 0 ? "Message sent." : "Message completed with non-zero exit code."
+      };
+    });
+  };
+
   app.post<{ Body: { agentId?: string; sessionRef?: string; workingPath?: string; message?: string } }>(
     "/api/sessions/message",
-    async (request, reply) => {
-      return safeReply(reply, async () => {
-        const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
-        const sessionRef = request.body?.sessionRef?.trim();
-        const message = request.body?.message?.trim();
-        const workingPath = request.body?.workingPath?.trim();
-
-        if (!sessionRef) {
-          reply.code(400);
-          return {
-            error: "sessionRef is required"
-          };
-        }
-
-        if (!message) {
-          reply.code(400);
-          return {
-            error: "message is required"
-          };
-        }
-
-        const result = await runUiSessionMessage(service, agentId, {
-          sessionRef,
-          workingPath,
-          message
-        });
-
-        const output = result.stdout.trim() || result.stderr.trim();
-
-        return {
-          agentId,
-          sessionRef,
-          output,
-          result: {
-            code: result.code,
-            stdout: result.stdout,
-            stderr: result.stderr
-          },
-          message: result.code === 0 ? "Message sent." : "Message completed with non-zero exit code."
-        };
-      });
-    }
+    handleSessionMessage
+  );
+  app.post<{ Body: { agentId?: string; sessionRef?: string; workingPath?: string; message?: string } }>(
+    "/api/session/message",
+    handleSessionMessage
   );
 
 }

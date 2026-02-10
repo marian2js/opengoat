@@ -815,18 +815,13 @@ export function App(): ReactElement {
     setActionMessage(null);
 
     try {
-      const response = await fetchJson<SessionSendMessageResponse>("/api/sessions/message", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          agentId: "goat",
-          sessionRef: selectedSession.sessionKey,
-          workingPath: selectedSession.workingPath,
-          message: text
-        })
-      });
+      const payload = {
+        agentId: "goat",
+        sessionRef: selectedSession.sessionKey,
+        workingPath: selectedSession.workingPath,
+        message: text
+      };
+      const response = await sendSessionMessage(payload);
 
       const assistantReply = response.output.trim() || "No output was returned.";
       appendSessionMessage(sessionId, {
@@ -837,13 +832,46 @@ export function App(): ReactElement {
       setSessionChatStatus(response.result.code === 0 ? "ready" : "error");
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Unable to send session message.";
+      const normalizedError =
+        message === "Not Found"
+          ? "Session message endpoint is unavailable. Refresh/restart the UI server to load the latest API routes."
+          : message;
       appendSessionMessage(sessionId, {
         id: `${sessionId}:assistant-error:${Date.now()}`,
         role: "assistant",
-        content: message
+        content: normalizedError
       });
       setSessionChatStatus("error");
     }
+  }
+
+  async function sendSessionMessage(payload: {
+    agentId: string;
+    sessionRef: string;
+    workingPath?: string;
+    message: string;
+  }): Promise<SessionSendMessageResponse> {
+    const routes = ["/api/sessions/message", "/api/session/message"];
+    let lastError: unknown;
+
+    for (const routePath of routes) {
+      try {
+        return await fetchJson<SessionSendMessageResponse>(routePath, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+      } catch (error) {
+        lastError = error;
+        if (!(error instanceof Error) || error.message !== "Not Found") {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error("Unable to send session message.");
   }
 
   return (
@@ -1309,39 +1337,37 @@ export function App(): ReactElement {
                 ) : null}
 
                 {route.kind === "session" ? (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>{selectedSession?.title ?? "Session Not Found"}</CardTitle>
-                      <CardDescription>
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <h2 className="text-xl font-semibold">{selectedSession?.title ?? "Session Not Found"}</h2>
+                      <p className="text-sm text-muted-foreground">
                         {selectedSession
                           ? "Send messages directly into this session."
                           : `No saved session was found for id ${route.sessionId}.`}
-                      </CardDescription>
-                    </CardHeader>
+                      </p>
+                    </div>
                     {selectedSession ? (
-                      <CardContent className="space-y-4">
-                        <div className="rounded-lg border border-border/70 bg-background/30 p-2">
-                          <Conversation className="h-[440px]">
-                            <ConversationContent className="gap-4 p-3">
-                              {sessionMessages.length === 0 ? (
-                                <ConversationEmptyState
-                                  icon={<MessageSquare className="size-10" />}
-                                  title="Start this session"
-                                  description="Send your first message below."
-                                />
-                              ) : (
-                                sessionMessages.map((message) => (
-                                  <Message from={message.role} key={message.id}>
-                                    <MessageContent>
-                                      <MessageResponse>{message.content}</MessageResponse>
-                                    </MessageContent>
-                                  </Message>
-                                ))
-                              )}
-                            </ConversationContent>
-                            <ConversationScrollButton />
-                          </Conversation>
-                        </div>
+                      <>
+                        <Conversation className="h-[520px] rounded-lg border border-border/70 bg-background/30">
+                          <ConversationContent className="gap-4 p-4">
+                            {sessionMessages.length === 0 ? (
+                              <ConversationEmptyState
+                                icon={<MessageSquare className="size-10" />}
+                                title="Start this session"
+                                description="Send your first message below."
+                              />
+                            ) : (
+                              sessionMessages.map((message) => (
+                                <Message from={message.role} key={message.id}>
+                                  <MessageContent>
+                                    <MessageResponse>{message.content}</MessageResponse>
+                                  </MessageContent>
+                                </Message>
+                              ))
+                            )}
+                          </ConversationContent>
+                          <ConversationScrollButton />
+                        </Conversation>
 
                         <PromptInput
                           onSubmit={(message) => {
@@ -1361,9 +1387,9 @@ export function App(): ReactElement {
                             />
                           </PromptInputFooter>
                         </PromptInput>
-                      </CardContent>
+                      </>
                     ) : null}
-                  </Card>
+                  </div>
                 ) : null}
 
                 {route.kind === "page" && route.view === "skills" ? (
