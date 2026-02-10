@@ -379,6 +379,28 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   });
 
+  app.post<{ Body: { agentId?: string; sessionRef?: string } }>("/api/sessions/remove", async (request, reply) => {
+    return safeReply(reply, async () => {
+      const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
+      const sessionRef = request.body?.sessionRef?.trim();
+      if (!sessionRef) {
+        reply.code(400);
+        return {
+          error: "sessionRef is required"
+        };
+      }
+
+      const removed = await removeUiSession(service, agentId, sessionRef);
+      return {
+        agentId,
+        removedSession: {
+          sessionRef: removed.sessionKey
+        },
+        message: "Session removed."
+      };
+    });
+  });
+
 }
 
 interface FrontendOptions {

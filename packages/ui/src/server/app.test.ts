@@ -350,6 +350,16 @@ describe("OpenGoat UI server API", () => {
     expect(deleteResponse.statusCode).toBe(200);
     expect(removeSession).toHaveBeenCalledTimes(1);
     expect(removeSession).toHaveBeenCalledWith("goat", "project:tmp");
+
+    const removeSessionResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/remove",
+      payload: {
+        sessionRef: "agent:goat:main"
+      }
+    });
+    expect(removeSessionResponse.statusCode).toBe(200);
+    expect(removeSession).toHaveBeenCalledWith("goat", "agent:goat:main");
   });
 });
 
