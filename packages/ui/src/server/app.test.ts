@@ -52,6 +52,35 @@ interface SessionRunInfo {
   isNewSession: boolean;
 }
 
+interface TaskEntry {
+  createdAt: string;
+  createdBy: string;
+  content: string;
+}
+
+interface TaskRecord {
+  taskId: string;
+  boardId: string;
+  createdAt: string;
+  workspace: string;
+  owner: string;
+  assignedTo: string;
+  title: string;
+  description: string;
+  status: string;
+  blockers: string[];
+  artifacts: TaskEntry[];
+  worklog: TaskEntry[];
+}
+
+interface BoardRecord {
+  boardId: string;
+  title: string;
+  createdAt: string;
+  owner: string;
+  tasks: TaskRecord[];
+}
+
 let activeServer: Awaited<ReturnType<typeof createOpenGoatUiServer>> | undefined;
 
 afterEach(async () => {
@@ -507,6 +536,306 @@ describe("OpenGoat UI server API", () => {
         }
       ]
     });
+  });
+
+  it("returns persisted session history", async () => {
+    const getSessionHistory = vi.fn<NonNullable<OpenClawUiService["getSessionHistory"]>>(async (): Promise<{
+      sessionKey: string;
+      sessionId: string;
+      transcriptPath: string;
+      messages: Array<{
+        type: "message";
+        role: "user" | "assistant";
+        content: string;
+        timestamp: number;
+      }>;
+    }> => {
+      return {
+        sessionKey: "workspace:tmp",
+        sessionId: "session-1",
+        transcriptPath: "/tmp/transcript.jsonl",
+        messages: [
+          {
+            type: "message",
+            role: "user",
+            content: "hello",
+            timestamp: 1
+          },
+          {
+            type: "message",
+            role: "assistant",
+            content: "world",
+            timestamp: 2
+          }
+        ]
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        getSessionHistory
+      }
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/sessions/history?agentId=goat&sessionRef=workspace%3Atmp&limit=50"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(getSessionHistory).toHaveBeenCalledWith("goat", {
+      sessionRef: "workspace:tmp",
+      limit: 50
+    });
+    expect(response.json()).toMatchObject({
+      sessionRef: "workspace:tmp",
+      history: {
+        sessionId: "session-1",
+        messages: [
+          { role: "user", content: "hello" },
+          { role: "assistant", content: "world" }
+        ]
+      }
+    });
+  });
+
+  it("manages boards and tasks through the api", async () => {
+    const baseTask: TaskRecord = {
+      taskId: "task-plan",
+      boardId: "board-roadmap",
+      createdAt: "2026-02-11T08:00:00.000Z",
+      workspace: "~",
+      owner: "goat",
+      assignedTo: "developer",
+      title: "Plan roadmap",
+      description: "Draft roadmap milestones",
+      status: "todo",
+      blockers: [],
+      artifacts: [],
+      worklog: []
+    };
+    const board: BoardRecord = {
+      boardId: "board-roadmap",
+      title: "Roadmap",
+      createdAt: "2026-02-11T08:00:00.000Z",
+      owner: "goat",
+      tasks: [baseTask]
+    };
+
+    const listBoards = vi.fn<NonNullable<OpenClawUiService["listBoards"]>>(async () => {
+      return [
+        {
+          boardId: board.boardId,
+          title: board.title,
+          createdAt: board.createdAt,
+          owner: board.owner
+        }
+      ];
+    });
+    const getBoard = vi.fn<NonNullable<OpenClawUiService["getBoard"]>>(async () => board);
+    const createBoard = vi.fn<NonNullable<OpenClawUiService["createBoard"]>>(async (_actorId, options) => {
+      return {
+        boardId: "board-new",
+        title: options.title,
+        createdAt: "2026-02-11T08:01:00.000Z",
+        owner: "goat"
+      };
+    });
+    const updateBoard = vi.fn<NonNullable<OpenClawUiService["updateBoard"]>>(async (_actorId, boardId, options) => {
+      return {
+        boardId,
+        title: options.title ?? "Roadmap",
+        createdAt: "2026-02-11T08:00:00.000Z",
+        owner: "goat"
+      };
+    });
+    const listTasks = vi.fn<NonNullable<OpenClawUiService["listTasks"]>>(async () => [baseTask]);
+    const createTask = vi.fn<NonNullable<OpenClawUiService["createTask"]>>(async (_actorId, boardId, options) => {
+      return {
+        ...baseTask,
+        boardId,
+        title: options.title,
+        description: options.description,
+        assignedTo: options.assignedTo ?? "goat",
+        status: options.status ?? "todo",
+        workspace: options.workspace ?? "~"
+      };
+    });
+    const updateTaskStatus = vi.fn<NonNullable<OpenClawUiService["updateTaskStatus"]>>(async (_actorId, taskId, status) => {
+      return {
+        ...baseTask,
+        taskId,
+        status
+      };
+    });
+    const addTaskBlocker = vi.fn<NonNullable<OpenClawUiService["addTaskBlocker"]>>(async (_actorId, taskId, blocker) => {
+      return {
+        ...baseTask,
+        taskId,
+        blockers: [blocker]
+      };
+    });
+    const addTaskArtifact = vi.fn<NonNullable<OpenClawUiService["addTaskArtifact"]>>(async (_actorId, taskId, content) => {
+      return {
+        ...baseTask,
+        taskId,
+        artifacts: [
+          {
+            createdAt: "2026-02-11T08:02:00.000Z",
+            createdBy: "developer",
+            content
+          }
+        ]
+      };
+    });
+    const addTaskWorklog = vi.fn<NonNullable<OpenClawUiService["addTaskWorklog"]>>(async (_actorId, taskId, content) => {
+      return {
+        ...baseTask,
+        taskId,
+        worklog: [
+          {
+            createdAt: "2026-02-11T08:03:00.000Z",
+            createdBy: "developer",
+            content
+          }
+        ]
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        listBoards,
+        getBoard,
+        createBoard,
+        updateBoard,
+        listTasks,
+        createTask,
+        updateTaskStatus,
+        addTaskBlocker,
+        addTaskArtifact,
+        addTaskWorklog
+      }
+    });
+
+    const boardsResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/boards"
+    });
+    expect(boardsResponse.statusCode).toBe(200);
+    expect(boardsResponse.json()).toMatchObject({
+      boards: [
+        {
+          boardId: "board-roadmap",
+          title: "Roadmap",
+          tasks: [{ taskId: "task-plan" }]
+        }
+      ]
+    });
+
+    const createBoardResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/boards",
+      payload: {
+        actorId: "goat",
+        title: "Platform"
+      }
+    });
+    expect(createBoardResponse.statusCode).toBe(200);
+    expect(createBoard).toHaveBeenCalledWith("goat", { title: "Platform" });
+
+    const createBoardAliasResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/board/create",
+      payload: {
+        actorId: "goat",
+        title: "Platform Alias"
+      }
+    });
+    expect(createBoardAliasResponse.statusCode).toBe(200);
+    expect(createBoard).toHaveBeenCalledWith("goat", { title: "Platform Alias" });
+
+    const updateBoardResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/boards/board-roadmap",
+      payload: {
+        actorId: "goat",
+        title: "Roadmap v2"
+      }
+    });
+    expect(updateBoardResponse.statusCode).toBe(200);
+    expect(updateBoard).toHaveBeenCalledWith("goat", "board-roadmap", { title: "Roadmap v2" });
+
+    const createTaskResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/tasks",
+      payload: {
+        actorId: "goat",
+        boardId: "board-roadmap",
+        title: "Design API",
+        description: "Document API contracts",
+        assignedTo: "developer",
+        status: "todo",
+        workspace: "~"
+      }
+    });
+    expect(createTaskResponse.statusCode).toBe(200);
+    expect(createTask).toHaveBeenCalledWith("goat", "board-roadmap", {
+      title: "Design API",
+      description: "Document API contracts",
+      assignedTo: "developer",
+      status: "todo",
+      workspace: "~"
+    });
+
+    const statusResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/tasks/task-plan/status",
+      payload: {
+        actorId: "developer",
+        status: "doing"
+      }
+    });
+    expect(statusResponse.statusCode).toBe(200);
+    expect(updateTaskStatus).toHaveBeenCalledWith("developer", "task-plan", "doing");
+
+    const blockerResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/tasks/task-plan/blocker",
+      payload: {
+        actorId: "developer",
+        content: "Waiting for schema"
+      }
+    });
+    expect(blockerResponse.statusCode).toBe(200);
+    expect(addTaskBlocker).toHaveBeenCalledWith("developer", "task-plan", "Waiting for schema");
+
+    const artifactResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/tasks/task-plan/artifact",
+      payload: {
+        actorId: "developer",
+        content: "https://example.com/spec"
+      }
+    });
+    expect(artifactResponse.statusCode).toBe(200);
+    expect(addTaskArtifact).toHaveBeenCalledWith("developer", "task-plan", "https://example.com/spec");
+
+    const worklogResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/tasks/task-plan/worklog",
+      payload: {
+        actorId: "developer",
+        content: "Initial draft complete"
+      }
+    });
+    expect(worklogResponse.statusCode).toBe(200);
+    expect(addTaskWorklog).toHaveBeenCalledWith("developer", "task-plan", "Initial draft complete");
   });
 });
 

@@ -25,6 +25,7 @@ interface AgentDescriptor {
 interface OrganizationAgent extends AgentDescriptor {
   reportsTo: string | null;
   type: "manager" | "individual" | "unknown";
+  role?: string;
 }
 
 interface AgentCreationResult {
@@ -96,8 +97,33 @@ export interface OpenClawUiService {
     agentId: string,
     options: { message: string; sessionRef?: string; cwd?: string; images?: UiImageInput[] }
   ) => Promise<AgentRunResult>;
+  getSessionHistory?: (
+    agentId?: string,
+    options?: { sessionRef?: string; limit?: number; includeCompaction?: boolean }
+  ) => Promise<SessionHistoryResult>;
   renameSession?: (agentId?: string, title?: string, sessionRef?: string) => Promise<SessionSummary>;
   removeSession?: (agentId?: string, sessionRef?: string) => Promise<SessionRemoveResult>;
+  createBoard?: (actorId: string, options: { title: string }) => Promise<BoardSummary>;
+  listBoards?: () => Promise<BoardSummary[]>;
+  getBoard?: (boardId: string) => Promise<BoardRecord>;
+  updateBoard?: (actorId: string, boardId: string, options: { title?: string }) => Promise<BoardSummary>;
+  createTask?: (
+    actorId: string,
+    boardId: string,
+    options: {
+      title: string;
+      description: string;
+      workspace?: string;
+      assignedTo?: string;
+      status?: string;
+    }
+  ) => Promise<TaskRecord>;
+  listTasks?: (boardId: string) => Promise<TaskRecord[]>;
+  getTask?: (taskId: string) => Promise<TaskRecord>;
+  updateTaskStatus?: (actorId: string, taskId: string, status: string) => Promise<TaskRecord>;
+  addTaskBlocker?: (actorId: string, taskId: string, blocker: string) => Promise<TaskRecord>;
+  addTaskArtifact?: (actorId: string, taskId: string, content: string) => Promise<TaskRecord>;
+  addTaskWorklog?: (actorId: string, taskId: string, content: string) => Promise<TaskRecord>;
 }
 
 interface SessionRunInfo {
@@ -120,6 +146,52 @@ interface SessionRemoveResult {
   sessionId: string;
   title: string;
   transcriptPath: string;
+}
+
+interface SessionHistoryItem {
+  type: "message" | "compaction";
+  role?: "user" | "assistant" | "system";
+  content: string;
+  timestamp: number;
+}
+
+interface SessionHistoryResult {
+  sessionKey: string;
+  sessionId?: string;
+  transcriptPath?: string;
+  messages: SessionHistoryItem[];
+}
+
+interface TaskEntry {
+  createdAt: string;
+  createdBy: string;
+  content: string;
+}
+
+interface TaskRecord {
+  taskId: string;
+  boardId: string;
+  createdAt: string;
+  workspace: string;
+  owner: string;
+  assignedTo: string;
+  title: string;
+  description: string;
+  status: string;
+  blockers: string[];
+  artifacts: TaskEntry[];
+  worklog: TaskEntry[];
+}
+
+interface BoardSummary {
+  boardId: string;
+  title: string;
+  createdAt: string;
+  owner: string;
+}
+
+interface BoardRecord extends BoardSummary {
+  tasks: TaskRecord[];
 }
 
 interface AgentRunResult {
@@ -256,6 +328,46 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   });
 
+  const handleSessionHistory = async (
+    request: {
+      query: {
+        agentId?: string;
+        sessionRef?: string;
+        limit?: string;
+      };
+    },
+    reply: FastifyReply
+  ): Promise<unknown> => {
+    return safeReply(reply, async () => {
+      const agentId = request.query.agentId?.trim() || DEFAULT_AGENT_ID;
+      const sessionRef = request.query.sessionRef?.trim();
+      if (!sessionRef) {
+        reply.code(400);
+        return {
+          error: "sessionRef is required"
+        };
+      }
+
+      const rawLimit = request.query.limit?.trim();
+      const parsedLimit = rawLimit ? Number.parseInt(rawLimit, 10) : undefined;
+      const limit = typeof parsedLimit === "number" && Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : undefined;
+
+      const history = await getUiSessionHistory(service, agentId, {
+        sessionRef,
+        limit
+      });
+
+      return {
+        agentId,
+        sessionRef: history.sessionKey,
+        history
+      };
+    });
+  };
+
+  app.get<{ Querystring: { agentId?: string; sessionRef?: string; limit?: string } }>("/api/sessions/history", handleSessionHistory);
+  app.get<{ Querystring: { agentId?: string; sessionRef?: string; limit?: string } }>("/api/session/history", handleSessionHistory);
+
   app.get<{ Querystring: { agentId?: string; global?: string } }>("/api/skills", async (request, reply) => {
     return safeReply(reply, async () => {
       const global = request.query.global === "1" || request.query.global === "true";
@@ -274,6 +386,284 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
       };
     });
   });
+
+  app.get("/api/boards", async (_request, reply) => {
+    return safeReply(reply, async () => {
+      const summaries = await listUiBoards(service);
+      const boards = await Promise.all(
+        summaries.map(async (summary) => {
+          return getUiBoard(service, summary.boardId);
+        })
+      );
+
+      return {
+        boards
+      };
+    });
+  });
+
+  app.get<{ Params: { boardId: string } }>("/api/boards/:boardId", async (request, reply) => {
+    return safeReply(reply, async () => {
+      const boardId = request.params.boardId?.trim();
+      if (!boardId) {
+        reply.code(400);
+        return {
+          error: "boardId is required"
+        };
+      }
+
+      const board = await getUiBoard(service, boardId);
+      return {
+        board
+      };
+    });
+  });
+
+  const handleBoardCreate = async (
+    request: {
+      body?: {
+        actorId?: string;
+        title?: string;
+      };
+    },
+    reply: FastifyReply
+  ): Promise<unknown> => {
+    return safeReply(reply, async () => {
+      const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
+      const title = request.body?.title?.trim();
+      if (!title) {
+        reply.code(400);
+        return {
+          error: "title is required"
+        };
+      }
+
+      const board = await createUiBoard(service, actorId, { title });
+      return {
+        board,
+        message: `Board \"${board.title}\" created.`
+      };
+    });
+  };
+
+  app.post<{ Body: { actorId?: string; title?: string } }>("/api/boards", handleBoardCreate);
+  app.post<{ Body: { actorId?: string; title?: string } }>("/api/board/create", handleBoardCreate);
+
+  app.post<{ Params: { boardId: string }; Body: { actorId?: string; title?: string } }>(
+    "/api/boards/:boardId",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
+        const boardId = request.params.boardId?.trim();
+        const title = request.body?.title?.trim();
+        if (!boardId) {
+          reply.code(400);
+          return {
+            error: "boardId is required"
+          };
+        }
+        if (!title) {
+          reply.code(400);
+          return {
+            error: "title is required"
+          };
+        }
+
+        const board = await updateUiBoard(service, actorId, boardId, { title });
+        return {
+          board,
+          message: `Board \"${board.title}\" updated.`
+        };
+      });
+    }
+  );
+
+  app.get<{ Params: { boardId: string } }>("/api/boards/:boardId/tasks", async (request, reply) => {
+    return safeReply(reply, async () => {
+      const boardId = request.params.boardId?.trim();
+      if (!boardId) {
+        reply.code(400);
+        return {
+          error: "boardId is required"
+        };
+      }
+
+      const tasks = await listUiTasks(service, boardId);
+      return {
+        boardId,
+        tasks
+      };
+    });
+  });
+
+  app.post<{
+    Body: {
+      actorId?: string;
+      boardId?: string;
+      title?: string;
+      description?: string;
+      workspace?: string;
+      assignedTo?: string;
+      status?: string;
+    };
+  }>("/api/tasks", async (request, reply) => {
+    return safeReply(reply, async () => {
+      const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
+      const boardId = request.body?.boardId?.trim();
+      const title = request.body?.title?.trim();
+      const description = request.body?.description?.trim();
+      const workspace = request.body?.workspace?.trim();
+      const assignedTo = request.body?.assignedTo?.trim();
+      const status = request.body?.status?.trim();
+
+      if (!boardId) {
+        reply.code(400);
+        return {
+          error: "boardId is required"
+        };
+      }
+      if (!title) {
+        reply.code(400);
+        return {
+          error: "title is required"
+        };
+      }
+      if (!description) {
+        reply.code(400);
+        return {
+          error: "description is required"
+        };
+      }
+
+      const task = await createUiTask(service, actorId, boardId, {
+        title,
+        description,
+        workspace,
+        assignedTo,
+        status
+      });
+      return {
+        task,
+        message: `Task \"${task.title}\" created.`
+      };
+    });
+  });
+
+  app.post<{ Params: { taskId: string }; Body: { actorId?: string; status?: string } }>(
+    "/api/tasks/:taskId/status",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
+        const taskId = request.params.taskId?.trim();
+        const status = request.body?.status?.trim();
+        if (!taskId) {
+          reply.code(400);
+          return {
+            error: "taskId is required"
+          };
+        }
+        if (!status) {
+          reply.code(400);
+          return {
+            error: "status is required"
+          };
+        }
+
+        const task = await updateUiTaskStatus(service, actorId, taskId, status);
+        return {
+          task,
+          message: `Task \"${task.taskId}\" updated.`
+        };
+      });
+    }
+  );
+
+  app.post<{ Params: { taskId: string }; Body: { actorId?: string; content?: string } }>(
+    "/api/tasks/:taskId/blocker",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
+        const taskId = request.params.taskId?.trim();
+        const content = request.body?.content?.trim();
+        if (!taskId) {
+          reply.code(400);
+          return {
+            error: "taskId is required"
+          };
+        }
+        if (!content) {
+          reply.code(400);
+          return {
+            error: "content is required"
+          };
+        }
+
+        const task = await addUiTaskBlocker(service, actorId, taskId, content);
+        return {
+          task,
+          message: `Blocker added to \"${task.taskId}\".`
+        };
+      });
+    }
+  );
+
+  app.post<{ Params: { taskId: string }; Body: { actorId?: string; content?: string } }>(
+    "/api/tasks/:taskId/artifact",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
+        const taskId = request.params.taskId?.trim();
+        const content = request.body?.content?.trim();
+        if (!taskId) {
+          reply.code(400);
+          return {
+            error: "taskId is required"
+          };
+        }
+        if (!content) {
+          reply.code(400);
+          return {
+            error: "content is required"
+          };
+        }
+
+        const task = await addUiTaskArtifact(service, actorId, taskId, content);
+        return {
+          task,
+          message: `Artifact added to \"${task.taskId}\".`
+        };
+      });
+    }
+  );
+
+  app.post<{ Params: { taskId: string }; Body: { actorId?: string; content?: string } }>(
+    "/api/tasks/:taskId/worklog",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
+        const taskId = request.params.taskId?.trim();
+        const content = request.body?.content?.trim();
+        if (!taskId) {
+          reply.code(400);
+          return {
+            error: "taskId is required"
+          };
+        }
+        if (!content) {
+          reply.code(400);
+          return {
+            error: "content is required"
+          };
+        }
+
+        const task = await addUiTaskWorklog(service, actorId, taskId, content);
+        return {
+          task,
+          message: `Worklog added to \"${task.taskId}\".`
+        };
+      });
+    }
+  );
 
   app.post<{ Body: { agentId?: string; folderName?: string; folderPath?: string } }>("/api/projects", async (request, reply) => {
     return safeReply(reply, async () => {
@@ -723,6 +1113,44 @@ async function removeUiSession(
   throw new Error("Session removal is unavailable on this runtime.");
 }
 
+async function getUiSessionHistory(
+  service: OpenClawUiService,
+  agentId: string,
+  options: {
+    sessionRef: string;
+    limit?: number;
+  }
+): Promise<SessionHistoryResult> {
+  if (typeof service.getSessionHistory === "function") {
+    return service.getSessionHistory(agentId, {
+      sessionRef: options.sessionRef,
+      limit: options.limit
+    });
+  }
+
+  const legacy = service as OpenClawUiService & {
+    sessionService?: {
+      getSessionHistory?: (
+        paths: unknown,
+        legacyAgentId: string,
+        request: {
+          sessionRef?: string;
+          limit?: number;
+          includeCompaction?: boolean;
+        }
+      ) => Promise<SessionHistoryResult>;
+    };
+  };
+  if (typeof legacy.getPaths === "function" && typeof legacy.sessionService?.getSessionHistory === "function") {
+    return legacy.sessionService.getSessionHistory(legacy.getPaths(), agentId, {
+      sessionRef: options.sessionRef,
+      limit: options.limit
+    });
+  }
+
+  throw new Error("Session history is unavailable on this runtime.");
+}
+
 async function runUiSessionMessage(
   service: OpenClawUiService,
   agentId: string,
@@ -743,6 +1171,110 @@ async function runUiSessionMessage(
   }
 
   throw new Error("Session messaging is unavailable on this runtime.");
+}
+
+async function listUiBoards(service: OpenClawUiService): Promise<BoardSummary[]> {
+  if (typeof service.listBoards === "function") {
+    return service.listBoards();
+  }
+
+  throw new Error("Board listing is unavailable on this runtime.");
+}
+
+async function getUiBoard(service: OpenClawUiService, boardId: string): Promise<BoardRecord> {
+  if (typeof service.getBoard === "function") {
+    return service.getBoard(boardId);
+  }
+
+  throw new Error("Board details are unavailable on this runtime.");
+}
+
+async function createUiBoard(
+  service: OpenClawUiService,
+  actorId: string,
+  options: {
+    title: string;
+  }
+): Promise<BoardSummary> {
+  if (typeof service.createBoard === "function") {
+    return service.createBoard(actorId, options);
+  }
+
+  throw new Error("Board creation is unavailable on this runtime.");
+}
+
+async function updateUiBoard(
+  service: OpenClawUiService,
+  actorId: string,
+  boardId: string,
+  options: {
+    title?: string;
+  }
+): Promise<BoardSummary> {
+  if (typeof service.updateBoard === "function") {
+    return service.updateBoard(actorId, boardId, options);
+  }
+
+  throw new Error("Board updates are unavailable on this runtime.");
+}
+
+async function createUiTask(
+  service: OpenClawUiService,
+  actorId: string,
+  boardId: string,
+  options: {
+    title: string;
+    description: string;
+    workspace?: string;
+    assignedTo?: string;
+    status?: string;
+  }
+): Promise<TaskRecord> {
+  if (typeof service.createTask === "function") {
+    return service.createTask(actorId, boardId, options);
+  }
+
+  throw new Error("Task creation is unavailable on this runtime.");
+}
+
+async function listUiTasks(service: OpenClawUiService, boardId: string): Promise<TaskRecord[]> {
+  if (typeof service.listTasks === "function") {
+    return service.listTasks(boardId);
+  }
+
+  throw new Error("Task listing is unavailable on this runtime.");
+}
+
+async function updateUiTaskStatus(service: OpenClawUiService, actorId: string, taskId: string, status: string): Promise<TaskRecord> {
+  if (typeof service.updateTaskStatus === "function") {
+    return service.updateTaskStatus(actorId, taskId, status);
+  }
+
+  throw new Error("Task status updates are unavailable on this runtime.");
+}
+
+async function addUiTaskBlocker(service: OpenClawUiService, actorId: string, taskId: string, content: string): Promise<TaskRecord> {
+  if (typeof service.addTaskBlocker === "function") {
+    return service.addTaskBlocker(actorId, taskId, content);
+  }
+
+  throw new Error("Task blocker updates are unavailable on this runtime.");
+}
+
+async function addUiTaskArtifact(service: OpenClawUiService, actorId: string, taskId: string, content: string): Promise<TaskRecord> {
+  if (typeof service.addTaskArtifact === "function") {
+    return service.addTaskArtifact(actorId, taskId, content);
+  }
+
+  throw new Error("Task artifact updates are unavailable on this runtime.");
+}
+
+async function addUiTaskWorklog(service: OpenClawUiService, actorId: string, taskId: string, content: string): Promise<TaskRecord> {
+  if (typeof service.addTaskWorklog === "function") {
+    return service.addTaskWorklog(actorId, taskId, content);
+  }
+
+  throw new Error("Task worklog updates are unavailable on this runtime.");
 }
 
 async function resolveProjectFolder(
@@ -886,6 +1418,7 @@ async function resolveOrganizationAgents(service: OpenClawUiService): Promise<Or
         const configPath = path.resolve(agent.internalConfigDir, "config.json");
         const raw = await readFile(configPath, "utf8");
         const parsed = JSON.parse(raw) as {
+          role?: string;
           organization?: {
             reportsTo?: string | null;
             type?: string;
@@ -895,17 +1428,20 @@ async function resolveOrganizationAgents(service: OpenClawUiService): Promise<Or
         const organization = parsed.organization;
         const reportsTo = normalizeReportsToValue(organization?.reportsTo, fallbackReportsTo, agentIds);
         const type = normalizeTypeValue(organization?.type, fallbackType);
+        const role = normalizeRoleValue(parsed.role);
 
         return {
           ...agent,
           reportsTo,
-          type
+          type,
+          role
         };
       } catch {
         return {
           ...agent,
           reportsTo: fallbackReportsTo,
-          type: fallbackType
+          type: fallbackType,
+          role: undefined
         };
       }
     })
@@ -935,6 +1471,18 @@ function normalizeTypeValue(rawType: string | undefined, fallback: OrganizationA
     return normalized;
   }
   return fallback;
+}
+
+function normalizeRoleValue(rawRole: string | undefined): string | undefined {
+  const normalized = rawRole?.trim();
+  if (normalized) {
+    const genericRole = normalized.toLowerCase();
+    if (genericRole === "manager" || genericRole === "individual contributor" || genericRole === "team member") {
+      return undefined;
+    }
+    return normalized;
+  }
+  return undefined;
 }
 
 async function safeReply<T>(reply: FastifyReply, operation: () => Promise<T>): Promise<T | { error: string }> {

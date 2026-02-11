@@ -1,7 +1,8 @@
 import type { ChatStatus, FileUIPart } from "ai";
-import type { ComponentType, FormEvent, ReactElement } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ComponentType, ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dagre from "@dagrejs/dagre";
+import multiavatar from "@multiavatar/multiavatar/esm";
 import {
   Background,
   Controls,
@@ -24,8 +25,8 @@ import {
   Home,
   MoreHorizontal,
   MessageSquare,
+  PenLine,
   Plus,
-  RefreshCw,
   Sparkles,
   UsersRound,
   X
@@ -37,16 +38,25 @@ import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-e
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-type PageView = "overview" | "agents" | "skills";
+type PageView = "overview" | "boards" | "agents" | "skills";
 
 type AppRoute =
   | {
       kind: "page";
       view: PageView;
+    }
+  | {
+      kind: "agent";
+      agentId: string;
+    }
+  | {
+      kind: "board";
+      boardId: string;
     }
   | {
       kind: "session";
@@ -56,6 +66,7 @@ type AppRoute =
 interface HealthResponse {
   ok: boolean;
   mode: "development" | "production";
+  homeDir: string;
   timestamp: string;
 }
 
@@ -66,6 +77,7 @@ interface Agent {
   internalConfigDir: string;
   reportsTo: string | null;
   type: "manager" | "individual" | "unknown";
+  role?: string;
 }
 
 interface Session {
@@ -107,12 +119,46 @@ interface SkillsResponse {
   agentId?: string;
 }
 
+interface TaskEntry {
+  createdAt: string;
+  createdBy: string;
+  content: string;
+}
+
+interface TaskRecord {
+  taskId: string;
+  boardId: string;
+  createdAt: string;
+  workspace: string;
+  owner: string;
+  assignedTo: string;
+  title: string;
+  description: string;
+  status: "todo" | "doing" | "blocked" | "done" | string;
+  blockers: string[];
+  artifacts: TaskEntry[];
+  worklog: TaskEntry[];
+}
+
+interface BoardRecord {
+  boardId: string;
+  title: string;
+  createdAt: string;
+  owner: string;
+  tasks: TaskRecord[];
+}
+
+interface BoardsResponse {
+  boards: BoardRecord[];
+}
+
 interface DashboardState {
   health: HealthResponse;
   overview: OverviewResponse;
   sessions: SessionsResponse;
   agentSkills: SkillsResponse;
   globalSkills: SkillsResponse;
+  boards: BoardsResponse;
 }
 
 interface Project {
@@ -137,6 +183,12 @@ interface WorkspaceNode {
   workingPath: string;
   sessions: WorkspaceSessionItem[];
   updatedAt: number;
+}
+
+interface AgentProjectOption {
+  id: string;
+  name: string;
+  workingPath: string;
 }
 
 interface CreateProjectResponse {
@@ -214,6 +266,19 @@ interface SessionSendMessageResponse {
   message?: string;
 }
 
+interface SessionHistoryResponse {
+  agentId: string;
+  sessionRef: string;
+  history: {
+    messages: Array<{
+      type: "message" | "compaction";
+      role?: "user" | "assistant" | "system";
+      content: string;
+      timestamp: number;
+    }>;
+  };
+}
+
 interface SessionMessageImageInput {
   dataUrl?: string;
   mediaType?: string;
@@ -245,6 +310,19 @@ interface MetricCard {
   icon: ComponentType<{ className?: string }>;
 }
 
+interface TaskCreateDraft {
+  title: string;
+  description: string;
+  workspace: string;
+  assignedTo: string;
+  status: "todo" | "doing" | "blocked" | "done";
+}
+
+interface TaskEntryDraft {
+  kind: "blocker" | "artifact" | "worklog";
+  content: string;
+}
+
 interface OrgHierarchy {
   agentsById: Map<string, Agent>;
   childrenById: Map<string, string[]>;
@@ -255,7 +333,7 @@ interface OrgNodeData {
   [key: string]: unknown;
   agentId: string;
   displayName: string;
-  type: Agent["type"];
+  role?: string;
   directReports: number;
   collapsed: boolean;
   onToggle: (agentId: string) => void;
@@ -263,11 +341,14 @@ interface OrgNodeData {
 
 const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
+const MULTIAVATAR_API_BASE_URL = "https://api.multiavatar.com";
+const DEFAULT_AGENT_ID = "goat";
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
+  { id: "boards", label: "Boards", icon: Boxes },
   { id: "agents", label: "Agents", icon: UsersRound },
-  { id: "skills", label: "Skills", icon: Boxes }
+  { id: "skills", label: "Skills", icon: Sparkles }
 ];
 
 const DEFAULT_FORM: CreateAgentForm = {
@@ -296,6 +377,27 @@ export function App(): ReactElement {
   const [collapsedWorkspaceIds, setCollapsedWorkspaceIds] = useState<Set<string>>(() => new Set());
   const [sessionChatStatus, setSessionChatStatus] = useState<ChatStatus>("ready");
   const [sessionMessagesById, setSessionMessagesById] = useState<Record<string, SessionChatMessage[]>>({});
+  const [sessionsByAgentId, setSessionsByAgentId] = useState<Record<string, Session[]>>({});
+  const [selectedProjectIdByAgentId, setSelectedProjectIdByAgentId] = useState<Record<string, string>>({});
+  const hydratedSessionIdsRef = useRef<Set<string>>(new Set());
+  const [boardActorId, setBoardActorId] = useState("goat");
+  const [taskActorId, setTaskActorId] = useState("goat");
+  const [newBoardTitle, setNewBoardTitle] = useState("");
+  const [taskDraftByBoardId, setTaskDraftByBoardId] = useState<Record<string, TaskCreateDraft>>({});
+  const [taskStatusDraftById, setTaskStatusDraftById] = useState<Record<string, string>>({});
+  const [isCreateBoardDialogOpen, setCreateBoardDialogOpen] = useState(false);
+  const [createBoardDialogError, setCreateBoardDialogError] = useState<string | null>(null);
+  const [isCreateAgentDialogOpen, setCreateAgentDialogOpen] = useState(false);
+  const [createAgentDialogError, setCreateAgentDialogError] = useState<string | null>(null);
+  const [isCreateTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
+  const [createTaskDialogError, setCreateTaskDialogError] = useState<string | null>(null);
+  const [isTaskDetailsDialogOpen, setTaskDetailsDialogOpen] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [taskDetailsError, setTaskDetailsError] = useState<string | null>(null);
+  const [taskEntryDraft, setTaskEntryDraft] = useState<TaskEntryDraft>({
+    kind: "worklog",
+    content: ""
+  });
 
   const navigateToRoute = useCallback((nextRoute: AppRoute) => {
     const nextPath = routeToPath(nextRoute);
@@ -357,12 +459,15 @@ export function App(): ReactElement {
     setError(null);
 
     try {
-      const [health, overview, sessions, agentSkills, globalSkills] = await Promise.all([
+      const [health, overview, sessions, agentSkills, globalSkills, boards] = await Promise.all([
         fetchJson<HealthResponse>("/api/health"),
         fetchJson<OverviewResponse>("/api/openclaw/overview"),
-        fetchJson<SessionsResponse>("/api/sessions?agentId=goat"),
-        fetchJson<SkillsResponse>("/api/skills?agentId=goat"),
-        fetchJson<SkillsResponse>("/api/skills?global=true")
+        fetchJson<SessionsResponse>(`/api/sessions?agentId=${encodeURIComponent(DEFAULT_AGENT_ID)}`),
+        fetchJson<SkillsResponse>(`/api/skills?agentId=${encodeURIComponent(DEFAULT_AGENT_ID)}`),
+        fetchJson<SkillsResponse>("/api/skills?global=true"),
+        fetchJson<BoardsResponse>("/api/boards").catch(() => {
+          return { boards: [] } satisfies BoardsResponse;
+        })
       ]);
 
       setState({
@@ -370,7 +475,11 @@ export function App(): ReactElement {
         overview,
         sessions,
         agentSkills,
-        globalSkills
+        globalSkills,
+        boards
+      });
+      setSessionsByAgentId({
+        [sessions.agentId]: sessions.sessions
       });
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Failed to load data.";
@@ -393,15 +502,36 @@ export function App(): ReactElement {
     });
   }, []);
 
-  const refreshSessions = useCallback(async () => {
-    const sessions = await fetchJson<SessionsResponse>("/api/sessions?agentId=goat");
+  const refreshSessions = useCallback(async (agentId: string = DEFAULT_AGENT_ID) => {
+    const response = await fetchJson<SessionsResponse>(`/api/sessions?agentId=${encodeURIComponent(agentId)}`);
+    setSessionsByAgentId((current) => ({
+      ...current,
+      [response.agentId]: response.sessions
+    }));
+    if (response.agentId !== DEFAULT_AGENT_ID) {
+      return;
+    }
+
     setState((current) => {
       if (!current) {
         return current;
       }
       return {
         ...current,
-        sessions
+        sessions: response
+      };
+    });
+  }, []);
+
+  const refreshBoards = useCallback(async () => {
+    const boards = await fetchJson<BoardsResponse>("/api/boards");
+    setState((current) => {
+      if (!current) {
+        return current;
+      }
+      return {
+        ...current,
+        boards
       };
     });
   }, []);
@@ -409,6 +539,20 @@ export function App(): ReactElement {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (route.kind !== "agent") {
+      return;
+    }
+
+    if (sessionsByAgentId[route.agentId]) {
+      return;
+    }
+
+    void refreshSessions(route.agentId).catch(() => {
+      // Non-fatal: agent page can still render and allow new messages.
+    });
+  }, [route, sessionsByAgentId, refreshSessions]);
 
   useEffect(() => {
     if (!state) {
@@ -430,7 +574,17 @@ export function App(): ReactElement {
         reportsTo: agentIds[0] ?? "goat"
       };
     });
-  }, [state]);
+
+    const hasBoardActor = agentIds.includes(boardActorId);
+    if (!hasBoardActor) {
+      setBoardActorId(agentIds[0] ?? "goat");
+    }
+
+    const hasTaskActor = agentIds.includes(taskActorId);
+    if (!hasTaskActor) {
+      setTaskActorId(agentIds[0] ?? "goat");
+    }
+  }, [state, boardActorId, taskActorId]);
 
   const agents = state?.overview.agents ?? [];
   const sessions = state?.sessions.sessions ?? [];
@@ -440,12 +594,13 @@ export function App(): ReactElement {
     }
     return sessions.find((session) => session.sessionId === route.sessionId) ?? null;
   }, [route, sessions]);
-  const sessionMessages = useMemo(() => {
-    if (!selectedSession) {
-      return [];
+  const selectedAgent = useMemo(() => {
+    if (route.kind !== "agent") {
+      return null;
     }
-    return sessionMessagesById[selectedSession.sessionId] ?? [];
-  }, [selectedSession, sessionMessagesById]);
+    return agents.find((agent) => agent.id === route.agentId) ?? null;
+  }, [route, agents]);
+
   const projects = useMemo<Project[]>(() => {
     return sessions
       .filter((session) => session.sessionKey.startsWith("project:") && typeof session.workingPath === "string")
@@ -499,6 +654,229 @@ export function App(): ReactElement {
       .sort((left, right) => right.updatedAt - left.updatedAt);
   }, [projects, sessions]);
 
+  const agentProjectOptions = useMemo<AgentProjectOption[]>(() => {
+    if (workspaceNodes.length > 0) {
+      return workspaceNodes.map((workspace) => ({
+        id: workspace.id,
+        name: workspace.name,
+        workingPath: workspace.workingPath
+      }));
+    }
+
+    const homeDir = state?.health.homeDir?.trim() || "~";
+    return [
+      {
+        id: "home",
+        name: "Home",
+        workingPath: homeDir
+      }
+    ];
+  }, [workspaceNodes, state?.health.homeDir]);
+
+  const selectedAgentProject = useMemo(() => {
+    if (route.kind !== "agent") {
+      return null;
+    }
+
+    const selectedProjectId = selectedProjectIdByAgentId[route.agentId];
+    if (selectedProjectId) {
+      const match = agentProjectOptions.find((project) => project.id === selectedProjectId);
+      if (match) {
+        return match;
+      }
+    }
+
+    return agentProjectOptions[0] ?? null;
+  }, [route, selectedProjectIdByAgentId, agentProjectOptions]);
+
+  useEffect(() => {
+    if (route.kind !== "agent") {
+      return;
+    }
+
+    if (!selectedAgentProject) {
+      return;
+    }
+
+    const currentProjectId = selectedProjectIdByAgentId[route.agentId];
+    if (currentProjectId === selectedAgentProject.id) {
+      return;
+    }
+
+    setSelectedProjectIdByAgentId((current) => ({
+      ...current,
+      [route.agentId]: selectedAgentProject.id
+    }));
+  }, [route, selectedAgentProject, selectedProjectIdByAgentId]);
+
+  const selectedAgentSessions = useMemo(() => {
+    if (route.kind !== "agent") {
+      return [];
+    }
+
+    return sessionsByAgentId[route.agentId] ?? [];
+  }, [route, sessionsByAgentId]);
+
+  const selectedAgentWorkspaceSession = useMemo(() => {
+    if (route.kind !== "agent" || !selectedAgentProject) {
+      return null;
+    }
+
+    const targetPath = normalizePathForComparison(selectedAgentProject.workingPath);
+    const candidates = selectedAgentSessions
+      .filter((session) => {
+        return normalizePathForComparison(session.workingPath) === targetPath;
+      })
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+
+    return candidates[0] ?? null;
+  }, [route, selectedAgentProject, selectedAgentSessions]);
+
+  const activeChatContext = useMemo(() => {
+    if (route.kind === "session" && selectedSession) {
+      return {
+        agentId: DEFAULT_AGENT_ID,
+        sessionRef: selectedSession.sessionKey,
+        workingPath: selectedSession.workingPath,
+        chatKey: `session:${selectedSession.sessionId}`,
+        historyRef: selectedSession.sessionKey
+      };
+    }
+
+    if (route.kind === "agent" && selectedAgentProject) {
+      const sessionRef =
+        selectedAgentWorkspaceSession?.sessionKey ??
+        buildFrontendAgentProjectSessionRef(route.agentId, selectedAgentProject.workingPath);
+      return {
+        agentId: route.agentId,
+        sessionRef,
+        workingPath: selectedAgentProject.workingPath,
+        chatKey: `agent:${route.agentId}:${sessionRef}`,
+        historyRef: selectedAgentWorkspaceSession?.sessionKey ?? null
+      };
+    }
+
+    return null;
+  }, [route, selectedSession, selectedAgentProject, selectedAgentWorkspaceSession]);
+
+  const sessionMessages = useMemo(() => {
+    if (!activeChatContext) {
+      return [];
+    }
+    return sessionMessagesById[activeChatContext.chatKey] ?? [];
+  }, [activeChatContext, sessionMessagesById]);
+
+  useEffect(() => {
+    if (!activeChatContext?.historyRef) {
+      return;
+    }
+
+    const hydrationKey = `${activeChatContext.agentId}:${activeChatContext.historyRef}`;
+    if (hydratedSessionIdsRef.current.has(hydrationKey)) {
+      return;
+    }
+
+    let cancelled = false;
+    const params = new URLSearchParams({
+      agentId: activeChatContext.agentId,
+      sessionRef: activeChatContext.historyRef,
+      limit: "200"
+    });
+
+    void fetchJson<SessionHistoryResponse>(`/api/sessions/history?${params.toString()}`)
+      .then((response) => {
+        if (cancelled) {
+          return;
+        }
+
+        const hydratedMessages = mapHistoryToSessionMessages(activeChatContext.chatKey, response.history.messages);
+        setSessionMessagesById((current) => {
+          const existing = current[activeChatContext.chatKey];
+          if (existing && existing.length > 0) {
+            return current;
+          }
+
+          return {
+            ...current,
+            [activeChatContext.chatKey]: hydratedMessages
+          };
+        });
+      })
+      .catch(() => {
+        // Non-fatal: session can still continue from an empty client-side state.
+      })
+      .finally(() => {
+        hydratedSessionIdsRef.current.add(hydrationKey);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeChatContext]);
+
+  const boards = state?.boards.boards ?? [];
+  const selectedBoard = useMemo(() => {
+    if (route.kind !== "board") {
+      return null;
+    }
+    return boards.find((board) => board.boardId === route.boardId) ?? null;
+  }, [boards, route]);
+  const selectedTask = useMemo(() => {
+    if (!selectedBoard || !selectedTaskId) {
+      return null;
+    }
+    return selectedBoard.tasks.find((task) => task.taskId === selectedTaskId) ?? null;
+  }, [selectedBoard, selectedTaskId]);
+  const selectedTaskActivity = useMemo(() => {
+    if (!selectedTask) {
+      return [];
+    }
+
+    const toTimestamp = (value: string): number => {
+      const parsed = Date.parse(value);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    };
+
+    return [
+      ...selectedTask.artifacts.map((entry) => ({
+        type: "artifact" as const,
+        createdAt: entry.createdAt,
+        createdBy: entry.createdBy,
+        content: entry.content
+      })),
+      ...selectedTask.worklog.map((entry) => ({
+        type: "worklog" as const,
+        createdAt: entry.createdAt,
+        createdBy: entry.createdBy,
+        content: entry.content
+      }))
+    ].sort((left, right) => toTimestamp(right.createdAt) - toTimestamp(left.createdAt));
+  }, [selectedTask]);
+  const agentById = useMemo(() => {
+    const map = new Map<string, Agent>();
+    for (const agent of agents) {
+      map.set(agent.id, agent);
+    }
+    return map;
+  }, [agents]);
+
+  const getAssignableAgents = useCallback(
+    (actorId: string): Agent[] => {
+      const actor = agentById.get(actorId);
+      if (!actor) {
+        return [];
+      }
+
+      if (actor.type === "manager") {
+        const directReportees = agents.filter((candidate) => candidate.reportsTo === actorId);
+        return [actor, ...directReportees];
+      }
+
+      return [actor];
+    },
+    [agentById, agents]
+  );
+
   useEffect(() => {
     setCollapsedWorkspaceIds((current) => {
       const validIds = new Set(workspaceNodes.map((workspace) => workspace.id));
@@ -514,6 +892,74 @@ export function App(): ReactElement {
       return changed ? next : current;
     });
   }, [workspaceNodes]);
+
+  useEffect(() => {
+    if (route.kind === "board") {
+      return;
+    }
+
+    setTaskDetailsDialogOpen(false);
+    setSelectedTaskId(null);
+    setTaskDetailsError(null);
+  }, [route]);
+
+  useEffect(() => {
+    if (!isTaskDetailsDialogOpen) {
+      return;
+    }
+
+    if (!selectedTask) {
+      setTaskDetailsDialogOpen(false);
+      setSelectedTaskId(null);
+    }
+  }, [isTaskDetailsDialogOpen, selectedTask]);
+
+  useEffect(() => {
+    setTaskDraftByBoardId((current) => {
+      if (boards.length === 0) {
+        return {};
+      }
+
+      const next: Record<string, TaskCreateDraft> = {};
+      for (const board of boards) {
+        const existing = current[board.boardId];
+        const allowed = getAssignableAgents(taskActorId);
+        const fallbackAssignee = allowed[0]?.id ?? taskActorId;
+        const assignedTo = allowed.some((agent) => agent.id === existing?.assignedTo)
+          ? (existing?.assignedTo ?? fallbackAssignee)
+          : fallbackAssignee;
+
+        next[board.boardId] = existing
+          ? {
+              ...existing,
+              assignedTo
+            }
+          : {
+              title: "",
+              description: "",
+              workspace: "~",
+              assignedTo,
+              status: "todo"
+            };
+      }
+      return next;
+    });
+
+    setTaskStatusDraftById((current) => {
+      const statusByTaskId = new Map<string, string>();
+      for (const board of boards) {
+        for (const task of board.tasks) {
+          statusByTaskId.set(task.taskId, task.status);
+        }
+      }
+
+      const next: Record<string, string> = {};
+      for (const [taskId, status] of statusByTaskId.entries()) {
+        next[taskId] = status;
+      }
+      return next;
+    });
+  }, [boards, getAssignableAgents, taskActorId]);
 
   const healthTimestamp = state ? new Date(state.health.timestamp).toLocaleString() : "Loading...";
 
@@ -547,23 +993,33 @@ export function App(): ReactElement {
     ];
   }, [state]);
 
-  async function handleCreateAgent(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-
+  async function handleCreateAgent(options?: { fromDialog?: boolean }): Promise<void> {
     if (!createForm.name.trim()) {
-      setActionMessage("Agent name is required.");
+      if (options?.fromDialog) {
+        setCreateAgentDialogError("Agent name is required.");
+      } else {
+        setActionMessage("Agent name is required.");
+      }
       return;
     }
 
     if (!state || agents.length === 0) {
-      setActionMessage("No available manager targets found.");
+      if (options?.fromDialog) {
+        setCreateAgentDialogError("No available manager targets found.");
+      } else {
+        setActionMessage("No available manager targets found.");
+      }
       return;
     }
 
     const allowedReportsTo = new Set(agents.map((agent) => agent.id));
     const reportsTo = allowedReportsTo.has(createForm.reportsTo) ? createForm.reportsTo : (agents[0]?.id ?? "");
     if (!reportsTo) {
-      setActionMessage("Reports To is required.");
+      if (options?.fromDialog) {
+        setCreateAgentDialogError("Reports To is required.");
+      } else {
+        setActionMessage("Reports To is required.");
+      }
       return;
     }
 
@@ -571,7 +1027,11 @@ export function App(): ReactElement {
     const submittedNameTrimmed = submittedName.trim();
 
     setMutating(true);
-    setActionMessage(null);
+    if (options?.fromDialog) {
+      setCreateAgentDialogError(null);
+    } else {
+      setActionMessage(null);
+    }
 
     try {
       const response = await fetchJson<{ message?: string }>("/api/agents", {
@@ -592,10 +1052,17 @@ export function App(): ReactElement {
         }
         return { ...current, name: "" };
       });
+      if (options?.fromDialog) {
+        setCreateAgentDialogOpen(false);
+      }
       await refreshOverview();
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Unable to create agent.";
-      setActionMessage(message);
+      if (options?.fromDialog) {
+        setCreateAgentDialogError(message);
+      } else {
+        setActionMessage(message);
+      }
     } finally {
       setMutating(false);
     }
@@ -621,6 +1088,12 @@ export function App(): ReactElement {
 
       setActionMessage(`Agent \"${agentId}\" removed.`);
       await refreshOverview();
+      if (route.kind === "agent" && route.agentId === agentId) {
+        navigateToRoute({
+          kind: "page",
+          view: "agents"
+        });
+      }
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Unable to delete agent.";
       setActionMessage(message);
@@ -837,18 +1310,311 @@ export function App(): ReactElement {
     }
   }
 
-  function appendSessionMessage(sessionId: string, message: SessionChatMessage): void {
-    setSessionMessagesById((current) => {
-      const next = current[sessionId] ? [...current[sessionId], message] : [message];
+  function updateTaskDraft(boardId: string, patch: Partial<TaskCreateDraft>): void {
+    setTaskDraftByBoardId((current) => {
+      const existing = current[boardId] ?? {
+        title: "",
+        description: "",
+        workspace: "~",
+        assignedTo: taskActorId,
+        status: "todo"
+      };
       return {
         ...current,
-        [sessionId]: next
+        [boardId]: {
+          ...existing,
+          ...patch
+        }
+      };
+    });
+  }
+
+  async function handleCreateBoard(): Promise<void> {
+    const title = newBoardTitle.trim();
+    if (!title) {
+      setCreateBoardDialogError("Board title is required.");
+      return;
+    }
+
+    setMutating(true);
+    setCreateBoardDialogError(null);
+    try {
+      const response = await createBoardRequest({
+        actorId: boardActorId,
+        title
+      });
+
+      setNewBoardTitle("");
+      setActionMessage(response.message ?? `Board \"${title}\" created.`);
+      await refreshBoards();
+      const boardId = response.board?.boardId?.trim();
+      if (boardId) {
+        navigateToRoute({
+          kind: "board",
+          boardId
+        });
+      }
+      setCreateBoardDialogOpen(false);
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "Unable to create board.";
+      const normalizedError =
+        message === "Not Found"
+          ? "Board create endpoint is unavailable. Refresh/restart the UI server to load the latest API routes."
+          : message;
+      setCreateBoardDialogError(normalizedError);
+      setActionMessage(null);
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function handleRenameBoard(board: BoardRecord): Promise<void> {
+    const nextTitle = window.prompt(`Rename board \"${board.title}\"`, board.title)?.trim();
+    if (!nextTitle || nextTitle === board.title) {
+      return;
+    }
+
+    setMutating(true);
+    setActionMessage(null);
+    try {
+      const response = await fetchJson<{ message?: string }>(`/api/boards/${encodeURIComponent(board.boardId)}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          actorId: boardActorId,
+          title: nextTitle
+        })
+      });
+
+      setActionMessage(response.message ?? `Board \"${nextTitle}\" updated.`);
+      await refreshBoards();
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "Unable to rename board.";
+      setActionMessage(message);
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function handleCreateTask(boardId: string, options?: { fromDialog?: boolean }): Promise<void> {
+    const draft = taskDraftByBoardId[boardId];
+    const title = draft?.title.trim() ?? "";
+    const description = draft?.description.trim() ?? "";
+    const workspace = draft?.workspace.trim() || "~";
+    const assignedTo = draft?.assignedTo?.trim();
+    const status = draft?.status ?? "todo";
+
+    if (!title) {
+      if (options?.fromDialog) {
+        setCreateTaskDialogError("Task title is required.");
+      } else {
+        setActionMessage("Task title is required.");
+      }
+      return;
+    }
+    if (!description) {
+      if (options?.fromDialog) {
+        setCreateTaskDialogError("Task description is required.");
+      } else {
+        setActionMessage("Task description is required.");
+      }
+      return;
+    }
+    if (!assignedTo) {
+      if (options?.fromDialog) {
+        setCreateTaskDialogError("Task assignee is required.");
+      } else {
+        setActionMessage("Task assignee is required.");
+      }
+      return;
+    }
+
+    setMutating(true);
+    if (options?.fromDialog) {
+      setCreateTaskDialogError(null);
+    } else {
+      setActionMessage(null);
+    }
+    try {
+      const response = await fetchJson<{ message?: string }>("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          actorId: taskActorId,
+          boardId,
+          title,
+          description,
+          workspace,
+          assignedTo,
+          status
+        })
+      });
+
+      setTaskDraftByBoardId((current) => {
+        return {
+          ...current,
+          [boardId]: {
+            ...(current[boardId] ?? {
+              title: "",
+              description: "",
+              workspace: "~",
+              assignedTo,
+              status: "todo"
+            }),
+            title: "",
+            description: ""
+          }
+        };
+      });
+      if (options?.fromDialog) {
+        setCreateTaskDialogOpen(false);
+        setCreateTaskDialogError(null);
+      } else {
+        setActionMessage(response.message ?? `Task \"${title}\" created.`);
+      }
+      await refreshBoards();
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "Unable to create task.";
+      if (options?.fromDialog) {
+        setCreateTaskDialogError(message);
+      } else {
+        setActionMessage(message);
+      }
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  function handleOpenTaskDetails(taskId: string): void {
+    setSelectedTaskId(taskId);
+    setTaskDetailsDialogOpen(true);
+    setTaskDetailsError(null);
+    setTaskEntryDraft({
+      kind: "worklog",
+      content: ""
+    });
+  }
+
+  async function handleUpdateTaskStatus(taskId: string, options?: { fromDetails?: boolean }): Promise<void> {
+    const status = (taskStatusDraftById[taskId] ?? "").trim();
+    if (!status) {
+      if (options?.fromDetails) {
+        setTaskDetailsError("Task status is required.");
+      } else {
+        setActionMessage("Task status is required.");
+      }
+      return;
+    }
+
+    setMutating(true);
+    if (options?.fromDetails) {
+      setTaskDetailsError(null);
+    } else {
+      setActionMessage(null);
+    }
+    try {
+      const response = await fetchJson<{ message?: string }>(`/api/tasks/${encodeURIComponent(taskId)}/status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          actorId: taskActorId,
+          status
+        })
+      });
+
+      if (options?.fromDetails) {
+        setTaskDetailsError(null);
+      } else {
+        setActionMessage(response.message ?? `Task \"${taskId}\" updated.`);
+      }
+      await refreshBoards();
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "Unable to update task status.";
+      if (options?.fromDetails) {
+        setTaskDetailsError(message);
+      } else {
+        setActionMessage(message);
+      }
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function handleAddTaskEntry(
+    taskId: string,
+    kind: "blocker" | "artifact" | "worklog",
+    contentOverride?: string,
+    options?: { fromDetails?: boolean }
+  ): Promise<void> {
+    const label = kind === "blocker" ? "blocker" : kind;
+    const content = (contentOverride ?? window.prompt(`Add ${label} for task \"${taskId}\"`) ?? "").trim();
+    if (!content) {
+      if (options?.fromDetails) {
+        setTaskDetailsError(`A ${label} entry cannot be empty.`);
+      }
+      return;
+    }
+
+    setMutating(true);
+    if (options?.fromDetails) {
+      setTaskDetailsError(null);
+    } else {
+      setActionMessage(null);
+    }
+    try {
+      const response = await fetchJson<{ message?: string }>(`/api/tasks/${encodeURIComponent(taskId)}/${kind}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          actorId: taskActorId,
+          content
+        })
+      });
+
+      if (options?.fromDetails) {
+        setTaskEntryDraft((current) => ({
+          ...current,
+          content: ""
+        }));
+      } else {
+        setActionMessage(response.message ?? `${label} added.`);
+      }
+      await refreshBoards();
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : `Unable to add task ${label}.`;
+      if (options?.fromDetails) {
+        setTaskDetailsError(message);
+      } else {
+        setActionMessage(message);
+      }
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  function appendSessionMessage(chatKey: string, hydrationKey: string | null, message: SessionChatMessage): void {
+    if (hydrationKey) {
+      hydratedSessionIdsRef.current.add(hydrationKey);
+    }
+    setSessionMessagesById((current) => {
+      const next = current[chatKey] ? [...current[chatKey], message] : [message];
+      return {
+        ...current,
+        [chatKey]: next
       };
     });
   }
 
   async function handleSessionPromptSubmit(promptMessage: PromptInputMessage): Promise<void> {
-    if (!selectedSession) {
+    if (!activeChatContext) {
       return;
     }
 
@@ -863,7 +1629,6 @@ export function App(): ReactElement {
       return;
     }
 
-    const sessionId = selectedSession.sessionId;
     const message =
       text ||
       (images.length === 1
@@ -875,8 +1640,9 @@ export function App(): ReactElement {
         : text
       : `Sent ${images.length} image${images.length === 1 ? "" : "s"}.`;
 
-    appendSessionMessage(sessionId, {
-      id: `${sessionId}:user:${Date.now()}`,
+    const hydrationKey = `${activeChatContext.agentId}:${activeChatContext.sessionRef}`;
+    appendSessionMessage(activeChatContext.chatKey, hydrationKey, {
+      id: `${activeChatContext.chatKey}:user:${Date.now()}`,
       role: "user",
       content: userMessage
     });
@@ -885,29 +1651,30 @@ export function App(): ReactElement {
 
     try {
       const payload = {
-        agentId: "goat",
-        sessionRef: selectedSession.sessionKey,
-        workingPath: selectedSession.workingPath,
+        agentId: activeChatContext.agentId,
+        sessionRef: activeChatContext.sessionRef,
+        workingPath: activeChatContext.workingPath,
         message,
         images
       };
       const response = await sendSessionMessage(payload);
 
       const assistantReply = response.output.trim() || "No output was returned.";
-      appendSessionMessage(sessionId, {
-        id: `${sessionId}:assistant:${Date.now()}`,
+      appendSessionMessage(activeChatContext.chatKey, hydrationKey, {
+        id: `${activeChatContext.chatKey}:assistant:${Date.now()}`,
         role: "assistant",
         content: assistantReply
       });
       setSessionChatStatus(response.result.code === 0 ? "ready" : "error");
+      await refreshSessions(activeChatContext.agentId);
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : "Unable to send session message.";
       const normalizedError =
         message === "Not Found"
           ? "Session message endpoint is unavailable. Refresh/restart the UI server to load the latest API routes."
           : message;
-      appendSessionMessage(sessionId, {
-        id: `${sessionId}:assistant-error:${Date.now()}`,
+      appendSessionMessage(activeChatContext.chatKey, hydrationKey, {
+        id: `${activeChatContext.chatKey}:assistant-error:${Date.now()}`,
         role: "assistant",
         content: normalizedError
       });
@@ -945,18 +1712,45 @@ export function App(): ReactElement {
     throw lastError instanceof Error ? lastError : new Error("Unable to send session message.");
   }
 
+  async function createBoardRequest(payload: {
+    actorId: string;
+    title: string;
+  }): Promise<{ message?: string; board?: { boardId?: string } }> {
+    const routes = ["/api/boards", "/api/board/create"];
+    let lastError: unknown;
+
+    for (const routePath of routes) {
+      try {
+        return await fetchJson<{ message?: string; board?: { boardId?: string } }>(routePath, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+      } catch (error) {
+        lastError = error;
+        if (!(error instanceof Error) || error.message !== "Not Found") {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error("Unable to create board.");
+  }
+
   return (
-    <div className="h-screen bg-background text-foreground">
+    <div className="h-screen bg-background text-[14px] text-foreground">
       <div className="flex h-full">
         <aside
           className={cn(
-            "hidden border-r border-border bg-card/50 transition-[width] duration-200 md:flex md:flex-col",
+            "opengoat-sidebar hidden border-r border-border bg-card transition-[width] duration-200 md:flex md:flex-col",
             isSidebarCollapsed ? "md:w-16" : "md:w-64"
           )}
         >
           <div className="flex h-14 items-center border-b border-border px-3">
-            <div className="flex size-8 items-center justify-center rounded-md bg-accent text-muted-foreground">
-              <Sparkles className="size-4" />
+            <div className="flex size-8 items-center justify-center rounded-md bg-accent text-base leading-none">
+              <span aria-hidden="true">🐐</span>
             </div>
             {!isSidebarCollapsed ? <p className="ml-2 text-sm font-semibold">OpenGoat UI</p> : null}
             <button
@@ -965,14 +1759,18 @@ export function App(): ReactElement {
               onClick={() => setSidebarCollapsed((value) => !value)}
               aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              {isSidebarCollapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
+              {isSidebarCollapsed ? <ChevronRight className="size-4 icon-stroke-1_2" /> : <ChevronLeft className="size-4 icon-stroke-1_2" />}
             </button>
           </div>
 
           <nav className="min-h-0 flex-1 overflow-y-auto p-2">
+            {!isSidebarCollapsed ? <p className="px-3 pb-2 text-[11px] font-medium tracking-wide text-muted-foreground">Main Menu</p> : null}
             {SIDEBAR_ITEMS.map((item) => {
               const Icon = item.icon;
-              const active = route.kind === "page" && item.id === route.view;
+              const active =
+                (route.kind === "page" && item.id === route.view) ||
+                (route.kind === "board" && item.id === "boards") ||
+                (route.kind === "agent" && item.id === "agents");
 
               return (
                 <button
@@ -981,8 +1779,10 @@ export function App(): ReactElement {
                   title={item.label}
                   onClick={() => handleViewChange(item.id)}
                   className={cn(
-                    "mb-1 flex w-full items-center rounded-md px-3 py-2 text-sm transition-colors",
-                    active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+                    "mb-1 flex w-full items-center rounded-lg border px-3 py-2.5 text-[14px] font-medium transition-colors",
+                    active
+                      ? "border-border bg-accent/90 text-foreground"
+                      : "border-transparent text-muted-foreground hover:border-border/60 hover:bg-accent/60 hover:text-foreground",
                     isSidebarCollapsed && "justify-center px-2"
                   )}
                 >
@@ -1001,7 +1801,7 @@ export function App(): ReactElement {
                 void handleAddProject();
               }}
               className={cn(
-                "mb-1 flex w-full items-center rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
+                "mb-1 flex w-full items-center rounded-lg border border-transparent px-3 py-2.5 text-[14px] text-muted-foreground transition-colors hover:border-border/60 hover:bg-accent/60 hover:text-foreground",
                 isSidebarCollapsed && "justify-center px-2"
               )}
               disabled={isMutating || isLoading}
@@ -1040,7 +1840,7 @@ export function App(): ReactElement {
                         setOpenSessionMenuId(null);
                       }}
                       className={cn(
-                        "flex w-full items-center rounded-md px-3 py-2 pr-16 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
+                        "flex w-full items-center rounded-lg border border-transparent px-3 py-2.5 pr-16 text-[14px] text-muted-foreground transition-colors hover:border-border/60 hover:bg-accent/60 hover:text-foreground",
                         isSidebarCollapsed && "justify-center px-2 pr-2"
                       )}
                     >
@@ -1063,7 +1863,7 @@ export function App(): ReactElement {
                           }}
                           className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
                         >
-                          <Plus className="size-3.5" />
+                          <Plus className="size-3.5 icon-stroke-1" />
                         </button>
                         <button
                           type="button"
@@ -1078,7 +1878,7 @@ export function App(): ReactElement {
                           }}
                           className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
                         >
-                          <MoreHorizontal className="size-3.5" />
+                          <MoreHorizontal className="size-3.5 icon-stroke-1" />
                         </button>
                       </div>
                     ) : null}
@@ -1196,35 +1996,547 @@ export function App(): ReactElement {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="border-b border-border bg-background/95 px-4 py-4 sm:px-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{viewTitle(route, selectedSession)}</h1>
-                <p className="mt-1 text-sm text-muted-foreground">{viewDescription(route, selectedSession)}</p>
-              </div>
+          <header className="border-b border-border bg-background px-4 py-3 sm:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {route.kind === "agent" ? (
+                <div className="flex min-w-0 items-center gap-3">
+                  {selectedAgent ? <AgentAvatar agentId={selectedAgent.id} displayName={selectedAgent.displayName} size="md" /> : null}
+                  <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
+                    {selectedAgent?.displayName ?? route.agentId}
+                  </h1>
+                </div>
+              ) : (
+                <div>
+                  <h1
+                    className={cn(
+                      "font-semibold tracking-tight",
+                      route.kind === "page" && route.view === "overview" ? "text-4xl sm:text-5xl" : "text-xl sm:text-2xl"
+                    )}
+                  >
+                    {viewTitle(route, selectedSession, selectedBoard)}
+                  </h1>
+                </div>
+              )}
 
-              <div className="flex items-center gap-2">
-                {state?.health.ok ? <Badge variant="success">Connected</Badge> : <Badge variant="secondary">Loading</Badge>}
+              {route.kind === "page" && route.view === "boards" ? (
                 <Button
-                  variant="secondary"
                   size="sm"
                   onClick={() => {
-                    void loadData();
+                    setCreateBoardDialogError(null);
+                    setCreateBoardDialogOpen(true);
                   }}
                   disabled={isLoading || isMutating}
                 >
-                  <RefreshCw className={cn("mr-2 size-4", isLoading && "animate-spin")} />
-                  Refresh
+                  Create Board
                 </Button>
-              </div>
+              ) : null}
+
+              {route.kind === "page" && route.view === "agents" ? (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setCreateAgentDialogError(null);
+                    setCreateAgentDialogOpen(true);
+                  }}
+                  disabled={isLoading || isMutating}
+                >
+                  Create Agent
+                </Button>
+              ) : null}
+
+              {route.kind === "agent" ? (
+                <div className="flex min-w-[220px] items-center gap-2">
+                  <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="agentProjectSelector">
+                    Project
+                  </label>
+                  <select
+                    id="agentProjectSelector"
+                    className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    value={selectedAgentProject?.id ?? ""}
+                    onChange={(event) => {
+                      const nextProjectId = event.target.value;
+                      setSelectedProjectIdByAgentId((current) => ({
+                        ...current,
+                        [route.agentId]: nextProjectId
+                      }));
+                    }}
+                  >
+                    {agentProjectOptions.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+
+              {route.kind === "board" ? (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setCreateTaskDialogError(null);
+                    setCreateTaskDialogOpen(true);
+                  }}
+                  disabled={isLoading || isMutating || !selectedBoard}
+                >
+                  Create Task
+                </Button>
+              ) : null}
             </div>
           </header>
+
+          <Dialog
+            open={isCreateBoardDialogOpen}
+            onOpenChange={(open) => {
+              setCreateBoardDialogOpen(open);
+              setCreateBoardDialogError(null);
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Board</DialogTitle>
+                <DialogDescription>Create a board as a manager. Core permission checks are enforced by the backend.</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createBoardActor">
+                    Act As
+                  </label>
+                  <select
+                    id="createBoardActor"
+                    className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    value={boardActorId}
+                    onChange={(event) => setBoardActorId(event.target.value)}
+                  >
+                    {agents.map((agent) => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.displayName} ({agent.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createBoardTitle">
+                    Title
+                  </label>
+                  <Input
+                    id="createBoardTitle"
+                    value={newBoardTitle}
+                    onChange={(event) => setNewBoardTitle(event.target.value)}
+                    placeholder="Q2 Delivery"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && newBoardTitle.trim() && !isMutating && !isLoading) {
+                        event.preventDefault();
+                        void handleCreateBoard();
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              {createBoardDialogError ? <p className="text-sm text-danger">{createBoardDialogError}</p> : null}
+
+              <DialogFooter>
+                <Button variant="secondary" onClick={() => setCreateBoardDialogOpen(false)} disabled={isMutating}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    void handleCreateBoard();
+                  }}
+                  disabled={isMutating || isLoading || !newBoardTitle.trim()}
+                >
+                  Create
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={isCreateAgentDialogOpen}
+            onOpenChange={(open) => {
+              setCreateAgentDialogOpen(open);
+              setCreateAgentDialogError(null);
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Agent</DialogTitle>
+                <DialogDescription>Create an agent and assign a reporting manager.</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createAgentName">
+                    Name
+                  </label>
+                  <Input
+                    id="createAgentName"
+                    value={createForm.name}
+                    onChange={(event) => setCreateForm((value) => ({ ...value, name: event.target.value }))}
+                    placeholder="Developer"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && createForm.name.trim() && !isMutating && !isLoading) {
+                        event.preventDefault();
+                        void handleCreateAgent({
+                          fromDialog: true
+                        });
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createAgentReportsTo">
+                    Reports To
+                  </label>
+                  <select
+                    id="createAgentReportsTo"
+                    className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    value={createForm.reportsTo}
+                    onChange={(event) =>
+                      setCreateForm((value) => ({
+                        ...value,
+                        reportsTo: event.target.value
+                      }))
+                    }
+                  >
+                    {agents.map((agent) => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.displayName} ({agent.id})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">You can only assign existing agents as manager.</p>
+                </div>
+              </div>
+
+              {createAgentDialogError ? <p className="text-sm text-danger">{createAgentDialogError}</p> : null}
+
+              <DialogFooter>
+                <Button variant="secondary" onClick={() => setCreateAgentDialogOpen(false)} disabled={isMutating}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    void handleCreateAgent({
+                      fromDialog: true
+                    });
+                  }}
+                  disabled={isMutating || isLoading || !createForm.name.trim()}
+                >
+                  Create
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {selectedBoard ? (
+            <Dialog
+              open={isCreateTaskDialogOpen}
+              onOpenChange={(open) => {
+                setCreateTaskDialogOpen(open);
+                setCreateTaskDialogError(null);
+              }}
+            >
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create Task</DialogTitle>
+                  <DialogDescription>{`Add a task to ${selectedBoard.title}.`}</DialogDescription>
+                </DialogHeader>
+
+                {(() => {
+                  const draft = taskDraftByBoardId[selectedBoard.boardId] ?? {
+                    title: "",
+                    description: "",
+                    workspace: "~",
+                    assignedTo: taskActorId,
+                    status: "todo" as const
+                  };
+                  const assignableAgents = getAssignableAgents(taskActorId);
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskActor">
+                          Task Actor
+                        </label>
+                        <select
+                          id="createTaskActor"
+                          className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          value={taskActorId}
+                          onChange={(event) => setTaskActorId(event.target.value)}
+                        >
+                          {agents.map((agent) => (
+                            <option key={agent.id} value={agent.id}>
+                              {agent.displayName} ({agent.id})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-1.5 md:col-span-2">
+                          <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskTitle">
+                            Title
+                          </label>
+                          <Input
+                            id="createTaskTitle"
+                            value={draft.title}
+                            onChange={(event) => updateTaskDraft(selectedBoard.boardId, { title: event.target.value })}
+                            placeholder="Implement feature"
+                          />
+                        </div>
+                        <div className="space-y-1.5 md:col-span-2">
+                          <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskDescription">
+                            Description
+                          </label>
+                          <textarea
+                            id="createTaskDescription"
+                            className="min-h-[96px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            value={draft.description}
+                            onChange={(event) => updateTaskDraft(selectedBoard.boardId, { description: event.target.value })}
+                            placeholder="Define acceptance criteria."
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskWorkspace">
+                            Workspace
+                          </label>
+                          <Input
+                            id="createTaskWorkspace"
+                            value={draft.workspace}
+                            onChange={(event) => updateTaskDraft(selectedBoard.boardId, { workspace: event.target.value })}
+                            placeholder="~"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskAssign">
+                            Assign To
+                          </label>
+                          <select
+                            id="createTaskAssign"
+                            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            value={draft.assignedTo}
+                            onChange={(event) => updateTaskDraft(selectedBoard.boardId, { assignedTo: event.target.value })}
+                          >
+                            {assignableAgents.map((agent) => (
+                              <option key={agent.id} value={agent.id}>
+                                {agent.displayName} ({agent.id})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskStatus">
+                            Initial Status
+                          </label>
+                          <select
+                            id="createTaskStatus"
+                            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            value={draft.status}
+                            onChange={(event) =>
+                              updateTaskDraft(selectedBoard.boardId, {
+                                status: event.target.value as TaskCreateDraft["status"]
+                              })
+                            }
+                          >
+                            <option value="todo">todo</option>
+                            <option value="doing">doing</option>
+                            <option value="blocked">blocked</option>
+                            <option value="done">done</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {createTaskDialogError ? <p className="text-sm text-danger">{createTaskDialogError}</p> : null}
+
+                <DialogFooter>
+                  <Button variant="secondary" onClick={() => setCreateTaskDialogOpen(false)} disabled={isMutating}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      void handleCreateTask(selectedBoard.boardId, {
+                        fromDialog: true
+                      });
+                    }}
+                    disabled={isMutating || isLoading}
+                  >
+                    Create Task
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          ) : null}
+
+          <Dialog
+            open={isTaskDetailsDialogOpen && Boolean(selectedTask)}
+            onOpenChange={(open) => {
+              setTaskDetailsDialogOpen(open);
+              if (!open) {
+                setTaskDetailsError(null);
+                setTaskEntryDraft({
+                  kind: "worklog",
+                  content: ""
+                });
+              }
+            }}
+          >
+            {selectedTask ? (
+              <DialogContent className="h-[82vh] max-h-[82vh] max-w-[880px] gap-0 overflow-hidden p-0">
+                <DialogHeader className="border-b border-border/70 px-6 py-5">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <DialogTitle className="truncate text-2xl leading-tight font-semibold tracking-tight">{selectedTask.title}</DialogTitle>
+                      <DialogDescription className="mt-1">{selectedTask.taskId}</DialogDescription>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-border/60 bg-background/50 px-2.5 py-1 text-xs text-muted-foreground">{`Assignee @${selectedTask.assignedTo}`}</span>
+                        <span className="rounded-full border border-border/60 bg-background/50 px-2.5 py-1 text-xs text-muted-foreground">{`Owner @${selectedTask.owner}`}</span>
+                        <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-medium", taskStatusPillClasses(selectedTask.status))}>
+                          {selectedTask.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="w-full max-w-[220px] space-y-1 sm:w-auto">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Update Status</p>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="h-9 min-w-[118px] flex-1 rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          value={taskStatusDraftById[selectedTask.taskId] ?? selectedTask.status}
+                          onChange={(event) =>
+                            setTaskStatusDraftById((current) => ({
+                              ...current,
+                              [selectedTask.taskId]: event.target.value
+                            }))
+                          }
+                        >
+                          <option value="todo">todo</option>
+                          <option value="doing">doing</option>
+                          <option value="blocked">blocked</option>
+                          <option value="done">done</option>
+                        </select>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="h-9 shrink-0 px-3"
+                          disabled={isMutating || isLoading}
+                          onClick={() => {
+                            void handleUpdateTaskStatus(selectedTask.taskId, {
+                              fromDetails: true
+                            });
+                          }}
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </DialogHeader>
+
+                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                  <section>
+                    <h3 className="text-base font-medium">Description</h3>
+                    <p className="mt-2 text-base leading-relaxed whitespace-pre-wrap text-foreground">{selectedTask.description}</p>
+                  </section>
+
+                  <section className="mt-7">
+                    <h3 className="text-base font-medium">Blockers</h3>
+                    {selectedTask.blockers.length === 0 ? (
+                      <p className="mt-2 text-sm text-muted-foreground">No blockers.</p>
+                    ) : (
+                      <ul className="mt-2 space-y-2">
+                        {selectedTask.blockers.map((blocker, index) => (
+                          <li key={`${selectedTask.taskId}:blocker:${index}`} className="rounded-md border border-border/60 bg-background/30 px-3 py-2 text-sm">
+                            {blocker}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+
+                  <section className="mt-7">
+                    <h3 className="text-base font-medium">Activity</h3>
+                    {selectedTaskActivity.length === 0 ? (
+                      <p className="mt-2 text-sm text-muted-foreground">No artifacts or worklog entries yet.</p>
+                    ) : (
+                      <div className="mt-2 space-y-2">
+                        {selectedTaskActivity.map((entry, index) => (
+                          <article key={`${selectedTask.taskId}:activity:${entry.type}:${index}`} className="rounded-md border border-border/60 bg-background/30 px-4 py-3">
+                            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{entry.type}</span>
+                              <span className="text-xs text-muted-foreground">{`@${entry.createdBy} • ${formatEntryDate(entry.createdAt)}`}</span>
+                            </div>
+                            <p className="text-sm leading-relaxed">{entry.content}</p>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </div>
+
+                <div className="border-t border-border/70 bg-background/70 px-6 py-4">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Add Entry</p>
+                  <div className="mt-2 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <select
+                        className="h-9 min-w-[128px] rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        value={taskEntryDraft.kind}
+                        onChange={(event) =>
+                          setTaskEntryDraft((current) => ({
+                            ...current,
+                            kind: event.target.value as TaskEntryDraft["kind"]
+                          }))
+                        }
+                      >
+                        <option value="worklog">Worklog</option>
+                        <option value="artifact">Artifact</option>
+                        <option value="blocker">Blocker</option>
+                      </select>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-9 px-3"
+                        disabled={isMutating || isLoading || !taskEntryDraft.content.trim()}
+                        onClick={() => {
+                          void handleAddTaskEntry(selectedTask.taskId, taskEntryDraft.kind, taskEntryDraft.content, {
+                            fromDetails: true
+                          });
+                        }}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                    <textarea
+                      className="min-h-[72px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      value={taskEntryDraft.content}
+                      onChange={(event) =>
+                        setTaskEntryDraft((current) => ({
+                          ...current,
+                          content: event.target.value
+                        }))
+                      }
+                      placeholder={`Add ${taskEntryDraft.kind} details...`}
+                    />
+                  </div>
+                  {taskDetailsError ? <p className="mt-2 text-sm text-danger">{taskDetailsError}</p> : null}
+                </div>
+              </DialogContent>
+            ) : null}
+          </Dialog>
 
           <div className="border-b border-border px-3 py-2 md:hidden">
             <div className="flex gap-1 overflow-x-auto">
               {SIDEBAR_ITEMS.map((item) => {
                 const Icon = item.icon;
-                const active = route.kind === "page" && item.id === route.view;
+                const active =
+                  (route.kind === "page" && item.id === route.view) || (route.kind === "board" && item.id === "boards");
 
                 return (
                   <button
@@ -1261,7 +2573,7 @@ export function App(): ReactElement {
           <main
             className={cn(
               "flex min-h-0 flex-1 flex-col gap-4 p-4 sm:p-6",
-              route.kind === "session" ? "overflow-hidden" : "overflow-y-auto"
+              route.kind === "session" || route.kind === "agent" ? "overflow-hidden" : "overflow-y-auto"
             )}
           >
             {error ? (
@@ -1294,137 +2606,254 @@ export function App(): ReactElement {
             {!state && isLoading ? <p className="text-sm text-muted-foreground">Loading runtime data...</p> : null}
 
             {state ? (
-              <div className={cn(route.kind === "session" ? "flex min-h-0 flex-1 flex-col" : "space-y-4")}>
+              <div className={cn(route.kind === "session" || route.kind === "agent" ? "flex min-h-0 flex-1 flex-col" : "space-y-4")}>
                 {route.kind === "page" && route.view === "overview" ? (
                   <>
-                    <div className="grid gap-4 xl:grid-cols-3">
+                    <section>
+                      <div className="mb-3 flex items-center justify-between">
+                        <p className="text-sm font-medium text-muted-foreground">Runtime Overview</p>
+                      </div>
+                      <div className="grid gap-3 xl:grid-cols-3">
                       {metrics.map((metric) => {
                         const Icon = metric.icon;
                         return (
-                          <Card key={metric.id}>
-                            <CardHeader className="pb-2">
-                              <div className="flex items-center justify-between">
-                                <CardDescription>{metric.label}</CardDescription>
-                                <span className="inline-flex size-8 items-center justify-center rounded-md bg-accent text-muted-foreground">
-                                  <Icon className="size-4" />
+                          <Card key={metric.id} className="border-border/70 bg-card/70">
+                            <CardHeader className="pb-1">
+                              <div className="flex items-center justify-between gap-3">
+                                <CardDescription className="text-[14px] font-medium text-muted-foreground">{metric.label}</CardDescription>
+                                <span className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 bg-accent/60 text-muted-foreground">
+                                  <Icon className="size-4 icon-stroke-1_2" />
                                 </span>
                               </div>
-                              <CardTitle className="text-4xl leading-none">{metric.value}</CardTitle>
+                              <CardTitle className="text-5xl leading-none font-medium tracking-tight">{metric.value}</CardTitle>
                             </CardHeader>
-                            <CardContent>
-                              <p className="text-xs text-muted-foreground">{metric.hint}</p>
+                            <CardContent className="pt-0">
+                              <p className="text-[13px] text-muted-foreground">{metric.hint}</p>
                             </CardContent>
                           </Card>
                         );
                       })}
-                    </div>
+                      </div>
+                    </section>
 
                     {agents.length >= 2 ? <OrganizationChartPanel agents={agents} /> : null}
                   </>
                 ) : null}
 
                 {route.kind === "page" && route.view === "agents" ? (
-                  <div className="grid gap-4 xl:grid-cols-[390px_1fr]">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Create Agent</CardTitle>
-                        <CardDescription>Only name and reporting manager are required.</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <form className="space-y-4" onSubmit={(event) => void handleCreateAgent(event)}>
-                          <div className="space-y-1.5">
-                            <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="name">
-                              Name
-                            </label>
-                            <Input
-                              id="name"
-                              value={createForm.name}
-                              onChange={(event) => setCreateForm((value) => ({ ...value, name: event.target.value }))}
-                              placeholder="Developer"
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="reportsTo">
-                              Reports To
-                            </label>
-                            <select
-                              id="reportsTo"
-                              className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                              value={createForm.reportsTo}
-                              onChange={(event) =>
-                                setCreateForm((value) => ({
-                                  ...value,
-                                  reportsTo: event.target.value
-                                }))
+                  <section className="space-y-3">
+                    <p className="text-sm text-muted-foreground">Current organization members.</p>
+                    {agents.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No agents found.</p>
+                    ) : (
+                      <div className="overflow-hidden rounded-xl border border-border/80">
+                        {agents.map((agent, index) => (
+                          <div
+                            key={agent.id}
+                            className={cn(
+                              "flex cursor-pointer items-center justify-between gap-3 bg-background/30 px-4 py-3 transition-colors hover:bg-accent/30",
+                              index !== agents.length - 1 && "border-b border-border/70"
+                            )}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              navigateToRoute({
+                                kind: "agent",
+                                agentId: agent.id
+                              });
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                navigateToRoute({
+                                  kind: "agent",
+                                  agentId: agent.id
+                                });
                               }
-                            >
-                              {agents.map((agent) => (
-                                <option key={agent.id} value={agent.id}>
-                                  {agent.displayName} ({agent.id})
-                                </option>
-                              ))}
-                            </select>
-                            <p className="text-xs text-muted-foreground">You can only assign existing agents as manager.</p>
-                          </div>
-
-                          <Button
-                            className="w-full"
-                            disabled={isMutating || agents.length === 0 || !createForm.name.trim()}
-                            type="submit"
+                            }}
                           >
-                            Create Agent
-                          </Button>
-                        </form>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Agent Directory</CardTitle>
-                        <CardDescription>Current organization members.</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {agents.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No agents found.</p>
-                        ) : (
-                          <div className="overflow-hidden rounded-xl border border-border/80">
-                            {agents.map((agent, index) => (
-                              <div
-                                key={agent.id}
-                                className={cn(
-                                  "flex items-center justify-between gap-3 bg-background/30 px-4 py-3",
-                                  index !== agents.length - 1 && "border-b border-border/70"
-                                )}
-                              >
-                                <div className="min-w-0">
-                                  <p className="truncate font-medium">{agent.displayName}</p>
-                                  <p className="truncate text-xs text-muted-foreground">{agent.id}</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {agent.id === "goat" ? <Badge variant="secondary">Head of Org</Badge> : null}
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    disabled={agent.id === "goat" || isMutating}
-                                    onClick={() => {
-                                      void handleDeleteAgent(agent.id);
-                                    }}
-                                  >
-                                    Delete
-                                  </Button>
-                                </div>
+                            <div className="flex min-w-0 items-center gap-3">
+                              <AgentAvatar agentId={agent.id} displayName={agent.displayName} />
+                              <div className="min-w-0">
+                                <p className="truncate font-medium">{agent.displayName}</p>
+                                <p className="truncate text-xs text-muted-foreground">{agent.id}</p>
                               </div>
-                            ))}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {agent.id === "goat" ? <Badge variant="secondary">Head of Org</Badge> : null}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={agent.id === "goat" || isMutating}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  void handleDeleteAgent(agent.id);
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            </div>
                           </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
                 ) : null}
 
-                {route.kind === "session" ? (
-                  selectedSession ? (
+                {route.kind === "page" && route.view === "boards" ? (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Boards</CardTitle>
+                      <CardDescription>Open a board to view tasks and manage work.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {boards.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No boards found yet. Use Create Board in the header.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {boards.map((board) => (
+                            <button
+                              key={board.boardId}
+                              type="button"
+                              className="flex w-full items-center justify-between rounded-md border border-border/80 bg-background/30 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+                              onClick={() => {
+                                navigateToRoute({
+                                  kind: "board",
+                                  boardId: board.boardId
+                                });
+                              }}
+                            >
+                              <div>
+                                <p className="font-medium">{board.title}</p>
+                                <p className="text-xs text-muted-foreground">{`${board.boardId} • owner @${board.owner}`}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm">{board.tasks.length} tasks</p>
+                                <p className="text-xs text-muted-foreground">Open</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ) : null}
+
+                {route.kind === "board" ? (
+                  selectedBoard ? (
+                    <div className="space-y-4">
+                      <section className="rounded-lg border border-border/80 bg-card/40 px-4 py-4 sm:px-5">
+                        <div className="flex flex-wrap items-end justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="group inline-flex max-w-full items-center gap-1.5">
+                              <h2 className="truncate text-2xl font-semibold tracking-tight">{selectedBoard.title}</h2>
+                              <button
+                                type="button"
+                                className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary group-hover:opacity-100"
+                                aria-label="Rename board"
+                                onClick={() => {
+                                  void handleRenameBoard(selectedBoard);
+                                }}
+                                disabled={isMutating || isLoading}
+                              >
+                                <PenLine className="size-4" />
+                              </button>
+                            </div>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {`${selectedBoard.boardId} • owner @${selectedBoard.owner} • created ${new Date(selectedBoard.createdAt).toLocaleString()}`}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-end gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[11px] uppercase tracking-wide text-muted-foreground" htmlFor="boardTaskActor">
+                                Act As
+                              </label>
+                              <select
+                                id="boardTaskActor"
+                                className="h-9 min-w-[220px] rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                value={taskActorId}
+                                onChange={(event) => setTaskActorId(event.target.value)}
+                              >
+                                {agents.map((agent) => (
+                                  <option key={agent.id} value={agent.id}>
+                                    {agent.displayName} ({agent.id})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                navigateToRoute({ kind: "page", view: "boards" });
+                              }}
+                            >
+                              Back to Boards
+                            </Button>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section className="overflow-hidden rounded-lg border border-border/80 bg-card/25">
+                        <div className="border-b border-border/70 px-4 py-3">
+                          <p className="text-sm font-medium">Tasks</p>
+                          <p className="text-xs text-muted-foreground">
+                            Open a task for full details. Table focuses on title, assignee, and status.
+                          </p>
+                        </div>
+
+                        {selectedBoard.tasks.length === 0 ? (
+                          <div className="px-4 py-8">
+                            <p className="text-sm text-muted-foreground">No tasks on this board yet. Use Create Task in the top right.</p>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full">
+                              <thead>
+                                <tr className="border-b border-border/70 bg-accent/25 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                  <th className="px-4 py-2 font-medium">Task</th>
+                                  <th className="px-4 py-2 font-medium">Assignee</th>
+                                  <th className="px-4 py-2 font-medium">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border/60">
+                                {selectedBoard.tasks.map((task) => (
+                                  <tr key={task.taskId} className="transition-colors hover:bg-accent/20">
+                                    <td className="px-4 py-3">
+                                      <button
+                                        type="button"
+                                        className="group text-left"
+                                        onClick={() => {
+                                          handleOpenTaskDetails(task.taskId);
+                                        }}
+                                      >
+                                        <span className="block font-medium text-foreground group-hover:underline">{task.title}</span>
+                                      </button>
+                                    </td>
+                                    <td className="px-4 py-3 text-sm text-muted-foreground">{`@${task.assignedTo}`}</td>
+                                    <td className="px-4 py-3">
+                                      <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium", taskStatusPillClasses(task.status))}>
+                                        {task.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </section>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{`No board was found for id ${route.boardId}.`}</p>
+                  )
+                ) : null}
+
+                {route.kind === "session" || route.kind === "agent" ? (
+                  activeChatContext ? (
                     <div className="flex min-h-0 flex-1 flex-col">
                       <Conversation className="min-h-0 flex-1">
                         <ConversationContent className="gap-4 p-4">
@@ -1444,14 +2873,10 @@ export function App(): ReactElement {
                                 </Message>
                               ))}
                               {sessionChatStatus === "streaming" ? (
-                                <Message from="assistant" key={`${selectedSession.sessionId}:thinking`}>
+                                <Message from="assistant" key={`${activeChatContext.chatKey}:thinking`}>
                                   <MessageContent className="w-full max-w-full bg-transparent px-0 py-0">
                                     <Reasoning isStreaming>
                                       <ReasoningTrigger />
-                                      <ReasoningContent>
-                                        Working on your request. The response will appear here as soon as the runtime
-                                        finishes.
-                                      </ReasoningContent>
                                     </Reasoning>
                                   </MessageContent>
                                 </Message>
@@ -1471,7 +2896,11 @@ export function App(): ReactElement {
                       >
                         <PromptInputBody>
                           <PromptInputTextarea
-                            placeholder="Message this session..."
+                            placeholder={
+                              route.kind === "agent"
+                                ? `Message ${selectedAgent?.displayName ?? route.agentId}...`
+                                : "Message this session..."
+                            }
                             disabled={sessionChatStatus === "streaming" || isLoading || isMutating}
                           />
                         </PromptInputBody>
@@ -1485,7 +2914,9 @@ export function App(): ReactElement {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      {`No saved session was found for id ${route.sessionId}.`}
+                      {route.kind === "session"
+                        ? `No saved session was found for id ${route.sessionId}.`
+                        : `No chat workspace is available for agent ${route.agentId}.`}
                     </p>
                   )
                 ) : null}
@@ -1603,20 +3034,20 @@ function OrganizationChartPanel({ agents }: { agents: Agent[] }): ReactElement {
   }, []);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+    <Card className="border-border/70 bg-card/70">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 pb-3">
         <div>
-          <CardTitle className="text-base">Organization Chart</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-[20px] font-medium">Organization Chart</CardTitle>
+          <CardDescription className="text-[14px]">
             Multi-level hierarchy with zoom, pan, and per-branch expand/collapse controls.
           </CardDescription>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={expandAll}>
+          <Button size="sm" variant="secondary" className="h-9 px-3 text-[14px]" onClick={expandAll}>
             Expand All
           </Button>
-          <Button size="sm" variant="secondary" onClick={collapseAll}>
+          <Button size="sm" variant="secondary" className="h-9 px-3 text-[14px]" onClick={collapseAll}>
             Collapse Branches
           </Button>
         </div>
@@ -1626,7 +3057,7 @@ function OrganizationChartPanel({ agents }: { agents: Agent[] }): ReactElement {
         {flowModel.nodes.length === 0 ? (
           <p className="text-sm text-muted-foreground">No organization nodes found.</p>
         ) : (
-          <div className="h-[640px] rounded-lg border border-border/80 bg-background/50">
+          <div className="h-[640px] rounded-xl border border-border/70 bg-background/45">
             <ReactFlow
               nodes={flowModel.nodes}
               edges={flowModel.edges}
@@ -1652,11 +3083,59 @@ function OrganizationChartPanel({ agents }: { agents: Agent[] }): ReactElement {
   );
 }
 
+function AgentAvatar({
+  agentId,
+  displayName,
+  size = "sm",
+  className
+}: {
+  agentId: string;
+  displayName: string;
+  size?: "sm" | "md";
+  className?: string;
+}): ReactElement {
+  const remoteSrc = useMemo(() => {
+    return `${MULTIAVATAR_API_BASE_URL}/${encodeURIComponent(agentId)}.svg`;
+  }, [agentId]);
+  const fallbackSrc = useMemo(() => {
+    const svg = multiavatar(agentId);
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }, [agentId]);
+  const [avatarSrc, setAvatarSrc] = useState(remoteSrc);
+
+  useEffect(() => {
+    setAvatarSrc(remoteSrc);
+  }, [remoteSrc]);
+
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 overflow-hidden rounded-full border border-border/80 bg-background/80",
+        size === "md" ? "size-9" : "size-8",
+        className
+      )}
+    >
+      <img
+        src={avatarSrc}
+        alt={`${displayName} avatar`}
+        className="size-full object-cover"
+        loading="lazy"
+        decoding="async"
+        onError={() => {
+          setAvatarSrc((current) => {
+            return current === fallbackSrc ? current : fallbackSrc;
+          });
+        }}
+      />
+    </span>
+  );
+}
+
 function OrganizationChartNode({ id, data }: NodeProps<OrgChartNode>): ReactElement {
   const hasChildren = data.directReports > 0;
 
   return (
-    <div className="relative w-[260px] rounded-lg border border-border bg-card px-3 py-3 shadow-sm">
+    <div className="relative w-[260px] rounded-xl border border-border/80 bg-card/95 px-3 py-3 shadow-sm">
       <Handle
         type="target"
         position={Position.Top}
@@ -1665,9 +3144,12 @@ function OrganizationChartNode({ id, data }: NodeProps<OrgChartNode>): ReactElem
       />
 
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{data.displayName}</p>
-          <p className="truncate text-xs text-muted-foreground">{data.agentId}</p>
+        <div className="flex min-w-0 items-start gap-2">
+          <AgentAvatar agentId={data.agentId} displayName={data.displayName} className="mt-0.5" />
+          <div className="min-w-0">
+            <p className="truncate text-[14px] font-medium">{data.displayName}</p>
+            <p className="truncate text-xs text-muted-foreground">{data.agentId}</p>
+          </div>
         </div>
 
         {hasChildren ? (
@@ -1688,9 +3170,6 @@ function OrganizationChartNode({ id, data }: NodeProps<OrgChartNode>): ReactElem
       </div>
 
       <div className="mt-2 flex items-center gap-2">
-        <Badge variant="secondary" className="capitalize">
-          {data.type}
-        </Badge>
         <p className="text-xs text-muted-foreground">
           {hasChildren ? `${data.directReports} direct report${data.directReports > 1 ? "s" : ""}` : "No direct reports"}
         </p>
@@ -1844,7 +3323,7 @@ function buildFlowModel(params: {
       data: {
         agentId,
         displayName: agent?.displayName ?? agentId,
-        type: agent?.type ?? "unknown",
+        role: resolveAgentRoleLabel(agent),
         directReports,
         collapsed: collapsedNodeIds.has(agentId),
         onToggle
@@ -1880,6 +3359,18 @@ function normalizeReportsTo(value: string | null | undefined): string | null {
   return normalized;
 }
 
+function resolveAgentRoleLabel(agent: Agent | undefined): string | undefined {
+  const explicitRole = agent?.role?.trim();
+  if (explicitRole) {
+    const genericRole = explicitRole.toLowerCase();
+    if (genericRole === "manager" || genericRole === "individual contributor" || genericRole === "team member") {
+      return undefined;
+    }
+    return explicitRole;
+  }
+  return undefined;
+}
+
 async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
   const payload = await response.json().catch(() => {
@@ -1897,39 +3388,30 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
-function viewTitle(route: AppRoute, selectedSession: Session | null): string {
+function viewTitle(route: AppRoute, selectedSession: Session | null, selectedBoard: BoardRecord | null): string {
   if (route.kind === "session") {
     return selectedSession?.title ?? "Session";
+  }
+
+  if (route.kind === "agent") {
+    return "Agent";
+  }
+
+  if (route.kind === "board") {
+    return selectedBoard?.title ?? "Board";
   }
 
   switch (route.view) {
     case "overview":
       return "Dashboard";
+    case "boards":
+      return "Boards";
     case "agents":
       return "Agents";
     case "skills":
       return "Skills";
     default:
       return "Dashboard";
-  }
-}
-
-function viewDescription(route: AppRoute, selectedSession: Session | null): string {
-  if (route.kind === "session") {
-    return selectedSession
-      ? `Viewing session ${selectedSession.sessionId}.`
-      : `Session id ${route.sessionId} was not found.`;
-  }
-
-  switch (route.view) {
-    case "overview":
-      return "Operational summary for your OpenGoat runtime.";
-    case "agents":
-      return "Create and maintain your organization hierarchy.";
-    case "skills":
-      return "Review assigned and global skill coverage.";
-    default:
-      return "";
   }
 }
 
@@ -1942,7 +3424,8 @@ function getInitialRoute(): AppRoute {
 }
 
 function parseRoute(pathname: string): AppRoute {
-  const normalized = pathname.trim() || "/";
+  const trimmed = pathname.trim() || "/";
+  const normalized = trimmed.length > 1 ? trimmed.replace(/\/+$/, "") : trimmed;
 
   if (normalized === "/" || normalized === "/overview") {
     return { kind: "page", view: "overview" };
@@ -1950,6 +3433,30 @@ function parseRoute(pathname: string): AppRoute {
 
   if (normalized === "/agents") {
     return { kind: "page", view: "agents" };
+  }
+
+  if (normalized.startsWith("/agents/")) {
+    const agentId = decodeURIComponent(normalized.slice("/agents/".length)).trim();
+    if (agentId) {
+      return {
+        kind: "agent",
+        agentId
+      };
+    }
+  }
+
+  if (normalized.startsWith("/boards/")) {
+    const boardId = decodeURIComponent(normalized.slice("/boards/".length)).trim();
+    if (boardId) {
+      return {
+        kind: "board",
+        boardId
+      };
+    }
+  }
+
+  if (normalized === "/boards") {
+    return { kind: "page", view: "boards" };
   }
 
   if (normalized === "/skills") {
@@ -1974,11 +3481,39 @@ function routeToPath(route: AppRoute): string {
     return `/sessions/${encodeURIComponent(route.sessionId)}`;
   }
 
+  if (route.kind === "agent") {
+    return `/agents/${encodeURIComponent(route.agentId)}`;
+  }
+
+  if (route.kind === "board") {
+    return `/boards/${encodeURIComponent(route.boardId)}`;
+  }
+
   if (route.view === "overview") {
     return "/overview";
   }
 
   return `/${route.view}`;
+}
+
+function normalizePathForComparison(pathname: string | undefined): string {
+  return pathname?.trim().replace(/[\\/]+$/, "").toLowerCase() ?? "";
+}
+
+function buildFrontendAgentProjectSessionRef(agentId: string, workingPath: string): string {
+  const normalizedAgent = normalizeProjectSegment(agentId);
+  const normalizedPath = normalizeProjectSegment(workingPath);
+  const suffix = normalizedPath.slice(-24) || "workspace";
+  return `ui-agent:${normalizedAgent}-${suffix}`;
+}
+
+function normalizeProjectSegment(value: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized || "project";
 }
 
 function toSessionMessageImages(files: FileUIPart[]): SessionMessageImageInput[] {
@@ -2003,4 +3538,50 @@ function toSessionMessageImages(files: FileUIPart[]): SessionMessageImageInput[]
   }
 
   return images;
+}
+
+function mapHistoryToSessionMessages(
+  sessionId: string,
+  history: Array<{ type: "message" | "compaction"; role?: "user" | "assistant" | "system"; content: string; timestamp: number }>
+): SessionChatMessage[] {
+  const messages: SessionChatMessage[] = [];
+
+  for (let index = 0; index < history.length; index += 1) {
+    const item = history[index];
+    if (!item || item.type !== "message") {
+      continue;
+    }
+    if (item.role !== "user" && item.role !== "assistant") {
+      continue;
+    }
+
+    messages.push({
+      id: `${sessionId}:history:${item.timestamp}:${index}`,
+      role: item.role,
+      content: item.content
+    });
+  }
+
+  return messages;
+}
+
+function taskStatusPillClasses(status: string): string {
+  switch (status.trim().toLowerCase()) {
+    case "done":
+      return "bg-success/20 text-success";
+    case "doing":
+      return "bg-sky-500/20 text-sky-300";
+    case "blocked":
+      return "bg-amber-500/20 text-amber-300";
+    default:
+      return "bg-accent text-foreground";
+  }
+}
+
+function formatEntryDate(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.valueOf())) {
+    return timestamp;
+  }
+  return date.toLocaleString();
 }

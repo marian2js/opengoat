@@ -3,23 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 6.2%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 6.2%;
-  --popover-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
+  --background: 222 12% 7%;
+  --foreground: 210 22% 95%;
+  --card: 222 11% 10%;
+  --card-foreground: 210 22% 95%;
+  --popover: 222 11% 10%;
+  --popover-foreground: 210 22% 95%;
+  --border: 222 9% 21%;
+  --input: 222 9% 21%;
   --ring: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
+  --muted: 222 9% 15%;
+  --muted-foreground: 215 9% 65%;
   --primary: 210 40% 98%;
   --primary-foreground: 222.2 47.4% 11.2%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
+  --secondary: 222 9% 14%;
+  --secondary-foreground: 210 22% 95%;
+  --accent: 222 8% 18%;
+  --accent-foreground: 210 22% 95%;
   --success: 142.1 70.6% 45.3%;
   --success-foreground: 138 76.5% 96.7%;
   --destructive: 0 62.8% 30.6%;
@@ -39,10 +39,44 @@ body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
   min-height: 100vh;
+}
+
+.opengoat-sidebar {
+  --background: 223 14% 8%;
+  --foreground: 210 22% 95%;
+  --card: 223 13% 9%;
+  --card-foreground: 210 22% 95%;
+  --popover: 223 13% 9%;
+  --popover-foreground: 210 22% 95%;
+  --border: 223 9% 20%;
+  --input: 223 9% 20%;
+  --muted: 223 9% 14%;
+  --muted-foreground: 216 11% 69%;
+  --secondary: 223 9% 14%;
+  --secondary-foreground: 210 22% 95%;
+  --accent: 223 9% 17%;
+  --accent-foreground: 210 22% 95%;
+}
+
+.lucide {
+  stroke-width: 1.5;
+}
+
+.icon-stroke-1_2 {
+  stroke-width: 1.2;
+}
+
+.icon-stroke-1 {
+  stroke-width: 1;
 }
 
 .react-flow__controls {
