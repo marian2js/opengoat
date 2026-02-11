@@ -12,7 +12,7 @@ import fastifyStatic from "@fastify/static";
 import { createServer as createViteServer } from "vite";
 import { createOpenGoatRuntime } from "@opengoat/core";
 
-const DEFAULT_AGENT_ID = "goat";
+const DEFAULT_AGENT_ID = "ceo";
 const execFileAsync = promisify(execFile);
 
 interface AgentDescriptor {

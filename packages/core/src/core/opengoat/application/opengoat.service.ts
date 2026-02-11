@@ -67,8 +67,8 @@ interface OpenGoatServiceDeps {
 const OPENCLAW_PROVIDER_ID = "openclaw";
 
 export interface RuntimeDefaultsSyncResult {
-  goatSyncCode?: number;
-  goatSynced: boolean;
+  ceoSyncCode?: number;
+  ceoSynced: boolean;
   warnings: string[];
 }
 
@@ -173,16 +173,16 @@ export class OpenGoatService {
   public async syncRuntimeDefaults(): Promise<RuntimeDefaultsSyncResult> {
     const paths = this.pathsProvider.getPaths();
     const warnings: string[] = [];
-    let goatSynced = false;
-    let goatSyncCode: number | undefined;
+    let ceoSynced = false;
+    let ceoSyncCode: number | undefined;
 
-    let goatDescriptor = (await this.agentService.listAgents(paths)).find((agent) => agent.id === DEFAULT_AGENT_ID);
-    if (!goatDescriptor) {
+    let ceoDescriptor = (await this.agentService.listAgents(paths)).find((agent) => agent.id === DEFAULT_AGENT_ID);
+    if (!ceoDescriptor) {
       const created = await this.agentService.ensureAgent(
         paths,
         {
           id: DEFAULT_AGENT_ID,
-          displayName: "Goat"
+          displayName: "CEO"
         },
         {
           type: "manager",
@@ -191,48 +191,48 @@ export class OpenGoatService {
           role: "Head of Organization"
         }
       );
-      goatDescriptor = created.agent;
+      ceoDescriptor = created.agent;
     }
 
     try {
       await this.agentService.syncAgentRoleAssignments(paths, DEFAULT_AGENT_ID);
     } catch (error) {
-      warnings.push(`OpenGoat role skill assignment sync for "goat" failed: ${toErrorMessage(error)}`);
+      warnings.push(`OpenGoat role skill assignment sync for "ceo" failed: ${toErrorMessage(error)}`);
     }
 
     try {
-      await this.agentService.ensureGoatWorkspaceBootstrap(paths);
+      await this.agentService.ensureCeoWorkspaceBootstrap(paths);
     } catch (error) {
-      warnings.push(`OpenGoat workspace bootstrap for "goat" failed: ${toErrorMessage(error)}`);
+      warnings.push(`OpenGoat workspace bootstrap for "ceo" failed: ${toErrorMessage(error)}`);
     }
 
     try {
       await this.boardService.ensureDefaultBoardForAgent(paths, DEFAULT_AGENT_ID);
     } catch (error) {
-      warnings.push(`Default board ensure for "goat" failed: ${toErrorMessage(error)}`);
+      warnings.push(`Default board ensure for "ceo" failed: ${toErrorMessage(error)}`);
     }
 
     try {
-      const goatSync = await this.providerService.createProviderAgent(paths, DEFAULT_AGENT_ID, {
+      const ceoSync = await this.providerService.createProviderAgent(paths, DEFAULT_AGENT_ID, {
         providerId: OPENCLAW_PROVIDER_ID,
-        displayName: goatDescriptor.displayName,
-        workspaceDir: goatDescriptor.workspaceDir,
-        internalConfigDir: goatDescriptor.internalConfigDir
+        displayName: ceoDescriptor.displayName,
+        workspaceDir: ceoDescriptor.workspaceDir,
+        internalConfigDir: ceoDescriptor.internalConfigDir
       });
-      goatSyncCode = goatSync.code;
-      goatSynced = goatSync.code === 0 || containsAlreadyExistsMessage(goatSync.stdout, goatSync.stderr);
-      if (!goatSynced) {
+      ceoSyncCode = ceoSync.code;
+      ceoSynced = ceoSync.code === 0 || containsAlreadyExistsMessage(ceoSync.stdout, ceoSync.stderr);
+      if (!ceoSynced) {
         warnings.push(
-          `OpenClaw sync for "goat" failed (code ${goatSync.code}). ${(goatSync.stderr || goatSync.stdout).trim()}`
+          `OpenClaw sync for "ceo" failed (code ${ceoSync.code}). ${(ceoSync.stderr || ceoSync.stdout).trim()}`
         );
       }
     } catch (error) {
-      warnings.push(`OpenClaw sync for "goat" failed: ${toErrorMessage(error)}`);
+      warnings.push(`OpenClaw sync for "ceo" failed: ${toErrorMessage(error)}`);
     }
 
     return {
-      goatSyncCode,
-      goatSynced,
+      ceoSyncCode,
+      ceoSynced,
       warnings
     };
   }

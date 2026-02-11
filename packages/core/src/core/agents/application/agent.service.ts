@@ -13,9 +13,9 @@ import {
   renderBoardIndividualSkillMarkdown,
   renderBoardManagerSkillMarkdown,
   renderAgentsIndex,
-  renderGoatAgentsMarkdown,
+  renderCeoAgentsMarkdown,
   renderManagerSkillMarkdown,
-  renderGoatSoulMarkdown,
+  renderCeoSoulMarkdown,
   renderInternalAgentConfig,
   resolveAgentRole,
   type AgentTemplateOptions
@@ -44,7 +44,7 @@ interface AgentConfigShape {
   };
 }
 
-export interface GoatWorkspaceBootstrapResult {
+export interface CeoWorkspaceBootstrapResult {
   createdPaths: string[];
   skippedPaths: string[];
   removedPaths: string[];
@@ -151,7 +151,7 @@ export class AgentService {
     return descriptors.sort((left, right) => left.id.localeCompare(right.id));
   }
 
-  public async ensureGoatWorkspaceBootstrap(paths: OpenGoatPaths): Promise<GoatWorkspaceBootstrapResult> {
+  public async ensureCeoWorkspaceBootstrap(paths: OpenGoatPaths): Promise<CeoWorkspaceBootstrapResult> {
     const workspaceDir = this.pathPort.join(paths.workspacesDir, DEFAULT_AGENT_ID);
     const agentsPath = this.pathPort.join(workspaceDir, "AGENTS.md");
     const soulPath = this.pathPort.join(workspaceDir, "SOUL.md");
@@ -165,14 +165,14 @@ export class AgentService {
     const shouldOverwrite = await this.fileSystem.exists(bootstrapPath);
     await this.writeMarkdown(
       agentsPath,
-      renderGoatAgentsMarkdown(),
+      renderCeoAgentsMarkdown(),
       createdPaths,
       skippedPaths,
       { overwrite: shouldOverwrite }
     );
     await this.writeMarkdown(
       soulPath,
-      renderGoatSoulMarkdown(),
+      renderCeoSoulMarkdown(),
       createdPaths,
       skippedPaths,
       { overwrite: shouldOverwrite }
@@ -293,7 +293,7 @@ export class AgentService {
       throw new Error("Agent id cannot be empty.");
     }
     if (isDefaultAgentId(agentId)) {
-      throw new Error("Cannot delete goat. It is the immutable default entry agent.");
+      throw new Error("Cannot delete ceo. It is the immutable default entry agent.");
     }
 
     const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
@@ -348,7 +348,7 @@ export class AgentService {
       throw new Error(`Agent "${agentId}" cannot report to itself.`);
     }
     if (isDefaultAgentId(agentId) && explicitReportsTo) {
-      throw new Error("goat is the head of the organization and cannot report to another agent.");
+      throw new Error("ceo is the head of the organization and cannot report to another agent.");
     }
     const reportsTo = resolveReportsTo(agentId, rawReportsTo);
 

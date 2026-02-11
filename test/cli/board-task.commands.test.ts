@@ -20,28 +20,28 @@ function createContext(service: unknown) {
 
 describe("board/task CLI commands", () => {
   it("board create forwards actor", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
     const createBoard = vi.fn(async () => ({
       boardId: "core-planning-1234abcd",
       title: "Core Planning",
       createdAt: "2026-02-10T00:00:00.000Z",
-      owner: "goat"
+      owner: "ceo"
     }));
 
     const { context, stdout } = createContext({ initialize, createBoard });
 
-    const code = await boardCommand.run(["create", "Core", "Planning", "--as", "goat"], context);
+    const code = await boardCommand.run(["create", "Core", "Planning", "--as", "ceo"], context);
 
     expect(code).toBe(0);
     expect(initialize).toHaveBeenCalledOnce();
-    expect(createBoard).toHaveBeenCalledWith("goat", {
+    expect(createBoard).toHaveBeenCalledWith("ceo", {
       title: "Core Planning"
     });
     expect(stdout.output()).toContain("Board created: Core Planning (core-planning-1234abcd)");
   });
 
   it("board update requires at least one change", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
     const updateBoard = vi.fn();
 
     const { context, stderr } = createContext({ initialize, updateBoard });
@@ -54,13 +54,13 @@ describe("board/task CLI commands", () => {
   });
 
   it("task create forwards actor assignment and metadata", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
     const createTask = vi.fn(async () => ({
       taskId: "task-1234abcd",
       boardId: "delivery-board",
       createdAt: "2026-02-10T00:00:00.000Z",
       workspace: "~",
-      owner: "goat",
+      owner: "ceo",
       assignedTo: "cto",
       title: "Define API",
       description: "Draft API contract",
@@ -77,7 +77,7 @@ describe("board/task CLI commands", () => {
         "create",
         "delivery-board",
         "--as",
-        "goat",
+        "ceo",
         "--assign",
         "cto",
         "--title",
@@ -91,7 +91,7 @@ describe("board/task CLI commands", () => {
     );
 
     expect(code).toBe(0);
-    expect(createTask).toHaveBeenCalledWith("goat", "delivery-board", {
+    expect(createTask).toHaveBeenCalledWith("ceo", "delivery-board", {
       title: "Define API",
       description: "Draft API contract",
       workspace: undefined,
@@ -103,13 +103,13 @@ describe("board/task CLI commands", () => {
   });
 
   it("task status forwards actor and new status", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
     const updateTaskStatus = vi.fn(async () => ({
       taskId: "task-1234abcd",
       boardId: "delivery-board",
       createdAt: "2026-02-10T00:00:00.000Z",
       workspace: "~",
-      owner: "goat",
+      owner: "ceo",
       assignedTo: "cto",
       title: "Define API",
       description: "Draft API contract",
@@ -129,13 +129,13 @@ describe("board/task CLI commands", () => {
   });
 
   it("task blocker add forwards content", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
     const addTaskBlocker = vi.fn(async () => ({
       taskId: "task-1234abcd",
       boardId: "delivery-board",
       createdAt: "2026-02-10T00:00:00.000Z",
       workspace: "~",
-      owner: "goat",
+      owner: "ceo",
       assignedTo: "cto",
       title: "Define API",
       description: "Draft API contract",
@@ -158,7 +158,7 @@ describe("board/task CLI commands", () => {
   });
 
   it("task cron --once runs one cycle", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
     const runTaskCronCycle = vi.fn(async () => ({
       ranAt: "2026-02-10T00:00:00.000Z",
       scannedTasks: 4,
@@ -179,14 +179,14 @@ describe("board/task CLI commands", () => {
   });
 
   it("task create forwards custom workspace", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
     const createTask = vi.fn(async () => ({
       taskId: "task-9",
       boardId: "delivery-board",
       createdAt: "2026-02-10T00:00:00.000Z",
       workspace: "/repo/service",
-      owner: "goat",
-      assignedTo: "goat",
+      owner: "ceo",
+      assignedTo: "ceo",
       title: "Review API",
       description: "Review details",
       status: "todo",
@@ -211,7 +211,7 @@ describe("board/task CLI commands", () => {
     );
 
     expect(code).toBe(0);
-    expect(createTask).toHaveBeenCalledWith("goat", "delivery-board", {
+    expect(createTask).toHaveBeenCalledWith("ceo", "delivery-board", {
       title: "Review API",
       description: "Review details",
       workspace: "/repo/service",
@@ -221,14 +221,14 @@ describe("board/task CLI commands", () => {
   });
 
   it("task create allows omitting board id", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
     const createTask = vi.fn(async () => ({
       taskId: "task-11",
-      boardId: "goat-board",
+      boardId: "ceo-board",
       createdAt: "2026-02-10T00:00:00.000Z",
       workspace: "~",
-      owner: "goat",
-      assignedTo: "goat",
+      owner: "ceo",
+      assignedTo: "ceo",
       title: "Backlog Grooming",
       description: "Sort next tasks",
       status: "todo",
@@ -250,7 +250,7 @@ describe("board/task CLI commands", () => {
     );
 
     expect(code).toBe(0);
-    expect(createTask).toHaveBeenCalledWith("goat", undefined, {
+    expect(createTask).toHaveBeenCalledWith("ceo", undefined, {
       title: "Backlog Grooming",
       description: "Sort next tasks",
       workspace: undefined,

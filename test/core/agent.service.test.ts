@@ -45,11 +45,11 @@ describe("AgentService", () => {
     const { service, paths } = await createAgentServiceWithPaths();
 
     const result = await service.ensureAgent(paths, {
-      id: "goat",
-      displayName: "Goat"
+      id: "ceo",
+      displayName: "CEO"
     });
 
-    expect(result.agent.workspaceDir).toBe(path.join(paths.workspacesDir, "goat"));
+    expect(result.agent.workspaceDir).toBe(path.join(paths.workspacesDir, "ceo"));
     expect(result.createdPaths.length).toBeGreaterThan(0);
 
     const config = JSON.parse(
@@ -64,11 +64,11 @@ describe("AgentService", () => {
     const index = JSON.parse(await readFile(paths.agentsIndexJsonPath, "utf-8")) as {
       agents: string[];
     };
-    expect(index.agents).toEqual(["goat"]);
+    expect(index.agents).toEqual(["ceo"]);
     expect(result.createdPaths).not.toContain(path.join(result.agent.workspaceDir, "AGENTS.md"));
   });
 
-  it("defaults non-goat reportsTo to goat when omitted", async () => {
+  it("defaults non-ceo reportsTo to ceo when omitted", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
 
     const result = await service.ensureAgent(paths, {
@@ -79,7 +79,7 @@ describe("AgentService", () => {
     const config = JSON.parse(await readFile(path.join(result.agent.internalConfigDir, "config.json"), "utf-8")) as {
       organization?: { reportsTo?: string | null };
     };
-    expect(config.organization?.reportsTo).toBe("goat");
+    expect(config.organization?.reportsTo).toBe("ceo");
   });
 
   it("supports explicit reportsTo manager when creating an agent", async () => {
@@ -143,7 +143,7 @@ describe("AgentService", () => {
       JSON.stringify(
         {
           schemaVersion: 1,
-          defaultAgent: "goat",
+          defaultAgent: "ceo",
           createdAt: "2026-02-01T00:00:00.000Z",
           updatedAt: "2026-02-01T00:00:00.000Z"
         },
@@ -163,7 +163,7 @@ describe("AgentService", () => {
       updatedAt: string;
     };
 
-    expect(config.defaultAgent).toBe("goat");
+    expect(config.defaultAgent).toBe("ceo");
     expect(config.createdAt).toBe("2026-02-01T00:00:00.000Z");
     expect(config.updatedAt).toBe("2026-02-01T00:00:00.000Z");
   });
@@ -218,28 +218,28 @@ describe("AgentService", () => {
   it("is idempotent and does not overwrite existing config.json", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
 
-    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
+    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
 
-    const configPath = path.join(paths.agentsDir, "goat", "config.json");
-    await fileSystem.writeFile(configPath, JSON.stringify({ displayName: "Custom Goat" }, null, 2) + "\n");
+    const configPath = path.join(paths.agentsDir, "ceo", "config.json");
+    await fileSystem.writeFile(configPath, JSON.stringify({ displayName: "Custom CEO" }, null, 2) + "\n");
 
-    const second = await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
+    const second = await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
 
     expect(second.createdPaths).toEqual([]);
     expect(second.skippedPaths.length).toBeGreaterThan(0);
-    expect(await readFile(configPath, "utf-8")).toContain("Custom Goat");
+    expect(await readFile(configPath, "utf-8")).toContain("Custom CEO");
   });
 
   it("updates manager relationship in config.json", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
-    await service.ensureAgent(paths, { id: "cto", displayName: "CTO" }, { type: "manager", reportsTo: "goat" });
+    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    await service.ensureAgent(paths, { id: "cto", displayName: "CTO" }, { type: "manager", reportsTo: "ceo" });
     await service.ensureAgent(paths, { id: "engineer", displayName: "Engineer" });
 
     const result = await service.setAgentManager(paths, "engineer", "cto");
 
     expect(result.agentId).toBe("engineer");
-    expect(result.previousReportsTo).toBe("goat");
+    expect(result.previousReportsTo).toBe("ceo");
     expect(result.reportsTo).toBe("cto");
 
     const config = JSON.parse(await readFile(path.join(paths.agentsDir, "engineer", "config.json"), "utf-8")) as {
@@ -251,8 +251,8 @@ describe("AgentService", () => {
 
   it("rejects manager reassignment that would create a cycle", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
-    await service.ensureAgent(paths, { id: "cto", displayName: "CTO" }, { type: "manager", reportsTo: "goat" });
+    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    await service.ensureAgent(paths, { id: "cto", displayName: "CTO" }, { type: "manager", reportsTo: "ceo" });
     await service.ensureAgent(paths, { id: "engineer", displayName: "Engineer" }, { reportsTo: "cto" });
 
     await expect(service.setAgentManager(paths, "cto", "engineer")).rejects.toThrow("create a cycle");
@@ -271,12 +271,12 @@ describe("AgentService", () => {
     expect(await fileSystem.exists(path.join(paths.agentsDir, "developer"))).toBe(false);
   });
 
-  it("prevents deleting goat", async () => {
+  it("prevents deleting ceo", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
+    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
 
-    await expect(service.removeAgent(paths, "goat")).rejects.toThrow(
-      "Cannot delete goat"
+    await expect(service.removeAgent(paths, "ceo")).rejects.toThrow(
+      "Cannot delete ceo"
     );
   });
 });

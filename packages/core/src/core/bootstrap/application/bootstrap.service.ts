@@ -46,7 +46,7 @@ export class BootstrapService {
 
     const ceo: AgentIdentity = {
       id: DEFAULT_AGENT_ID,
-      displayName: "Goat"
+      displayName: "CEO"
     };
 
     const agentResult = await this.agentService.ensureAgent(paths, ceo, {
@@ -55,7 +55,7 @@ export class BootstrapService {
       skills: ["manager"],
       role: "Head of Organization"
     });
-    const workspaceBootstrapResult = await this.agentService.ensureGoatWorkspaceBootstrap(paths);
+    const workspaceBootstrapResult = await this.agentService.ensureCeoWorkspaceBootstrap(paths);
 
     createdPaths.push(...agentResult.createdPaths);
     skippedPaths.push(...agentResult.skippedPaths);

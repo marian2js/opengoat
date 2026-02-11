@@ -20,31 +20,31 @@ afterEach(async () => {
 });
 
 describe("BootstrapService", () => {
-  it("initializes the full OpenGoat home and goat manager agent", async () => {
+  it("initializes the full OpenGoat home and ceo manager agent", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     const result = await service.initialize();
 
     expect(result.paths.homeDir).toBe(paths.homeDir);
-    expect(result.defaultAgent).toBe("goat");
+    expect(result.defaultAgent).toBe("ceo");
     expect(result.createdPaths.length).toBeGreaterThan(0);
 
     const config = JSON.parse(await readFile(paths.globalConfigJsonPath, "utf-8")) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("goat");
+    expect(config.defaultAgent).toBe("ceo");
 
-    const goatConfig = JSON.parse(
-      await readFile(path.join(paths.agentsDir, "goat", "config.json"), "utf-8")
+    const ceoConfig = JSON.parse(
+      await readFile(path.join(paths.agentsDir, "ceo", "config.json"), "utf-8")
     ) as { runtime?: { adapter?: string } };
-    expect(goatConfig.runtime?.adapter).toBe("openclaw");
+    expect(ceoConfig.runtime?.adapter).toBe("openclaw");
 
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "AGENTS.md"))).toBe(true);
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "SOUL.md"))).toBe(true);
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "skills", "manager", "SKILL.md"))).toBe(true);
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "skills", "board-manager", "SKILL.md"))).toBe(true);
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "skills", "board-individual"))).toBe(false);
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md"))).toBe(false);
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "AGENTS.md"))).toBe(true);
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "SOUL.md"))).toBe(true);
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "skills", "manager", "SKILL.md"))).toBe(true);
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "skills", "board-manager", "SKILL.md"))).toBe(true);
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "skills", "board-individual"))).toBe(false);
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "BOOTSTRAP.md"))).toBe(false);
     expect(await fileSystem.exists(paths.skillsDir)).toBe(false);
   });
 
@@ -59,7 +59,7 @@ describe("BootstrapService", () => {
     expect(second.skippedPaths.length).toBeGreaterThan(0);
   });
 
-  it("forces goat as default even when config was changed", async () => {
+  it("forces ceo as default even when config was changed", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     await fileSystem.ensureDir(paths.homeDir);
@@ -85,7 +85,7 @@ describe("BootstrapService", () => {
       defaultAgent: string;
     };
 
-    expect(config.defaultAgent).toBe("goat");
+    expect(config.defaultAgent).toBe("ceo");
   });
 
   it("repairs config when it is malformed", async () => {
@@ -101,10 +101,10 @@ describe("BootstrapService", () => {
     const config = JSON.parse(await readFile(paths.globalConfigJsonPath, "utf-8")) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("goat");
+    expect(config.defaultAgent).toBe("ceo");
   });
 
-  it("ensures agents index always includes goat", async () => {
+  it("ensures agents index always includes ceo", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     await fileSystem.ensureDir(paths.homeDir);
@@ -128,7 +128,7 @@ describe("BootstrapService", () => {
     const index = JSON.parse(await readFile(paths.agentsIndexJsonPath, "utf-8")) as {
       agents: string[];
     };
-    expect(index.agents).toEqual(["goat", "research"]);
+    expect(index.agents).toEqual(["ceo", "research"]);
   });
 
 });

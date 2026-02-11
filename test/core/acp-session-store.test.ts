@@ -7,14 +7,14 @@ describe("InMemoryAcpSessionStore", () => {
 
     store.put({
       sessionId: "s1",
-      agentId: "goat",
+      agentId: "ceo",
       sessionRef: "main",
       cwd: "/tmp",
       createdAt: 1,
       updatedAt: 1
     });
 
-    expect(store.get("s1")?.agentId).toBe("goat");
+    expect(store.get("s1")?.agentId).toBe("ceo");
 
     store.update("s1", {
       agentId: "developer",

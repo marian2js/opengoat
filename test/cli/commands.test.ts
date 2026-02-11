@@ -27,7 +27,7 @@ describe("CLI commands", () => {
   it("init command prints initialization result", async () => {
     const initialize = vi.fn(async () => ({
       paths: { homeDir: "/tmp/opengoat" },
-      defaultAgent: "goat",
+      defaultAgent: "ceo",
       createdPaths: ["/tmp/opengoat/config.json"],
       skippedPaths: []
     }));
@@ -38,7 +38,7 @@ describe("CLI commands", () => {
     expect(code).toBe(0);
     expect(initialize).toHaveBeenCalledOnce();
     expect(stdout.output()).toContain("OpenGoat home: /tmp/opengoat");
-    expect(stdout.output()).toContain("Default agent: goat");
+    expect(stdout.output()).toContain("Default agent: ceo");
   });
 
   it("agent create validates usage", async () => {
@@ -92,7 +92,7 @@ describe("CLI commands", () => {
         "--role",
         "Developer",
         "--reports-to",
-        "goat",
+        "ceo",
         "--skill",
         "research",
         "--skill",
@@ -104,7 +104,7 @@ describe("CLI commands", () => {
     expect(code).toBe(0);
     expect(createAgent).toHaveBeenCalledWith("Research Analyst", {
       type: "individual",
-      reportsTo: "goat",
+      reportsTo: "ceo",
       skills: ["docs", "research"],
       role: "Developer"
     });
@@ -192,7 +192,7 @@ describe("CLI commands", () => {
   it("agent set-manager updates reports-to relationship", async () => {
     const setAgentManager = vi.fn(async () => ({
       agentId: "engineer",
-      previousReportsTo: "goat",
+      previousReportsTo: "ceo",
       reportsTo: "cto",
       updatedPaths: ["/tmp/workspaces/engineer/AGENTS.md", "/tmp/agents/engineer/config.json"]
     }));
@@ -203,7 +203,7 @@ describe("CLI commands", () => {
     expect(code).toBe(0);
     expect(setAgentManager).toHaveBeenCalledWith("engineer", "cto");
     expect(stdout.output()).toContain("Updated manager: engineer");
-    expect(stdout.output()).toContain("Previous reports-to: goat");
+    expect(stdout.output()).toContain("Previous reports-to: ceo");
     expect(stdout.output()).toContain("Current reports-to: cto");
   });
 
@@ -212,7 +212,7 @@ describe("CLI commands", () => {
       .fn()
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
-        { id: "goat", displayName: "Goat", role: "Head of Organization" },
+        { id: "ceo", displayName: "CEO", role: "Head of Organization" },
         { id: "research", displayName: "research", role: "Developer" }
       ]);
 
@@ -224,16 +224,16 @@ describe("CLI commands", () => {
     const second = createContext({ listAgents });
     const secondCode = await agentListCommand.run([], second.context);
     expect(secondCode).toBe(0);
-    expect(second.stdout.output()).toContain("goat [Head of Organization]\n");
+    expect(second.stdout.output()).toContain("ceo [Head of Organization]\n");
     expect(second.stdout.output()).toContain("research [Developer]\n");
   });
 
-  it("agent command defaults to goat when agent id is omitted", async () => {
+  it("agent command defaults to ceo when agent id is omitted", async () => {
     const runAgent = vi.fn(async () => ({
       code: 0,
       stdout: "ok\n",
       stderr: "",
-      agentId: "goat",
+      agentId: "ceo",
       providerId: "openclaw"
     }));
 
@@ -242,7 +242,7 @@ describe("CLI commands", () => {
 
     expect(code).toBe(0);
     expect(runAgent).toHaveBeenCalledWith(
-      "goat",
+      "ceo",
       expect.objectContaining({
         message: "hello"
       })
@@ -272,7 +272,7 @@ describe("CLI commands", () => {
     const secondCode = await agentCommand.run(["--help"], second.context);
     expect(secondCode).toBe(0);
     expect(second.stdout.output()).toContain("opengoat agent [agent-id]");
-    expect(second.stdout.output()).toContain("agent-id defaults to goat");
+    expect(second.stdout.output()).toContain("agent-id defaults to ceo");
     expect(second.stdout.output()).toContain("agent last-action");
   });
 
@@ -281,7 +281,7 @@ describe("CLI commands", () => {
       code: 0,
       stdout: "",
       stderr: "",
-      agentId: "goat",
+      agentId: "ceo",
       providerId: "openclaw"
     }));
 
@@ -293,7 +293,7 @@ describe("CLI commands", () => {
 
     expect(code).toBe(0);
     expect(runAgent).toHaveBeenCalledWith(
-      "goat",
+      "ceo",
       expect.objectContaining({
         cwd: "/tmp/project"
       })
@@ -324,14 +324,14 @@ describe("CLI commands", () => {
   it("agent last-action supports --json and empty state", async () => {
     const getAgentLastAction = vi.fn(async () => null);
     const empty = createContext({ getAgentLastAction });
-    const emptyCode = await agentLastActionCommand.run(["goat"], empty.context);
+    const emptyCode = await agentLastActionCommand.run(["ceo"], empty.context);
     expect(emptyCode).toBe(0);
-    expect(empty.stdout.output()).toContain('No AI actions found for agent "goat".');
+    expect(empty.stdout.output()).toContain('No AI actions found for agent "ceo".');
 
     const jsonResult = createContext({
       getAgentLastAction: vi.fn(async () => ({
-        agentId: "goat",
-        sessionKey: "agent:goat:main",
+        agentId: "ceo",
+        sessionKey: "agent:ceo:main",
         sessionId: "session-2",
         transcriptPath: "/tmp/session-2.jsonl",
         timestamp: Date.parse("2026-02-10T10:05:00.000Z")
@@ -339,7 +339,7 @@ describe("CLI commands", () => {
     });
     const jsonCode = await agentLastActionCommand.run(["--json"], jsonResult.context);
     expect(jsonCode).toBe(0);
-    expect(jsonResult.stdout.output()).toContain('"agentId": "goat"');
+    expect(jsonResult.stdout.output()).toContain('"agentId": "ceo"');
     expect(jsonResult.stdout.output()).toContain('"iso": "2026-02-10T10:05:00.000Z"');
   });
 });

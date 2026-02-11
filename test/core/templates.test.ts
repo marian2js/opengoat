@@ -11,22 +11,22 @@ describe("default templates", () => {
 
     expect(config).toEqual({
       schemaVersion: 1,
-      defaultAgent: "goat",
+      defaultAgent: "ceo",
       createdAt: "2026-02-06T00:00:00.000Z",
       updatedAt: "2026-02-06T00:00:00.000Z"
     });
   });
 
   it("renders agents index payload", () => {
-    const index = renderAgentsIndex("2026-02-06T00:00:00.000Z", ["goat", "research"]);
+    const index = renderAgentsIndex("2026-02-06T00:00:00.000Z", ["ceo", "research"]);
 
     expect(index.schemaVersion).toBe(1);
-    expect(index.agents).toEqual(["goat", "research"]);
+    expect(index.agents).toEqual(["ceo", "research"]);
     expect(index.updatedAt).toBe("2026-02-06T00:00:00.000Z");
   });
 
   it("renders internal agent config templates", () => {
-    const identity = { id: "goat", displayName: "Goat" };
+    const identity = { id: "ceo", displayName: "CEO" };
     const internalConfig = renderInternalAgentConfig(identity) as {
       role: string;
       organization: { type: string; reportsTo: string | null };

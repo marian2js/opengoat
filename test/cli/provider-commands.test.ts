@@ -45,7 +45,7 @@ describe("provider CLI commands", () => {
   it("agent provider get validates and passes through", async () => {
     const runOpenClaw = vi.fn(async () => ({
       code: 0,
-      stdout: "goat\topenclaw\n",
+      stdout: "ceo\topenclaw\n",
       stderr: ""
     }));
     const { context, stderr } = createContext({ runOpenClaw });
@@ -54,9 +54,9 @@ describe("provider CLI commands", () => {
     expect(stderr.output()).toContain("Usage: opengoat agent provider get");
 
     const ok = createContext({ runOpenClaw });
-    expect(await agentProviderGetCommand.run(["goat"], ok.context)).toBe(0);
-    expect(runOpenClaw).toHaveBeenLastCalledWith(["agents", "provider", "get", "goat"]);
-    expect(ok.stdout.output()).toContain("goat\topenclaw");
+    expect(await agentProviderGetCommand.run(["ceo"], ok.context)).toBe(0);
+    expect(runOpenClaw).toHaveBeenLastCalledWith(["agents", "provider", "get", "ceo"]);
+    expect(ok.stdout.output()).toContain("ceo\topenclaw");
   });
 
   it("agent provider set validates and passes through", async () => {
@@ -67,12 +67,12 @@ describe("provider CLI commands", () => {
     }));
 
     const first = createContext({ runOpenClaw });
-    expect(await agentProviderSetCommand.run(["goat"], first.context)).toBe(1);
+    expect(await agentProviderSetCommand.run(["ceo"], first.context)).toBe(1);
     expect(first.stderr.output()).toContain("Usage: opengoat agent provider set");
 
     const second = createContext({ runOpenClaw });
-    expect(await agentProviderSetCommand.run(["goat", "openclaw"], second.context)).toBe(0);
-    expect(runOpenClaw).toHaveBeenLastCalledWith(["agents", "provider", "set", "goat", "openclaw"]);
+    expect(await agentProviderSetCommand.run(["ceo", "openclaw"], second.context)).toBe(0);
+    expect(runOpenClaw).toHaveBeenLastCalledWith(["agents", "provider", "set", "ceo", "openclaw"]);
     expect(second.stdout.output()).toContain("updated");
   });
 
@@ -84,7 +84,7 @@ describe("provider CLI commands", () => {
     expect(noArgs.stderr.output()).toContain("Missing <agent-id>");
 
     const missingMessage = createContext({ runAgent });
-    expect(await agentRunCommand.run(["goat"], missingMessage.context)).toBe(1);
+    expect(await agentRunCommand.run(["ceo"], missingMessage.context)).toBe(1);
     expect(missingMessage.stderr.output()).toContain("--message is required");
 
     expect(runAgent).not.toHaveBeenCalled();
@@ -95,19 +95,19 @@ describe("provider CLI commands", () => {
       code: 0,
       stdout: "done\n",
       stderr: "",
-      agentId: "goat",
+      agentId: "ceo",
       providerId: "openclaw"
     }));
 
     const first = createContext({ runAgent });
     const code = await agentRunCommand.run(
-      ["goat", "--message", "hi", "--model", "o3", "--cwd", "/tmp/project", "--", "--foo", "bar"],
+      ["ceo", "--message", "hi", "--model", "o3", "--cwd", "/tmp/project", "--", "--foo", "bar"],
       first.context
     );
 
     expect(code).toBe(0);
     expect(runAgent).toHaveBeenCalledWith(
-      "goat",
+      "ceo",
       expect.objectContaining({
         message: "hi",
         model: "o3",
@@ -120,12 +120,12 @@ describe("provider CLI commands", () => {
       code: 2,
       stdout: "",
       stderr: "failed\n",
-      agentId: "goat",
+      agentId: "ceo",
       providerId: "openclaw"
     }));
 
     const second = createContext({ runAgent: failingRunAgent });
-    const failCode = await agentRunCommand.run(["goat", "--message", "hi", "--no-stream"], second.context);
+    const failCode = await agentRunCommand.run(["ceo", "--message", "hi", "--no-stream"], second.context);
 
     expect(failCode).toBe(2);
     expect(second.stderr.output()).toContain("Runtime run failed");
@@ -136,15 +136,15 @@ describe("provider CLI commands", () => {
       code: 1,
       stdout: "",
       stderr: "HTTP 401: invalid_api_key\n",
-      agentId: "goat",
+      agentId: "ceo",
       providerId: "openclaw"
     }));
 
     const { context, stderr } = createContext({ runAgent });
-    const code = await agentRunCommand.run(["goat", "--message", "hi"], context);
+    const code = await agentRunCommand.run(["ceo", "--message", "hi"], context);
 
     expect(code).toBe(1);
     expect(stderr.output()).toContain("HTTP 401: invalid_api_key");
-    expect(stderr.output()).toContain("Runtime run failed for goat (openclaw).");
+    expect(stderr.output()).toContain("Runtime run failed for ceo (openclaw).");
   });
 });

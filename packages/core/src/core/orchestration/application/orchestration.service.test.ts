@@ -30,9 +30,9 @@ describe("OrchestrationService manager runtime", () => {
     const providerService = {
       invokeAgent: vi.fn(async () => ({
         code: 0,
-        stdout: "hello from goat\n",
+        stdout: "hello from ceo\n",
         stderr: "",
-        agentId: "goat",
+        agentId: "ceo",
         providerId: "openclaw"
       }))
     };
@@ -41,20 +41,20 @@ describe("OrchestrationService manager runtime", () => {
       prepareRunSession: vi.fn(async () => ({
         enabled: true,
         info: {
-          agentId: "goat",
-          sessionKey: "agent:goat:main",
+          agentId: "ceo",
+          sessionKey: "agent:ceo:main",
           sessionId: "session-1",
-          transcriptPath: path.join(paths.sessionsDir, "goat", "session-1.jsonl"),
-          workspacePath: path.join(paths.workspacesDir, "goat"),
+          transcriptPath: path.join(paths.sessionsDir, "ceo", "session-1.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "ceo"),
           workingPath: tempDir,
           isNewSession: true
         },
         compactionApplied: false
       })),
       recordAssistantReply: vi.fn(async () => ({
-        sessionKey: "agent:goat:main",
+        sessionKey: "agent:ceo:main",
         sessionId: "session-1",
-        transcriptPath: path.join(paths.sessionsDir, "goat", "session-1.jsonl"),
+        transcriptPath: path.join(paths.sessionsDir, "ceo", "session-1.jsonl"),
         applied: false,
         compactedMessages: 0
       }))
@@ -62,21 +62,21 @@ describe("OrchestrationService manager runtime", () => {
 
     const service = new OrchestrationService({
       providerService: providerService as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["goat"]) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["ceo"]) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
       nowIso: () => "2026-02-10T10:00:00.000Z"
     });
 
-    const result = await service.runAgent(paths, "goat", {
+    const result = await service.runAgent(paths, "ceo", {
       message: "hello",
       cwd: tempDir
     });
 
     expect(providerService.invokeAgent).toHaveBeenCalledWith(
       paths,
-      "goat",
+      "ceo",
       expect.objectContaining({
         providerSessionId: "session-1"
       }),
@@ -84,10 +84,10 @@ describe("OrchestrationService manager runtime", () => {
     );
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("hello from goat");
+    expect(result.stdout).toContain("hello from ceo");
     expect(result.orchestration?.mode).toBe("single-agent");
     expect(result.orchestration?.steps).toEqual([]);
-    expect(result.orchestration?.sessionGraph.nodes[0]?.agentId).toBe("goat");
+    expect(result.orchestration?.sessionGraph.nodes[0]?.agentId).toBe("ceo");
 
     const trace = JSON.parse(await readFile(result.tracePath, "utf8")) as {
       orchestration?: { mode?: string; steps?: unknown[] };
@@ -116,7 +116,7 @@ describe("OrchestrationService manager runtime", () => {
           providerId: "openclaw"
         }))
       } as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["goat", "developer"]) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["ceo", "developer"]) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
@@ -165,14 +165,14 @@ function createManifestServiceStub(agentIds: string[]) {
           id: agentId,
           name: agentId,
           description: `${agentId} agent`,
-          type: agentId === "goat" ? "manager" : "individual",
-          reportsTo: agentId === "goat" ? null : "goat",
+          type: agentId === "ceo" ? "manager" : "individual",
+          reportsTo: agentId === "ceo" ? null : "ceo",
           discoverable: true,
           tags: [],
-          skills: agentId === "goat" ? ["manager"] : [],
+          skills: agentId === "ceo" ? ["manager"] : [],
           delegation: {
             canReceive: true,
-            canDelegate: agentId === "goat"
+            canDelegate: agentId === "ceo"
           },
           priority: 50
         }

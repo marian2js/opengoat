@@ -5,10 +5,10 @@ This document describes the current organization-first runtime model.
 ## Runtime Premise
 
 - all OpenGoat agents are OpenClaw agents
-- `goat` is the default manager (head/CEO)
+- `ceo` is the default manager (head/CEO)
 - hierarchy is explicit in agent metadata
 - manager behavior is skill-driven (`manager` skill)
-- OpenClaw owns workspace bootstrap semantics; OpenGoat pre-seeds `goat` `AGENTS.md` + `SOUL.md` and removes `BOOTSTRAP.md`
+- OpenClaw owns workspace bootstrap semantics; OpenGoat pre-seeds `ceo` `AGENTS.md` + `SOUL.md` and removes `BOOTSTRAP.md`
 - every manager has a default board; if a manager creates a task without an explicit board id, OpenGoat routes it to that default board
 - default manager boards cannot be deleted
 
@@ -16,7 +16,7 @@ This document describes the current organization-first runtime model.
 
 For `opengoat agent ...`:
 
-1. resolve target agent (fallback to `goat` if missing)
+1. resolve target agent (fallback to `ceo` if missing)
 2. prepare/resolve the agent session id
 3. invoke that OpenClaw agent directly with `--session-id <opengoat-session-id>`
 4. record assistant reply into session transcript

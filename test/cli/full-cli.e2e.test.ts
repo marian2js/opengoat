@@ -37,7 +37,7 @@ describe("CLI full e2e smoke", () => {
 
     await expectOk(
       await runBinary(["init"], opengoatHome, env),
-      "Default agent: goat",
+      "Default agent: ceo",
     );
     await expectOk(
       await runBinary(
@@ -95,11 +95,11 @@ describe("CLI full e2e smoke", () => {
     );
     await expectOk(
       await runBinary(
-        ["agent", "set-manager", "developer", "goat"],
+        ["agent", "set-manager", "developer", "ceo"],
         opengoatHome,
         env,
       ),
-      "Current reports-to: goat",
+      "Current reports-to: ceo",
     );
 
     await expectOk(
@@ -195,7 +195,7 @@ describe("CLI full e2e smoke", () => {
           "install",
           "helper",
           "--agent",
-          "goat",
+          "ceo",
           "--from",
           skillSourcePath,
         ],
@@ -205,7 +205,7 @@ describe("CLI full e2e smoke", () => {
       "Installed skill: helper",
     );
     await expectOk(
-      await runBinary(["skill", "list", "--agent", "goat"], opengoatHome, env),
+      await runBinary(["skill", "list", "--agent", "ceo"], opengoatHome, env),
       "helper",
     );
     await expectOk(
@@ -218,12 +218,12 @@ describe("CLI full e2e smoke", () => {
       "openclaw",
     );
     await expectOk(
-      await runBinary(["agent", "provider", "get", "goat"], opengoatHome, env),
-      "goat\topenclaw",
+      await runBinary(["agent", "provider", "get", "ceo"], opengoatHome, env),
+      "ceo\topenclaw",
     );
     await expectOk(
       await runBinary(
-        ["agent", "provider", "set", "goat", "openclaw"],
+        ["agent", "provider", "set", "ceo", "openclaw"],
         opengoatHome,
         env,
       ),
@@ -245,7 +245,7 @@ describe("CLI full e2e smoke", () => {
     );
     await expectOk(
       await runBinary(["agent", "list"], opengoatHome, env),
-      "goat",
+      "ceo",
     );
 
     const calls = await readStubCalls(stubLogPath);
@@ -259,11 +259,11 @@ describe("CLI full e2e smoke", () => {
       ),
     ).toBe(true);
     expect(
-      flattened.some((entry) => entry.includes("agents provider get goat")),
+      flattened.some((entry) => entry.includes("agents provider get ceo")),
     ).toBe(true);
     expect(
       flattened.some((entry) =>
-        entry.includes("agents provider set goat openclaw"),
+        entry.includes("agents provider set ceo openclaw"),
       ),
     ).toBe(true);
     expect(flattened.some((entry) => entry.includes("agent --agent developer"))).toBe(
@@ -308,15 +308,15 @@ async function writeScenarioFixture(root: string): Promise<string> {
       {
         name: "scripted-smoke",
         message: "Confirm scripted scenario execution.",
-        entryAgentId: "goat",
+        entryAgentId: "ceo",
         scripted: {
           agentReplies: {
-            goat: "Scripted response from goat.",
+            ceo: "Scripted response from ceo.",
           },
         },
         assertions: {
           mustSucceed: true,
-          stdoutIncludes: ["Scripted response from goat"],
+          stdoutIncludes: ["Scripted response from ceo"],
         },
       },
       null,

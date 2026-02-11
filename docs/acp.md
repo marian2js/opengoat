@@ -16,7 +16,7 @@ Reference: [Agent Client Protocol](https://agentclientprotocol.com/get-started/i
 
 OpenGoat remains a manager runtime with ACP surface, now OpenClaw-first:
 
-- default entry agent is `goat`
+- default entry agent is `ceo`
 - agent execution runtime is OpenClaw
 - direct agent invocation + session semantics are preserved
 
@@ -63,5 +63,5 @@ Accepted aliases in request `_meta`:
 
 ```bash
 ./bin/opengoat acp --help
-./bin/opengoat acp --agent goat --verbose
+./bin/opengoat acp --agent ceo --verbose
 ```

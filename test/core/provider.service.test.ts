@@ -42,18 +42,18 @@ describe("ProviderService (OpenClaw runtime)", () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
     const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, "goat");
+    await seedAgent(fileSystem, paths, "ceo");
 
     const provider = new FakeOpenClawProvider();
     const service = createProviderService(fileSystem, createRegistry(provider));
 
-    const result = await service.invokeAgent(paths, "goat", { message: "hello" });
+    const result = await service.invokeAgent(paths, "ceo", { message: "hello" });
 
     expect(result.providerId).toBe("openclaw");
     expect(provider.lastInvoke?.cwd).toBeUndefined();
     expect(provider.lastInvoke?.systemPrompt).toBeUndefined();
     expect(provider.lastInvoke?.message).toBe("hello");
-    expect(provider.lastInvoke?.agent).toBe("goat");
+    expect(provider.lastInvoke?.agent).toBe("ceo");
   });
 
   it("stores and resolves external gateway config", async () => {
@@ -168,7 +168,7 @@ async function seedAgent(fileSystem: NodeFileSystem, paths: OpenGoatPaths, agent
     path.join(paths.agentsDir, agentId, "config.json"),
     JSON.stringify(
       {
-        displayName: "Goat",
+        displayName: "CEO",
         prompt: {
           bootstrapFiles: ["AGENTS.md"]
         },

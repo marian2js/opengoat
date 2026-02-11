@@ -44,7 +44,7 @@ describe("skill commands", () => {
     const code = await skillListCommand.run([], context);
 
     expect(code).toBe(0);
-    expect(listSkills).toHaveBeenCalledWith("goat");
+    expect(listSkills).toHaveBeenCalledWith("ceo");
     expect(stdout.output()).toContain("code-review");
   });
 

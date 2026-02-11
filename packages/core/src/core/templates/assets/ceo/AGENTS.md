@@ -1,10 +1,10 @@
-# AGENTS.md - OpenGoat Goat Workspace
+# AGENTS.md - OpenGoat CEO Workspace
 
-This workspace is pre-seeded by OpenGoat so `goat` can run immediately without first-run bootstrap prompts.
+This workspace is pre-seeded by OpenGoat so `ceo` can run immediately without first-run bootstrap prompts.
 
 ## Role
 
-- Agent id: `goat`
+- Agent id: `ceo`
 - Role: Head of Organization
 - Runtime: OpenClaw
 

@@ -153,10 +153,10 @@ describe("OpenGoat UI server API", () => {
 
   it("creates project session through the api", async () => {
     const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(async (_agentId, options): Promise<SessionRunInfo> => {
-      const sessionKey = options?.sessionRef ?? "agent:goat:main";
+      const sessionKey = options?.sessionRef ?? "agent:ceo:main";
       const isProject = sessionKey.startsWith("project:");
       return {
-        agentId: "goat",
+        agentId: "ceo",
         sessionKey,
         sessionId: isProject ? "project-session-1" : "workspace-session-1",
         transcriptPath: "/tmp/transcript.jsonl",
@@ -165,7 +165,7 @@ describe("OpenGoat UI server API", () => {
         isNewSession: !isProject
       };
     });
-    const renameSession = vi.fn<NonNullable<OpenClawUiService["renameSession"]>>(async (_agentId, title = "Session", sessionRef = "agent:goat:main"): Promise<SessionSummary> => {
+    const renameSession = vi.fn<NonNullable<OpenClawUiService["renameSession"]>>(async (_agentId, title = "Session", sessionRef = "agent:ceo:main"): Promise<SessionSummary> => {
       return {
         sessionKey: sessionRef,
         sessionId: sessionRef.startsWith("project:") ? "project-session-1" : "workspace-session-1",
@@ -216,12 +216,12 @@ describe("OpenGoat UI server API", () => {
 
   it("creates project session through legacy core fallback when prepareSession is unavailable", async () => {
     const prepareRunSession = vi.fn(async (_paths: unknown, _agentId: string, request: { sessionRef?: string; workingPath?: string }): Promise<{ enabled: true; info: SessionRunInfo }> => {
-      const sessionKey = request.sessionRef ?? "agent:goat:main";
+      const sessionKey = request.sessionRef ?? "agent:ceo:main";
       const isProject = sessionKey.startsWith("project:");
       return {
         enabled: true,
         info: {
-          agentId: "goat",
+          agentId: "ceo",
           sessionKey,
           sessionId: isProject ? "legacy-project-session-1" : "legacy-workspace-session-1",
           transcriptPath: "/tmp/transcript.jsonl",
@@ -289,7 +289,7 @@ describe("OpenGoat UI server API", () => {
   it("creates a nested workspace session and assigns a default title", async () => {
     const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(async (): Promise<SessionRunInfo> => {
       return {
-        agentId: "goat",
+        agentId: "ceo",
         sessionKey: "workspace:tmp",
         sessionId: "session-2",
         transcriptPath: "/tmp/transcript-2.jsonl",
@@ -386,7 +386,7 @@ describe("OpenGoat UI server API", () => {
       }
     });
     expect(renameResponse.statusCode).toBe(200);
-    expect(renameSession).toHaveBeenCalledWith("goat", "Renamed", "project:tmp");
+    expect(renameSession).toHaveBeenCalledWith("ceo", "Renamed", "project:tmp");
 
     const deleteResponse = await activeServer.inject({
       method: "POST",
@@ -397,28 +397,28 @@ describe("OpenGoat UI server API", () => {
     });
     expect(deleteResponse.statusCode).toBe(200);
     expect(removeSession).toHaveBeenCalledTimes(1);
-    expect(removeSession).toHaveBeenCalledWith("goat", "project:tmp");
+    expect(removeSession).toHaveBeenCalledWith("ceo", "project:tmp");
 
     const removeSessionResponse = await activeServer.inject({
       method: "POST",
       url: "/api/sessions/remove",
       payload: {
-        sessionRef: "agent:goat:main"
+        sessionRef: "agent:ceo:main"
       }
     });
     expect(removeSessionResponse.statusCode).toBe(200);
-    expect(removeSession).toHaveBeenCalledWith("goat", "agent:goat:main");
+    expect(removeSession).toHaveBeenCalledWith("ceo", "agent:ceo:main");
 
     const renameSessionResponse = await activeServer.inject({
       method: "POST",
       url: "/api/sessions/rename",
       payload: {
-        sessionRef: "agent:goat:main",
+        sessionRef: "agent:ceo:main",
         name: "Renamed Session"
       }
     });
     expect(renameSessionResponse.statusCode).toBe(200);
-    expect(renameSession).toHaveBeenCalledWith("goat", "Renamed Session", "agent:goat:main");
+    expect(renameSession).toHaveBeenCalledWith("ceo", "Renamed Session", "agent:ceo:main");
   });
 
   it("sends a message to an existing session", async () => {
@@ -449,7 +449,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/sessions/message",
       payload: {
-        agentId: "goat",
+        agentId: "ceo",
         sessionRef: "workspace:tmp",
         workingPath: "/tmp",
         message: "hello"
@@ -457,7 +457,7 @@ describe("OpenGoat UI server API", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(runAgent).toHaveBeenCalledWith("goat", {
+    expect(runAgent).toHaveBeenCalledWith("ceo", {
       message: "hello",
       sessionRef: "workspace:tmp",
       cwd: "/tmp"
@@ -473,7 +473,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/session/message",
       payload: {
-        agentId: "goat",
+        agentId: "ceo",
         sessionRef: "workspace:tmp",
         workingPath: "/tmp",
         message: "hello alias"
@@ -510,7 +510,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/sessions/message",
       payload: {
-        agentId: "goat",
+        agentId: "ceo",
         sessionRef: "workspace:tmp",
         workingPath: "/tmp",
         images: [
@@ -524,7 +524,7 @@ describe("OpenGoat UI server API", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(runAgent).toHaveBeenCalledWith("goat", {
+    expect(runAgent).toHaveBeenCalledWith("ceo", {
       message: "Please analyze the attached image.",
       sessionRef: "workspace:tmp",
       cwd: "/tmp",
@@ -582,11 +582,11 @@ describe("OpenGoat UI server API", () => {
 
     const response = await activeServer.inject({
       method: "GET",
-      url: "/api/sessions/history?agentId=goat&sessionRef=workspace%3Atmp&limit=50"
+      url: "/api/sessions/history?agentId=ceo&sessionRef=workspace%3Atmp&limit=50"
     });
 
     expect(response.statusCode).toBe(200);
-    expect(getSessionHistory).toHaveBeenCalledWith("goat", {
+    expect(getSessionHistory).toHaveBeenCalledWith("ceo", {
       sessionRef: "workspace:tmp",
       limit: 50
     });
@@ -608,7 +608,7 @@ describe("OpenGoat UI server API", () => {
       boardId: "board-roadmap",
       createdAt: "2026-02-11T08:00:00.000Z",
       workspace: "~",
-      owner: "goat",
+      owner: "ceo",
       assignedTo: "developer",
       title: "Plan roadmap",
       description: "Draft roadmap milestones",
@@ -621,7 +621,7 @@ describe("OpenGoat UI server API", () => {
       boardId: "board-roadmap",
       title: "Roadmap",
       createdAt: "2026-02-11T08:00:00.000Z",
-      owner: "goat",
+      owner: "ceo",
       tasks: [baseTask]
     };
 
@@ -641,7 +641,7 @@ describe("OpenGoat UI server API", () => {
         boardId: "board-new",
         title: options.title,
         createdAt: "2026-02-11T08:01:00.000Z",
-        owner: "goat"
+        owner: "ceo"
       };
     });
     const updateBoard = vi.fn<NonNullable<OpenClawUiService["updateBoard"]>>(async (_actorId, boardId, options) => {
@@ -649,7 +649,7 @@ describe("OpenGoat UI server API", () => {
         boardId,
         title: options.title ?? "Roadmap",
         createdAt: "2026-02-11T08:00:00.000Z",
-        owner: "goat"
+        owner: "ceo"
       };
     });
     const listTasks = vi.fn<NonNullable<OpenClawUiService["listTasks"]>>(async () => [baseTask]);
@@ -659,7 +659,7 @@ describe("OpenGoat UI server API", () => {
         boardId,
         title: options.title,
         description: options.description,
-        assignedTo: options.assignedTo ?? "goat",
+        assignedTo: options.assignedTo ?? "ceo",
         status: options.status ?? "todo",
         workspace: options.workspace ?? "~"
       };
@@ -742,40 +742,40 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/boards",
       payload: {
-        actorId: "goat",
+        actorId: "ceo",
         title: "Platform"
       }
     });
     expect(createBoardResponse.statusCode).toBe(200);
-    expect(createBoard).toHaveBeenCalledWith("goat", { title: "Platform" });
+    expect(createBoard).toHaveBeenCalledWith("ceo", { title: "Platform" });
 
     const createBoardAliasResponse = await activeServer.inject({
       method: "POST",
       url: "/api/board/create",
       payload: {
-        actorId: "goat",
+        actorId: "ceo",
         title: "Platform Alias"
       }
     });
     expect(createBoardAliasResponse.statusCode).toBe(200);
-    expect(createBoard).toHaveBeenCalledWith("goat", { title: "Platform Alias" });
+    expect(createBoard).toHaveBeenCalledWith("ceo", { title: "Platform Alias" });
 
     const updateBoardResponse = await activeServer.inject({
       method: "POST",
       url: "/api/boards/board-roadmap",
       payload: {
-        actorId: "goat",
+        actorId: "ceo",
         title: "Roadmap v2"
       }
     });
     expect(updateBoardResponse.statusCode).toBe(200);
-    expect(updateBoard).toHaveBeenCalledWith("goat", "board-roadmap", { title: "Roadmap v2" });
+    expect(updateBoard).toHaveBeenCalledWith("ceo", "board-roadmap", { title: "Roadmap v2" });
 
     const createTaskResponse = await activeServer.inject({
       method: "POST",
       url: "/api/tasks",
       payload: {
-        actorId: "goat",
+        actorId: "ceo",
         boardId: "board-roadmap",
         title: "Design API",
         description: "Document API contracts",
@@ -785,7 +785,7 @@ describe("OpenGoat UI server API", () => {
       }
     });
     expect(createTaskResponse.statusCode).toBe(200);
-    expect(createTask).toHaveBeenCalledWith("goat", "board-roadmap", {
+    expect(createTask).toHaveBeenCalledWith("ceo", "board-roadmap", {
       title: "Design API",
       description: "Document API contracts",
       assignedTo: "developer",
@@ -869,7 +869,7 @@ function createMockService(): OpenClawUiService {
     listSessions: async (): Promise<SessionSummary[]> => [],
     listSkills: async (): Promise<ResolvedSkill[]> => [],
     listGlobalSkills: async (): Promise<ResolvedSkill[]> => [],
-    renameSession: async (_agentId, title = "Session", sessionRef = "agent:goat:main"): Promise<SessionSummary> => {
+    renameSession: async (_agentId, title = "Session", sessionRef = "agent:ceo:main"): Promise<SessionSummary> => {
       return {
         sessionKey: sessionRef,
         sessionId: "session-1",
@@ -884,7 +884,7 @@ function createMockService(): OpenClawUiService {
         compactionCount: 0
       };
     },
-    removeSession: async (_agentId, sessionRef = "agent:goat:main"): Promise<{
+    removeSession: async (_agentId, sessionRef = "agent:ceo:main"): Promise<{
       sessionKey: string;
       sessionId: string;
       title: string;
@@ -899,8 +899,8 @@ function createMockService(): OpenClawUiService {
     },
     prepareSession: async (): Promise<SessionRunInfo> => {
       return {
-        agentId: "goat",
-        sessionKey: "agent:goat:main",
+        agentId: "ceo",
+        sessionKey: "agent:ceo:main",
         sessionId: "session-1",
         transcriptPath: "/tmp/transcript.jsonl",
         workspacePath: "/tmp/workspace",

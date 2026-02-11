@@ -34,16 +34,16 @@ export function renderAgentsIndex(nowIso: string, agents: string[]): AgentsIndex
   };
 }
 
-export function renderGoatAgentsMarkdown(): string {
-  return readMarkdownTemplate("goat/AGENTS.md");
+export function renderCeoAgentsMarkdown(): string {
+  return readMarkdownTemplate("ceo/AGENTS.md");
 }
 
-export function renderGoatSoulMarkdown(): string {
-  return readMarkdownTemplate("goat/SOUL.md");
+export function renderCeoSoulMarkdown(): string {
+  return readMarkdownTemplate("ceo/SOUL.md");
 }
 
 export function renderManagerSkillMarkdown(): string {
-  return readMarkdownTemplate("goat/skills/manager/SKILL.md");
+  return readMarkdownTemplate("ceo/skills/manager/SKILL.md");
 }
 
 export function renderBoardManagerSkillMarkdown(): string {
@@ -58,11 +58,11 @@ export function renderInternalAgentConfig(
   agent: AgentIdentity,
   options: AgentTemplateOptions = {}
 ): Record<string, unknown> {
-  const isGoat = isDefaultAgentId(agent.id);
-  const type = options.type ?? (isGoat ? "manager" : "individual");
+  const isCeo = isDefaultAgentId(agent.id);
+  const type = options.type ?? (isCeo ? "manager" : "individual");
   const role = resolveAgentRole(agent.id, type, options.role ?? agent.role);
   const reportsTo =
-    options.reportsTo === undefined ? (isGoat ? null : DEFAULT_AGENT_ID) : options.reportsTo;
+    options.reportsTo === undefined ? (isCeo ? null : DEFAULT_AGENT_ID) : options.reportsTo;
   const assignedSkills = dedupe(options.skills ?? ROLE_SKILLS[type]);
 
   return {

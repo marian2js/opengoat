@@ -26,11 +26,11 @@ describe("BoardService", () => {
   it("allows only managers to create boards", async () => {
     const harness = await createHarness();
 
-    const board = await harness.boardService.createBoard(harness.paths, "goat", {
+    const board = await harness.boardService.createBoard(harness.paths, "ceo", {
       title: "Core Planning"
     });
 
-    expect(board.owner).toBe("goat");
+    expect(board.owner).toBe("ceo");
 
     await expect(
       harness.boardService.createBoard(harness.paths, "engineer", {
@@ -42,11 +42,11 @@ describe("BoardService", () => {
   it("allows managers to assign tasks only to direct reportees", async () => {
     const harness = await createHarness();
 
-    const board = await harness.boardService.createBoard(harness.paths, "goat", {
+    const board = await harness.boardService.createBoard(harness.paths, "ceo", {
       title: "Leadership"
     });
 
-    const allowed = await harness.boardService.createTask(harness.paths, "goat", board.boardId, {
+    const allowed = await harness.boardService.createTask(harness.paths, "ceo", board.boardId, {
       title: "Define roadmap",
       description: "Draft Q2 roadmap",
       assignedTo: "cto"
@@ -55,9 +55,9 @@ describe("BoardService", () => {
     expect(allowed.assignedTo).toBe("cto");
 
     await expect(
-      harness.boardService.createTask(harness.paths, "goat", board.boardId, {
+      harness.boardService.createTask(harness.paths, "ceo", board.boardId, {
         title: "Deep engineering task",
-        description: "Should fail because engineer is not a direct report of goat",
+        description: "Should fail because engineer is not a direct report of ceo",
         assignedTo: "engineer"
       })
     ).rejects.toThrow("Managers can only assign tasks to their direct reportees");
@@ -66,16 +66,16 @@ describe("BoardService", () => {
   it("creates a default board for managers and uses it when board id is omitted", async () => {
     const harness = await createHarness();
 
-    const task = await harness.boardService.createTask(harness.paths, "goat", undefined, {
+    const task = await harness.boardService.createTask(harness.paths, "ceo", undefined, {
       title: "Shape roadmap",
       description: "Define scope for next cycle"
     });
 
     const boards = await harness.boardService.listBoards(harness.paths);
-    const goatBoards = boards.filter((board) => board.owner === "goat");
+    const ceoBoards = boards.filter((board) => board.owner === "ceo");
 
-    expect(goatBoards).toHaveLength(1);
-    expect(task.boardId).toBe(goatBoards[0]?.boardId);
+    expect(ceoBoards).toHaveLength(1);
+    expect(task.boardId).toBe(ceoBoards[0]?.boardId);
   });
 
   it("rejects boardless task creation for non-manager agents", async () => {
@@ -92,7 +92,7 @@ describe("BoardService", () => {
   it("allows any agent to create tasks for themselves and blocks non-manager assignment to others", async () => {
     const harness = await createHarness();
 
-    const board = await harness.boardService.createBoard(harness.paths, "goat", {
+    const board = await harness.boardService.createBoard(harness.paths, "ceo", {
       title: "Execution"
     });
 
@@ -124,11 +124,11 @@ describe("BoardService", () => {
   it("allows only assignee to update task status, blockers, artifacts, and worklog", async () => {
     const harness = await createHarness();
 
-    const board = await harness.boardService.createBoard(harness.paths, "goat", {
+    const board = await harness.boardService.createBoard(harness.paths, "ceo", {
       title: "Delivery"
     });
 
-    const task = await harness.boardService.createTask(harness.paths, "goat", board.boardId, {
+    const task = await harness.boardService.createTask(harness.paths, "ceo", board.boardId, {
       title: "Architecture review",
       description: "Review architecture and report",
       assignedTo: "cto"
@@ -149,18 +149,18 @@ describe("BoardService", () => {
     expect(withWorklog.worklog[0]?.createdBy).toBe("cto");
 
     await expect(
-      harness.boardService.updateTaskStatus(harness.paths, "goat", task.taskId, "done")
+      harness.boardService.updateTaskStatus(harness.paths, "ceo", task.taskId, "done")
     ).rejects.toThrow("Only the assigned agent can update task status");
   });
 
   it("allows only board owner to update board settings", async () => {
     const harness = await createHarness();
 
-    const board = await harness.boardService.createBoard(harness.paths, "goat", {
+    const board = await harness.boardService.createBoard(harness.paths, "ceo", {
       title: "Org Board"
     });
 
-    const updated = await harness.boardService.updateBoard(harness.paths, "goat", board.boardId, {
+    const updated = await harness.boardService.updateBoard(harness.paths, "ceo", board.boardId, {
       title: "Org Board Updated"
     });
 
@@ -176,11 +176,11 @@ describe("BoardService", () => {
   it("accepts only todo/doing/blocked/done as task status values", async () => {
     const harness = await createHarness();
 
-    const board = await harness.boardService.createBoard(harness.paths, "goat", {
+    const board = await harness.boardService.createBoard(harness.paths, "ceo", {
       title: "QA Board"
     });
 
-    await harness.boardService.createTask(harness.paths, "goat", board.boardId, {
+    await harness.boardService.createTask(harness.paths, "ceo", board.boardId, {
       title: "Prepare release",
       description: "Prepare release notes",
       assignedTo: "cto",
@@ -196,7 +196,7 @@ describe("BoardService", () => {
     ).rejects.toThrow("Task status must be one of: todo, doing, blocked, done.");
 
     await expect(
-      harness.boardService.createTask(harness.paths, "goat", board.boardId, {
+      harness.boardService.createTask(harness.paths, "ceo", board.boardId, {
         title: "Invalid status creation",
         description: "Should fail",
         assignedTo: "cto",
@@ -208,10 +208,10 @@ describe("BoardService", () => {
   it("creates an index for task status", async () => {
     const harness = await createHarness();
 
-    const board = await harness.boardService.createBoard(harness.paths, "goat", {
+    const board = await harness.boardService.createBoard(harness.paths, "ceo", {
       title: "Index Board"
     });
-    await harness.boardService.createTask(harness.paths, "goat", board.boardId, {
+    await harness.boardService.createTask(harness.paths, "ceo", board.boardId, {
       title: "Indexed task",
       description: "Ensures DB is initialized"
     });
@@ -265,10 +265,10 @@ async function createHarness(): Promise<{
     nowIso: () => "2026-02-10T00:00:00.000Z"
   });
 
-  await agentService.ensureAgent(paths, { id: "goat", displayName: "Goat" }, { type: "manager", reportsTo: null, role: "Head of Organization" });
-  await agentService.ensureAgent(paths, { id: "cto", displayName: "CTO" }, { type: "manager", reportsTo: "goat", role: "CTO" });
+  await agentService.ensureAgent(paths, { id: "ceo", displayName: "CEO" }, { type: "manager", reportsTo: null, role: "Head of Organization" });
+  await agentService.ensureAgent(paths, { id: "cto", displayName: "CTO" }, { type: "manager", reportsTo: "ceo", role: "CTO" });
   await agentService.ensureAgent(paths, { id: "engineer", displayName: "Engineer" }, { type: "individual", reportsTo: "cto", role: "Developer" });
-  await agentService.ensureAgent(paths, { id: "qa", displayName: "QA" }, { type: "individual", reportsTo: "goat", role: "QA" });
+  await agentService.ensureAgent(paths, { id: "qa", displayName: "QA" }, { type: "individual", reportsTo: "ceo", role: "QA" });
 
   const boardService = new BoardService({
     fileSystem,

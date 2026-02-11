@@ -4,7 +4,7 @@ import { executeAgentRun } from "./agent-run.shared.js";
 
 export const agentCommand: CliCommand = {
   path: ["agent"],
-  description: "Send a message to an agent (default: goat).",
+  description: "Send a message to an agent (default: ceo).",
   async run(args, context): Promise<number> {
     if (isHelpRequest(args)) {
       printHelp(context.stdout);

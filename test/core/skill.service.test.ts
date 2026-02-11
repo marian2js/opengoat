@@ -29,7 +29,7 @@ describe("SkillService", () => {
 
     await setAssignedSkills(fileSystem, paths, ["code-review"]);
 
-    const skills = await service.listSkills(paths, "goat");
+    const skills = await service.listSkills(paths, "ceo");
     expect(skills).toHaveLength(1);
     expect(skills[0]?.source).toBe("managed");
     expect(skills[0]?.id).toBe("code-review");
@@ -47,7 +47,7 @@ describe("SkillService", () => {
     );
     await setAssignedSkills(fileSystem, paths, ["deploy-checklist"]);
 
-    const prompt = await service.buildSkillsPrompt(paths, "goat");
+    const prompt = await service.buildSkillsPrompt(paths, "ceo");
     expect(prompt.prompt).toContain("## Skills");
     expect(prompt.prompt).toContain("<available_skills>");
     expect(prompt.prompt).toContain("deploy-checklist");
@@ -72,10 +72,10 @@ describe("SkillService", () => {
     );
     await setAssignedSkills(fileSystem, paths, ["hidden-skill"]);
 
-    const allSkills = await service.listSkills(paths, "goat");
+    const allSkills = await service.listSkills(paths, "ceo");
     expect(allSkills.some((skill) => skill.id === "hidden-skill")).toBe(true);
 
-    const prompt = await service.buildSkillsPrompt(paths, "goat");
+    const prompt = await service.buildSkillsPrompt(paths, "ceo");
     expect(prompt.prompt).not.toContain("hidden-skill");
   });
 
@@ -91,11 +91,11 @@ describe("SkillService", () => {
     );
     await setAssignedSkills(fileSystem, paths, ["release-audit"]);
     await writeFile(
-      path.join(paths.agentsDir, "goat", "config.json"),
+      path.join(paths.agentsDir, "ceo", "config.json"),
       JSON.stringify(
         {
           schemaVersion: 2,
-          id: "goat",
+          id: "ceo",
           runtime: {
             skills: {
               enabled: true,
@@ -113,7 +113,7 @@ describe("SkillService", () => {
       "utf8"
     );
 
-    const skills = await service.listSkills(paths, "goat");
+    const skills = await service.listSkills(paths, "ceo");
     expect(skills).toHaveLength(1);
     expect(skills[0]?.source).toBe("extra");
     expect(skills[0]?.id).toBe("release-audit");
@@ -130,7 +130,7 @@ describe("SkillService", () => {
     await fileSystem.writeFile(path.join(sourceSkillDir, "references.md"), "extra\n");
 
     const result = await service.installSkill(paths, {
-      agentId: "goat",
+      agentId: "ceo",
       skillName: "local-skill",
       sourcePath: sourceSkillDir
     });
@@ -139,7 +139,7 @@ describe("SkillService", () => {
     expect(await readFile(result.installedPath, "utf8")).toContain("Local Skill");
     expect(await readFile(path.join(path.dirname(result.installedPath), "references.md"), "utf8")).toContain("extra");
 
-    const config = JSON.parse(await readFile(path.join(paths.agentsDir, "goat", "config.json"), "utf8")) as {
+    const config = JSON.parse(await readFile(path.join(paths.agentsDir, "ceo", "config.json"), "utf8")) as {
       runtime?: { skills?: { assigned?: string[] } };
     };
     expect(config.runtime?.skills?.assigned).toContain("local-skill");
@@ -165,12 +165,12 @@ describe("SkillService", () => {
     const { service, paths } = await createHarness();
 
     await service.installSkill(paths, {
-      agentId: "goat",
+      agentId: "ceo",
       skillName: "manager",
       description: "Manager role skill"
     });
 
-    const managerConfig = JSON.parse(await readFile(path.join(paths.agentsDir, "goat", "config.json"), "utf8")) as {
+    const managerConfig = JSON.parse(await readFile(path.join(paths.agentsDir, "ceo", "config.json"), "utf8")) as {
       organization?: { type?: string };
       runtime?: { skills?: { assigned?: string[] } };
     };
@@ -178,12 +178,12 @@ describe("SkillService", () => {
     expect(managerConfig.runtime?.skills?.assigned).toEqual(["manager", "board-manager"]);
 
     await service.installSkill(paths, {
-      agentId: "goat",
+      agentId: "ceo",
       skillName: "board-individual",
       description: "Individual role skill"
     });
 
-    const individualConfig = JSON.parse(await readFile(path.join(paths.agentsDir, "goat", "config.json"), "utf8")) as {
+    const individualConfig = JSON.parse(await readFile(path.join(paths.agentsDir, "ceo", "config.json"), "utf8")) as {
       organization?: { type?: string };
       runtime?: { skills?: { assigned?: string[] } };
     };
@@ -217,14 +217,14 @@ async function createHarness(): Promise<{
   await fileSystem.ensureDir(paths.providersDir);
   await fileSystem.ensureDir(paths.runsDir);
 
-  await fileSystem.ensureDir(path.join(paths.workspacesDir, "goat"));
-  await fileSystem.ensureDir(path.join(paths.agentsDir, "goat"));
+  await fileSystem.ensureDir(path.join(paths.workspacesDir, "ceo"));
+  await fileSystem.ensureDir(path.join(paths.agentsDir, "ceo"));
   await writeFile(
-    path.join(paths.agentsDir, "goat", "config.json"),
+    path.join(paths.agentsDir, "ceo", "config.json"),
     JSON.stringify(
       {
         schemaVersion: 2,
-        id: "goat",
+        id: "ceo",
         runtime: {
           skills: {
             enabled: true,
@@ -250,7 +250,7 @@ async function createHarness(): Promise<{
 }
 
 async function setAssignedSkills(fileSystem: NodeFileSystem, paths: ReturnType<TestPathsProvider["getPaths"]>, skills: string[]): Promise<void> {
-  const configPath = path.join(paths.agentsDir, "goat", "config.json");
+  const configPath = path.join(paths.agentsDir, "ceo", "config.json");
   const raw = await readFile(configPath, "utf8");
   const config = JSON.parse(raw) as { runtime?: { skills?: { assigned?: string[] } } };
   config.runtime = config.runtime ?? {};

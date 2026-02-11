@@ -9,14 +9,14 @@ OpenGoat is a CLI-first organization runtime.
 Current policy:
 
 - every OpenGoat agent is an OpenClaw agent
-- `goat` is the immutable default manager (head of organization)
+- `ceo` is the immutable default manager (head of organization)
 - organizations are hierarchical (`reportsTo`)
 - managers act through skills, not hardcoded control-flow logic
 
 ## 2) Core Rules
 
-1. `goat` is always the default entry agent.
-2. `goat` cannot be deleted.
+1. `ceo` is always the default entry agent.
+2. `ceo` cannot be deleted.
 3. OpenGoat is source of truth for which agents exist.
 4. creating/deleting an OpenGoat agent syncs create/delete in OpenClaw.
 5. managers only manage direct reportees by org definition.
@@ -43,8 +43,8 @@ Canonical fields:
 
 Defaults:
 
-- `goat`: `type=manager`, `reportsTo=null`, assigned `manager` skill
-- other agents: `type=individual`, `reportsTo=goat`
+- `ceo`: `type=manager`, `reportsTo=null`, assigned `manager` skill
+- other agents: `type=individual`, `reportsTo=ceo`
 
 ## 4) Manager Runtime Model
 
@@ -73,7 +73,7 @@ OpenGoat pre-installs role skills in each agent workspace so OpenClaw can resolv
 - managers: `manager`, `board-manager`
 - individuals: `board-individual`
 
-`goat` receives manager role skills by default under `workspaces/goat/skills/`.
+`ceo` receives manager role skills by default under `workspaces/ceo/skills/`.
 
 ## 6) OpenClaw Integration
 
@@ -127,7 +127,7 @@ Main structure:
 
 OpenClaw owns workspace bootstrap markdown semantics.
 
-OpenGoat pre-seeds `workspaces/goat/AGENTS.md` and `workspaces/goat/SOUL.md` and removes `BOOTSTRAP.md`
+OpenGoat pre-seeds `workspaces/ceo/AGENTS.md` and `workspaces/ceo/SOUL.md` and removes `BOOTSTRAP.md`
 to avoid first-run bootstrap prompts for the default manager.
 
 ## 10) Module Layout
@@ -163,10 +163,10 @@ Optional UI extension module:
 
 If rebuilding from scratch, preserve these behaviors:
 
-1. bootstrap creates `goat`, core OpenGoat state, and pre-seeded `goat` workspace markdown (`AGENTS.md` + `SOUL.md`).
+1. bootstrap creates `ceo`, core OpenGoat state, and pre-seeded `ceo` workspace markdown (`AGENTS.md` + `SOUL.md`).
 2. `agent create` creates local state and syncs OpenClaw create.
 3. `agent delete` syncs OpenClaw delete and removes local state.
-4. `goat` is undeletable.
+4. `ceo` is undeletable.
 5. onboarding only configures OpenClaw local/external gateway.
 6. sessions enforce working-path safety/rotation.
 7. session ids map 1:1 to OpenClaw `--session-id` during runs.

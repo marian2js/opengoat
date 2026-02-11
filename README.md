@@ -22,13 +22,13 @@ OpenGoat keeps your org structure as source-of-truth and syncs agent lifecycle t
 
 ## What You Get
 
-- `goat` as the default head of organization (CEO entry point).
+- `ceo` as the default head of organization (CEO entry point).
 - Hierarchical teams via `reportsTo`.
 - OpenClaw-managed skills with OpenGoat-side assignment metadata.
 - CLI-first workflows for create, run, restructure, and audit sessions.
 - Manager default boards: every manager has a non-deletable default board.
 - Task default routing: manager task creation without `<board-id>` uses that manager default board.
-- Goat workspace pre-seeded with `AGENTS.md` + `SOUL.md` to skip first-run OpenClaw bootstrap prompts.
+- CEO workspace pre-seeded with `AGENTS.md` + `SOUL.md` to skip first-run OpenClaw bootstrap prompts.
 
 ## Install
 
@@ -47,7 +47,7 @@ opengoat init
 # 2) Connect to OpenClaw (local runtime)
 opengoat onboard --local --non-interactive
 
-# 3) Talk to the default organization head (goat)
+# 3) Talk to the default organization head (ceo)
 opengoat agent --message "Set up a CTO and two engineers for this project."
 ```
 
@@ -64,17 +64,17 @@ opengoat onboard --external \
 
 ```bash
 # Create roles
-opengoat agent create "CTO" --manager --reports-to goat --skill manager
+opengoat agent create "CTO" --manager --reports-to ceo --skill manager
 opengoat agent create "Engineer" --individual --reports-to cto --skill coding
 
-# If --reports-to is omitted, it defaults to goat
+# If --reports-to is omitted, it defaults to ceo
 opengoat agent create "Designer" --individual
 
 # Run work through any role
 opengoat agent cto --message "Plan the Q2 engineering roadmap."
 
 # Restructure reporting lines
-opengoat agent set-manager engineer goat
+opengoat agent set-manager engineer ceo
 
 # Inspect structure
 opengoat agent list
@@ -89,7 +89,7 @@ On bootstrap, OpenGoat pre-installs role skills in agent workspaces:
 - managers: `manager`, `board-manager`
 - individuals: `board-individual`
 
-For `goat`, this is written under `workspaces/goat/skills/`.
+For `ceo`, this is written under `workspaces/ceo/skills/`.
 
 OpenGoat keeps per-agent skill assignment metadata and includes compatibility install/list commands:
 
@@ -110,9 +110,9 @@ Useful commands:
 
 ```bash
 opengoat session list
-opengoat session history --agent goat
-opengoat session rename --agent goat --title "Planning"
-opengoat session reset --agent goat
+opengoat session history --agent ceo
+opengoat session rename --agent ceo --title "Planning"
+opengoat session reset --agent ceo
 ```
 
 ## Docker

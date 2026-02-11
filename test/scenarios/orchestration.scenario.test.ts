@@ -27,7 +27,7 @@ describe("manager runtime scenarios", () => {
   it("runs single-agent manager runtime without internal delegation loop", async () => {
     const { service } = await createScenarioHarness();
 
-    const result = await service.runAgent("goat", {
+    const result = await service.runAgent("ceo", {
       message: "Build a new reporting dashboard with export support and verify it works."
     });
 
@@ -37,12 +37,12 @@ describe("manager runtime scenarios", () => {
     expect(result.orchestration?.steps).toEqual([]);
   });
 
-  it("falls back to goat when unknown entry agent is requested", async () => {
+  it("falls back to ceo when unknown entry agent is requested", async () => {
     const { service } = await createScenarioHarness();
 
     const result = await service.runAgent("missing-agent", { message: "Hello there" });
 
-    expect(result.entryAgentId).toBe("goat");
+    expect(result.entryAgentId).toBe("ceo");
     expect(result.orchestration?.mode).toBe("single-agent");
   });
 });
@@ -106,7 +106,7 @@ class ScriptedProvider extends BaseProvider {
     this.validateInvokeOptions(options);
     const agentId = options.agent ?? "unknown";
     const output =
-      agentId === "goat"
+      agentId === "ceo"
         ? `Manager acknowledged request: ${options.message.trim()}\n`
         : `handled-by:${agentId}\n`;
 

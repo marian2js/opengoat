@@ -32,12 +32,12 @@ describe("scenario run command", () => {
         code: 0,
         stdout: "ok\n",
         stderr: "",
-        agentId: "goat",
+        agentId: "ceo",
         providerId: "openclaw",
-        entryAgentId: "goat",
+        entryAgentId: "ceo",
         routing: {
-          entryAgentId: "goat",
-          targetAgentId: "goat",
+          entryAgentId: "ceo",
+          targetAgentId: "ceo",
           confidence: 1,
           reason: "test",
           rewrittenMessage: "",
@@ -67,12 +67,12 @@ describe("scenario run command", () => {
         code: 0,
         stdout: "done\n",
         stderr: "",
-        agentId: "goat",
+        agentId: "ceo",
         providerId: "openclaw",
-        entryAgentId: "goat",
+        entryAgentId: "ceo",
         routing: {
-          entryAgentId: "goat",
-          targetAgentId: "goat",
+          entryAgentId: "ceo",
+          targetAgentId: "ceo",
           confidence: 1,
           reason: "test",
           rewrittenMessage: "",
@@ -106,7 +106,7 @@ describe("scenario run command", () => {
       ],
       scripted: {
         agentReplies: {
-          goat: "Scenario complete",
+          ceo: "Scenario complete",
           worker: "WORK DONE"
         }
       },

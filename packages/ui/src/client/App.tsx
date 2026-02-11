@@ -342,7 +342,7 @@ interface OrgNodeData {
 const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
 const MULTIAVATAR_API_BASE_URL = "https://api.multiavatar.com";
-const DEFAULT_AGENT_ID = "goat";
+const DEFAULT_AGENT_ID = "ceo";
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
@@ -353,7 +353,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 
 const DEFAULT_FORM: CreateAgentForm = {
   name: "",
-  reportsTo: "goat"
+  reportsTo: "ceo"
 };
 
 type OrgChartNode = Node<OrgNodeData, "orgNode">;
@@ -380,8 +380,8 @@ export function App(): ReactElement {
   const [sessionsByAgentId, setSessionsByAgentId] = useState<Record<string, Session[]>>({});
   const [selectedProjectIdByAgentId, setSelectedProjectIdByAgentId] = useState<Record<string, string>>({});
   const hydratedSessionIdsRef = useRef<Set<string>>(new Set());
-  const [boardActorId, setBoardActorId] = useState("goat");
-  const [taskActorId, setTaskActorId] = useState("goat");
+  const [boardActorId, setBoardActorId] = useState("ceo");
+  const [taskActorId, setTaskActorId] = useState("ceo");
   const [newBoardTitle, setNewBoardTitle] = useState("");
   const [taskDraftByBoardId, setTaskDraftByBoardId] = useState<Record<string, TaskCreateDraft>>({});
   const [taskStatusDraftById, setTaskStatusDraftById] = useState<Record<string, string>>({});
@@ -571,18 +571,18 @@ export function App(): ReactElement {
 
       return {
         ...current,
-        reportsTo: agentIds[0] ?? "goat"
+        reportsTo: agentIds[0] ?? "ceo"
       };
     });
 
     const hasBoardActor = agentIds.includes(boardActorId);
     if (!hasBoardActor) {
-      setBoardActorId(agentIds[0] ?? "goat");
+      setBoardActorId(agentIds[0] ?? "ceo");
     }
 
     const hasTaskActor = agentIds.includes(taskActorId);
     if (!hasTaskActor) {
-      setTaskActorId(agentIds[0] ?? "goat");
+      setTaskActorId(agentIds[0] ?? "ceo");
     }
   }, [state, boardActorId, taskActorId]);
 
@@ -978,7 +978,7 @@ export function App(): ReactElement {
       },
       {
         id: "sessions",
-        label: "Goat Sessions",
+        label: "CEO Sessions",
         value: state.sessions.sessions.length,
         hint: "Saved conversation contexts",
         icon: Clock3
@@ -1069,7 +1069,7 @@ export function App(): ReactElement {
   }
 
   async function handleDeleteAgent(agentId: string): Promise<void> {
-    if (agentId === "goat") {
+    if (agentId === "ceo") {
       return;
     }
 
@@ -1117,7 +1117,7 @@ export function App(): ReactElement {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          agentId: "goat",
+          agentId: "ceo",
           folderName: picked.project.name,
           folderPath: picked.project.path
         })
@@ -1150,7 +1150,7 @@ export function App(): ReactElement {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          agentId: "goat",
+          agentId: "ceo",
           workingPath: workspace.workingPath,
           workspaceName: workspace.name
         })
@@ -1188,7 +1188,7 @@ export function App(): ReactElement {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          agentId: "goat",
+          agentId: "ceo",
           sessionRef: workspace.projectSessionKey,
           name: nextName
         })
@@ -1222,7 +1222,7 @@ export function App(): ReactElement {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          agentId: "goat",
+          agentId: "ceo",
           sessionRef: workspace.projectSessionKey
         })
       });
@@ -1255,7 +1255,7 @@ export function App(): ReactElement {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          agentId: "goat",
+          agentId: "ceo",
           sessionRef: session.sessionKey
         })
       });
@@ -1294,7 +1294,7 @@ export function App(): ReactElement {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          agentId: "goat",
+          agentId: "ceo",
           sessionRef: session.sessionKey,
           name: nextName
         })
@@ -2680,11 +2680,11 @@ export function App(): ReactElement {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              {agent.id === "goat" ? <Badge variant="secondary">Head of Org</Badge> : null}
+                              {agent.id === "ceo" ? <Badge variant="secondary">Head of Org</Badge> : null}
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                disabled={agent.id === "goat" || isMutating}
+                                disabled={agent.id === "ceo" || isMutating}
                                 onClick={(event) => {
                                   event.preventDefault();
                                   event.stopPropagation();
@@ -2926,7 +2926,7 @@ export function App(): ReactElement {
                     <Card>
                       <CardHeader>
                         <CardTitle>Assigned Skills</CardTitle>
-                        <CardDescription>Skills currently assigned to goat.</CardDescription>
+                        <CardDescription>Skills currently assigned to ceo.</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-2">
                         {state.agentSkills.skills.length === 0 ? (

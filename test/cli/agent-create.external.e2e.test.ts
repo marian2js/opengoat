@@ -64,7 +64,7 @@ describe("agent create OpenClaw sync e2e", () => {
     const { stubPath, stubLogPath } = await createOpenClawStub(root);
 
     const result = await runBinary(
-      ["agent", "create", "OpenClaw Writer", "--specialist", "--reports-to", "goat", "--skill", "writing"],
+      ["agent", "create", "OpenClaw Writer", "--specialist", "--reports-to", "ceo", "--skill", "writing"],
       opengoatHome,
       {
         OPENCLAW_CMD: stubPath,
