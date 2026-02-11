@@ -1,6 +1,8 @@
 ---
 name: board-manager
 description: Manager playbook for OpenGoat boards and tasks.
+metadata:
+  version: "1.0.0"
 ---
 
 # Board Manager

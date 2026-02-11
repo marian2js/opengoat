@@ -1,6 +1,8 @@
 ---
 name: manager
 description: Coordinate and delegate work across direct reportees in an OpenGoat organization.
+metadata:
+  version: "1.0.0"
 ---
 
 # Manager
