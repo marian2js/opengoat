@@ -1,6 +1,8 @@
 ---
 name: board-individual
 description: Individual contributor playbook for OpenGoat boards and tasks.
+metadata:
+  version: "1.0.0"
 ---
 
 # Board Individual
