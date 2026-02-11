@@ -33,6 +33,7 @@ import {
 import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import { PromptInput, PromptInputBody, PromptInputFooter, type PromptInputMessage, PromptInputSubmit, PromptInputTextarea } from "@/components/ai-elements/prompt-input";
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1434,13 +1435,28 @@ export function App(): ReactElement {
                               description="Send your first message below."
                             />
                           ) : (
-                            sessionMessages.map((message) => (
-                              <Message from={message.role} key={message.id}>
-                                <MessageContent>
-                                  <MessageResponse>{message.content}</MessageResponse>
-                                </MessageContent>
-                              </Message>
-                            ))
+                            <>
+                              {sessionMessages.map((message) => (
+                                <Message from={message.role} key={message.id}>
+                                  <MessageContent>
+                                    <MessageResponse>{message.content}</MessageResponse>
+                                  </MessageContent>
+                                </Message>
+                              ))}
+                              {sessionChatStatus === "streaming" ? (
+                                <Message from="assistant" key={`${selectedSession.sessionId}:thinking`}>
+                                  <MessageContent className="w-full max-w-full bg-transparent px-0 py-0">
+                                    <Reasoning isStreaming>
+                                      <ReasoningTrigger />
+                                      <ReasoningContent>
+                                        Working on your request. The response will appear here as soon as the runtime
+                                        finishes.
+                                      </ReasoningContent>
+                                    </Reasoning>
+                                  </MessageContent>
+                                </Message>
+                              ) : null}
+                            </>
                           )}
                         </ConversationContent>
                         <ConversationScrollButton />
