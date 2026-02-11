@@ -452,6 +452,62 @@ describe("OpenGoat UI server API", () => {
     });
     expect(aliasResponse.statusCode).toBe(200);
   });
+
+  it("sends attached images to an existing session", async () => {
+    const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(async (): Promise<{
+      code: number;
+      stdout: string;
+      stderr: string;
+      providerId: string;
+    }> => {
+      return {
+        code: 0,
+        stdout: "assistant response",
+        stderr: "",
+        providerId: "openclaw"
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        runAgent
+      }
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message",
+      payload: {
+        agentId: "goat",
+        sessionRef: "workspace:tmp",
+        workingPath: "/tmp",
+        images: [
+          {
+            name: "chart.png",
+            mediaType: "image/png",
+            dataUrl: "data:image/png;base64,Zm9v"
+          }
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(runAgent).toHaveBeenCalledWith("goat", {
+      message: "Please analyze the attached image.",
+      sessionRef: "workspace:tmp",
+      cwd: "/tmp",
+      images: [
+        {
+          name: "chart.png",
+          mediaType: "image/png",
+          dataUrl: "data:image/png;base64,Zm9v"
+        }
+      ]
+    });
+  });
 });
 
 function createMockService(): OpenClawUiService {

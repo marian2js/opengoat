@@ -72,6 +72,12 @@ interface ResolvedSkill {
   source: string;
 }
 
+interface UiImageInput {
+  dataUrl?: string;
+  mediaType?: string;
+  name?: string;
+}
+
 export interface OpenClawUiService {
   initialize?: () => Promise<unknown>;
   getHomeDir: () => string;
@@ -88,7 +94,7 @@ export interface OpenClawUiService {
   ) => Promise<SessionRunInfo>;
   runAgent?: (
     agentId: string,
-    options: { message: string; sessionRef?: string; cwd?: string }
+    options: { message: string; sessionRef?: string; cwd?: string; images?: UiImageInput[] }
   ) => Promise<AgentRunResult>;
   renameSession?: (agentId?: string, title?: string, sessionRef?: string) => Promise<SessionSummary>;
   removeSession?: (agentId?: string, sessionRef?: string) => Promise<SessionRemoveResult>;
@@ -458,7 +464,15 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
   });
 
   const handleSessionMessage = async (
-    request: { body?: { agentId?: string; sessionRef?: string; workingPath?: string; message?: string } },
+    request: {
+      body?: {
+        agentId?: string;
+        sessionRef?: string;
+        workingPath?: string;
+        message?: string;
+        images?: UiImageInput[];
+      };
+    },
     reply: FastifyReply
   ): Promise<unknown> => {
     return safeReply(reply, async () => {
@@ -466,6 +480,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
       const sessionRef = request.body?.sessionRef?.trim();
       const message = request.body?.message?.trim();
       const workingPath = request.body?.workingPath?.trim();
+      const images = normalizeUiImages(request.body?.images);
 
       if (!sessionRef) {
         reply.code(400);
@@ -474,17 +489,22 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
         };
       }
 
-      if (!message) {
+      if (!message && images.length === 0) {
         reply.code(400);
         return {
-          error: "message is required"
+          error: "message or image is required"
         };
       }
 
       const result = await runUiSessionMessage(service, agentId, {
         sessionRef,
         workingPath,
-        message
+        message:
+          message ||
+          (images.length === 1
+            ? "Please analyze the attached image."
+            : "Please analyze the attached images."),
+        images: images.length > 0 ? images : undefined
       });
 
       const output = result.stdout.trim() || result.stderr.trim();
@@ -503,11 +523,15 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   };
 
-  app.post<{ Body: { agentId?: string; sessionRef?: string; workingPath?: string; message?: string } }>(
+  app.post<{
+    Body: { agentId?: string; sessionRef?: string; workingPath?: string; message?: string; images?: UiImageInput[] };
+  }>(
     "/api/sessions/message",
     handleSessionMessage
   );
-  app.post<{ Body: { agentId?: string; sessionRef?: string; workingPath?: string; message?: string } }>(
+  app.post<{
+    Body: { agentId?: string; sessionRef?: string; workingPath?: string; message?: string; images?: UiImageInput[] };
+  }>(
     "/api/session/message",
     handleSessionMessage
   );
@@ -706,13 +730,15 @@ async function runUiSessionMessage(
     sessionRef: string;
     workingPath?: string;
     message: string;
+    images?: UiImageInput[];
   }
 ): Promise<AgentRunResult> {
   if (typeof service.runAgent === "function") {
     return service.runAgent(agentId, {
       message: options.message,
       sessionRef: options.sessionRef,
-      cwd: options.workingPath
+      cwd: options.workingPath,
+      images: options.images
     });
   }
 
@@ -781,6 +807,22 @@ function buildProjectSessionRef(projectName: string, projectPath: string): strin
   const segment = normalizeProjectSegment(projectName);
   const suffix = normalizeProjectSegment(projectPath).slice(-10) || "session";
   return `project:${segment}-${suffix}`;
+}
+
+function normalizeUiImages(images: UiImageInput[] | undefined): UiImageInput[] {
+  if (!images || images.length === 0) {
+    return [];
+  }
+
+  return images.filter((image) => {
+    if (!image || typeof image !== "object") {
+      return false;
+    }
+
+    const dataUrl = image.dataUrl?.trim();
+    const mediaType = image.mediaType?.trim();
+    return Boolean(dataUrl && dataUrl.startsWith("data:") && mediaType?.toLowerCase().startsWith("image/"));
+  });
 }
 
 function buildWorkspaceSessionRef(workspaceName: string, workspacePath: string): string {

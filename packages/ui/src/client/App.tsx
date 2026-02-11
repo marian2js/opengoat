@@ -1,4 +1,4 @@
-import type { ChatStatus } from "ai";
+import type { ChatStatus, FileUIPart } from "ai";
 import type { ComponentType, FormEvent, ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dagre from "@dagrejs/dagre";
@@ -211,6 +211,12 @@ interface SessionSendMessageResponse {
     stderr: string;
   };
   message?: string;
+}
+
+interface SessionMessageImageInput {
+  dataUrl?: string;
+  mediaType?: string;
+  name?: string;
 }
 
 interface SessionChatMessage {
@@ -846,15 +852,32 @@ export function App(): ReactElement {
     }
 
     const text = promptMessage.text.trim();
-    if (!text) {
+    const images = toSessionMessageImages(promptMessage.files);
+    if (promptMessage.files.length > 0 && images.length === 0) {
+      setActionMessage("Unable to process attached image files. Please try again.");
+      return;
+    }
+
+    if (!text && images.length === 0) {
       return;
     }
 
     const sessionId = selectedSession.sessionId;
+    const message =
+      text ||
+      (images.length === 1
+        ? "Please analyze the attached image."
+        : "Please analyze the attached images.");
+    const userMessage = text
+      ? images.length > 0
+        ? `${text}\n\n(Attached ${images.length} image${images.length === 1 ? "" : "s"}.)`
+        : text
+      : `Sent ${images.length} image${images.length === 1 ? "" : "s"}.`;
+
     appendSessionMessage(sessionId, {
       id: `${sessionId}:user:${Date.now()}`,
       role: "user",
-      content: text
+      content: userMessage
     });
     setSessionChatStatus("streaming");
     setActionMessage(null);
@@ -864,7 +887,8 @@ export function App(): ReactElement {
         agentId: "goat",
         sessionRef: selectedSession.sessionKey,
         workingPath: selectedSession.workingPath,
-        message: text
+        message,
+        images
       };
       const response = await sendSessionMessage(payload);
 
@@ -895,6 +919,7 @@ export function App(): ReactElement {
     sessionRef: string;
     workingPath?: string;
     message: string;
+    images?: SessionMessageImageInput[];
   }): Promise<SessionSendMessageResponse> {
     const routes = ["/api/sessions/message", "/api/session/message"];
     let lastError: unknown;
@@ -1422,6 +1447,7 @@ export function App(): ReactElement {
                       </Conversation>
 
                       <PromptInput
+                        accept="image/*"
                         className="mt-4 shrink-0"
                         onSubmit={(message) => {
                           void handleSessionPromptSubmit(message);
@@ -1433,7 +1459,7 @@ export function App(): ReactElement {
                             disabled={sessionChatStatus === "streaming" || isLoading || isMutating}
                           />
                         </PromptInputBody>
-                        <PromptInputFooter>
+                        <PromptInputFooter className="justify-end">
                           <PromptInputSubmit
                             status={sessionChatStatus}
                             disabled={sessionChatStatus === "streaming" || isLoading || isMutating}
@@ -1937,4 +1963,28 @@ function routeToPath(route: AppRoute): string {
   }
 
   return `/${route.view}`;
+}
+
+function toSessionMessageImages(files: FileUIPart[]): SessionMessageImageInput[] {
+  const images: SessionMessageImageInput[] = [];
+
+  for (const file of files) {
+    const mediaType = file.mediaType?.trim();
+    if (!mediaType?.toLowerCase().startsWith("image/")) {
+      continue;
+    }
+
+    const dataUrl = file.url?.trim();
+    if (!dataUrl?.startsWith("data:")) {
+      continue;
+    }
+
+    images.push({
+      dataUrl,
+      mediaType,
+      name: file.filename
+    });
+  }
+
+  return images;
 }
