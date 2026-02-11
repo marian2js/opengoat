@@ -9,6 +9,8 @@ This document describes the current organization-first runtime model.
 - hierarchy is explicit in agent metadata
 - manager behavior is skill-driven (`manager` skill)
 - OpenClaw owns workspace bootstrap semantics; OpenGoat pre-seeds `goat` `AGENTS.md` + `SOUL.md` and removes `BOOTSTRAP.md`
+- every manager has a default board; if a manager creates a task without an explicit board id, OpenGoat routes it to that default board
+- default manager boards cannot be deleted
 
 ## Execution Flow
 

@@ -5,8 +5,7 @@ import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import {
   renderAgentsIndex,
-  renderGlobalConfig,
-  renderGlobalConfigMarkdown
+  renderGlobalConfig
 } from "../../templates/default-templates.js";
 import { AgentService } from "../../agents/application/agent.service.js";
 
@@ -44,13 +43,6 @@ export class BootstrapService {
     const now = this.nowIso();
     await this.ensureGlobalConfig(paths.globalConfigJsonPath, now, createdPaths, skippedPaths);
     await this.ensureAgentsIndex(paths.agentsIndexJsonPath, now, createdPaths, skippedPaths);
-
-    await this.writeMarkdownIfMissing(
-      paths.globalConfigMarkdownPath,
-      renderGlobalConfigMarkdown(),
-      createdPaths,
-      skippedPaths
-    );
 
     const ceo: AgentIdentity = {
       id: DEFAULT_AGENT_ID,
@@ -146,23 +138,6 @@ export class BootstrapService {
       return;
     }
     createdPaths.push(directoryPath);
-  }
-
-  private async writeMarkdownIfMissing(
-    filePath: string,
-    content: string,
-    createdPaths: string[],
-    skippedPaths: string[]
-  ): Promise<void> {
-    const exists = await this.fileSystem.exists(filePath);
-    if (exists) {
-      skippedPaths.push(filePath);
-      return;
-    }
-
-    const markdown = content.endsWith("\n") ? content : `${content}\n`;
-    await this.fileSystem.writeFile(filePath, markdown);
-    createdPaths.push(filePath);
   }
 
   private async readJsonIfPresent<T>(filePath: string): Promise<T | null> {

@@ -196,7 +196,7 @@ export const taskCommand: CliCommand = {
 interface TaskCreateArgsOk {
   ok: true;
   actorId: string;
-  boardId: string;
+  boardId?: string;
   title: string;
   description: string;
   workspace?: string;
@@ -231,9 +231,12 @@ type ParseEntryResult = { ok: false; error: string } | TaskEntryArgsOk;
 type ParseCronResult = { ok: false; error: string } | TaskCronArgsOk;
 
 function parseCreateArgs(args: string[]): ParseCreateResult {
-  const boardId = args[0]?.trim();
-  if (!boardId) {
-    return { ok: false, error: "Missing <board-id>." };
+  let boardId: string | undefined;
+  let indexOffset = 0;
+  const firstToken = args[0]?.trim();
+  if (firstToken && !firstToken.startsWith("--")) {
+    boardId = firstToken;
+    indexOffset = 1;
   }
 
   let actorId = DEFAULT_AGENT_ID;
@@ -243,7 +246,7 @@ function parseCreateArgs(args: string[]): ParseCreateResult {
   let assignedTo: string | undefined;
   let status: string | undefined;
 
-  for (let index = 1; index < args.length; index += 1) {
+  for (let index = indexOffset; index < args.length; index += 1) {
     const token = args[index];
 
     if (token === "--as") {
@@ -462,7 +465,7 @@ function parseCronArgs(args: string[]): ParseCronResult {
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write(
-    "  opengoat task create <board-id> --title <title> --description <text> [--workspace <path|~>] [--as <agent-id>] [--assign <agent-id>] [--status <todo|doing|blocked|done>]\n"
+    "  opengoat task create [board-id] --title <title> --description <text> [--workspace <path|~>] [--as <agent-id>] [--assign <agent-id>] [--status <todo|doing|blocked|done>]\n"
   );
   output.write("  opengoat task list <board-id> [--json]\n");
   output.write("  opengoat task show <task-id> [--json]\n");

@@ -12,6 +12,7 @@ Use this skill when coordinating delivery through OpenGoat boards and tasks.
 - Create boards.
 - Rename boards you own.
 - Create tasks for yourself or your direct reportees.
+- Create tasks without specifying a board id to use your manager default board.
 - Assign tasks only to direct reportees.
 - Read board and task state.
 
@@ -20,6 +21,7 @@ Use this skill when coordinating delivery through OpenGoat boards and tasks.
 - Only managers can assign tasks to other agents.
 - Managers cannot assign tasks to agents outside their direct report chain.
 - Only board owners can rename boards.
+- Manager default boards cannot be deleted.
 - Task status, blockers, artifacts, and worklog can only be updated by the task assignee.
 
 ## Working Pattern

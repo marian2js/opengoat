@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFile as readFileBuffer, writeFile as writeFileBuffer } from "node:fs/promises";
 import { createRequire } from "node:module";
 import initSqlJs, { type Database as SqlJsDatabase, type SqlJsStatic } from "sql.js";
-import { isManagerAgent, type AgentManifestService } from "../../agents/index.js";
+import { isManagerAgent, type AgentManifest, type AgentManifestService } from "../../agents/index.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
@@ -29,6 +29,7 @@ interface BoardRow {
   title: string;
   created_at: string;
   owner_agent_id: string;
+  is_default: number;
 }
 
 interface TaskRow {
@@ -86,29 +87,22 @@ export class BoardService {
       throw new Error("Only managers can create boards.");
     }
 
-    const boardId = createEntityId(title);
-    const createdAt = this.nowIso();
-    this.execute(
-      db,
-      `INSERT INTO boards (board_id, title, created_at, owner_agent_id)
-       VALUES (?, ?, ?, ?)`,
-      [boardId, title, createdAt, normalizedActorId]
-    );
+    const hasDefaultBoard = this.getDefaultBoardByOwner(db, normalizedActorId) !== undefined;
+    const board = this.insertBoard(db, {
+      title,
+      owner: normalizedActorId,
+      makeDefault: !hasDefaultBoard
+    });
     await this.persistDatabase(paths, db);
 
-    return {
-      boardId,
-      title,
-      createdAt,
-      owner: normalizedActorId
-    };
+    return board;
   }
 
   public async listBoards(paths: OpenGoatPaths): Promise<BoardSummary[]> {
     const db = await this.getDatabase(paths);
     const rows = this.queryAll<BoardRow>(
       db,
-      `SELECT board_id, title, created_at, owner_agent_id
+      `SELECT board_id, title, created_at, owner_agent_id, is_default
        FROM boards
        ORDER BY created_at ASC`
     );
@@ -167,13 +161,11 @@ export class BoardService {
   public async createTask(
     paths: OpenGoatPaths,
     actorId: string,
-    boardId: string,
+    boardId: string | null | undefined,
     options: CreateTaskOptions
   ): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
-    const normalizedBoardId = normalizeEntityId(boardId, "board id");
     const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
-    this.requireBoard(db, normalizedBoardId);
     const title = options.title.trim();
     if (!title) {
       throw new Error("Task title cannot be empty.");
@@ -206,6 +198,7 @@ export class BoardService {
 
     const status = normalizeTaskStatus(options.status);
     const workspace = normalizeTaskWorkspace(options.workspace);
+    const { boardId: resolvedBoardId } = this.resolveBoardForTaskCreation(db, actor, boardId);
 
     const taskId = createEntityId(`task-${title}`);
     const createdAt = this.nowIso();
@@ -222,11 +215,56 @@ export class BoardService {
          description,
          status
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [taskId, normalizedBoardId, createdAt, workspace, normalizedActorId, assignedTo, title, description, status]
+      [taskId, resolvedBoardId, createdAt, workspace, normalizedActorId, assignedTo, title, description, status]
     );
     await this.persistDatabase(paths, db);
 
     return this.requireTask(db, taskId);
+  }
+
+  public async ensureDefaultBoardForAgent(paths: OpenGoatPaths, agentId: string): Promise<BoardSummary | null> {
+    const normalizedAgentId = normalizeAgentId(agentId);
+    if (!normalizedAgentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const db = await this.getDatabase(paths);
+    const manifests = await this.agentManifestService.listManifests(paths);
+    const agent = manifests.find((manifest) => manifest.agentId === normalizedAgentId);
+    if (!agent) {
+      throw new Error(`Agent \"${normalizedAgentId}\" does not exist.`);
+    }
+    if (!isManagerAgent(agent)) {
+      return null;
+    }
+
+    const ensured = this.ensureDefaultBoardForManager(db, normalizedAgentId, agent.metadata.name);
+    if (ensured.changed) {
+      await this.persistDatabase(paths, db);
+    }
+    return ensured.board;
+  }
+
+  public async ensureDefaultBoardsForManagers(paths: OpenGoatPaths): Promise<BoardSummary[]> {
+    const db = await this.getDatabase(paths);
+    const manifests = await this.agentManifestService.listManifests(paths);
+    const managers = manifests.filter((manifest) => isManagerAgent(manifest));
+    const ensuredBoards: BoardSummary[] = [];
+    let changed = false;
+
+    for (const manager of managers) {
+      const ensured = this.ensureDefaultBoardForManager(db, manager.agentId, manager.metadata.name);
+      ensuredBoards.push(ensured.board);
+      if (ensured.changed) {
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await this.persistDatabase(paths, db);
+    }
+
+    return ensuredBoards;
   }
 
   public async listTasks(paths: OpenGoatPaths, boardId: string): Promise<TaskRecord[]> {
@@ -430,7 +468,7 @@ export class BoardService {
   private requireBoard(db: SqlJsDatabase, boardId: string): BoardRow {
     const row = this.queryOne<BoardRow>(
       db,
-      `SELECT board_id, title, created_at, owner_agent_id
+      `SELECT board_id, title, created_at, owner_agent_id, is_default
        FROM boards
        WHERE board_id = ?`,
       [boardId]
@@ -467,9 +505,12 @@ export class BoardService {
          board_id TEXT PRIMARY KEY,
          title TEXT NOT NULL,
          created_at TEXT NOT NULL,
-         owner_agent_id TEXT NOT NULL
+         owner_agent_id TEXT NOT NULL,
+         is_default INTEGER NOT NULL DEFAULT 0
        );`
     );
+    this.ensureBoardDefaultColumn(db);
+    this.normalizeDefaultBoardsByOwner(db);
     this.execute(
       db,
       `CREATE TABLE IF NOT EXISTS tasks (
@@ -519,11 +560,23 @@ export class BoardService {
          FOREIGN KEY(task_id) REFERENCES tasks(task_id) ON DELETE CASCADE
        );`
     );
+    this.execute(
+      db,
+      `CREATE TRIGGER IF NOT EXISTS prevent_default_board_delete
+       BEFORE DELETE ON boards
+       FOR EACH ROW
+       WHEN OLD.is_default = 1
+       BEGIN
+         SELECT RAISE(ABORT, 'Default boards cannot be deleted.');
+       END;`
+    );
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_tasks_board_id ON tasks(board_id);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);");
+    this.execute(db, "CREATE INDEX IF NOT EXISTS idx_boards_owner_default ON boards(owner_agent_id, is_default);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_blockers_task_id ON task_blockers(task_id);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_artifacts_task_id ON task_artifacts(task_id);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_worklog_task_id ON task_worklog(task_id);");
+    await this.ensureDefaultBoardsForManagersInDatabase(paths, db);
 
     await this.persistDatabase(paths, db);
     return db;
@@ -582,6 +635,185 @@ export class BoardService {
       db,
       `ALTER TABLE tasks ADD COLUMN workspace TEXT NOT NULL DEFAULT '${DEFAULT_TASK_WORKSPACE}';`
     );
+  }
+
+  private ensureBoardDefaultColumn(db: SqlJsDatabase): void {
+    const columns = this.queryAll<{ name: string }>(db, "PRAGMA table_info(boards);");
+    const hasDefaultColumn = columns.some((column) => column.name === "is_default");
+    if (hasDefaultColumn) {
+      return;
+    }
+
+    this.execute(db, "ALTER TABLE boards ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0;");
+  }
+
+  private normalizeDefaultBoardsByOwner(db: SqlJsDatabase): void {
+    const owners = this.queryAll<{ owner_agent_id: string }>(
+      db,
+      `SELECT DISTINCT owner_agent_id
+       FROM boards
+       ORDER BY owner_agent_id ASC`
+    );
+    for (const ownerRow of owners) {
+      const ownerId = ownerRow.owner_agent_id;
+      if (!ownerId) {
+        continue;
+      }
+      const ownedBoards = this.queryAll<BoardRow>(
+        db,
+        `SELECT board_id, title, created_at, owner_agent_id, is_default
+         FROM boards
+         WHERE owner_agent_id = ?
+         ORDER BY is_default DESC, created_at ASC, board_id ASC`,
+        [ownerId]
+      );
+      const selectedBoardId = ownedBoards[0]?.board_id;
+      if (!selectedBoardId) {
+        continue;
+      }
+      this.assignDefaultBoard(db, ownerId, selectedBoardId);
+    }
+  }
+
+  private async ensureDefaultBoardsForManagersInDatabase(paths: OpenGoatPaths, db: SqlJsDatabase): Promise<void> {
+    const manifests = await this.agentManifestService.listManifests(paths);
+    const managers = manifests.filter((manifest) => isManagerAgent(manifest));
+    for (const manager of managers) {
+      this.ensureDefaultBoardForManager(db, manager.agentId, manager.metadata.name);
+    }
+  }
+
+  private ensureDefaultBoardForManager(
+    db: SqlJsDatabase,
+    managerId: string,
+    displayName: string
+  ): {
+    board: BoardSummary;
+    changed: boolean;
+  } {
+    const existingDefault = this.getDefaultBoardByOwner(db, managerId);
+    if (existingDefault) {
+      return {
+        board: toBoardSummary(existingDefault),
+        changed: false
+      };
+    }
+
+    const existingBoard = this.queryOne<BoardRow>(
+      db,
+      `SELECT board_id, title, created_at, owner_agent_id, is_default
+       FROM boards
+       WHERE owner_agent_id = ?
+       ORDER BY created_at ASC, board_id ASC`,
+      [managerId]
+    );
+    if (existingBoard) {
+      this.assignDefaultBoard(db, managerId, existingBoard.board_id);
+      return {
+        board: {
+          boardId: existingBoard.board_id,
+          title: existingBoard.title,
+          createdAt: existingBoard.created_at,
+          owner: existingBoard.owner_agent_id
+        },
+        changed: true
+      };
+    }
+
+    const created = this.insertBoard(db, {
+      title: `${displayName.trim() || managerId} Board`,
+      owner: managerId,
+      makeDefault: true
+    });
+    return {
+      board: created,
+      changed: true
+    };
+  }
+
+  private resolveBoardForTaskCreation(
+    db: SqlJsDatabase,
+    actor: AgentManifest,
+    rawBoardId: string | null | undefined
+  ): {
+    boardId: string;
+  } {
+    const providedBoardId = rawBoardId?.trim();
+    if (providedBoardId) {
+      const normalizedBoardId = normalizeEntityId(providedBoardId, "board id");
+      this.requireBoard(db, normalizedBoardId);
+      return {
+        boardId: normalizedBoardId
+      };
+    }
+
+    if (!isManagerAgent(actor)) {
+      throw new Error("Board id is required for non-manager agents.");
+    }
+
+    const ensured = this.ensureDefaultBoardForManager(db, actor.agentId, actor.metadata.name);
+    return {
+      boardId: ensured.board.boardId
+    };
+  }
+
+  private getDefaultBoardByOwner(db: SqlJsDatabase, ownerAgentId: string): BoardRow | undefined {
+    return this.queryOne<BoardRow>(
+      db,
+      `SELECT board_id, title, created_at, owner_agent_id, is_default
+       FROM boards
+       WHERE owner_agent_id = ?
+         AND is_default = 1
+       ORDER BY created_at ASC, board_id ASC`,
+      [ownerAgentId]
+    );
+  }
+
+  private assignDefaultBoard(db: SqlJsDatabase, ownerAgentId: string, boardId: string): void {
+    this.execute(
+      db,
+      `UPDATE boards
+       SET is_default = 0
+       WHERE owner_agent_id = ?`,
+      [ownerAgentId]
+    );
+    this.execute(
+      db,
+      `UPDATE boards
+       SET is_default = 1
+       WHERE board_id = ?`,
+      [boardId]
+    );
+  }
+
+  private insertBoard(
+    db: SqlJsDatabase,
+    params: {
+      title: string;
+      owner: string;
+      makeDefault: boolean;
+    }
+  ): BoardSummary {
+    const boardId = createEntityId(params.title);
+    const createdAt = this.nowIso();
+
+    if (params.makeDefault) {
+      this.assignDefaultBoard(db, params.owner, boardId);
+    }
+
+    this.execute(
+      db,
+      `INSERT INTO boards (board_id, title, created_at, owner_agent_id, is_default)
+       VALUES (?, ?, ?, ?, ?)`,
+      [boardId, params.title, createdAt, params.owner, params.makeDefault ? 1 : 0]
+    );
+
+    return {
+      boardId,
+      title: params.title,
+      createdAt,
+      owner: params.owner
+    };
   }
 }
 

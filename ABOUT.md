@@ -22,6 +22,8 @@ Current policy:
 5. managers only manage direct reportees by org definition.
 6. sessions are preserved and tied to working path.
 7. each OpenGoat session maps 1:1 to an OpenClaw session id.
+8. every manager has a default board; manager task creation without a board uses this default board.
+9. default manager boards are immutable for deletion.
 
 ## 3) Agent Model
 
@@ -117,7 +119,6 @@ Main structure:
 
 - `config.json`
 - `agents.json`
-- `CONFIG.md`
 - `workspaces/` (OpenClaw workspace paths)
 - `agents/`
 - `skills/` (optional compatibility store; created on first `opengoat skill install`)

@@ -167,7 +167,7 @@ export class OpenGoatService {
   }
 
   public initialize(): Promise<InitializationResult> {
-    return this.bootstrapService.initialize();
+    return this.initializeWithDefaultBoards();
   }
 
   public async syncRuntimeDefaults(): Promise<RuntimeDefaultsSyncResult> {
@@ -204,6 +204,12 @@ export class OpenGoatService {
       await this.agentService.ensureGoatWorkspaceBootstrap(paths);
     } catch (error) {
       warnings.push(`OpenGoat workspace bootstrap for "goat" failed: ${toErrorMessage(error)}`);
+    }
+
+    try {
+      await this.boardService.ensureDefaultBoardForAgent(paths, DEFAULT_AGENT_ID);
+    } catch (error) {
+      warnings.push(`Default board ensure for "goat" failed: ${toErrorMessage(error)}`);
     }
 
     try {
@@ -272,6 +278,8 @@ export class OpenGoatService {
         }`.trim()
       );
     }
+
+    await this.boardService.ensureDefaultBoardForAgent(paths, created.agent.id);
 
     return {
       ...created,
@@ -411,7 +419,11 @@ export class OpenGoatService {
     return this.boardService.updateBoard(paths, actorId, boardId, options);
   }
 
-  public async createTask(actorId: string, boardId: string, options: CreateTaskOptions): Promise<TaskRecord> {
+  public async createTask(
+    actorId: string,
+    boardId: string | null | undefined,
+    options: CreateTaskOptions
+  ): Promise<TaskRecord> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.createTask(paths, actorId, boardId, options);
   }
@@ -557,7 +569,13 @@ export class OpenGoatService {
 
   public async installSkill(request: InstallSkillRequest): Promise<InstallSkillResult> {
     const paths = this.pathsProvider.getPaths();
-    return this.skillService.installSkill(paths, request);
+    const result = await this.skillService.installSkill(paths, request);
+    if (result.scope === "agent" && result.agentId) {
+      await this.agentService.syncAgentRoleAssignments(paths, result.agentId);
+      await this.agentService.ensureAgentWorkspaceRoleSkills(paths, result.agentId);
+      await this.boardService.ensureDefaultBoardForAgent(paths, result.agentId);
+    }
+    return result;
   }
 
   public async runOpenClaw(args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Promise<CommandRunResult> {
@@ -680,6 +698,13 @@ export class OpenGoatService {
 
   private resolveNowIso(): string {
     return this.nowIso();
+  }
+
+  private async initializeWithDefaultBoards(): Promise<InitializationResult> {
+    const initialization = await this.bootstrapService.initialize();
+    const paths = this.pathsProvider.getPaths();
+    await this.boardService.ensureDefaultBoardsForManagers(paths);
+    return initialization;
   }
 
   private resolveNowMs(): number {

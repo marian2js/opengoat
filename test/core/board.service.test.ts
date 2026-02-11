@@ -63,6 +63,32 @@ describe("BoardService", () => {
     ).rejects.toThrow("Managers can only assign tasks to their direct reportees");
   });
 
+  it("creates a default board for managers and uses it when board id is omitted", async () => {
+    const harness = await createHarness();
+
+    const task = await harness.boardService.createTask(harness.paths, "goat", undefined, {
+      title: "Shape roadmap",
+      description: "Define scope for next cycle"
+    });
+
+    const boards = await harness.boardService.listBoards(harness.paths);
+    const goatBoards = boards.filter((board) => board.owner === "goat");
+
+    expect(goatBoards).toHaveLength(1);
+    expect(task.boardId).toBe(goatBoards[0]?.boardId);
+  });
+
+  it("rejects boardless task creation for non-manager agents", async () => {
+    const harness = await createHarness();
+
+    await expect(
+      harness.boardService.createTask(harness.paths, "engineer", undefined, {
+        title: "No board",
+        description: "Should fail"
+      })
+    ).rejects.toThrow("Board id is required for non-manager agents.");
+  });
+
   it("allows any agent to create tasks for themselves and blocks non-manager assignment to others", async () => {
     const harness = await createHarness();
 

@@ -76,6 +76,19 @@ describe("OpenGoatService", () => {
     expect(agents.find((agent) => agent.id === "research-analyst")?.role).toBe("Developer");
   });
 
+  it("creates a default board when creating a manager agent", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("CTO", { type: "manager", reportsTo: "goat" });
+
+    const boards = await service.listBoards();
+    const ctoBoards = boards.filter((board) => board.owner === "cto");
+    expect(ctoBoards).toHaveLength(1);
+  });
+
   it("still syncs OpenClaw when the local agent already exists", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
@@ -221,6 +234,31 @@ describe("OpenGoatService", () => {
     const updated = await service.setAgentManager("engineer", "cto");
     expect(updated.previousReportsTo).toBe("goat");
     expect(updated.reportsTo).toBe("cto");
+  });
+
+  it("creates a default board when an agent becomes manager via skill install", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("Engineer", { type: "individual", reportsTo: "goat" });
+
+    await service.installSkill({
+      agentId: "engineer",
+      skillName: "manager",
+      description: "Promote to manager"
+    });
+
+    const boards = await service.listBoards();
+    const engineerBoards = boards.filter((board) => board.owner === "engineer");
+    expect(engineerBoards).toHaveLength(1);
+
+    const task = await service.createTask("engineer", undefined, {
+      title: "Plan sprint",
+      description: "Create sprint plan"
+    });
+    expect(task.boardId).toBe(engineerBoards[0]?.boardId);
   });
 
   it("returns the latest agent AI action timestamp", async () => {

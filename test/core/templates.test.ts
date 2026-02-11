@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   renderAgentsIndex,
   renderGlobalConfig,
-  renderGlobalConfigMarkdown,
   renderInternalAgentConfig
 } from "../../packages/core/src/core/templates/default-templates.js";
 
@@ -39,14 +38,5 @@ describe("default templates", () => {
     expect(internalConfig.runtime.adapter).toBe("openclaw");
     expect(internalConfig.runtime.sessions.mainKey).toBe("main");
     expect(internalConfig.runtime.skills.assigned).toEqual(["manager", "board-manager"]);
-  });
-
-  it("renders human-readable global config markdown", () => {
-    const markdown = renderGlobalConfigMarkdown();
-
-    expect(markdown).toContain("# OpenGoat Home");
-    expect(markdown).toContain("`config.json`");
-    expect(markdown).toContain("`agents/`");
-    expect(markdown).toContain("OpenClaw owns runtime skill loading");
   });
 });

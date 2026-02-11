@@ -19,6 +19,7 @@ Use this skill when executing assigned work via OpenGoat boards and tasks.
 - You cannot assign tasks to other agents unless you are a manager and the assignee is your direct reportee.
 - You cannot update status, blockers, artifacts, or worklog on tasks assigned to someone else.
 - You cannot rename boards you do not own.
+- You must specify a board id when creating tasks unless you are a manager with a default board.
 
 ## Working Pattern
 

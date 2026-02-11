@@ -34,10 +34,6 @@ export function renderAgentsIndex(nowIso: string, agents: string[]): AgentsIndex
   };
 }
 
-export function renderGlobalConfigMarkdown(): string {
-  return readMarkdownTemplate("global/CONFIG.md");
-}
-
 export function renderGoatAgentsMarkdown(): string {
   return readMarkdownTemplate("goat/AGENTS.md");
 }

@@ -219,4 +219,43 @@ describe("board/task CLI commands", () => {
       status: undefined
     });
   });
+
+  it("task create allows omitting board id", async () => {
+    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
+    const createTask = vi.fn(async () => ({
+      taskId: "task-11",
+      boardId: "goat-board",
+      createdAt: "2026-02-10T00:00:00.000Z",
+      workspace: "~",
+      owner: "goat",
+      assignedTo: "goat",
+      title: "Backlog Grooming",
+      description: "Sort next tasks",
+      status: "todo",
+      blockers: [],
+      artifacts: [],
+      worklog: []
+    }));
+
+    const { context } = createContext({ initialize, createTask });
+    const code = await taskCommand.run(
+      [
+        "create",
+        "--title",
+        "Backlog Grooming",
+        "--description",
+        "Sort next tasks"
+      ],
+      context
+    );
+
+    expect(code).toBe(0);
+    expect(createTask).toHaveBeenCalledWith("goat", undefined, {
+      title: "Backlog Grooming",
+      description: "Sort next tasks",
+      workspace: undefined,
+      assignedTo: undefined,
+      status: undefined
+    });
+  });
 });

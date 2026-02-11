@@ -26,6 +26,8 @@ OpenGoat keeps your org structure as source-of-truth and syncs agent lifecycle t
 - Hierarchical teams via `reportsTo`.
 - OpenClaw-managed skills with OpenGoat-side assignment metadata.
 - CLI-first workflows for create, run, restructure, and audit sessions.
+- Manager default boards: every manager has a non-deletable default board.
+- Task default routing: manager task creation without `<board-id>` uses that manager default board.
 - Goat workspace pre-seeded with `AGENTS.md` + `SOUL.md` to skip first-run OpenClaw bootstrap prompts.
 
 ## Install
