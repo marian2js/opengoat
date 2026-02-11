@@ -1,4 +1,4 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
+import { DEFAULT_AGENT_ID, normalizeAgentId, type TaskRecord } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
 
 export const taskCommand: CliCommand = {
@@ -79,16 +79,29 @@ export const taskCommand: CliCommand = {
       }
 
       if (command === "list") {
-        const boardId = args[1]?.trim();
-        if (!boardId) {
-          context.stderr.write("Missing <board-id>.\n");
+        const parsed = parseListArgs(args.slice(1));
+        if (!parsed.ok) {
+          context.stderr.write(`${parsed.error}\n`);
           printHelp(context.stderr);
           return 1;
         }
-        const json = args.slice(2).includes("--json");
-        const tasks = await context.service.listTasks(boardId);
 
-        if (json) {
+        let tasks: TaskRecord[] = [];
+        if (parsed.boardId) {
+          tasks = await context.service.listTasks(parsed.boardId);
+        } else {
+          const boards = await context.service.listBoards();
+          const tasksByBoard = await Promise.all(
+            boards.map((board) => context.service.listTasks(board.boardId))
+          );
+          tasks = tasksByBoard.flat();
+        }
+
+        if (parsed.owner) {
+          tasks = tasks.filter((task) => task.owner === parsed.owner);
+        }
+
+        if (parsed.json) {
           context.stdout.write(`${JSON.stringify(tasks, null, 2)}\n`);
           return 0;
         }
@@ -99,7 +112,10 @@ export const taskCommand: CliCommand = {
         }
 
         for (const task of tasks) {
-          context.stdout.write(`${task.taskId}\t${task.title}\t[${task.status}]\tassigned=${task.assignedTo}\n`);
+          const boardFragment = parsed.boardId ? "" : `\tboard=${task.boardId}`;
+          context.stdout.write(
+            `${task.taskId}\t${task.title}\t[${task.status}]\tassigned=${task.assignedTo}${boardFragment}\n`
+          );
         }
         return 0;
       }
@@ -225,10 +241,18 @@ interface TaskCronArgsOk {
   inactiveMinutes: number;
 }
 
+interface TaskListArgsOk {
+  ok: true;
+  boardId?: string;
+  owner?: string;
+  json: boolean;
+}
+
 type ParseCreateResult = { ok: false; error: string } | TaskCreateArgsOk;
 type ParseStatusResult = { ok: false; error: string } | TaskStatusArgsOk;
 type ParseEntryResult = { ok: false; error: string } | TaskEntryArgsOk;
 type ParseCronResult = { ok: false; error: string } | TaskCronArgsOk;
+type ParseListResult = { ok: false; error: string } | TaskListArgsOk;
 
 function parseCreateArgs(args: string[]): ParseCreateResult {
   let boardId: string | undefined;
@@ -462,12 +486,62 @@ function parseCronArgs(args: string[]): ParseCronResult {
   };
 }
 
+function parseListArgs(args: string[]): ParseListResult {
+  let boardId: string | undefined;
+  let owner: string | undefined;
+  let json = false;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index]?.trim();
+    if (!token) {
+      continue;
+    }
+
+    if (token === "--json") {
+      json = true;
+      continue;
+    }
+
+    if (token === "--owner") {
+      const value = args[index + 1]?.trim();
+      const normalizedOwner = normalizeAgentId(value || "");
+      if (!normalizedOwner) {
+        return { ok: false, error: "Missing value for --owner." };
+      }
+      owner = normalizedOwner;
+      index += 1;
+      continue;
+    }
+
+    if (token.startsWith("--")) {
+      return { ok: false, error: `Unknown option: ${token}` };
+    }
+
+    if (boardId) {
+      return { ok: false, error: `Unexpected argument: ${token}` };
+    }
+    boardId = token;
+  }
+
+  if (!boardId && !owner) {
+    return { ok: false, error: "Missing <board-id> or --owner <agent-id>." };
+  }
+
+  return {
+    ok: true,
+    boardId,
+    owner,
+    json
+  };
+}
+
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write(
     "  opengoat task create [board-id] --title <title> --description <text> [--workspace <path|~>] [--as <agent-id>] [--assign <agent-id>] [--status <todo|doing|blocked|done>]\n"
   );
-  output.write("  opengoat task list <board-id> [--json]\n");
+  output.write("  opengoat task list <board-id> [--owner <agent-id>] [--json]\n");
+  output.write("  opengoat task list --owner <agent-id> [--json]\n");
   output.write("  opengoat task show <task-id> [--json]\n");
   output.write("  opengoat task status <task-id> <todo|doing|blocked|done> [--as <agent-id>]\n");
   output.write("  opengoat task blocker add <task-id> <content> [--as <agent-id>]\n");

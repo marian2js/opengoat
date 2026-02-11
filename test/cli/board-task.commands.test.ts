@@ -53,6 +53,32 @@ describe("board/task CLI commands", () => {
     expect(stderr.output()).toContain("Specify --title.");
   });
 
+  it("board list filters by owner", async () => {
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const listBoards = vi.fn(async () => [
+      {
+        boardId: "ceo-board",
+        title: "CEO Board",
+        createdAt: "2026-02-10T00:00:00.000Z",
+        owner: "ceo"
+      },
+      {
+        boardId: "cto-board",
+        title: "CTO Board",
+        createdAt: "2026-02-10T00:00:00.000Z",
+        owner: "cto"
+      }
+    ]);
+
+    const { context, stdout } = createContext({ initialize, listBoards });
+    const code = await boardCommand.run(["list", "--owner", "ceo"], context);
+
+    expect(code).toBe(0);
+    expect(listBoards).toHaveBeenCalledOnce();
+    expect(stdout.output()).toContain("ceo-board");
+    expect(stdout.output()).not.toContain("cto-board");
+  });
+
   it("task create forwards actor assignment and metadata", async () => {
     const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
     const createTask = vi.fn(async () => ({
@@ -257,5 +283,69 @@ describe("board/task CLI commands", () => {
       assignedTo: undefined,
       status: undefined
     });
+  });
+
+  it("task list filters by owner across all boards", async () => {
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const listBoards = vi.fn(async () => [
+      {
+        boardId: "ceo-board",
+        title: "CEO Board",
+        createdAt: "2026-02-10T00:00:00.000Z",
+        owner: "ceo"
+      },
+      {
+        boardId: "cto-board",
+        title: "CTO Board",
+        createdAt: "2026-02-10T00:00:00.000Z",
+        owner: "cto"
+      }
+    ]);
+    const listTasks = vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          taskId: "task-a",
+          boardId: "ceo-board",
+          createdAt: "2026-02-10T00:00:00.000Z",
+          workspace: "~",
+          owner: "ceo",
+          assignedTo: "ceo",
+          title: "CEO task",
+          description: "A",
+          status: "todo",
+          blockers: [],
+          artifacts: [],
+          worklog: []
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          taskId: "task-b",
+          boardId: "cto-board",
+          createdAt: "2026-02-10T00:00:00.000Z",
+          workspace: "~",
+          owner: "cto",
+          assignedTo: "cto",
+          title: "CTO task",
+          description: "B",
+          status: "todo",
+          blockers: [],
+          artifacts: [],
+          worklog: []
+        }
+      ]);
+
+    const { context, stdout } = createContext({ initialize, listBoards, listTasks });
+    const code = await taskCommand.run(["list", "--owner", "ceo"], context);
+
+    expect(code).toBe(0);
+    expect(listBoards).toHaveBeenCalledOnce();
+    expect(listTasks).toHaveBeenCalledTimes(2);
+    expect(listTasks).toHaveBeenNthCalledWith(1, "ceo-board");
+    expect(listTasks).toHaveBeenNthCalledWith(2, "cto-board");
+    expect(stdout.output()).toContain("task-a");
+    expect(stdout.output()).not.toContain("task-b");
+    expect(stdout.output()).toContain("board=ceo-board");
   });
 });

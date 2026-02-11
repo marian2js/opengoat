@@ -1,4 +1,4 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
+import { DEFAULT_AGENT_ID, normalizeAgentId } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
 
 export const boardCommand: CliCommand = {
@@ -31,17 +31,24 @@ export const boardCommand: CliCommand = {
       }
 
       if (command === "list") {
-        const json = args.slice(1).includes("--json");
+        const parsed = parseListArgs(args.slice(1));
+        if (!parsed.ok) {
+          context.stderr.write(`${parsed.error}\n`);
+          printHelp(context.stderr);
+          return 1;
+        }
+
         const boards = await context.service.listBoards();
-        if (json) {
-          context.stdout.write(`${JSON.stringify(boards, null, 2)}\n`);
+        const filtered = parsed.owner ? boards.filter((board) => board.owner === parsed.owner) : boards;
+        if (parsed.json) {
+          context.stdout.write(`${JSON.stringify(filtered, null, 2)}\n`);
           return 0;
         }
-        if (boards.length === 0) {
+        if (filtered.length === 0) {
           context.stdout.write("No boards found.\n");
           return 0;
         }
-        for (const board of boards) {
+        for (const board of filtered) {
           context.stdout.write(`${board.boardId}\t${board.title}\towner=${board.owner}\n`);
         }
         return 0;
@@ -103,6 +110,12 @@ interface CreateArgsOk {
   title: string;
 }
 
+interface ListArgsOk {
+  ok: true;
+  json: boolean;
+  owner?: string;
+}
+
 interface UpdateArgsOk {
   ok: true;
   actorId: string;
@@ -111,6 +124,7 @@ interface UpdateArgsOk {
 }
 
 type ParseResult = { ok: false; error: string } | CreateArgsOk;
+type ParseListResult = { ok: false; error: string } | ListArgsOk;
 type ParseUpdateResult = { ok: false; error: string } | UpdateArgsOk;
 
 function parseCreateArgs(args: string[]): ParseResult {
@@ -149,6 +163,42 @@ function parseCreateArgs(args: string[]): ParseResult {
     ok: true,
     actorId,
     title
+  };
+}
+
+function parseListArgs(args: string[]): ParseListResult {
+  let json = false;
+  let owner: string | undefined;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index]?.trim();
+    if (!token) {
+      continue;
+    }
+
+    if (token === "--json") {
+      json = true;
+      continue;
+    }
+
+    if (token === "--owner") {
+      const value = args[index + 1]?.trim();
+      const normalized = normalizeAgentId(value || "");
+      if (!normalized) {
+        return { ok: false, error: "Missing value for --owner." };
+      }
+      owner = normalized;
+      index += 1;
+      continue;
+    }
+
+    return { ok: false, error: `Unknown option: ${token}` };
+  }
+
+  return {
+    ok: true,
+    json,
+    owner
   };
 }
 
@@ -202,7 +252,7 @@ function parseUpdateArgs(args: string[]): ParseUpdateResult {
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write("  opengoat board create <title> [--as <agent-id>]\n");
-  output.write("  opengoat board list [--json]\n");
+  output.write("  opengoat board list [--owner <agent-id>] [--json]\n");
   output.write("  opengoat board show <board-id> [--json]\n");
   output.write("  opengoat board update <board-id> [--as <agent-id>] --title <title>\n");
 }
