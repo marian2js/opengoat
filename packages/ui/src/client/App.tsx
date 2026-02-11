@@ -920,8 +920,8 @@ export function App(): ReactElement {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="flex min-h-screen">
+    <div className="h-screen bg-background text-foreground">
+      <div className="flex h-full">
         <aside
           className={cn(
             "hidden border-r border-border bg-card/50 transition-[width] duration-200 md:flex md:flex-col",
@@ -943,7 +943,7 @@ export function App(): ReactElement {
             </button>
           </div>
 
-          <nav className="flex-1 p-2">
+          <nav className="min-h-0 flex-1 overflow-y-auto p-2">
             {SIDEBAR_ITEMS.map((item) => {
               const Icon = item.icon;
               const active = route.kind === "page" && item.id === route.view;
@@ -1169,7 +1169,7 @@ export function App(): ReactElement {
           </div>
         </aside>
 
-        <div className="flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
           <header className="border-b border-border bg-background/95 px-4 py-4 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -1232,7 +1232,12 @@ export function App(): ReactElement {
             </div>
           </div>
 
-          <main className="space-y-4 p-4 sm:p-6">
+          <main
+            className={cn(
+              "flex min-h-0 flex-1 flex-col gap-4 p-4 sm:p-6",
+              route.kind === "session" ? "overflow-hidden" : "overflow-y-auto"
+            )}
+          >
             {error ? (
               <Card className="border-danger/40 bg-danger/5">
                 <CardContent className="pt-5">
@@ -1263,7 +1268,7 @@ export function App(): ReactElement {
             {!state && isLoading ? <p className="text-sm text-muted-foreground">Loading runtime data...</p> : null}
 
             {state ? (
-              <div className="space-y-4">
+              <div className={cn(route.kind === "session" ? "flex min-h-0 flex-1 flex-col" : "space-y-4")}>
                 {route.kind === "page" && route.view === "overview" ? (
                   <>
                     <div className="grid gap-4 xl:grid-cols-3">
@@ -1393,59 +1398,54 @@ export function App(): ReactElement {
                 ) : null}
 
                 {route.kind === "session" ? (
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <h2 className="text-xl font-semibold">{selectedSession?.title ?? "Session Not Found"}</h2>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedSession
-                          ? "Send messages directly into this session."
-                          : `No saved session was found for id ${route.sessionId}.`}
-                      </p>
-                    </div>
-                    {selectedSession ? (
-                      <>
-                        <Conversation className="h-[520px] rounded-lg border border-border/70 bg-background/30">
-                          <ConversationContent className="gap-4 p-4">
-                            {sessionMessages.length === 0 ? (
-                              <ConversationEmptyState
-                                icon={<MessageSquare className="size-10" />}
-                                title="Start this session"
-                                description="Send your first message below."
-                              />
-                            ) : (
-                              sessionMessages.map((message) => (
-                                <Message from={message.role} key={message.id}>
-                                  <MessageContent>
-                                    <MessageResponse>{message.content}</MessageResponse>
-                                  </MessageContent>
-                                </Message>
-                              ))
-                            )}
-                          </ConversationContent>
-                          <ConversationScrollButton />
-                        </Conversation>
+                  selectedSession ? (
+                    <div className="flex min-h-0 flex-1 flex-col">
+                      <Conversation className="min-h-0 flex-1">
+                        <ConversationContent className="gap-4 p-4">
+                          {sessionMessages.length === 0 ? (
+                            <ConversationEmptyState
+                              icon={<MessageSquare className="size-10" />}
+                              title="Start this session"
+                              description="Send your first message below."
+                            />
+                          ) : (
+                            sessionMessages.map((message) => (
+                              <Message from={message.role} key={message.id}>
+                                <MessageContent>
+                                  <MessageResponse>{message.content}</MessageResponse>
+                                </MessageContent>
+                              </Message>
+                            ))
+                          )}
+                        </ConversationContent>
+                        <ConversationScrollButton />
+                      </Conversation>
 
-                        <PromptInput
-                          onSubmit={(message) => {
-                            void handleSessionPromptSubmit(message);
-                          }}
-                        >
-                          <PromptInputBody>
-                            <PromptInputTextarea
-                              placeholder="Message this session..."
-                              disabled={sessionChatStatus === "streaming" || isLoading || isMutating}
-                            />
-                          </PromptInputBody>
-                          <PromptInputFooter>
-                            <PromptInputSubmit
-                              status={sessionChatStatus}
-                              disabled={sessionChatStatus === "streaming" || isLoading || isMutating}
-                            />
-                          </PromptInputFooter>
-                        </PromptInput>
-                      </>
-                    ) : null}
-                  </div>
+                      <PromptInput
+                        className="mt-4 shrink-0"
+                        onSubmit={(message) => {
+                          void handleSessionPromptSubmit(message);
+                        }}
+                      >
+                        <PromptInputBody>
+                          <PromptInputTextarea
+                            placeholder="Message this session..."
+                            disabled={sessionChatStatus === "streaming" || isLoading || isMutating}
+                          />
+                        </PromptInputBody>
+                        <PromptInputFooter>
+                          <PromptInputSubmit
+                            status={sessionChatStatus}
+                            disabled={sessionChatStatus === "streaming" || isLoading || isMutating}
+                          />
+                        </PromptInputFooter>
+                      </PromptInput>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {`No saved session was found for id ${route.sessionId}.`}
+                    </p>
+                  )
                 ) : null}
 
                 {route.kind === "page" && route.view === "skills" ? (
