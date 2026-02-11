@@ -160,6 +160,36 @@ describe("SkillService", () => {
     const globalSkills = await service.listGlobalSkills(paths);
     expect(globalSkills.some((skill) => skill.id === "global-helper")).toBe(true);
   });
+
+  it("reconciles role skills when switching between manager and individual skills", async () => {
+    const { service, paths } = await createHarness();
+
+    await service.installSkill(paths, {
+      agentId: "goat",
+      skillName: "manager",
+      description: "Manager role skill"
+    });
+
+    const managerConfig = JSON.parse(await readFile(path.join(paths.agentsDir, "goat", "config.json"), "utf8")) as {
+      organization?: { type?: string };
+      runtime?: { skills?: { assigned?: string[] } };
+    };
+    expect(managerConfig.organization?.type).toBe("manager");
+    expect(managerConfig.runtime?.skills?.assigned).toEqual(["manager", "board-manager"]);
+
+    await service.installSkill(paths, {
+      agentId: "goat",
+      skillName: "board-individual",
+      description: "Individual role skill"
+    });
+
+    const individualConfig = JSON.parse(await readFile(path.join(paths.agentsDir, "goat", "config.json"), "utf8")) as {
+      organization?: { type?: string };
+      runtime?: { skills?: { assigned?: string[] } };
+    };
+    expect(individualConfig.organization?.type).toBe("individual");
+    expect(individualConfig.runtime?.skills?.assigned).toEqual(["board-individual"]);
+  });
 });
 
 async function createHarness(): Promise<{

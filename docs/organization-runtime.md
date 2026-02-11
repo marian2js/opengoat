@@ -52,7 +52,9 @@ Skills are delegated to OpenClaw.
 - OpenClaw loads bundled skills, managed skills (`~/.openclaw/skills`), and workspace-local `skills/`
 - OpenGoat stores per-agent skill assignment metadata
 - manager capability is represented by assigned `manager` skill
-- bootstrap pre-installs `manager` for `goat` at `workspaces/goat/skills/manager/SKILL.md`
+- role skills are workspace-installed and assignment-synced:
+  - managers: `manager`, `board-manager`
+  - individuals: `board-individual`
 
 ## Sessions
 

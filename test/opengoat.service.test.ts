@@ -62,6 +62,14 @@ describe("OpenGoatService", () => {
     expect(created.runtimeSync?.runtimeId).toBe("openclaw");
     expect(created.runtimeSync?.code).toBe(0);
 
+    const createdConfig = JSON.parse(
+      await readFile(path.join(root, "agents", "research-analyst", "config.json"), "utf-8")
+    ) as { runtime?: { skills?: { assigned?: string[] } } };
+    expect(createdConfig.runtime?.skills?.assigned).toEqual(["research", "board-individual"]);
+    await expect(
+      access(path.join(root, "workspaces", "research-analyst", "skills", "board-individual", "SKILL.md"), constants.F_OK)
+    ).resolves.toBeUndefined();
+
     const agents = await service.listAgents();
     expect(agents.map((agent) => agent.id)).toEqual(["goat", "research-analyst"]);
     expect(agents.find((agent) => agent.id === "goat")?.role).toBe("Head of Organization");
@@ -191,9 +199,14 @@ describe("OpenGoatService", () => {
     const agentsMarkdown = await readFile(path.join(goatWorkspace, "AGENTS.md"), "utf-8");
     const soulMarkdown = await readFile(path.join(goatWorkspace, "SOUL.md"), "utf-8");
     const managerSkillMarkdown = await readFile(path.join(goatWorkspace, "skills", "manager", "SKILL.md"), "utf-8");
+    const boardManagerSkillMarkdown = await readFile(
+      path.join(goatWorkspace, "skills", "board-manager", "SKILL.md"),
+      "utf-8"
+    );
     expect(agentsMarkdown).toContain("OpenGoat Goat Workspace");
     expect(soulMarkdown).toContain("You are `goat`, the OpenGoat head manager.");
     expect(managerSkillMarkdown).toContain("name: manager");
+    expect(boardManagerSkillMarkdown).toContain("name: board-manager");
   });
 
   it("updates who an agent reports to", async () => {

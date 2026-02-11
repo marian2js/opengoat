@@ -195,6 +195,12 @@ export class OpenGoatService {
     }
 
     try {
+      await this.agentService.syncAgentRoleAssignments(paths, DEFAULT_AGENT_ID);
+    } catch (error) {
+      warnings.push(`OpenGoat role skill assignment sync for "goat" failed: ${toErrorMessage(error)}`);
+    }
+
+    try {
       await this.agentService.ensureGoatWorkspaceBootstrap(paths);
     } catch (error) {
       warnings.push(`OpenGoat workspace bootstrap for "goat" failed: ${toErrorMessage(error)}`);
@@ -234,6 +240,20 @@ export class OpenGoatService {
       skills: options.skills,
       role: options.role
     });
+    try {
+      await this.agentService.syncAgentRoleAssignments(paths, created.agent.id);
+      const workspaceSkillSync = await this.agentService.ensureAgentWorkspaceRoleSkills(paths, created.agent.id);
+      created.createdPaths.push(...workspaceSkillSync.createdPaths);
+      created.skippedPaths.push(...workspaceSkillSync.skippedPaths);
+      created.skippedPaths.push(...workspaceSkillSync.removedPaths);
+    } catch (error) {
+      if (!created.alreadyExisted) {
+        await this.agentService.removeAgent(paths, created.agent.id);
+      }
+      throw new Error(
+        `Failed to sync role skills for "${created.agent.id}". ${toErrorMessage(error)}`
+      );
+    }
 
     const runtimeSync = await this.providerService.createProviderAgent(paths, created.agent.id, {
       providerId: OPENCLAW_PROVIDER_ID,
@@ -301,7 +321,10 @@ export class OpenGoatService {
 
   public async setAgentManager(rawAgentId: string, rawReportsTo: string | null): Promise<AgentManagerUpdateResult> {
     const paths = this.pathsProvider.getPaths();
-    return this.agentService.setAgentManager(paths, rawAgentId, rawReportsTo);
+    const updated = await this.agentService.setAgentManager(paths, rawAgentId, rawReportsTo);
+    await this.agentService.syncAgentRoleAssignments(paths, updated.agentId);
+    await this.agentService.ensureAgentWorkspaceRoleSkills(paths, updated.agentId);
+    return updated;
   }
 
   public async listAgents(): Promise<AgentDescriptor[]> {
