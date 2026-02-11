@@ -82,7 +82,12 @@ opengoat agent list
 
 Skills are owned by OpenClaw (bundled + `~/.openclaw/skills` + workspace-local `skills/`).
 
-On bootstrap, OpenGoat pre-installs `manager` for `goat` at `workspaces/goat/skills/manager/SKILL.md`.
+On bootstrap, OpenGoat pre-installs role skills in agent workspaces:
+
+- managers: `manager`, `board-manager`
+- individuals: `board-individual`
+
+For `goat`, this is written under `workspaces/goat/skills/`.
 
 OpenGoat keeps per-agent skill assignment metadata and includes compatibility install/list commands:
 

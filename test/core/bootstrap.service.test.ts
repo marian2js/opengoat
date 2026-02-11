@@ -42,6 +42,8 @@ describe("BootstrapService", () => {
     expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "AGENTS.md"))).toBe(true);
     expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "SOUL.md"))).toBe(true);
     expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "skills", "manager", "SKILL.md"))).toBe(true);
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "skills", "board-manager", "SKILL.md"))).toBe(true);
+    expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "skills", "board-individual"))).toBe(false);
     expect(await fileSystem.exists(path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md"))).toBe(false);
     expect(await fileSystem.exists(paths.skillsDir)).toBe(false);
   });

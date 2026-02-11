@@ -172,7 +172,7 @@ export class SkillService {
       await this.fileSystem.copyDir(sourceDir, targetDir);
       if (scope === "agent") {
         await this.assignSkillToAgent(paths, normalizedAgentId, skillId);
-        await this.promoteManagerIfNeeded(paths, normalizedAgentId, skillId);
+        await this.reconcileRoleSkillsIfNeeded(paths, normalizedAgentId, skillId);
       }
 
       return {
@@ -200,7 +200,7 @@ export class SkillService {
 
     if (scope === "agent") {
       await this.assignSkillToAgent(paths, normalizedAgentId, skillId);
-      await this.promoteManagerIfNeeded(paths, normalizedAgentId, skillId);
+      await this.reconcileRoleSkillsIfNeeded(paths, normalizedAgentId, skillId);
     }
 
     return {
@@ -325,9 +325,9 @@ export class SkillService {
     await this.fileSystem.writeFile(configPath, `${JSON.stringify(parsed, null, 2)}\n`);
   }
 
-  private async promoteManagerIfNeeded(paths: OpenGoatPaths, agentId: string, skillId: string): Promise<void> {
+  private async reconcileRoleSkillsIfNeeded(paths: OpenGoatPaths, agentId: string, skillId: string): Promise<void> {
     const normalizedSkill = skillId.trim().toLowerCase();
-    if (normalizedSkill !== MANAGER_SKILL_ID) {
+    if (normalizedSkill !== MANAGER_SKILL_ID && normalizedSkill !== BOARD_INDIVIDUAL_SKILL_ID) {
       return;
     }
 
@@ -342,11 +342,38 @@ export class SkillService {
       parsed.organization && typeof parsed.organization === "object" && !Array.isArray(parsed.organization)
         ? (parsed.organization as Record<string, unknown>)
         : {};
-    organizationRecord.type = "manager";
+    const runtimeRecord =
+      parsed.runtime && typeof parsed.runtime === "object" && !Array.isArray(parsed.runtime)
+        ? (parsed.runtime as Record<string, unknown>)
+        : {};
+    const skillsRecord =
+      runtimeRecord.skills && typeof runtimeRecord.skills === "object" && !Array.isArray(runtimeRecord.skills)
+        ? (runtimeRecord.skills as Record<string, unknown>)
+        : {};
+    const assignedRaw = Array.isArray(skillsRecord.assigned) ? skillsRecord.assigned : [];
+    const assigned = [...new Set(assignedRaw.map((value) => String(value).trim().toLowerCase()).filter(Boolean))];
+
+    if (normalizedSkill === MANAGER_SKILL_ID) {
+      organizationRecord.type = "manager";
+      const withoutIndividual = assigned.filter((entry) => entry !== BOARD_INDIVIDUAL_SKILL_ID);
+      skillsRecord.assigned = [...new Set([...withoutIndividual, MANAGER_SKILL_ID, BOARD_MANAGER_SKILL_ID])];
+    } else {
+      organizationRecord.type = "individual";
+      const withoutManager = assigned.filter(
+        (entry) => entry !== MANAGER_SKILL_ID && entry !== BOARD_MANAGER_SKILL_ID
+      );
+      skillsRecord.assigned = [...new Set([...withoutManager, BOARD_INDIVIDUAL_SKILL_ID])];
+    }
+
+    runtimeRecord.skills = skillsRecord;
+    parsed.runtime = runtimeRecord as AgentConfigShape["runtime"];
     parsed.organization = organizationRecord as AgentConfigShape["organization"];
     await this.fileSystem.writeFile(configPath, `${JSON.stringify(parsed, null, 2)}\n`);
   }
 }
+
+const BOARD_MANAGER_SKILL_ID = "board-manager";
+const BOARD_INDIVIDUAL_SKILL_ID = "board-individual";
 
 function renderSkillMarkdown(params: { skillId: string; description: string }): string {
   return [

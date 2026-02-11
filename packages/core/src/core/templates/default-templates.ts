@@ -12,6 +12,11 @@ export interface AgentTemplateOptions {
   role?: string;
 }
 
+const ROLE_SKILLS: Record<"manager" | "individual", string[]> = {
+  manager: ["manager", "board-manager"],
+  individual: ["board-individual"]
+};
+
 export function renderGlobalConfig(nowIso: string): OpenGoatConfig {
   return {
     schemaVersion: 1,
@@ -45,6 +50,14 @@ export function renderManagerSkillMarkdown(): string {
   return readMarkdownTemplate("goat/skills/manager/SKILL.md");
 }
 
+export function renderBoardManagerSkillMarkdown(): string {
+  return readMarkdownTemplate("skills/board-manager/SKILL.md");
+}
+
+export function renderBoardIndividualSkillMarkdown(): string {
+  return readMarkdownTemplate("skills/board-individual/SKILL.md");
+}
+
 export function renderInternalAgentConfig(
   agent: AgentIdentity,
   options: AgentTemplateOptions = {}
@@ -54,7 +67,7 @@ export function renderInternalAgentConfig(
   const role = resolveAgentRole(agent.id, type, options.role ?? agent.role);
   const reportsTo =
     options.reportsTo === undefined ? (isGoat ? null : DEFAULT_AGENT_ID) : options.reportsTo;
-  const assignedSkills = dedupe(options.skills ?? (type === "manager" ? ["manager"] : []));
+  const assignedSkills = dedupe(options.skills ?? ROLE_SKILLS[type]);
 
   return {
     schemaVersion: 2,

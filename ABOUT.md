@@ -66,8 +66,12 @@ Assignment model:
 
 Agent runtime config stores assignment under `runtime.skills.assigned`.
 
-OpenGoat pre-installs the `manager` skill for `goat` in `workspaces/goat/skills/manager/SKILL.md`
-so OpenClaw can resolve it from the agent workspace.
+OpenGoat pre-installs role skills in each agent workspace so OpenClaw can resolve them:
+
+- managers: `manager`, `board-manager`
+- individuals: `board-individual`
+
+`goat` receives manager role skills by default under `workspaces/goat/skills/`.
 
 ## 6) OpenClaw Integration
 
