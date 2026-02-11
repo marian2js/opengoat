@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { OpenClawProvider } from "./provider.js";
+import { homedir } from "node:os";
+import { delimiter, dirname, join } from "node:path";
 
 describe("openclaw provider", () => {
+  class TestableOpenClawProvider extends OpenClawProvider {
+    public exposePrepareExecutionEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+      return this.prepareExecutionEnv(env);
+    }
+  }
+
   it("maps invoke options", () => {
     const provider = new OpenClawProvider();
     const invocation = provider.buildInvocation({
@@ -142,5 +150,19 @@ describe("openclaw provider", () => {
       "--token",
       "secret",
     ]);
+  });
+
+  it("expands PATH to include common user npm/bin locations", () => {
+    const provider = new TestableOpenClawProvider();
+    const prepared = provider.exposePrepareExecutionEnv({
+      PATH: "/usr/bin",
+      npm_config_prefix: "/tmp/opengoat-prefix",
+    });
+
+    const entries = (prepared.PATH ?? "").split(delimiter);
+    expect(entries).toContain(dirname(process.execPath));
+    expect(entries).toContain(join(homedir(), ".npm-global", "bin"));
+    expect(entries).toContain(join("/tmp/opengoat-prefix", "bin"));
+    expect(entries).toContain("/usr/bin");
   });
 });

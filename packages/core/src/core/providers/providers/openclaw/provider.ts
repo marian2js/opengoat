@@ -7,7 +7,8 @@ import type {
   ProviderExecutionResult,
   ProviderInvokeOptions,
 } from "../../types.js";
-import { delimiter } from "node:path";
+import { homedir } from "node:os";
+import { delimiter, dirname, join } from "node:path";
 
 export class OpenClawProvider extends BaseCliProvider {
   public constructor() {
@@ -58,15 +59,7 @@ export class OpenClawProvider extends BaseCliProvider {
   }
 
   protected override prepareExecutionEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-    if (process.platform !== "darwin") {
-      return env;
-    }
-
-    const preferredNodePaths = [
-      "/opt/homebrew/bin",
-      "/opt/homebrew/opt/node@22/bin",
-      "/usr/local/opt/node@22/bin",
-    ];
+    const preferredNodePaths = resolvePreferredCommandPaths(env);
     const mergedPath = dedupePathEntries([
       ...preferredNodePaths,
       ...(env.PATH?.split(delimiter) ?? []),
@@ -141,4 +134,38 @@ function dedupePathEntries(entries: string[]): string[] {
   }
 
   return result;
+}
+
+function resolvePreferredCommandPaths(env: NodeJS.ProcessEnv): string[] {
+  const homeDir = homedir();
+  const preferredPaths: string[] = [
+    dirname(process.execPath),
+    join(homeDir, ".npm-global", "bin"),
+    join(homeDir, ".npm", "bin"),
+    join(homeDir, ".local", "bin"),
+    join(homeDir, ".volta", "bin"),
+    join(homeDir, ".fnm", "current", "bin"),
+    join(homeDir, ".asdf", "shims"),
+    join(homeDir, "bin"),
+  ];
+
+  const npmPrefixCandidates = dedupePathEntries([
+    env.npm_config_prefix ?? "",
+    env.NPM_CONFIG_PREFIX ?? "",
+    process.env.npm_config_prefix ?? "",
+    process.env.NPM_CONFIG_PREFIX ?? "",
+  ]);
+  for (const prefix of npmPrefixCandidates) {
+    preferredPaths.push(join(prefix, "bin"));
+  }
+
+  if (process.platform === "darwin") {
+    preferredPaths.push(
+      "/opt/homebrew/bin",
+      "/opt/homebrew/opt/node@22/bin",
+      "/usr/local/opt/node@22/bin",
+    );
+  }
+
+  return preferredPaths;
 }
