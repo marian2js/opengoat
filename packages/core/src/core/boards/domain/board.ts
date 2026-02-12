@@ -8,7 +8,7 @@ export interface TaskRecord {
   taskId: string;
   boardId: string;
   createdAt: string;
-  workspace: string;
+  project: string;
   owner: string;
   assignedTo: string;
   title: string;
@@ -41,7 +41,7 @@ export interface UpdateBoardOptions {
 export interface CreateTaskOptions {
   title: string;
   description: string;
-  workspace?: string;
+  project?: string;
   assignedTo?: string;
   status?: string;
 }

@@ -113,7 +113,7 @@ export interface OpenClawUiService {
     options: {
       title: string;
       description: string;
-      workspace?: string;
+      project?: string;
       assignedTo?: string;
       status?: string;
     }
@@ -172,7 +172,7 @@ interface TaskRecord {
   taskId: string;
   boardId: string;
   createdAt: string;
-  workspace: string;
+  project: string;
   owner: string;
   assignedTo: string;
   title: string;
@@ -502,7 +502,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
       boardId?: string;
       title?: string;
       description?: string;
-      workspace?: string;
+      project?: string;
       assignedTo?: string;
       status?: string;
     };
@@ -512,7 +512,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
       const boardId = request.body?.boardId?.trim();
       const title = request.body?.title?.trim();
       const description = request.body?.description?.trim();
-      const workspace = request.body?.workspace?.trim();
+      const project = request.body?.project?.trim();
       const assignedTo = request.body?.assignedTo?.trim();
       const status = request.body?.status?.trim();
 
@@ -538,7 +538,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
       const task = await createUiTask(service, actorId, boardId, {
         title,
         description,
-        workspace,
+        project,
         assignedTo,
         status
       });
@@ -1225,7 +1225,7 @@ async function createUiTask(
   options: {
     title: string;
     description: string;
-    workspace?: string;
+    project?: string;
     assignedTo?: string;
     status?: string;
   }

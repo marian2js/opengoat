@@ -129,7 +129,7 @@ interface TaskRecord {
   taskId: string;
   boardId: string;
   createdAt: string;
-  workspace: string;
+  project: string;
   owner: string;
   assignedTo: string;
   title: string;
@@ -313,7 +313,7 @@ interface MetricCard {
 interface TaskCreateDraft {
   title: string;
   description: string;
-  workspace: string;
+  project: string;
   assignedTo: string;
   status: "todo" | "doing" | "blocked" | "done";
 }
@@ -937,7 +937,7 @@ export function App(): ReactElement {
           : {
               title: "",
               description: "",
-              workspace: "~",
+              project: "~",
               assignedTo,
               status: "todo"
             };
@@ -1315,7 +1315,7 @@ export function App(): ReactElement {
       const existing = current[boardId] ?? {
         title: "",
         description: "",
-        workspace: "~",
+        project: "~",
         assignedTo: taskActorId,
         status: "todo"
       };
@@ -1402,7 +1402,7 @@ export function App(): ReactElement {
     const draft = taskDraftByBoardId[boardId];
     const title = draft?.title.trim() ?? "";
     const description = draft?.description.trim() ?? "";
-    const workspace = draft?.workspace.trim() || "~";
+    const project = draft?.project.trim() || "~";
     const assignedTo = draft?.assignedTo?.trim();
     const status = draft?.status ?? "todo";
 
@@ -1448,7 +1448,7 @@ export function App(): ReactElement {
           boardId,
           title,
           description,
-          workspace,
+          project,
           assignedTo,
           status
         })
@@ -1461,7 +1461,7 @@ export function App(): ReactElement {
             ...(current[boardId] ?? {
               title: "",
               description: "",
-              workspace: "~",
+              project: "~",
               assignedTo,
               status: "todo"
             }),
@@ -2251,7 +2251,7 @@ export function App(): ReactElement {
                   const draft = taskDraftByBoardId[selectedBoard.boardId] ?? {
                     title: "",
                     description: "",
-                    workspace: "~",
+                    project: "~",
                     assignedTo: taskActorId,
                     status: "todo" as const
                   };
@@ -2302,13 +2302,13 @@ export function App(): ReactElement {
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskWorkspace">
-                            Workspace
+                          <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskProject">
+                            Project
                           </label>
                           <Input
-                            id="createTaskWorkspace"
-                            value={draft.workspace}
-                            onChange={(event) => updateTaskDraft(selectedBoard.boardId, { workspace: event.target.value })}
+                            id="createTaskProject"
+                            value={draft.project}
+                            onChange={(event) => updateTaskDraft(selectedBoard.boardId, { project: event.target.value })}
                             placeholder="~"
                           />
                         </div>

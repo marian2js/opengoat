@@ -85,7 +85,7 @@ describe("board/task CLI commands", () => {
       taskId: "task-1234abcd",
       boardId: "delivery-board",
       createdAt: "2026-02-10T00:00:00.000Z",
-      workspace: "~",
+      project: "~",
       owner: "ceo",
       assignedTo: "cto",
       title: "Define API",
@@ -120,12 +120,12 @@ describe("board/task CLI commands", () => {
     expect(createTask).toHaveBeenCalledWith("ceo", "delivery-board", {
       title: "Define API",
       description: "Draft API contract",
-      workspace: undefined,
+      project: undefined,
       assignedTo: "cto",
       status: "doing"
     });
     expect(stdout.output()).toContain("Task created: Define API (task-1234abcd)");
-    expect(stdout.output()).toContain("Workspace: ~");
+    expect(stdout.output()).toContain("Project: ~");
   });
 
   it("task status forwards actor and new status", async () => {
@@ -134,7 +134,7 @@ describe("board/task CLI commands", () => {
       taskId: "task-1234abcd",
       boardId: "delivery-board",
       createdAt: "2026-02-10T00:00:00.000Z",
-      workspace: "~",
+      project: "~",
       owner: "ceo",
       assignedTo: "cto",
       title: "Define API",
@@ -160,7 +160,7 @@ describe("board/task CLI commands", () => {
       taskId: "task-1234abcd",
       boardId: "delivery-board",
       createdAt: "2026-02-10T00:00:00.000Z",
-      workspace: "~",
+      project: "~",
       owner: "ceo",
       assignedTo: "cto",
       title: "Define API",
@@ -204,13 +204,13 @@ describe("board/task CLI commands", () => {
     expect(stdout.output()).toContain("[task-cron] ran=2026-02-10T00:00:00.000Z");
   });
 
-  it("task create forwards custom workspace", async () => {
+  it("task create forwards custom project", async () => {
     const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
     const createTask = vi.fn(async () => ({
       taskId: "task-9",
       boardId: "delivery-board",
       createdAt: "2026-02-10T00:00:00.000Z",
-      workspace: "/repo/service",
+      project: "/repo/service",
       owner: "ceo",
       assignedTo: "ceo",
       title: "Review API",
@@ -230,7 +230,7 @@ describe("board/task CLI commands", () => {
         "Review API",
         "--description",
         "Review details",
-        "--workspace",
+        "--project",
         "/repo/service"
       ],
       context
@@ -240,7 +240,7 @@ describe("board/task CLI commands", () => {
     expect(createTask).toHaveBeenCalledWith("ceo", "delivery-board", {
       title: "Review API",
       description: "Review details",
-      workspace: "/repo/service",
+      project: "/repo/service",
       assignedTo: undefined,
       status: undefined
     });
@@ -252,7 +252,7 @@ describe("board/task CLI commands", () => {
       taskId: "task-11",
       boardId: "ceo-board",
       createdAt: "2026-02-10T00:00:00.000Z",
-      workspace: "~",
+      project: "~",
       owner: "ceo",
       assignedTo: "ceo",
       title: "Backlog Grooming",
@@ -279,7 +279,7 @@ describe("board/task CLI commands", () => {
     expect(createTask).toHaveBeenCalledWith("ceo", undefined, {
       title: "Backlog Grooming",
       description: "Sort next tasks",
-      workspace: undefined,
+      project: undefined,
       assignedTo: undefined,
       status: undefined
     });
@@ -308,7 +308,7 @@ describe("board/task CLI commands", () => {
           taskId: "task-a",
           boardId: "ceo-board",
           createdAt: "2026-02-10T00:00:00.000Z",
-          workspace: "~",
+          project: "~",
           owner: "ceo",
           assignedTo: "ceo",
           title: "CEO task",
@@ -324,7 +324,7 @@ describe("board/task CLI commands", () => {
           taskId: "task-b",
           boardId: "cto-board",
           createdAt: "2026-02-10T00:00:00.000Z",
-          workspace: "~",
+          project: "~",
           owner: "cto",
           assignedTo: "cto",
           title: "CTO task",

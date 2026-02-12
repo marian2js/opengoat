@@ -74,7 +74,7 @@ export const boardCommand: CliCommand = {
         context.stdout.write(`Tasks: ${board.tasks.length}\n`);
         for (const task of board.tasks) {
           context.stdout.write(
-            `- ${task.taskId}: ${task.title} [${task.status}] workspace=${task.workspace} -> ${task.assignedTo}\n`
+            `- ${task.taskId}: ${task.title} [${task.status}] project=${task.project} -> ${task.assignedTo}\n`
           );
         }
         return 0;

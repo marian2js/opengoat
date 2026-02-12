@@ -36,7 +36,7 @@ interface TaskRow {
   task_id: string;
   board_id: string;
   created_at: string;
-  workspace: string;
+  project: string;
   owner_agent_id: string;
   assigned_to_agent_id: string;
   title: string;
@@ -51,7 +51,7 @@ interface EntryRow {
 }
 
 const TASK_STATUSES = ["todo", "doing", "blocked", "done"] as const;
-const DEFAULT_TASK_WORKSPACE = "~";
+const DEFAULT_TASK_PROJECT = "~";
 const require = createRequire(import.meta.url);
 
 export class BoardService {
@@ -197,7 +197,7 @@ export class BoardService {
     }
 
     const status = normalizeTaskStatus(options.status);
-    const workspace = normalizeTaskWorkspace(options.workspace);
+    const project = normalizeTaskProject(options.project);
     const { boardId: resolvedBoardId } = this.resolveBoardForTaskCreation(db, actor, boardId);
 
     const taskId = createEntityId(`task-${title}`);
@@ -208,14 +208,14 @@ export class BoardService {
          task_id,
          board_id,
          created_at,
-         workspace,
+         project,
          owner_agent_id,
          assigned_to_agent_id,
          title,
          description,
          status
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [taskId, resolvedBoardId, createdAt, workspace, normalizedActorId, assignedTo, title, description, status]
+      [taskId, resolvedBoardId, createdAt, project, normalizedActorId, assignedTo, title, description, status]
     );
     await this.persistDatabase(paths, db);
 
@@ -392,7 +392,7 @@ export class BoardService {
   private async listTasksByBoardId(db: SqlJsDatabase, boardId: string): Promise<TaskRecord[]> {
     const rows = this.queryAll<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, workspace, owner_agent_id, assigned_to_agent_id, title, description, status
+      `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status
        FROM tasks
        WHERE board_id = ?
        ORDER BY created_at ASC`,
@@ -410,7 +410,7 @@ export class BoardService {
   private requireTask(db: SqlJsDatabase, taskId: string): TaskRecord {
     const row = this.queryOne<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, workspace, owner_agent_id, assigned_to_agent_id, title, description, status
+      `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status
        FROM tasks
        WHERE task_id = ?`,
       [taskId]
@@ -453,7 +453,7 @@ export class BoardService {
       taskId: row.task_id,
       boardId: row.board_id,
       createdAt: row.created_at,
-      workspace: row.workspace || DEFAULT_TASK_WORKSPACE,
+      project: row.project || DEFAULT_TASK_PROJECT,
       owner: row.owner_agent_id,
       assignedTo: row.assigned_to_agent_id,
       title: row.title,
@@ -517,7 +517,7 @@ export class BoardService {
          task_id TEXT PRIMARY KEY,
          board_id TEXT NOT NULL,
          created_at TEXT NOT NULL,
-         workspace TEXT NOT NULL DEFAULT '${DEFAULT_TASK_WORKSPACE}',
+         project TEXT NOT NULL DEFAULT '${DEFAULT_TASK_PROJECT}',
          owner_agent_id TEXT NOT NULL,
          assigned_to_agent_id TEXT NOT NULL,
          title TEXT NOT NULL,
@@ -526,7 +526,7 @@ export class BoardService {
          FOREIGN KEY(board_id) REFERENCES boards(board_id) ON DELETE CASCADE
        );`
     );
-    this.ensureTaskWorkspaceColumn(db);
+    this.ensureTaskProjectColumn(db);
     this.execute(
       db,
       `CREATE TABLE IF NOT EXISTS task_blockers (
@@ -624,17 +624,28 @@ export class BoardService {
     return all[0];
   }
 
-  private ensureTaskWorkspaceColumn(db: SqlJsDatabase): void {
+  private ensureTaskProjectColumn(db: SqlJsDatabase): void {
     const columns = this.queryAll<{ name: string }>(db, "PRAGMA table_info(tasks);");
-    const hasWorkspace = columns.some((column) => column.name === "workspace");
-    if (hasWorkspace) {
+    const hasProject = columns.some((column) => column.name === "project");
+    if (hasProject) {
       return;
     }
 
     this.execute(
       db,
-      `ALTER TABLE tasks ADD COLUMN workspace TEXT NOT NULL DEFAULT '${DEFAULT_TASK_WORKSPACE}';`
+      `ALTER TABLE tasks ADD COLUMN project TEXT NOT NULL DEFAULT '${DEFAULT_TASK_PROJECT}';`
     );
+
+    const hasWorkspace = columns.some((column) => column.name === "workspace");
+    if (hasWorkspace) {
+      this.execute(
+        db,
+        `UPDATE tasks
+         SET project = workspace
+         WHERE workspace IS NOT NULL
+           AND TRIM(workspace) <> '';`
+      );
+    }
   }
 
   private ensureBoardDefaultColumn(db: SqlJsDatabase): void {
@@ -845,10 +856,10 @@ function normalizeTaskStatus(rawStatus: string | undefined, allowEmpty = false):
   return normalized;
 }
 
-function normalizeTaskWorkspace(rawWorkspace: string | undefined): string {
-  const normalized = rawWorkspace?.trim();
+function normalizeTaskProject(rawProject: string | undefined): string {
+  const normalized = rawProject?.trim();
   if (!normalized) {
-    return DEFAULT_TASK_WORKSPACE;
+    return DEFAULT_TASK_PROJECT;
   }
   return normalized;
 }

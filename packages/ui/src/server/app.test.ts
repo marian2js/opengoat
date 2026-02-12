@@ -62,7 +62,7 @@ interface TaskRecord {
   taskId: string;
   boardId: string;
   createdAt: string;
-  workspace: string;
+  project: string;
   owner: string;
   assignedTo: string;
   title: string;
@@ -607,7 +607,7 @@ describe("OpenGoat UI server API", () => {
       taskId: "task-plan",
       boardId: "board-roadmap",
       createdAt: "2026-02-11T08:00:00.000Z",
-      workspace: "~",
+      project: "~",
       owner: "ceo",
       assignedTo: "developer",
       title: "Plan roadmap",
@@ -661,7 +661,7 @@ describe("OpenGoat UI server API", () => {
         description: options.description,
         assignedTo: options.assignedTo ?? "ceo",
         status: options.status ?? "todo",
-        workspace: options.workspace ?? "~"
+        project: options.project ?? "~"
       };
     });
     const updateTaskStatus = vi.fn<NonNullable<OpenClawUiService["updateTaskStatus"]>>(async (_actorId, taskId, status) => {
@@ -781,7 +781,7 @@ describe("OpenGoat UI server API", () => {
         description: "Document API contracts",
         assignedTo: "developer",
         status: "todo",
-        workspace: "~"
+        project: "~"
       }
     });
     expect(createTaskResponse.statusCode).toBe(200);
@@ -790,7 +790,7 @@ describe("OpenGoat UI server API", () => {
       description: "Document API contracts",
       assignedTo: "developer",
       status: "todo",
-      workspace: "~"
+      project: "~"
     });
 
     const statusResponse = await activeServer.inject({
