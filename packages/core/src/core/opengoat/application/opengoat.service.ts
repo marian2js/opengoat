@@ -1,3 +1,4 @@
+import path from "node:path";
 import { AgentManifestService } from "../../agents/application/agent-manifest.service.js";
 import { AgentService } from "../../agents/application/agent.service.js";
 import {
@@ -67,7 +68,6 @@ import {
   renderBoardIndividualSkillMarkdown,
   renderBoardManagerSkillMarkdown,
 } from "../../templates/default-templates.js";
-import path from "node:path";
 
 interface OpenGoatServiceDeps {
   fileSystem: FileSystemPort;
@@ -864,7 +864,10 @@ export class OpenGoatService {
     }
 
     return this.commandRunner.run({
-      command: process.env.OPENGOAT_OPENCLAW_CMD?.trim() || "openclaw",
+      command:
+        process.env.OPENGOAT_OPENCLAW_CMD?.trim() ||
+        process.env.OPENCLAW_CMD?.trim() ||
+        "openclaw",
       args: sanitized,
       cwd: options.cwd,
       env: options.env,
@@ -1098,7 +1101,9 @@ export class OpenGoatService {
       ["board-individual", renderBoardIndividualSkillMarkdown()],
     ]);
 
-    const managedSkillsDirExists = await this.fileSystem.exists(managedSkillsDir);
+    const managedSkillsDirExists = await this.fileSystem.exists(
+      managedSkillsDir,
+    );
     await this.fileSystem.ensureDir(managedSkillsDir);
     if (managedSkillsDirExists) {
       skippedPaths.push(managedSkillsDir);
@@ -1205,7 +1210,9 @@ export class OpenGoatService {
     }
 
     const env = await this.resolveOpenClawEnv(paths);
-    const listed = await this.runOpenClaw(["agents", "list", "--json"], { env });
+    const listed = await this.runOpenClaw(["agents", "list", "--json"], {
+      env,
+    });
     if (listed.code !== 0) {
       throw new Error(
         `OpenClaw agents list failed (exit ${listed.code}). ${
@@ -1241,7 +1248,9 @@ export class OpenGoatService {
     );
     if (deleted.code !== 0) {
       throw new Error(
-        `OpenClaw agent location repair failed deleting "${params.agentId}" (exit ${deleted.code}). ${
+        `OpenClaw agent location repair failed deleting "${
+          params.agentId
+        }" (exit ${deleted.code}). ${
           deleted.stderr.trim() || deleted.stdout.trim() || ""
         }`.trim(),
       );
@@ -1262,7 +1271,9 @@ export class OpenGoatService {
       !containsAlreadyExistsMessage(recreated.stdout, recreated.stderr)
     ) {
       throw new Error(
-        `OpenClaw agent location repair failed creating "${params.agentId}" (exit ${recreated.code}). ${
+        `OpenClaw agent location repair failed creating "${
+          params.agentId
+        }" (exit ${recreated.code}). ${
           recreated.stderr.trim() || recreated.stdout.trim() || ""
         }`.trim(),
       );
