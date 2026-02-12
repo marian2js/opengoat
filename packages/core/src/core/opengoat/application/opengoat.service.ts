@@ -48,7 +48,10 @@ import type {
   ProviderStoredConfig,
   ProviderSummary,
 } from "../../providers/index.js";
-import { createDefaultProviderRegistry } from "../../providers/index.js";
+import {
+  ProviderCommandNotFoundError,
+  createDefaultProviderRegistry,
+} from "../../providers/index.js";
 import {
   SessionService,
   type AgentLastAction,
@@ -264,6 +267,10 @@ export class OpenGoatService {
             `OpenClaw delete failed with code ${deleted.code}.`,
         });
       } catch (error) {
+        if (error instanceof ProviderCommandNotFoundError) {
+          deletedOpenClawAgents.push(agentId);
+          continue;
+        }
         failedOpenClawAgents.push({
           agentId,
           reason: toErrorMessage(error),

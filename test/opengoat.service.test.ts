@@ -656,10 +656,11 @@ describe("OpenGoatService", () => {
     expect(agentsMarkdown).not.toContain("\nbar\n");
     expect(soulMarkdown.startsWith("# SOUL.md - Legacy CEO")).toBe(true);
     expect(soulMarkdown).toContain("## Your Role");
-    expect(soulMarkdown).toContain("- Your id: `ceo` (agent id)");
+    expect(soulMarkdown).toContain("- Your id: ceo (agent id)");
     expect(soulMarkdown).toContain("- Your name: CEO");
     expect(soulMarkdown).toContain("- Role: CEO");
-    expect(soulMarkdown).toContain("opengoat agent info ceo");
+    expect(soulMarkdown).not.toContain("## Core Behavior");
+    expect(soulMarkdown).not.toContain("## Guardrails");
     expect(soulMarkdown).toContain("Legacy body");
     expect(boardManagerSkillMarkdown).toContain("name: board-manager");
     await expect(

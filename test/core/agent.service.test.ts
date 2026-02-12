@@ -204,11 +204,28 @@ describe("AgentService", () => {
     expect(agentsMarkdown).not.toContain("## First Run");
     expect(agentsMarkdown).not.toContain("\nbar\n");
     expect(soulMarkdown.startsWith("# SOUL.md - Custom")).toBe(true);
+    expect(soulMarkdown).toContain(
+      [
+        "Legacy body",
+        "",
+        "",
+        "## Your Role",
+        "",
+        "You are part of an organization run by OpenGoat.",
+        "",
+        "- Your id: ceo (agent id)",
+        "- Your name: CEO",
+        "- Role: CEO",
+        "",
+        "",
+      ].join("\n"),
+    );
     expect(soulMarkdown).toContain("## Your Role");
-    expect(soulMarkdown).toContain("- Your id: `ceo` (agent id)");
+    expect(soulMarkdown).toContain("- Your id: ceo (agent id)");
     expect(soulMarkdown).toContain("- Your name: CEO");
     expect(soulMarkdown).toContain("- Role: CEO");
-    expect(soulMarkdown).toContain("opengoat agent info ceo");
+    expect(soulMarkdown).not.toContain("## Core Behavior");
+    expect(soulMarkdown).not.toContain("## Guardrails");
     expect(soulMarkdown).toContain("Legacy body");
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });

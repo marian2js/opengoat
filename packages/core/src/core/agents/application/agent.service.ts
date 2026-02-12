@@ -20,7 +20,6 @@ import {
   renderAgentsIndex,
   renderBoardIndividualSkillMarkdown,
   renderBoardManagerSkillMarkdown,
-  renderCeoSoulMarkdown,
   renderInternalAgentConfig,
   resolveAgentRole,
   type AgentTemplateOptions,
@@ -586,12 +585,12 @@ export class AgentService {
       ? await this.fileSystem.readFile(filePath)
       : this.renderDefaultSoulMarkdown(profile.agentId, profile.displayName);
     const next = upsertSoulRoleSection(source, profile);
-    if (exists && normalizeMarkdown(source) === next) {
+    if (source === next) {
       skippedPaths.push(filePath);
       return;
     }
 
-    await this.fileSystem.writeFile(filePath, `${next}\n`);
+    await this.fileSystem.writeFile(filePath, next);
     if (exists) {
       skippedPaths.push(filePath);
       return;
@@ -677,13 +676,10 @@ export class AgentService {
   }
 
   private renderDefaultSoulMarkdown(
-    agentId: string,
+    _agentId: string,
     displayName: string,
   ): string {
-    if (isDefaultAgentId(agentId)) {
-      return renderCeoSoulMarkdown();
-    }
-    return `# SOUL.md - ${displayName}`;
+    return `# SOUL.md - ${displayName}\n\n`;
   }
 
   private async assertNoReportingCycle(
@@ -891,22 +887,26 @@ function upsertSoulRoleSection(
   },
 ): string {
   const withoutRole = removeSectionByHeading(markdown, /^##\s+your role\s*$/i);
-  const lines = withoutRole.replace(/\r\n/g, "\n").split("\n");
-  const firstNonEmptyIndex = lines.findIndex((line) => line.trim().length > 0);
-  const headingLine =
-    firstNonEmptyIndex >= 0
-      ? lines[firstNonEmptyIndex] ?? `# SOUL.md - ${profile.displayName}`
-      : `# SOUL.md - ${profile.displayName}`;
-  const remainder = lines
-    .slice(firstNonEmptyIndex >= 0 ? firstNonEmptyIndex + 1 : 0)
-    .join("\n")
-    .replace(/^\n+/, "")
-    .trimEnd();
+  const lineBreak = withoutRole.includes("\r\n") ? "\r\n" : "\n";
+  const lines = withoutRole.split(/\r?\n/);
+  while (lines.length < 3) {
+    lines.push("");
+  }
+
+  const insertionIndex = 3;
   const roleSection = renderSoulRoleSection(profile);
-  const merged = remainder
-    ? `${headingLine}\n\n${roleSection}\n\n${remainder}`
-    : `${headingLine}\n\n${roleSection}`;
-  return normalizeMarkdown(merged);
+  const roleSectionLines = roleSection.split("\n");
+  const merged = [
+    ...lines.slice(0, insertionIndex),
+    "",
+    "",
+    ...roleSectionLines,
+    "",
+    "",
+    ...lines.slice(insertionIndex),
+  ];
+
+  return merged.join(lineBreak);
 }
 
 function renderSoulRoleSection(profile: {
@@ -919,25 +919,25 @@ function renderSoulRoleSection(profile: {
     "",
     "You are part of an organization run by OpenGoat.",
     "",
-    `- Your id: \`${profile.agentId}\` (agent id)`,
+    `- Your id: ${profile.agentId} (agent id)`,
     `- Your name: ${profile.displayName}`,
     `- Role: ${profile.role}`,
-    "",
-    `You can run \`opengoat agent info ${profile.agentId}\` to learn more about yourself.`,
-    "",
-    "Your mission is the organization mission. You must help it succeed.",
   ].join("\n");
 }
 
 function removeSectionByHeading(markdown: string, heading: RegExp): string {
-  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  const lineBreak = markdown.includes("\r\n") ? "\r\n" : "\n";
+  const lines = markdown.split(/\r?\n/);
+  const hasTrailingLineBreak = /\r?\n$/.test(markdown);
   const kept: string[] = [];
   let skipping = false;
+  let removed = false;
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (!skipping && heading.test(trimmed)) {
       skipping = true;
+      removed = true;
       continue;
     }
     if (skipping) {
@@ -950,9 +950,13 @@ function removeSectionByHeading(markdown: string, heading: RegExp): string {
     kept.push(line);
   }
 
-  return normalizeMarkdown(kept.join("\n"));
-}
+  if (!removed) {
+    return markdown;
+  }
 
-function normalizeMarkdown(value: string): string {
-  return value.replace(/\r\n/g, "\n").trimEnd();
+  let next = kept.join(lineBreak);
+  if (hasTrailingLineBreak && !next.endsWith(lineBreak)) {
+    next = `${next}${lineBreak}`;
+  }
+  return next;
 }
