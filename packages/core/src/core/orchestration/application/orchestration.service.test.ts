@@ -96,6 +96,131 @@ describe("OrchestrationService manager runtime", () => {
     expect(trace.orchestration?.steps).toEqual([]);
   });
 
+  it("uses prepared session project path as cwd when no cwd is provided", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-manager-runtime-cwd-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const projectPath = path.join(tempDir, "saaslib");
+
+    const providerService = {
+      invokeAgent: vi.fn(async () => ({
+        code: 0,
+        stdout: "ok\n",
+        stderr: "",
+        agentId: "ceo",
+        providerId: "openclaw"
+      }))
+    };
+
+    const sessionService = {
+      prepareRunSession: vi.fn(async () => ({
+        enabled: true,
+        info: {
+          agentId: "ceo",
+          sessionKey: "workspace:saaslib",
+          sessionId: "session-2",
+          transcriptPath: path.join(paths.sessionsDir, "ceo", "session-2.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "ceo"),
+          projectPath,
+          isNewSession: false
+        },
+        compactionApplied: false
+      })),
+      recordAssistantReply: vi.fn(async () => ({
+        sessionKey: "workspace:saaslib",
+        sessionId: "session-2",
+        transcriptPath: path.join(paths.sessionsDir, "ceo", "session-2.jsonl"),
+        applied: false,
+        compactedMessages: 0
+      }))
+    };
+
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      agentManifestService: createManifestServiceStub(["ceo"]) as unknown as AgentManifestService,
+      sessionService: sessionService as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-10T10:00:00.000Z"
+    });
+
+    await service.runAgent(paths, "ceo", {
+      message: "ship it"
+    });
+
+    expect(providerService.invokeAgent).toHaveBeenCalledWith(
+      paths,
+      "ceo",
+      expect.objectContaining({
+        providerSessionId: "session-2",
+        cwd: projectPath
+      }),
+      expect.any(Object)
+    );
+  });
+
+  it("adds project context instructions when project path differs from workspace", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-manager-runtime-prompt-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const projectPath = path.join(tempDir, "saaslib");
+
+    const providerService = {
+      invokeAgent: vi.fn(async () => ({
+        code: 0,
+        stdout: "ok\n",
+        stderr: "",
+        agentId: "ceo",
+        providerId: "openclaw"
+      }))
+    };
+
+    const sessionService = {
+      prepareRunSession: vi.fn(async () => ({
+        enabled: true,
+        info: {
+          agentId: "ceo",
+          sessionKey: "workspace:saaslib",
+          sessionId: "session-3",
+          transcriptPath: path.join(paths.sessionsDir, "ceo", "session-3.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "ceo"),
+          projectPath,
+          isNewSession: false
+        },
+        compactionApplied: false
+      })),
+      recordAssistantReply: vi.fn(async () => ({
+        sessionKey: "workspace:saaslib",
+        sessionId: "session-3",
+        transcriptPath: path.join(paths.sessionsDir, "ceo", "session-3.jsonl"),
+        applied: false,
+        compactedMessages: 0
+      }))
+    };
+
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      agentManifestService: createManifestServiceStub(["ceo"]) as unknown as AgentManifestService,
+      sessionService: sessionService as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-10T10:00:00.000Z"
+    });
+
+    await service.runAgent(paths, "ceo", {
+      message: "ship it"
+    });
+
+    expect(providerService.invokeAgent).toHaveBeenCalledWith(
+      paths,
+      "ceo",
+      expect.objectContaining({
+        systemPrompt: expect.stringContaining(`Session project path: ${projectPath}`)
+      }),
+      expect.any(Object)
+    );
+  });
+
   it("uses target agent session scope by default", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-manager-session-"));
     tempDirs.push(tempDir);

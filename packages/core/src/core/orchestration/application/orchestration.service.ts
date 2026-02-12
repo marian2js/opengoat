@@ -184,6 +184,11 @@ export class OrchestrationService {
     const invokeOptions = sanitizeProviderInvokeOptions(options);
     if (preparedSession.enabled) {
       invokeOptions.providerSessionId = preparedSession.info.sessionId;
+      invokeOptions.cwd = resolveInvocationCwd(invokeOptions.cwd, preparedSession.info.projectPath);
+      const projectContextPrompt = buildProjectContextSystemPrompt(preparedSession.info);
+      if (projectContextPrompt) {
+        invokeOptions.systemPrompt = mergeSystemPrompts(invokeOptions.systemPrompt, projectContextPrompt);
+      }
     }
 
     const execution = await this.providerService.invokeAgent(paths, agentId, invokeOptions, {
@@ -320,4 +325,36 @@ function sanitizeProviderInvokeOptions(options: OrchestrationRunOptions): Provid
   delete sanitized.disableSession;
   delete (sanitized as ProviderInvokeOptions & { hooks?: unknown }).hooks;
   return sanitized;
+}
+
+function resolveInvocationCwd(requestedCwd: string | undefined, sessionProjectPath: string): string {
+  const normalizedRequested = requestedCwd?.trim();
+  if (normalizedRequested) {
+    return normalizedRequested;
+  }
+  return sessionProjectPath;
+}
+
+function buildProjectContextSystemPrompt(session: SessionRunInfo): string | undefined {
+  const projectPath = session.projectPath.trim();
+  const workspacePath = session.workspacePath.trim();
+  if (!projectPath || projectPath === workspacePath) {
+    return undefined;
+  }
+
+  return [
+    "OpenGoat session context:",
+    `Session project path: ${projectPath}`,
+    `Agent workspace path: ${workspacePath}`,
+    "Use the session project path for project files. Prefer absolute paths under that directory or `cd` into it before running commands.",
+    "Avoid creating task files in the agent workspace unless the user explicitly asks for it."
+  ].join("\n");
+}
+
+function mergeSystemPrompts(current: string | undefined, extra: string): string {
+  const normalizedCurrent = current?.trim();
+  if (!normalizedCurrent) {
+    return extra;
+  }
+  return `${normalizedCurrent}\n\n${extra}`;
 }

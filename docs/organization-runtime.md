@@ -67,6 +67,8 @@ Session behavior:
 - tied to project path
 - same key + different path rotates to a new session id
 - OpenGoat session id is the OpenClaw session id for that session (1:1 mapping)
+- if project path is omitted on later runs, OpenGoat reuses the stored path for that session key
+- OpenGoat injects project-path runtime context so project sessions stay anchored to the selected repo path
 
 Storage:
 
