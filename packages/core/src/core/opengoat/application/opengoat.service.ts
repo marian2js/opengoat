@@ -275,7 +275,9 @@ export class OpenGoatService {
       const managedSkillsCleanup = await this.removeOpenClawManagedRoleSkills(
         paths,
       );
-      removedOpenClawManagedSkillDirs.push(...managedSkillsCleanup.removedPaths);
+      removedOpenClawManagedSkillDirs.push(
+        ...managedSkillsCleanup.removedPaths,
+      );
     } catch (error) {
       warnings.push(
         `OpenClaw managed skills cleanup failed: ${toErrorMessage(error)}`,
@@ -1453,7 +1455,7 @@ function containsAlreadyExistsMessage(stdout: string, stderr: string): boolean {
 
 function containsAgentNotFoundMessage(stdout: string, stderr: string): boolean {
   const text = `${stdout}\n${stderr}`.toLowerCase();
-  return /\b(not found|does not exist|no such agent|unknown agent)\b/.test(
+  return /\b(not found|does not exist|no such agent|unknown agent|could not find|no agent found|not exist)\b/.test(
     text,
   );
 }

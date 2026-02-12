@@ -1,5 +1,8 @@
 import type { CliCommand } from "../framework/command.js";
-import { createCliPrompter, PromptCancelledError } from "../framework/prompter.js";
+import {
+  createCliPrompter,
+  PromptCancelledError,
+} from "../framework/prompter.js";
 
 export const hardResetCommand: CliCommand = {
   path: ["hard-reset"],
