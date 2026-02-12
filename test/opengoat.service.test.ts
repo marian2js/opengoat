@@ -310,13 +310,30 @@ describe("OpenGoatService", () => {
     ).rejects.toBeTruthy();
   });
 
-  it("installs role skills into OpenClaw managed skills directory", async () => {
+  it("removes role skills from OpenClaw managed skills directory", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
     const managedSkillsDir = path.join(root, "openclaw-managed-skills");
+    const staleBoardManagerSkillDir = path.join(managedSkillsDir, "board-manager");
+    const staleBoardIndividualSkillDir = path.join(
+      managedSkillsDir,
+      "board-individual",
+    );
     const staleManagedSkillDir = path.join(managedSkillsDir, "manager");
+    await new NodeFileSystem().ensureDir(staleBoardManagerSkillDir);
+    await new NodeFileSystem().ensureDir(staleBoardIndividualSkillDir);
     await new NodeFileSystem().ensureDir(staleManagedSkillDir);
+    await writeFile(
+      path.join(staleBoardManagerSkillDir, "SKILL.md"),
+      "# stale manager board skill\n",
+      "utf-8",
+    );
+    await writeFile(
+      path.join(staleBoardIndividualSkillDir, "SKILL.md"),
+      "# stale individual board skill\n",
+      "utf-8",
+    );
     await writeFile(
       path.join(staleManagedSkillDir, "SKILL.md"),
       "# stale managed skill\n",
@@ -367,16 +384,16 @@ describe("OpenGoatService", () => {
 
     await expect(
       access(
-        path.join(managedSkillsDir, "board-manager", "SKILL.md"),
+        path.join(managedSkillsDir, "board-manager"),
         constants.F_OK,
       ),
-    ).resolves.toBeUndefined();
+    ).rejects.toBeTruthy();
     await expect(
       access(
-        path.join(managedSkillsDir, "board-individual", "SKILL.md"),
+        path.join(managedSkillsDir, "board-individual"),
         constants.F_OK,
       ),
-    ).resolves.toBeUndefined();
+    ).rejects.toBeTruthy();
     await expect(
       access(staleManagedSkillDir, constants.F_OK),
     ).rejects.toBeTruthy();

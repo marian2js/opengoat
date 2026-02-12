@@ -73,6 +73,9 @@ OpenGoat pre-installs role skills in each agent workspace so OpenClaw can resolv
 - managers: `board-manager`
 - individuals: `board-individual`
 
+Role skills are mutually exclusive per agent. OpenGoat does not install role
+skills into OpenClaw shared managed skills.
+
 `ceo` receives manager role skills by default under `workspaces/ceo/skills/`.
 
 ## 6) OpenClaw Integration

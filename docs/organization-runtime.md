@@ -57,6 +57,7 @@ Skills are delegated to OpenClaw.
 - role skills are workspace-installed and assignment-synced:
   - managers: `board-manager`
   - individuals: `board-individual`
+- role skills are mutually exclusive per agent and are not installed into OpenClaw shared managed skills
 
 ## Sessions
 

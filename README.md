@@ -24,7 +24,7 @@ OpenGoat keeps your org structure as source-of-truth and syncs agent lifecycle t
 
 - `ceo` as the default head of organization (CEO entry point).
 - Hierarchical teams via `reportsTo`.
-- OpenClaw-managed skills with OpenGoat-side assignment metadata.
+- OpenClaw-owned skills with per-agent role-skill assignment metadata.
 - CLI-first workflows for create, run, restructure, and audit sessions.
 - Manager default boards: every manager has a non-deletable default board.
 - Task default routing: manager task creation without `<board-id>` uses that manager default board.
@@ -88,6 +88,9 @@ On bootstrap, OpenGoat pre-installs role skills in agent workspaces:
 
 - managers: `board-manager`
 - individuals: `board-individual`
+
+Role skills are mutually exclusive per agent. OpenGoat does not install these role
+skills into OpenClaw shared managed skills.
 
 For `ceo`, this is written under `workspaces/ceo/skills/`.
 

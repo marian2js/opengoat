@@ -64,10 +64,6 @@ import {
   type InstallSkillResult,
   type ResolvedSkill,
 } from "../../skills/index.js";
-import {
-  renderBoardIndividualSkillMarkdown,
-  renderBoardManagerSkillMarkdown,
-} from "../../templates/default-templates.js";
 
 interface OpenGoatServiceDeps {
   fileSystem: FileSystemPort;
@@ -1036,7 +1032,7 @@ export class OpenGoatService {
     const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
     const removedPaths: string[] = [];
-    const managedSkillsSync = await this.syncOpenClawManagedRoleSkills(paths);
+    const managedSkillsSync = await this.removeOpenClawManagedRoleSkills(paths);
     createdPaths.push(...managedSkillsSync.createdPaths);
     skippedPaths.push(...managedSkillsSync.skippedPaths);
     removedPaths.push(...managedSkillsSync.removedPaths);
@@ -1074,7 +1070,7 @@ export class OpenGoatService {
     };
   }
 
-  private async syncOpenClawManagedRoleSkills(
+  private async removeOpenClawManagedRoleSkills(
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
   ): Promise<{
     createdPaths: string[];
@@ -1098,53 +1094,14 @@ export class OpenGoatService {
       };
     }
 
-    const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
     const removedPaths: string[] = [];
-    const roleSkills = new Map<string, string>([
-      ["board-manager", renderBoardManagerSkillMarkdown()],
-      ["board-individual", renderBoardIndividualSkillMarkdown()],
-    ]);
-
-    const managedSkillsDirExists = await this.fileSystem.exists(
-      managedSkillsDir,
-    );
-    await this.fileSystem.ensureDir(managedSkillsDir);
-    if (managedSkillsDirExists) {
-      skippedPaths.push(managedSkillsDir);
-    } else {
-      createdPaths.push(managedSkillsDir);
-    }
-
-    for (const [skillId, markdown] of roleSkills.entries()) {
-      const skillDir = this.pathPort.join(managedSkillsDir, skillId);
-      const skillFilePath = this.pathPort.join(skillDir, "SKILL.md");
-      const skillDirExists = await this.fileSystem.exists(skillDir);
-      await this.fileSystem.ensureDir(skillDir);
-      if (skillDirExists) {
-        skippedPaths.push(skillDir);
-      } else {
-        createdPaths.push(skillDir);
-      }
-
-      const normalizedMarkdown = ensureTrailingNewline(markdown);
-      const skillFileExists = await this.fileSystem.exists(skillFilePath);
-      if (skillFileExists) {
-        const existingMarkdown = await this.fileSystem.readFile(skillFilePath);
-        if (existingMarkdown === normalizedMarkdown) {
-          skippedPaths.push(skillFilePath);
-          continue;
-        }
-      }
-      await this.fileSystem.writeFile(skillFilePath, normalizedMarkdown);
-      if (skillFileExists) {
-        skippedPaths.push(skillFilePath);
-      } else {
-        createdPaths.push(skillFilePath);
-      }
-    }
-
-    for (const legacySkillId of ["manager", "board-user"]) {
+    for (const legacySkillId of [
+      "board-manager",
+      "board-individual",
+      "manager",
+      "board-user",
+    ]) {
       const legacyDir = this.pathPort.join(managedSkillsDir, legacySkillId);
       if (!(await this.fileSystem.exists(legacyDir))) {
         skippedPaths.push(legacyDir);
@@ -1155,7 +1112,7 @@ export class OpenGoatService {
     }
 
     return {
-      createdPaths,
+      createdPaths: [],
       skippedPaths,
       removedPaths,
     };
@@ -1367,10 +1324,6 @@ function resolveInactiveMinutes(value: number | undefined): number {
     return 30;
   }
   return Math.floor(value);
-}
-
-function ensureTrailingNewline(value: string): string {
-  return value.endsWith("\n") ? value : `${value}\n`;
 }
 
 function extractManagedSkillsDir(payload: unknown): string | null {
