@@ -47,15 +47,7 @@ export class OpenClawProvider extends BaseCliProvider {
     args.push(...(options.passthroughArgs ?? []));
     args.push("--message", options.message);
 
-    // Inject extra arguments from env if present
-    const extraArgs = options.env?.OPENCLAW_ARGUMENTS?.trim();
-    if (extraArgs) {
-      // Simple splitting by space - for more complex cases user should use shell script wrapper
-      // or we might need a proper argv parser, but this suffices for simple flags like --remote
-      args.push(...extraArgs.split(" ").filter((arg) => arg.trim().length > 0));
-    }
-
-    return args;
+    return [...resolveOpenClawArguments(options.env), ...args];
   }
 
   protected override prepareExecutionEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -77,10 +69,16 @@ export class OpenClawProvider extends BaseCliProvider {
     const passthrough = options.passthroughArgs ?? [];
 
     if (passthrough.length > 0) {
-      return ["models", "auth", "login", ...passthrough];
+      return [
+        ...resolveOpenClawArguments(options.env),
+        "models",
+        "auth",
+        "login",
+        ...passthrough,
+      ];
     }
 
-    return ["onboard"];
+    return [...resolveOpenClawArguments(options.env), "onboard"];
   }
 
   protected override buildCreateAgentInvocationArgs(
@@ -102,13 +100,19 @@ export class OpenClawProvider extends BaseCliProvider {
       args.push("--model", model);
     }
 
-    return args;
+    return [...resolveOpenClawArguments(options.env), ...args];
   }
 
   protected override buildDeleteAgentInvocationArgs(
     options: ProviderDeleteAgentOptions,
   ): string[] {
-    return ["agents", "delete", options.agentId, "--force"];
+    return [
+      ...resolveOpenClawArguments(options.env),
+      "agents",
+      "delete",
+      options.agentId,
+      "--force",
+    ];
   }
 
   public override async invoke(
@@ -118,6 +122,18 @@ export class OpenClawProvider extends BaseCliProvider {
     const result = await super.invoke(options);
     return attachProviderSessionId(result, sessionId);
   }
+}
+
+function resolveOpenClawArguments(env: NodeJS.ProcessEnv | undefined): string[] {
+  const raw = env?.OPENCLAW_ARGUMENTS?.trim();
+  if (!raw) {
+    return [];
+  }
+
+  return raw
+    .split(" ")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
 }
 
 function dedupePathEntries(entries: string[]): string[] {

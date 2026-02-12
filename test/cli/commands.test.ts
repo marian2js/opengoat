@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { agentCommand } from "../../packages/cli/src/cli/commands/agent.command.js";
+import { agentAllReporteesCommand } from "../../packages/cli/src/cli/commands/agent-all-reportees.command.js";
 import { agentCreateCommand } from "../../packages/cli/src/cli/commands/agent-create.command.js";
 import { agentDeleteCommand } from "../../packages/cli/src/cli/commands/agent-delete.command.js";
+import { agentDirectReporteesCommand } from "../../packages/cli/src/cli/commands/agent-direct-reportees.command.js";
 import { agentInfoCommand } from "../../packages/cli/src/cli/commands/agent-info.command.js";
 import { agentLastActionCommand } from "../../packages/cli/src/cli/commands/agent-last-action.command.js";
 import { agentListCommand } from "../../packages/cli/src/cli/commands/agent-list.command.js";
-import { agentAllReporteesCommand } from "../../packages/cli/src/cli/commands/agent-all-reportees.command.js";
-import { agentDirectReporteesCommand } from "../../packages/cli/src/cli/commands/agent-direct-reportees.command.js";
 import { agentSetManagerCommand } from "../../packages/cli/src/cli/commands/agent-set-manager.command.js";
+import { agentCommand } from "../../packages/cli/src/cli/commands/agent.command.js";
 import { initCommand } from "../../packages/cli/src/cli/commands/init.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
@@ -19,10 +19,10 @@ function createContext(service: unknown) {
     context: {
       service: service as never,
       stdout: stdout.stream,
-      stderr: stderr.stream
+      stderr: stderr.stream,
     },
     stdout,
-    stderr
+    stderr,
   };
 }
 
@@ -32,7 +32,7 @@ describe("CLI commands", () => {
       paths: { homeDir: "/tmp/opengoat" },
       defaultAgent: "ceo",
       createdPaths: ["/tmp/opengoat/config.json"],
-      skippedPaths: []
+      skippedPaths: [],
     }));
 
     const { context, stdout } = createContext({ initialize });
@@ -73,7 +73,7 @@ describe("CLI commands", () => {
         displayName: "Research Analyst",
         role: "Developer",
         workspaceDir: "/tmp/workspaces/research-analyst",
-        internalConfigDir: "/tmp/agents/research-analyst"
+        internalConfigDir: "/tmp/agents/research-analyst",
       },
       createdPaths: ["a", "b"],
       skippedPaths: [],
@@ -82,8 +82,8 @@ describe("CLI commands", () => {
         runtimeId: "openclaw",
         code: 0,
         stdout: "",
-        stderr: ""
-      }
+        stderr: "",
+      },
     }));
 
     const { context, stdout } = createContext({ createAgent });
@@ -99,9 +99,9 @@ describe("CLI commands", () => {
         "--skill",
         "research",
         "--skill",
-        "docs"
+        "docs",
       ],
-      context
+      context,
     );
 
     expect(code).toBe(0);
@@ -109,9 +109,11 @@ describe("CLI commands", () => {
       type: "individual",
       reportsTo: "ceo",
       skills: ["docs", "research"],
-      role: "Developer"
+      role: "Developer",
     });
-    expect(stdout.output()).toContain("Agent ready: Research Analyst (research-analyst)");
+    expect(stdout.output()).toContain(
+      "Agent ready: Research Analyst (research-analyst)",
+    );
     expect(stdout.output()).toContain("Role: Developer");
     expect(stdout.output()).toContain("OpenClaw sync: openclaw (code 0)");
   });
@@ -123,7 +125,7 @@ describe("CLI commands", () => {
         displayName: "Developer",
         role: "Developer",
         workspaceDir: "/tmp/workspaces/developer",
-        internalConfigDir: "/tmp/agents/developer"
+        internalConfigDir: "/tmp/agents/developer",
       },
       createdPaths: [],
       skippedPaths: [],
@@ -132,15 +134,17 @@ describe("CLI commands", () => {
         runtimeId: "openclaw",
         code: 0,
         stdout: "",
-        stderr: ""
-      }
+        stderr: "",
+      },
     }));
     const { context, stdout } = createContext({ createAgent });
 
     const code = await agentCreateCommand.run(["Developer"], context);
 
     expect(code).toBe(0);
-    expect(stdout.output()).toContain("Local agent already existed; OpenClaw sync was still attempted.");
+    expect(stdout.output()).toContain(
+      "Local agent already existed; OpenClaw sync was still attempted.",
+    );
     expect(stdout.output()).toContain("OpenClaw sync: openclaw (code 0)");
   });
 
@@ -159,22 +163,28 @@ describe("CLI commands", () => {
     const deleteAgent = vi.fn(async () => ({
       agentId: "research-analyst",
       existed: true,
-      removedPaths: ["/tmp/workspaces/research-analyst", "/tmp/agents/research-analyst"],
+      removedPaths: [
+        "/tmp/workspaces/research-analyst",
+        "/tmp/agents/research-analyst",
+      ],
       skippedPaths: [],
       runtimeSync: {
         runtimeId: "openclaw",
         code: 0,
         stdout: "",
-        stderr: ""
-      }
+        stderr: "",
+      },
     }));
     const { context, stdout } = createContext({ deleteAgent });
 
-    const code = await agentDeleteCommand.run(["research-analyst", "--force"], context);
+    const code = await agentDeleteCommand.run(
+      ["research-analyst", "--force"],
+      context,
+    );
 
     expect(code).toBe(0);
     expect(deleteAgent).toHaveBeenCalledWith("research-analyst", {
-      force: true
+      force: true,
     });
     expect(stdout.output()).toContain("Agent deleted: research-analyst");
     expect(stdout.output()).toContain("OpenClaw sync: openclaw (code 0)");
@@ -197,7 +207,10 @@ describe("CLI commands", () => {
       agentId: "engineer",
       previousReportsTo: "ceo",
       reportsTo: "cto",
-      updatedPaths: ["/tmp/workspaces/engineer/AGENTS.md", "/tmp/agents/engineer/config.json"]
+      updatedPaths: [
+        "/tmp/workspaces/engineer/AGENTS.md",
+        "/tmp/agents/engineer/config.json",
+      ],
     }));
     const { context, stdout } = createContext({ setAgentManager });
 
@@ -219,22 +232,22 @@ describe("CLI commands", () => {
     const getAgentInfo = vi.fn(async () => ({
       id: "ceo",
       name: "CEO",
-      role: "Head of Organization",
+      role: "CEO",
       totalReportees: 3,
       directReportees: [
         {
           id: "cto",
           name: "CTO",
           role: "Chief Technology Officer",
-          totalReportees: 1
+          totalReportees: 1,
         },
         {
           id: "qa",
           name: "QA",
           role: "QA Engineer",
-          totalReportees: 0
-        }
-      ]
+          totalReportees: 0,
+        },
+      ],
     }));
     const valid = createContext({ getAgentInfo });
     const validCode = await agentInfoCommand.run(["ceo"], valid.context);
@@ -242,21 +255,31 @@ describe("CLI commands", () => {
     expect(getAgentInfo).toHaveBeenCalledWith("ceo");
     expect(valid.stdout.output()).toContain("id: ceo");
     expect(valid.stdout.output()).toContain("name: CEO");
-    expect(valid.stdout.output()).toContain("role: Head of Organization");
+    expect(valid.stdout.output()).toContain("role: CEO");
     expect(valid.stdout.output()).toContain("total reportees: 3");
-    expect(valid.stdout.output()).toContain('direct reportees:\n- {id: "cto", name: "CTO"');
-    expect(valid.stdout.output()).toContain('total reportees: 0}');
+    expect(valid.stdout.output()).toContain(
+      'direct reportees:\n- {id: "cto", name: "CTO"',
+    );
+    expect(valid.stdout.output()).toContain("total reportees: 0}");
   });
 
   it("agent direct-reportees validates usage and prints one id per line", async () => {
     const invalid = createContext({ listDirectReportees: vi.fn() });
-    const invalidCode = await agentDirectReporteesCommand.run([], invalid.context);
+    const invalidCode = await agentDirectReporteesCommand.run(
+      [],
+      invalid.context,
+    );
     expect(invalidCode).toBe(1);
-    expect(invalid.stderr.output()).toContain("Usage: opengoat agent direct-reportees");
+    expect(invalid.stderr.output()).toContain(
+      "Usage: opengoat agent direct-reportees",
+    );
 
     const listDirectReportees = vi.fn(async () => ["cto", "qa"]);
     const valid = createContext({ listDirectReportees });
-    const validCode = await agentDirectReporteesCommand.run(["ceo"], valid.context);
+    const validCode = await agentDirectReporteesCommand.run(
+      ["ceo"],
+      valid.context,
+    );
     expect(validCode).toBe(0);
     expect(listDirectReportees).toHaveBeenCalledWith("ceo");
     expect(valid.stdout.output()).toBe("cto\nqa\n");
@@ -266,11 +289,16 @@ describe("CLI commands", () => {
     const invalid = createContext({ listAllReportees: vi.fn() });
     const invalidCode = await agentAllReporteesCommand.run([], invalid.context);
     expect(invalidCode).toBe(1);
-    expect(invalid.stderr.output()).toContain("Usage: opengoat agent all-reportees");
+    expect(invalid.stderr.output()).toContain(
+      "Usage: opengoat agent all-reportees",
+    );
 
     const listAllReportees = vi.fn(async () => ["cto", "engineer", "qa"]);
     const valid = createContext({ listAllReportees });
-    const validCode = await agentAllReporteesCommand.run(["ceo"], valid.context);
+    const validCode = await agentAllReporteesCommand.run(
+      ["ceo"],
+      valid.context,
+    );
     expect(validCode).toBe(0);
     expect(listAllReportees).toHaveBeenCalledWith("ceo");
     expect(valid.stdout.output()).toBe("cto\nengineer\nqa\n");
@@ -281,19 +309,21 @@ describe("CLI commands", () => {
       .fn()
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
-        { id: "ceo", displayName: "CEO", role: "Head of Organization" },
-        { id: "research", displayName: "research", role: "Developer" }
+        { id: "ceo", displayName: "CEO", role: "CEO" },
+        { id: "research", displayName: "research", role: "Developer" },
       ]);
 
     const first = createContext({ listAgents });
     const firstCode = await agentListCommand.run([], first.context);
     expect(firstCode).toBe(0);
-    expect(first.stdout.output()).toContain("No agents found. Run: opengoat onboard");
+    expect(first.stdout.output()).toContain(
+      "No agents found. Run: opengoat onboard",
+    );
 
     const second = createContext({ listAgents });
     const secondCode = await agentListCommand.run([], second.context);
     expect(secondCode).toBe(0);
-    expect(second.stdout.output()).toContain("ceo [Head of Organization]\n");
+    expect(second.stdout.output()).toContain("ceo [CEO]\n");
     expect(second.stdout.output()).toContain("research [Developer]\n");
   });
 
@@ -303,7 +333,7 @@ describe("CLI commands", () => {
       stdout: "ok\n",
       stderr: "",
       agentId: "ceo",
-      providerId: "openclaw"
+      providerId: "openclaw",
     }));
 
     const { context } = createContext({ runAgent });
@@ -313,8 +343,8 @@ describe("CLI commands", () => {
     expect(runAgent).toHaveBeenCalledWith(
       "ceo",
       expect.objectContaining({
-        message: "hello"
-      })
+        message: "hello",
+      }),
     );
   });
 
@@ -324,17 +354,20 @@ describe("CLI commands", () => {
       stdout: "",
       stderr: "",
       agentId: "research",
-      providerId: "openclaw"
+      providerId: "openclaw",
     }));
 
     const first = createContext({ runAgent });
-    const firstCode = await agentCommand.run(["research", "--message", "hello"], first.context);
+    const firstCode = await agentCommand.run(
+      ["research", "--message", "hello"],
+      first.context,
+    );
     expect(firstCode).toBe(0);
     expect(runAgent).toHaveBeenCalledWith(
       "research",
       expect.objectContaining({
-        message: "hello"
-      })
+        message: "hello",
+      }),
     );
 
     const second = createContext({ runAgent: vi.fn() });
@@ -354,27 +387,30 @@ describe("CLI commands", () => {
       stdout: "",
       stderr: "",
       agentId: "ceo",
-      providerId: "openclaw"
+      providerId: "openclaw",
     }));
 
     const { context } = createContext({ runAgent });
     const code = await agentCommand.run(
       ["--message", "check", "--project-path", "/tmp/project"],
-      context
+      context,
     );
 
     expect(code).toBe(0);
     expect(runAgent).toHaveBeenCalledWith(
       "ceo",
       expect.objectContaining({
-        cwd: "/tmp/project"
-      })
+        cwd: "/tmp/project",
+      }),
     );
   });
 
   it("agent last-action validates args and prints results", async () => {
     const invalid = createContext({ getAgentLastAction: vi.fn() });
-    const invalidCode = await agentLastActionCommand.run(["--unknown"], invalid.context);
+    const invalidCode = await agentLastActionCommand.run(
+      ["--unknown"],
+      invalid.context,
+    );
     expect(invalidCode).toBe(1);
     expect(invalid.stderr.output()).toContain("Unknown option: --unknown");
 
@@ -383,14 +419,21 @@ describe("CLI commands", () => {
       sessionKey: "agent:developer:main",
       sessionId: "session-1",
       transcriptPath: "/tmp/session-1.jsonl",
-      timestamp: Date.parse("2026-02-10T10:00:00.000Z")
+      timestamp: Date.parse("2026-02-10T10:00:00.000Z"),
     }));
     const valid = createContext({ getAgentLastAction });
-    const validCode = await agentLastActionCommand.run(["developer"], valid.context);
+    const validCode = await agentLastActionCommand.run(
+      ["developer"],
+      valid.context,
+    );
     expect(validCode).toBe(0);
     expect(getAgentLastAction).toHaveBeenCalledWith("developer");
-    expect(valid.stdout.output()).toContain("Last AI action: 2026-02-10T10:00:00.000Z");
-    expect(valid.stdout.output()).toContain("Session key: agent:developer:main");
+    expect(valid.stdout.output()).toContain(
+      "Last AI action: 2026-02-10T10:00:00.000Z",
+    );
+    expect(valid.stdout.output()).toContain(
+      "Session key: agent:developer:main",
+    );
   });
 
   it("agent last-action supports --json and empty state", async () => {
@@ -398,7 +441,9 @@ describe("CLI commands", () => {
     const empty = createContext({ getAgentLastAction });
     const emptyCode = await agentLastActionCommand.run(["ceo"], empty.context);
     expect(emptyCode).toBe(0);
-    expect(empty.stdout.output()).toContain('No AI actions found for agent "ceo".');
+    expect(empty.stdout.output()).toContain(
+      'No AI actions found for agent "ceo".',
+    );
 
     const jsonResult = createContext({
       getAgentLastAction: vi.fn(async () => ({
@@ -406,12 +451,17 @@ describe("CLI commands", () => {
         sessionKey: "agent:ceo:main",
         sessionId: "session-2",
         transcriptPath: "/tmp/session-2.jsonl",
-        timestamp: Date.parse("2026-02-10T10:05:00.000Z")
-      }))
+        timestamp: Date.parse("2026-02-10T10:05:00.000Z"),
+      })),
     });
-    const jsonCode = await agentLastActionCommand.run(["--json"], jsonResult.context);
+    const jsonCode = await agentLastActionCommand.run(
+      ["--json"],
+      jsonResult.context,
+    );
     expect(jsonCode).toBe(0);
     expect(jsonResult.stdout.output()).toContain('"agentId": "ceo"');
-    expect(jsonResult.stdout.output()).toContain('"iso": "2026-02-10T10:05:00.000Z"');
+    expect(jsonResult.stdout.output()).toContain(
+      '"iso": "2026-02-10T10:05:00.000Z"',
+    );
   });
 });

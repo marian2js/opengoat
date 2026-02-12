@@ -30,7 +30,7 @@ describe("board/task CLI commands", () => {
 
     const { context, stdout } = createContext({ initialize, createBoard });
 
-    const code = await boardCommand.run(["create", "Core", "Planning", "--as", "ceo"], context);
+    const code = await boardCommand.run(["create", "Core", "Planning", "--owner", "ceo"], context);
 
     expect(code).toBe(0);
     expect(initialize).toHaveBeenCalledOnce();
@@ -102,7 +102,7 @@ describe("board/task CLI commands", () => {
       [
         "create",
         "delivery-board",
-        "--as",
+        "--owner",
         "ceo",
         "--assign",
         "cto",
@@ -147,11 +147,52 @@ describe("board/task CLI commands", () => {
 
     const { context, stdout } = createContext({ initialize, updateTaskStatus });
 
-    const code = await taskCommand.run(["status", "task-1234abcd", "Doing", "--as", "cto"], context);
+    const code = await taskCommand.run(["status", "task-1234abcd", "Doing", "--ass", "cto"], context);
 
     expect(code).toBe(0);
-    expect(updateTaskStatus).toHaveBeenCalledWith("cto", "task-1234abcd", "Doing");
+    expect(updateTaskStatus).toHaveBeenCalledWith("cto", "task-1234abcd", "Doing", undefined);
     expect(stdout.output()).toContain("Status: Doing");
+  });
+
+  it("task status forwards reason for blocked/pending statuses", async () => {
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const updateTaskStatus = vi.fn(async () => ({
+      taskId: "task-1234abcd",
+      boardId: "delivery-board",
+      createdAt: "2026-02-10T00:00:00.000Z",
+      project: "~",
+      owner: "ceo",
+      assignedTo: "cto",
+      title: "Define API",
+      description: "Draft API contract",
+      status: "blocked",
+      statusReason: "Waiting for DB migration",
+      blockers: [],
+      artifacts: [],
+      worklog: []
+    }));
+
+    const { context, stdout } = createContext({ initialize, updateTaskStatus });
+    const code = await taskCommand.run(
+      ["status", "task-1234abcd", "blocked", "--reason", "Waiting for DB migration", "--ass", "cto"],
+      context
+    );
+
+    expect(code).toBe(0);
+    expect(updateTaskStatus).toHaveBeenCalledWith("cto", "task-1234abcd", "blocked", "Waiting for DB migration");
+    expect(stdout.output()).toContain("Reason: Waiting for DB migration");
+  });
+
+  it("task status requires reason when status is pending or blocked", async () => {
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const updateTaskStatus = vi.fn();
+    const { context, stderr } = createContext({ initialize, updateTaskStatus });
+
+    const code = await taskCommand.run(["status", "task-1234abcd", "pending", "--ass", "cto"], context);
+
+    expect(code).toBe(1);
+    expect(updateTaskStatus).not.toHaveBeenCalled();
+    expect(stderr.output()).toContain("--reason is required when status is pending.");
   });
 
   it("task blocker add forwards content", async () => {
@@ -174,7 +215,7 @@ describe("board/task CLI commands", () => {
     const { context, stdout } = createContext({ initialize, addTaskBlocker });
 
     const code = await taskCommand.run(
-      ["blocker", "add", "task-1234abcd", "Waiting", "for", "auth", "token", "--as", "cto"],
+      ["blocker", "add", "task-1234abcd", "Waiting", "for", "auth", "token", "--ass", "cto"],
       context
     );
 
@@ -285,7 +326,7 @@ describe("board/task CLI commands", () => {
     });
   });
 
-  it("task list filters by owner across all boards", async () => {
+  it("task list filters by assignee across all boards", async () => {
     const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
     const listBoards = vi.fn(async () => [
       {
@@ -337,7 +378,7 @@ describe("board/task CLI commands", () => {
       ]);
 
     const { context, stdout } = createContext({ initialize, listBoards, listTasks });
-    const code = await taskCommand.run(["list", "--owner", "ceo"], context);
+    const code = await taskCommand.run(["list", "--ass", "ceo"], context);
 
     expect(code).toBe(0);
     expect(listBoards).toHaveBeenCalledOnce();

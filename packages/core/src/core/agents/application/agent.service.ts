@@ -1,23 +1,30 @@
+import {
+  DEFAULT_AGENT_ID,
+  isDefaultAgentId,
+  normalizeAgentId,
+} from "../../domain/agent-id.js";
 import type {
-  AgentManagerUpdateResult,
-  AgentDeletionResult,
   AgentCreationResult,
+  AgentDeletionResult,
   AgentDescriptor,
-  AgentIdentity
+  AgentIdentity,
+  AgentManagerUpdateResult,
 } from "../../domain/agent.js";
-import { DEFAULT_AGENT_ID, isDefaultAgentId, normalizeAgentId } from "../../domain/agent-id.js";
-import type { AgentsIndex, OpenGoatPaths } from "../../domain/opengoat-paths.js";
+import type {
+  AgentsIndex,
+  OpenGoatPaths,
+} from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import {
+  renderAgentsIndex,
   renderBoardIndividualSkillMarkdown,
   renderBoardManagerSkillMarkdown,
-  renderAgentsIndex,
   renderCeoAgentsMarkdown,
   renderCeoSoulMarkdown,
   renderInternalAgentConfig,
   resolveAgentRole,
-  type AgentTemplateOptions
+  type AgentTemplateOptions,
 } from "../../templates/default-templates.js";
 
 interface AgentServiceDeps {
@@ -80,7 +87,9 @@ export class AgentService {
     const id = normalizeAgentId(displayName);
 
     if (!id) {
-      throw new Error("Agent name must contain at least one alphanumeric character.");
+      throw new Error(
+        "Agent name must contain at least one alphanumeric character.",
+      );
     }
 
     return { id, displayName };
@@ -89,7 +98,7 @@ export class AgentService {
   public async ensureAgent(
     paths: OpenGoatPaths,
     identity: AgentIdentity,
-    options: EnsureAgentOptions = {}
+    options: EnsureAgentOptions = {},
   ): Promise<AgentCreationResult> {
     const workspaceDir = this.pathPort.join(paths.workspacesDir, identity.id);
     const internalConfigDir = this.pathPort.join(paths.agentsDir, identity.id);
@@ -107,25 +116,30 @@ export class AgentService {
       configPath,
       renderInternalAgentConfig(identity, templateOptions),
       createdPaths,
-      skippedPaths
+      skippedPaths,
     );
     const role = await this.readAgentRole(paths, identity.id);
 
-    const existingIndex = await this.readJsonIfPresent<AgentsIndex>(paths.agentsIndexJsonPath);
+    const existingIndex = await this.readJsonIfPresent<AgentsIndex>(
+      paths.agentsIndexJsonPath,
+    );
     const agents = dedupe([...(existingIndex?.agents ?? []), identity.id]);
     const nextIndex = renderAgentsIndex(this.nowIso(), agents);
-    await this.fileSystem.writeFile(paths.agentsIndexJsonPath, toJson(nextIndex));
+    await this.fileSystem.writeFile(
+      paths.agentsIndexJsonPath,
+      toJson(nextIndex),
+    );
 
     return {
       agent: {
         ...identity,
         role,
         workspaceDir,
-        internalConfigDir
+        internalConfigDir,
       },
       alreadyExisted: configExisted,
       createdPaths,
-      skippedPaths
+      skippedPaths,
     };
   }
 
@@ -143,15 +157,20 @@ export class AgentService {
         displayName,
         role,
         workspaceDir,
-        internalConfigDir
+        internalConfigDir,
       });
     }
 
     return descriptors.sort((left, right) => left.id.localeCompare(right.id));
   }
 
-  public async ensureCeoWorkspaceBootstrap(paths: OpenGoatPaths): Promise<CeoWorkspaceBootstrapResult> {
-    const workspaceDir = this.pathPort.join(paths.workspacesDir, DEFAULT_AGENT_ID);
+  public async ensureCeoWorkspaceBootstrap(
+    paths: OpenGoatPaths,
+  ): Promise<CeoWorkspaceBootstrapResult> {
+    const workspaceDir = this.pathPort.join(
+      paths.workspacesDir,
+      DEFAULT_AGENT_ID,
+    );
     const agentsPath = this.pathPort.join(workspaceDir, "AGENTS.md");
     const soulPath = this.pathPort.join(workspaceDir, "SOUL.md");
     const bootstrapPath = this.pathPort.join(workspaceDir, "BOOTSTRAP.md");
@@ -167,16 +186,19 @@ export class AgentService {
       renderCeoAgentsMarkdown(),
       createdPaths,
       skippedPaths,
-      { overwrite: shouldOverwrite }
+      { overwrite: shouldOverwrite },
     );
     await this.writeMarkdown(
       soulPath,
       renderCeoSoulMarkdown(),
       createdPaths,
       skippedPaths,
-      { overwrite: shouldOverwrite }
+      { overwrite: shouldOverwrite },
     );
-    const workspaceSkillSync = await this.ensureAgentWorkspaceRoleSkills(paths, DEFAULT_AGENT_ID);
+    const workspaceSkillSync = await this.ensureAgentWorkspaceRoleSkills(
+      paths,
+      DEFAULT_AGENT_ID,
+    );
     createdPaths.push(...workspaceSkillSync.createdPaths);
     skippedPaths.push(...workspaceSkillSync.skippedPaths);
     removedPaths.push(...workspaceSkillSync.removedPaths);
@@ -191,19 +213,28 @@ export class AgentService {
     return {
       createdPaths,
       skippedPaths,
-      removedPaths
+      removedPaths,
     };
   }
 
-  public async ensureAgentWorkspaceRoleSkills(paths: OpenGoatPaths, agentId: string): Promise<WorkspaceSkillSyncResult> {
+  public async ensureAgentWorkspaceRoleSkills(
+    paths: OpenGoatPaths,
+    agentId: string,
+  ): Promise<WorkspaceSkillSyncResult> {
     const normalizedAgentId = normalizeAgentId(agentId);
     if (!normalizedAgentId) {
       throw new Error("Agent id cannot be empty.");
     }
     const type = await this.readAgentType(paths, normalizedAgentId);
-    const requiredSkillIds = type === "manager" ? MANAGER_ROLE_SKILLS : INDIVIDUAL_ROLE_SKILLS;
-    const managedRoleSkillIds = [...new Set([...MANAGER_ROLE_SKILLS, ...INDIVIDUAL_ROLE_SKILLS])];
-    const workspaceDir = this.pathPort.join(paths.workspacesDir, normalizedAgentId);
+    const requiredSkillIds =
+      type === "manager" ? MANAGER_ROLE_SKILLS : INDIVIDUAL_ROLE_SKILLS;
+    const managedRoleSkillIds = [
+      ...new Set([...MANAGER_ROLE_SKILLS, ...INDIVIDUAL_ROLE_SKILLS]),
+    ];
+    const workspaceDir = this.pathPort.join(
+      paths.workspacesDir,
+      normalizedAgentId,
+    );
     const skillsDir = this.pathPort.join(workspaceDir, "skills");
     const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
@@ -221,7 +252,7 @@ export class AgentService {
         this.renderWorkspaceSkill(skillId),
         createdPaths,
         skippedPaths,
-        { overwrite: true }
+        { overwrite: true },
       );
     }
 
@@ -241,38 +272,59 @@ export class AgentService {
     return {
       createdPaths,
       skippedPaths,
-      removedPaths
+      removedPaths,
     };
   }
 
-  public async syncAgentRoleAssignments(paths: OpenGoatPaths, agentId: string): Promise<RoleAssignmentSyncResult> {
+  public async syncAgentRoleAssignments(
+    paths: OpenGoatPaths,
+    agentId: string,
+  ): Promise<RoleAssignmentSyncResult> {
     const normalizedAgentId = normalizeAgentId(agentId);
     if (!normalizedAgentId) {
       throw new Error("Agent id cannot be empty.");
     }
-    const configPath = this.pathPort.join(paths.agentsDir, normalizedAgentId, "config.json");
-    const config = await this.readJsonIfPresent<Record<string, unknown>>(configPath);
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      normalizedAgentId,
+      "config.json",
+    );
+    const config = await this.readJsonIfPresent<Record<string, unknown>>(
+      configPath,
+    );
     if (!config) {
       return {
         updatedPaths: [],
-        skippedPaths: [configPath]
+        skippedPaths: [configPath],
       };
     }
 
     const type = await this.readAgentType(paths, normalizedAgentId);
-    const requiredSkillIds = type === "manager" ? MANAGER_ROLE_SKILLS : INDIVIDUAL_ROLE_SKILLS;
-    const roleSkillIds = new Set<string>([...MANAGER_ROLE_SKILLS, ...INDIVIDUAL_ROLE_SKILLS]);
+    const requiredSkillIds =
+      type === "manager" ? MANAGER_ROLE_SKILLS : INDIVIDUAL_ROLE_SKILLS;
+    const roleSkillIds = new Set<string>([
+      ...MANAGER_ROLE_SKILLS,
+      ...INDIVIDUAL_ROLE_SKILLS,
+    ]);
     const runtimeRecord = toObject(config.runtime);
     const skillsRecord = toObject(runtimeRecord.skills);
-    const assignedRaw = Array.isArray(skillsRecord.assigned) ? skillsRecord.assigned : [];
-    const assigned = [...new Set(assignedRaw.map((value) => String(value).trim().toLowerCase()).filter(Boolean))];
+    const assignedRaw = Array.isArray(skillsRecord.assigned)
+      ? skillsRecord.assigned
+      : [];
+    const assigned = [
+      ...new Set(
+        assignedRaw
+          .map((value) => String(value).trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    ];
     const preserved = assigned.filter((skillId) => !roleSkillIds.has(skillId));
     const nextAssigned = [...new Set([...preserved, ...requiredSkillIds])];
 
     if (sameStringArray(assigned, nextAssigned)) {
       return {
         updatedPaths: [],
-        skippedPaths: [configPath]
+        skippedPaths: [configPath],
       };
     }
 
@@ -282,17 +334,22 @@ export class AgentService {
     await this.fileSystem.writeFile(configPath, toJson(config));
     return {
       updatedPaths: [configPath],
-      skippedPaths: []
+      skippedPaths: [],
     };
   }
 
-  public async removeAgent(paths: OpenGoatPaths, rawAgentId: string): Promise<AgentDeletionResult> {
+  public async removeAgent(
+    paths: OpenGoatPaths,
+    rawAgentId: string,
+  ): Promise<AgentDeletionResult> {
     const agentId = normalizeAgentId(rawAgentId);
     if (!agentId) {
       throw new Error("Agent id cannot be empty.");
     }
     if (isDefaultAgentId(agentId)) {
-      throw new Error("Cannot delete ceo. It is the immutable default entry agent.");
+      throw new Error(
+        "Cannot delete ceo. It is the immutable default entry agent.",
+      );
     }
 
     const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
@@ -308,7 +365,9 @@ export class AgentService {
       skippedPaths.push(workspaceDir);
     }
 
-    const internalConfigExists = await this.fileSystem.exists(internalConfigDir);
+    const internalConfigExists = await this.fileSystem.exists(
+      internalConfigDir,
+    );
     if (internalConfigExists) {
       await this.fileSystem.removeDir(internalConfigDir);
       removedPaths.push(internalConfigDir);
@@ -316,25 +375,30 @@ export class AgentService {
       skippedPaths.push(internalConfigDir);
     }
 
-    const index = await this.readJsonIfPresent<AgentsIndex>(paths.agentsIndexJsonPath);
+    const index = await this.readJsonIfPresent<AgentsIndex>(
+      paths.agentsIndexJsonPath,
+    );
     if (index) {
       const filtered = dedupe(index.agents.filter((id) => id !== agentId));
       const nextIndex = renderAgentsIndex(this.nowIso(), filtered);
-      await this.fileSystem.writeFile(paths.agentsIndexJsonPath, toJson(nextIndex));
+      await this.fileSystem.writeFile(
+        paths.agentsIndexJsonPath,
+        toJson(nextIndex),
+      );
     }
 
     return {
       agentId,
       existed: workspaceExists || internalConfigExists,
       removedPaths,
-      skippedPaths
+      skippedPaths,
     };
   }
 
   public async setAgentManager(
     paths: OpenGoatPaths,
     rawAgentId: string,
-    rawReportsTo: string | null | undefined
+    rawReportsTo: string | null | undefined,
   ): Promise<AgentManagerUpdateResult> {
     const agentId = normalizeAgentId(rawAgentId);
     if (!agentId) {
@@ -342,12 +406,16 @@ export class AgentService {
     }
 
     const explicitReportsTo =
-      rawReportsTo === null || rawReportsTo === undefined ? null : normalizeAgentId(rawReportsTo);
+      rawReportsTo === null || rawReportsTo === undefined
+        ? null
+        : normalizeAgentId(rawReportsTo);
     if (explicitReportsTo === agentId) {
       throw new Error(`Agent "${agentId}" cannot report to itself.`);
     }
     if (isDefaultAgentId(agentId) && explicitReportsTo) {
-      throw new Error("ceo is the head of the organization and cannot report to another agent.");
+      throw new Error(
+        "ceo is the head of the organization and cannot report to another agent.",
+      );
     }
     const reportsTo = resolveReportsTo(agentId, rawReportsTo);
 
@@ -361,26 +429,38 @@ export class AgentService {
 
     await this.assertNoReportingCycle(paths, agentId, reportsTo, knownAgents);
 
-    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      agentId,
+      "config.json",
+    );
     const displayName = await this.readAgentDisplayName(paths, agentId);
     const role = await this.readAgentRole(paths, agentId);
-    const existingConfig = (await this.readJsonIfPresent<Record<string, unknown>>(configPath)) ??
-      (renderInternalAgentConfig({ id: agentId, displayName, role }) as Record<string, unknown>);
+    const existingConfig =
+      (await this.readJsonIfPresent<Record<string, unknown>>(configPath)) ??
+      (renderInternalAgentConfig({ id: agentId, displayName, role }) as Record<
+        string,
+        unknown
+      >);
     const existingOrganization = toObject(existingConfig.organization);
 
-    const previousReportsTo = normalizeReportsToValue(existingOrganization.reportsTo);
+    const previousReportsTo = normalizeReportsToValue(
+      existingOrganization.reportsTo,
+    );
     const nextOrganization: Record<string, unknown> = {
       ...existingOrganization,
-      reportsTo
+      reportsTo,
     };
 
     if (typeof existingOrganization.type !== "string") {
-      nextOrganization.type = isDefaultAgentId(agentId) ? "manager" : "individual";
+      nextOrganization.type = isDefaultAgentId(agentId)
+        ? "manager"
+        : "individual";
     }
 
     const nextConfig = {
       ...existingConfig,
-      organization: nextOrganization
+      organization: nextOrganization,
     };
 
     await this.fileSystem.writeFile(configPath, toJson(nextConfig));
@@ -389,14 +469,14 @@ export class AgentService {
       agentId,
       previousReportsTo: previousReportsTo ?? null,
       reportsTo,
-      updatedPaths: [configPath]
+      updatedPaths: [configPath],
     };
   }
 
   private async ensureDirectory(
     directoryPath: string,
     createdPaths: string[],
-    skippedPaths: string[]
+    skippedPaths: string[],
   ): Promise<void> {
     const existed = await this.fileSystem.exists(directoryPath);
     await this.fileSystem.ensureDir(directoryPath);
@@ -411,7 +491,7 @@ export class AgentService {
     filePath: string,
     payload: unknown,
     createdPaths: string[],
-    skippedPaths: string[]
+    skippedPaths: string[],
   ): Promise<void> {
     const exists = await this.fileSystem.exists(filePath);
     if (exists) {
@@ -428,7 +508,7 @@ export class AgentService {
     content: string,
     createdPaths: string[],
     skippedPaths: string[],
-    options: { overwrite?: boolean } = {}
+    options: { overwrite?: boolean } = {},
   ): Promise<void> {
     const exists = await this.fileSystem.exists(filePath);
     if (exists && !options.overwrite) {
@@ -459,27 +539,57 @@ export class AgentService {
     }
   }
 
-  private async readAgentDisplayName(paths: OpenGoatPaths, agentId: string): Promise<string> {
-    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+  private async readAgentDisplayName(
+    paths: OpenGoatPaths,
+    agentId: string,
+  ): Promise<string> {
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      agentId,
+      "config.json",
+    );
     const config = await this.readJsonIfPresent<AgentConfigShape>(configPath);
     return config?.displayName?.trim() || agentId;
   }
 
-  private async readAgentRole(paths: OpenGoatPaths, agentId: string): Promise<string> {
-    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+  private async readAgentRole(
+    paths: OpenGoatPaths,
+    agentId: string,
+  ): Promise<string> {
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      agentId,
+      "config.json",
+    );
     const config = await this.readJsonIfPresent<AgentConfigShape>(configPath);
-    const type = config?.organization?.type ?? (isDefaultAgentId(agentId) ? "manager" : "individual");
+    const type =
+      config?.organization?.type ??
+      (isDefaultAgentId(agentId) ? "manager" : "individual");
     return resolveAgentRole(agentId, type, config?.role);
   }
 
-  private async readAgentType(paths: OpenGoatPaths, agentId: string): Promise<"manager" | "individual"> {
-    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+  private async readAgentType(
+    paths: OpenGoatPaths,
+    agentId: string,
+  ): Promise<"manager" | "individual"> {
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      agentId,
+      "config.json",
+    );
     const config = await this.readJsonIfPresent<AgentConfigShape>(configPath);
     const type = config?.organization?.type;
-    if (type === "manager" || type === "individual") {
+    const hasDirectReportees = await this.hasDirectReportees(paths, agentId);
+    if (type === "manager") {
       return type;
     }
-    return isDefaultAgentId(agentId) ? "manager" : "individual";
+    if (type === "individual") {
+      return hasDirectReportees ? "manager" : "individual";
+    }
+    if (isDefaultAgentId(agentId)) {
+      return "manager";
+    }
+    return hasDirectReportees ? "manager" : "individual";
   }
 
   private renderWorkspaceSkill(skillId: string): string {
@@ -496,7 +606,7 @@ export class AgentService {
     paths: OpenGoatPaths,
     agentId: string,
     reportsTo: string | null,
-    knownAgentIds: string[]
+    knownAgentIds: string[],
   ): Promise<void> {
     if (!reportsTo) {
       return;
@@ -505,8 +615,11 @@ export class AgentService {
     const reportsToByAgent = new Map<string, string | null>();
     await Promise.all(
       knownAgentIds.map(async (candidateAgentId) => {
-        reportsToByAgent.set(candidateAgentId, await this.readAgentReportsTo(paths, candidateAgentId));
-      })
+        reportsToByAgent.set(
+          candidateAgentId,
+          await this.readAgentReportsTo(paths, candidateAgentId),
+        );
+      }),
     );
 
     reportsToByAgent.set(agentId, reportsTo);
@@ -515,15 +628,24 @@ export class AgentService {
 
     while (cursor) {
       if (visited.has(cursor)) {
-        throw new Error(`Cannot set "${agentId}" to report to "${reportsTo}" because it would create a cycle.`);
+        throw new Error(
+          `Cannot set "${agentId}" to report to "${reportsTo}" because it would create a cycle.`,
+        );
       }
       visited.add(cursor);
       cursor = reportsToByAgent.get(cursor) ?? null;
     }
   }
 
-  private async readAgentReportsTo(paths: OpenGoatPaths, agentId: string): Promise<string | null> {
-    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+  private async readAgentReportsTo(
+    paths: OpenGoatPaths,
+    agentId: string,
+  ): Promise<string | null> {
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      agentId,
+      "config.json",
+    );
     const config = await this.readJsonIfPresent<AgentConfigShape>(configPath);
     const reportsTo = normalizeReportsToValue(config?.organization?.reportsTo);
 
@@ -537,25 +659,57 @@ export class AgentService {
 
     return reportsTo;
   }
+
+  private async hasDirectReportees(
+    paths: OpenGoatPaths,
+    managerAgentId: string,
+  ): Promise<boolean> {
+    const normalizedManagerId = normalizeAgentId(managerAgentId);
+    if (!normalizedManagerId) {
+      return false;
+    }
+
+    const knownAgents = await this.fileSystem.listDirectories(paths.agentsDir);
+    for (const agentId of knownAgents) {
+      if (agentId === normalizedManagerId) {
+        continue;
+      }
+      const reportsTo = await this.readAgentReportsTo(paths, agentId);
+      if (reportsTo === normalizedManagerId) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 }
 
 const MANAGER_ROLE_SKILLS = ["board-manager"];
 const INDIVIDUAL_ROLE_SKILLS = ["board-individual"];
 
-function toAgentTemplateOptions(agentId: string, options: EnsureAgentOptions): AgentTemplateOptions {
-  const type = options.type ?? (isDefaultAgentId(agentId) ? "manager" : "individual");
+function toAgentTemplateOptions(
+  agentId: string,
+  options: EnsureAgentOptions,
+): AgentTemplateOptions {
+  const type =
+    options.type ?? (isDefaultAgentId(agentId) ? "manager" : "individual");
   const reportsTo = resolveReportsTo(agentId, options.reportsTo);
-  const skills = dedupe(options.skills ?? (type === "manager" ? MANAGER_ROLE_SKILLS : INDIVIDUAL_ROLE_SKILLS));
+  const providedSkills = options.skills ?? [];
+  const roleSkillIds = new Set([...MANAGER_ROLE_SKILLS, ...INDIVIDUAL_ROLE_SKILLS]);
+  const skills = dedupe(providedSkills.filter((skillId) => !roleSkillIds.has(skillId)));
   const role = resolveAgentRole(agentId, type, options.role);
   return {
     type,
     reportsTo,
     skills,
-    role
+    role,
   };
 }
 
-function resolveReportsTo(agentId: string, reportsTo: string | null | undefined): string | null {
+function resolveReportsTo(
+  agentId: string,
+  reportsTo: string | null | undefined,
+): string | null {
   if (isDefaultAgentId(agentId)) {
     return null;
   }

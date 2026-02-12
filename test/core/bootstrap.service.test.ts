@@ -1,12 +1,16 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
 import { AgentService } from "../../packages/core/src/core/agents/index.js";
 import { BootstrapService } from "../../packages/core/src/core/bootstrap/index.js";
+import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
 import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
 import { NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
-import { TestPathsProvider, createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
+import {
+  TestPathsProvider,
+  createTempDir,
+  removeTempDir,
+} from "../helpers/temp-opengoat.js";
 
 const roots: string[] = [];
 
@@ -29,22 +33,52 @@ describe("BootstrapService", () => {
     expect(result.defaultAgent).toBe("ceo");
     expect(result.createdPaths.length).toBeGreaterThan(0);
 
-    const config = JSON.parse(await readFile(paths.globalConfigJsonPath, "utf-8")) as {
+    const config = JSON.parse(
+      await readFile(paths.globalConfigJsonPath, "utf-8"),
+    ) as {
       defaultAgent: string;
     };
     expect(config.defaultAgent).toBe("ceo");
 
     const ceoConfig = JSON.parse(
-      await readFile(path.join(paths.agentsDir, "ceo", "config.json"), "utf-8")
+      await readFile(path.join(paths.agentsDir, "ceo", "config.json"), "utf-8"),
     ) as { runtime?: { adapter?: string } };
     expect(ceoConfig.runtime?.adapter).toBe("openclaw");
 
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "AGENTS.md"))).toBe(true);
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "SOUL.md"))).toBe(true);
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "skills", "manager", "SKILL.md"))).toBe(false);
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "skills", "board-manager", "SKILL.md"))).toBe(true);
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "skills", "board-individual"))).toBe(false);
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "BOOTSTRAP.md"))).toBe(false);
+    expect(
+      await fileSystem.exists(
+        path.join(paths.workspacesDir, "ceo", "AGENTS.md"),
+      ),
+    ).toBe(true);
+    expect(
+      await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "SOUL.md")),
+    ).toBe(true);
+    expect(
+      await fileSystem.exists(
+        path.join(paths.workspacesDir, "ceo", "skills", "manager", "SKILL.md"),
+      ),
+    ).toBe(false);
+    expect(
+      await fileSystem.exists(
+        path.join(
+          paths.workspacesDir,
+          "ceo",
+          "skills",
+          "board-manager",
+          "SKILL.md",
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      await fileSystem.exists(
+        path.join(paths.workspacesDir, "ceo", "skills", "board-individual"),
+      ),
+    ).toBe(false);
+    expect(
+      await fileSystem.exists(
+        path.join(paths.workspacesDir, "ceo", "BOOTSTRAP.md"),
+      ),
+    ).toBe(false);
     expect(await fileSystem.exists(paths.skillsDir)).toBe(false);
   });
 
@@ -72,16 +106,18 @@ describe("BootstrapService", () => {
           schemaVersion: 1,
           defaultAgent: "custom-agent",
           createdAt: "2026-01-01T00:00:00.000Z",
-          updatedAt: "2026-01-01T00:00:00.000Z"
+          updatedAt: "2026-01-01T00:00:00.000Z",
         },
         null,
-        2
-      ) + "\n"
+        2,
+      ) + "\n",
     );
 
     await service.initialize();
 
-    const config = JSON.parse(await readFile(paths.globalConfigJsonPath, "utf-8")) as {
+    const config = JSON.parse(
+      await readFile(paths.globalConfigJsonPath, "utf-8"),
+    ) as {
       defaultAgent: string;
     };
 
@@ -98,7 +134,9 @@ describe("BootstrapService", () => {
 
     await service.initialize();
 
-    const config = JSON.parse(await readFile(paths.globalConfigJsonPath, "utf-8")) as {
+    const config = JSON.parse(
+      await readFile(paths.globalConfigJsonPath, "utf-8"),
+    ) as {
       defaultAgent: string;
     };
     expect(config.defaultAgent).toBe("ceo");
@@ -116,21 +154,22 @@ describe("BootstrapService", () => {
         {
           schemaVersion: 1,
           agents: ["research"],
-          updatedAt: "2026-01-01T00:00:00.000Z"
+          updatedAt: "2026-01-01T00:00:00.000Z",
         },
         null,
-        2
-      ) + "\n"
+        2,
+      ) + "\n",
     );
 
     await service.initialize();
 
-    const index = JSON.parse(await readFile(paths.agentsIndexJsonPath, "utf-8")) as {
+    const index = JSON.parse(
+      await readFile(paths.agentsIndexJsonPath, "utf-8"),
+    ) as {
       agents: string[];
     };
     expect(index.agents).toEqual(["ceo", "research"]);
   });
-
 });
 
 async function createBootstrapService(): Promise<{
@@ -151,12 +190,12 @@ async function createBootstrapService(): Promise<{
     fileSystem,
     pathsProvider,
     agentService,
-    nowIso
+    nowIso,
   });
 
   return {
     service,
     paths: pathsProvider.getPaths(),
-    fileSystem
+    fileSystem,
   };
 }

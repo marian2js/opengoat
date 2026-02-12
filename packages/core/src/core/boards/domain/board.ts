@@ -14,6 +14,7 @@ export interface TaskRecord {
   title: string;
   description: string;
   status: string;
+  statusReason?: string;
   blockers: string[];
   artifacts: TaskEntry[];
   worklog: TaskEntry[];

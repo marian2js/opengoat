@@ -46,6 +46,7 @@ interface CreateAgentOptions {
   type?: "manager" | "individual";
   reportsTo?: string | null;
   skills?: string[];
+  role?: string;
 }
 
 interface DeleteAgentOptions {
@@ -84,7 +85,7 @@ export interface OpenClawUiService {
   getHomeDir: () => string;
   getPaths?: () => unknown;
   listAgents: () => Promise<AgentDescriptor[]>;
-  createAgent: (name: string, options?: Record<string, unknown>) => Promise<AgentCreationResult>;
+  createAgent: (name: string, options?: CreateAgentOptions) => Promise<AgentCreationResult>;
   deleteAgent: (agentId: string, options?: Record<string, unknown>) => Promise<AgentDeletionResult>;
   listSessions: (agentId?: string, options?: { activeMinutes?: number }) => Promise<SessionSummary[]>;
   listSkills: (agentId?: string) => Promise<ResolvedSkill[]>;
@@ -120,7 +121,7 @@ export interface OpenClawUiService {
   ) => Promise<TaskRecord>;
   listTasks?: (boardId: string) => Promise<TaskRecord[]>;
   getTask?: (taskId: string) => Promise<TaskRecord>;
-  updateTaskStatus?: (actorId: string, taskId: string, status: string) => Promise<TaskRecord>;
+  updateTaskStatus?: (actorId: string, taskId: string, status: string, reason?: string) => Promise<TaskRecord>;
   addTaskBlocker?: (actorId: string, taskId: string, blocker: string) => Promise<TaskRecord>;
   addTaskArtifact?: (actorId: string, taskId: string, content: string) => Promise<TaskRecord>;
   addTaskWorklog?: (actorId: string, taskId: string, content: string) => Promise<TaskRecord>;
@@ -178,6 +179,7 @@ interface TaskRecord {
   title: string;
   description: string;
   status: string;
+  statusReason?: string;
   blockers: string[];
   artifacts: TaskEntry[];
   worklog: TaskEntry[];
@@ -278,7 +280,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   });
 
-  app.post<{ Body: { name?: string; type?: "manager" | "individual"; reportsTo?: string | null; skills?: string[] | string } }>(
+  app.post<{ Body: { name?: string; type?: "manager" | "individual"; reportsTo?: string | null; skills?: string[] | string; role?: string } }>(
     "/api/agents",
     async (request, reply) => {
       return safeReply(reply, async () => {
@@ -291,11 +293,17 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
         }
 
         const skills = normalizeSkills(request.body?.skills);
-        const created = await service.createAgent(name, {
+        const createOptions: CreateAgentOptions = {
           type: request.body?.type,
           reportsTo: normalizeReportsTo(request.body?.reportsTo),
           skills
-        } satisfies CreateAgentOptions);
+        };
+        const role = normalizeRole(request.body?.role);
+        if (role) {
+          createOptions.role = role;
+        }
+
+        const created = await service.createAgent(name, createOptions);
 
         return {
           agent: created.agent,
@@ -356,11 +364,23 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
         sessionRef,
         limit
       });
+      const sanitizedHistory: SessionHistoryResult = {
+        ...history,
+        messages: history.messages.map((item) => {
+          if (item.type !== "message") {
+            return item;
+          }
+          return {
+            ...item,
+            content: sanitizeConversationText(item.content)
+          };
+        })
+      };
 
       return {
         agentId,
-        sessionRef: history.sessionKey,
-        history
+        sessionRef: sanitizedHistory.sessionKey,
+        history: sanitizedHistory
       };
     });
   };
@@ -549,13 +569,14 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   });
 
-  app.post<{ Params: { taskId: string }; Body: { actorId?: string; status?: string } }>(
+  app.post<{ Params: { taskId: string }; Body: { actorId?: string; status?: string; reason?: string } }>(
     "/api/tasks/:taskId/status",
     async (request, reply) => {
       return safeReply(reply, async () => {
         const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
         const taskId = request.params.taskId?.trim();
         const status = request.body?.status?.trim();
+        const reason = request.body?.reason?.trim();
         if (!taskId) {
           reply.code(400);
           return {
@@ -569,7 +590,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
           };
         }
 
-        const task = await updateUiTaskStatus(service, actorId, taskId, status);
+        const task = await updateUiTaskStatus(service, actorId, taskId, status, reason);
         return {
           task,
           message: `Task \"${task.taskId}\" updated.`
@@ -897,7 +918,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
         images: images.length > 0 ? images : undefined
       });
 
-      const output = result.stdout.trim() || result.stderr.trim();
+      const output = sanitizeConversationText(result.stdout.trim() || result.stderr.trim());
 
       return {
         agentId,
@@ -1024,6 +1045,39 @@ function normalizeSkills(value: string[] | string | undefined): string[] | undef
     .filter(Boolean);
 
   return parsed.length > 0 ? parsed : undefined;
+}
+
+function normalizeRole(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized || undefined;
+}
+
+function sanitizeConversationText(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const withoutAnsi = stripAnsiCodes(trimmed)
+    .replace(/\[(?:\d{1,3};)*\d{1,3}m/g, "")
+    .replace(/(?:^|\s)(?:\d{1,3};)*\d{1,3}m(?=\s|$)/g, " ")
+    .replace(/\r\n?/g, "\n");
+
+  const withoutPrefix = withoutAnsi
+    .replace(/^\s*\[agents\/[^\]\n]+\]\s*/iu, "")
+    .replace(/^\s*inherited\s+[^\n]*?\s+from\s+main\s+agent\s*/iu, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return withoutPrefix || trimmed;
+}
+
+function stripAnsiCodes(value: string): string {
+  return value.replace(
+    /[\u001B\u009B][[\]()#;?]*(?:\d{1,4}(?:;\d{0,4})*)?[0-9A-ORZcf-ntqry=><]/g,
+    ""
+  );
 }
 
 async function prepareProjectSession(
@@ -1245,9 +1299,15 @@ async function listUiTasks(service: OpenClawUiService, boardId: string): Promise
   throw new Error("Task listing is unavailable on this runtime.");
 }
 
-async function updateUiTaskStatus(service: OpenClawUiService, actorId: string, taskId: string, status: string): Promise<TaskRecord> {
+async function updateUiTaskStatus(
+  service: OpenClawUiService,
+  actorId: string,
+  taskId: string,
+  status: string,
+  reason?: string
+): Promise<TaskRecord> {
   if (typeof service.updateTaskStatus === "function") {
-    return service.updateTaskStatus(actorId, taskId, status);
+    return service.updateTaskStatus(actorId, taskId, status, reason);
   }
 
   throw new Error("Task status updates are unavailable on this runtime.");

@@ -97,8 +97,8 @@ export const taskCommand: CliCommand = {
           tasks = tasksByBoard.flat();
         }
 
-        if (parsed.owner) {
-          tasks = tasks.filter((task) => task.owner === parsed.owner);
+        if (parsed.assignee) {
+          tasks = tasks.filter((task) => task.assignedTo === parsed.assignee);
         }
 
         if (parsed.json) {
@@ -154,9 +154,12 @@ export const taskCommand: CliCommand = {
           printHelp(context.stderr);
           return 1;
         }
-        const task = await context.service.updateTaskStatus(parsed.actorId, parsed.taskId, parsed.status);
+        const task = await context.service.updateTaskStatus(parsed.actorId, parsed.taskId, parsed.status, parsed.reason);
         context.stdout.write(`Task updated: ${task.taskId}\n`);
         context.stdout.write(`Status: ${task.status}\n`);
+        if (task.statusReason) {
+          context.stdout.write(`Reason: ${task.statusReason}\n`);
+        }
         return 0;
       }
 
@@ -225,6 +228,7 @@ interface TaskStatusArgsOk {
   actorId: string;
   taskId: string;
   status: string;
+  reason?: string;
 }
 
 interface TaskEntryArgsOk {
@@ -244,7 +248,7 @@ interface TaskCronArgsOk {
 interface TaskListArgsOk {
   ok: true;
   boardId?: string;
-  owner?: string;
+  assignee?: string;
   json: boolean;
 }
 
@@ -273,10 +277,10 @@ function parseCreateArgs(args: string[]): ParseCreateResult {
   for (let index = indexOffset; index < args.length; index += 1) {
     const token = args[index];
 
-    if (token === "--as") {
+    if (token === "--owner") {
       const value = args[index + 1]?.trim();
       if (!value) {
-        return { ok: false, error: "Missing value for --as." };
+        return { ok: false, error: "Missing value for --owner." };
       }
       actorId = value;
       index += 1;
@@ -359,36 +363,55 @@ function parseStatusArgs(args: string[]): ParseStatusResult {
   const taskId = args[0]?.trim();
   const status = args[1]?.trim();
   if (!taskId || !status) {
-    return { ok: false, error: "Usage: opengoat task status <task-id> <status> [--as <agent-id>]" };
+    return {
+      ok: false,
+      error: "Usage: opengoat task status <task-id> <status> [--reason <text>] [--ass <agent-id>]"
+    };
   }
 
   let actorId = DEFAULT_AGENT_ID;
+  let reason: string | undefined;
   for (let index = 2; index < args.length; index += 1) {
     const token = args[index];
-    if (token === "--as") {
+    if (token === "--ass") {
       const value = args[index + 1]?.trim();
       if (!value) {
-        return { ok: false, error: "Missing value for --as." };
+        return { ok: false, error: "Missing value for --ass." };
       }
       actorId = value;
+      index += 1;
+      continue;
+    }
+    if (token === "--reason") {
+      const value = args[index + 1]?.trim();
+      if (!value) {
+        return { ok: false, error: "Missing value for --reason." };
+      }
+      reason = value;
       index += 1;
       continue;
     }
     return { ok: false, error: `Unknown option: ${token}` };
   }
 
+  const normalizedStatus = status.toLowerCase();
+  if ((normalizedStatus === "pending" || normalizedStatus === "blocked") && !reason) {
+    return { ok: false, error: `--reason is required when status is ${normalizedStatus}.` };
+  }
+
   return {
     ok: true,
     actorId,
     taskId,
-    status
+    status,
+    reason
   };
 }
 
 function parseEntryArgs(args: string[], kind: "blocker" | "artifact" | "worklog"): ParseEntryResult {
   const action = args[0]?.trim().toLowerCase();
   if (action !== "add") {
-    return { ok: false, error: `Usage: opengoat task ${kind} add <task-id> <content> [--as <agent-id>]` };
+    return { ok: false, error: `Usage: opengoat task ${kind} add <task-id> <content> [--ass <agent-id>]` };
   }
 
   const taskId = args[1]?.trim();
@@ -405,10 +428,10 @@ function parseEntryArgs(args: string[], kind: "blocker" | "artifact" | "worklog"
       continue;
     }
 
-    if (token === "--as") {
+    if (token === "--ass") {
       const value = args[index + 1]?.trim();
       if (!value) {
-        return { ok: false, error: "Missing value for --as." };
+        return { ok: false, error: "Missing value for --ass." };
       }
       actorId = value;
       index += 1;
@@ -488,7 +511,7 @@ function parseCronArgs(args: string[]): ParseCronResult {
 
 function parseListArgs(args: string[]): ParseListResult {
   let boardId: string | undefined;
-  let owner: string | undefined;
+  let assignee: string | undefined;
   let json = false;
 
   for (let index = 0; index < args.length; index += 1) {
@@ -502,13 +525,13 @@ function parseListArgs(args: string[]): ParseListResult {
       continue;
     }
 
-    if (token === "--owner") {
+    if (token === "--ass") {
       const value = args[index + 1]?.trim();
-      const normalizedOwner = normalizeAgentId(value || "");
-      if (!normalizedOwner) {
-        return { ok: false, error: "Missing value for --owner." };
+      const normalizedAssignee = normalizeAgentId(value || "");
+      if (!normalizedAssignee) {
+        return { ok: false, error: "Missing value for --ass." };
       }
-      owner = normalizedOwner;
+      assignee = normalizedAssignee;
       index += 1;
       continue;
     }
@@ -523,14 +546,14 @@ function parseListArgs(args: string[]): ParseListResult {
     boardId = token;
   }
 
-  if (!boardId && !owner) {
-    return { ok: false, error: "Missing <board-id> or --owner <agent-id>." };
+  if (!boardId && !assignee) {
+    return { ok: false, error: "Missing <board-id> or --ass <agent-id>." };
   }
 
   return {
     ok: true,
     boardId,
-    owner,
+    assignee,
     json
   };
 }
@@ -538,15 +561,15 @@ function parseListArgs(args: string[]): ParseListResult {
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write(
-    "  opengoat task create [board-id] --title <title> --description <text> [--project <path|~>] [--as <agent-id>] [--assign <agent-id>] [--status <todo|doing|blocked|done>]\n"
+    "  opengoat task create [board-id] --title <title> --description <text> [--project <path|~>] [--owner <agent-id>] [--assign <agent-id>] [--status <todo|doing|pending|blocked|done>]\n"
   );
-  output.write("  opengoat task list <board-id> [--owner <agent-id>] [--json]\n");
-  output.write("  opengoat task list --owner <agent-id> [--json]\n");
+  output.write("  opengoat task list <board-id> [--ass <agent-id>] [--json]\n");
+  output.write("  opengoat task list --ass <agent-id> [--json]\n");
   output.write("  opengoat task show <task-id> [--json]\n");
-  output.write("  opengoat task status <task-id> <todo|doing|blocked|done> [--as <agent-id>]\n");
-  output.write("  opengoat task blocker add <task-id> <content> [--as <agent-id>]\n");
-  output.write("  opengoat task artifact add <task-id> <content> [--as <agent-id>]\n");
-  output.write("  opengoat task worklog add <task-id> <content> [--as <agent-id>]\n");
+  output.write("  opengoat task status <task-id> <todo|doing|pending|blocked|done> [--reason <text>] [--ass <agent-id>]\n");
+  output.write("  opengoat task blocker add <task-id> <content> [--ass <agent-id>]\n");
+  output.write("  opengoat task artifact add <task-id> <content> [--ass <agent-id>]\n");
+  output.write("  opengoat task worklog add <task-id> <content> [--ass <agent-id>]\n");
   output.write("  opengoat task cron [--once] [--interval-minutes <n>] [--inactive-minutes <n>]\n");
 }
 

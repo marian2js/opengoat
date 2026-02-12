@@ -142,14 +142,44 @@ describe("openclaw provider", () => {
     });
 
     expect(invocation.args).toEqual([
-      "agent",
-      "--message",
-      "hello remote",
       "--remote",
       "ws://localhost:18789",
       "--token",
       "secret",
+      "agent",
+      "--message",
+      "hello remote",
     ]);
+  });
+
+  it("prepends OPENCLAW_ARGUMENTS for create/delete/auth commands", () => {
+    const provider = new OpenClawProvider();
+    const env = {
+      OPENCLAW_ARGUMENTS: "--profile team-a",
+    };
+
+    const createInvocation = provider.buildCreateAgentInvocation({
+      agentId: "research-analyst",
+      displayName: "Research Analyst",
+      workspaceDir: "/tmp/workspaces/research-analyst",
+      internalConfigDir: "/tmp/agents/research-analyst",
+      env,
+    });
+    expect(createInvocation.args.slice(0, 2)).toEqual(["--profile", "team-a"]);
+    expect(createInvocation.args.slice(2, 5)).toEqual(["agents", "add", "research-analyst"]);
+
+    const deleteInvocation = provider.buildDeleteAgentInvocation({
+      agentId: "research-analyst",
+      env,
+    });
+    expect(deleteInvocation.args.slice(0, 2)).toEqual(["--profile", "team-a"]);
+    expect(deleteInvocation.args.slice(2, 5)).toEqual(["agents", "delete", "research-analyst"]);
+
+    const authInvocation = provider.buildAuthInvocation({
+      env,
+    });
+    expect(authInvocation.args.slice(0, 2)).toEqual(["--profile", "team-a"]);
+    expect(authInvocation.args.slice(2)).toEqual(["onboard"]);
   });
 
   it("expands PATH to include common user npm/bin locations", () => {

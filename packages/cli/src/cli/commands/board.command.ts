@@ -137,10 +137,10 @@ function parseCreateArgs(args: string[]): ParseResult {
       continue;
     }
 
-    if (token === "--as") {
+    if (token === "--owner") {
       const value = args[index + 1]?.trim();
       if (!value) {
-        return { ok: false, error: "Missing value for --as." };
+        return { ok: false, error: "Missing value for --owner." };
       }
       actorId = value;
       index += 1;
@@ -214,10 +214,10 @@ function parseUpdateArgs(args: string[]): ParseUpdateResult {
   for (let index = 1; index < args.length; index += 1) {
     const token = args[index];
 
-    if (token === "--as") {
+    if (token === "--owner") {
       const value = args[index + 1]?.trim();
       if (!value) {
-        return { ok: false, error: "Missing value for --as." };
+        return { ok: false, error: "Missing value for --owner." };
       }
       actorId = value;
       index += 1;
@@ -251,10 +251,10 @@ function parseUpdateArgs(args: string[]): ParseUpdateResult {
 
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
-  output.write("  opengoat board create <title> [--as <agent-id>]\n");
+  output.write("  opengoat board create <title> [--owner <agent-id>]\n");
   output.write("  opengoat board list [--owner <agent-id>] [--json]\n");
   output.write("  opengoat board show <board-id> [--json]\n");
-  output.write("  opengoat board update <board-id> [--as <agent-id>] --title <title>\n");
+  output.write("  opengoat board update <board-id> [--owner <agent-id>] --title <title>\n");
 }
 
 function toErrorMessage(error: unknown): string {

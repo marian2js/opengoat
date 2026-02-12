@@ -1,20 +1,18 @@
 import os from "node:os";
 import path from "node:path";
-import {
-  BOARD_MANAGER_SKILL_ID,
-} from "../../agents/domain/agent-manifest.js";
+import { BOARD_MANAGER_SKILL_ID } from "../../agents/domain/agent-manifest.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import {
+  resolveSkillsConfig,
   type AgentSkillsConfig,
   type InstallSkillRequest,
   type InstallSkillResult,
   type ResolvedSkill,
   type SkillScope,
-  resolveSkillsConfig,
-  type SkillsPromptResult
+  type SkillsPromptResult,
 } from "../domain/skill.js";
 
 interface SkillServiceDeps {
@@ -45,35 +43,51 @@ export class SkillService {
   public async listSkills(
     paths: OpenGoatPaths,
     agentId = DEFAULT_AGENT_ID,
-    runtimeConfig?: AgentSkillsConfig
+    runtimeConfig?: AgentSkillsConfig,
   ): Promise<ResolvedSkill[]> {
     const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
     const resolvedConfig = resolveSkillsConfig(
-      runtimeConfig ?? (await this.readAgentSkillsConfig(paths, normalizedAgentId))
+      runtimeConfig ??
+        (await this.readAgentSkillsConfig(paths, normalizedAgentId)),
     );
     if (!resolvedConfig.enabled) {
       return [];
     }
 
-    const discovered = await this.loadSkillsWithPrecedence(paths, resolvedConfig);
+    const discovered = await this.loadSkillsWithPrecedence(
+      paths,
+      resolvedConfig,
+    );
     const assigned = new Set(resolvedConfig.assigned);
-    const filtered = assigned.size > 0 ? discovered.filter((skill) => assigned.has(skill.id)) : discovered;
+    const filtered =
+      assigned.size > 0
+        ? discovered.filter((skill) => assigned.has(skill.id))
+        : discovered;
     return [...filtered].sort((left, right) => left.id.localeCompare(right.id));
   }
 
-  public async listGlobalSkills(paths: OpenGoatPaths): Promise<ResolvedSkill[]> {
-    const loaded = await this.loadSkillsFromDirectory(paths.skillsDir, "managed");
+  public async listGlobalSkills(
+    paths: OpenGoatPaths,
+  ): Promise<ResolvedSkill[]> {
+    const loaded = await this.loadSkillsFromDirectory(
+      paths.skillsDir,
+      "managed",
+    );
     return loaded.sort((left, right) => left.id.localeCompare(right.id));
   }
 
   public async buildSkillsPrompt(
     paths: OpenGoatPaths,
     agentId = DEFAULT_AGENT_ID,
-    runtimeConfig?: AgentSkillsConfig
+    runtimeConfig?: AgentSkillsConfig,
   ): Promise<SkillsPromptResult> {
     const skills = await this.listSkills(paths, agentId, runtimeConfig);
     const resolvedConfig = resolveSkillsConfig(
-      runtimeConfig ?? (await this.readAgentSkillsConfig(paths, normalizeAgentId(agentId) || DEFAULT_AGENT_ID))
+      runtimeConfig ??
+        (await this.readAgentSkillsConfig(
+          paths,
+          normalizeAgentId(agentId) || DEFAULT_AGENT_ID,
+        )),
     );
     if (!resolvedConfig.enabled) {
       return { prompt: "", skills: [] };
@@ -81,7 +95,9 @@ export class SkillService {
 
     const selected: ResolvedSkill[] = [];
     let budgetUsed = 0;
-    for (const skill of skills.filter((entry) => entry.frontmatter.disableModelInvocation !== true)) {
+    for (const skill of skills.filter(
+      (entry) => entry.frontmatter.disableModelInvocation !== true,
+    )) {
       if (selected.length >= resolvedConfig.prompt.maxSkills) {
         break;
       }
@@ -89,14 +105,18 @@ export class SkillService {
         ? clampText(skill.content, resolvedConfig.prompt.maxCharsPerSkill)
         : "";
       const estimatedChars =
-        skill.name.length + skill.description.length + skill.skillFilePath.length + content.length + 150;
+        skill.name.length +
+        skill.description.length +
+        skill.skillFilePath.length +
+        content.length +
+        150;
       if (budgetUsed + estimatedChars > resolvedConfig.prompt.maxTotalChars) {
         break;
       }
       budgetUsed += estimatedChars;
       selected.push({
         ...skill,
-        content
+        content,
       });
     }
 
@@ -107,14 +127,14 @@ export class SkillService {
       "- If multiple skills could apply, choose the most specific.",
       "- If none apply, continue without using a skill.",
       "Skill definitions are centralized under the global skills store.",
-      ""
+      "",
     ];
 
     if (selected.length === 0) {
       lines.push("No installed skills were found for this agent.");
       return {
         prompt: lines.join("\n"),
-        skills: []
+        skills: [],
       };
     }
 
@@ -123,7 +143,9 @@ export class SkillService {
       lines.push("  <skill>");
       lines.push(`    <id>${escapeXml(skill.id)}</id>`);
       lines.push(`    <name>${escapeXml(skill.name)}</name>`);
-      lines.push(`    <description>${escapeXml(skill.description)}</description>`);
+      lines.push(
+        `    <description>${escapeXml(skill.description)}</description>`,
+      );
       lines.push(`    <location>${escapeXml(skill.skillFilePath)}</location>`);
       lines.push(`    <source>${skill.source}</source>`);
       if (resolvedConfig.prompt.includeContent && skill.content.trim()) {
@@ -137,16 +159,22 @@ export class SkillService {
 
     return {
       prompt: lines.join("\n"),
-      skills: selected
+      skills: selected,
     };
   }
 
-  public async installSkill(paths: OpenGoatPaths, request: InstallSkillRequest): Promise<InstallSkillResult> {
+  public async installSkill(
+    paths: OpenGoatPaths,
+    request: InstallSkillRequest,
+  ): Promise<InstallSkillResult> {
     const scope: SkillScope = request.scope === "global" ? "global" : "agent";
-    const normalizedAgentId = normalizeAgentId(request.agentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
+    const normalizedAgentId =
+      normalizeAgentId(request.agentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
     const skillId = normalizeAgentId(request.skillName);
     if (!skillId) {
-      throw new Error("Skill name must contain at least one alphanumeric character.");
+      throw new Error(
+        "Skill name must contain at least one alphanumeric character.",
+      );
     }
 
     const baseDir = paths.skillsDir;
@@ -159,20 +187,26 @@ export class SkillService {
     if (request.sourcePath?.trim()) {
       const sourcePath = resolveUserPath(request.sourcePath.trim());
       const sourceSkillFile =
-        sourcePath.toLowerCase().endsWith("/skill.md") || sourcePath.toLowerCase().endsWith("\\skill.md")
+        sourcePath.toLowerCase().endsWith("/skill.md") ||
+        sourcePath.toLowerCase().endsWith("\\skill.md")
           ? sourcePath
           : this.pathPort.join(sourcePath, "SKILL.md");
       const sourceFileExists = await this.fileSystem.exists(sourceSkillFile);
       if (!sourceFileExists) {
         throw new Error(`Source skill not found: ${sourceSkillFile}`);
       }
-      const sourceDir = sourceSkillFile === sourcePath ? path.dirname(sourcePath) : sourcePath;
+      const sourceDir =
+        sourceSkillFile === sourcePath ? path.dirname(sourcePath) : sourcePath;
 
       await this.fileSystem.removeDir(targetDir);
       await this.fileSystem.copyDir(sourceDir, targetDir);
       if (scope === "agent") {
         await this.assignSkillToAgent(paths, normalizedAgentId, skillId);
-        await this.reconcileRoleSkillsIfNeeded(paths, normalizedAgentId, skillId);
+        await this.reconcileRoleSkillsIfNeeded(
+          paths,
+          normalizedAgentId,
+          skillId,
+        );
       }
 
       return {
@@ -182,19 +216,33 @@ export class SkillService {
         skillName: request.skillName.trim(),
         source: "source-path",
         installedPath: targetSkillFile,
-        replaced
+        replaced,
       };
     }
 
     let source: InstallSkillResult["source"] = "generated";
-    const existingGlobalSkill = this.pathPort.join(paths.skillsDir, skillId, "SKILL.md");
-    if (scope === "agent" && (await this.fileSystem.exists(existingGlobalSkill))) {
+    const existingGlobalSkill = this.pathPort.join(
+      paths.skillsDir,
+      skillId,
+      "SKILL.md",
+    );
+    if (
+      scope === "agent" &&
+      (await this.fileSystem.exists(existingGlobalSkill))
+    ) {
       source = "managed";
     } else {
-      const description = request.description?.trim() || `Skill instructions for ${request.skillName.trim()}.`;
-      const content = request.content?.trim() || renderSkillMarkdown({ skillId, description });
+      const description =
+        request.description?.trim() ||
+        `Skill instructions for ${request.skillName.trim()}.`;
+      const content =
+        request.content?.trim() ||
+        renderSkillMarkdown({ skillId, description });
       await this.fileSystem.ensureDir(targetDir);
-      await this.fileSystem.writeFile(targetSkillFile, ensureTrailingNewline(content));
+      await this.fileSystem.writeFile(
+        targetSkillFile,
+        ensureTrailingNewline(content),
+      );
       source = "generated";
     }
 
@@ -210,18 +258,30 @@ export class SkillService {
       skillName: request.skillName.trim(),
       source,
       installedPath: targetSkillFile,
-      replaced
+      replaced,
     };
   }
 
   private async loadSkillsWithPrecedence(
     paths: OpenGoatPaths,
-    config: ReturnType<typeof resolveSkillsConfig>
+    config: ReturnType<typeof resolveSkillsConfig>,
   ): Promise<ResolvedSkill[]> {
     const extraDirs = config.load.extraDirs.map(resolveUserPath);
-    const sources: Array<{ source: ResolvedSkill["source"]; dir: string; enabled: boolean }> = [
-      { source: "managed", dir: paths.skillsDir, enabled: config.includeManaged },
-      ...extraDirs.map((dir) => ({ source: "extra" as const, dir, enabled: true }))
+    const sources: Array<{
+      source: ResolvedSkill["source"];
+      dir: string;
+      enabled: boolean;
+    }> = [
+      {
+        source: "managed",
+        dir: paths.skillsDir,
+        enabled: config.includeManaged,
+      },
+      ...extraDirs.map((dir) => ({
+        source: "extra" as const,
+        dir,
+        enabled: true,
+      })),
     ];
 
     const merged = new Map<string, ResolvedSkill>();
@@ -229,7 +289,10 @@ export class SkillService {
       if (!sourceEntry.enabled) {
         continue;
       }
-      const loaded = await this.loadSkillsFromDirectory(sourceEntry.dir, sourceEntry.source);
+      const loaded = await this.loadSkillsFromDirectory(
+        sourceEntry.dir,
+        sourceEntry.source,
+      );
       for (const skill of loaded) {
         merged.set(skill.id, skill);
       }
@@ -238,7 +301,10 @@ export class SkillService {
     return [...merged.values()];
   }
 
-  private async loadSkillsFromDirectory(baseDir: string, source: ResolvedSkill["source"]): Promise<ResolvedSkill[]> {
+  private async loadSkillsFromDirectory(
+    baseDir: string,
+    source: ResolvedSkill["source"],
+  ): Promise<ResolvedSkill[]> {
     const skillDirs = await this.fileSystem.listDirectories(baseDir);
     const loaded: ResolvedSkill[] = [];
 
@@ -262,7 +328,9 @@ export class SkillService {
         continue;
       }
 
-      const id = normalizeAgentId(parsed.frontmatter.name ?? directoryName) || normalizeAgentId(directoryName);
+      const id =
+        normalizeAgentId(parsed.frontmatter.name ?? directoryName) ||
+        normalizeAgentId(directoryName);
       if (!id) {
         continue;
       }
@@ -270,20 +338,28 @@ export class SkillService {
       loaded.push({
         id,
         name: parsed.frontmatter.name ?? humanizeSkillName(directoryName),
-        description: parsed.frontmatter.description ?? summarizeSkillBody(parsed.body),
+        description:
+          parsed.frontmatter.description ?? summarizeSkillBody(parsed.body),
         source,
         skillDir,
         skillFilePath,
         content: parsed.body.trim(),
-        frontmatter: parsed.frontmatter
+        frontmatter: parsed.frontmatter,
       });
     }
 
     return loaded;
   }
 
-  private async readAgentSkillsConfig(paths: OpenGoatPaths, agentId: string): Promise<AgentSkillsConfig | undefined> {
-    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+  private async readAgentSkillsConfig(
+    paths: OpenGoatPaths,
+    agentId: string,
+  ): Promise<AgentSkillsConfig | undefined> {
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      agentId,
+      "config.json",
+    );
     if (!(await this.fileSystem.exists(configPath))) {
       return undefined;
     }
@@ -297,8 +373,16 @@ export class SkillService {
     }
   }
 
-  private async assignSkillToAgent(paths: OpenGoatPaths, agentId: string, skillId: string): Promise<void> {
-    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+  private async assignSkillToAgent(
+    paths: OpenGoatPaths,
+    agentId: string,
+    skillId: string,
+  ): Promise<void> {
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      agentId,
+      "config.json",
+    );
     if (!(await this.fileSystem.exists(configPath))) {
       return;
     }
@@ -306,15 +390,27 @@ export class SkillService {
     const raw = await this.fileSystem.readFile(configPath);
     const parsed = JSON.parse(raw) as AgentConfigShape;
     const runtimeRecord =
-      parsed.runtime && typeof parsed.runtime === "object" && !Array.isArray(parsed.runtime)
+      parsed.runtime &&
+      typeof parsed.runtime === "object" &&
+      !Array.isArray(parsed.runtime)
         ? (parsed.runtime as Record<string, unknown>)
         : {};
     const skillsRecord =
-      runtimeRecord.skills && typeof runtimeRecord.skills === "object" && !Array.isArray(runtimeRecord.skills)
+      runtimeRecord.skills &&
+      typeof runtimeRecord.skills === "object" &&
+      !Array.isArray(runtimeRecord.skills)
         ? (runtimeRecord.skills as Record<string, unknown>)
         : {};
-    const assignedRaw = Array.isArray(skillsRecord.assigned) ? skillsRecord.assigned : [];
-    const assigned = [...new Set(assignedRaw.map((value) => String(value).trim().toLowerCase()).filter(Boolean))];
+    const assignedRaw = Array.isArray(skillsRecord.assigned)
+      ? skillsRecord.assigned
+      : [];
+    const assigned = [
+      ...new Set(
+        assignedRaw
+          .map((value) => String(value).trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    ];
     if (!assigned.includes(skillId)) {
       assigned.push(skillId);
     }
@@ -322,16 +418,30 @@ export class SkillService {
     skillsRecord.assigned = assigned;
     runtimeRecord.skills = skillsRecord;
     parsed.runtime = runtimeRecord as AgentConfigShape["runtime"];
-    await this.fileSystem.writeFile(configPath, `${JSON.stringify(parsed, null, 2)}\n`);
+    await this.fileSystem.writeFile(
+      configPath,
+      `${JSON.stringify(parsed, null, 2)}\n`,
+    );
   }
 
-  private async reconcileRoleSkillsIfNeeded(paths: OpenGoatPaths, agentId: string, skillId: string): Promise<void> {
+  private async reconcileRoleSkillsIfNeeded(
+    paths: OpenGoatPaths,
+    agentId: string,
+    skillId: string,
+  ): Promise<void> {
     const normalizedSkill = skillId.trim().toLowerCase();
-    if (normalizedSkill !== BOARD_MANAGER_SKILL_ID && normalizedSkill !== BOARD_INDIVIDUAL_SKILL_ID) {
+    if (
+      normalizedSkill !== BOARD_MANAGER_SKILL_ID &&
+      normalizedSkill !== BOARD_INDIVIDUAL_SKILL_ID
+    ) {
       return;
     }
 
-    const configPath = this.pathPort.join(paths.agentsDir, agentId, "config.json");
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      agentId,
+      "config.json",
+    );
     if (!(await this.fileSystem.exists(configPath))) {
       return;
     }
@@ -339,40 +449,64 @@ export class SkillService {
     const raw = await this.fileSystem.readFile(configPath);
     const parsed = JSON.parse(raw) as AgentConfigShape;
     const organizationRecord =
-      parsed.organization && typeof parsed.organization === "object" && !Array.isArray(parsed.organization)
+      parsed.organization &&
+      typeof parsed.organization === "object" &&
+      !Array.isArray(parsed.organization)
         ? (parsed.organization as Record<string, unknown>)
         : {};
     const runtimeRecord =
-      parsed.runtime && typeof parsed.runtime === "object" && !Array.isArray(parsed.runtime)
+      parsed.runtime &&
+      typeof parsed.runtime === "object" &&
+      !Array.isArray(parsed.runtime)
         ? (parsed.runtime as Record<string, unknown>)
         : {};
     const skillsRecord =
-      runtimeRecord.skills && typeof runtimeRecord.skills === "object" && !Array.isArray(runtimeRecord.skills)
+      runtimeRecord.skills &&
+      typeof runtimeRecord.skills === "object" &&
+      !Array.isArray(runtimeRecord.skills)
         ? (runtimeRecord.skills as Record<string, unknown>)
         : {};
-    const assignedRaw = Array.isArray(skillsRecord.assigned) ? skillsRecord.assigned : [];
-    const assigned = [...new Set(assignedRaw.map((value) => String(value).trim().toLowerCase()).filter(Boolean))];
+    const assignedRaw = Array.isArray(skillsRecord.assigned)
+      ? skillsRecord.assigned
+      : [];
+    const assigned = [
+      ...new Set(
+        assignedRaw
+          .map((value) => String(value).trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    ];
 
     if (normalizedSkill === BOARD_MANAGER_SKILL_ID) {
       organizationRecord.type = "manager";
-      const withoutIndividual = assigned.filter((entry) => entry !== BOARD_INDIVIDUAL_SKILL_ID);
-      skillsRecord.assigned = [...new Set([...withoutIndividual, BOARD_MANAGER_SKILL_ID])];
     } else {
       organizationRecord.type = "individual";
-      const withoutManager = assigned.filter((entry) => entry !== BOARD_MANAGER_SKILL_ID);
-      skillsRecord.assigned = [...new Set([...withoutManager, BOARD_INDIVIDUAL_SKILL_ID])];
     }
+
+    // Role skills live in OpenClaw workspace skill folders, not local assigned metadata.
+    skillsRecord.assigned = assigned.filter(
+      (entry) =>
+        entry !== BOARD_MANAGER_SKILL_ID &&
+        entry !== BOARD_INDIVIDUAL_SKILL_ID,
+    );
 
     runtimeRecord.skills = skillsRecord;
     parsed.runtime = runtimeRecord as AgentConfigShape["runtime"];
-    parsed.organization = organizationRecord as AgentConfigShape["organization"];
-    await this.fileSystem.writeFile(configPath, `${JSON.stringify(parsed, null, 2)}\n`);
+    parsed.organization =
+      organizationRecord as AgentConfigShape["organization"];
+    await this.fileSystem.writeFile(
+      configPath,
+      `${JSON.stringify(parsed, null, 2)}\n`,
+    );
   }
 }
 
 const BOARD_INDIVIDUAL_SKILL_ID = "board-individual";
 
-function renderSkillMarkdown(params: { skillId: string; description: string }): string {
+function renderSkillMarkdown(params: {
+  skillId: string;
+  description: string;
+}): string {
   return [
     "---",
     `name: ${humanizeSkillName(params.skillId)}`,
@@ -388,7 +522,7 @@ function renderSkillMarkdown(params: { skillId: string; description: string }): 
     "- Add explicit step-by-step guidance here.",
     "",
     "## Constraints",
-    "- Add constraints and safety checks here."
+    "- Add constraints and safety checks here.",
   ].join("\n");
 }
 
@@ -458,7 +592,10 @@ function parseSkillMarkdown(content: string): {
       }
       continue;
     }
-    if (key === "disable-model-invocation" || key === "disable_model_invocation") {
+    if (
+      key === "disable-model-invocation" ||
+      key === "disable_model_invocation"
+    ) {
       const normalized = value.toLowerCase();
       if (normalized === "true") {
         frontmatter.disableModelInvocation = true;

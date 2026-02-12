@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   renderAgentsIndex,
   renderGlobalConfig,
-  renderInternalAgentConfig
+  renderInternalAgentConfig,
 } from "../../packages/core/src/core/templates/default-templates.js";
 
 describe("default templates", () => {
@@ -13,12 +13,15 @@ describe("default templates", () => {
       schemaVersion: 1,
       defaultAgent: "ceo",
       createdAt: "2026-02-06T00:00:00.000Z",
-      updatedAt: "2026-02-06T00:00:00.000Z"
+      updatedAt: "2026-02-06T00:00:00.000Z",
     });
   });
 
   it("renders agents index payload", () => {
-    const index = renderAgentsIndex("2026-02-06T00:00:00.000Z", ["ceo", "research"]);
+    const index = renderAgentsIndex("2026-02-06T00:00:00.000Z", [
+      "ceo",
+      "research",
+    ]);
 
     expect(index.schemaVersion).toBe(1);
     expect(index.agents).toEqual(["ceo", "research"]);
@@ -30,13 +33,17 @@ describe("default templates", () => {
     const internalConfig = renderInternalAgentConfig(identity) as {
       role: string;
       organization: { type: string; reportsTo: string | null };
-      runtime: { adapter: string; sessions: { mainKey: string }; skills: { assigned: string[] } };
+      runtime: {
+        adapter: string;
+        sessions: { mainKey: string };
+        skills: { assigned: string[] };
+      };
     };
-    expect(internalConfig.role).toBe("Head of Organization");
+    expect(internalConfig.role).toBe("CEO");
     expect(internalConfig.organization.type).toBe("manager");
     expect(internalConfig.organization.reportsTo).toBeNull();
     expect(internalConfig.runtime.adapter).toBe("openclaw");
     expect(internalConfig.runtime.sessions.mainKey).toBe("main");
-    expect(internalConfig.runtime.skills.assigned).toEqual(["board-manager"]);
+    expect(internalConfig.runtime.skills.assigned).toEqual([]);
   });
 });

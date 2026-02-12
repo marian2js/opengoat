@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import type { AgentIdentity } from "../domain/agent.js";
 import { DEFAULT_AGENT_ID, isDefaultAgentId } from "../domain/agent-id.js";
+import type { AgentIdentity } from "../domain/agent.js";
 import type { AgentsIndex, OpenGoatConfig } from "../domain/opengoat-paths.js";
 
 export { DEFAULT_AGENT_ID } from "../domain/agent-id.js";
@@ -13,8 +13,8 @@ export interface AgentTemplateOptions {
 }
 
 const ROLE_SKILLS: Record<"manager" | "individual", string[]> = {
-  manager: ["board-manager"],
-  individual: ["board-individual"]
+  manager: [],
+  individual: [],
 };
 
 export function renderGlobalConfig(nowIso: string): OpenGoatConfig {
@@ -22,15 +22,18 @@ export function renderGlobalConfig(nowIso: string): OpenGoatConfig {
     schemaVersion: 1,
     defaultAgent: DEFAULT_AGENT_ID,
     createdAt: nowIso,
-    updatedAt: nowIso
+    updatedAt: nowIso,
   };
 }
 
-export function renderAgentsIndex(nowIso: string, agents: string[]): AgentsIndex {
+export function renderAgentsIndex(
+  nowIso: string,
+  agents: string[],
+): AgentsIndex {
   return {
     schemaVersion: 1,
     agents,
-    updatedAt: nowIso
+    updatedAt: nowIso,
   };
 }
 
@@ -52,13 +55,17 @@ export function renderBoardIndividualSkillMarkdown(): string {
 
 export function renderInternalAgentConfig(
   agent: AgentIdentity,
-  options: AgentTemplateOptions = {}
+  options: AgentTemplateOptions = {},
 ): Record<string, unknown> {
   const isCeo = isDefaultAgentId(agent.id);
   const type = options.type ?? (isCeo ? "manager" : "individual");
   const role = resolveAgentRole(agent.id, type, options.role ?? agent.role);
   const reportsTo =
-    options.reportsTo === undefined ? (isCeo ? null : DEFAULT_AGENT_ID) : options.reportsTo;
+    options.reportsTo === undefined
+      ? isCeo
+        ? null
+        : DEFAULT_AGENT_ID
+      : options.reportsTo;
   const assignedSkills = dedupe(options.skills ?? ROLE_SKILLS[type]);
 
   return {
@@ -75,7 +82,7 @@ export function renderInternalAgentConfig(
       reportsTo,
       discoverable: true,
       tags: type === "manager" ? ["manager", "leadership"] : ["specialized"],
-      priority: type === "manager" ? 100 : 50
+      priority: type === "manager" ? 100 : 50,
     },
     runtime: {
       adapter: "openclaw",
@@ -85,21 +92,21 @@ export function renderInternalAgentConfig(
         contextMaxChars: 12_000,
         reset: {
           mode: "daily",
-          atHour: 4
+          atHour: 4,
         },
         pruning: {
           enabled: true,
           maxMessages: 40,
           maxChars: 16_000,
-          keepRecentMessages: 12
+          keepRecentMessages: 12,
         },
         compaction: {
           enabled: true,
           triggerMessageCount: 80,
           triggerChars: 32_000,
           keepRecentMessages: 20,
-          summaryMaxChars: 4_000
-        }
+          summaryMaxChars: 4_000,
+        },
       },
       skills: {
         enabled: true,
@@ -107,23 +114,23 @@ export function renderInternalAgentConfig(
         includeManaged: true,
         assigned: assignedSkills,
         load: {
-          extraDirs: []
+          extraDirs: [],
         },
         prompt: {
           maxSkills: 12,
           maxCharsPerSkill: 6_000,
           maxTotalChars: 36_000,
-          includeContent: true
-        }
-      }
-    }
+          includeContent: true,
+        },
+      },
+    },
   };
 }
 
 export function resolveAgentRole(
   agentId: string,
   type: "manager" | "individual",
-  rawRole?: string
+  rawRole?: string,
 ): string {
   const explicitRole = rawRole?.trim();
   if (explicitRole) {
@@ -131,7 +138,7 @@ export function resolveAgentRole(
   }
 
   if (isDefaultAgentId(agentId)) {
-    return "Head of Organization";
+    return "CEO";
   }
 
   return type === "manager" ? "Manager" : "Individual Contributor";
@@ -149,7 +156,10 @@ function readMarkdownTemplate(relativePath: string): string {
     return cached;
   }
 
-  const content = readFileSync(new URL(`./assets/${relativePath}`, import.meta.url), "utf-8")
+  const content = readFileSync(
+    new URL(`./assets/${relativePath}`, import.meta.url),
+    "utf-8",
+  )
     .replace(/\r\n/g, "\n")
     .trimEnd();
   markdownTemplateCache.set(relativePath, content);

@@ -7,12 +7,24 @@ import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
 const roots: string[] = [];
 const originalHome = process.env.OPENGOAT_HOME;
+const originalOpenClawStateDir = process.env.OPENCLAW_STATE_DIR;
+const originalOpenClawConfigPath = process.env.OPENCLAW_CONFIG_PATH;
 
 afterEach(async () => {
   if (originalHome === undefined) {
     delete process.env.OPENGOAT_HOME;
   } else {
     process.env.OPENGOAT_HOME = originalHome;
+  }
+  if (originalOpenClawStateDir === undefined) {
+    delete process.env.OPENCLAW_STATE_DIR;
+  } else {
+    process.env.OPENCLAW_STATE_DIR = originalOpenClawStateDir;
+  }
+  if (originalOpenClawConfigPath === undefined) {
+    delete process.env.OPENCLAW_CONFIG_PATH;
+  } else {
+    process.env.OPENCLAW_CONFIG_PATH = originalOpenClawConfigPath;
   }
 
   while (roots.length > 0) {
@@ -28,6 +40,7 @@ describe("runCli", () => {
     const root = await createTempDir("opengoat-runcli-");
     roots.push(root);
     process.env.OPENGOAT_HOME = root;
+    applyOpenClawIsolation(root);
 
     const code = await runCli([]);
 
@@ -39,6 +52,7 @@ describe("runCli", () => {
     const root = await createTempDir("opengoat-runcli-");
     roots.push(root);
     process.env.OPENGOAT_HOME = root;
+    applyOpenClawIsolation(root);
 
     const code = await runCli(["onboard", "--non-interactive", "--local"]);
 
@@ -54,6 +68,7 @@ describe("runCli", () => {
     const root = await createTempDir("opengoat-runcli-");
     roots.push(root);
     process.env.OPENGOAT_HOME = root;
+    applyOpenClawIsolation(root);
 
     const code = await runCli(["init"]);
 
@@ -69,6 +84,7 @@ describe("runCli", () => {
     const root = await createTempDir("opengoat-runcli-");
     roots.push(root);
     process.env.OPENGOAT_HOME = root;
+    applyOpenClawIsolation(root);
 
     const code = await runCli(["does-not-exist"]);
     expect(code).toBe(1);
@@ -78,6 +94,7 @@ describe("runCli", () => {
     const root = await createTempDir("opengoat-runcli-");
     roots.push(root);
     process.env.OPENGOAT_HOME = root;
+    applyOpenClawIsolation(root);
 
     const code = await runCli(["agent", "--help"]);
     expect(code).toBe(0);
@@ -87,6 +104,7 @@ describe("runCli", () => {
     const root = await createTempDir("opengoat-runcli-");
     roots.push(root);
     process.env.OPENGOAT_HOME = root;
+    applyOpenClawIsolation(root);
 
     const code = await runCli(["acp", "--help"]);
     expect(code).toBe(0);
@@ -96,6 +114,7 @@ describe("runCli", () => {
     const root = await createTempDir("opengoat-runcli-");
     roots.push(root);
     process.env.OPENGOAT_HOME = root;
+    applyOpenClawIsolation(root);
 
     const code = await runCli(["--log-level", "debug", "--log-format", "json", "init"]);
     expect(code).toBe(0);
@@ -105,8 +124,15 @@ describe("runCli", () => {
     const root = await createTempDir("opengoat-runcli-");
     roots.push(root);
     process.env.OPENGOAT_HOME = root;
+    applyOpenClawIsolation(root);
 
     const code = await runCli(["agent", "--help", "--log-level", "debug", "--log-format", "pretty"]);
     expect(code).toBe(0);
   });
 });
+
+function applyOpenClawIsolation(root: string): void {
+  const stateDir = path.join(root, ".openclaw");
+  process.env.OPENCLAW_STATE_DIR = stateDir;
+  process.env.OPENCLAW_CONFIG_PATH = path.join(stateDir, "openclaw.json");
+}

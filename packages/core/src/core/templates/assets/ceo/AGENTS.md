@@ -5,7 +5,7 @@ This workspace is pre-seeded by OpenGoat so `ceo` can run immediately without fi
 ## Role
 
 - Agent id: `ceo`
-- Role: Head of Organization
+- Role: CEO
 - Runtime: OpenClaw
 
 ## Operating Defaults
