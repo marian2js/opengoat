@@ -20,7 +20,6 @@ import {
   renderAgentsIndex,
   renderBoardIndividualSkillMarkdown,
   renderBoardManagerSkillMarkdown,
-  renderCeoAgentsMarkdown,
   renderCeoSoulMarkdown,
   renderInternalAgentConfig,
   resolveAgentRole,
@@ -551,26 +550,25 @@ export class AgentService {
 
   private async rewriteAgentsMarkdown(
     filePath: string,
-    agentId: string,
+    _agentId: string,
     createdPaths: string[],
     skippedPaths: string[],
   ): Promise<void> {
     const exists = await this.fileSystem.exists(filePath);
-    const source = exists
-      ? await this.fileSystem.readFile(filePath)
-      : this.renderDefaultAgentsMarkdown(agentId);
-    const next = removeFirstRunSection(source);
-    if (exists && normalizeMarkdown(source) === next) {
+    if (!exists) {
       skippedPaths.push(filePath);
       return;
     }
 
-    await this.fileSystem.writeFile(filePath, `${next}\n`);
-    if (exists) {
+    const source = await this.fileSystem.readFile(filePath);
+    const next = removeFirstRunSection(source);
+    if (source === next) {
       skippedPaths.push(filePath);
       return;
     }
-    createdPaths.push(filePath);
+
+    await this.fileSystem.writeFile(filePath, next);
+    skippedPaths.push(filePath);
   }
 
   private async rewriteSoulMarkdown(
@@ -676,13 +674,6 @@ export class AgentService {
       return renderBoardIndividualSkillMarkdown();
     }
     throw new Error(`Unsupported workspace skill id: ${skillId}`);
-  }
-
-  private renderDefaultAgentsMarkdown(agentId: string): string {
-    if (isDefaultAgentId(agentId)) {
-      return renderCeoAgentsMarkdown();
-    }
-    return "# AGENTS.md";
   }
 
   private renderDefaultSoulMarkdown(
@@ -856,14 +847,18 @@ function sameStringArray(left: string[], right: string[]): boolean {
 }
 
 function removeFirstRunSection(markdown: string): string {
-  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  const lineBreak = markdown.includes("\r\n") ? "\r\n" : "\n";
+  const lines = markdown.split(/\r?\n/);
+  const hasTrailingLineBreak = /\r?\n$/.test(markdown);
   const kept: string[] = [];
   let skipping = false;
+  let removed = false;
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (!skipping && /^##\s+first run\s*$/i.test(trimmed)) {
       skipping = true;
+      removed = true;
       continue;
     }
     if (skipping) {
@@ -876,7 +871,15 @@ function removeFirstRunSection(markdown: string): string {
     kept.push(line);
   }
 
-  return normalizeMarkdown(kept.join("\n"));
+  if (!removed) {
+    return markdown;
+  }
+
+  let next = kept.join(lineBreak);
+  if (hasTrailingLineBreak && !next.endsWith(lineBreak)) {
+    next = `${next}${lineBreak}`;
+  }
+  return next;
 }
 
 function upsertSoulRoleSection(

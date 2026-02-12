@@ -334,27 +334,6 @@ export class OpenGoatService {
     }
 
     try {
-      await this.agentService.ensureCeoWorkspaceBootstrap(paths);
-    } catch (error) {
-      warnings.push(
-        `OpenGoat workspace bootstrap for "ceo" failed: ${toErrorMessage(
-          error,
-        )}`,
-      );
-    }
-
-    try {
-      await this.boardService.ensureDefaultBoardForAgent(
-        paths,
-        DEFAULT_AGENT_ID,
-      );
-    } catch (error) {
-      warnings.push(
-        `Default board ensure for "ceo" failed: ${toErrorMessage(error)}`,
-      );
-    }
-
-    try {
       const ceoSync = await this.providerService.createProviderAgent(
         paths,
         DEFAULT_AGENT_ID,
@@ -393,6 +372,27 @@ export class OpenGoatService {
           `OpenClaw ceo location sync failed: ${toErrorMessage(error)}`,
         );
       }
+    }
+
+    try {
+      await this.agentService.ensureCeoWorkspaceBootstrap(paths);
+    } catch (error) {
+      warnings.push(
+        `OpenGoat workspace bootstrap for "ceo" failed: ${toErrorMessage(
+          error,
+        )}`,
+      );
+    }
+
+    try {
+      await this.boardService.ensureDefaultBoardForAgent(
+        paths,
+        DEFAULT_AGENT_ID,
+      );
+    } catch (error) {
+      warnings.push(
+        `Default board ensure for "ceo" failed: ${toErrorMessage(error)}`,
+      );
     }
 
     return {
