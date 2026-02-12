@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
 import { AgentService } from "../../packages/core/src/core/agents/index.js";
+import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
 import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
 import { NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
 import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
@@ -24,20 +24,22 @@ describe("AgentService", () => {
 
     expect(service.normalizeAgentName("  Research Analyst  ")).toEqual({
       id: "research-analyst",
-      displayName: "Research Analyst"
+      displayName: "Research Analyst",
     });
     expect(service.normalizeAgentName("John Doe")).toEqual({
       id: "john-doe",
-      displayName: "John Doe"
+      displayName: "John Doe",
     });
     expect(service.normalizeAgentName("Developer")).toEqual({
       id: "developer",
-      displayName: "Developer"
+      displayName: "Developer",
     });
 
-    expect(() => service.normalizeAgentName("   ")).toThrowError("Agent name cannot be empty.");
+    expect(() => service.normalizeAgentName("   ")).toThrowError(
+      "Agent name cannot be empty.",
+    );
     expect(() => service.normalizeAgentName("***")).toThrowError(
-      "Agent name must contain at least one alphanumeric character."
+      "Agent name must contain at least one alphanumeric character.",
     );
   });
 
@@ -46,26 +48,39 @@ describe("AgentService", () => {
 
     const result = await service.ensureAgent(paths, {
       id: "ceo",
-      displayName: "CEO"
+      displayName: "CEO",
     });
 
-    expect(result.agent.workspaceDir).toBe(path.join(paths.workspacesDir, "ceo"));
+    expect(result.agent.workspaceDir).toBe(
+      path.join(paths.workspacesDir, "ceo"),
+    );
     expect(result.createdPaths.length).toBeGreaterThan(0);
 
     const config = JSON.parse(
-      await readFile(path.join(result.agent.internalConfigDir, "config.json"), "utf-8")
-    ) as { role?: string; runtime?: { adapter?: string }; organization?: { type?: string; reportsTo?: string | null } };
-    expect(config.role).toBe("Head of Organization");
+      await readFile(
+        path.join(result.agent.internalConfigDir, "config.json"),
+        "utf-8",
+      ),
+    ) as {
+      role?: string;
+      runtime?: { adapter?: string };
+      organization?: { type?: string; reportsTo?: string | null };
+    };
+    expect(config.role).toBe("CEO");
     expect(config.runtime?.adapter).toBe("openclaw");
     expect(config.organization?.type).toBe("manager");
     expect(config.organization?.reportsTo).toBeNull();
-    expect(result.agent.role).toBe("Head of Organization");
+    expect(result.agent.role).toBe("CEO");
 
-    const index = JSON.parse(await readFile(paths.agentsIndexJsonPath, "utf-8")) as {
+    const index = JSON.parse(
+      await readFile(paths.agentsIndexJsonPath, "utf-8"),
+    ) as {
       agents: string[];
     };
     expect(index.agents).toEqual(["ceo"]);
-    expect(result.createdPaths).not.toContain(path.join(result.agent.workspaceDir, "AGENTS.md"));
+    expect(result.createdPaths).not.toContain(
+      path.join(result.agent.workspaceDir, "AGENTS.md"),
+    );
   });
 
   it("defaults non-ceo reportsTo to ceo when omitted", async () => {
@@ -73,10 +88,15 @@ describe("AgentService", () => {
 
     const result = await service.ensureAgent(paths, {
       id: "developer",
-      displayName: "Developer"
+      displayName: "Developer",
     });
 
-    const config = JSON.parse(await readFile(path.join(result.agent.internalConfigDir, "config.json"), "utf-8")) as {
+    const config = JSON.parse(
+      await readFile(
+        path.join(result.agent.internalConfigDir, "config.json"),
+        "utf-8",
+      ),
+    ) as {
       organization?: { reportsTo?: string | null };
     };
     expect(config.organization?.reportsTo).toBe("ceo");
@@ -89,14 +109,19 @@ describe("AgentService", () => {
       paths,
       {
         id: "engineer",
-        displayName: "Engineer"
+        displayName: "Engineer",
       },
       {
-        reportsTo: "CTO"
-      }
+        reportsTo: "CTO",
+      },
     );
 
-    const config = JSON.parse(await readFile(path.join(result.agent.internalConfigDir, "config.json"), "utf-8")) as {
+    const config = JSON.parse(
+      await readFile(
+        path.join(result.agent.internalConfigDir, "config.json"),
+        "utf-8",
+      ),
+    ) as {
       organization?: { reportsTo?: string | null };
     };
     expect(config.organization?.reportsTo).toBe("cto");
@@ -109,14 +134,19 @@ describe("AgentService", () => {
       paths,
       {
         id: "neo",
-        displayName: "Neo"
+        displayName: "Neo",
       },
       {
-        role: "Developer"
-      }
+        role: "Developer",
+      },
     );
 
-    const config = JSON.parse(await readFile(path.join(result.agent.internalConfigDir, "config.json"), "utf-8")) as {
+    const config = JSON.parse(
+      await readFile(
+        path.join(result.agent.internalConfigDir, "config.json"),
+        "utf-8",
+      ),
+    ) as {
       role?: string;
     };
     expect(config.role).toBe("Developer");
@@ -128,11 +158,17 @@ describe("AgentService", () => {
 
     const result = await service.ensureAgent(paths, {
       id: "developer",
-      displayName: "Developer"
+      displayName: "Developer",
     });
 
-    expect(await fileSystem.exists(path.join(result.agent.workspaceDir, "AGENTS.md"))).toBe(false);
-    expect(await fileSystem.exists(path.join(result.agent.workspaceDir, "SOUL.md"))).toBe(false);
+    expect(
+      await fileSystem.exists(
+        path.join(result.agent.workspaceDir, "AGENTS.md"),
+      ),
+    ).toBe(false);
+    expect(
+      await fileSystem.exists(path.join(result.agent.workspaceDir, "SOUL.md")),
+    ).toBe(false);
   });
 
   it("never changes global default agent during agent creation", async () => {
@@ -145,19 +181,21 @@ describe("AgentService", () => {
           schemaVersion: 1,
           defaultAgent: "ceo",
           createdAt: "2026-02-01T00:00:00.000Z",
-          updatedAt: "2026-02-01T00:00:00.000Z"
+          updatedAt: "2026-02-01T00:00:00.000Z",
         },
         null,
-        2
-      ) + "\n"
+        2,
+      ) + "\n",
     );
 
     await service.ensureAgent(paths, {
       id: "research-analyst",
-      displayName: "Research Analyst"
+      displayName: "Research Analyst",
     });
 
-    const config = JSON.parse(await readFile(paths.globalConfigJsonPath, "utf-8")) as {
+    const config = JSON.parse(
+      await readFile(paths.globalConfigJsonPath, "utf-8"),
+    ) as {
       defaultAgent: string;
       createdAt: string;
       updatedAt: string;
@@ -177,19 +215,21 @@ describe("AgentService", () => {
         {
           schemaVersion: 1,
           agents: ["zeta", "alpha", "alpha"],
-          updatedAt: "2026-02-01T00:00:00.000Z"
+          updatedAt: "2026-02-01T00:00:00.000Z",
         },
         null,
-        2
-      ) + "\n"
+        2,
+      ) + "\n",
     );
 
     await service.ensureAgent(paths, {
       id: "beta",
-      displayName: "Beta"
+      displayName: "Beta",
     });
 
-    const index = JSON.parse(await readFile(paths.agentsIndexJsonPath, "utf-8")) as {
+    const index = JSON.parse(
+      await readFile(paths.agentsIndexJsonPath, "utf-8"),
+    ) as {
       agents: string[];
     };
     expect(index.agents).toEqual(["alpha", "beta", "zeta"]);
@@ -201,10 +241,13 @@ describe("AgentService", () => {
     await fileSystem.ensureDir(path.join(paths.agentsDir, "z-agent"));
     await fileSystem.writeFile(
       path.join(paths.agentsDir, "z-agent", "config.json"),
-      JSON.stringify({ displayName: "Zed" }, null, 2) + "\n"
+      JSON.stringify({ displayName: "Zed" }, null, 2) + "\n",
     );
     await fileSystem.ensureDir(path.join(paths.agentsDir, "a-agent"));
-    await fileSystem.writeFile(path.join(paths.agentsDir, "a-agent", "config.json"), "{bad json");
+    await fileSystem.writeFile(
+      path.join(paths.agentsDir, "a-agent", "config.json"),
+      "{bad json",
+    );
 
     const agents = await service.listAgents(paths);
 
@@ -221,9 +264,15 @@ describe("AgentService", () => {
     await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
 
     const configPath = path.join(paths.agentsDir, "ceo", "config.json");
-    await fileSystem.writeFile(configPath, JSON.stringify({ displayName: "Custom CEO" }, null, 2) + "\n");
+    await fileSystem.writeFile(
+      configPath,
+      JSON.stringify({ displayName: "Custom CEO" }, null, 2) + "\n",
+    );
 
-    const second = await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    const second = await service.ensureAgent(paths, {
+      id: "ceo",
+      displayName: "CEO",
+    });
 
     expect(second.createdPaths).toEqual([]);
     expect(second.skippedPaths.length).toBeGreaterThan(0);
@@ -233,8 +282,15 @@ describe("AgentService", () => {
   it("updates manager relationship in config.json", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
-    await service.ensureAgent(paths, { id: "cto", displayName: "CTO" }, { type: "manager", reportsTo: "ceo" });
-    await service.ensureAgent(paths, { id: "engineer", displayName: "Engineer" });
+    await service.ensureAgent(
+      paths,
+      { id: "cto", displayName: "CTO" },
+      { type: "manager", reportsTo: "ceo" },
+    );
+    await service.ensureAgent(paths, {
+      id: "engineer",
+      displayName: "Engineer",
+    });
 
     const result = await service.setAgentManager(paths, "engineer", "cto");
 
@@ -242,33 +298,59 @@ describe("AgentService", () => {
     expect(result.previousReportsTo).toBe("ceo");
     expect(result.reportsTo).toBe("cto");
 
-    const config = JSON.parse(await readFile(path.join(paths.agentsDir, "engineer", "config.json"), "utf-8")) as {
+    const config = JSON.parse(
+      await readFile(
+        path.join(paths.agentsDir, "engineer", "config.json"),
+        "utf-8",
+      ),
+    ) as {
       organization?: { reportsTo?: string | null };
     };
     expect(config.organization?.reportsTo).toBe("cto");
-    expect(result.updatedPaths).toEqual([path.join(paths.agentsDir, "engineer", "config.json")]);
+    expect(result.updatedPaths).toEqual([
+      path.join(paths.agentsDir, "engineer", "config.json"),
+    ]);
   });
 
   it("rejects manager reassignment that would create a cycle", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
-    await service.ensureAgent(paths, { id: "cto", displayName: "CTO" }, { type: "manager", reportsTo: "ceo" });
-    await service.ensureAgent(paths, { id: "engineer", displayName: "Engineer" }, { reportsTo: "cto" });
+    await service.ensureAgent(
+      paths,
+      { id: "cto", displayName: "CTO" },
+      { type: "manager", reportsTo: "ceo" },
+    );
+    await service.ensureAgent(
+      paths,
+      { id: "engineer", displayName: "Engineer" },
+      { reportsTo: "cto" },
+    );
 
-    await expect(service.setAgentManager(paths, "cto", "engineer")).rejects.toThrow("create a cycle");
+    await expect(
+      service.setAgentManager(paths, "cto", "engineer"),
+    ).rejects.toThrow("create a cycle");
   });
 
   it("removes a non-default agent internal config and prunes optional workspace dir", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "developer", displayName: "Developer" });
+    await service.ensureAgent(paths, {
+      id: "developer",
+      displayName: "Developer",
+    });
 
     const deletion = await service.removeAgent(paths, "developer");
 
     expect(deletion.agentId).toBe("developer");
     expect(deletion.existed).toBe(true);
-    expect(deletion.removedPaths).toEqual([path.join(paths.agentsDir, "developer")]);
-    expect(await fileSystem.exists(path.join(paths.workspacesDir, "developer"))).toBe(false);
-    expect(await fileSystem.exists(path.join(paths.agentsDir, "developer"))).toBe(false);
+    expect(deletion.removedPaths).toEqual([
+      path.join(paths.agentsDir, "developer"),
+    ]);
+    expect(
+      await fileSystem.exists(path.join(paths.workspacesDir, "developer")),
+    ).toBe(false);
+    expect(
+      await fileSystem.exists(path.join(paths.agentsDir, "developer")),
+    ).toBe(false);
   });
 
   it("prevents deleting ceo", async () => {
@@ -276,7 +358,7 @@ describe("AgentService", () => {
     await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
 
     await expect(service.removeAgent(paths, "ceo")).rejects.toThrow(
-      "Cannot delete ceo"
+      "Cannot delete ceo",
     );
   });
 });
@@ -285,7 +367,7 @@ function createAgentService(): AgentService {
   return new AgentService({
     fileSystem: new NodeFileSystem(),
     pathPort: new NodePathPort(),
-    nowIso: () => "2026-02-06T00:00:00.000Z"
+    nowIso: () => "2026-02-06T00:00:00.000Z",
   });
 }
 
@@ -308,7 +390,7 @@ async function createAgentServiceWithPaths(): Promise<{
     runsDir: path.join(root, "runs"),
     globalConfigJsonPath: path.join(root, "config.json"),
     globalConfigMarkdownPath: path.join(root, "CONFIG.md"),
-    agentsIndexJsonPath: path.join(root, "agents.json")
+    agentsIndexJsonPath: path.join(root, "agents.json"),
   };
 
   await fileSystem.ensureDir(paths.homeDir);
@@ -322,6 +404,6 @@ async function createAgentServiceWithPaths(): Promise<{
   return {
     service: createAgentService(),
     paths,
-    fileSystem
+    fileSystem,
   };
 }

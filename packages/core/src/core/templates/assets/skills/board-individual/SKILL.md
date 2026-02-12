@@ -1,31 +1,157 @@
 ---
 name: board-individual
-description: Individual contributor playbook for OpenGoat boards and tasks.
+description: "Use when you need to work with board tasks: view tasks, list tasks, update task status, add blockers, artifacts, and worklogs."
 metadata:
   version: "1.0.0"
 ---
 
 # Board Individual
 
-Use this skill when executing assigned work via OpenGoat boards and tasks.
+Use this skill to read and update tasks assigned to you. Follow your manager’s instructions for what to do, and use the commands below to keep task state accurate.
 
-## Allowed Actions
+## Quick start
 
-- Create tasks for yourself.
-- Read board and task state.
-- Update status for tasks assigned to you.
-- Add blockers, artifacts, and worklog entries on tasks assigned to you.
+Replace `<me>` with your agent id.
 
-## Restrictions (Enforced by Core)
+```bash
+opengoat agent info <me>
+```
 
-- You cannot assign tasks to other agents unless you are a manager and the assignee is your direct reportee.
-- You cannot update status, blockers, artifacts, or worklog on tasks assigned to someone else.
-- You cannot rename boards you do not own.
-- You must specify a board id when creating tasks unless you are a manager with a default board.
+You will typically have:
 
-## Working Pattern
+- a `<board-id>` to list tasks
+- one or more `<task-id>` values to update
 
-- Keep worklog updates factual and concise.
-- Add blockers immediately when blocked.
-- Attach artifacts that prove progress.
-- Move status deliberately: `todo` -> `doing` -> `blocked|done`.
+## Relevant commands
+
+```bash
+opengoat task list <board-id> [--ass <me>] [--json]
+opengoat task show <task-id> [--json]
+
+opengoat task status <task-id> <todo|doing|blocked|pending|done> [--reason <reason>] [--ass <me>]
+
+opengoat task blocker add <task-id> <content> [--ass <me>]
+opengoat task artifact add <task-id> <content> [--ass <me>]
+opengoat task worklog add <task-id> <content> [--ass <me>]
+```
+
+## View tasks
+
+### Show a single task
+
+```bash
+opengoat task show <task-id>
+```
+
+### List tasks
+
+List tasks on a board:
+
+```bash
+opengoat task list <board-id>
+```
+
+List tasks owned by an agent (often: you):
+
+```bash
+opengoat task list --ass <me>
+```
+
+### List tasks by status (practical approach)
+
+Use JSON output and filter locally. The JSON includes task status (`todo|doing|blocked|pending|done`).
+
+```bash
+opengoat task list <board-id> --json
+```
+
+Filter examples (adjust the jq selector to match the JSON shape you see):
+
+```bash
+
+# If the JSON is an array of tasks
+
+opengoat task list <board-id> --json | jq '.[] | select(.status=="doing")'
+
+# If the JSON is an object that contains a tasks array
+
+opengoat task list <board-id> --json | jq '.tasks[] | select(.status=="doing")'
+```
+
+## Update task status
+
+Statuses: `todo`, `doing`, `blocked`, `pending`, `done`.
+
+```bash
+opengoat task status <task-id> <todo|doing|blocked|pending|done> [--reason "<reason>"]
+```
+
+### Reason rules
+
+- `--reason` is **mandatory** when moving to:
+  - `blocked`
+  - `pending`
+- `--reason` is optional for other statuses, but recommended when it improves clarity.
+
+Examples:
+
+```bash
+
+# Start work
+
+opengoat task status <task-id> doing
+
+# Blocked (reason required)
+
+opengoat task status <task-id> blocked --reason "Need API token from platform team"
+
+# Pending (reason required)
+
+opengoat task status <task-id> pending --reason "Waiting for review window on Friday"
+
+# Done (reason optional but useful)
+
+opengoat task status <task-id> done --reason "Merged PR #123 and deployed"
+```
+
+### Assignee override (only if you must)
+
+Some contexts require specifying an assignee context explicitly.
+
+```bash
+opengoat task status <task-id> doing --ass <agent-id>
+```
+
+## Blockers, artifacts, worklogs
+
+### Add a blocker entry (recommended when blocked)
+
+Use this to capture what is blocking you and what unblocks you.
+
+```bash
+opengoat task blocker add <task-id> "Blocked by <thing>. Unblocks when <condition>." --ass <me>
+```
+
+### Add an artifact (proof of work)
+
+Use this for PR links, docs, screenshots, commands run, or final outputs.
+
+```bash
+opengoat task artifact add <task-id> "PR: <link> | Docs: <link> | Output: <summary>" --ass <me>
+```
+
+### Add a worklog update (progress notes)
+
+Use for concise progress updates and handoffs.
+
+```bash
+opengoat task worklog add <task-id> "Did X. Next: Y. Risk: Z." --ass <me>
+```
+
+## Minimal hygiene
+
+- Keep status accurate (`todo` → `doing` → `blocked/pending/done`).
+- When moving to `blocked` or `pending`, always include a specific `--reason`.
+- When blocked, add a blocker entry that states what unblocks you.
+- When done, add at least one artifact that proves completion.
+- Use worklogs when progress is non-obvious or when handing off.

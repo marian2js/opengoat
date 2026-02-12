@@ -1,13 +1,16 @@
-import type { AgentIdentity } from "../../domain/agent.js";
+import { AgentService } from "../../agents/application/agent.service.js";
 import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
-import type { InitializationResult, OpenGoatConfig } from "../../domain/opengoat-paths.js";
+import type { AgentIdentity } from "../../domain/agent.js";
+import type {
+  InitializationResult,
+  OpenGoatConfig,
+} from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import {
   renderAgentsIndex,
-  renderGlobalConfig
+  renderGlobalConfig,
 } from "../../templates/default-templates.js";
-import { AgentService } from "../../agents/application/agent.service.js";
 
 interface BootstrapServiceDeps {
   fileSystem: FileSystemPort;
@@ -41,21 +44,31 @@ export class BootstrapService {
     await this.ensureDirectory(paths.runsDir, createdPaths, skippedPaths);
 
     const now = this.nowIso();
-    await this.ensureGlobalConfig(paths.globalConfigJsonPath, now, createdPaths, skippedPaths);
-    await this.ensureAgentsIndex(paths.agentsIndexJsonPath, now, createdPaths, skippedPaths);
+    await this.ensureGlobalConfig(
+      paths.globalConfigJsonPath,
+      now,
+      createdPaths,
+      skippedPaths,
+    );
+    await this.ensureAgentsIndex(
+      paths.agentsIndexJsonPath,
+      now,
+      createdPaths,
+      skippedPaths,
+    );
 
     const ceo: AgentIdentity = {
       id: DEFAULT_AGENT_ID,
-      displayName: "CEO"
+      displayName: "CEO",
     };
 
     const agentResult = await this.agentService.ensureAgent(paths, ceo, {
       type: "manager",
       reportsTo: null,
-      skills: ["board-manager"],
-      role: "Head of Organization"
+      role: "CEO",
     });
-    const workspaceBootstrapResult = await this.agentService.ensureCeoWorkspaceBootstrap(paths);
+    const workspaceBootstrapResult =
+      await this.agentService.ensureCeoWorkspaceBootstrap(paths);
 
     createdPaths.push(...agentResult.createdPaths);
     skippedPaths.push(...agentResult.skippedPaths);
@@ -67,7 +80,7 @@ export class BootstrapService {
       paths,
       createdPaths,
       skippedPaths,
-      defaultAgent: DEFAULT_AGENT_ID
+      defaultAgent: DEFAULT_AGENT_ID,
     };
   }
 
@@ -75,16 +88,21 @@ export class BootstrapService {
     globalConfigJsonPath: string,
     now: string,
     createdPaths: string[],
-    skippedPaths: string[]
+    skippedPaths: string[],
   ): Promise<void> {
     const exists = await this.fileSystem.exists(globalConfigJsonPath);
     if (!exists) {
-      await this.fileSystem.writeFile(globalConfigJsonPath, `${JSON.stringify(renderGlobalConfig(now), null, 2)}\n`);
+      await this.fileSystem.writeFile(
+        globalConfigJsonPath,
+        `${JSON.stringify(renderGlobalConfig(now), null, 2)}\n`,
+      );
       createdPaths.push(globalConfigJsonPath);
       return;
     }
 
-    const current = await this.readJsonIfPresent<OpenGoatConfig>(globalConfigJsonPath);
+    const current = await this.readJsonIfPresent<OpenGoatConfig>(
+      globalConfigJsonPath,
+    );
     if (current && current.defaultAgent === DEFAULT_AGENT_ID) {
       skippedPaths.push(globalConfigJsonPath);
       return;
@@ -94,10 +112,13 @@ export class BootstrapService {
       schemaVersion: 1,
       defaultAgent: DEFAULT_AGENT_ID,
       createdAt: current?.createdAt ?? now,
-      updatedAt: now
+      updatedAt: now,
     };
 
-    await this.fileSystem.writeFile(globalConfigJsonPath, `${JSON.stringify(repaired, null, 2)}\n`);
+    await this.fileSystem.writeFile(
+      globalConfigJsonPath,
+      `${JSON.stringify(repaired, null, 2)}\n`,
+    );
     skippedPaths.push(globalConfigJsonPath);
   }
 
@@ -105,23 +126,29 @@ export class BootstrapService {
     agentsIndexJsonPath: string,
     now: string,
     createdPaths: string[],
-    skippedPaths: string[]
+    skippedPaths: string[],
   ): Promise<void> {
     const exists = await this.fileSystem.exists(agentsIndexJsonPath);
     if (!exists) {
       await this.fileSystem.writeFile(
         agentsIndexJsonPath,
-        `${JSON.stringify(renderAgentsIndex(now, [DEFAULT_AGENT_ID]), null, 2)}\n`
+        `${JSON.stringify(
+          renderAgentsIndex(now, [DEFAULT_AGENT_ID]),
+          null,
+          2,
+        )}\n`,
       );
       createdPaths.push(agentsIndexJsonPath);
       return;
     }
 
-    const current = await this.readJsonIfPresent<{ agents?: string[] }>(agentsIndexJsonPath);
+    const current = await this.readJsonIfPresent<{ agents?: string[] }>(
+      agentsIndexJsonPath,
+    );
     const mergedAgents = dedupe([...(current?.agents ?? []), DEFAULT_AGENT_ID]);
     await this.fileSystem.writeFile(
       agentsIndexJsonPath,
-      `${JSON.stringify(renderAgentsIndex(now, mergedAgents), null, 2)}\n`
+      `${JSON.stringify(renderAgentsIndex(now, mergedAgents), null, 2)}\n`,
     );
     skippedPaths.push(agentsIndexJsonPath);
   }
@@ -129,7 +156,7 @@ export class BootstrapService {
   private async ensureDirectory(
     directoryPath: string,
     createdPaths: string[],
-    skippedPaths: string[]
+    skippedPaths: string[],
   ): Promise<void> {
     const existed = await this.fileSystem.exists(directoryPath);
     await this.fileSystem.ensureDir(directoryPath);
@@ -148,7 +175,6 @@ export class BootstrapService {
       return null;
     }
   }
-
 }
 
 function dedupe(values: string[]): string[] {

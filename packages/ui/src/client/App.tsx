@@ -1,6 +1,47 @@
-import type { ChatStatus, FileUIPart } from "ai";
-import type { ComponentType, ReactElement } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  type PromptInputMessage,
+} from "@/components/ai-elements/prompt-input";
+import {
+  Reasoning,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Toaster } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
 import dagre from "@dagrejs/dagre";
 import multiavatar from "@multiavatar/multiavatar/esm";
 import {
@@ -12,8 +53,9 @@ import {
   type Edge,
   type Node,
   type NodeProps,
-  type NodeTypes
+  type NodeTypes,
 } from "@xyflow/react";
+import type { ChatStatus, FileUIPart } from "ai";
 import {
   Boxes,
   ChevronLeft,
@@ -23,25 +65,16 @@ import {
   FolderOpen,
   FolderPlus,
   Home,
-  MoreHorizontal,
   MessageSquare,
+  MoreHorizontal,
   PenLine,
   Plus,
   Sparkles,
   UsersRound,
-  X
 } from "lucide-react";
-import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from "@/components/ai-elements/conversation";
-import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
-import { PromptInput, PromptInputBody, PromptInputFooter, type PromptInputMessage, PromptInputSubmit, PromptInputTextarea } from "@/components/ai-elements/prompt-input";
-import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
+import type { ComponentType, ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 type PageView = "overview" | "boards" | "agents" | "skills";
 
@@ -135,6 +168,7 @@ interface TaskRecord {
   title: string;
   description: string;
   status: "todo" | "doing" | "blocked" | "done" | string;
+  statusReason?: string;
   blockers: string[];
   artifacts: TaskEntry[];
   worklog: TaskEntry[];
@@ -179,7 +213,7 @@ interface WorkspaceSessionItem {
 interface WorkspaceNode {
   id: string;
   name: string;
-  projectSessionKey: string;
+  projectSessionKey?: string;
   projectPath: string;
   sessions: WorkspaceSessionItem[];
   updatedAt: number;
@@ -293,6 +327,7 @@ interface SessionChatMessage {
 
 interface CreateAgentForm {
   name: string;
+  role: string;
   reportsTo: string;
 }
 
@@ -315,7 +350,7 @@ interface TaskCreateDraft {
   description: string;
   project: string;
   assignedTo: string;
-  status: "todo" | "doing" | "blocked" | "done";
+  status: "todo" | "doing" | "pending" | "blocked" | "done";
 }
 
 interface TaskEntryDraft {
@@ -348,18 +383,19 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
   { id: "boards", label: "Boards", icon: Boxes },
   { id: "agents", label: "Agents", icon: UsersRound },
-  { id: "skills", label: "Skills", icon: Sparkles }
+  { id: "skills", label: "Skills", icon: Sparkles },
 ];
 
 const DEFAULT_FORM: CreateAgentForm = {
   name: "",
-  reportsTo: "ceo"
+  role: "",
+  reportsTo: "ceo",
 };
 
 type OrgChartNode = Node<OrgNodeData, "orgNode">;
 
 const orgChartNodeTypes = {
-  orgNode: OrganizationChartNode
+  orgNode: OrganizationChartNode,
 } satisfies NodeTypes;
 
 export function App(): ReactElement {
@@ -370,38 +406,65 @@ export function App(): ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [isMutating, setMutating] = useState(false);
   const [createForm, setCreateForm] = useState<CreateAgentForm>(DEFAULT_FORM);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [hoveredWorkspaceId, setHoveredWorkspaceId] = useState<string | null>(null);
-  const [openWorkspaceMenuId, setOpenWorkspaceMenuId] = useState<string | null>(null);
-  const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(null);
-  const [collapsedWorkspaceIds, setCollapsedWorkspaceIds] = useState<Set<string>>(() => new Set());
-  const [sessionChatStatus, setSessionChatStatus] = useState<ChatStatus>("ready");
-  const [sessionMessagesById, setSessionMessagesById] = useState<Record<string, SessionChatMessage[]>>({});
-  const [sessionsByAgentId, setSessionsByAgentId] = useState<Record<string, Session[]>>({});
-  const [selectedProjectIdByAgentId, setSelectedProjectIdByAgentId] = useState<Record<string, string>>({});
+  const [hoveredWorkspaceId, setHoveredWorkspaceId] = useState<string | null>(
+    null,
+  );
+  const [openWorkspaceMenuId, setOpenWorkspaceMenuId] = useState<string | null>(
+    null,
+  );
+  const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(
+    null,
+  );
+  const [collapsedWorkspaceIds, setCollapsedWorkspaceIds] = useState<
+    Set<string>
+  >(() => new Set());
+  const [sessionChatStatus, setSessionChatStatus] =
+    useState<ChatStatus>("ready");
+  const [sessionMessagesById, setSessionMessagesById] = useState<
+    Record<string, SessionChatMessage[]>
+  >({});
+  const [sessionsByAgentId, setSessionsByAgentId] = useState<
+    Record<string, Session[]>
+  >({});
+  const [selectedProjectIdByAgentId, setSelectedProjectIdByAgentId] = useState<
+    Record<string, string>
+  >({});
   const hydratedSessionIdsRef = useRef<Set<string>>(new Set());
   const [boardActorId, setBoardActorId] = useState("ceo");
   const [taskActorId, setTaskActorId] = useState("ceo");
   const [newBoardTitle, setNewBoardTitle] = useState("");
-  const [taskDraftByBoardId, setTaskDraftByBoardId] = useState<Record<string, TaskCreateDraft>>({});
-  const [taskStatusDraftById, setTaskStatusDraftById] = useState<Record<string, string>>({});
+  const [taskDraftByBoardId, setTaskDraftByBoardId] = useState<
+    Record<string, TaskCreateDraft>
+  >({});
+  const [taskStatusDraftById, setTaskStatusDraftById] = useState<
+    Record<string, string>
+  >({});
   const [isCreateBoardDialogOpen, setCreateBoardDialogOpen] = useState(false);
-  const [createBoardDialogError, setCreateBoardDialogError] = useState<string | null>(null);
+  const [createBoardDialogError, setCreateBoardDialogError] = useState<
+    string | null
+  >(null);
   const [isCreateAgentDialogOpen, setCreateAgentDialogOpen] = useState(false);
-  const [createAgentDialogError, setCreateAgentDialogError] = useState<string | null>(null);
+  const [createAgentDialogError, setCreateAgentDialogError] = useState<
+    string | null
+  >(null);
   const [isCreateTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
-  const [createTaskDialogError, setCreateTaskDialogError] = useState<string | null>(null);
+  const [createTaskDialogError, setCreateTaskDialogError] = useState<
+    string | null
+  >(null);
   const [isTaskDetailsDialogOpen, setTaskDetailsDialogOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskDetailsError, setTaskDetailsError] = useState<string | null>(null);
   const [taskEntryDraft, setTaskEntryDraft] = useState<TaskEntryDraft>({
     kind: "worklog",
-    content: ""
+    content: "",
   });
 
   const navigateToRoute = useCallback((nextRoute: AppRoute) => {
     const nextPath = routeToPath(nextRoute);
-    if (typeof window !== "undefined" && window.location.pathname !== nextPath) {
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname !== nextPath
+    ) {
       window.history.pushState({}, "", nextPath);
     }
     setRoute(nextRoute);
@@ -412,13 +475,12 @@ export function App(): ReactElement {
 
   const handleViewChange = useCallback(
     (nextView: PageView) => {
-      setActionMessage(null);
       navigateToRoute({
         kind: "page",
-        view: nextView
+        view: nextView,
       });
     },
-    [navigateToRoute]
+    [navigateToRoute],
   );
 
   useEffect(() => {
@@ -459,16 +521,21 @@ export function App(): ReactElement {
     setError(null);
 
     try {
-      const [health, overview, sessions, agentSkills, globalSkills, boards] = await Promise.all([
-        fetchJson<HealthResponse>("/api/health"),
-        fetchJson<OverviewResponse>("/api/openclaw/overview"),
-        fetchJson<SessionsResponse>(`/api/sessions?agentId=${encodeURIComponent(DEFAULT_AGENT_ID)}`),
-        fetchJson<SkillsResponse>(`/api/skills?agentId=${encodeURIComponent(DEFAULT_AGENT_ID)}`),
-        fetchJson<SkillsResponse>("/api/skills?global=true"),
-        fetchJson<BoardsResponse>("/api/boards").catch(() => {
-          return { boards: [] } satisfies BoardsResponse;
-        })
-      ]);
+      const [health, overview, sessions, agentSkills, globalSkills, boards] =
+        await Promise.all([
+          fetchJson<HealthResponse>("/api/health"),
+          fetchJson<OverviewResponse>("/api/openclaw/overview"),
+          fetchJson<SessionsResponse>(
+            `/api/sessions?agentId=${encodeURIComponent(DEFAULT_AGENT_ID)}`,
+          ),
+          fetchJson<SkillsResponse>(
+            `/api/skills?agentId=${encodeURIComponent(DEFAULT_AGENT_ID)}`,
+          ),
+          fetchJson<SkillsResponse>("/api/skills?global=true"),
+          fetchJson<BoardsResponse>("/api/boards").catch(() => {
+            return { boards: [] } satisfies BoardsResponse;
+          }),
+        ]);
 
       setState({
         health,
@@ -476,13 +543,16 @@ export function App(): ReactElement {
         sessions,
         agentSkills,
         globalSkills,
-        boards
+        boards,
       });
       setSessionsByAgentId({
-        [sessions.agentId]: sessions.sessions
+        [sessions.agentId]: sessions.sessions,
       });
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Failed to load data.";
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to load data.";
       setError(message);
     } finally {
       setLoading(false);
@@ -490,38 +560,45 @@ export function App(): ReactElement {
   }, []);
 
   const refreshOverview = useCallback(async () => {
-    const overview = await fetchJson<OverviewResponse>("/api/openclaw/overview");
+    const overview = await fetchJson<OverviewResponse>(
+      "/api/openclaw/overview",
+    );
     setState((current) => {
       if (!current) {
         return current;
       }
       return {
         ...current,
-        overview
+        overview,
       };
     });
   }, []);
 
-  const refreshSessions = useCallback(async (agentId: string = DEFAULT_AGENT_ID) => {
-    const response = await fetchJson<SessionsResponse>(`/api/sessions?agentId=${encodeURIComponent(agentId)}`);
-    setSessionsByAgentId((current) => ({
-      ...current,
-      [response.agentId]: response.sessions
-    }));
-    if (response.agentId !== DEFAULT_AGENT_ID) {
-      return;
-    }
-
-    setState((current) => {
-      if (!current) {
-        return current;
-      }
-      return {
+  const refreshSessions = useCallback(
+    async (agentId: string = DEFAULT_AGENT_ID) => {
+      const response = await fetchJson<SessionsResponse>(
+        `/api/sessions?agentId=${encodeURIComponent(agentId)}`,
+      );
+      setSessionsByAgentId((current) => ({
         ...current,
-        sessions: response
-      };
-    });
-  }, []);
+        [response.agentId]: response.sessions,
+      }));
+      if (response.agentId !== DEFAULT_AGENT_ID) {
+        return;
+      }
+
+      setState((current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          sessions: response,
+        };
+      });
+    },
+    [],
+  );
 
   const refreshBoards = useCallback(async () => {
     const boards = await fetchJson<BoardsResponse>("/api/boards");
@@ -531,7 +608,7 @@ export function App(): ReactElement {
       }
       return {
         ...current,
-        boards
+        boards,
       };
     });
   }, []);
@@ -571,7 +648,7 @@ export function App(): ReactElement {
 
       return {
         ...current,
-        reportsTo: agentIds[0] ?? "ceo"
+        reportsTo: agentIds[0] ?? "ceo",
       };
     });
 
@@ -592,7 +669,9 @@ export function App(): ReactElement {
     if (route.kind !== "session") {
       return null;
     }
-    return sessions.find((session) => session.sessionId === route.sessionId) ?? null;
+    return (
+      sessions.find((session) => session.sessionId === route.sessionId) ?? null
+    );
   }, [route, sessions]);
   const selectedAgent = useMemo(() => {
     if (route.kind !== "agent") {
@@ -601,65 +680,92 @@ export function App(): ReactElement {
     return agents.find((agent) => agent.id === route.agentId) ?? null;
   }, [route, agents]);
 
-  const projects = useMemo<Project[]>(() => {
-    return sessions
-      .filter((session) => session.sessionKey.startsWith("project:") && typeof session.projectPath === "string")
-      .map((session) => {
-        return {
-          sessionKey: session.sessionKey,
-          sessionId: session.sessionId,
-          name: session.title,
-          projectPath: session.projectPath ?? "",
-          updatedAt: session.updatedAt
-        };
-      })
-      .sort((left, right) => right.updatedAt - left.updatedAt);
-  }, [sessions]);
   const workspaceNodes = useMemo<WorkspaceNode[]>(() => {
-    const sessionsByPath = new Map<string, WorkspaceSessionItem[]>();
+    const sessionsByPath = new Map<
+      string,
+      {
+        projectPath: string;
+        sessions: WorkspaceSessionItem[];
+        project?: Project;
+        latestUpdatedAt: number;
+      }
+    >();
+
     for (const session of sessions) {
       const projectPath = session.projectPath?.trim();
       if (!projectPath) {
         continue;
       }
-      if (session.sessionKey.startsWith("project:")) {
+
+      const pathKey = normalizePathForComparison(projectPath);
+      if (!pathKey) {
         continue;
       }
 
-      const items = sessionsByPath.get(projectPath) ?? [];
-      items.push({
-        sessionId: session.sessionId,
-        sessionKey: session.sessionKey,
-        title: session.title,
-        updatedAt: session.updatedAt
-      });
-      sessionsByPath.set(projectPath, items);
+      const existing = sessionsByPath.get(pathKey) ?? {
+        projectPath,
+        sessions: [],
+        latestUpdatedAt: 0,
+      };
+      if (!existing.projectPath) {
+        existing.projectPath = projectPath;
+      }
+      existing.latestUpdatedAt = Math.max(
+        existing.latestUpdatedAt,
+        session.updatedAt,
+      );
+
+      if (session.sessionKey.startsWith("project:")) {
+        const currentProject = existing.project;
+        if (!currentProject || session.updatedAt >= currentProject.updatedAt) {
+          existing.project = {
+            sessionKey: session.sessionKey,
+            sessionId: session.sessionId,
+            name: session.title,
+            projectPath,
+            updatedAt: session.updatedAt,
+          };
+        }
+      } else {
+        existing.sessions.push({
+          sessionId: session.sessionId,
+          sessionKey: session.sessionKey,
+          title: session.title,
+          updatedAt: session.updatedAt,
+        });
+      }
+
+      sessionsByPath.set(pathKey, existing);
     }
 
-    for (const items of sessionsByPath.values()) {
-      items.sort((left, right) => right.updatedAt - left.updatedAt);
+    for (const entry of sessionsByPath.values()) {
+      entry.sessions.sort((left, right) => right.updatedAt - left.updatedAt);
     }
 
-    return projects
-      .map((project) => {
+    return [...sessionsByPath.values()]
+      .map((entry) => {
+        const project = entry.project;
+        const projectPath = entry.projectPath;
         return {
-          id: project.sessionId,
-          name: project.name,
-          projectSessionKey: project.sessionKey,
-          projectPath: project.projectPath,
-          sessions: sessionsByPath.get(project.projectPath) ?? [],
-          updatedAt: project.updatedAt
+          id:
+            project?.sessionId ??
+            `workspace:${normalizeProjectSegment(projectPath)}`,
+          name: project?.name?.trim() || deriveWorkspaceName(projectPath),
+          projectSessionKey: project?.sessionKey,
+          projectPath,
+          sessions: entry.sessions,
+          updatedAt: project?.updatedAt ?? entry.latestUpdatedAt,
         };
       })
       .sort((left, right) => right.updatedAt - left.updatedAt);
-  }, [projects, sessions]);
+  }, [sessions]);
 
   const agentProjectOptions = useMemo<AgentProjectOption[]>(() => {
     if (workspaceNodes.length > 0) {
       return workspaceNodes.map((workspace) => ({
         id: workspace.id,
         name: workspace.name,
-        projectPath: workspace.projectPath
+        projectPath: workspace.projectPath,
       }));
     }
 
@@ -668,8 +774,8 @@ export function App(): ReactElement {
       {
         id: "home",
         name: "Home",
-        projectPath: homeDir
-      }
+        projectPath: homeDir,
+      },
     ];
   }, [workspaceNodes, state?.health.homeDir]);
 
@@ -680,7 +786,9 @@ export function App(): ReactElement {
 
     const selectedProjectId = selectedProjectIdByAgentId[route.agentId];
     if (selectedProjectId) {
-      const match = agentProjectOptions.find((project) => project.id === selectedProjectId);
+      const match = agentProjectOptions.find(
+        (project) => project.id === selectedProjectId,
+      );
       if (match) {
         return match;
       }
@@ -705,7 +813,7 @@ export function App(): ReactElement {
 
     setSelectedProjectIdByAgentId((current) => ({
       ...current,
-      [route.agentId]: selectedAgentProject.id
+      [route.agentId]: selectedAgentProject.id,
     }));
   }, [route, selectedAgentProject, selectedProjectIdByAgentId]);
 
@@ -722,7 +830,9 @@ export function App(): ReactElement {
       return null;
     }
 
-    const targetPath = normalizePathForComparison(selectedAgentProject.projectPath);
+    const targetPath = normalizePathForComparison(
+      selectedAgentProject.projectPath,
+    );
     const candidates = selectedAgentSessions
       .filter((session) => {
         return normalizePathForComparison(session.projectPath) === targetPath;
@@ -739,25 +849,33 @@ export function App(): ReactElement {
         sessionRef: selectedSession.sessionKey,
         projectPath: selectedSession.projectPath,
         chatKey: `session:${selectedSession.sessionId}`,
-        historyRef: selectedSession.sessionKey
+        historyRef: selectedSession.sessionKey,
       };
     }
 
     if (route.kind === "agent" && selectedAgentProject) {
       const sessionRef =
         selectedAgentWorkspaceSession?.sessionKey ??
-        buildFrontendAgentProjectSessionRef(route.agentId, selectedAgentProject.projectPath);
+        buildFrontendAgentProjectSessionRef(
+          route.agentId,
+          selectedAgentProject.projectPath,
+        );
       return {
         agentId: route.agentId,
         sessionRef,
         projectPath: selectedAgentProject.projectPath,
         chatKey: `agent:${route.agentId}:${sessionRef}`,
-        historyRef: selectedAgentWorkspaceSession?.sessionKey ?? null
+        historyRef: selectedAgentWorkspaceSession?.sessionKey ?? null,
       };
     }
 
     return null;
-  }, [route, selectedSession, selectedAgentProject, selectedAgentWorkspaceSession]);
+  }, [
+    route,
+    selectedSession,
+    selectedAgentProject,
+    selectedAgentWorkspaceSession,
+  ]);
 
   const sessionMessages = useMemo(() => {
     if (!activeChatContext) {
@@ -780,16 +898,21 @@ export function App(): ReactElement {
     const params = new URLSearchParams({
       agentId: activeChatContext.agentId,
       sessionRef: activeChatContext.historyRef,
-      limit: "200"
+      limit: "200",
     });
 
-    void fetchJson<SessionHistoryResponse>(`/api/sessions/history?${params.toString()}`)
+    void fetchJson<SessionHistoryResponse>(
+      `/api/sessions/history?${params.toString()}`,
+    )
       .then((response) => {
         if (cancelled) {
           return;
         }
 
-        const hydratedMessages = mapHistoryToSessionMessages(activeChatContext.chatKey, response.history.messages);
+        const hydratedMessages = mapHistoryToSessionMessages(
+          activeChatContext.chatKey,
+          response.history.messages,
+        );
         setSessionMessagesById((current) => {
           const existing = current[activeChatContext.chatKey];
           if (existing && existing.length > 0) {
@@ -798,7 +921,7 @@ export function App(): ReactElement {
 
           return {
             ...current,
-            [activeChatContext.chatKey]: hydratedMessages
+            [activeChatContext.chatKey]: hydratedMessages,
           };
         });
       })
@@ -825,7 +948,9 @@ export function App(): ReactElement {
     if (!selectedBoard || !selectedTaskId) {
       return null;
     }
-    return selectedBoard.tasks.find((task) => task.taskId === selectedTaskId) ?? null;
+    return (
+      selectedBoard.tasks.find((task) => task.taskId === selectedTaskId) ?? null
+    );
   }, [selectedBoard, selectedTaskId]);
   const selectedTaskActivity = useMemo(() => {
     if (!selectedTask) {
@@ -842,15 +967,18 @@ export function App(): ReactElement {
         type: "artifact" as const,
         createdAt: entry.createdAt,
         createdBy: entry.createdBy,
-        content: entry.content
+        content: entry.content,
       })),
       ...selectedTask.worklog.map((entry) => ({
         type: "worklog" as const,
         createdAt: entry.createdAt,
         createdBy: entry.createdBy,
-        content: entry.content
-      }))
-    ].sort((left, right) => toTimestamp(right.createdAt) - toTimestamp(left.createdAt));
+        content: entry.content,
+      })),
+    ].sort(
+      (left, right) =>
+        toTimestamp(right.createdAt) - toTimestamp(left.createdAt),
+    );
   }, [selectedTask]);
   const agentById = useMemo(() => {
     const map = new Map<string, Agent>();
@@ -868,13 +996,15 @@ export function App(): ReactElement {
       }
 
       if (actor.type === "manager") {
-        const directReportees = agents.filter((candidate) => candidate.reportsTo === actorId);
+        const directReportees = agents.filter(
+          (candidate) => candidate.reportsTo === actorId,
+        );
         return [actor, ...directReportees];
       }
 
       return [actor];
     },
-    [agentById, agents]
+    [agentById, agents],
   );
 
   useEffect(() => {
@@ -925,21 +1055,23 @@ export function App(): ReactElement {
         const existing = current[board.boardId];
         const allowed = getAssignableAgents(taskActorId);
         const fallbackAssignee = allowed[0]?.id ?? taskActorId;
-        const assignedTo = allowed.some((agent) => agent.id === existing?.assignedTo)
-          ? (existing?.assignedTo ?? fallbackAssignee)
+        const assignedTo = allowed.some(
+          (agent) => agent.id === existing?.assignedTo,
+        )
+          ? existing?.assignedTo ?? fallbackAssignee
           : fallbackAssignee;
 
         next[board.boardId] = existing
           ? {
               ...existing,
-              assignedTo
+              assignedTo,
             }
           : {
               title: "",
               description: "",
               project: "~",
               assignedTo,
-              status: "todo"
+              status: "todo",
             };
       }
       return next;
@@ -961,7 +1093,9 @@ export function App(): ReactElement {
     });
   }, [boards, getAssignableAgents, taskActorId]);
 
-  const healthTimestamp = state ? new Date(state.health.timestamp).toLocaleString() : "Loading...";
+  const healthTimestamp = state
+    ? new Date(state.health.timestamp).toLocaleString()
+    : "Loading...";
 
   const metrics = useMemo<MetricCard[]>(() => {
     if (!state) {
@@ -974,31 +1108,33 @@ export function App(): ReactElement {
         label: "Agents",
         value: state.overview.totals.agents,
         hint: "Organization members",
-        icon: UsersRound
+        icon: UsersRound,
       },
       {
         id: "sessions",
         label: "CEO Sessions",
         value: state.sessions.sessions.length,
         hint: "Saved conversation contexts",
-        icon: Clock3
+        icon: Clock3,
       },
       {
         id: "skills",
         label: "Global Skills",
         value: state.globalSkills.skills.length,
         hint: "Reusable capabilities",
-        icon: Sparkles
-      }
+        icon: Sparkles,
+      },
     ];
   }, [state]);
 
-  async function handleCreateAgent(options?: { fromDialog?: boolean }): Promise<void> {
+  async function handleCreateAgent(options?: {
+    fromDialog?: boolean;
+  }): Promise<void> {
     if (!createForm.name.trim()) {
       if (options?.fromDialog) {
         setCreateAgentDialogError("Agent name is required.");
       } else {
-        setActionMessage("Agent name is required.");
+        toast.error("Agent name is required.");
       }
       return;
     }
@@ -1007,61 +1143,69 @@ export function App(): ReactElement {
       if (options?.fromDialog) {
         setCreateAgentDialogError("No available manager targets found.");
       } else {
-        setActionMessage("No available manager targets found.");
+        toast.error("No available manager targets found.");
       }
       return;
     }
 
     const allowedReportsTo = new Set(agents.map((agent) => agent.id));
-    const reportsTo = allowedReportsTo.has(createForm.reportsTo) ? createForm.reportsTo : (agents[0]?.id ?? "");
+    const reportsTo = allowedReportsTo.has(createForm.reportsTo)
+      ? createForm.reportsTo
+      : agents[0]?.id ?? "";
     if (!reportsTo) {
       if (options?.fromDialog) {
         setCreateAgentDialogError("Reports To is required.");
       } else {
-        setActionMessage("Reports To is required.");
+        toast.error("Reports To is required.");
       }
       return;
     }
 
     const submittedName = createForm.name;
     const submittedNameTrimmed = submittedName.trim();
+    const submittedRole = createForm.role.trim();
 
     setMutating(true);
     if (options?.fromDialog) {
       setCreateAgentDialogError(null);
     } else {
-      setActionMessage(null);
     }
 
     try {
       const response = await fetchJson<{ message?: string }>("/api/agents", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           name: createForm.name,
-          reportsTo
-        })
+          reportsTo,
+          ...(submittedRole ? { role: submittedRole } : {}),
+        }),
       });
 
-      setActionMessage(response.message ?? `Agent \"${submittedName}\" processed.`);
+      toast.success(
+        response.message ?? `Agent \"${submittedName}\" processed.`,
+      );
       setCreateForm((current) => {
         if (current.name.trim() !== submittedNameTrimmed) {
           return current;
         }
-        return { ...current, name: "" };
+        return { ...current, name: "", role: "" };
       });
       if (options?.fromDialog) {
         setCreateAgentDialogOpen(false);
       }
       await refreshOverview();
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to create agent.";
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to create agent.";
       if (options?.fromDialog) {
         setCreateAgentDialogError(message);
       } else {
-        setActionMessage(message);
+        toast.error(message);
       }
     } finally {
       setMutating(false);
@@ -1079,24 +1223,29 @@ export function App(): ReactElement {
     }
 
     setMutating(true);
-    setActionMessage(null);
 
     try {
-      await fetchJson<{ removed: { existed: boolean } }>(`/api/agents/${encodeURIComponent(agentId)}?force=true`, {
-        method: "DELETE"
-      });
+      await fetchJson<{ removed: { existed: boolean } }>(
+        `/api/agents/${encodeURIComponent(agentId)}?force=true`,
+        {
+          method: "DELETE",
+        },
+      );
 
-      setActionMessage(`Agent \"${agentId}\" removed.`);
+      toast.success(`Agent \"${agentId}\" removed.`);
       await refreshOverview();
       if (route.kind === "agent" && route.agentId === agentId) {
         navigateToRoute({
           kind: "page",
-          view: "agents"
+          view: "agents",
         });
       }
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to delete agent.";
-      setActionMessage(message);
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to delete agent.";
+      toast.error(message);
     } finally {
       setMutating(false);
     }
@@ -1104,227 +1253,296 @@ export function App(): ReactElement {
 
   async function handleAddProject(): Promise<void> {
     setMutating(true);
-    setActionMessage(null);
 
     try {
-      const picked = await fetchJson<PickProjectResponse>("/api/projects/pick", {
-        method: "POST"
-      });
+      const picked = await fetchJson<PickProjectResponse>(
+        "/api/projects/pick",
+        {
+          method: "POST",
+        },
+      );
 
       const response = await fetchJson<CreateProjectResponse>("/api/projects", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           agentId: "ceo",
           folderName: picked.project.name,
-          folderPath: picked.project.path
-        })
+          folderPath: picked.project.path,
+        }),
       });
 
-      setActionMessage(response.message ?? `Project \"${response.project.name}\" added.`);
+      toast.success(
+        response.message ?? `Project \"${response.project.name}\" added.`,
+      );
       await refreshSessions();
       navigateToRoute({
         kind: "session",
-        sessionId: response.session.sessionId
+        sessionId: response.session.sessionId,
       });
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to add project.";
-      setActionMessage(message);
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to add project.";
+      toast.error(message);
     } finally {
       setMutating(false);
     }
   }
 
-  async function handleCreateWorkspaceSession(workspace: WorkspaceNode): Promise<void> {
+  async function handleCreateWorkspaceSession(
+    workspace: WorkspaceNode,
+  ): Promise<void> {
     setMutating(true);
-    setActionMessage(null);
     setOpenWorkspaceMenuId(null);
     setOpenSessionMenuId(null);
 
     try {
-      const response = await fetchJson<WorkspaceSessionResponse>("/api/workspaces/session", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
+      const response = await fetchJson<WorkspaceSessionResponse>(
+        "/api/workspaces/session",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            agentId: "ceo",
+            projectPath: workspace.projectPath,
+            workspaceName: workspace.name,
+          }),
         },
-        body: JSON.stringify({
-          agentId: "ceo",
-          projectPath: workspace.projectPath,
-          workspaceName: workspace.name
-        })
-      });
+      );
 
-      setActionMessage(response.message ?? `Session created in \"${workspace.name}\".`);
+      toast.success(
+        response.message ?? `Session created in \"${workspace.name}\".`,
+      );
       await refreshSessions();
       navigateToRoute({
         kind: "session",
-        sessionId: response.session.sessionId
+        sessionId: response.session.sessionId,
       });
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to create workspace session.";
-      setActionMessage(message);
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to create workspace session.";
+      toast.error(message);
     } finally {
       setMutating(false);
     }
   }
 
-  async function handleRenameWorkspace(workspace: WorkspaceNode): Promise<void> {
-    const nextName = window.prompt(`Rename workspace \"${workspace.name}\"`, workspace.name)?.trim();
+  async function handleRenameWorkspace(
+    workspace: WorkspaceNode,
+  ): Promise<void> {
+    if (!workspace.projectSessionKey) {
+      toast.error("Workspace metadata is unavailable for rename.");
+      return;
+    }
+
+    const nextName = window
+      .prompt(`Rename workspace \"${workspace.name}\"`, workspace.name)
+      ?.trim();
     if (!nextName || nextName === workspace.name) {
       return;
     }
 
     setMutating(true);
-    setActionMessage(null);
     setOpenWorkspaceMenuId(null);
     setOpenSessionMenuId(null);
 
     try {
-      const response = await fetchJson<WorkspaceRenameResponse>("/api/workspaces/rename", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
+      const response = await fetchJson<WorkspaceRenameResponse>(
+        "/api/workspaces/rename",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            agentId: "ceo",
+            sessionRef: workspace.projectSessionKey,
+            name: nextName,
+          }),
         },
-        body: JSON.stringify({
-          agentId: "ceo",
-          sessionRef: workspace.projectSessionKey,
-          name: nextName
-        })
-      });
+      );
 
-      setActionMessage(response.message ?? `Workspace renamed to \"${nextName}\".`);
+      toast.success(
+        response.message ?? `Workspace renamed to \"${nextName}\".`,
+      );
       await refreshSessions();
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to rename workspace.";
-      setActionMessage(message);
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to rename workspace.";
+      toast.error(message);
     } finally {
       setMutating(false);
     }
   }
 
-  async function handleDeleteWorkspace(workspace: WorkspaceNode): Promise<void> {
-    const confirmed = window.confirm(`Remove workspace \"${workspace.name}\" from sidebar? Sessions will be kept.`);
+  async function handleDeleteWorkspace(
+    workspace: WorkspaceNode,
+  ): Promise<void> {
+    if (!workspace.projectSessionKey) {
+      toast.error("Workspace metadata is unavailable for removal.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Remove workspace \"${workspace.name}\" from sidebar? Sessions will be kept.`,
+    );
     if (!confirmed) {
       return;
     }
 
     setMutating(true);
-    setActionMessage(null);
     setOpenWorkspaceMenuId(null);
     setOpenSessionMenuId(null);
 
     try {
-      const response = await fetchJson<WorkspaceDeleteResponse>("/api/workspaces/delete", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
+      const response = await fetchJson<WorkspaceDeleteResponse>(
+        "/api/workspaces/delete",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            agentId: "ceo",
+            sessionRef: workspace.projectSessionKey,
+          }),
         },
-        body: JSON.stringify({
-          agentId: "ceo",
-          sessionRef: workspace.projectSessionKey
-        })
-      });
+      );
 
-      setActionMessage(response.message ?? `Workspace \"${workspace.name}\" removed.`);
+      toast.success(
+        response.message ?? `Workspace \"${workspace.name}\" removed.`,
+      );
       await refreshSessions();
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to remove workspace.";
-      setActionMessage(message);
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to remove workspace.";
+      toast.error(message);
     } finally {
       setMutating(false);
     }
   }
 
-  async function handleRemoveSession(session: WorkspaceSessionItem): Promise<void> {
+  async function handleRemoveSession(
+    session: WorkspaceSessionItem,
+  ): Promise<void> {
     const confirmed = window.confirm(`Remove session \"${session.title}\"?`);
     if (!confirmed) {
       return;
     }
 
     setMutating(true);
-    setActionMessage(null);
     setOpenSessionMenuId(null);
     setOpenWorkspaceMenuId(null);
 
     try {
-      const response = await fetchJson<SessionRemoveResponse>("/api/sessions/remove", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
+      const response = await fetchJson<SessionRemoveResponse>(
+        "/api/sessions/remove",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            agentId: "ceo",
+            sessionRef: session.sessionKey,
+          }),
         },
-        body: JSON.stringify({
-          agentId: "ceo",
-          sessionRef: session.sessionKey
-        })
-      });
+      );
 
-      setActionMessage(response.message ?? `Session \"${session.title}\" removed.`);
+      toast.success(
+        response.message ?? `Session \"${session.title}\" removed.`,
+      );
       await refreshSessions();
       if (route.kind === "session" && route.sessionId === session.sessionId) {
         navigateToRoute({
           kind: "page",
-          view: "overview"
+          view: "overview",
         });
       }
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to remove session.";
-      setActionMessage(message);
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to remove session.";
+      toast.error(message);
     } finally {
       setMutating(false);
     }
   }
 
-  async function handleRenameSession(session: WorkspaceSessionItem): Promise<void> {
-    const nextName = window.prompt(`Rename session \"${session.title}\"`, session.title)?.trim();
+  async function handleRenameSession(
+    session: WorkspaceSessionItem,
+  ): Promise<void> {
+    const nextName = window
+      .prompt(`Rename session \"${session.title}\"`, session.title)
+      ?.trim();
     if (!nextName || nextName === session.title) {
       return;
     }
 
     setMutating(true);
-    setActionMessage(null);
     setOpenSessionMenuId(null);
     setOpenWorkspaceMenuId(null);
 
     try {
-      const response = await fetchJson<SessionRenameResponse>("/api/sessions/rename", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
+      const response = await fetchJson<SessionRenameResponse>(
+        "/api/sessions/rename",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            agentId: "ceo",
+            sessionRef: session.sessionKey,
+            name: nextName,
+          }),
         },
-        body: JSON.stringify({
-          agentId: "ceo",
-          sessionRef: session.sessionKey,
-          name: nextName
-        })
-      });
+      );
 
-      setActionMessage(response.message ?? `Session renamed to \"${nextName}\".`);
+      toast.success(response.message ?? `Session renamed to \"${nextName}\".`);
       await refreshSessions();
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to rename session.";
-      setActionMessage(message);
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to rename session.";
+      toast.error(message);
     } finally {
       setMutating(false);
     }
   }
 
-  function updateTaskDraft(boardId: string, patch: Partial<TaskCreateDraft>): void {
+  function updateTaskDraft(
+    boardId: string,
+    patch: Partial<TaskCreateDraft>,
+  ): void {
     setTaskDraftByBoardId((current) => {
       const existing = current[boardId] ?? {
         title: "",
         description: "",
         project: "~",
         assignedTo: taskActorId,
-        status: "todo"
+        status: "todo",
       };
       return {
         ...current,
         [boardId]: {
           ...existing,
-          ...patch
-        }
+          ...patch,
+        },
       };
     });
   }
@@ -1341,64 +1559,76 @@ export function App(): ReactElement {
     try {
       const response = await createBoardRequest({
         actorId: boardActorId,
-        title
+        title,
       });
 
       setNewBoardTitle("");
-      setActionMessage(response.message ?? `Board \"${title}\" created.`);
+      toast.success(response.message ?? `Board \"${title}\" created.`);
       await refreshBoards();
       const boardId = response.board?.boardId?.trim();
       if (boardId) {
         navigateToRoute({
           kind: "board",
-          boardId
+          boardId,
         });
       }
       setCreateBoardDialogOpen(false);
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to create board.";
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to create board.";
       const normalizedError =
         message === "Not Found"
           ? "Board create endpoint is unavailable. Refresh/restart the UI server to load the latest API routes."
           : message;
       setCreateBoardDialogError(normalizedError);
-      setActionMessage(null);
     } finally {
       setMutating(false);
     }
   }
 
   async function handleRenameBoard(board: BoardRecord): Promise<void> {
-    const nextTitle = window.prompt(`Rename board \"${board.title}\"`, board.title)?.trim();
+    const nextTitle = window
+      .prompt(`Rename board \"${board.title}\"`, board.title)
+      ?.trim();
     if (!nextTitle || nextTitle === board.title) {
       return;
     }
 
     setMutating(true);
-    setActionMessage(null);
     try {
-      const response = await fetchJson<{ message?: string }>(`/api/boards/${encodeURIComponent(board.boardId)}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
+      const response = await fetchJson<{ message?: string }>(
+        `/api/boards/${encodeURIComponent(board.boardId)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            actorId: boardActorId,
+            title: nextTitle,
+          }),
         },
-        body: JSON.stringify({
-          actorId: boardActorId,
-          title: nextTitle
-        })
-      });
+      );
 
-      setActionMessage(response.message ?? `Board \"${nextTitle}\" updated.`);
+      toast.success(response.message ?? `Board \"${nextTitle}\" updated.`);
       await refreshBoards();
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to rename board.";
-      setActionMessage(message);
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to rename board.";
+      toast.error(message);
     } finally {
       setMutating(false);
     }
   }
 
-  async function handleCreateTask(boardId: string, options?: { fromDialog?: boolean }): Promise<void> {
+  async function handleCreateTask(
+    boardId: string,
+    options?: { fromDialog?: boolean },
+  ): Promise<void> {
     const draft = taskDraftByBoardId[boardId];
     const title = draft?.title.trim() ?? "";
     const description = draft?.description.trim() ?? "";
@@ -1410,7 +1640,7 @@ export function App(): ReactElement {
       if (options?.fromDialog) {
         setCreateTaskDialogError("Task title is required.");
       } else {
-        setActionMessage("Task title is required.");
+        toast.error("Task title is required.");
       }
       return;
     }
@@ -1418,7 +1648,7 @@ export function App(): ReactElement {
       if (options?.fromDialog) {
         setCreateTaskDialogError("Task description is required.");
       } else {
-        setActionMessage("Task description is required.");
+        toast.error("Task description is required.");
       }
       return;
     }
@@ -1426,7 +1656,7 @@ export function App(): ReactElement {
       if (options?.fromDialog) {
         setCreateTaskDialogError("Task assignee is required.");
       } else {
-        setActionMessage("Task assignee is required.");
+        toast.error("Task assignee is required.");
       }
       return;
     }
@@ -1435,13 +1665,12 @@ export function App(): ReactElement {
     if (options?.fromDialog) {
       setCreateTaskDialogError(null);
     } else {
-      setActionMessage(null);
     }
     try {
       const response = await fetchJson<{ message?: string }>("/api/tasks", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           actorId: taskActorId,
@@ -1450,8 +1679,8 @@ export function App(): ReactElement {
           description,
           project,
           assignedTo,
-          status
-        })
+          status,
+        }),
       });
 
       setTaskDraftByBoardId((current) => {
@@ -1463,26 +1692,29 @@ export function App(): ReactElement {
               description: "",
               project: "~",
               assignedTo,
-              status: "todo"
+              status: "todo",
             }),
             title: "",
-            description: ""
-          }
+            description: "",
+          },
         };
       });
       if (options?.fromDialog) {
         setCreateTaskDialogOpen(false);
         setCreateTaskDialogError(null);
       } else {
-        setActionMessage(response.message ?? `Task \"${title}\" created.`);
+        toast.success(response.message ?? `Task \"${title}\" created.`);
       }
       await refreshBoards();
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to create task.";
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to create task.";
       if (options?.fromDialog) {
         setCreateTaskDialogError(message);
       } else {
-        setActionMessage(message);
+        toast.error(message);
       }
     } finally {
       setMutating(false);
@@ -1495,17 +1727,43 @@ export function App(): ReactElement {
     setTaskDetailsError(null);
     setTaskEntryDraft({
       kind: "worklog",
-      content: ""
+      content: "",
     });
   }
 
-  async function handleUpdateTaskStatus(taskId: string, options?: { fromDetails?: boolean }): Promise<void> {
+  async function handleUpdateTaskStatus(
+    taskId: string,
+    options?: { fromDetails?: boolean },
+  ): Promise<void> {
     const status = (taskStatusDraftById[taskId] ?? "").trim();
     if (!status) {
       if (options?.fromDetails) {
         setTaskDetailsError("Task status is required.");
       } else {
-        setActionMessage("Task status is required.");
+        toast.error("Task status is required.");
+      }
+      return;
+    }
+
+    const normalizedStatus = status.toLowerCase();
+    const reason =
+      normalizedStatus === "blocked" || normalizedStatus === "pending"
+        ? window
+            .prompt(
+              `Reason is required when setting status to ${normalizedStatus}.`,
+            )
+            ?.trim()
+        : undefined;
+    if (
+      (normalizedStatus === "blocked" || normalizedStatus === "pending") &&
+      !reason
+    ) {
+      if (options?.fromDetails) {
+        setTaskDetailsError(
+          `Reason is required for status "${normalizedStatus}".`,
+        );
+      } else {
+        toast.error(`Reason is required for status "${normalizedStatus}".`);
       }
       return;
     }
@@ -1514,32 +1772,38 @@ export function App(): ReactElement {
     if (options?.fromDetails) {
       setTaskDetailsError(null);
     } else {
-      setActionMessage(null);
     }
     try {
-      const response = await fetchJson<{ message?: string }>(`/api/tasks/${encodeURIComponent(taskId)}/status`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
+      const response = await fetchJson<{ message?: string }>(
+        `/api/tasks/${encodeURIComponent(taskId)}/status`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            actorId: taskActorId,
+            status,
+            reason,
+          }),
         },
-        body: JSON.stringify({
-          actorId: taskActorId,
-          status
-        })
-      });
+      );
 
       if (options?.fromDetails) {
         setTaskDetailsError(null);
       } else {
-        setActionMessage(response.message ?? `Task \"${taskId}\" updated.`);
+        toast.success(response.message ?? `Task \"${taskId}\" updated.`);
       }
       await refreshBoards();
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to update task status.";
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to update task status.";
       if (options?.fromDetails) {
         setTaskDetailsError(message);
       } else {
-        setActionMessage(message);
+        toast.error(message);
       }
     } finally {
       setMutating(false);
@@ -1550,10 +1814,14 @@ export function App(): ReactElement {
     taskId: string,
     kind: "blocker" | "artifact" | "worklog",
     contentOverride?: string,
-    options?: { fromDetails?: boolean }
+    options?: { fromDetails?: boolean },
   ): Promise<void> {
     const label = kind === "blocker" ? "blocker" : kind;
-    const content = (contentOverride ?? window.prompt(`Add ${label} for task \"${taskId}\"`) ?? "").trim();
+    const content = (
+      contentOverride ??
+      window.prompt(`Add ${label} for task \"${taskId}\"`) ??
+      ""
+    ).trim();
     if (!content) {
       if (options?.fromDetails) {
         setTaskDetailsError(`A ${label} entry cannot be empty.`);
@@ -1565,55 +1833,68 @@ export function App(): ReactElement {
     if (options?.fromDetails) {
       setTaskDetailsError(null);
     } else {
-      setActionMessage(null);
     }
     try {
-      const response = await fetchJson<{ message?: string }>(`/api/tasks/${encodeURIComponent(taskId)}/${kind}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
+      const response = await fetchJson<{ message?: string }>(
+        `/api/tasks/${encodeURIComponent(taskId)}/${kind}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            actorId: taskActorId,
+            content,
+          }),
         },
-        body: JSON.stringify({
-          actorId: taskActorId,
-          content
-        })
-      });
+      );
 
       if (options?.fromDetails) {
         setTaskEntryDraft((current) => ({
           ...current,
-          content: ""
+          content: "",
         }));
       } else {
-        setActionMessage(response.message ?? `${label} added.`);
+        toast.success(response.message ?? `${label} added.`);
       }
       await refreshBoards();
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : `Unable to add task ${label}.`;
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : `Unable to add task ${label}.`;
       if (options?.fromDetails) {
         setTaskDetailsError(message);
       } else {
-        setActionMessage(message);
+        toast.error(message);
       }
     } finally {
       setMutating(false);
     }
   }
 
-  function appendSessionMessage(chatKey: string, hydrationKey: string | null, message: SessionChatMessage): void {
+  function appendSessionMessage(
+    chatKey: string,
+    hydrationKey: string | null,
+    message: SessionChatMessage,
+  ): void {
     if (hydrationKey) {
       hydratedSessionIdsRef.current.add(hydrationKey);
     }
     setSessionMessagesById((current) => {
-      const next = current[chatKey] ? [...current[chatKey], message] : [message];
+      const next = current[chatKey]
+        ? [...current[chatKey], message]
+        : [message];
       return {
         ...current,
-        [chatKey]: next
+        [chatKey]: next,
       };
     });
   }
 
-  async function handleSessionPromptSubmit(promptMessage: PromptInputMessage): Promise<void> {
+  async function handleSessionPromptSubmit(
+    promptMessage: PromptInputMessage,
+  ): Promise<void> {
     if (!activeChatContext) {
       return;
     }
@@ -1621,7 +1902,7 @@ export function App(): ReactElement {
     const text = promptMessage.text.trim();
     const images = toSessionMessageImages(promptMessage.files);
     if (promptMessage.files.length > 0 && images.length === 0) {
-      setActionMessage("Unable to process attached image files. Please try again.");
+      toast.error("Unable to process attached image files. Please try again.");
       return;
     }
 
@@ -1636,7 +1917,9 @@ export function App(): ReactElement {
         : "Please analyze the attached images.");
     const userMessage = text
       ? images.length > 0
-        ? `${text}\n\n(Attached ${images.length} image${images.length === 1 ? "" : "s"}.)`
+        ? `${text}\n\n(Attached ${images.length} image${
+            images.length === 1 ? "" : "s"
+          }.)`
         : text
       : `Sent ${images.length} image${images.length === 1 ? "" : "s"}.`;
 
@@ -1644,10 +1927,9 @@ export function App(): ReactElement {
     appendSessionMessage(activeChatContext.chatKey, hydrationKey, {
       id: `${activeChatContext.chatKey}:user:${Date.now()}`,
       role: "user",
-      content: userMessage
+      content: userMessage,
     });
     setSessionChatStatus("streaming");
-    setActionMessage(null);
 
     try {
       const payload = {
@@ -1655,20 +1937,24 @@ export function App(): ReactElement {
         sessionRef: activeChatContext.sessionRef,
         projectPath: activeChatContext.projectPath,
         message,
-        images
+        images,
       };
       const response = await sendSessionMessage(payload);
 
-      const assistantReply = response.output.trim() || "No output was returned.";
+      const assistantReply =
+        response.output.trim() || "No output was returned.";
       appendSessionMessage(activeChatContext.chatKey, hydrationKey, {
         id: `${activeChatContext.chatKey}:assistant:${Date.now()}`,
         role: "assistant",
-        content: assistantReply
+        content: assistantReply,
       });
       setSessionChatStatus(response.result.code === 0 ? "ready" : "error");
       await refreshSessions(activeChatContext.agentId);
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to send session message.";
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to send session message.";
       const normalizedError =
         message === "Not Found"
           ? "Session message endpoint is unavailable. Refresh/restart the UI server to load the latest API routes."
@@ -1676,7 +1962,7 @@ export function App(): ReactElement {
       appendSessionMessage(activeChatContext.chatKey, hydrationKey, {
         id: `${activeChatContext.chatKey}:assistant-error:${Date.now()}`,
         role: "assistant",
-        content: normalizedError
+        content: normalizedError,
       });
       setSessionChatStatus("error");
     }
@@ -1697,9 +1983,9 @@ export function App(): ReactElement {
         return await fetchJson<SessionSendMessageResponse>(routePath, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
         });
       } catch (error) {
         lastError = error;
@@ -1709,7 +1995,9 @@ export function App(): ReactElement {
       }
     }
 
-    throw lastError instanceof Error ? lastError : new Error("Unable to send session message.");
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Unable to send session message.");
   }
 
   async function createBoardRequest(payload: {
@@ -1721,12 +2009,15 @@ export function App(): ReactElement {
 
     for (const routePath of routes) {
       try {
-        return await fetchJson<{ message?: string; board?: { boardId?: string } }>(routePath, {
+        return await fetchJson<{
+          message?: string;
+          board?: { boardId?: string };
+        }>(routePath, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
         });
       } catch (error) {
         lastError = error;
@@ -1736,35 +2027,50 @@ export function App(): ReactElement {
       }
     }
 
-    throw lastError instanceof Error ? lastError : new Error("Unable to create board.");
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Unable to create board.");
   }
 
   return (
     <div className="h-screen bg-background text-[14px] text-foreground">
+      <Toaster />
       <div className="flex h-full">
         <aside
           className={cn(
             "opengoat-sidebar hidden border-r border-border bg-card transition-[width] duration-200 md:flex md:flex-col",
-            isSidebarCollapsed ? "md:w-16" : "md:w-64"
+            isSidebarCollapsed ? "md:w-16" : "md:w-64",
           )}
         >
           <div className="flex h-14 items-center border-b border-border px-3">
             <div className="flex size-8 items-center justify-center rounded-md bg-accent text-base leading-none">
               <span aria-hidden="true">🐐</span>
             </div>
-            {!isSidebarCollapsed ? <p className="ml-2 text-sm font-semibold">OpenGoat UI</p> : null}
+            {!isSidebarCollapsed ? (
+              <p className="ml-2 text-sm font-semibold">OpenGoat UI</p>
+            ) : null}
             <button
               type="button"
               className="ml-auto inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
               onClick={() => setSidebarCollapsed((value) => !value)}
-              aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={
+                isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+              }
             >
-              {isSidebarCollapsed ? <ChevronRight className="size-4 icon-stroke-1_2" /> : <ChevronLeft className="size-4 icon-stroke-1_2" />}
+              {isSidebarCollapsed ? (
+                <ChevronRight className="size-4 icon-stroke-1_2" />
+              ) : (
+                <ChevronLeft className="size-4 icon-stroke-1_2" />
+              )}
             </button>
           </div>
 
           <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-            {!isSidebarCollapsed ? <p className="px-3 pb-2 text-[11px] font-medium tracking-wide text-muted-foreground">Main Menu</p> : null}
+            {!isSidebarCollapsed ? (
+              <p className="px-3 pb-2 text-[11px] font-medium tracking-wide text-muted-foreground">
+                Main Menu
+              </p>
+            ) : null}
             {SIDEBAR_ITEMS.map((item) => {
               const Icon = item.icon;
               const active =
@@ -1783,11 +2089,13 @@ export function App(): ReactElement {
                     active
                       ? "border-border bg-accent/90 text-foreground"
                       : "border-transparent text-muted-foreground hover:border-border/60 hover:bg-accent/60 hover:text-foreground",
-                    isSidebarCollapsed && "justify-center px-2"
+                    isSidebarCollapsed && "justify-center px-2",
                   )}
                 >
                   <Icon className="size-4 shrink-0" />
-                  {!isSidebarCollapsed ? <span className="ml-2">{item.label}</span> : null}
+                  {!isSidebarCollapsed ? (
+                    <span className="ml-2">{item.label}</span>
+                  ) : null}
                 </button>
               );
             })}
@@ -1802,16 +2110,21 @@ export function App(): ReactElement {
               }}
               className={cn(
                 "mb-1 flex w-full items-center rounded-lg border border-transparent px-3 py-2.5 text-[14px] text-muted-foreground transition-colors hover:border-border/60 hover:bg-accent/60 hover:text-foreground",
-                isSidebarCollapsed && "justify-center px-2"
+                isSidebarCollapsed && "justify-center px-2",
               )}
               disabled={isMutating || isLoading}
             >
               <FolderPlus className="size-4 shrink-0" />
-              {!isSidebarCollapsed ? <span className="ml-2">Add Project</span> : null}
+              {!isSidebarCollapsed ? (
+                <span className="ml-2">Add Project</span>
+              ) : null}
             </button>
 
             {workspaceNodes.map((workspace) => {
-              const isWorkspaceCollapsed = collapsedWorkspaceIds.has(workspace.id);
+              const isWorkspaceCollapsed = collapsedWorkspaceIds.has(
+                workspace.id,
+              );
+              const canManageWorkspace = Boolean(workspace.projectSessionKey);
               const FolderIcon = isWorkspaceCollapsed ? Folder : FolderOpen;
 
               return (
@@ -1820,7 +2133,9 @@ export function App(): ReactElement {
                     className="relative"
                     onMouseEnter={() => setHoveredWorkspaceId(workspace.id)}
                     onMouseLeave={() => {
-                      setHoveredWorkspaceId((current) => (current === workspace.id ? null : current));
+                      setHoveredWorkspaceId((current) =>
+                        current === workspace.id ? null : current,
+                      );
                     }}
                   >
                     <button
@@ -1841,14 +2156,18 @@ export function App(): ReactElement {
                       }}
                       className={cn(
                         "flex w-full items-center rounded-lg border border-transparent px-3 py-2.5 pr-16 text-[14px] text-muted-foreground transition-colors hover:border-border/60 hover:bg-accent/60 hover:text-foreground",
-                        isSidebarCollapsed && "justify-center px-2 pr-2"
+                        isSidebarCollapsed && "justify-center px-2 pr-2",
                       )}
                     >
                       <FolderIcon className="size-4 shrink-0" />
-                      {!isSidebarCollapsed ? <span className="ml-2 truncate">{workspace.name}</span> : null}
+                      {!isSidebarCollapsed ? (
+                        <span className="ml-2 truncate">{workspace.name}</span>
+                      ) : null}
                     </button>
 
-                    {!isSidebarCollapsed && (hoveredWorkspaceId === workspace.id || openWorkspaceMenuId === workspace.id) ? (
+                    {!isSidebarCollapsed &&
+                    (hoveredWorkspaceId === workspace.id ||
+                      openWorkspaceMenuId === workspace.id) ? (
                       <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
                         <button
                           type="button"
@@ -1865,25 +2184,31 @@ export function App(): ReactElement {
                         >
                           <Plus className="size-3.5 icon-stroke-1" />
                         </button>
-                        <button
-                          type="button"
-                          aria-label={`Workspace menu for ${workspace.name}`}
-                          title="More"
-                          disabled={isMutating}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            setOpenSessionMenuId(null);
-                            setOpenWorkspaceMenuId((current) => (current === workspace.id ? null : workspace.id));
-                          }}
-                          className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-                        >
-                          <MoreHorizontal className="size-3.5 icon-stroke-1" />
-                        </button>
+                        {canManageWorkspace ? (
+                          <button
+                            type="button"
+                            aria-label={`Workspace menu for ${workspace.name}`}
+                            title="More"
+                            disabled={isMutating}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setOpenSessionMenuId(null);
+                              setOpenWorkspaceMenuId((current) =>
+                                current === workspace.id ? null : workspace.id,
+                              );
+                            }}
+                            className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                          >
+                            <MoreHorizontal className="size-3.5 icon-stroke-1" />
+                          </button>
+                        ) : null}
                       </div>
                     ) : null}
 
-                    {!isSidebarCollapsed && openWorkspaceMenuId === workspace.id ? (
+                    {!isSidebarCollapsed &&
+                    canManageWorkspace &&
+                    openWorkspaceMenuId === workspace.id ? (
                       <div className="absolute right-2 top-9 z-20 min-w-[140px] rounded-md border border-border bg-card p-1 shadow-lg">
                         <button
                           type="button"
@@ -1914,20 +2239,26 @@ export function App(): ReactElement {
                   {!isSidebarCollapsed && !isWorkspaceCollapsed ? (
                     <div className="mt-0.5 space-y-0.5">
                       {workspace.sessions.map((session) => (
-                        <div key={session.sessionId} className="group/session relative">
+                        <div
+                          key={session.sessionId}
+                          className="group/session relative"
+                        >
                           <button
                             type="button"
                             title={`${session.title} (${session.sessionKey})`}
                             onClick={() => {
                               navigateToRoute({
                                 kind: "session",
-                                sessionId: session.sessionId
+                                sessionId: session.sessionId,
                               });
                               setOpenWorkspaceMenuId(null);
                             }}
                             className="flex w-full items-center rounded-md py-1.5 pl-9 pr-8 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
                           >
-                            <span className="mr-2 inline-block size-2 shrink-0" aria-hidden="true" />
+                            <span
+                              className="mr-2 inline-block size-2 shrink-0"
+                              aria-hidden="true"
+                            />
                             <span className="truncate">{session.title}</span>
                           </button>
                           <button
@@ -1939,11 +2270,17 @@ export function App(): ReactElement {
                               event.preventDefault();
                               event.stopPropagation();
                               setOpenWorkspaceMenuId(null);
-                              setOpenSessionMenuId((current) => (current === session.sessionId ? null : session.sessionId));
+                              setOpenSessionMenuId((current) =>
+                                current === session.sessionId
+                                  ? null
+                                  : session.sessionId,
+                              );
                             }}
                             className={cn(
                               "absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50",
-                              openSessionMenuId === session.sessionId ? "opacity-100" : "opacity-0 group-hover/session:opacity-100"
+                              openSessionMenuId === session.sessionId
+                                ? "opacity-100"
+                                : "opacity-0 group-hover/session:opacity-100",
                             )}
                           >
                             <MoreHorizontal className="size-3.5" />
@@ -1986,8 +2323,12 @@ export function App(): ReactElement {
           <div className="border-t border-border p-3">
             {!isSidebarCollapsed ? (
               <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Last Sync</p>
-                <p className="mt-1 text-xs text-foreground">{healthTimestamp}</p>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Last Sync
+                </p>
+                <p className="mt-1 text-xs text-foreground">
+                  {healthTimestamp}
+                </p>
               </div>
             ) : (
               <div className="mx-auto h-2 w-2 rounded-full bg-success" />
@@ -2000,7 +2341,13 @@ export function App(): ReactElement {
             <div className="flex flex-wrap items-center justify-between gap-3">
               {route.kind === "agent" ? (
                 <div className="flex min-w-0 items-center gap-3">
-                  {selectedAgent ? <AgentAvatar agentId={selectedAgent.id} displayName={selectedAgent.displayName} size="md" /> : null}
+                  {selectedAgent ? (
+                    <AgentAvatar
+                      agentId={selectedAgent.id}
+                      displayName={selectedAgent.displayName}
+                      size="md"
+                    />
+                  ) : null}
                   <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
                     {selectedAgent?.displayName ?? route.agentId}
                   </h1>
@@ -2009,8 +2356,7 @@ export function App(): ReactElement {
                 <div>
                   <h1
                     className={cn(
-                      "font-semibold tracking-tight",
-                      route.kind === "page" && route.view === "overview" ? "text-4xl sm:text-5xl" : "text-xl sm:text-2xl"
+                      "font-semibold tracking-tight text-xl sm:text-2xl",
                     )}
                   >
                     {viewTitle(route, selectedSession, selectedBoard)}
@@ -2046,7 +2392,10 @@ export function App(): ReactElement {
 
               {route.kind === "agent" ? (
                 <div className="flex min-w-[220px] items-center gap-2">
-                  <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="agentProjectSelector">
+                  <label
+                    className="text-xs uppercase tracking-wide text-muted-foreground"
+                    htmlFor="agentProjectSelector"
+                  >
                     Project
                   </label>
                   <select
@@ -2057,7 +2406,7 @@ export function App(): ReactElement {
                       const nextProjectId = event.target.value;
                       setSelectedProjectIdByAgentId((current) => ({
                         ...current,
-                        [route.agentId]: nextProjectId
+                        [route.agentId]: nextProjectId,
                       }));
                     }}
                   >
@@ -2095,12 +2444,18 @@ export function App(): ReactElement {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Board</DialogTitle>
-                <DialogDescription>Create a board as a manager. Core permission checks are enforced by the backend.</DialogDescription>
+                <DialogDescription>
+                  Create a board as a manager. Core permission checks are
+                  enforced by the backend.
+                </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createBoardActor">
+                  <label
+                    className="text-xs uppercase tracking-wide text-muted-foreground"
+                    htmlFor="createBoardActor"
+                  >
                     Act As
                   </label>
                   <select
@@ -2118,7 +2473,10 @@ export function App(): ReactElement {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createBoardTitle">
+                  <label
+                    className="text-xs uppercase tracking-wide text-muted-foreground"
+                    htmlFor="createBoardTitle"
+                  >
                     Title
                   </label>
                   <Input
@@ -2127,7 +2485,12 @@ export function App(): ReactElement {
                     onChange={(event) => setNewBoardTitle(event.target.value)}
                     placeholder="Q2 Delivery"
                     onKeyDown={(event) => {
-                      if (event.key === "Enter" && newBoardTitle.trim() && !isMutating && !isLoading) {
+                      if (
+                        event.key === "Enter" &&
+                        newBoardTitle.trim() &&
+                        !isMutating &&
+                        !isLoading
+                      ) {
                         event.preventDefault();
                         void handleCreateBoard();
                       }
@@ -2136,10 +2499,16 @@ export function App(): ReactElement {
                 </div>
               </div>
 
-              {createBoardDialogError ? <p className="text-sm text-danger">{createBoardDialogError}</p> : null}
+              {createBoardDialogError ? (
+                <p className="text-sm text-danger">{createBoardDialogError}</p>
+              ) : null}
 
               <DialogFooter>
-                <Button variant="secondary" onClick={() => setCreateBoardDialogOpen(false)} disabled={isMutating}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setCreateBoardDialogOpen(false)}
+                  disabled={isMutating}
+                >
                   Cancel
                 </Button>
                 <Button
@@ -2164,24 +2533,39 @@ export function App(): ReactElement {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Agent</DialogTitle>
-                <DialogDescription>Create an agent and assign a reporting manager.</DialogDescription>
+                <DialogDescription>
+                  Create an agent and assign a reporting manager.
+                </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createAgentName">
+                  <label
+                    className="text-xs uppercase tracking-wide text-muted-foreground"
+                    htmlFor="createAgentName"
+                  >
                     Name
                   </label>
                   <Input
                     id="createAgentName"
                     value={createForm.name}
-                    onChange={(event) => setCreateForm((value) => ({ ...value, name: event.target.value }))}
+                    onChange={(event) =>
+                      setCreateForm((value) => ({
+                        ...value,
+                        name: event.target.value,
+                      }))
+                    }
                     placeholder="Developer"
                     onKeyDown={(event) => {
-                      if (event.key === "Enter" && createForm.name.trim() && !isMutating && !isLoading) {
+                      if (
+                        event.key === "Enter" &&
+                        createForm.name.trim() &&
+                        !isMutating &&
+                        !isLoading
+                      ) {
                         event.preventDefault();
                         void handleCreateAgent({
-                          fromDialog: true
+                          fromDialog: true,
                         });
                       }
                     }}
@@ -2189,7 +2573,43 @@ export function App(): ReactElement {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createAgentReportsTo">
+                  <label
+                    className="text-xs uppercase tracking-wide text-muted-foreground"
+                    htmlFor="createAgentRole"
+                  >
+                    Role (Optional)
+                  </label>
+                  <Input
+                    id="createAgentRole"
+                    value={createForm.role}
+                    onChange={(event) =>
+                      setCreateForm((value) => ({
+                        ...value,
+                        role: event.target.value,
+                      }))
+                    }
+                    placeholder="Software Engineer"
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" &&
+                        createForm.name.trim() &&
+                        !isMutating &&
+                        !isLoading
+                      ) {
+                        event.preventDefault();
+                        void handleCreateAgent({
+                          fromDialog: true,
+                        });
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    className="text-xs uppercase tracking-wide text-muted-foreground"
+                    htmlFor="createAgentReportsTo"
+                  >
                     Reports To
                   </label>
                   <select
@@ -2199,7 +2619,7 @@ export function App(): ReactElement {
                     onChange={(event) =>
                       setCreateForm((value) => ({
                         ...value,
-                        reportsTo: event.target.value
+                        reportsTo: event.target.value,
                       }))
                     }
                   >
@@ -2209,20 +2629,28 @@ export function App(): ReactElement {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-muted-foreground">You can only assign existing agents as manager.</p>
+                  <p className="text-xs text-muted-foreground">
+                    You can only assign existing agents as manager.
+                  </p>
                 </div>
               </div>
 
-              {createAgentDialogError ? <p className="text-sm text-danger">{createAgentDialogError}</p> : null}
+              {createAgentDialogError ? (
+                <p className="text-sm text-danger">{createAgentDialogError}</p>
+              ) : null}
 
               <DialogFooter>
-                <Button variant="secondary" onClick={() => setCreateAgentDialogOpen(false)} disabled={isMutating}>
+                <Button
+                  variant="secondary"
+                  onClick={() => setCreateAgentDialogOpen(false)}
+                  disabled={isMutating}
+                >
                   Cancel
                 </Button>
                 <Button
                   onClick={() => {
                     void handleCreateAgent({
-                      fromDialog: true
+                      fromDialog: true,
                     });
                   }}
                   disabled={isMutating || isLoading || !createForm.name.trim()}
@@ -2253,21 +2681,26 @@ export function App(): ReactElement {
                     description: "",
                     project: "~",
                     assignedTo: taskActorId,
-                    status: "todo" as const
+                    status: "todo" as const,
                   };
                   const assignableAgents = getAssignableAgents(taskActorId);
 
                   return (
                     <div className="space-y-3">
                       <div className="space-y-1.5">
-                        <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskActor">
+                        <label
+                          className="text-xs uppercase tracking-wide text-muted-foreground"
+                          htmlFor="createTaskActor"
+                        >
                           Task Actor
                         </label>
                         <select
                           id="createTaskActor"
                           className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                           value={taskActorId}
-                          onChange={(event) => setTaskActorId(event.target.value)}
+                          onChange={(event) =>
+                            setTaskActorId(event.target.value)
+                          }
                         >
                           {agents.map((agent) => (
                             <option key={agent.id} value={agent.id}>
@@ -2279,48 +2712,76 @@ export function App(): ReactElement {
 
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="space-y-1.5 md:col-span-2">
-                          <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskTitle">
+                          <label
+                            className="text-xs uppercase tracking-wide text-muted-foreground"
+                            htmlFor="createTaskTitle"
+                          >
                             Title
                           </label>
                           <Input
                             id="createTaskTitle"
                             value={draft.title}
-                            onChange={(event) => updateTaskDraft(selectedBoard.boardId, { title: event.target.value })}
+                            onChange={(event) =>
+                              updateTaskDraft(selectedBoard.boardId, {
+                                title: event.target.value,
+                              })
+                            }
                             placeholder="Implement feature"
                           />
                         </div>
                         <div className="space-y-1.5 md:col-span-2">
-                          <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskDescription">
+                          <label
+                            className="text-xs uppercase tracking-wide text-muted-foreground"
+                            htmlFor="createTaskDescription"
+                          >
                             Description
                           </label>
                           <textarea
                             id="createTaskDescription"
                             className="min-h-[96px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             value={draft.description}
-                            onChange={(event) => updateTaskDraft(selectedBoard.boardId, { description: event.target.value })}
+                            onChange={(event) =>
+                              updateTaskDraft(selectedBoard.boardId, {
+                                description: event.target.value,
+                              })
+                            }
                             placeholder="Define acceptance criteria."
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskProject">
+                          <label
+                            className="text-xs uppercase tracking-wide text-muted-foreground"
+                            htmlFor="createTaskProject"
+                          >
                             Project
                           </label>
                           <Input
                             id="createTaskProject"
                             value={draft.project}
-                            onChange={(event) => updateTaskDraft(selectedBoard.boardId, { project: event.target.value })}
+                            onChange={(event) =>
+                              updateTaskDraft(selectedBoard.boardId, {
+                                project: event.target.value,
+                              })
+                            }
                             placeholder="~"
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskAssign">
+                          <label
+                            className="text-xs uppercase tracking-wide text-muted-foreground"
+                            htmlFor="createTaskAssign"
+                          >
                             Assign To
                           </label>
                           <select
                             id="createTaskAssign"
                             className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             value={draft.assignedTo}
-                            onChange={(event) => updateTaskDraft(selectedBoard.boardId, { assignedTo: event.target.value })}
+                            onChange={(event) =>
+                              updateTaskDraft(selectedBoard.boardId, {
+                                assignedTo: event.target.value,
+                              })
+                            }
                           >
                             {assignableAgents.map((agent) => (
                               <option key={agent.id} value={agent.id}>
@@ -2330,7 +2791,10 @@ export function App(): ReactElement {
                           </select>
                         </div>
                         <div className="space-y-1.5">
-                          <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="createTaskStatus">
+                          <label
+                            className="text-xs uppercase tracking-wide text-muted-foreground"
+                            htmlFor="createTaskStatus"
+                          >
                             Initial Status
                           </label>
                           <select
@@ -2339,12 +2803,14 @@ export function App(): ReactElement {
                             value={draft.status}
                             onChange={(event) =>
                               updateTaskDraft(selectedBoard.boardId, {
-                                status: event.target.value as TaskCreateDraft["status"]
+                                status: event.target
+                                  .value as TaskCreateDraft["status"],
                               })
                             }
                           >
                             <option value="todo">todo</option>
                             <option value="doing">doing</option>
+                            <option value="pending">pending</option>
                             <option value="blocked">blocked</option>
                             <option value="done">done</option>
                           </select>
@@ -2354,16 +2820,22 @@ export function App(): ReactElement {
                   );
                 })()}
 
-                {createTaskDialogError ? <p className="text-sm text-danger">{createTaskDialogError}</p> : null}
+                {createTaskDialogError ? (
+                  <p className="text-sm text-danger">{createTaskDialogError}</p>
+                ) : null}
 
                 <DialogFooter>
-                  <Button variant="secondary" onClick={() => setCreateTaskDialogOpen(false)} disabled={isMutating}>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setCreateTaskDialogOpen(false)}
+                    disabled={isMutating}
+                  >
                     Cancel
                   </Button>
                   <Button
                     onClick={() => {
                       void handleCreateTask(selectedBoard.boardId, {
-                        fromDialog: true
+                        fromDialog: true,
                       });
                     }}
                     disabled={isMutating || isLoading}
@@ -2383,7 +2855,7 @@ export function App(): ReactElement {
                 setTaskDetailsError(null);
                 setTaskEntryDraft({
                   kind: "worklog",
-                  content: ""
+                  content: "",
                 });
               }
             }}
@@ -2393,32 +2865,47 @@ export function App(): ReactElement {
                 <DialogHeader className="border-b border-border/70 px-6 py-5">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                      <DialogTitle className="truncate text-2xl leading-tight font-semibold tracking-tight">{selectedTask.title}</DialogTitle>
-                      <DialogDescription className="mt-1">{selectedTask.taskId}</DialogDescription>
+                      <DialogTitle className="truncate text-2xl leading-tight font-semibold tracking-tight">
+                        {selectedTask.title}
+                      </DialogTitle>
+                      <DialogDescription className="mt-1">
+                        {selectedTask.taskId}
+                      </DialogDescription>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <span className="rounded-full border border-border/60 bg-background/50 px-2.5 py-1 text-xs text-muted-foreground">{`Assignee @${selectedTask.assignedTo}`}</span>
                         <span className="rounded-full border border-border/60 bg-background/50 px-2.5 py-1 text-xs text-muted-foreground">{`Owner @${selectedTask.owner}`}</span>
-                        <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-medium", taskStatusPillClasses(selectedTask.status))}>
+                        <span
+                          className={cn(
+                            "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
+                            taskStatusPillClasses(selectedTask.status),
+                          )}
+                        >
                           {selectedTask.status}
                         </span>
                       </div>
                     </div>
 
                     <div className="w-full max-w-[220px] space-y-1 sm:w-auto">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Update Status</p>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        Update Status
+                      </p>
                       <div className="flex items-center gap-2">
                         <select
                           className="h-9 min-w-[118px] flex-1 rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                          value={taskStatusDraftById[selectedTask.taskId] ?? selectedTask.status}
+                          value={
+                            taskStatusDraftById[selectedTask.taskId] ??
+                            selectedTask.status
+                          }
                           onChange={(event) =>
                             setTaskStatusDraftById((current) => ({
                               ...current,
-                              [selectedTask.taskId]: event.target.value
+                              [selectedTask.taskId]: event.target.value,
                             }))
                           }
                         >
                           <option value="todo">todo</option>
                           <option value="doing">doing</option>
+                          <option value="pending">pending</option>
                           <option value="blocked">blocked</option>
                           <option value="done">done</option>
                         </select>
@@ -2429,7 +2916,7 @@ export function App(): ReactElement {
                           disabled={isMutating || isLoading}
                           onClick={() => {
                             void handleUpdateTaskStatus(selectedTask.taskId, {
-                              fromDetails: true
+                              fromDetails: true,
                             });
                           }}
                         >
@@ -2443,17 +2930,24 @@ export function App(): ReactElement {
                 <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                   <section>
                     <h3 className="text-base font-medium">Description</h3>
-                    <p className="mt-2 text-base leading-relaxed whitespace-pre-wrap text-foreground">{selectedTask.description}</p>
+                    <p className="mt-2 text-base leading-relaxed whitespace-pre-wrap text-foreground">
+                      {selectedTask.description}
+                    </p>
                   </section>
 
                   <section className="mt-7">
                     <h3 className="text-base font-medium">Blockers</h3>
                     {selectedTask.blockers.length === 0 ? (
-                      <p className="mt-2 text-sm text-muted-foreground">No blockers.</p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        No blockers.
+                      </p>
                     ) : (
                       <ul className="mt-2 space-y-2">
                         {selectedTask.blockers.map((blocker, index) => (
-                          <li key={`${selectedTask.taskId}:blocker:${index}`} className="rounded-md border border-border/60 bg-background/30 px-3 py-2 text-sm">
+                          <li
+                            key={`${selectedTask.taskId}:blocker:${index}`}
+                            className="rounded-md border border-border/60 bg-background/30 px-3 py-2 text-sm"
+                          >
                             {blocker}
                           </li>
                         ))}
@@ -2464,16 +2958,27 @@ export function App(): ReactElement {
                   <section className="mt-7">
                     <h3 className="text-base font-medium">Activity</h3>
                     {selectedTaskActivity.length === 0 ? (
-                      <p className="mt-2 text-sm text-muted-foreground">No artifacts or worklog entries yet.</p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        No artifacts or worklog entries yet.
+                      </p>
                     ) : (
                       <div className="mt-2 space-y-2">
                         {selectedTaskActivity.map((entry, index) => (
-                          <article key={`${selectedTask.taskId}:activity:${entry.type}:${index}`} className="rounded-md border border-border/60 bg-background/30 px-4 py-3">
+                          <article
+                            key={`${selectedTask.taskId}:activity:${entry.type}:${index}`}
+                            className="rounded-md border border-border/60 bg-background/30 px-4 py-3"
+                          >
                             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{entry.type}</span>
-                              <span className="text-xs text-muted-foreground">{`@${entry.createdBy} • ${formatEntryDate(entry.createdAt)}`}</span>
+                              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                                {entry.type}
+                              </span>
+                              <span className="text-xs text-muted-foreground">{`@${
+                                entry.createdBy
+                              } • ${formatEntryDate(entry.createdAt)}`}</span>
                             </div>
-                            <p className="text-sm leading-relaxed">{entry.content}</p>
+                            <p className="text-sm leading-relaxed">
+                              {entry.content}
+                            </p>
                           </article>
                         ))}
                       </div>
@@ -2482,7 +2987,9 @@ export function App(): ReactElement {
                 </div>
 
                 <div className="border-t border-border/70 bg-background/70 px-6 py-4">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Add Entry</p>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Add Entry
+                  </p>
                   <div className="mt-2 space-y-2">
                     <div className="flex items-center gap-2">
                       <select
@@ -2491,7 +2998,7 @@ export function App(): ReactElement {
                         onChange={(event) =>
                           setTaskEntryDraft((current) => ({
                             ...current,
-                            kind: event.target.value as TaskEntryDraft["kind"]
+                            kind: event.target.value as TaskEntryDraft["kind"],
                           }))
                         }
                       >
@@ -2503,11 +3010,20 @@ export function App(): ReactElement {
                         variant="secondary"
                         size="sm"
                         className="h-9 px-3"
-                        disabled={isMutating || isLoading || !taskEntryDraft.content.trim()}
+                        disabled={
+                          isMutating ||
+                          isLoading ||
+                          !taskEntryDraft.content.trim()
+                        }
                         onClick={() => {
-                          void handleAddTaskEntry(selectedTask.taskId, taskEntryDraft.kind, taskEntryDraft.content, {
-                            fromDetails: true
-                          });
+                          void handleAddTaskEntry(
+                            selectedTask.taskId,
+                            taskEntryDraft.kind,
+                            taskEntryDraft.content,
+                            {
+                              fromDetails: true,
+                            },
+                          );
                         }}
                       >
                         Add
@@ -2519,13 +3035,17 @@ export function App(): ReactElement {
                       onChange={(event) =>
                         setTaskEntryDraft((current) => ({
                           ...current,
-                          content: event.target.value
+                          content: event.target.value,
                         }))
                       }
                       placeholder={`Add ${taskEntryDraft.kind} details...`}
                     />
                   </div>
-                  {taskDetailsError ? <p className="mt-2 text-sm text-danger">{taskDetailsError}</p> : null}
+                  {taskDetailsError ? (
+                    <p className="mt-2 text-sm text-danger">
+                      {taskDetailsError}
+                    </p>
+                  ) : null}
                 </div>
               </DialogContent>
             ) : null}
@@ -2536,7 +3056,8 @@ export function App(): ReactElement {
               {SIDEBAR_ITEMS.map((item) => {
                 const Icon = item.icon;
                 const active =
-                  (route.kind === "page" && item.id === route.view) || (route.kind === "board" && item.id === "boards");
+                  (route.kind === "page" && item.id === route.view) ||
+                  (route.kind === "board" && item.id === "boards");
 
                 return (
                   <button
@@ -2547,7 +3068,7 @@ export function App(): ReactElement {
                       "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm whitespace-nowrap",
                       active
                         ? "border-border bg-accent text-foreground"
-                        : "border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+                        : "border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground",
                     )}
                   >
                     <Icon className="size-4" />
@@ -2573,7 +3094,9 @@ export function App(): ReactElement {
           <main
             className={cn(
               "flex min-h-0 flex-1 flex-col gap-4 p-4 sm:p-6",
-              route.kind === "session" || route.kind === "agent" ? "overflow-hidden" : "overflow-y-auto"
+              route.kind === "session" || route.kind === "agent"
+                ? "overflow-hidden"
+                : "overflow-y-auto",
             )}
           >
             {error ? (
@@ -2584,67 +3107,75 @@ export function App(): ReactElement {
               </Card>
             ) : null}
 
-            {actionMessage ? (
-              <Card className="border-border bg-accent/30">
-                <CardContent className="pt-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm">{actionMessage}</p>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="-mr-1 -mt-1 size-8"
-                      onClick={() => setActionMessage(null)}
-                      aria-label="Dismiss alert"
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+            {!state && isLoading ? (
+              <p className="text-sm text-muted-foreground">
+                Loading runtime data...
+              </p>
             ) : null}
 
-            {!state && isLoading ? <p className="text-sm text-muted-foreground">Loading runtime data...</p> : null}
-
             {state ? (
-              <div className={cn(route.kind === "session" || route.kind === "agent" ? "flex min-h-0 flex-1 flex-col" : "space-y-4")}>
+              <div
+                className={cn(
+                  route.kind === "session" || route.kind === "agent"
+                    ? "flex min-h-0 flex-1 flex-col"
+                    : "space-y-4",
+                )}
+              >
                 {route.kind === "page" && route.view === "overview" ? (
                   <>
                     <section>
                       <div className="mb-3 flex items-center justify-between">
-                        <p className="text-sm font-medium text-muted-foreground">Runtime Overview</p>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Runtime Overview
+                        </p>
                       </div>
                       <div className="grid gap-3 xl:grid-cols-3">
-                      {metrics.map((metric) => {
-                        const Icon = metric.icon;
-                        return (
-                          <Card key={metric.id} className="border-border/70 bg-card/70">
-                            <CardHeader className="pb-1">
-                              <div className="flex items-center justify-between gap-3">
-                                <CardDescription className="text-[14px] font-medium text-muted-foreground">{metric.label}</CardDescription>
-                                <span className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 bg-accent/60 text-muted-foreground">
-                                  <Icon className="size-4 icon-stroke-1_2" />
-                                </span>
-                              </div>
-                              <CardTitle className="text-5xl leading-none font-medium tracking-tight">{metric.value}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="pt-0">
-                              <p className="text-[13px] text-muted-foreground">{metric.hint}</p>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
+                        {metrics.map((metric) => {
+                          const Icon = metric.icon;
+                          return (
+                            <Card
+                              key={metric.id}
+                              className="border-border/70 bg-card/70"
+                            >
+                              <CardHeader className="pb-1">
+                                <div className="flex items-center justify-between gap-3">
+                                  <CardDescription className="text-[14px] font-medium text-muted-foreground">
+                                    {metric.label}
+                                  </CardDescription>
+                                  <span className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 bg-accent/60 text-muted-foreground">
+                                    <Icon className="size-4 icon-stroke-1_2" />
+                                  </span>
+                                </div>
+                                <CardTitle className="text-5xl leading-none font-medium tracking-tight">
+                                  {metric.value}
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="pt-0">
+                                <p className="text-[13px] text-muted-foreground">
+                                  {metric.hint}
+                                </p>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
                       </div>
                     </section>
 
-                    {agents.length >= 2 ? <OrganizationChartPanel agents={agents} /> : null}
+                    {agents.length >= 2 ? (
+                      <OrganizationChartPanel agents={agents} />
+                    ) : null}
                   </>
                 ) : null}
 
                 {route.kind === "page" && route.view === "agents" ? (
                   <section className="space-y-3">
-                    <p className="text-sm text-muted-foreground">Current organization members.</p>
+                    <p className="text-sm text-muted-foreground">
+                      Current organization members.
+                    </p>
                     {agents.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No agents found.</p>
+                      <p className="text-sm text-muted-foreground">
+                        No agents found.
+                      </p>
                     ) : (
                       <div className="overflow-hidden rounded-xl border border-border/80">
                         {agents.map((agent, index) => (
@@ -2652,14 +3183,15 @@ export function App(): ReactElement {
                             key={agent.id}
                             className={cn(
                               "flex cursor-pointer items-center justify-between gap-3 bg-background/30 px-4 py-3 transition-colors hover:bg-accent/30",
-                              index !== agents.length - 1 && "border-b border-border/70"
+                              index !== agents.length - 1 &&
+                                "border-b border-border/70",
                             )}
                             role="button"
                             tabIndex={0}
                             onClick={() => {
                               navigateToRoute({
                                 kind: "agent",
-                                agentId: agent.id
+                                agentId: agent.id,
                               });
                             }}
                             onKeyDown={(event) => {
@@ -2667,20 +3199,29 @@ export function App(): ReactElement {
                                 event.preventDefault();
                                 navigateToRoute({
                                   kind: "agent",
-                                  agentId: agent.id
+                                  agentId: agent.id,
                                 });
                               }
                             }}
                           >
                             <div className="flex min-w-0 items-center gap-3">
-                              <AgentAvatar agentId={agent.id} displayName={agent.displayName} />
+                              <AgentAvatar
+                                agentId={agent.id}
+                                displayName={agent.displayName}
+                              />
                               <div className="min-w-0">
-                                <p className="truncate font-medium">{agent.displayName}</p>
-                                <p className="truncate text-xs text-muted-foreground">{agent.id}</p>
+                                <p className="truncate font-medium">
+                                  {agent.displayName}
+                                </p>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {agent.id}
+                                </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              {agent.id === "ceo" ? <Badge variant="secondary">Head of Org</Badge> : null}
+                              {agent.id === "ceo" ? (
+                                <Badge variant="secondary">Head of Org</Badge>
+                              ) : null}
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -2705,11 +3246,15 @@ export function App(): ReactElement {
                   <Card>
                     <CardHeader>
                       <CardTitle>Boards</CardTitle>
-                      <CardDescription>Open a board to view tasks and manage work.</CardDescription>
+                      <CardDescription>
+                        Open a board to view tasks and manage work.
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       {boards.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No boards found yet. Use Create Board in the header.</p>
+                        <p className="text-sm text-muted-foreground">
+                          No boards found yet. Use Create Board in the header.
+                        </p>
                       ) : (
                         <div className="space-y-2">
                           {boards.map((board) => (
@@ -2720,7 +3265,7 @@ export function App(): ReactElement {
                               onClick={() => {
                                 navigateToRoute({
                                   kind: "board",
-                                  boardId: board.boardId
+                                  boardId: board.boardId,
                                 });
                               }}
                             >
@@ -2729,8 +3274,12 @@ export function App(): ReactElement {
                                 <p className="text-xs text-muted-foreground">{`${board.boardId} • owner @${board.owner}`}</p>
                               </div>
                               <div className="text-right">
-                                <p className="text-sm">{board.tasks.length} tasks</p>
-                                <p className="text-xs text-muted-foreground">Open</p>
+                                <p className="text-sm">
+                                  {board.tasks.length} tasks
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Open
+                                </p>
                               </div>
                             </button>
                           ))}
@@ -2747,7 +3296,9 @@ export function App(): ReactElement {
                         <div className="flex flex-wrap items-end justify-between gap-4">
                           <div className="min-w-0 flex-1">
                             <div className="group inline-flex max-w-full items-center gap-1.5">
-                              <h2 className="truncate text-2xl font-semibold tracking-tight">{selectedBoard.title}</h2>
+                              <h2 className="truncate text-2xl font-semibold tracking-tight">
+                                {selectedBoard.title}
+                              </h2>
                               <button
                                 type="button"
                                 className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary group-hover:opacity-100"
@@ -2761,20 +3312,29 @@ export function App(): ReactElement {
                               </button>
                             </div>
                             <p className="mt-1 text-sm text-muted-foreground">
-                              {`${selectedBoard.boardId} • owner @${selectedBoard.owner} • created ${new Date(selectedBoard.createdAt).toLocaleString()}`}
+                              {`${selectedBoard.boardId} • owner @${
+                                selectedBoard.owner
+                              } • created ${new Date(
+                                selectedBoard.createdAt,
+                              ).toLocaleString()}`}
                             </p>
                           </div>
 
                           <div className="flex flex-wrap items-end gap-2">
                             <div className="space-y-1">
-                              <label className="text-[11px] uppercase tracking-wide text-muted-foreground" htmlFor="boardTaskActor">
+                              <label
+                                className="text-[11px] uppercase tracking-wide text-muted-foreground"
+                                htmlFor="boardTaskActor"
+                              >
                                 Act As
                               </label>
                               <select
                                 id="boardTaskActor"
                                 className="h-9 min-w-[220px] rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                 value={taskActorId}
-                                onChange={(event) => setTaskActorId(event.target.value)}
+                                onChange={(event) =>
+                                  setTaskActorId(event.target.value)
+                                }
                               >
                                 {agents.map((agent) => (
                                   <option key={agent.id} value={agent.id}>
@@ -2788,7 +3348,10 @@ export function App(): ReactElement {
                               variant="secondary"
                               size="sm"
                               onClick={() => {
-                                navigateToRoute({ kind: "page", view: "boards" });
+                                navigateToRoute({
+                                  kind: "page",
+                                  view: "boards",
+                                });
                               }}
                             >
                               Back to Boards
@@ -2801,27 +3364,40 @@ export function App(): ReactElement {
                         <div className="border-b border-border/70 px-4 py-3">
                           <p className="text-sm font-medium">Tasks</p>
                           <p className="text-xs text-muted-foreground">
-                            Open a task for full details. Table focuses on title, assignee, and status.
+                            Open a task for full details. Table focuses on
+                            title, assignee, and status.
                           </p>
                         </div>
 
                         {selectedBoard.tasks.length === 0 ? (
                           <div className="px-4 py-8">
-                            <p className="text-sm text-muted-foreground">No tasks on this board yet. Use Create Task in the top right.</p>
+                            <p className="text-sm text-muted-foreground">
+                              No tasks on this board yet. Use Create Task in the
+                              top right.
+                            </p>
                           </div>
                         ) : (
                           <div className="overflow-x-auto">
                             <table className="min-w-full">
                               <thead>
                                 <tr className="border-b border-border/70 bg-accent/25 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                                  <th className="px-4 py-2 font-medium">Task</th>
-                                  <th className="px-4 py-2 font-medium">Assignee</th>
-                                  <th className="px-4 py-2 font-medium">Status</th>
+                                  <th className="px-4 py-2 font-medium">
+                                    Task
+                                  </th>
+                                  <th className="px-4 py-2 font-medium">
+                                    Assignee
+                                  </th>
+                                  <th className="px-4 py-2 font-medium">
+                                    Status
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-border/60">
                                 {selectedBoard.tasks.map((task) => (
-                                  <tr key={task.taskId} className="transition-colors hover:bg-accent/20">
+                                  <tr
+                                    key={task.taskId}
+                                    className="transition-colors hover:bg-accent/20"
+                                  >
                                     <td className="px-4 py-3">
                                       <button
                                         type="button"
@@ -2830,12 +3406,19 @@ export function App(): ReactElement {
                                           handleOpenTaskDetails(task.taskId);
                                         }}
                                       >
-                                        <span className="block font-medium text-foreground group-hover:underline">{task.title}</span>
+                                        <span className="block font-medium text-foreground group-hover:underline">
+                                          {task.title}
+                                        </span>
                                       </button>
                                     </td>
                                     <td className="px-4 py-3 text-sm text-muted-foreground">{`@${task.assignedTo}`}</td>
                                     <td className="px-4 py-3">
-                                      <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium", taskStatusPillClasses(task.status))}>
+                                      <span
+                                        className={cn(
+                                          "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+                                          taskStatusPillClasses(task.status),
+                                        )}
+                                      >
                                         {task.status}
                                       </span>
                                     </td>
@@ -2868,12 +3451,17 @@ export function App(): ReactElement {
                               {sessionMessages.map((message) => (
                                 <Message from={message.role} key={message.id}>
                                   <MessageContent>
-                                    <MessageResponse>{message.content}</MessageResponse>
+                                    <MessageResponse>
+                                      {message.content}
+                                    </MessageResponse>
                                   </MessageContent>
                                 </Message>
                               ))}
                               {sessionChatStatus === "streaming" ? (
-                                <Message from="assistant" key={`${activeChatContext.chatKey}:thinking`}>
+                                <Message
+                                  from="assistant"
+                                  key={`${activeChatContext.chatKey}:thinking`}
+                                >
                                   <MessageContent className="w-full max-w-full bg-transparent px-0 py-0">
                                     <Reasoning isStreaming>
                                       <ReasoningTrigger />
@@ -2898,16 +3486,26 @@ export function App(): ReactElement {
                           <PromptInputTextarea
                             placeholder={
                               route.kind === "agent"
-                                ? `Message ${selectedAgent?.displayName ?? route.agentId}...`
+                                ? `Message ${
+                                    selectedAgent?.displayName ?? route.agentId
+                                  }...`
                                 : "Message this session..."
                             }
-                            disabled={sessionChatStatus === "streaming" || isLoading || isMutating}
+                            disabled={
+                              sessionChatStatus === "streaming" ||
+                              isLoading ||
+                              isMutating
+                            }
                           />
                         </PromptInputBody>
                         <PromptInputFooter className="justify-end">
                           <PromptInputSubmit
                             status={sessionChatStatus}
-                            disabled={sessionChatStatus === "streaming" || isLoading || isMutating}
+                            disabled={
+                              sessionChatStatus === "streaming" ||
+                              isLoading ||
+                              isMutating
+                            }
                           />
                         </PromptInputFooter>
                       </PromptInput>
@@ -2926,19 +3524,30 @@ export function App(): ReactElement {
                     <Card>
                       <CardHeader>
                         <CardTitle>Assigned Skills</CardTitle>
-                        <CardDescription>Skills currently assigned to ceo.</CardDescription>
+                        <CardDescription>
+                          Skills currently assigned to ceo.
+                        </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-2">
                         {state.agentSkills.skills.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No assigned skills.</p>
+                          <p className="text-sm text-muted-foreground">
+                            No assigned skills.
+                          </p>
                         ) : (
                           state.agentSkills.skills.map((skill) => (
-                            <div key={skill.id} className="rounded-md border border-border/80 bg-background/30 p-3">
+                            <div
+                              key={skill.id}
+                              className="rounded-md border border-border/80 bg-background/30 p-3"
+                            >
                               <div className="mb-1 flex items-center justify-between gap-3">
                                 <p className="font-medium">{skill.name}</p>
-                                <Badge variant="secondary">{skill.source}</Badge>
+                                <Badge variant="secondary">
+                                  {skill.source}
+                                </Badge>
                               </div>
-                              <p className="text-xs text-muted-foreground">{skill.description || "No description"}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {skill.description || "No description"}
+                              </p>
                             </div>
                           ))
                         )}
@@ -2948,19 +3557,30 @@ export function App(): ReactElement {
                     <Card>
                       <CardHeader>
                         <CardTitle>Global Skills</CardTitle>
-                        <CardDescription>Centralized reusable skill catalog.</CardDescription>
+                        <CardDescription>
+                          Centralized reusable skill catalog.
+                        </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-2">
                         {state.globalSkills.skills.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No global skills.</p>
+                          <p className="text-sm text-muted-foreground">
+                            No global skills.
+                          </p>
                         ) : (
                           state.globalSkills.skills.map((skill) => (
-                            <div key={skill.id} className="rounded-md border border-border/80 bg-background/30 p-3">
+                            <div
+                              key={skill.id}
+                              className="rounded-md border border-border/80 bg-background/30 p-3"
+                            >
                               <div className="mb-1 flex items-center justify-between gap-3">
                                 <p className="font-medium">{skill.name}</p>
-                                <Badge variant="secondary">{skill.source}</Badge>
+                                <Badge variant="secondary">
+                                  {skill.source}
+                                </Badge>
                               </div>
-                              <p className="text-xs text-muted-foreground">{skill.description || "No description"}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {skill.description || "No description"}
+                              </p>
                             </div>
                           ))
                         )}
@@ -2979,7 +3599,9 @@ export function App(): ReactElement {
 
 function OrganizationChartPanel({ agents }: { agents: Agent[] }): ReactElement {
   const hierarchy = useMemo(() => buildOrgHierarchy(agents), [agents]);
-  const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(new Set());
+  const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   useEffect(() => {
     setCollapsedNodeIds((previous) => {
@@ -3010,7 +3632,7 @@ function OrganizationChartPanel({ agents }: { agents: Agent[] }): ReactElement {
     return buildFlowModel({
       hierarchy,
       collapsedNodeIds,
-      onToggle: toggleNode
+      onToggle: toggleNode,
     });
   }, [hierarchy, collapsedNodeIds, toggleNode]);
 
@@ -3037,17 +3659,30 @@ function OrganizationChartPanel({ agents }: { agents: Agent[] }): ReactElement {
     <Card className="border-border/70 bg-card/70">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 pb-3">
         <div>
-          <CardTitle className="text-[20px] font-medium">Organization Chart</CardTitle>
+          <CardTitle className="text-[20px] font-medium">
+            Organization Chart
+          </CardTitle>
           <CardDescription className="text-[14px]">
-            Multi-level hierarchy with zoom, pan, and per-branch expand/collapse controls.
+            Multi-level hierarchy with zoom, pan, and per-branch expand/collapse
+            controls.
           </CardDescription>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" className="h-9 px-3 text-[14px]" onClick={expandAll}>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-9 px-3 text-[14px]"
+            onClick={expandAll}
+          >
             Expand All
           </Button>
-          <Button size="sm" variant="secondary" className="h-9 px-3 text-[14px]" onClick={collapseAll}>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-9 px-3 text-[14px]"
+            onClick={collapseAll}
+          >
             Collapse Branches
           </Button>
         </div>
@@ -3055,7 +3690,9 @@ function OrganizationChartPanel({ agents }: { agents: Agent[] }): ReactElement {
 
       <CardContent>
         {flowModel.nodes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No organization nodes found.</p>
+          <p className="text-sm text-muted-foreground">
+            No organization nodes found.
+          </p>
         ) : (
           <div className="h-[640px] rounded-xl border border-border/70 bg-background/45">
             <ReactFlow
@@ -3087,7 +3724,7 @@ function AgentAvatar({
   agentId,
   displayName,
   size = "sm",
-  className
+  className,
 }: {
   agentId: string;
   displayName: string;
@@ -3112,7 +3749,7 @@ function AgentAvatar({
       className={cn(
         "inline-flex shrink-0 overflow-hidden rounded-full border border-border/80 bg-background/80",
         size === "md" ? "size-9" : "size-8",
-        className
+        className,
       )}
     >
       <img
@@ -3131,7 +3768,10 @@ function AgentAvatar({
   );
 }
 
-function OrganizationChartNode({ id, data }: NodeProps<OrgChartNode>): ReactElement {
+function OrganizationChartNode({
+  id,
+  data,
+}: NodeProps<OrgChartNode>): ReactElement {
   const hasChildren = data.directReports > 0;
 
   return (
@@ -3145,10 +3785,18 @@ function OrganizationChartNode({ id, data }: NodeProps<OrgChartNode>): ReactElem
 
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2">
-          <AgentAvatar agentId={data.agentId} displayName={data.displayName} className="mt-0.5" />
+          <AgentAvatar
+            agentId={data.agentId}
+            displayName={data.displayName}
+            className="mt-0.5"
+          />
           <div className="min-w-0">
-            <p className="truncate text-[14px] font-medium">{data.displayName}</p>
-            <p className="truncate text-xs text-muted-foreground">{data.agentId}</p>
+            <p className="truncate text-[14px] font-medium">
+              {data.displayName}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              {data.role ?? data.agentId}
+            </p>
           </div>
         </div>
 
@@ -3161,7 +3809,11 @@ function OrganizationChartNode({ id, data }: NodeProps<OrgChartNode>): ReactElem
               data.onToggle(id);
             }}
             className="inline-flex min-w-10 items-center justify-center rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
-            aria-label={data.collapsed ? `Expand ${data.displayName}` : `Collapse ${data.displayName}`}
+            aria-label={
+              data.collapsed
+                ? `Expand ${data.displayName}`
+                : `Collapse ${data.displayName}`
+            }
           >
             {data.collapsed ? "+" : "-"}
             {data.directReports}
@@ -3171,7 +3823,11 @@ function OrganizationChartNode({ id, data }: NodeProps<OrgChartNode>): ReactElem
 
       <div className="mt-2 flex items-center gap-2">
         <p className="text-xs text-muted-foreground">
-          {hasChildren ? `${data.directReports} direct report${data.directReports > 1 ? "s" : ""}` : "No direct reports"}
+          {hasChildren
+            ? `${data.directReports} direct report${
+                data.directReports > 1 ? "s" : ""
+              }`
+            : "No direct reports"}
         </p>
       </div>
 
@@ -3186,7 +3842,9 @@ function OrganizationChartNode({ id, data }: NodeProps<OrgChartNode>): ReactElem
 }
 
 function buildOrgHierarchy(agents: Agent[]): OrgHierarchy {
-  const sortedAgents = [...agents].sort((left, right) => left.displayName.localeCompare(right.displayName));
+  const sortedAgents = [...agents].sort((left, right) =>
+    left.displayName.localeCompare(right.displayName),
+  );
   const agentsById = new Map(sortedAgents.map((agent) => [agent.id, agent]));
   const childrenById = new Map<string, string[]>();
   const roots: string[] = [];
@@ -3212,14 +3870,18 @@ function buildOrgHierarchy(agents: Agent[]): OrgHierarchy {
     siblingIds.sort((left, right) => {
       const leftAgent = agentsById.get(left);
       const rightAgent = agentsById.get(right);
-      return (leftAgent?.displayName ?? left).localeCompare(rightAgent?.displayName ?? right);
+      return (leftAgent?.displayName ?? left).localeCompare(
+        rightAgent?.displayName ?? right,
+      );
     });
   }
 
   roots.sort((left, right) => {
     const leftAgent = agentsById.get(left);
     const rightAgent = agentsById.get(right);
-    return (leftAgent?.displayName ?? left).localeCompare(rightAgent?.displayName ?? right);
+    return (leftAgent?.displayName ?? left).localeCompare(
+      rightAgent?.displayName ?? right,
+    );
   });
 
   if (roots.length === 0 && sortedAgents.length > 0) {
@@ -3229,7 +3891,7 @@ function buildOrgHierarchy(agents: Agent[]): OrgHierarchy {
   return {
     agentsById,
     childrenById,
-    roots: roots.filter(Boolean)
+    roots: roots.filter(Boolean),
   };
 }
 
@@ -3246,7 +3908,7 @@ function buildFlowModel(params: {
   if (hierarchy.agentsById.size === 0) {
     return {
       nodes: [],
-      edges: []
+      edges: [],
     };
   }
 
@@ -3292,13 +3954,13 @@ function buildFlowModel(params: {
     nodesep: 42,
     ranksep: 86,
     marginx: 24,
-    marginy: 24
+    marginy: 24,
   });
 
   for (const agentId of visibleNodeIds) {
     graph.setNode(agentId, {
       width: NODE_WIDTH,
-      height: NODE_HEIGHT
+      height: NODE_HEIGHT,
     });
   }
 
@@ -3318,7 +3980,7 @@ function buildFlowModel(params: {
       type: "orgNode",
       position: {
         x: (layout?.x ?? 0) - NODE_WIDTH / 2,
-        y: (layout?.y ?? 0) - NODE_HEIGHT / 2
+        y: (layout?.y ?? 0) - NODE_HEIGHT / 2,
       },
       data: {
         agentId,
@@ -3326,8 +3988,8 @@ function buildFlowModel(params: {
         role: resolveAgentRoleLabel(agent),
         directReports,
         collapsed: collapsedNodeIds.has(agentId),
-        onToggle
-      }
+        onToggle,
+      },
     } satisfies OrgChartNode;
   });
 
@@ -3340,14 +4002,14 @@ function buildFlowModel(params: {
       animated: false,
       style: {
         stroke: "hsl(var(--border))",
-        strokeWidth: 1.4
-      }
+        strokeWidth: 1.4,
+      },
     } satisfies Edge;
   });
 
   return {
     nodes,
-    edges
+    edges,
   };
 }
 
@@ -3363,7 +4025,11 @@ function resolveAgentRoleLabel(agent: Agent | undefined): string | undefined {
   const explicitRole = agent?.role?.trim();
   if (explicitRole) {
     const genericRole = explicitRole.toLowerCase();
-    if (genericRole === "manager" || genericRole === "individual contributor" || genericRole === "team member") {
+    if (
+      genericRole === "manager" ||
+      genericRole === "individual contributor" ||
+      genericRole === "team member"
+    ) {
       return undefined;
     }
     return explicitRole;
@@ -3379,7 +4045,10 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const message =
-      payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+      payload &&
+      typeof payload === "object" &&
+      "error" in payload &&
+      typeof payload.error === "string"
         ? payload.error
         : `Request failed with ${response.status}`;
     throw new Error(message);
@@ -3388,7 +4057,11 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
-function viewTitle(route: AppRoute, selectedSession: Session | null, selectedBoard: BoardRecord | null): string {
+function viewTitle(
+  route: AppRoute,
+  selectedSession: Session | null,
+  selectedBoard: BoardRecord | null,
+): string {
   if (route.kind === "session") {
     return selectedSession?.title ?? "Session";
   }
@@ -3436,21 +4109,25 @@ function parseRoute(pathname: string): AppRoute {
   }
 
   if (normalized.startsWith("/agents/")) {
-    const agentId = decodeURIComponent(normalized.slice("/agents/".length)).trim();
+    const agentId = decodeURIComponent(
+      normalized.slice("/agents/".length),
+    ).trim();
     if (agentId) {
       return {
         kind: "agent",
-        agentId
+        agentId,
       };
     }
   }
 
   if (normalized.startsWith("/boards/")) {
-    const boardId = decodeURIComponent(normalized.slice("/boards/".length)).trim();
+    const boardId = decodeURIComponent(
+      normalized.slice("/boards/".length),
+    ).trim();
     if (boardId) {
       return {
         kind: "board",
-        boardId
+        boardId,
       };
     }
   }
@@ -3464,11 +4141,13 @@ function parseRoute(pathname: string): AppRoute {
   }
 
   if (normalized.startsWith("/sessions/")) {
-    const sessionId = decodeURIComponent(normalized.slice("/sessions/".length)).trim();
+    const sessionId = decodeURIComponent(
+      normalized.slice("/sessions/".length),
+    ).trim();
     if (sessionId) {
       return {
         kind: "session",
-        sessionId
+        sessionId,
       };
     }
   }
@@ -3497,10 +4176,28 @@ function routeToPath(route: AppRoute): string {
 }
 
 function normalizePathForComparison(pathname: string | undefined): string {
-  return pathname?.trim().replace(/[\\/]+$/, "").toLowerCase() ?? "";
+  return (
+    pathname
+      ?.trim()
+      .replace(/[\\/]+$/, "")
+      .toLowerCase() ?? ""
+  );
 }
 
-function buildFrontendAgentProjectSessionRef(agentId: string, projectPath: string): string {
+function deriveWorkspaceName(projectPath: string): string {
+  const normalizedPath = projectPath.trim().replace(/[\\/]+$/, "");
+  if (!normalizedPath) {
+    return "Project";
+  }
+
+  const segments = normalizedPath.split(/[\\/]/).filter(Boolean);
+  return segments[segments.length - 1] || normalizedPath || "Project";
+}
+
+function buildFrontendAgentProjectSessionRef(
+  agentId: string,
+  projectPath: string,
+): string {
   const normalizedAgent = normalizeProjectSegment(agentId);
   const normalizedPath = normalizeProjectSegment(projectPath);
   const suffix = normalizedPath.slice(-24) || "workspace";
@@ -3516,7 +4213,9 @@ function normalizeProjectSegment(value: string): string {
   return normalized || "project";
 }
 
-function toSessionMessageImages(files: FileUIPart[]): SessionMessageImageInput[] {
+function toSessionMessageImages(
+  files: FileUIPart[],
+): SessionMessageImageInput[] {
   const images: SessionMessageImageInput[] = [];
 
   for (const file of files) {
@@ -3533,7 +4232,7 @@ function toSessionMessageImages(files: FileUIPart[]): SessionMessageImageInput[]
     images.push({
       dataUrl,
       mediaType,
-      name: file.filename
+      name: file.filename,
     });
   }
 
@@ -3542,7 +4241,12 @@ function toSessionMessageImages(files: FileUIPart[]): SessionMessageImageInput[]
 
 function mapHistoryToSessionMessages(
   sessionId: string,
-  history: Array<{ type: "message" | "compaction"; role?: "user" | "assistant" | "system"; content: string; timestamp: number }>
+  history: Array<{
+    type: "message" | "compaction";
+    role?: "user" | "assistant" | "system";
+    content: string;
+    timestamp: number;
+  }>,
 ): SessionChatMessage[] {
   const messages: SessionChatMessage[] = [];
 
@@ -3558,7 +4262,7 @@ function mapHistoryToSessionMessages(
     messages.push({
       id: `${sessionId}:history:${item.timestamp}:${index}`,
       role: item.role,
-      content: item.content
+      content: item.content,
     });
   }
 

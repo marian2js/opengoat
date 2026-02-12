@@ -1,20 +1,42 @@
+import { AgentManifestService } from "../../agents/application/agent-manifest.service.js";
+import { AgentService } from "../../agents/application/agent.service.js";
+import {
+  BoardService,
+  type BoardRecord,
+  type BoardSummary,
+  type CreateBoardOptions,
+  type CreateTaskOptions,
+  type TaskRecord,
+  type UpdateBoardOptions,
+} from "../../boards/index.js";
+import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
+import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type {
-  AgentInfo,
-  AgentManagerUpdateResult,
-  AgentReporteeSummary,
   AgentCreationResult,
   AgentDeletionResult,
   AgentDescriptor,
+  AgentInfo,
+  AgentManagerUpdateResult,
+  AgentReporteeSummary,
   CreateAgentOptions,
-  DeleteAgentOptions
+  DeleteAgentOptions,
 } from "../../domain/agent.js";
-import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { InitializationResult } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
+import {
+  OrchestrationService,
+  type OrchestrationRunOptions,
+  type OrchestrationRunResult,
+  type RoutingDecision,
+} from "../../orchestration/index.js";
+import type {
+  CommandRunResult,
+  CommandRunnerPort,
+} from "../../ports/command-runner.port.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
-import type { CommandRunResult, CommandRunnerPort } from "../../ports/command-runner.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
+import { ProviderService } from "../../providers/application/provider.service.js";
 import type {
   AgentProviderBinding,
   OpenClawGatewayConfig,
@@ -23,29 +45,9 @@ import type {
   ProviderOnboardingSpec,
   ProviderRegistry,
   ProviderStoredConfig,
-  ProviderSummary
+  ProviderSummary,
 } from "../../providers/index.js";
 import { createDefaultProviderRegistry } from "../../providers/index.js";
-import { AgentManifestService } from "../../agents/application/agent-manifest.service.js";
-import { AgentService } from "../../agents/application/agent.service.js";
-import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
-import {
-  BoardService,
-  type BoardRecord,
-  type BoardSummary,
-  type CreateBoardOptions,
-  type CreateTaskOptions,
-  type TaskRecord,
-  type UpdateBoardOptions
-} from "../../boards/index.js";
-import {
-  OrchestrationService,
-  type OrchestrationRunOptions,
-  type OrchestrationRunResult,
-  type RoutingDecision
-} from "../../orchestration/index.js";
-import { ProviderService } from "../../providers/application/provider.service.js";
-import { SkillService, type InstallSkillRequest, type InstallSkillResult, type ResolvedSkill } from "../../skills/index.js";
 import {
   SessionService,
   type AgentLastAction,
@@ -53,8 +55,19 @@ import {
   type SessionHistoryResult,
   type SessionRemoveResult,
   type SessionRunInfo,
-  type SessionSummary
+  type SessionSummary,
 } from "../../sessions/index.js";
+import {
+  SkillService,
+  type InstallSkillRequest,
+  type InstallSkillResult,
+  type ResolvedSkill,
+} from "../../skills/index.js";
+import {
+  renderBoardIndividualSkillMarkdown,
+  renderBoardManagerSkillMarkdown,
+} from "../../templates/default-templates.js";
+import path from "node:path";
 
 interface OpenGoatServiceDeps {
   fileSystem: FileSystemPort;
@@ -96,6 +109,8 @@ export interface TaskCronRunResult {
 }
 
 export class OpenGoatService {
+  private readonly fileSystem: FileSystemPort;
+  private readonly pathPort: PathPort;
   private readonly pathsProvider: OpenGoatPathsProvider;
   private readonly agentService: AgentService;
   private readonly agentManifestService: AgentManifestService;
@@ -107,48 +122,53 @@ export class OpenGoatService {
   private readonly boardService: BoardService;
   private readonly commandRunner?: CommandRunnerPort;
   private readonly nowIso: () => string;
+  private openClawManagedSkillsDirCache?: string | null;
 
   public constructor(deps: OpenGoatServiceDeps) {
     const nowIso = deps.nowIso ?? (() => new Date().toISOString());
-    const rootLogger = (deps.logger ?? createNoopLogger()).child({ scope: "opengoat-service" });
+    const rootLogger = (deps.logger ?? createNoopLogger()).child({
+      scope: "opengoat-service",
+    });
     const providerRegistryFactory = deps.providerRegistry
       ? () => deps.providerRegistry as ProviderRegistry
       : () => createDefaultProviderRegistry();
 
+    this.fileSystem = deps.fileSystem;
+    this.pathPort = deps.pathPort;
     this.pathsProvider = deps.pathsProvider;
     this.nowIso = nowIso;
     this.agentService = new AgentService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
-      nowIso
+      nowIso,
     });
     this.agentManifestService = new AgentManifestService({
       fileSystem: deps.fileSystem,
-      pathPort: deps.pathPort
+      pathPort: deps.pathPort,
     });
     this.bootstrapService = new BootstrapService({
       fileSystem: deps.fileSystem,
       pathsProvider: deps.pathsProvider,
       agentService: this.agentService,
-      nowIso
+      nowIso,
     });
     this.skillService = new SkillService({
       fileSystem: deps.fileSystem,
-      pathPort: deps.pathPort
+      pathPort: deps.pathPort,
     });
     this.providerService = new ProviderService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       providerRegistry: providerRegistryFactory,
       nowIso,
-      logger: rootLogger.child({ scope: "provider" })
+      logger: rootLogger.child({ scope: "provider" }),
     });
     this.sessionService = new SessionService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       commandRunner: deps.commandRunner,
       nowIso,
-      nowMs: () => Date.now()
+      nowMs: () => Date.now(),
     });
     this.commandRunner = deps.commandRunner;
     this.orchestrationService = new OrchestrationService({
@@ -158,13 +178,13 @@ export class OpenGoatService {
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       nowIso,
-      logger: rootLogger.child({ scope: "orchestration" })
+      logger: rootLogger.child({ scope: "orchestration" }),
     });
     this.boardService = new BoardService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       nowIso,
-      agentManifestService: this.agentManifestService
+      agentManifestService: this.agentManifestService,
     });
   }
 
@@ -178,79 +198,121 @@ export class OpenGoatService {
     let ceoSynced = false;
     let ceoSyncCode: number | undefined;
 
-    let ceoDescriptor = (await this.agentService.listAgents(paths)).find((agent) => agent.id === DEFAULT_AGENT_ID);
+    let ceoDescriptor = (await this.agentService.listAgents(paths)).find(
+      (agent) => agent.id === DEFAULT_AGENT_ID,
+    );
     if (!ceoDescriptor) {
       const created = await this.agentService.ensureAgent(
         paths,
         {
           id: DEFAULT_AGENT_ID,
-          displayName: "CEO"
+          displayName: "CEO",
         },
         {
           type: "manager",
           reportsTo: null,
-          skills: ["board-manager"],
-          role: "Head of Organization"
-        }
+          role: "CEO",
+        },
       );
       ceoDescriptor = created.agent;
     }
 
     try {
-      await this.agentService.syncAgentRoleAssignments(paths, DEFAULT_AGENT_ID);
+      await this.syncOpenClawRoleSkills(paths, DEFAULT_AGENT_ID);
     } catch (error) {
-      warnings.push(`OpenGoat role skill assignment sync for "ceo" failed: ${toErrorMessage(error)}`);
+      warnings.push(
+        `OpenClaw role skill assignment sync for "ceo" failed: ${toErrorMessage(
+          error,
+        )}`,
+      );
     }
 
     try {
       await this.agentService.ensureCeoWorkspaceBootstrap(paths);
     } catch (error) {
-      warnings.push(`OpenGoat workspace bootstrap for "ceo" failed: ${toErrorMessage(error)}`);
+      warnings.push(
+        `OpenGoat workspace bootstrap for "ceo" failed: ${toErrorMessage(
+          error,
+        )}`,
+      );
     }
 
     try {
-      await this.boardService.ensureDefaultBoardForAgent(paths, DEFAULT_AGENT_ID);
+      await this.boardService.ensureDefaultBoardForAgent(
+        paths,
+        DEFAULT_AGENT_ID,
+      );
     } catch (error) {
-      warnings.push(`Default board ensure for "ceo" failed: ${toErrorMessage(error)}`);
+      warnings.push(
+        `Default board ensure for "ceo" failed: ${toErrorMessage(error)}`,
+      );
     }
 
     try {
-      const ceoSync = await this.providerService.createProviderAgent(paths, DEFAULT_AGENT_ID, {
-        providerId: OPENCLAW_PROVIDER_ID,
-        displayName: ceoDescriptor.displayName,
-        workspaceDir: ceoDescriptor.workspaceDir,
-        internalConfigDir: ceoDescriptor.internalConfigDir
-      });
+      const ceoSync = await this.providerService.createProviderAgent(
+        paths,
+        DEFAULT_AGENT_ID,
+        {
+          providerId: OPENCLAW_PROVIDER_ID,
+          displayName: ceoDescriptor.displayName,
+          workspaceDir: ceoDescriptor.workspaceDir,
+          internalConfigDir: ceoDescriptor.internalConfigDir,
+        },
+      );
       ceoSyncCode = ceoSync.code;
-      ceoSynced = ceoSync.code === 0 || containsAlreadyExistsMessage(ceoSync.stdout, ceoSync.stderr);
+      ceoSynced =
+        ceoSync.code === 0 ||
+        containsAlreadyExistsMessage(ceoSync.stdout, ceoSync.stderr);
       if (!ceoSynced) {
         warnings.push(
-          `OpenClaw sync for "ceo" failed (code ${ceoSync.code}). ${(ceoSync.stderr || ceoSync.stdout).trim()}`
+          `OpenClaw sync for "ceo" failed (code ${ceoSync.code}). ${(
+            ceoSync.stderr || ceoSync.stdout
+          ).trim()}`,
         );
       }
     } catch (error) {
       warnings.push(`OpenClaw sync for "ceo" failed: ${toErrorMessage(error)}`);
     }
 
+    if (ceoSynced) {
+      try {
+        await this.ensureOpenClawAgentLocation(paths, {
+          agentId: DEFAULT_AGENT_ID,
+          displayName: ceoDescriptor.displayName,
+          workspaceDir: ceoDescriptor.workspaceDir,
+          internalConfigDir: ceoDescriptor.internalConfigDir,
+        });
+      } catch (error) {
+        warnings.push(
+          `OpenClaw ceo location sync failed: ${toErrorMessage(error)}`,
+        );
+      }
+    }
+
     return {
       ceoSyncCode,
       ceoSynced,
-      warnings
+      warnings,
     };
   }
 
-  public async createAgent(rawName: string, options: CreateAgentOptions = {}): Promise<AgentCreationResult> {
+  public async createAgent(
+    rawName: string,
+    options: CreateAgentOptions = {},
+  ): Promise<AgentCreationResult> {
     const identity = this.agentService.normalizeAgentName(rawName);
     const paths = this.pathsProvider.getPaths();
     const created = await this.agentService.ensureAgent(paths, identity, {
       type: options.type,
       reportsTo: options.reportsTo,
       skills: options.skills,
-      role: options.role
+      role: options.role,
     });
     try {
-      await this.agentService.syncAgentRoleAssignments(paths, created.agent.id);
-      const workspaceSkillSync = await this.agentService.ensureAgentWorkspaceRoleSkills(paths, created.agent.id);
+      const workspaceSkillSync = await this.syncOpenClawRoleSkills(
+        paths,
+        created.agent.id,
+      );
       created.createdPaths.push(...workspaceSkillSync.createdPaths);
       created.skippedPaths.push(...workspaceSkillSync.skippedPaths);
       created.skippedPaths.push(...workspaceSkillSync.removedPaths);
@@ -259,25 +321,53 @@ export class OpenGoatService {
         await this.agentService.removeAgent(paths, created.agent.id);
       }
       throw new Error(
-        `Failed to sync role skills for "${created.agent.id}". ${toErrorMessage(error)}`
+        `Failed to sync OpenClaw role skills for "${
+          created.agent.id
+        }". ${toErrorMessage(error)}`,
       );
     }
 
-    const runtimeSync = await this.providerService.createProviderAgent(paths, created.agent.id, {
-      providerId: OPENCLAW_PROVIDER_ID,
-      displayName: created.agent.displayName,
-      workspaceDir: created.agent.workspaceDir,
-      internalConfigDir: created.agent.internalConfigDir
-    });
+    const runtimeSync = await this.providerService.createProviderAgent(
+      paths,
+      created.agent.id,
+      {
+        providerId: OPENCLAW_PROVIDER_ID,
+        displayName: created.agent.displayName,
+        workspaceDir: created.agent.workspaceDir,
+        internalConfigDir: created.agent.internalConfigDir,
+      },
+    );
 
-    if (runtimeSync.code !== 0 && !containsAlreadyExistsMessage(runtimeSync.stdout, runtimeSync.stderr)) {
+    if (
+      runtimeSync.code !== 0 &&
+      !containsAlreadyExistsMessage(runtimeSync.stdout, runtimeSync.stderr)
+    ) {
       if (!created.alreadyExisted) {
         await this.agentService.removeAgent(paths, created.agent.id);
       }
       throw new Error(
-        `OpenClaw agent creation failed for "${created.agent.id}" (exit ${runtimeSync.code}). ${
+        `OpenClaw agent creation failed for "${created.agent.id}" (exit ${
+          runtimeSync.code
+        }). ${
           runtimeSync.stderr.trim() || runtimeSync.stdout.trim() || ""
-        }`.trim()
+        }`.trim(),
+      );
+    }
+    try {
+      await this.ensureOpenClawAgentLocation(paths, {
+        agentId: created.agent.id,
+        displayName: created.agent.displayName,
+        workspaceDir: created.agent.workspaceDir,
+        internalConfigDir: created.agent.internalConfigDir,
+      });
+    } catch (error) {
+      if (!created.alreadyExisted) {
+        await this.agentService.removeAgent(paths, created.agent.id);
+      }
+      throw new Error(
+        `OpenClaw agent location sync failed for "${
+          created.agent.id
+        }". ${toErrorMessage(error)}`,
       );
     }
 
@@ -289,31 +379,42 @@ export class OpenGoatService {
         runtimeId: runtimeSync.providerId,
         code: runtimeSync.code,
         stdout: runtimeSync.stdout,
-        stderr: runtimeSync.stderr
-      }
+        stderr: runtimeSync.stderr,
+      },
     };
   }
 
-  public async deleteAgent(rawAgentId: string, options: DeleteAgentOptions = {}): Promise<AgentDeletionResult> {
+  public async deleteAgent(
+    rawAgentId: string,
+    options: DeleteAgentOptions = {},
+  ): Promise<AgentDeletionResult> {
     const paths = this.pathsProvider.getPaths();
     const agentId = normalizeAgentId(rawAgentId);
     if (!agentId) {
       throw new Error("Agent id cannot be empty.");
     }
 
-    const existing = (await this.agentService.listAgents(paths)).find((entry) => entry.id === agentId);
+    const existing = (await this.agentService.listAgents(paths)).find(
+      (entry) => entry.id === agentId,
+    );
     if (!existing) {
       return this.agentService.removeAgent(paths, agentId);
     }
 
-    const runtimeSync = await this.providerService.deleteProviderAgent(paths, agentId, {
-      providerId: OPENCLAW_PROVIDER_ID
-    });
+    const runtimeSync = await this.providerService.deleteProviderAgent(
+      paths,
+      agentId,
+      {
+        providerId: OPENCLAW_PROVIDER_ID,
+      },
+    );
     if (runtimeSync.code !== 0 && !options.force) {
       throw new Error(
-        `OpenClaw agent deletion failed for "${agentId}" (exit ${runtimeSync.code}). ${
+        `OpenClaw agent deletion failed for "${agentId}" (exit ${
+          runtimeSync.code
+        }). ${
           runtimeSync.stderr.trim() || runtimeSync.stdout.trim() || ""
-        }`.trim()
+        }`.trim(),
       );
     }
 
@@ -324,16 +425,28 @@ export class OpenGoatService {
         runtimeId: runtimeSync.providerId,
         code: runtimeSync.code,
         stdout: runtimeSync.stdout,
-        stderr: runtimeSync.stderr
-      }
+        stderr: runtimeSync.stderr,
+      },
     };
   }
 
-  public async setAgentManager(rawAgentId: string, rawReportsTo: string | null): Promise<AgentManagerUpdateResult> {
+  public async setAgentManager(
+    rawAgentId: string,
+    rawReportsTo: string | null,
+  ): Promise<AgentManagerUpdateResult> {
     const paths = this.pathsProvider.getPaths();
-    const updated = await this.agentService.setAgentManager(paths, rawAgentId, rawReportsTo);
-    await this.agentService.syncAgentRoleAssignments(paths, updated.agentId);
-    await this.agentService.ensureAgentWorkspaceRoleSkills(paths, updated.agentId);
+    const updated = await this.agentService.setAgentManager(
+      paths,
+      rawAgentId,
+      rawReportsTo,
+    );
+    await this.syncOpenClawRoleSkills(paths, updated.agentId);
+    if (updated.previousReportsTo) {
+      await this.syncOpenClawRoleSkills(paths, updated.previousReportsTo);
+    }
+    if (updated.reportsTo) {
+      await this.syncOpenClawRoleSkills(paths, updated.reportsTo);
+    }
     return updated;
   }
 
@@ -380,7 +493,7 @@ export class OpenGoatService {
     const paths = this.pathsProvider.getPaths();
     const [agents, manifests] = await Promise.all([
       this.agentService.listAgents(paths),
-      this.agentManifestService.listManifests(paths)
+      this.agentManifestService.listManifests(paths),
     ]);
 
     const descriptorsById = new Map(agents.map((agent) => [agent.id, agent]));
@@ -394,13 +507,18 @@ export class OpenGoatService {
       .filter((manifest) => manifest.metadata.reportsTo === agentId)
       .map((manifest) => {
         const descriptor = descriptorsById.get(manifest.agentId);
-        const name = descriptor?.displayName?.trim() || manifest.metadata.name || manifest.agentId;
-        const role = descriptor?.role?.trim() || manifest.metadata.description || "Agent";
+        const name =
+          descriptor?.displayName?.trim() ||
+          manifest.metadata.name ||
+          manifest.agentId;
+        const role =
+          descriptor?.role?.trim() || manifest.metadata.description || "Agent";
         return {
           id: manifest.agentId,
           name,
           role,
-          totalReportees: collectAllReportees(manifests, manifest.agentId).length
+          totalReportees: collectAllReportees(manifests, manifest.agentId)
+            .length,
         };
       })
       .sort((left, right) => left.id.localeCompare(right.id));
@@ -410,7 +528,7 @@ export class OpenGoatService {
       name: agent.displayName,
       role: agent.role,
       totalReportees,
-      directReportees
+      directReportees,
     };
   }
 
@@ -418,34 +536,46 @@ export class OpenGoatService {
     return this.providerService.listProviders();
   }
 
-  public getProviderOnboarding(providerId: string): Promise<ProviderOnboardingSpec | undefined> {
+  public getProviderOnboarding(
+    providerId: string,
+  ): Promise<ProviderOnboardingSpec | undefined> {
     return this.providerService.getProviderOnboarding(providerId);
   }
 
-  public async getProviderConfig(providerId: string): Promise<ProviderStoredConfig | null> {
+  public async getProviderConfig(
+    providerId: string,
+  ): Promise<ProviderStoredConfig | null> {
     const paths = this.pathsProvider.getPaths();
     return this.providerService.getProviderConfig(paths, providerId);
   }
 
-  public async setProviderConfig(providerId: string, env: Record<string, string>): Promise<ProviderStoredConfig> {
+  public async setProviderConfig(
+    providerId: string,
+    env: Record<string, string>,
+  ): Promise<ProviderStoredConfig> {
     const paths = this.pathsProvider.getPaths();
     return this.providerService.setProviderConfig(paths, providerId, env);
   }
 
   public async authenticateProvider(
     providerId: string,
-    options: ProviderAuthOptions = {}
+    options: ProviderAuthOptions = {},
   ): Promise<ProviderExecutionResult> {
     const paths = this.pathsProvider.getPaths();
     return this.providerService.invokeProviderAuth(paths, providerId, options);
   }
 
-  public async getAgentProvider(agentId: string): Promise<AgentProviderBinding> {
+  public async getAgentProvider(
+    agentId: string,
+  ): Promise<AgentProviderBinding> {
     const paths = this.pathsProvider.getPaths();
     return this.providerService.getAgentProvider(paths, agentId);
   }
 
-  public async setAgentProvider(agentId: string, providerId: string): Promise<AgentProviderBinding> {
+  public async setAgentProvider(
+    agentId: string,
+    providerId: string,
+  ): Promise<AgentProviderBinding> {
     const paths = this.pathsProvider.getPaths();
     return this.providerService.setAgentProvider(paths, agentId, providerId);
   }
@@ -455,25 +585,33 @@ export class OpenGoatService {
     return this.providerService.getOpenClawGatewayConfig(paths);
   }
 
-  public async setOpenClawGatewayConfig(config: OpenClawGatewayConfig): Promise<OpenClawGatewayConfig> {
+  public async setOpenClawGatewayConfig(
+    config: OpenClawGatewayConfig,
+  ): Promise<OpenClawGatewayConfig> {
     const paths = this.pathsProvider.getPaths();
     return this.providerService.setOpenClawGatewayConfig(paths, config);
   }
 
-  public async routeMessage(agentId: string, message: string): Promise<RoutingDecision> {
+  public async routeMessage(
+    agentId: string,
+    message: string,
+  ): Promise<RoutingDecision> {
     const paths = this.pathsProvider.getPaths();
     return this.orchestrationService.routeMessage(paths, agentId, message);
   }
 
   public async runAgent(
     agentId: string,
-    options: OrchestrationRunOptions
+    options: OrchestrationRunOptions,
   ): Promise<OrchestrationRunResult> {
     const paths = this.pathsProvider.getPaths();
     return this.orchestrationService.runAgent(paths, agentId, options);
   }
 
-  public async createBoard(actorId: string, options: CreateBoardOptions): Promise<BoardSummary> {
+  public async createBoard(
+    actorId: string,
+    options: CreateBoardOptions,
+  ): Promise<BoardSummary> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.createBoard(paths, actorId, options);
   }
@@ -488,7 +626,11 @@ export class OpenGoatService {
     return this.boardService.getBoard(paths, boardId);
   }
 
-  public async updateBoard(actorId: string, boardId: string, options: UpdateBoardOptions): Promise<BoardSummary> {
+  public async updateBoard(
+    actorId: string,
+    boardId: string,
+    options: UpdateBoardOptions,
+  ): Promise<BoardSummary> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.updateBoard(paths, actorId, boardId, options);
   }
@@ -496,7 +638,7 @@ export class OpenGoatService {
   public async createTask(
     actorId: string,
     boardId: string | null | undefined,
-    options: CreateTaskOptions
+    options: CreateTaskOptions,
   ): Promise<TaskRecord> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.createTask(paths, actorId, boardId, options);
@@ -512,33 +654,64 @@ export class OpenGoatService {
     return this.boardService.getTask(paths, taskId);
   }
 
-  public async updateTaskStatus(actorId: string, taskId: string, status: string): Promise<TaskRecord> {
+  public async updateTaskStatus(
+    actorId: string,
+    taskId: string,
+    status: string,
+    reason?: string,
+  ): Promise<TaskRecord> {
     const paths = this.pathsProvider.getPaths();
-    return this.boardService.updateTaskStatus(paths, actorId, taskId, status);
+    return this.boardService.updateTaskStatus(
+      paths,
+      actorId,
+      taskId,
+      status,
+      reason,
+    );
   }
 
-  public async addTaskBlocker(actorId: string, taskId: string, blocker: string): Promise<TaskRecord> {
+  public async addTaskBlocker(
+    actorId: string,
+    taskId: string,
+    blocker: string,
+  ): Promise<TaskRecord> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.addTaskBlocker(paths, actorId, taskId, blocker);
   }
 
-  public async addTaskArtifact(actorId: string, taskId: string, content: string): Promise<TaskRecord> {
+  public async addTaskArtifact(
+    actorId: string,
+    taskId: string,
+    content: string,
+  ): Promise<TaskRecord> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.addTaskArtifact(paths, actorId, taskId, content);
   }
 
-  public async addTaskWorklog(actorId: string, taskId: string, content: string): Promise<TaskRecord> {
+  public async addTaskWorklog(
+    actorId: string,
+    taskId: string,
+    content: string,
+  ): Promise<TaskRecord> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.addTaskWorklog(paths, actorId, taskId, content);
   }
 
-  public async runTaskCronCycle(options: { inactiveMinutes?: number } = {}): Promise<TaskCronRunResult> {
+  public async runTaskCronCycle(
+    options: { inactiveMinutes?: number } = {},
+  ): Promise<TaskCronRunResult> {
     const paths = this.pathsProvider.getPaths();
     const ranAt = this.resolveNowIso();
     const manifests = await this.agentManifestService.listManifests(paths);
-    const manifestsById = new Map(manifests.map((manifest) => [manifest.agentId, manifest]));
+    const manifestsById = new Map(
+      manifests.map((manifest) => [manifest.agentId, manifest]),
+    );
     const inactiveMinutes = resolveInactiveMinutes(options.inactiveMinutes);
-    const inactiveCandidates = await this.collectInactiveAgents(paths, manifests, inactiveMinutes);
+    const inactiveCandidates = await this.collectInactiveAgents(
+      paths,
+      manifests,
+      inactiveMinutes,
+    );
 
     const boards = await this.boardService.listBoards(paths);
     const dispatches: TaskCronDispatchResult[] = [];
@@ -562,59 +735,79 @@ export class OpenGoatService {
           const message = buildTodoTaskMessage({
             boardId: board.boardId,
             boardTitle: board.title,
-            task
+            task,
           });
-          const result = await this.dispatchAutomationMessage(paths, targetAgentId, sessionRef, message);
+          const result = await this.dispatchAutomationMessage(
+            paths,
+            targetAgentId,
+            sessionRef,
+            message,
+          );
           dispatches.push({
             kind: "todo",
             targetAgentId,
             sessionRef,
             taskId: task.taskId,
             ok: result.ok,
-            error: result.error
+            error: result.error,
           });
           continue;
         }
 
         blockedTasks += 1;
         const assigneeManifest = manifestsById.get(task.assignedTo);
-        const managerAgentId = normalizeAgentId(assigneeManifest?.metadata.reportsTo ?? "") || DEFAULT_AGENT_ID;
+        const managerAgentId =
+          normalizeAgentId(assigneeManifest?.metadata.reportsTo ?? "") ||
+          DEFAULT_AGENT_ID;
         const sessionRef = buildTaskSessionRef(managerAgentId, task.taskId);
         const message = buildBlockedTaskMessage({
           boardId: board.boardId,
           boardTitle: board.title,
-          task
+          task,
         });
-        const result = await this.dispatchAutomationMessage(paths, managerAgentId, sessionRef, message);
+        const result = await this.dispatchAutomationMessage(
+          paths,
+          managerAgentId,
+          sessionRef,
+          message,
+        );
         dispatches.push({
           kind: "blocked",
           targetAgentId: managerAgentId,
           sessionRef,
           taskId: task.taskId,
           ok: result.ok,
-          error: result.error
+          error: result.error,
         });
       }
     }
 
     for (const candidate of inactiveCandidates) {
-      const sessionRef = buildInactiveSessionRef(candidate.managerAgentId, candidate.subjectAgentId);
+      const sessionRef = buildInactiveSessionRef(
+        candidate.managerAgentId,
+        candidate.subjectAgentId,
+      );
       const message = buildInactiveAgentMessage({
         managerAgentId: candidate.managerAgentId,
         subjectAgentId: candidate.subjectAgentId,
         subjectName: candidate.subjectName,
         role: candidate.role,
         inactiveMinutes,
-        lastActionTimestamp: candidate.lastActionTimestamp
+        lastActionTimestamp: candidate.lastActionTimestamp,
       });
-      const result = await this.dispatchAutomationMessage(paths, candidate.managerAgentId, sessionRef, message);
+      const result = await this.dispatchAutomationMessage(
+        paths,
+        candidate.managerAgentId,
+        sessionRef,
+        message,
+      );
       dispatches.push({
         kind: "inactive",
         targetAgentId: candidate.managerAgentId,
         sessionRef,
         subjectAgentId: candidate.subjectAgentId,
         ok: result.ok,
-        error: result.error
+        error: result.error,
       });
     }
 
@@ -627,11 +820,13 @@ export class OpenGoatService {
       inactiveAgents: inactiveCandidates.length,
       sent: dispatches.length - failed,
       failed,
-      dispatches
+      dispatches,
     };
   }
 
-  public async listSkills(agentId = DEFAULT_AGENT_ID): Promise<ResolvedSkill[]> {
+  public async listSkills(
+    agentId = DEFAULT_AGENT_ID,
+  ): Promise<ResolvedSkill[]> {
     const paths = this.pathsProvider.getPaths();
     return this.skillService.listSkills(paths, agentId);
   }
@@ -641,20 +836,26 @@ export class OpenGoatService {
     return this.skillService.listGlobalSkills(paths);
   }
 
-  public async installSkill(request: InstallSkillRequest): Promise<InstallSkillResult> {
+  public async installSkill(
+    request: InstallSkillRequest,
+  ): Promise<InstallSkillResult> {
     const paths = this.pathsProvider.getPaths();
     const result = await this.skillService.installSkill(paths, request);
     if (result.scope === "agent" && result.agentId) {
-      await this.agentService.syncAgentRoleAssignments(paths, result.agentId);
-      await this.agentService.ensureAgentWorkspaceRoleSkills(paths, result.agentId);
+      await this.syncOpenClawRoleSkills(paths, result.agentId);
       await this.boardService.ensureDefaultBoardForAgent(paths, result.agentId);
     }
     return result;
   }
 
-  public async runOpenClaw(args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Promise<CommandRunResult> {
+  public async runOpenClaw(
+    args: string[],
+    options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+  ): Promise<CommandRunResult> {
     if (!this.commandRunner) {
-      throw new Error("OpenClaw passthrough is unavailable: command runner was not configured.");
+      throw new Error(
+        "OpenClaw passthrough is unavailable: command runner was not configured.",
+      );
     }
 
     const sanitized = args.map((value) => value.trim()).filter(Boolean);
@@ -666,11 +867,14 @@ export class OpenGoatService {
       command: process.env.OPENGOAT_OPENCLAW_CMD?.trim() || "openclaw",
       args: sanitized,
       cwd: options.cwd,
-      env: options.env
+      env: options.env,
     });
   }
 
-  public async listSessions(agentId = DEFAULT_AGENT_ID, options: { activeMinutes?: number } = {}): Promise<SessionSummary[]> {
+  public async listSessions(
+    agentId = DEFAULT_AGENT_ID,
+    options: { activeMinutes?: number } = {},
+  ): Promise<SessionSummary[]> {
     const paths = this.pathsProvider.getPaths();
     return this.sessionService.listSessions(paths, agentId, options);
   }
@@ -681,15 +885,19 @@ export class OpenGoatService {
       sessionRef?: string;
       projectPath?: string;
       forceNew?: boolean;
-    } = {}
+    } = {},
   ): Promise<SessionRunInfo> {
     const paths = this.pathsProvider.getPaths();
-    const prepared = await this.sessionService.prepareRunSession(paths, agentId, {
-      sessionRef: options.sessionRef,
-      projectPath: options.projectPath,
-      forceNew: options.forceNew,
-      userMessage: ""
-    });
+    const prepared = await this.sessionService.prepareRunSession(
+      paths,
+      agentId,
+      {
+        sessionRef: options.sessionRef,
+        projectPath: options.projectPath,
+        forceNew: options.forceNew,
+        userMessage: "",
+      },
+    );
 
     if (!prepared.enabled) {
       throw new Error("Session preparation was disabled.");
@@ -698,25 +906,37 @@ export class OpenGoatService {
     return prepared.info;
   }
 
-  public async getAgentLastAction(agentId = DEFAULT_AGENT_ID): Promise<AgentLastAction | null> {
+  public async getAgentLastAction(
+    agentId = DEFAULT_AGENT_ID,
+  ): Promise<AgentLastAction | null> {
     const paths = this.pathsProvider.getPaths();
     return this.sessionService.getLastAgentAction(paths, agentId);
   }
 
   public async getSessionHistory(
     agentId = DEFAULT_AGENT_ID,
-    options: { sessionRef?: string; limit?: number; includeCompaction?: boolean } = {}
+    options: {
+      sessionRef?: string;
+      limit?: number;
+      includeCompaction?: boolean;
+    } = {},
   ): Promise<SessionHistoryResult> {
     const paths = this.pathsProvider.getPaths();
     return this.sessionService.getSessionHistory(paths, agentId, options);
   }
 
-  public async resetSession(agentId = DEFAULT_AGENT_ID, sessionRef?: string): Promise<SessionRunInfo> {
+  public async resetSession(
+    agentId = DEFAULT_AGENT_ID,
+    sessionRef?: string,
+  ): Promise<SessionRunInfo> {
     const paths = this.pathsProvider.getPaths();
     return this.sessionService.resetSession(paths, agentId, sessionRef);
   }
 
-  public async compactSession(agentId = DEFAULT_AGENT_ID, sessionRef?: string): Promise<SessionCompactionResult> {
+  public async compactSession(
+    agentId = DEFAULT_AGENT_ID,
+    sessionRef?: string,
+  ): Promise<SessionCompactionResult> {
     const paths = this.pathsProvider.getPaths();
     return this.sessionService.compactSession(paths, agentId, sessionRef);
   }
@@ -724,13 +944,16 @@ export class OpenGoatService {
   public async renameSession(
     agentId = DEFAULT_AGENT_ID,
     title = "",
-    sessionRef?: string
+    sessionRef?: string,
   ): Promise<SessionSummary> {
     const paths = this.pathsProvider.getPaths();
     return this.sessionService.renameSession(paths, agentId, title, sessionRef);
   }
 
-  public async removeSession(agentId = DEFAULT_AGENT_ID, sessionRef?: string): Promise<SessionRemoveResult> {
+  public async removeSession(
+    agentId = DEFAULT_AGENT_ID,
+    sessionRef?: string,
+  ): Promise<SessionRemoveResult> {
     const paths = this.pathsProvider.getPaths();
     return this.sessionService.removeSession(paths, agentId, sessionRef);
   }
@@ -747,25 +970,29 @@ export class OpenGoatService {
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
     agentId: string,
     sessionRef: string,
-    message: string
+    message: string,
   ): Promise<{ ok: boolean; error?: string }> {
     try {
       const result = await this.orchestrationService.runAgent(paths, agentId, {
         message,
         sessionRef,
-        env: process.env
+        env: process.env,
       });
       if (result.code !== 0) {
         return {
           ok: false,
-          error: (result.stderr || result.stdout || `Runtime exited with code ${result.code}.`).trim()
+          error: (
+            result.stderr ||
+            result.stdout ||
+            `Runtime exited with code ${result.code}.`
+          ).trim(),
         };
       }
       return { ok: true };
     } catch (error) {
       return {
         ok: false,
-        error: toErrorMessage(error)
+        error: toErrorMessage(error),
       };
     }
   }
@@ -785,17 +1012,289 @@ export class OpenGoatService {
     return Date.now();
   }
 
+  private async syncOpenClawRoleSkills(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    rawAgentId: string,
+  ): Promise<{
+    createdPaths: string[];
+    skippedPaths: string[];
+    removedPaths: string[];
+  }> {
+    const agentId = normalizeAgentId(rawAgentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const createdPaths: string[] = [];
+    const skippedPaths: string[] = [];
+    const removedPaths: string[] = [];
+    const managedSkillsSync = await this.syncOpenClawManagedRoleSkills(paths);
+    createdPaths.push(...managedSkillsSync.createdPaths);
+    skippedPaths.push(...managedSkillsSync.skippedPaths);
+    removedPaths.push(...managedSkillsSync.removedPaths);
+    const syncedAgents = new Set<string>();
+
+    const syncAgent = async (targetAgentId: string): Promise<void> => {
+      if (syncedAgents.has(targetAgentId)) {
+        return;
+      }
+      syncedAgents.add(targetAgentId);
+      const sync = await this.agentService.ensureAgentWorkspaceRoleSkills(
+        paths,
+        targetAgentId,
+      );
+      createdPaths.push(...sync.createdPaths);
+      skippedPaths.push(...sync.skippedPaths);
+      removedPaths.push(...sync.removedPaths);
+    };
+
+    await syncAgent(agentId);
+
+    const manifest = await this.agentManifestService.getManifest(
+      paths,
+      agentId,
+    );
+    const managerAgentId = normalizeAgentId(manifest.metadata.reportsTo ?? "");
+    if (managerAgentId) {
+      await syncAgent(managerAgentId);
+    }
+
+    return {
+      createdPaths,
+      skippedPaths,
+      removedPaths,
+    };
+  }
+
+  private async syncOpenClawManagedRoleSkills(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+  ): Promise<{
+    createdPaths: string[];
+    skippedPaths: string[];
+    removedPaths: string[];
+  }> {
+    if (!this.commandRunner) {
+      return {
+        createdPaths: [],
+        skippedPaths: ["openclaw-managed-skills:command-runner-unavailable"],
+        removedPaths: [],
+      };
+    }
+
+    const managedSkillsDir = await this.resolveOpenClawManagedSkillsDir(paths);
+    if (!managedSkillsDir) {
+      return {
+        createdPaths: [],
+        skippedPaths: ["openclaw-managed-skills:unresolved"],
+        removedPaths: [],
+      };
+    }
+
+    const createdPaths: string[] = [];
+    const skippedPaths: string[] = [];
+    const removedPaths: string[] = [];
+    const roleSkills = new Map<string, string>([
+      ["board-manager", renderBoardManagerSkillMarkdown()],
+      ["board-individual", renderBoardIndividualSkillMarkdown()],
+    ]);
+
+    const managedSkillsDirExists = await this.fileSystem.exists(managedSkillsDir);
+    await this.fileSystem.ensureDir(managedSkillsDir);
+    if (managedSkillsDirExists) {
+      skippedPaths.push(managedSkillsDir);
+    } else {
+      createdPaths.push(managedSkillsDir);
+    }
+
+    for (const [skillId, markdown] of roleSkills.entries()) {
+      const skillDir = this.pathPort.join(managedSkillsDir, skillId);
+      const skillFilePath = this.pathPort.join(skillDir, "SKILL.md");
+      const skillDirExists = await this.fileSystem.exists(skillDir);
+      await this.fileSystem.ensureDir(skillDir);
+      if (skillDirExists) {
+        skippedPaths.push(skillDir);
+      } else {
+        createdPaths.push(skillDir);
+      }
+
+      const normalizedMarkdown = ensureTrailingNewline(markdown);
+      const skillFileExists = await this.fileSystem.exists(skillFilePath);
+      if (skillFileExists) {
+        const existingMarkdown = await this.fileSystem.readFile(skillFilePath);
+        if (existingMarkdown === normalizedMarkdown) {
+          skippedPaths.push(skillFilePath);
+          continue;
+        }
+      }
+      await this.fileSystem.writeFile(skillFilePath, normalizedMarkdown);
+      if (skillFileExists) {
+        skippedPaths.push(skillFilePath);
+      } else {
+        createdPaths.push(skillFilePath);
+      }
+    }
+
+    for (const legacySkillId of ["manager", "board-user"]) {
+      const legacyDir = this.pathPort.join(managedSkillsDir, legacySkillId);
+      if (!(await this.fileSystem.exists(legacyDir))) {
+        skippedPaths.push(legacyDir);
+        continue;
+      }
+      await this.fileSystem.removeDir(legacyDir);
+      removedPaths.push(legacyDir);
+    }
+
+    return {
+      createdPaths,
+      skippedPaths,
+      removedPaths,
+    };
+  }
+
+  private async resolveOpenClawManagedSkillsDir(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+  ): Promise<string | null> {
+    if (this.openClawManagedSkillsDirCache !== undefined) {
+      return this.openClawManagedSkillsDirCache;
+    }
+
+    const providerConfig = await this.providerService.getProviderConfig(
+      paths,
+      OPENCLAW_PROVIDER_ID,
+    );
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      ...(providerConfig?.env ?? {}),
+    };
+    const skillsList = await this.runOpenClaw(["skills", "list", "--json"], {
+      env,
+    });
+    if (skillsList.code !== 0) {
+      throw new Error(
+        `OpenClaw skills list failed (exit ${skillsList.code}). ${
+          skillsList.stderr.trim() || skillsList.stdout.trim() || ""
+        }`.trim(),
+      );
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(skillsList.stdout);
+    } catch {
+      throw new Error(
+        "OpenClaw skills list returned non-JSON output; cannot resolve managed skills directory.",
+      );
+    }
+
+    const managedSkillsDir = extractManagedSkillsDir(parsed);
+    this.openClawManagedSkillsDirCache = managedSkillsDir;
+    return managedSkillsDir;
+  }
+
+  private async ensureOpenClawAgentLocation(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    params: {
+      agentId: string;
+      displayName: string;
+      workspaceDir: string;
+      internalConfigDir: string;
+    },
+  ): Promise<void> {
+    if (!this.commandRunner) {
+      return;
+    }
+
+    const env = await this.resolveOpenClawEnv(paths);
+    const listed = await this.runOpenClaw(["agents", "list", "--json"], { env });
+    if (listed.code !== 0) {
+      throw new Error(
+        `OpenClaw agents list failed (exit ${listed.code}). ${
+          listed.stderr.trim() || listed.stdout.trim() || ""
+        }`.trim(),
+      );
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(listed.stdout);
+    } catch {
+      throw new Error(
+        "OpenClaw agents list returned non-JSON output; cannot verify agent location.",
+      );
+    }
+
+    const entry = extractOpenClawAgentEntry(parsed, params.agentId);
+    if (!entry) {
+      return;
+    }
+    if (
+      pathMatches(entry.workspace, params.workspaceDir) &&
+      pathMatches(entry.agentDir, params.internalConfigDir)
+    ) {
+      return;
+    }
+
+    const deleted = await this.providerService.deleteProviderAgent(
+      paths,
+      params.agentId,
+      { providerId: OPENCLAW_PROVIDER_ID },
+    );
+    if (deleted.code !== 0) {
+      throw new Error(
+        `OpenClaw agent location repair failed deleting "${params.agentId}" (exit ${deleted.code}). ${
+          deleted.stderr.trim() || deleted.stdout.trim() || ""
+        }`.trim(),
+      );
+    }
+
+    const recreated = await this.providerService.createProviderAgent(
+      paths,
+      params.agentId,
+      {
+        providerId: OPENCLAW_PROVIDER_ID,
+        displayName: params.displayName,
+        workspaceDir: params.workspaceDir,
+        internalConfigDir: params.internalConfigDir,
+      },
+    );
+    if (
+      recreated.code !== 0 &&
+      !containsAlreadyExistsMessage(recreated.stdout, recreated.stderr)
+    ) {
+      throw new Error(
+        `OpenClaw agent location repair failed creating "${params.agentId}" (exit ${recreated.code}). ${
+          recreated.stderr.trim() || recreated.stdout.trim() || ""
+        }`.trim(),
+      );
+    }
+  }
+
+  private async resolveOpenClawEnv(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+  ): Promise<NodeJS.ProcessEnv> {
+    const providerConfig = await this.providerService.getProviderConfig(
+      paths,
+      OPENCLAW_PROVIDER_ID,
+    );
+    return {
+      ...(providerConfig?.env ?? {}),
+      ...process.env,
+    };
+  }
+
   private async collectInactiveAgents(
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
     manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
-    inactiveMinutes: number
-  ): Promise<Array<{
-    managerAgentId: string;
-    subjectAgentId: string;
-    subjectName: string;
-    role: string;
-    lastActionTimestamp?: number;
-  }>> {
+    inactiveMinutes: number,
+  ): Promise<
+    Array<{
+      managerAgentId: string;
+      subjectAgentId: string;
+      subjectName: string;
+      role: string;
+      lastActionTimestamp?: number;
+    }>
+  > {
     const nowMs = this.resolveNowMs();
     const inactiveCutoffMs = nowMs - inactiveMinutes * 60_000;
     const inactive: Array<{
@@ -807,12 +1306,17 @@ export class OpenGoatService {
     }> = [];
 
     for (const manifest of manifests) {
-      const managerAgentId = normalizeAgentId(manifest.metadata.reportsTo ?? "");
+      const managerAgentId = normalizeAgentId(
+        manifest.metadata.reportsTo ?? "",
+      );
       if (!managerAgentId) {
         continue;
       }
 
-      const lastAction = await this.sessionService.getLastAgentAction(paths, manifest.agentId);
+      const lastAction = await this.sessionService.getLastAgentAction(
+        paths,
+        manifest.agentId,
+      );
       if (lastAction && lastAction.timestamp >= inactiveCutoffMs) {
         continue;
       }
@@ -822,7 +1326,7 @@ export class OpenGoatService {
         subjectAgentId: manifest.agentId,
         subjectName: manifest.metadata.name,
         role: manifest.metadata.description,
-        lastActionTimestamp: lastAction?.timestamp
+        lastActionTimestamp: lastAction?.timestamp,
       });
     }
 
@@ -832,7 +1336,7 @@ export class OpenGoatService {
 
 function containsAlreadyExistsMessage(stdout: string, stderr: string): boolean {
   const text = `${stdout}\n${stderr}`.toLowerCase();
-  return text.includes("already exists") || text.includes("exists");
+  return /\balready exists?\b/.test(text);
 }
 
 function toErrorMessage(error: unknown): string {
@@ -849,13 +1353,90 @@ function resolveInactiveMinutes(value: number | undefined): number {
   return Math.floor(value);
 }
 
+function ensureTrailingNewline(value: string): string {
+  return value.endsWith("\n") ? value : `${value}\n`;
+}
+
+function extractManagedSkillsDir(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const record = payload as { managedSkillsDir?: unknown };
+  if (typeof record.managedSkillsDir !== "string") {
+    return null;
+  }
+
+  const managedSkillsDir = record.managedSkillsDir.trim();
+  return managedSkillsDir || null;
+}
+
+function extractOpenClawAgentEntry(
+  payload: unknown,
+  agentId: string,
+): { workspace: string; agentDir: string } | null {
+  if (!Array.isArray(payload)) {
+    return null;
+  }
+
+  const normalizedAgentId = normalizeAgentId(agentId);
+  if (!normalizedAgentId) {
+    return null;
+  }
+
+  for (const entry of payload) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      continue;
+    }
+    const record = entry as {
+      id?: unknown;
+      workspace?: unknown;
+      agentDir?: unknown;
+    };
+    const candidateId = normalizeAgentId(String(record.id ?? ""));
+    if (!candidateId || candidateId !== normalizedAgentId) {
+      continue;
+    }
+    return {
+      workspace: typeof record.workspace === "string" ? record.workspace : "",
+      agentDir: typeof record.agentDir === "string" ? record.agentDir : "",
+    };
+  }
+
+  return null;
+}
+
+function pathMatches(left: string, right: string): boolean {
+  const leftNormalized = normalizePathForCompare(left);
+  const rightNormalized = normalizePathForCompare(right);
+  if (!leftNormalized || !rightNormalized) {
+    return false;
+  }
+  return leftNormalized === rightNormalized;
+}
+
+function normalizePathForCompare(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  const resolved = path.resolve(trimmed);
+  if (process.platform === "win32") {
+    return resolved.toLowerCase();
+  }
+  return resolved;
+}
+
 function buildTaskSessionRef(agentId: string, taskId: string): string {
   const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
   const normalizedTaskId = normalizeAgentId(taskId) || "task";
   return `agent:${normalizedAgentId}:agent_${normalizedAgentId}_task_${normalizedTaskId}`;
 }
 
-function buildInactiveSessionRef(managerAgentId: string, subjectAgentId: string): string {
+function buildInactiveSessionRef(
+  managerAgentId: string,
+  subjectAgentId: string,
+): string {
   const manager = normalizeAgentId(managerAgentId) || DEFAULT_AGENT_ID;
   const subject = normalizeAgentId(subjectAgentId) || "agent";
   return `agent:${manager}:agent_${manager}_inactive_${subject}`;
@@ -866,14 +1447,25 @@ function buildTodoTaskMessage(params: {
   boardTitle: string;
   task: TaskRecord;
 }): string {
-  const blockers = params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "None";
+  const blockers =
+    params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "None";
   const artifacts =
     params.task.artifacts.length > 0
-      ? params.task.artifacts.map((entry) => `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`).join("\n")
+      ? params.task.artifacts
+          .map(
+            (entry) =>
+              `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`,
+          )
+          .join("\n")
       : "- None";
   const worklog =
     params.task.worklog.length > 0
-      ? params.task.worklog.map((entry) => `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`).join("\n")
+      ? params.task.worklog
+          .map(
+            (entry) =>
+              `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`,
+          )
+          .join("\n")
       : "- None";
 
   return [
@@ -892,7 +1484,7 @@ function buildTodoTaskMessage(params: {
     "Artifacts:",
     artifacts,
     "Worklog:",
-    worklog
+    worklog,
   ].join("\n");
 }
 
@@ -901,14 +1493,27 @@ function buildBlockedTaskMessage(params: {
   boardTitle: string;
   task: TaskRecord;
 }): string {
-  const blockerReason = params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "no blocker details were provided";
+  const blockerReason =
+    params.task.blockers.length > 0
+      ? params.task.blockers.join("; ")
+      : params.task.statusReason?.trim() || "no blocker details were provided";
   const artifacts =
     params.task.artifacts.length > 0
-      ? params.task.artifacts.map((entry) => `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`).join("\n")
+      ? params.task.artifacts
+          .map(
+            (entry) =>
+              `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`,
+          )
+          .join("\n")
       : "- None";
   const worklog =
     params.task.worklog.length > 0
-      ? params.task.worklog.map((entry) => `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`).join("\n")
+      ? params.task.worklog
+          .map(
+            (entry) =>
+              `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`,
+          )
+          .join("\n")
       : "- None";
 
   return [
@@ -926,7 +1531,7 @@ function buildBlockedTaskMessage(params: {
     "Artifacts:",
     artifacts,
     "Worklog:",
-    worklog
+    worklog,
   ].join("\n");
 }
 
@@ -939,7 +1544,8 @@ function buildInactiveAgentMessage(params: {
   lastActionTimestamp?: number;
 }): string {
   const lastAction =
-    typeof params.lastActionTimestamp === "number" && Number.isFinite(params.lastActionTimestamp)
+    typeof params.lastActionTimestamp === "number" &&
+    Number.isFinite(params.lastActionTimestamp)
       ? new Date(params.lastActionTimestamp).toISOString()
       : "No recorded assistant actions yet";
   return [
@@ -947,7 +1553,7 @@ function buildInactiveAgentMessage(params: {
     `Role: ${params.role}`,
     `Last action: ${lastAction}`,
     `Manager: @${params.managerAgentId}`,
-    "Please check in and unblock progress."
+    "Please check in and unblock progress.",
   ].join("\n");
 }
 
@@ -958,14 +1564,20 @@ type AgentReportNode = {
   };
 };
 
-function assertAgentExists(manifests: AgentReportNode[], agentId: string): void {
+function assertAgentExists(
+  manifests: AgentReportNode[],
+  agentId: string,
+): void {
   if (manifests.some((manifest) => manifest.agentId === agentId)) {
     return;
   }
   throw new Error(`Agent "${agentId}" does not exist.`);
 }
 
-function collectAllReportees(manifests: AgentReportNode[], managerAgentId: string): string[] {
+function collectAllReportees(
+  manifests: AgentReportNode[],
+  managerAgentId: string,
+): string[] {
   const byManager = new Map<string, string[]>();
   for (const manifest of manifests) {
     const reportsTo = manifest.metadata.reportsTo;

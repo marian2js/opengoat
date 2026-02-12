@@ -151,6 +151,47 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("passes optional role when creating agents through the api", async () => {
+    const createAgent = vi.fn<OpenClawUiService["createAgent"]>(async (name: string): Promise<AgentCreationResult> => {
+      return {
+        agent: {
+          id: "developer",
+          displayName: name,
+          workspaceDir: "/tmp/workspace",
+          internalConfigDir: "/tmp/internal"
+        },
+        createdPaths: [],
+        skippedPaths: []
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        createAgent
+      }
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/agents",
+      payload: {
+        name: "Developer",
+        role: "  Software Engineer  "
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(createAgent).toHaveBeenCalledWith("Developer", {
+      type: undefined,
+      reportsTo: undefined,
+      skills: undefined,
+      role: "Software Engineer"
+    });
+  });
+
   it("creates project session through the api", async () => {
     const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(async (_agentId, options): Promise<SessionRunInfo> => {
       const sessionKey = options?.sessionRef ?? "agent:ceo:main";
@@ -538,6 +579,48 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("sanitizes runtime prefixes and ansi sequences in session message output", async () => {
+    const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(async (): Promise<{
+      code: number;
+      stdout: string;
+      stderr: string;
+      providerId: string;
+    }> => {
+      return {
+        code: 0,
+        stdout:
+          "\u001b[33m[agents/auth-profiles]\u001b[39m \u001b[36minherited auth-profiles from main agent\u001b[39m\n\n# Hello\nThis is **markdown**.",
+        stderr: "",
+        providerId: "openclaw"
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        runAgent
+      }
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message",
+      payload: {
+        agentId: "ceo",
+        sessionRef: "workspace:tmp",
+        projectPath: "/tmp",
+        message: "hello"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      output: "# Hello\nThis is **markdown**."
+    });
+  });
+
   it("returns persisted session history", async () => {
     const getSessionHistory = vi.fn<NonNullable<OpenClawUiService["getSessionHistory"]>>(async (): Promise<{
       sessionKey: string;
@@ -597,6 +680,64 @@ describe("OpenGoat UI server API", () => {
         messages: [
           { role: "user", content: "hello" },
           { role: "assistant", content: "world" }
+        ]
+      }
+    });
+  });
+
+  it("sanitizes persisted session history messages for ui rendering", async () => {
+    const getSessionHistory = vi.fn<NonNullable<OpenClawUiService["getSessionHistory"]>>(async (): Promise<{
+      sessionKey: string;
+      sessionId: string;
+      transcriptPath: string;
+      messages: Array<{
+        type: "message";
+        role: "user" | "assistant";
+        content: string;
+        timestamp: number;
+      }>;
+    }> => {
+      return {
+        sessionKey: "workspace:tmp",
+        sessionId: "session-1",
+        transcriptPath: "/tmp/transcript.jsonl",
+        messages: [
+          {
+            type: "message",
+            role: "user",
+            content: "hello",
+            timestamp: 1
+          },
+          {
+            type: "message",
+            role: "assistant",
+            content: "[33m[agents/auth-profiles] [39m [36minherited auth-profiles from main agent 39m Hey **there**",
+            timestamp: 2
+          }
+        ]
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        getSessionHistory
+      }
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/sessions/history?agentId=ceo&sessionRef=workspace%3Atmp&limit=50"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      history: {
+        messages: [
+          { role: "user", content: "hello" },
+          { role: "assistant", content: "Hey **there**" }
         ]
       }
     });
@@ -802,7 +943,7 @@ describe("OpenGoat UI server API", () => {
       }
     });
     expect(statusResponse.statusCode).toBe(200);
-    expect(updateTaskStatus).toHaveBeenCalledWith("developer", "task-plan", "doing");
+    expect(updateTaskStatus).toHaveBeenCalledWith("developer", "task-plan", "doing", undefined);
 
     const blockerResponse = await activeServer.inject({
       method: "POST",

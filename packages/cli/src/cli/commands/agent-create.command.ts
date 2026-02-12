@@ -156,13 +156,9 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("Defaults: new agents report to ceo when --reports-to is omitted.\n");
 }
 
-function dedupeSkills(type: "manager" | "individual" | undefined, input: string[]): string[] | undefined {
-  const merged = [...input];
-  if (type === "manager" && !merged.includes("board-manager")) {
-    merged.push("board-manager");
-  }
-  if (merged.length === 0) {
+function dedupeSkills(_type: "manager" | "individual" | undefined, input: string[]): string[] | undefined {
+  if (input.length === 0) {
     return undefined;
   }
-  return [...new Set(merged)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(input)].sort((left, right) => left.localeCompare(right));
 }

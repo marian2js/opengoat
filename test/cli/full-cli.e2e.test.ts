@@ -332,6 +332,7 @@ async function createOpenClawStub(
 ): Promise<{ stubPath: string; stubLogPath: string }> {
   const stubLogPath = path.join(root, "openclaw-stub.log");
   const stubPath = path.join(root, "openclaw-stub.mjs");
+  const managedSkillsDir = path.join(root, "openclaw-managed-skills");
 
   await writeFile(
     stubPath,
@@ -344,14 +345,27 @@ async function createOpenClawStub(
       "  process.exit(2);",
       "}",
       "const args = process.argv.slice(2);",
+      "const normalized = normalizeArgs(args);",
       "appendFileSync(logPath, `${JSON.stringify(args)}\\n`, 'utf-8');",
-      "if (args[0] === 'providers' && args[1] === 'list') { process.stdout.write('openclaw\\tOpenClaw\\n'); process.exit(0); }",
-      "if (args[0] === 'agents' && args[1] === 'provider' && args[2] === 'get') { process.stdout.write(`${args[3] || ''}\\topenclaw\\n`); process.exit(0); }",
-      "if (args[0] === 'agents' && args[1] === 'provider' && args[2] === 'set') { process.stdout.write('provider-set-ok\\n'); process.exit(0); }",
-      "if (args[0] === 'agents' && args[1] === 'add') { process.stdout.write('agent-created\\n'); process.exit(0); }",
-      "if (args[0] === 'agents' && args[1] === 'delete') { process.stdout.write('agent-deleted\\n'); process.exit(0); }",
-      "if (args[0] === 'agent') { process.stdout.write('stub-agent-reply\\n'); process.exit(0); }",
+      `const managedSkillsDir = process.env.OPENCLAW_MANAGED_SKILLS_DIR || ${JSON.stringify(managedSkillsDir)};`,
+      "if (normalized[0] === 'skills' && normalized[1] === 'list' && normalized.includes('--json')) { process.stdout.write(JSON.stringify({ workspaceDir: '/tmp/openclaw-workspace', managedSkillsDir, skills: [] }) + '\\n'); process.exit(0); }",
+      "if (normalized[0] === 'agents' && normalized[1] === 'list' && normalized.includes('--json')) { process.stdout.write('[]\\n'); process.exit(0); }",
+      "if (normalized[0] === 'providers' && normalized[1] === 'list') { process.stdout.write('openclaw\\tOpenClaw\\n'); process.exit(0); }",
+      "if (normalized[0] === 'agents' && normalized[1] === 'provider' && normalized[2] === 'get') { process.stdout.write(`${normalized[3] || ''}\\topenclaw\\n`); process.exit(0); }",
+      "if (normalized[0] === 'agents' && normalized[1] === 'provider' && normalized[2] === 'set') { process.stdout.write('provider-set-ok\\n'); process.exit(0); }",
+      "if (normalized[0] === 'agents' && normalized[1] === 'add') { process.stdout.write('agent-created\\n'); process.exit(0); }",
+      "if (normalized[0] === 'agents' && normalized[1] === 'delete') { process.stdout.write('agent-deleted\\n'); process.exit(0); }",
+      "if (normalized[0] === 'agent') { process.stdout.write('stub-agent-reply\\n'); process.exit(0); }",
       "process.stdout.write('openclaw-stub-ok\\n');",
+      "function normalizeArgs(input) {",
+      "  const normalized = [...input];",
+      "  while (normalized.length > 0) {",
+      "    if (normalized[0] === '--profile') { normalized.splice(0, 2); continue; }",
+      "    if (normalized[0] === '--dev' || normalized[0] === '--no-color') { normalized.splice(0, 1); continue; }",
+      "    break;",
+      "  }",
+      "  return normalized;",
+      "}",
     ].join("\n"),
     "utf-8",
   );

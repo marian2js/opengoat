@@ -42,6 +42,7 @@ interface TaskRow {
   title: string;
   description: string;
   status: string;
+  status_reason: string | null;
 }
 
 interface EntryRow {
@@ -50,7 +51,7 @@ interface EntryRow {
   content: string;
 }
 
-const TASK_STATUSES = ["todo", "doing", "blocked", "done"] as const;
+const TASK_STATUSES = ["todo", "doing", "pending", "blocked", "done"] as const;
 const DEFAULT_TASK_PROJECT = "~";
 const require = createRequire(import.meta.url);
 
@@ -213,9 +214,10 @@ export class BoardService {
          assigned_to_agent_id,
          title,
          description,
-         status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [taskId, resolvedBoardId, createdAt, project, normalizedActorId, assignedTo, title, description, status]
+         status,
+         status_reason
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [taskId, resolvedBoardId, createdAt, project, normalizedActorId, assignedTo, title, description, status, null]
     );
     await this.persistDatabase(paths, db);
 
@@ -284,7 +286,8 @@ export class BoardService {
     paths: OpenGoatPaths,
     actorId: string,
     taskId: string,
-    status: string
+    status: string,
+    reason?: string
   ): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
     const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
@@ -293,8 +296,13 @@ export class BoardService {
     this.assertTaskAssignee(task, normalizedActorId);
 
     const nextStatus = normalizeTaskStatus(status, true);
+    const nextStatusReason = normalizeTaskStatusReason(nextStatus, reason);
 
-    this.execute(db, `UPDATE tasks SET status = ? WHERE task_id = ?`, [nextStatus, normalizedTaskId]);
+    this.execute(db, `UPDATE tasks SET status = ?, status_reason = ? WHERE task_id = ?`, [
+      nextStatus,
+      nextStatusReason,
+      normalizedTaskId
+    ]);
     await this.persistDatabase(paths, db);
     return this.requireTask(db, normalizedTaskId);
   }
@@ -392,7 +400,7 @@ export class BoardService {
   private async listTasksByBoardId(db: SqlJsDatabase, boardId: string): Promise<TaskRecord[]> {
     const rows = this.queryAll<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status
+      `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
        FROM tasks
        WHERE board_id = ?
        ORDER BY created_at ASC`,
@@ -410,7 +418,7 @@ export class BoardService {
   private requireTask(db: SqlJsDatabase, taskId: string): TaskRecord {
     const row = this.queryOne<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status
+      `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
        FROM tasks
        WHERE task_id = ?`,
       [taskId]
@@ -459,6 +467,7 @@ export class BoardService {
       title: row.title,
       description: row.description,
       status: row.status,
+      statusReason: row.status_reason?.trim() || undefined,
       blockers: blockersRows.map((entry) => entry.content),
       artifacts: artifactsRows.map((entry) => toTaskEntry(entry)),
       worklog: worklogRows.map((entry) => toTaskEntry(entry))
@@ -523,10 +532,12 @@ export class BoardService {
          title TEXT NOT NULL,
          description TEXT NOT NULL,
          status TEXT NOT NULL,
+         status_reason TEXT,
          FOREIGN KEY(board_id) REFERENCES boards(board_id) ON DELETE CASCADE
        );`
     );
     this.ensureTaskProjectColumn(db);
+    this.ensureTaskStatusReasonColumn(db);
     this.execute(
       db,
       `CREATE TABLE IF NOT EXISTS task_blockers (
@@ -599,7 +610,7 @@ export class BoardService {
     await writeFileBuffer(dbPath, data);
   }
 
-  private execute(db: SqlJsDatabase, sql: string, params: Array<string | number> = []): void {
+  private execute(db: SqlJsDatabase, sql: string, params: Array<string | number | null> = []): void {
     const statement = db.prepare(sql);
     statement.bind(params);
     while (statement.step()) {
@@ -608,7 +619,7 @@ export class BoardService {
     statement.free();
   }
 
-  private queryAll<T>(db: SqlJsDatabase, sql: string, params: Array<string | number> = []): T[] {
+  private queryAll<T>(db: SqlJsDatabase, sql: string, params: Array<string | number | null> = []): T[] {
     const statement = db.prepare(sql);
     statement.bind(params);
     const rows: T[] = [];
@@ -619,7 +630,7 @@ export class BoardService {
     return rows;
   }
 
-  private queryOne<T>(db: SqlJsDatabase, sql: string, params: Array<string | number> = []): T | undefined {
+  private queryOne<T>(db: SqlJsDatabase, sql: string, params: Array<string | number | null> = []): T | undefined {
     const all = this.queryAll<T>(db, sql, params);
     return all[0];
   }
@@ -646,6 +657,16 @@ export class BoardService {
            AND TRIM(workspace) <> '';`
       );
     }
+  }
+
+  private ensureTaskStatusReasonColumn(db: SqlJsDatabase): void {
+    const columns = this.queryAll<{ name: string }>(db, "PRAGMA table_info(tasks);");
+    const hasStatusReason = columns.some((column) => column.name === "status_reason");
+    if (hasStatusReason) {
+      return;
+    }
+
+    this.execute(db, "ALTER TABLE tasks ADD COLUMN status_reason TEXT;");
   }
 
   private ensureBoardDefaultColumn(db: SqlJsDatabase): void {
@@ -854,6 +875,14 @@ function normalizeTaskStatus(rawStatus: string | undefined, allowEmpty = false):
     throw new Error(`Task status must be one of: ${TASK_STATUSES.join(", ")}.`);
   }
   return normalized;
+}
+
+function normalizeTaskStatusReason(status: string, rawReason: string | undefined): string | null {
+  const reason = rawReason?.trim();
+  if ((status === "pending" || status === "blocked") && !reason) {
+    throw new Error(`Reason is required when task status is "${status}".`);
+  }
+  return reason || null;
 }
 
 function normalizeTaskProject(rawProject: string | undefined): string {

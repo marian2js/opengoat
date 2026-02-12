@@ -40,8 +40,9 @@ describe("agent create OpenClaw sync e2e", () => {
     expect(result.stdout).toContain("Agent ready: John Doe (john-doe)");
 
     const calls = await readStubCalls(stubLogPath);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toEqual(
+    const addCall = findCommandCall(calls, "agents", "add");
+    expect(addCall).toBeDefined();
+    expect(addCall).toEqual(
       expect.arrayContaining([
         "agents",
         "add",
@@ -77,8 +78,9 @@ describe("agent create OpenClaw sync e2e", () => {
     expect(result.stdout).toContain("OpenClaw sync: openclaw (code 0)");
 
     const calls = await readStubCalls(stubLogPath);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toEqual(
+    const addCall = findCommandCall(calls, "agents", "add");
+    expect(addCall).toBeDefined();
+    expect(addCall).toEqual(
       expect.arrayContaining([
         "agents",
         "add",
@@ -90,6 +92,36 @@ describe("agent create OpenClaw sync e2e", () => {
         "--non-interactive"
       ])
     );
+  });
+
+  it("prepends OPENCLAW_ARGUMENTS before create subcommand", async () => {
+    const root = await createTempDir("opengoat-agent-create-e2e-");
+    roots.push(root);
+
+    const opengoatHome = path.join(root, "opengoat-home");
+    await mkdir(opengoatHome, { recursive: true });
+    const { stubPath, stubLogPath } = await createOpenClawStub(root);
+
+    const result = await runBinary(
+      ["agent", "create", "Profile Targeted Agent"],
+      opengoatHome,
+      {
+        OPENCLAW_CMD: stubPath,
+        OPENCLAW_STUB_LOG: stubLogPath,
+        OPENCLAW_ARGUMENTS: "--profile team-a"
+      }
+    );
+
+    expect(result.code).toBe(0);
+    const calls = await readStubCalls(stubLogPath);
+    const addCallRaw = calls.find((entry) => entry[0] === "--profile");
+    expect(addCallRaw?.slice(0, 2)).toEqual(["--profile", "team-a"]);
+    const addCall = findCommandCall(calls, "agents", "add");
+    expect(addCall?.slice(0, 3)).toEqual([
+      "agents",
+      "add",
+      "profile-targeted-agent",
+    ]);
   });
 
   it("deletes an agent and syncs deletion to OpenClaw", async () => {
@@ -124,8 +156,9 @@ describe("agent create OpenClaw sync e2e", () => {
     expect(deleteResult.stdout).toContain("OpenClaw sync: openclaw (code 0)");
 
     const calls = await readStubCalls(stubLogPath);
-    expect(calls).toHaveLength(2);
-    expect(calls[1]).toEqual(
+    const deleteCall = findCommandCall(calls, "agents", "delete");
+    expect(deleteCall).toBeDefined();
+    expect(deleteCall).toEqual(
       expect.arrayContaining(["agents", "delete", "temporary-agent", "--force"])
     );
   });
@@ -150,7 +183,7 @@ describe("agent create OpenClaw sync e2e", () => {
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("OpenClaw agent creation failed");
     const calls = await readStubCalls(stubLogPath);
-    expect(calls).toHaveLength(1);
+    expect(findCommandCall(calls, "agents", "add")).toBeDefined();
   });
 
   it("still calls OpenClaw create when the local agent already exists", async () => {
@@ -184,8 +217,9 @@ describe("agent create OpenClaw sync e2e", () => {
     expect(createSecond.code).toBe(0);
     expect(createSecond.stdout).toContain("Local agent already existed; OpenClaw sync was still attempted.");
     const calls = await readStubCalls(second.stubLogPath);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toEqual(
+    const addCall = findCommandCall(calls, "agents", "add");
+    expect(addCall).toBeDefined();
+    expect(addCall).toEqual(
       expect.arrayContaining([
         "agents",
         "add",
@@ -209,6 +243,7 @@ async function createOpenClawStub(
   const safeSuffix = logName.replace(/[^a-z0-9.-]/gi, "-");
   const stubLogPath = path.join(root, safeSuffix);
   const stubPath = path.join(root, `${safeSuffix}.mjs`);
+  const managedSkillsDir = path.join(root, `${safeSuffix}-managed-skills`);
 
   await writeFile(
     stubPath,
@@ -221,11 +256,30 @@ async function createOpenClawStub(
       "  process.exit(2);",
       "}",
       "const args = process.argv.slice(2);",
+      "const normalized = normalizeArgs(args);",
       "appendFileSync(logPath, `${JSON.stringify(args)}\\n`, 'utf-8');",
+      `const managedSkillsDir = process.env.OPENCLAW_MANAGED_SKILLS_DIR || ${JSON.stringify(managedSkillsDir)};`,
+      "if (normalized[0] === 'skills' && normalized[1] === 'list' && normalized.includes('--json')) {",
+      "  process.stdout.write(JSON.stringify({ workspaceDir: '/tmp/openclaw-workspace', managedSkillsDir, skills: [] }) + '\\n');",
+      "  process.exit(0);",
+      "}",
+      "if (normalized[0] === 'agents' && normalized[1] === 'list' && normalized.includes('--json')) {",
+      "  process.stdout.write('[]\\n');",
+      "  process.exit(0);",
+      "}",
       failOnAdd
-        ? "if (args[0] === 'agents' && args[1] === 'add') { process.stderr.write('stub create failure\\n'); process.exit(1); }"
+        ? "if (normalized[0] === 'agents' && normalized[1] === 'add') { process.stderr.write('stub create failure\\n'); process.exit(1); }"
         : "",
-      "process.stdout.write('openclaw-stub-ok\\n');"
+      "process.stdout.write('openclaw-stub-ok\\n');",
+      "function normalizeArgs(input) {",
+      "  const normalized = [...input];",
+      "  while (normalized.length > 0) {",
+      "    if (normalized[0] === '--profile') { normalized.splice(0, 2); continue; }",
+      "    if (normalized[0] === '--dev' || normalized[0] === '--no-color') { normalized.splice(0, 1); continue; }",
+      "    break;",
+      "  }",
+      "  return normalized;",
+      "}"
     ].filter(Boolean).join("\n"),
     "utf-8"
   );
@@ -244,6 +298,28 @@ async function readStubCalls(stubLogPath: string): Promise<string[][]> {
     .split("\n")
     .filter(Boolean)
     .map((line) => JSON.parse(line) as string[]);
+}
+
+function findCommandCall(calls: string[][], command: string, subcommand: string): string[] | undefined {
+  return calls
+    .map((entry) => normalizeCommandArgs(entry))
+    .find((entry) => entry[0] === command && entry[1] === subcommand);
+}
+
+function normalizeCommandArgs(args: string[]): string[] {
+  const normalized = [...args];
+  while (normalized.length > 0) {
+    if (normalized[0] === "--profile") {
+      normalized.splice(0, 2);
+      continue;
+    }
+    if (normalized[0] === "--dev" || normalized[0] === "--no-color") {
+      normalized.splice(0, 1);
+      continue;
+    }
+    break;
+  }
+  return normalized;
 }
 
 async function runBinary(

@@ -31,7 +31,8 @@ describe("opengoat binary", () => {
       cwd: projectRoot,
       env: {
         ...process.env,
-        OPENGOAT_HOME: root
+        OPENGOAT_HOME: root,
+        ...buildOpenClawIsolatedEnv(root),
       }
     });
 
@@ -54,7 +55,8 @@ describe("opengoat binary", () => {
         cwd: projectRoot,
         env: {
           ...process.env,
-          OPENGOAT_HOME: root
+          OPENGOAT_HOME: root,
+          ...buildOpenClawIsolatedEnv(root),
         }
       }
     );
@@ -78,7 +80,8 @@ describe("opengoat binary", () => {
       cwd: projectRoot,
       env: {
         ...process.env,
-        OPENGOAT_HOME: root
+        OPENGOAT_HOME: root,
+        ...buildOpenClawIsolatedEnv(root),
       }
     });
 
@@ -90,3 +93,11 @@ describe("opengoat binary", () => {
     expect(config.defaultAgent).toBe("ceo");
   });
 });
+
+function buildOpenClawIsolatedEnv(root: string): NodeJS.ProcessEnv {
+  const stateDir = path.join(root, ".openclaw");
+  return {
+    OPENCLAW_STATE_DIR: stateDir,
+    OPENCLAW_CONFIG_PATH: path.join(stateDir, "openclaw.json"),
+  };
+}

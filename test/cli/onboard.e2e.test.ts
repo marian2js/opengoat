@@ -98,13 +98,16 @@ describe("onboard command e2e", () => {
 async function runBinary(args: string[], opengoatHome: string): Promise<{ code: number; stdout: string; stderr: string }> {
   const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
   const binaryPath = path.join(projectRoot, "bin", "opengoat");
+  const openClawStateDir = path.join(opengoatHome, ".openclaw");
 
   try {
     const { stdout, stderr } = await execFileAsync(binaryPath, args, {
       cwd: projectRoot,
       env: {
         ...process.env,
-        OPENGOAT_HOME: opengoatHome
+        OPENGOAT_HOME: opengoatHome,
+        OPENCLAW_STATE_DIR: openClawStateDir,
+        OPENCLAW_CONFIG_PATH: path.join(openClawStateDir, "openclaw.json")
       }
     });
     return {
