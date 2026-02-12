@@ -45,7 +45,9 @@ describe("runCli", () => {
     const code = await runCli([]);
 
     expect(code).toBe(0);
-    await expect(access(path.join(root, "config.json"), constants.F_OK)).rejects.toBeTruthy();
+    await expect(
+      access(path.join(root, "config.json"), constants.F_OK),
+    ).rejects.toBeTruthy();
   });
 
   it("bootstraps through CLI onboard command on a fresh home", async () => {
@@ -58,7 +60,9 @@ describe("runCli", () => {
 
     expect(code).toBe(0);
 
-    const config = JSON.parse(await readFile(path.join(root, "config.json"), "utf-8")) as {
+    const config = JSON.parse(
+      await readFile(path.join(root, "config.json"), "utf-8"),
+    ) as {
       defaultAgent: string;
     };
     expect(config.defaultAgent).toBe("ceo");
@@ -74,7 +78,9 @@ describe("runCli", () => {
 
     expect(code).toBe(0);
 
-    const config = JSON.parse(await readFile(path.join(root, "config.json"), "utf-8")) as {
+    const config = JSON.parse(
+      await readFile(path.join(root, "config.json"), "utf-8"),
+    ) as {
       defaultAgent: string;
     };
     expect(config.defaultAgent).toBe("ceo");
@@ -116,7 +122,13 @@ describe("runCli", () => {
     process.env.OPENGOAT_HOME = root;
     applyOpenClawIsolation(root);
 
-    const code = await runCli(["--log-level", "debug", "--log-format", "json", "init"]);
+    const code = await runCli([
+      "--log-level",
+      "debug",
+      "--log-format",
+      "json",
+      "init",
+    ]);
     expect(code).toBe(0);
   });
 
@@ -126,7 +138,14 @@ describe("runCli", () => {
     process.env.OPENGOAT_HOME = root;
     applyOpenClawIsolation(root);
 
-    const code = await runCli(["agent", "--help", "--log-level", "debug", "--log-format", "pretty"]);
+    const code = await runCli([
+      "agent",
+      "--help",
+      "--log-level",
+      "debug",
+      "--log-format",
+      "pretty",
+    ]);
     expect(code).toBe(0);
   });
 
@@ -138,11 +157,33 @@ describe("runCli", () => {
 
     const initCode = await runCli(["init"]);
     expect(initCode).toBe(0);
-    await expect(access(path.join(root, "config.json"), constants.F_OK)).resolves.toBeUndefined();
+    await expect(
+      access(path.join(root, "config.json"), constants.F_OK),
+    ).resolves.toBeUndefined();
 
     const resetCode = await runCli(["hard-reset", "--yes"]);
     expect(resetCode).toBe(0);
-    await expect(access(path.join(root, "config.json"), constants.F_OK)).rejects.toBeTruthy();
+    await expect(
+      access(path.join(root, "config.json"), constants.F_OK),
+    ).rejects.toBeTruthy();
+  });
+
+  it("supports hard-reset when OpenClaw CLI is missing", async () => {
+    const root = await createTempDir("opengoat-runcli-");
+    roots.push(root);
+    process.env.OPENGOAT_HOME = root;
+    applyOpenClawIsolation(root);
+
+    // Bootstrap first
+    const initCode = await runCli(["init"]);
+    expect(initCode).toBe(0);
+
+    // Simulate missing OpenClaw CLI
+    process.env.OPENCLAW_CMD = "this-command-does-not-exist-at-all";
+
+    const resetCode = await runCli(["hard-reset", "--yes"]);
+    expect(resetCode).toBe(0);
+    delete process.env.OPENCLAW_CMD;
   });
 });
 
