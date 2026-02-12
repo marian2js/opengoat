@@ -28,7 +28,7 @@ interface SessionSummary {
   updatedAt: number;
   transcriptPath: string;
   workspacePath: string;
-  workingPath?: string;
+  projectPath?: string;
   inputChars: number;
   outputChars: number;
   totalChars: number;
@@ -48,7 +48,7 @@ interface SessionRunInfo {
   sessionId: string;
   transcriptPath: string;
   workspacePath: string;
-  workingPath: string;
+  projectPath: string;
   isNewSession: boolean;
 }
 
@@ -161,7 +161,7 @@ describe("OpenGoat UI server API", () => {
         sessionId: isProject ? "project-session-1" : "workspace-session-1",
         transcriptPath: "/tmp/transcript.jsonl",
         workspacePath: "/tmp/workspace",
-        workingPath: options?.workingPath ?? "/tmp/opengoat",
+        projectPath: options?.projectPath ?? "/tmp/opengoat",
         isNewSession: !isProject
       };
     });
@@ -173,7 +173,7 @@ describe("OpenGoat UI server API", () => {
         updatedAt: Date.now(),
         transcriptPath: "/tmp/transcript.jsonl",
         workspacePath: "/tmp/workspace",
-        workingPath: "/tmp/opengoat",
+        projectPath: "/tmp/opengoat",
         inputChars: 0,
         outputChars: 0,
         totalChars: 0,
@@ -215,7 +215,7 @@ describe("OpenGoat UI server API", () => {
   });
 
   it("creates project session through legacy core fallback when prepareSession is unavailable", async () => {
-    const prepareRunSession = vi.fn(async (_paths: unknown, _agentId: string, request: { sessionRef?: string; workingPath?: string }): Promise<{ enabled: true; info: SessionRunInfo }> => {
+    const prepareRunSession = vi.fn(async (_paths: unknown, _agentId: string, request: { sessionRef?: string; projectPath?: string }): Promise<{ enabled: true; info: SessionRunInfo }> => {
       const sessionKey = request.sessionRef ?? "agent:ceo:main";
       const isProject = sessionKey.startsWith("project:");
       return {
@@ -226,7 +226,7 @@ describe("OpenGoat UI server API", () => {
           sessionId: isProject ? "legacy-project-session-1" : "legacy-workspace-session-1",
           transcriptPath: "/tmp/transcript.jsonl",
           workspacePath: "/tmp/workspace",
-          workingPath: request.workingPath ?? "/tmp",
+          projectPath: request.projectPath ?? "/tmp",
           isNewSession: !isProject
         }
       };
@@ -294,7 +294,7 @@ describe("OpenGoat UI server API", () => {
         sessionId: "session-2",
         transcriptPath: "/tmp/transcript-2.jsonl",
         workspacePath: "/tmp/workspace",
-        workingPath: "/tmp",
+        projectPath: "/tmp",
         isNewSession: true
       };
     });
@@ -306,7 +306,7 @@ describe("OpenGoat UI server API", () => {
         updatedAt: Date.now(),
         transcriptPath: "/tmp/transcript-2.jsonl",
         workspacePath: "/tmp/workspace",
-        workingPath: "/tmp",
+        projectPath: "/tmp",
         inputChars: 0,
         outputChars: 0,
         totalChars: 0,
@@ -328,7 +328,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/workspaces/session",
       payload: {
-        workingPath: "/tmp",
+        projectPath: "/tmp",
         workspaceName: "tmp"
       }
     });
@@ -347,7 +347,7 @@ describe("OpenGoat UI server API", () => {
         updatedAt: Date.now(),
         transcriptPath: "/tmp/transcript-1.jsonl",
         workspacePath: "/tmp/workspace",
-        workingPath: "/tmp",
+        projectPath: "/tmp",
         inputChars: 0,
         outputChars: 0,
         totalChars: 0,
@@ -451,7 +451,7 @@ describe("OpenGoat UI server API", () => {
       payload: {
         agentId: "ceo",
         sessionRef: "workspace:tmp",
-        workingPath: "/tmp",
+        projectPath: "/tmp",
         message: "hello"
       }
     });
@@ -475,7 +475,7 @@ describe("OpenGoat UI server API", () => {
       payload: {
         agentId: "ceo",
         sessionRef: "workspace:tmp",
-        workingPath: "/tmp",
+        projectPath: "/tmp",
         message: "hello alias"
       }
     });
@@ -512,7 +512,7 @@ describe("OpenGoat UI server API", () => {
       payload: {
         agentId: "ceo",
         sessionRef: "workspace:tmp",
-        workingPath: "/tmp",
+        projectPath: "/tmp",
         images: [
           {
             name: "chart.png",
@@ -877,7 +877,7 @@ function createMockService(): OpenClawUiService {
         updatedAt: Date.now(),
         transcriptPath: "/tmp/transcript.jsonl",
         workspacePath: "/tmp/workspace",
-        workingPath: "/tmp",
+        projectPath: "/tmp",
         inputChars: 0,
         outputChars: 0,
         totalChars: 0,
@@ -904,7 +904,7 @@ function createMockService(): OpenClawUiService {
         sessionId: "session-1",
         transcriptPath: "/tmp/transcript.jsonl",
         workspacePath: "/tmp/workspace",
-        workingPath: "/tmp",
+        projectPath: "/tmp",
         isNewSession: true
       };
     },

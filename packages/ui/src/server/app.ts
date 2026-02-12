@@ -59,7 +59,7 @@ interface SessionSummary {
   updatedAt: number;
   transcriptPath: string;
   workspacePath: string;
-  workingPath?: string;
+  projectPath?: string;
   inputChars: number;
   outputChars: number;
   totalChars: number;
@@ -91,7 +91,7 @@ export interface OpenClawUiService {
   listGlobalSkills: () => Promise<ResolvedSkill[]>;
   prepareSession?: (
     agentId?: string,
-    options?: { sessionRef?: string; workingPath?: string; forceNew?: boolean }
+    options?: { sessionRef?: string; projectPath?: string; forceNew?: boolean }
   ) => Promise<SessionRunInfo>;
   runAgent?: (
     agentId: string,
@@ -132,7 +132,7 @@ interface SessionRunInfo {
   sessionId: string;
   transcriptPath: string;
   workspacePath: string;
-  workingPath: string;
+  projectPath: string;
   isNewSession: boolean;
 }
 
@@ -672,7 +672,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
       const projectSessionRef = buildProjectSessionRef(project.name, project.path);
       await prepareProjectSession(service, agentId, {
         sessionRef: projectSessionRef,
-        workingPath: project.path,
+        projectPath: project.path,
         forceNew: false
       });
       await renameUiSession(service, agentId, project.name, projectSessionRef);
@@ -680,7 +680,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
       const workspaceSessionRef = buildWorkspaceSessionRef(project.name, project.path);
       const prepared = await prepareProjectSession(service, agentId, {
         sessionRef: workspaceSessionRef,
-        workingPath: project.path,
+        projectPath: project.path,
         forceNew: true
       });
       await renameUiSession(service, agentId, resolveDefaultWorkspaceSessionTitle(), workspaceSessionRef);
@@ -707,32 +707,32 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     });
   });
 
-  app.post<{ Body: { agentId?: string; workingPath?: string; workspaceName?: string } }>(
+  app.post<{ Body: { agentId?: string; projectPath?: string; workspaceName?: string } }>(
     "/api/workspaces/session",
     async (request, reply) => {
       return safeReply(reply, async () => {
         const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
-        const workingPath = request.body?.workingPath?.trim();
-        if (!workingPath) {
+        const projectPath = request.body?.projectPath?.trim();
+        if (!projectPath) {
           reply.code(400);
           return {
-            error: "workingPath is required"
+            error: "projectPath is required"
           };
         }
 
-        const resolvedWorkingPath = path.resolve(workingPath);
-        const stats = await stat(resolvedWorkingPath).catch(() => {
+        const resolvedProjectPath = path.resolve(projectPath);
+        const stats = await stat(resolvedProjectPath).catch(() => {
           return null;
         });
         if (!stats || !stats.isDirectory()) {
-          throw new Error(`Workspace path is not a directory: ${resolvedWorkingPath}`);
+          throw new Error(`Workspace path is not a directory: ${resolvedProjectPath}`);
         }
 
-        const workspaceName = request.body?.workspaceName?.trim() || path.basename(resolvedWorkingPath);
-        const sessionRef = buildWorkspaceSessionRef(workspaceName, resolvedWorkingPath);
+        const workspaceName = request.body?.workspaceName?.trim() || path.basename(resolvedProjectPath);
+        const sessionRef = buildWorkspaceSessionRef(workspaceName, resolvedProjectPath);
         const prepared = await prepareProjectSession(service, agentId, {
           sessionRef,
-          workingPath: resolvedWorkingPath,
+          projectPath: resolvedProjectPath,
           forceNew: true
         });
 
@@ -858,7 +858,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
       body?: {
         agentId?: string;
         sessionRef?: string;
-        workingPath?: string;
+        projectPath?: string;
         message?: string;
         images?: UiImageInput[];
       };
@@ -869,7 +869,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
       const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
       const sessionRef = request.body?.sessionRef?.trim();
       const message = request.body?.message?.trim();
-      const workingPath = request.body?.workingPath?.trim();
+      const projectPath = request.body?.projectPath?.trim();
       const images = normalizeUiImages(request.body?.images);
 
       if (!sessionRef) {
@@ -888,7 +888,7 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
 
       const result = await runUiSessionMessage(service, agentId, {
         sessionRef,
-        workingPath,
+        projectPath,
         message:
           message ||
           (images.length === 1
@@ -914,13 +914,13 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
   };
 
   app.post<{
-    Body: { agentId?: string; sessionRef?: string; workingPath?: string; message?: string; images?: UiImageInput[] };
+    Body: { agentId?: string; sessionRef?: string; projectPath?: string; message?: string; images?: UiImageInput[] };
   }>(
     "/api/sessions/message",
     handleSessionMessage
   );
   app.post<{
-    Body: { agentId?: string; sessionRef?: string; workingPath?: string; message?: string; images?: UiImageInput[] };
+    Body: { agentId?: string; sessionRef?: string; projectPath?: string; message?: string; images?: UiImageInput[] };
   }>(
     "/api/session/message",
     handleSessionMessage
@@ -1031,7 +1031,7 @@ async function prepareProjectSession(
   agentId: string,
   options: {
     sessionRef: string;
-    workingPath: string;
+    projectPath: string;
     forceNew: boolean;
   }
 ): Promise<SessionRunInfo> {
@@ -1046,7 +1046,7 @@ async function prepareProjectSession(
       prepareRunSession?: (
         paths: unknown,
         legacyAgentId: string,
-        request: { sessionRef?: string; forceNew?: boolean; workingPath?: string; userMessage: string }
+        request: { sessionRef?: string; forceNew?: boolean; projectPath?: string; userMessage: string }
       ) => Promise<LegacyPreparedSessionRun>;
       renameSession?: (paths: unknown, legacyAgentId: string, title: string, sessionRef?: string) => Promise<SessionSummary>;
       removeSession?: (paths: unknown, legacyAgentId: string, sessionRef?: string) => Promise<SessionRemoveResult>;
@@ -1057,7 +1057,7 @@ async function prepareProjectSession(
     const prepared = await legacy.sessionService.prepareRunSession(legacy.getPaths(), agentId, {
       sessionRef: options.sessionRef,
       forceNew: options.forceNew,
-      workingPath: options.workingPath,
+      projectPath: options.projectPath,
       userMessage: ""
     });
 
@@ -1156,7 +1156,7 @@ async function runUiSessionMessage(
   agentId: string,
   options: {
     sessionRef: string;
-    workingPath?: string;
+    projectPath?: string;
     message: string;
     images?: UiImageInput[];
   }
@@ -1165,7 +1165,7 @@ async function runUiSessionMessage(
     return service.runAgent(agentId, {
       message: options.message,
       sessionRef: options.sessionRef,
-      cwd: options.workingPath,
+      cwd: options.projectPath,
       images: options.images
     });
   }

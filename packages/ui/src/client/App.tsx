@@ -87,7 +87,7 @@ interface Session {
   updatedAt: number;
   transcriptPath: string;
   workspacePath: string;
-  workingPath?: string;
+  projectPath?: string;
   inputChars: number;
   outputChars: number;
   totalChars: number;
@@ -165,7 +165,7 @@ interface Project {
   sessionKey: string;
   sessionId: string;
   name: string;
-  workingPath: string;
+  projectPath: string;
   updatedAt: number;
 }
 
@@ -180,7 +180,7 @@ interface WorkspaceNode {
   id: string;
   name: string;
   projectSessionKey: string;
-  workingPath: string;
+  projectPath: string;
   sessions: WorkspaceSessionItem[];
   updatedAt: number;
 }
@@ -188,7 +188,7 @@ interface WorkspaceNode {
 interface AgentProjectOption {
   id: string;
   name: string;
-  workingPath: string;
+  projectPath: string;
 }
 
 interface CreateProjectResponse {
@@ -603,13 +603,13 @@ export function App(): ReactElement {
 
   const projects = useMemo<Project[]>(() => {
     return sessions
-      .filter((session) => session.sessionKey.startsWith("project:") && typeof session.workingPath === "string")
+      .filter((session) => session.sessionKey.startsWith("project:") && typeof session.projectPath === "string")
       .map((session) => {
         return {
           sessionKey: session.sessionKey,
           sessionId: session.sessionId,
           name: session.title,
-          workingPath: session.workingPath ?? "",
+          projectPath: session.projectPath ?? "",
           updatedAt: session.updatedAt
         };
       })
@@ -618,22 +618,22 @@ export function App(): ReactElement {
   const workspaceNodes = useMemo<WorkspaceNode[]>(() => {
     const sessionsByPath = new Map<string, WorkspaceSessionItem[]>();
     for (const session of sessions) {
-      const workingPath = session.workingPath?.trim();
-      if (!workingPath) {
+      const projectPath = session.projectPath?.trim();
+      if (!projectPath) {
         continue;
       }
       if (session.sessionKey.startsWith("project:")) {
         continue;
       }
 
-      const items = sessionsByPath.get(workingPath) ?? [];
+      const items = sessionsByPath.get(projectPath) ?? [];
       items.push({
         sessionId: session.sessionId,
         sessionKey: session.sessionKey,
         title: session.title,
         updatedAt: session.updatedAt
       });
-      sessionsByPath.set(workingPath, items);
+      sessionsByPath.set(projectPath, items);
     }
 
     for (const items of sessionsByPath.values()) {
@@ -646,8 +646,8 @@ export function App(): ReactElement {
           id: project.sessionId,
           name: project.name,
           projectSessionKey: project.sessionKey,
-          workingPath: project.workingPath,
-          sessions: sessionsByPath.get(project.workingPath) ?? [],
+          projectPath: project.projectPath,
+          sessions: sessionsByPath.get(project.projectPath) ?? [],
           updatedAt: project.updatedAt
         };
       })
@@ -659,7 +659,7 @@ export function App(): ReactElement {
       return workspaceNodes.map((workspace) => ({
         id: workspace.id,
         name: workspace.name,
-        workingPath: workspace.workingPath
+        projectPath: workspace.projectPath
       }));
     }
 
@@ -668,7 +668,7 @@ export function App(): ReactElement {
       {
         id: "home",
         name: "Home",
-        workingPath: homeDir
+        projectPath: homeDir
       }
     ];
   }, [workspaceNodes, state?.health.homeDir]);
@@ -722,10 +722,10 @@ export function App(): ReactElement {
       return null;
     }
 
-    const targetPath = normalizePathForComparison(selectedAgentProject.workingPath);
+    const targetPath = normalizePathForComparison(selectedAgentProject.projectPath);
     const candidates = selectedAgentSessions
       .filter((session) => {
-        return normalizePathForComparison(session.workingPath) === targetPath;
+        return normalizePathForComparison(session.projectPath) === targetPath;
       })
       .sort((left, right) => right.updatedAt - left.updatedAt);
 
@@ -737,7 +737,7 @@ export function App(): ReactElement {
       return {
         agentId: DEFAULT_AGENT_ID,
         sessionRef: selectedSession.sessionKey,
-        workingPath: selectedSession.workingPath,
+        projectPath: selectedSession.projectPath,
         chatKey: `session:${selectedSession.sessionId}`,
         historyRef: selectedSession.sessionKey
       };
@@ -746,11 +746,11 @@ export function App(): ReactElement {
     if (route.kind === "agent" && selectedAgentProject) {
       const sessionRef =
         selectedAgentWorkspaceSession?.sessionKey ??
-        buildFrontendAgentProjectSessionRef(route.agentId, selectedAgentProject.workingPath);
+        buildFrontendAgentProjectSessionRef(route.agentId, selectedAgentProject.projectPath);
       return {
         agentId: route.agentId,
         sessionRef,
-        workingPath: selectedAgentProject.workingPath,
+        projectPath: selectedAgentProject.projectPath,
         chatKey: `agent:${route.agentId}:${sessionRef}`,
         historyRef: selectedAgentWorkspaceSession?.sessionKey ?? null
       };
@@ -1151,7 +1151,7 @@ export function App(): ReactElement {
         },
         body: JSON.stringify({
           agentId: "ceo",
-          workingPath: workspace.workingPath,
+          projectPath: workspace.projectPath,
           workspaceName: workspace.name
         })
       });
@@ -1653,7 +1653,7 @@ export function App(): ReactElement {
       const payload = {
         agentId: activeChatContext.agentId,
         sessionRef: activeChatContext.sessionRef,
-        workingPath: activeChatContext.workingPath,
+        projectPath: activeChatContext.projectPath,
         message,
         images
       };
@@ -1685,7 +1685,7 @@ export function App(): ReactElement {
   async function sendSessionMessage(payload: {
     agentId: string;
     sessionRef: string;
-    workingPath?: string;
+    projectPath?: string;
     message: string;
     images?: SessionMessageImageInput[];
   }): Promise<SessionSendMessageResponse> {
@@ -1825,7 +1825,7 @@ export function App(): ReactElement {
                   >
                     <button
                       type="button"
-                      title={`${workspace.name} (${workspace.workingPath})`}
+                      title={`${workspace.name} (${workspace.projectPath})`}
                       onClick={() => {
                         setCollapsedWorkspaceIds((current) => {
                           const next = new Set(current);
@@ -3500,9 +3500,9 @@ function normalizePathForComparison(pathname: string | undefined): string {
   return pathname?.trim().replace(/[\\/]+$/, "").toLowerCase() ?? "";
 }
 
-function buildFrontendAgentProjectSessionRef(agentId: string, workingPath: string): string {
+function buildFrontendAgentProjectSessionRef(agentId: string, projectPath: string): string {
   const normalizedAgent = normalizeProjectSegment(agentId);
-  const normalizedPath = normalizeProjectSegment(workingPath);
+  const normalizedPath = normalizeProjectSegment(projectPath);
   const suffix = normalizedPath.slice(-24) || "workspace";
   return `ui-agent:${normalizedAgent}-${suffix}`;
 }

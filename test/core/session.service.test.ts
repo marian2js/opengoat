@@ -137,7 +137,7 @@ describe("SessionService", () => {
     expect(lastAction?.timestamp).toBe(expectedTimestamp);
   });
 
-  it("enforces one working path per session by rotating session id when working path changes", async () => {
+  it("enforces one project path per session by rotating session id when project path changes", async () => {
     const root = await createTempDir("opengoat-session-");
     roots.push(root);
 
@@ -148,7 +148,7 @@ describe("SessionService", () => {
     const service = createService(now);
 
     const first = await service.prepareRunSession(paths, "ceo", {
-      workingPath: "/tmp/project-a",
+      projectPath: "/tmp/project-a",
       userMessage: "first"
     });
     expect(first.enabled).toBe(true);
@@ -156,12 +156,12 @@ describe("SessionService", () => {
       throw new Error("Expected session-enabled run.");
     }
     const firstSessionId = first.info.sessionId;
-    expect(first.info.workingPath).toBe(path.resolve("/tmp/project-a"));
+    expect(first.info.projectPath).toBe(path.resolve("/tmp/project-a"));
     expect(first.info.workspacePath).toBe(path.join(paths.workspacesDir, "ceo"));
 
     now.value += 1_000;
     const second = await service.prepareRunSession(paths, "ceo", {
-      workingPath: "/tmp/project-a",
+      projectPath: "/tmp/project-a",
       userMessage: "second"
     });
     expect(second.enabled).toBe(true);
@@ -172,7 +172,7 @@ describe("SessionService", () => {
 
     now.value += 1_000;
     const third = await service.prepareRunSession(paths, "ceo", {
-      workingPath: "/tmp/project-b",
+      projectPath: "/tmp/project-b",
       userMessage: "third"
     });
     expect(third.enabled).toBe(true);
@@ -181,7 +181,7 @@ describe("SessionService", () => {
     }
     expect(third.info.isNewSession).toBe(true);
     expect(third.info.sessionId).not.toBe(firstSessionId);
-    expect(third.info.workingPath).toBe(path.resolve("/tmp/project-b"));
+    expect(third.info.projectPath).toBe(path.resolve("/tmp/project-b"));
   });
 
   it("compacts transcript history and keeps recent messages", async () => {
@@ -258,7 +258,7 @@ describe("SessionService", () => {
     expect(remaining).toHaveLength(0);
   });
 
-  it("initializes git in working path during session setup when needed", async () => {
+  it("initializes git in project path during session setup when needed", async () => {
     const root = await createTempDir("opengoat-session-");
     roots.push(root);
 
@@ -289,7 +289,7 @@ describe("SessionService", () => {
     const service = createService(now, commandRunner);
 
     const prepared = await service.prepareRunSession(paths, "ceo", {
-      workingPath: projectDir,
+      projectPath: projectDir,
       userMessage: "hello"
     });
     expect(prepared.enabled).toBe(true);

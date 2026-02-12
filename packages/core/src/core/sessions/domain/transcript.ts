@@ -8,7 +8,7 @@ export interface SessionTranscriptHeader {
   agentId: string;
   createdAt: string;
   workspacePath?: string;
-  workingPath?: string;
+  projectPath?: string;
 }
 
 export interface SessionTranscriptMessage {

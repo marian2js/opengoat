@@ -1,24 +1,34 @@
 ---
 name: board-manager
-description: Manager playbook for OpenGoat boards and tasks.
+description: Use when you need to delegate, track, or review work.
 metadata:
   version: "1.0.0"
 ---
 
 # Board Manager
 
-Use this skill when coordinating delivery through OpenGoat boards and tasks.
+Delegate and track work using a kanban board.
 
 ## Allowed Actions
 
 - Create boards.
-- Rename boards you own.
+- Manage boards you own.
 - Create tasks for yourself or your direct reportees.
-- Create tasks without specifying a board id to use your manager default board.
 - Assign tasks only to direct reportees.
 - Read board and task state.
+- If your session has an associated project, specify the path when creating tasks.
 
-## Restrictions (Enforced by Core)
+## Commands
+
+```bash
+opengoat board list --owner <agent-id>
+opengoat board show <board-id>
+opengoat task list --owner <agent-id>
+opengoat task create --owner <agent-id> --title "..." --description "..." --assign <agent-id> [--workspace <project-path>]
+opengoat task show <task-id>
+```
+
+## Restrictions
 
 - Only managers can assign tasks to other agents.
 - Managers cannot assign tasks to agents outside their direct report chain.

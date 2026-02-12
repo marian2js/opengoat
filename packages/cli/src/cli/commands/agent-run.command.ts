@@ -12,7 +12,7 @@ export const agentRunCommand: CliCommand = {
       context.stderr.write(
         "Usage: opengoat agent run <agent-id> --message <text> [--image <path>] [--session <key|id>] [--new-session|--no-session]\n"
       );
-      context.stderr.write("       [--model <model>] [--cwd <path>] [--no-stream] [-- <runtime-args>]\n");
+      context.stderr.write("       [--model <model>] [--project-path <path>] [--no-stream] [-- <runtime-args>]\n");
       return 1;
     }
 
@@ -27,7 +27,7 @@ type RunArgsResult =
       message: string;
       images: Array<{ path: string }>;
       model?: string;
-      cwd?: string;
+      projectPath?: string;
       sessionRef?: string;
       forceNewSession: boolean;
       disableSession: boolean;
@@ -53,7 +53,7 @@ function parseRunArgs(args: string[]): RunArgsResult {
   let message: string | undefined;
   let model: string | undefined;
   const images: Array<{ path: string }> = [];
-  let cwd: string | undefined;
+  let projectPath: string | undefined;
   let sessionRef: string | undefined;
   let forceNewSession = false;
   let disableSession = false;
@@ -117,12 +117,12 @@ function parseRunArgs(args: string[]): RunArgsResult {
       continue;
     }
 
-    if (token === "--cwd") {
+    if (token === "--project-path" || token === "--cwd") {
       const value = known[index + 1];
       if (!value) {
-        return { ok: false, error: "Missing value for --cwd." };
+        return { ok: false, error: `Missing value for ${token}.` };
       }
-      cwd = value.trim();
+      projectPath = value.trim();
       index += 1;
       continue;
     }
@@ -142,7 +142,7 @@ function parseRunArgs(args: string[]): RunArgsResult {
     message: message.trim(),
     images,
     model,
-    cwd,
+    projectPath,
     sessionRef,
     forceNewSession,
     disableSession,

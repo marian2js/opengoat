@@ -46,7 +46,7 @@ describe("OrchestrationService manager runtime", () => {
           sessionId: "session-1",
           transcriptPath: path.join(paths.sessionsDir, "ceo", "session-1.jsonl"),
           workspacePath: path.join(paths.workspacesDir, "ceo"),
-          workingPath: tempDir,
+          projectPath: tempDir,
           isNewSession: true
         },
         compactionApplied: false

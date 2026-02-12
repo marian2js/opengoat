@@ -605,14 +605,14 @@ export class OpenGoatService {
     agentId = DEFAULT_AGENT_ID,
     options: {
       sessionRef?: string;
-      workingPath?: string;
+      projectPath?: string;
       forceNew?: boolean;
     } = {}
   ): Promise<SessionRunInfo> {
     const paths = this.pathsProvider.getPaths();
     const prepared = await this.sessionService.prepareRunSession(paths, agentId, {
       sessionRef: options.sessionRef,
-      workingPath: options.workingPath,
+      projectPath: options.projectPath,
       forceNew: options.forceNew,
       userMessage: ""
     });

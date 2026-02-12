@@ -177,7 +177,7 @@ export class OrchestrationService {
       sessionRef: options.sessionRef,
       forceNew: options.forceNewSession,
       disableSession: options.disableSession,
-      workingPath: options.cwd,
+      projectPath: options.cwd,
       userMessage: options.message
     });
 

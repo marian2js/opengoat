@@ -46,7 +46,7 @@ export interface PrepareSessionRunRequest {
   sessionRef?: string;
   forceNew?: boolean;
   disableSession?: boolean;
-  workingPath?: string;
+  projectPath?: string;
   userMessage: string;
 }
 
@@ -110,7 +110,7 @@ export class SessionService {
 
     const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
     const workspacePath = this.pathPort.join(paths.workspacesDir, normalizedAgentId);
-    const workingPath = resolveWorkingPath(request.workingPath);
+    const projectPath = resolveProjectPath(request.projectPath);
     const config = await this.readSessionConfig(paths, normalizedAgentId);
     const store = await this.readStore(paths, normalizedAgentId);
     const sessionKey = resolveSessionKey({
@@ -121,12 +121,12 @@ export class SessionService {
     });
 
     const existingEntry = store.sessions[sessionKey];
-    if (!existingEntry || existingEntry.workingPath !== workingPath) {
-      await this.ensureWorkingPathGitRepository(workingPath);
+    if (!existingEntry || existingEntry.projectPath !== projectPath) {
+      await this.ensureProjectPathGitRepository(projectPath);
     }
     const fresh = existingEntry ? isSessionFresh(existingEntry.updatedAt, config.reset, this.nowMs()) : false;
-    const workingPathChanged = Boolean(existingEntry?.workingPath && existingEntry.workingPath !== workingPath);
-    const isNewSession = request.forceNew || !existingEntry || !fresh || workingPathChanged;
+    const projectPathChanged = Boolean(existingEntry?.projectPath && existingEntry.projectPath !== projectPath);
+    const isNewSession = request.forceNew || !existingEntry || !fresh || projectPathChanged;
     const sessionId = isNewSession ? newSessionId() : existingEntry.sessionId;
     const transcriptPath = isNewSession
       ? this.pathPort.join(resolveSessionsDir(paths, normalizedAgentId), `${sessionId}.jsonl`)
@@ -140,7 +140,7 @@ export class SessionService {
       updatedAt: this.nowMs(),
       transcriptFile: transcriptPath,
       workspacePath,
-      workingPath
+      projectPath
     };
     store.sessions[sessionKey] = nextEntry;
 
@@ -151,7 +151,7 @@ export class SessionService {
       sessionId,
       sessionKey,
       workspacePath,
-      workingPath
+      projectPath
     });
 
     const compaction = await this.compactSessionInternal({
@@ -179,7 +179,7 @@ export class SessionService {
         sessionKey,
         transcriptPath,
         workspacePath,
-        workingPath,
+        projectPath,
         isNewSession
       },
       compactionApplied: compaction.applied
@@ -440,7 +440,7 @@ export class SessionService {
     });
     const existingEntry = store.sessions[sessionKey];
     const sessionId = newSessionId();
-    const workingPath = existingEntry?.workingPath?.trim() || process.cwd();
+    const projectPath = existingEntry?.projectPath?.trim() || process.cwd();
     const transcriptPath = this.pathPort.join(resolveSessionsDir(paths, normalizedAgentId), `${sessionId}.jsonl`);
 
     store.sessions[sessionKey] = {
@@ -448,7 +448,7 @@ export class SessionService {
       updatedAt: this.nowMs(),
       transcriptFile: transcriptPath,
       workspacePath,
-      workingPath
+      projectPath
     };
 
     await this.persistStore(paths, normalizedAgentId, store);
@@ -458,7 +458,7 @@ export class SessionService {
       sessionId,
       sessionKey,
       workspacePath,
-      workingPath
+      projectPath
     });
 
     return {
@@ -467,7 +467,7 @@ export class SessionService {
       sessionKey,
       transcriptPath,
       workspacePath,
-      workingPath,
+      projectPath,
       isNewSession: true
     };
   }
@@ -527,7 +527,7 @@ export class SessionService {
       agentId: params.agentId,
       nowIso: this.nowIso(),
       workspacePath: entry.workspacePath?.trim() || this.pathPort.join(params.paths.workspacesDir, params.agentId),
-      workingPath: entry.workingPath?.trim() || process.cwd()
+      projectPath: entry.projectPath?.trim() || process.cwd()
     });
     const messages = records.filter(isSessionTranscriptMessage);
     const messageChars = messages.reduce((total, message) => total + message.content.length, 0);
@@ -627,7 +627,7 @@ export class SessionService {
       agentId: params.agentId,
       nowIso: this.nowIso(),
       workspacePath: entry.workspacePath?.trim() || this.pathPort.join(params.paths.workspacesDir, params.agentId),
-      workingPath: entry.workingPath?.trim() || process.cwd()
+      projectPath: entry.projectPath?.trim() || process.cwd()
     });
 
     const message: SessionTranscriptMessage = {
@@ -661,7 +661,7 @@ export class SessionService {
     sessionId: string;
     sessionKey: string;
     workspacePath: string;
-    workingPath: string;
+    projectPath: string;
   }): Promise<void> {
     const records = await this.readTranscriptRecords(params.transcriptPath);
     const header = ensureHeaderRecord(records, {
@@ -670,7 +670,7 @@ export class SessionService {
       agentId: params.agentId,
       nowIso: this.nowIso(),
       workspacePath: params.workspacePath,
-      workingPath: params.workingPath
+      projectPath: params.projectPath
     });
     const first = records[0];
     if (!first || !isSessionTranscriptHeader(first)) {
@@ -705,14 +705,14 @@ export class SessionService {
     if (record.schemaVersion === SESSION_STORE_SCHEMA_VERSION && isSessionEntryMap(record.sessions)) {
       return {
         schemaVersion: SESSION_STORE_SCHEMA_VERSION,
-        sessions: record.sessions
+        sessions: normalizeSessionEntries(record.sessions)
       };
     }
 
     if (isSessionEntryMap(parsed)) {
       return {
         schemaVersion: SESSION_STORE_SCHEMA_VERSION,
-        sessions: parsed
+        sessions: normalizeSessionEntries(parsed)
       };
     }
 
@@ -783,18 +783,18 @@ export class SessionService {
     return mergeSessionConfig(DEFAULT_SESSION_CONFIG, sessionConfigRaw);
   }
 
-  private async ensureWorkingPathGitRepository(workingPath: string): Promise<void> {
+  private async ensureProjectPathGitRepository(projectPath: string): Promise<void> {
     if (!this.commandRunner) {
       return;
     }
-    if (!(await this.fileSystem.exists(workingPath))) {
+    if (!(await this.fileSystem.exists(projectPath))) {
       return;
     }
     try {
       const probe = await this.commandRunner.run({
         command: "git",
         args: ["rev-parse", "--is-inside-work-tree"],
-        cwd: workingPath
+        cwd: projectPath
       });
       if (probe.code === 0) {
         return;
@@ -803,7 +803,7 @@ export class SessionService {
       await this.commandRunner.run({
         command: "git",
         args: ["init", "--quiet"],
-        cwd: workingPath
+        cwd: projectPath
       });
     } catch {
       // Git tooling might not be installed; session setup remains functional without VCS bootstrap.
@@ -824,6 +824,7 @@ function normalizeTranscriptRecord(value: unknown): SessionTranscriptRecord | nu
     agentId?: unknown;
     createdAt?: unknown;
     workspacePath?: unknown;
+    projectPath?: unknown;
     workingPath?: unknown;
     role?: unknown;
     content?: unknown;
@@ -849,7 +850,12 @@ function normalizeTranscriptRecord(value: unknown): SessionTranscriptRecord | nu
         agentId: record.agentId,
         createdAt: record.createdAt,
         workspacePath: typeof record.workspacePath === "string" ? record.workspacePath : undefined,
-        workingPath: typeof record.workingPath === "string" ? record.workingPath : undefined
+        projectPath:
+          typeof record.projectPath === "string"
+            ? record.projectPath
+            : typeof record.workingPath === "string"
+              ? record.workingPath
+              : undefined
       };
     }
     return null;
@@ -904,7 +910,7 @@ function ensureHeaderRecord(
     agentId: string;
     nowIso: string;
     workspacePath: string;
-    workingPath: string;
+    projectPath: string;
   }
 ): SessionTranscriptHeader {
   const existing = records.find(isSessionTranscriptHeader);
@@ -920,7 +926,7 @@ function ensureHeaderRecord(
     agentId: params.agentId,
     createdAt: params.nowIso,
     workspacePath: params.workspacePath,
-    workingPath: params.workingPath
+    projectPath: params.projectPath
   };
 }
 
@@ -1093,7 +1099,7 @@ function newSessionId(): string {
   return randomUUID().toLowerCase();
 }
 
-function resolveWorkingPath(input: string | undefined): string {
+function resolveProjectPath(input: string | undefined): string {
   const normalized = input?.trim();
   if (normalized) {
     return path.resolve(normalized);
@@ -1144,7 +1150,7 @@ function toSessionSummary(params: {
     workspacePath:
       params.entry.workspacePath?.trim() ||
       params.pathPort.join(params.paths.workspacesDir, params.agentId),
-    workingPath: params.entry.workingPath?.trim() || undefined,
+    projectPath: params.entry.projectPath?.trim() || undefined,
     inputChars: params.entry.inputChars ?? 0,
     outputChars: params.entry.outputChars ?? 0,
     totalChars: params.entry.totalChars ?? 0,
@@ -1167,6 +1173,7 @@ function isSessionEntryMap(value: unknown): value is Record<string, SessionEntry
       updatedAt?: unknown;
       title?: unknown;
       workspacePath?: unknown;
+      projectPath?: unknown;
       workingPath?: unknown;
     };
 
@@ -1174,6 +1181,9 @@ function isSessionEntryMap(value: unknown): value is Record<string, SessionEntry
       return false;
     }
     if (record.workspacePath !== undefined && typeof record.workspacePath !== "string") {
+      return false;
+    }
+    if (record.projectPath !== undefined && typeof record.projectPath !== "string") {
       return false;
     }
     if (record.workingPath !== undefined && typeof record.workingPath !== "string") {
@@ -1184,4 +1194,16 @@ function isSessionEntryMap(value: unknown): value is Record<string, SessionEntry
     }
     return true;
   });
+}
+
+function normalizeSessionEntries(entries: Record<string, SessionEntry>): Record<string, SessionEntry> {
+  const normalized: Record<string, SessionEntry> = {};
+  for (const [sessionKey, entry] of Object.entries(entries)) {
+    const record = entry as SessionEntry & { workingPath?: string };
+    normalized[sessionKey] = {
+      ...record,
+      projectPath: record.projectPath ?? record.workingPath
+    };
+  }
+  return normalized;
 }

@@ -101,7 +101,7 @@ describe("provider CLI commands", () => {
 
     const first = createContext({ runAgent });
     const code = await agentRunCommand.run(
-      ["ceo", "--message", "hi", "--model", "o3", "--cwd", "/tmp/project", "--", "--foo", "bar"],
+      ["ceo", "--message", "hi", "--model", "o3", "--project-path", "/tmp/project", "--", "--foo", "bar"],
       first.context
     );
 

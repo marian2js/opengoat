@@ -103,8 +103,8 @@ opengoat skill list
 
 Sessions are first-class and preserved across runs.
 
-- same session key + same working path -> same OpenClaw session id
-- same session key + different working path -> new session id (safety rotation)
+- same session key + same project path -> same OpenClaw session id
+- same session key + different project path -> new session id (safety rotation)
 
 Useful commands:
 

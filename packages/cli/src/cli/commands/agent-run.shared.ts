@@ -5,7 +5,7 @@ export interface AgentRunRequest {
   message: string;
   images?: Array<{ path: string }>;
   model?: string;
-  cwd?: string;
+  projectPath?: string;
   sessionRef?: string;
   forceNewSession?: boolean;
   disableSession?: boolean;
@@ -25,7 +25,7 @@ export async function executeAgentRun(request: AgentRunRequest, context: CliCont
       message: request.message,
       images: request.images,
       model: request.model,
-      cwd: request.cwd || process.cwd(),
+      cwd: request.projectPath || process.cwd(),
       sessionRef: request.sessionRef,
       forceNewSession: request.forceNewSession,
       disableSession: request.disableSession,

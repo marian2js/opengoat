@@ -276,7 +276,7 @@ describe("CLI commands", () => {
     expect(second.stdout.output()).toContain("agent last-action");
   });
 
-  it("agent command passes --cwd to service run options", async () => {
+  it("agent command passes --project-path to service run options", async () => {
     const runAgent = vi.fn(async () => ({
       code: 0,
       stdout: "",
@@ -287,7 +287,7 @@ describe("CLI commands", () => {
 
     const { context } = createContext({ runAgent });
     const code = await agentCommand.run(
-      ["--message", "check", "--cwd", "/tmp/project"],
+      ["--message", "check", "--project-path", "/tmp/project"],
       context
     );
 

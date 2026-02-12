@@ -29,7 +29,7 @@ type AgentArgsResult =
       message: string;
       images: Array<{ path: string }>;
       model?: string;
-      cwd?: string;
+      projectPath?: string;
       sessionRef?: string;
       forceNewSession: boolean;
       disableSession: boolean;
@@ -58,7 +58,7 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
   let message: string | undefined;
   let model: string | undefined;
   const images: Array<{ path: string }> = [];
-  let cwd: string | undefined;
+  let projectPath: string | undefined;
   let sessionRef: string | undefined;
   let forceNewSession = false;
   let disableSession = false;
@@ -122,12 +122,12 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
       continue;
     }
 
-    if (token === "--cwd") {
+    if (token === "--project-path" || token === "--cwd") {
       const value = known[index + 1];
       if (!value) {
-        return { ok: false, error: "Missing value for --cwd." };
+        return { ok: false, error: `Missing value for ${token}.` };
       }
-      cwd = value.trim();
+      projectPath = value.trim();
       index += 1;
       continue;
     }
@@ -147,7 +147,7 @@ function parseAgentArgs(args: string[]): AgentArgsResult {
     message: message.trim(),
     images,
     model,
-    cwd,
+    projectPath,
     sessionRef,
     forceNewSession,
     disableSession,
@@ -174,7 +174,7 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write(
     "  opengoat agent [agent-id] --message <text> [--image <path>] [--session <key|id>] [--new-session|--no-session]\n"
   );
-  output.write("                [--model <model>] [--cwd <path>] [--no-stream] [-- <runtime-args>]\n");
+  output.write("                [--model <model>] [--project-path <path>] [--no-stream] [-- <runtime-args>]\n");
   output.write("\n");
   output.write("Defaults:\n");
   output.write(`  agent-id defaults to ${DEFAULT_AGENT_ID}\n`);

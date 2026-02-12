@@ -274,7 +274,7 @@ describe("OpenGoatService", () => {
     expect(typeof result?.timestamp).toBe("number");
   });
 
-  it("prepares a new session for a specific working path without invoking runtime", async () => {
+  it("prepares a new session for a specific project path without invoking runtime", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -287,13 +287,13 @@ describe("OpenGoatService", () => {
 
     const prepared = await service.prepareSession("ceo", {
       sessionRef: "project:desktop-project",
-      workingPath: projectPath,
+      projectPath: projectPath,
       forceNew: true
     });
 
     expect(prepared.agentId).toBe("ceo");
     expect(prepared.sessionKey).toBe("project:desktop-project");
-    expect(prepared.workingPath).toBe(projectPath);
+    expect(prepared.projectPath).toBe(projectPath);
     expect(prepared.isNewSession).toBe(true);
     expect(provider.invocations).toHaveLength(0);
 

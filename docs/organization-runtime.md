@@ -63,7 +63,7 @@ Skills are delegated to OpenClaw.
 Session behavior:
 
 - continuity per agent/session key
-- tied to working path
+- tied to project path
 - same key + different path rotates to a new session id
 - OpenGoat session id is the OpenClaw session id for that session (1:1 mapping)
 
