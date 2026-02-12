@@ -581,9 +581,12 @@ export class AgentService {
     skippedPaths: string[],
   ): Promise<void> {
     const exists = await this.fileSystem.exists(filePath);
-    const source = exists
-      ? await this.fileSystem.readFile(filePath)
-      : this.renderDefaultSoulMarkdown(profile.agentId, profile.displayName);
+    if (!exists) {
+      skippedPaths.push(filePath);
+      return;
+    }
+
+    const source = await this.fileSystem.readFile(filePath);
     const next = upsertSoulRoleSection(source, profile);
     if (source === next) {
       skippedPaths.push(filePath);
@@ -673,13 +676,6 @@ export class AgentService {
       return renderBoardIndividualSkillMarkdown();
     }
     throw new Error(`Unsupported workspace skill id: ${skillId}`);
-  }
-
-  private renderDefaultSoulMarkdown(
-    _agentId: string,
-    displayName: string,
-  ): string {
-    return `# SOUL.md - ${displayName}\n\n`;
   }
 
   private async assertNoReportingCycle(

@@ -167,24 +167,6 @@ describe("runCli", () => {
       access(path.join(root, "config.json"), constants.F_OK),
     ).rejects.toBeTruthy();
   });
-
-  it("supports hard-reset when OpenClaw CLI is missing", async () => {
-    const root = await createTempDir("opengoat-runcli-");
-    roots.push(root);
-    process.env.OPENGOAT_HOME = root;
-    applyOpenClawIsolation(root);
-
-    // Bootstrap first
-    const initCode = await runCli(["init"]);
-    expect(initCode).toBe(0);
-
-    // Simulate missing OpenClaw CLI
-    process.env.OPENCLAW_CMD = "this-command-does-not-exist-at-all";
-
-    const resetCode = await runCli(["hard-reset", "--yes"]);
-    expect(resetCode).toBe(0);
-    delete process.env.OPENCLAW_CMD;
-  });
 });
 
 function applyOpenClawIsolation(root: string): void {

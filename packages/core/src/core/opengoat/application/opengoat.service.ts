@@ -259,12 +259,16 @@ export class OpenGoatService {
           deletedOpenClawAgents.push(agentId);
           continue;
         }
+        const failureReason = deleted.stderr.trim() || deleted.stdout.trim();
+        if (!failureReason) {
+          warnings.push(
+            `OpenClaw delete for "${agentId}" failed with code ${deleted.code}.`,
+          );
+          continue;
+        }
         failedOpenClawAgents.push({
           agentId,
-          reason:
-            deleted.stderr.trim() ||
-            deleted.stdout.trim() ||
-            `OpenClaw delete failed with code ${deleted.code}.`,
+          reason: failureReason,
         });
       } catch (error) {
         if (error instanceof ProviderCommandNotFoundError) {
