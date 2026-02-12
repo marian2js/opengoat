@@ -7,7 +7,7 @@ export interface AgentDelegationMetadata {
 
 export type AgentType = "manager" | "individual";
 
-export const MANAGER_SKILL_ID = "manager";
+export const BOARD_MANAGER_SKILL_ID = "board-manager";
 
 export interface AgentManifestMetadata {
   id: string;
@@ -36,7 +36,7 @@ export function isDiscoverableByManager(manifest: AgentManifest): boolean {
 }
 
 export function hasManagerSkill(skills: string[]): boolean {
-  return skills.some((skill) => sanitizeId(skill) === MANAGER_SKILL_ID);
+  return skills.some((skill) => sanitizeId(skill) === BOARD_MANAGER_SKILL_ID);
 }
 
 export function isManagerAgent(manifest: AgentManifest): boolean {
@@ -205,7 +205,7 @@ export function normalizeAgentManifestMetadata(params: {
   const normalizedSkills = dedupe((metadata.skills ?? []).map((skill) => sanitizeId(skill)).filter(Boolean));
   const skills =
     inferredType === "manager" && !hasManagerSkill(normalizedSkills)
-      ? dedupe([MANAGER_SKILL_ID, ...normalizedSkills])
+      ? dedupe([BOARD_MANAGER_SKILL_ID, ...normalizedSkills])
       : normalizedSkills;
   const delegation = {
     canReceive: metadata.delegation?.canReceive ?? true,

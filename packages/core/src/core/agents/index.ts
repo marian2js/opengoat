@@ -2,7 +2,7 @@ export { AgentService } from "./application/agent.service.js";
 export { AgentManifestService } from "./application/agent-manifest.service.js";
 export type { AgentManifest, AgentManifestMetadata } from "./domain/agent-manifest.js";
 export {
-  MANAGER_SKILL_ID,
+  BOARD_MANAGER_SKILL_ID,
   hasManagerSkill,
   isManagerAgent,
   isDiscoverableByManager,

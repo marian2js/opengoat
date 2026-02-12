@@ -30,7 +30,7 @@ export class RoutingService {
         entryAgentId,
         targetAgentId: entryAgentId,
         confidence: 1,
-        reason: "Entry agent is not a manager (missing manager skill).",
+        reason: "Entry agent is not a manager (missing board-manager skill).",
         rewrittenMessage: message,
         candidates: []
       };

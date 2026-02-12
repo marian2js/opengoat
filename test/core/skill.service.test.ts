@@ -166,7 +166,7 @@ describe("SkillService", () => {
 
     await service.installSkill(paths, {
       agentId: "ceo",
-      skillName: "manager",
+      skillName: "board-manager",
       description: "Manager role skill"
     });
 
@@ -175,7 +175,7 @@ describe("SkillService", () => {
       runtime?: { skills?: { assigned?: string[] } };
     };
     expect(managerConfig.organization?.type).toBe("manager");
-    expect(managerConfig.runtime?.skills?.assigned).toEqual(["manager", "board-manager"]);
+    expect(managerConfig.runtime?.skills?.assigned).toEqual(["board-manager"]);
 
     await service.installSkill(paths, {
       agentId: "ceo",

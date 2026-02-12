@@ -187,7 +187,7 @@ export class OpenGoatService {
         {
           type: "manager",
           reportsTo: null,
-          skills: ["manager"],
+          skills: ["board-manager"],
           role: "Head of Organization"
         }
       );

@@ -37,6 +37,6 @@ describe("default templates", () => {
     expect(internalConfig.organization.reportsTo).toBeNull();
     expect(internalConfig.runtime.adapter).toBe("openclaw");
     expect(internalConfig.runtime.sessions.mainKey).toBe("main");
-    expect(internalConfig.runtime.skills.assigned).toEqual(["manager", "board-manager"]);
+    expect(internalConfig.runtime.skills.assigned).toEqual(["board-manager"]);
   });
 });

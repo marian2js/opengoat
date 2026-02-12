@@ -158,8 +158,8 @@ function printHelp(output: NodeJS.WritableStream): void {
 
 function dedupeSkills(type: "manager" | "individual" | undefined, input: string[]): string[] | undefined {
   const merged = [...input];
-  if (type === "manager" && !merged.includes("manager")) {
-    merged.push("manager");
+  if (type === "manager" && !merged.includes("board-manager")) {
+    merged.push("board-manager");
   }
   if (merged.length === 0) {
     return undefined;

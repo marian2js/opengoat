@@ -17,7 +17,7 @@ OpenGoat keeps your org structure as source-of-truth and syncs agent lifecycle t
 
 - Organization-first: model managers and reportees with clear hierarchy.
 - OpenClaw-native: every OpenGoat agent maps 1:1 to an OpenClaw agent.
-- Skill-driven behavior: coordination lives in skills (for example, `manager`), not hardcoded orchestration loops.
+- Skill-driven behavior: coordination lives in skills (for example, `board-manager`), not hardcoded orchestration loops.
 - Session continuity: each OpenGoat session maps 1:1 to one OpenClaw session id.
 
 ## What You Get
@@ -64,7 +64,7 @@ opengoat onboard --external \
 
 ```bash
 # Create roles
-opengoat agent create "CTO" --manager --reports-to ceo --skill manager
+opengoat agent create "CTO" --manager --reports-to ceo --skill board-manager
 opengoat agent create "Engineer" --individual --reports-to cto --skill coding
 
 # If --reports-to is omitted, it defaults to ceo
@@ -86,7 +86,7 @@ Skills are owned by OpenClaw (bundled + `~/.openclaw/skills` + workspace-local `
 
 On bootstrap, OpenGoat pre-installs role skills in agent workspaces:
 
-- managers: `manager`, `board-manager`
+- managers: `board-manager`
 - individuals: `board-individual`
 
 For `ceo`, this is written under `workspaces/ceo/skills/`.
@@ -94,7 +94,7 @@ For `ceo`, this is written under `workspaces/ceo/skills/`.
 OpenGoat keeps per-agent skill assignment metadata and includes compatibility install/list commands:
 
 ```bash
-opengoat skill install manager --from /path/to/skill
+opengoat skill install board-manager --from /path/to/skill
 opengoat skill install jira-tools --from /path/to/skill
 opengoat skill list
 ```

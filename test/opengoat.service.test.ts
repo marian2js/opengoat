@@ -211,15 +211,14 @@ describe("OpenGoatService", () => {
 
     const agentsMarkdown = await readFile(path.join(ceoWorkspace, "AGENTS.md"), "utf-8");
     const soulMarkdown = await readFile(path.join(ceoWorkspace, "SOUL.md"), "utf-8");
-    const managerSkillMarkdown = await readFile(path.join(ceoWorkspace, "skills", "manager", "SKILL.md"), "utf-8");
     const boardManagerSkillMarkdown = await readFile(
       path.join(ceoWorkspace, "skills", "board-manager", "SKILL.md"),
       "utf-8"
     );
     expect(agentsMarkdown).toContain("OpenGoat CEO Workspace");
     expect(soulMarkdown).toContain("You are `ceo`, the OpenGoat head manager.");
-    expect(managerSkillMarkdown).toContain("name: manager");
     expect(boardManagerSkillMarkdown).toContain("name: board-manager");
+    await expect(access(path.join(ceoWorkspace, "skills", "manager", "SKILL.md"), constants.F_OK)).rejects.toBeTruthy();
   });
 
   it("updates who an agent reports to", async () => {
@@ -246,7 +245,7 @@ describe("OpenGoatService", () => {
 
     await service.installSkill({
       agentId: "engineer",
-      skillName: "manager",
+      skillName: "board-manager",
       description: "Promote to manager"
     });
 

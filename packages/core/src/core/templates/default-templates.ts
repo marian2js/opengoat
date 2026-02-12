@@ -13,7 +13,7 @@ export interface AgentTemplateOptions {
 }
 
 const ROLE_SKILLS: Record<"manager" | "individual", string[]> = {
-  manager: ["manager", "board-manager"],
+  manager: ["board-manager"],
   individual: ["board-individual"]
 };
 
@@ -40,10 +40,6 @@ export function renderCeoAgentsMarkdown(): string {
 
 export function renderCeoSoulMarkdown(): string {
   return readMarkdownTemplate("ceo/SOUL.md");
-}
-
-export function renderManagerSkillMarkdown(): string {
-  return readMarkdownTemplate("ceo/skills/manager/SKILL.md");
 }
 
 export function renderBoardManagerSkillMarkdown(): string {

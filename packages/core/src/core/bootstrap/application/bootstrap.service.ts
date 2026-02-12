@@ -52,7 +52,7 @@ export class BootstrapService {
     const agentResult = await this.agentService.ensureAgent(paths, ceo, {
       type: "manager",
       reportsTo: null,
-      skills: ["manager"],
+      skills: ["board-manager"],
       role: "Head of Organization"
     });
     const workspaceBootstrapResult = await this.agentService.ensureCeoWorkspaceBootstrap(paths);

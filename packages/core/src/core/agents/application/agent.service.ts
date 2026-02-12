@@ -14,7 +14,6 @@ import {
   renderBoardManagerSkillMarkdown,
   renderAgentsIndex,
   renderCeoAgentsMarkdown,
-  renderManagerSkillMarkdown,
   renderCeoSoulMarkdown,
   renderInternalAgentConfig,
   resolveAgentRole,
@@ -484,9 +483,6 @@ export class AgentService {
   }
 
   private renderWorkspaceSkill(skillId: string): string {
-    if (skillId === "manager") {
-      return renderManagerSkillMarkdown();
-    }
     if (skillId === "board-manager") {
       return renderBoardManagerSkillMarkdown();
     }
@@ -543,7 +539,7 @@ export class AgentService {
   }
 }
 
-const MANAGER_ROLE_SKILLS = ["manager", "board-manager"];
+const MANAGER_ROLE_SKILLS = ["board-manager"];
 const INDIVIDUAL_ROLE_SKILLS = ["board-individual"];
 
 function toAgentTemplateOptions(agentId: string, options: EnsureAgentOptions): AgentTemplateOptions {

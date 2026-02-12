@@ -7,7 +7,7 @@ This document describes the current organization-first runtime model.
 - all OpenGoat agents are OpenClaw agents
 - `ceo` is the default manager (head/CEO)
 - hierarchy is explicit in agent metadata
-- manager behavior is skill-driven (`manager` skill)
+- manager behavior is skill-driven (`board-manager` skill)
 - OpenClaw owns workspace bootstrap semantics; OpenGoat pre-seeds `ceo` `AGENTS.md` + `SOUL.md` and removes `BOOTSTRAP.md`
 - every manager has a default board; if a manager creates a task without an explicit board id, OpenGoat routes it to that default board
 - default manager boards cannot be deleted
@@ -53,9 +53,9 @@ Skills are delegated to OpenClaw.
 
 - OpenClaw loads bundled skills, managed skills (`~/.openclaw/skills`), and workspace-local `skills/`
 - OpenGoat stores per-agent skill assignment metadata
-- manager capability is represented by assigned `manager` skill
+- manager capability is represented by assigned `board-manager` skill
 - role skills are workspace-installed and assignment-synced:
-  - managers: `manager`, `board-manager`
+  - managers: `board-manager`
   - individuals: `board-individual`
 
 ## Sessions

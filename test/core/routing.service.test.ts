@@ -72,7 +72,7 @@ function createManifests(): AgentManifest[] {
         reportsTo: null,
         discoverable: true,
         tags: ["management", "routing"],
-        skills: ["manager"],
+        skills: ["board-manager"],
         delegation: { canReceive: true, canDelegate: true },
         priority: 100
       }
