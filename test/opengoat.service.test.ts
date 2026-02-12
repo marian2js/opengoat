@@ -192,6 +192,66 @@ describe("OpenGoatService", () => {
     expect(ctoBoards).toHaveLength(1);
   });
 
+  it("repairs stale OpenClaw ceo workspace mapping during initialize", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const commandRunner = new FakeCommandRunner(async (request) => {
+      if (
+        request.args[0] === "skills" &&
+        request.args[1] === "list" &&
+        request.args.includes("--json")
+      ) {
+        return {
+          code: 0,
+          stdout: JSON.stringify({
+            workspaceDir: path.join(root, "openclaw-workspace"),
+            managedSkillsDir: path.join(root, "openclaw-managed-skills"),
+            skills: [],
+          }),
+          stderr: "",
+        };
+      }
+      if (
+        request.args[0] === "agents" &&
+        request.args[1] === "list" &&
+        request.args.includes("--json")
+      ) {
+        return {
+          code: 0,
+          stdout: JSON.stringify([
+            {
+              id: "ceo",
+              workspace: path.join(root, "stale", "workspaces", "ceo"),
+              agentDir: path.join(root, "stale", "agents", "ceo"),
+            },
+          ]),
+          stderr: "",
+        };
+      }
+      return {
+        code: 0,
+        stdout: "",
+        stderr: "",
+      };
+    });
+
+    const { service, provider } = createService(
+      root,
+      new FakeOpenClawProvider(),
+      commandRunner,
+    );
+    await service.setOpenClawGatewayConfig({ mode: "local" });
+    await service.initialize();
+
+    expect(
+      provider.deletedAgents.some((entry) => entry.agentId === "ceo"),
+    ).toBe(true);
+    expect(
+      provider.createdAgents.filter((entry) => entry.agentId === "ceo").length,
+    ).toBeGreaterThanOrEqual(2);
+  });
+
   it("syncs OpenClaw role skills for the created agent and its manager", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);

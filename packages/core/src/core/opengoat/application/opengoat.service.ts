@@ -1008,6 +1008,11 @@ export class OpenGoatService {
     const initialization = await this.bootstrapService.initialize();
     const paths = this.pathsProvider.getPaths();
     await this.boardService.ensureDefaultBoardsForManagers(paths);
+    try {
+      await this.syncRuntimeDefaults();
+    } catch {
+      // Startup remains functional even if OpenClaw CLI/runtime is unavailable.
+    }
     return initialization;
   }
 
