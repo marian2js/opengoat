@@ -107,7 +107,9 @@ Session invariants:
 
 - session binds to agent + session key/id + project path
 - if the same session key is reused with a different path, OpenGoat rotates to a new session id
+- if a follow-up run omits project path, OpenGoat reuses the stored project path for that session key
 - OpenGoat reuses that same session id as OpenClaw `--session-id` for every run in the session
+- runtime invocation reuses session project path for cwd and injects project context when workspace and project paths differ
 
 Storage:
 

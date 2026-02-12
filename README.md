@@ -108,6 +108,7 @@ Sessions are first-class and preserved across runs.
 
 - same session key + same project path -> same OpenClaw session id
 - same session key + different project path -> new session id (safety rotation)
+- when a follow-up run omits `--project-path`, OpenGoat reuses the stored project path for that session key
 
 Useful commands:
 

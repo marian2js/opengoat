@@ -110,7 +110,6 @@ export class SessionService {
 
     const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
     const workspacePath = this.pathPort.join(paths.workspacesDir, normalizedAgentId);
-    const projectPath = resolveProjectPath(request.projectPath);
     const config = await this.readSessionConfig(paths, normalizedAgentId);
     const store = await this.readStore(paths, normalizedAgentId);
     const sessionKey = resolveSessionKey({
@@ -121,11 +120,13 @@ export class SessionService {
     });
 
     const existingEntry = store.sessions[sessionKey];
-    if (!existingEntry || existingEntry.projectPath !== projectPath) {
+    const existingProjectPath = resolveStoredProjectPath(existingEntry?.projectPath);
+    const projectPath = resolveProjectPath(request.projectPath, existingProjectPath);
+    if (!existingEntry || existingProjectPath !== projectPath) {
       await this.ensureProjectPathGitRepository(projectPath);
     }
     const fresh = existingEntry ? isSessionFresh(existingEntry.updatedAt, config.reset, this.nowMs()) : false;
-    const projectPathChanged = Boolean(existingEntry?.projectPath && existingEntry.projectPath !== projectPath);
+    const projectPathChanged = Boolean(existingProjectPath && existingProjectPath !== projectPath);
     const isNewSession = request.forceNew || !existingEntry || !fresh || projectPathChanged;
     const sessionId = isNewSession ? newSessionId() : existingEntry.sessionId;
     const transcriptPath = isNewSession
@@ -1099,12 +1100,24 @@ function newSessionId(): string {
   return randomUUID().toLowerCase();
 }
 
-function resolveProjectPath(input: string | undefined): string {
+function resolveProjectPath(input: string | undefined, fallback?: string): string {
   const normalized = input?.trim();
   if (normalized) {
     return path.resolve(normalized);
   }
+  const fallbackPath = resolveStoredProjectPath(fallback);
+  if (fallbackPath) {
+    return fallbackPath;
+  }
   return process.cwd();
+}
+
+function resolveStoredProjectPath(input: string | undefined): string | undefined {
+  const normalized = input?.trim();
+  if (!normalized) {
+    return undefined;
+  }
+  return path.resolve(normalized);
 }
 
 function normalizeSessionTitle(input: string): string {
