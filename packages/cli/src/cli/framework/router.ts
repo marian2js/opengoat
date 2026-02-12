@@ -44,8 +44,10 @@ export class CommandRouter {
     });
 
     for (const command of sorted) {
-      const path = command.path.join(" ").padEnd(20, " ");
-      this.context.stdout.write(`  ${path}${command.description}\n`);
+      const path = command.path.join(" ");
+      const paddedPath = path.padEnd(20, " ");
+      const separator = paddedPath.endsWith(" ") ? "" : " ";
+      this.context.stdout.write(`  ${paddedPath}${separator}${command.description}\n`);
     }
   }
 }

@@ -5,8 +5,11 @@ import { acpCommand } from "./commands/acp.command.js";
 import { agentCommand } from "./commands/agent.command.js";
 import { agentCreateCommand } from "./commands/agent-create.command.js";
 import { agentDeleteCommand } from "./commands/agent-delete.command.js";
+import { agentDirectReporteesCommand } from "./commands/agent-direct-reportees.command.js";
 import { agentListCommand } from "./commands/agent-list.command.js";
 import { agentLastActionCommand } from "./commands/agent-last-action.command.js";
+import { agentAllReporteesCommand } from "./commands/agent-all-reportees.command.js";
+import { agentInfoCommand } from "./commands/agent-info.command.js";
 import { agentProviderGetCommand } from "./commands/agent-provider-get.command.js";
 import { agentProviderSetCommand } from "./commands/agent-provider-set.command.js";
 import { agentRunCommand } from "./commands/agent-run.command.js";
@@ -70,6 +73,9 @@ export async function runCli(argv: string[]): Promise<number> {
       agentCreateCommand,
       agentDeleteCommand,
       agentSetManagerCommand,
+      agentDirectReporteesCommand,
+      agentAllReporteesCommand,
+      agentInfoCommand,
       agentProviderGetCommand,
       agentProviderSetCommand,
       agentListCommand,

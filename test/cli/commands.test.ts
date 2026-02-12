@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { agentCommand } from "../../packages/cli/src/cli/commands/agent.command.js";
 import { agentCreateCommand } from "../../packages/cli/src/cli/commands/agent-create.command.js";
 import { agentDeleteCommand } from "../../packages/cli/src/cli/commands/agent-delete.command.js";
+import { agentInfoCommand } from "../../packages/cli/src/cli/commands/agent-info.command.js";
 import { agentLastActionCommand } from "../../packages/cli/src/cli/commands/agent-last-action.command.js";
 import { agentListCommand } from "../../packages/cli/src/cli/commands/agent-list.command.js";
+import { agentAllReporteesCommand } from "../../packages/cli/src/cli/commands/agent-all-reportees.command.js";
+import { agentDirectReporteesCommand } from "../../packages/cli/src/cli/commands/agent-direct-reportees.command.js";
 import { agentSetManagerCommand } from "../../packages/cli/src/cli/commands/agent-set-manager.command.js";
 import { initCommand } from "../../packages/cli/src/cli/commands/init.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
@@ -207,6 +210,72 @@ describe("CLI commands", () => {
     expect(stdout.output()).toContain("Current reports-to: cto");
   });
 
+  it("agent info validates usage and prints organization details", async () => {
+    const invalid = createContext({ getAgentInfo: vi.fn() });
+    const invalidCode = await agentInfoCommand.run([], invalid.context);
+    expect(invalidCode).toBe(1);
+    expect(invalid.stderr.output()).toContain("Usage: opengoat agent info");
+
+    const getAgentInfo = vi.fn(async () => ({
+      id: "ceo",
+      name: "CEO",
+      role: "Head of Organization",
+      totalReportees: 3,
+      directReportees: [
+        {
+          id: "cto",
+          name: "CTO",
+          role: "Chief Technology Officer",
+          totalReportees: 1
+        },
+        {
+          id: "qa",
+          name: "QA",
+          role: "QA Engineer",
+          totalReportees: 0
+        }
+      ]
+    }));
+    const valid = createContext({ getAgentInfo });
+    const validCode = await agentInfoCommand.run(["ceo"], valid.context);
+    expect(validCode).toBe(0);
+    expect(getAgentInfo).toHaveBeenCalledWith("ceo");
+    expect(valid.stdout.output()).toContain("id: ceo");
+    expect(valid.stdout.output()).toContain("name: CEO");
+    expect(valid.stdout.output()).toContain("role: Head of Organization");
+    expect(valid.stdout.output()).toContain("total reportees: 3");
+    expect(valid.stdout.output()).toContain('direct reportees:\n- {id: "cto", name: "CTO"');
+    expect(valid.stdout.output()).toContain('total reportees: 0}');
+  });
+
+  it("agent direct-reportees validates usage and prints one id per line", async () => {
+    const invalid = createContext({ listDirectReportees: vi.fn() });
+    const invalidCode = await agentDirectReporteesCommand.run([], invalid.context);
+    expect(invalidCode).toBe(1);
+    expect(invalid.stderr.output()).toContain("Usage: opengoat agent direct-reportees");
+
+    const listDirectReportees = vi.fn(async () => ["cto", "qa"]);
+    const valid = createContext({ listDirectReportees });
+    const validCode = await agentDirectReporteesCommand.run(["ceo"], valid.context);
+    expect(validCode).toBe(0);
+    expect(listDirectReportees).toHaveBeenCalledWith("ceo");
+    expect(valid.stdout.output()).toBe("cto\nqa\n");
+  });
+
+  it("agent all-reportees validates usage and prints one id per line", async () => {
+    const invalid = createContext({ listAllReportees: vi.fn() });
+    const invalidCode = await agentAllReporteesCommand.run([], invalid.context);
+    expect(invalidCode).toBe(1);
+    expect(invalid.stderr.output()).toContain("Usage: opengoat agent all-reportees");
+
+    const listAllReportees = vi.fn(async () => ["cto", "engineer", "qa"]);
+    const valid = createContext({ listAllReportees });
+    const validCode = await agentAllReporteesCommand.run(["ceo"], valid.context);
+    expect(validCode).toBe(0);
+    expect(listAllReportees).toHaveBeenCalledWith("ceo");
+    expect(valid.stdout.output()).toBe("cto\nengineer\nqa\n");
+  });
+
   it("agent list prints empty state and rows", async () => {
     const listAgents = vi
       .fn()
@@ -274,6 +343,9 @@ describe("CLI commands", () => {
     expect(second.stdout.output()).toContain("opengoat agent [agent-id]");
     expect(second.stdout.output()).toContain("agent-id defaults to ceo");
     expect(second.stdout.output()).toContain("agent last-action");
+    expect(second.stdout.output()).toContain("agent info");
+    expect(second.stdout.output()).toContain("agent direct-reportees");
+    expect(second.stdout.output()).toContain("agent all-reportees");
   });
 
   it("agent command passes --project-path to service run options", async () => {

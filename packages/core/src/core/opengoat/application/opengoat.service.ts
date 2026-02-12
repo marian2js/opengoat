@@ -1,5 +1,7 @@
 import type {
+  AgentInfo,
   AgentManagerUpdateResult,
+  AgentReporteeSummary,
   AgentCreationResult,
   AgentDeletionResult,
   AgentDescriptor,
@@ -338,6 +340,78 @@ export class OpenGoatService {
   public async listAgents(): Promise<AgentDescriptor[]> {
     const paths = this.pathsProvider.getPaths();
     return this.agentService.listAgents(paths);
+  }
+
+  public async listDirectReportees(rawAgentId: string): Promise<string[]> {
+    const agentId = normalizeAgentId(rawAgentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const paths = this.pathsProvider.getPaths();
+    const manifests = await this.agentManifestService.listManifests(paths);
+    assertAgentExists(manifests, agentId);
+
+    return manifests
+      .filter((manifest) => manifest.metadata.reportsTo === agentId)
+      .map((manifest) => manifest.agentId)
+      .sort((left, right) => left.localeCompare(right));
+  }
+
+  public async listAllReportees(rawAgentId: string): Promise<string[]> {
+    const agentId = normalizeAgentId(rawAgentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const paths = this.pathsProvider.getPaths();
+    const manifests = await this.agentManifestService.listManifests(paths);
+    assertAgentExists(manifests, agentId);
+
+    return collectAllReportees(manifests, agentId);
+  }
+
+  public async getAgentInfo(rawAgentId: string): Promise<AgentInfo> {
+    const agentId = normalizeAgentId(rawAgentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const paths = this.pathsProvider.getPaths();
+    const [agents, manifests] = await Promise.all([
+      this.agentService.listAgents(paths),
+      this.agentManifestService.listManifests(paths)
+    ]);
+
+    const descriptorsById = new Map(agents.map((agent) => [agent.id, agent]));
+    const agent = descriptorsById.get(agentId);
+    if (!agent) {
+      throw new Error(`Agent "${agentId}" does not exist.`);
+    }
+
+    const totalReportees = collectAllReportees(manifests, agentId).length;
+    const directReportees: AgentReporteeSummary[] = manifests
+      .filter((manifest) => manifest.metadata.reportsTo === agentId)
+      .map((manifest) => {
+        const descriptor = descriptorsById.get(manifest.agentId);
+        const name = descriptor?.displayName?.trim() || manifest.metadata.name || manifest.agentId;
+        const role = descriptor?.role?.trim() || manifest.metadata.description || "Agent";
+        return {
+          id: manifest.agentId,
+          name,
+          role,
+          totalReportees: collectAllReportees(manifests, manifest.agentId).length
+        };
+      })
+      .sort((left, right) => left.id.localeCompare(right.id));
+
+    return {
+      id: agent.id,
+      name: agent.displayName,
+      role: agent.role,
+      totalReportees,
+      directReportees
+    };
   }
 
   public listProviders(): Promise<ProviderSummary[]> {
@@ -875,4 +949,44 @@ function buildInactiveAgentMessage(params: {
     `Manager: @${params.managerAgentId}`,
     "Please check in and unblock progress."
   ].join("\n");
+}
+
+type AgentReportNode = {
+  agentId: string;
+  metadata: {
+    reportsTo: string | null;
+  };
+};
+
+function assertAgentExists(manifests: AgentReportNode[], agentId: string): void {
+  if (manifests.some((manifest) => manifest.agentId === agentId)) {
+    return;
+  }
+  throw new Error(`Agent "${agentId}" does not exist.`);
+}
+
+function collectAllReportees(manifests: AgentReportNode[], managerAgentId: string): string[] {
+  const byManager = new Map<string, string[]>();
+  for (const manifest of manifests) {
+    const reportsTo = manifest.metadata.reportsTo;
+    if (!reportsTo) {
+      continue;
+    }
+    const reportees = byManager.get(reportsTo) ?? [];
+    reportees.push(manifest.agentId);
+    byManager.set(reportsTo, reportees);
+  }
+
+  const visited = new Set<string>();
+  const queue = [...(byManager.get(managerAgentId) ?? [])];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || current === managerAgentId || visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+    queue.push(...(byManager.get(current) ?? []));
+  }
+
+  return [...visited].sort((left, right) => left.localeCompare(right));
 }

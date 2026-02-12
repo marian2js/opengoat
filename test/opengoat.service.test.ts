@@ -76,6 +76,58 @@ describe("OpenGoatService", () => {
     expect(agents.find((agent) => agent.id === "research-analyst")?.role).toBe("Developer");
   });
 
+  it("lists direct and recursive reportees", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("CTO", { type: "manager", reportsTo: "ceo" });
+    await service.createAgent("QA", { type: "individual", reportsTo: "ceo" });
+    await service.createAgent("Engineer", { type: "individual", reportsTo: "cto" });
+    await service.createAgent("Intern", { type: "individual", reportsTo: "engineer" });
+
+    const direct = await service.listDirectReportees("ceo");
+    expect(direct).toEqual(["cto", "qa"]);
+
+    const all = await service.listAllReportees("ceo");
+    expect(all).toEqual(["cto", "engineer", "intern", "qa"]);
+
+    await expect(service.listDirectReportees("missing")).rejects.toThrow('Agent "missing" does not exist.');
+    await expect(service.listAllReportees("missing")).rejects.toThrow('Agent "missing" does not exist.');
+  });
+
+  it("returns agent info with direct reportees and totals", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("CTO", { type: "manager", reportsTo: "ceo", role: "Chief Technology Officer" });
+    await service.createAgent("QA", { type: "individual", reportsTo: "ceo", role: "QA Engineer" });
+    await service.createAgent("Engineer", { type: "individual", reportsTo: "cto", role: "Software Engineer" });
+
+    const info = await service.getAgentInfo("ceo");
+    expect(info.id).toBe("ceo");
+    expect(info.name).toBe("CEO");
+    expect(info.role).toBe("Head of Organization");
+    expect(info.totalReportees).toBe(3);
+    expect(info.directReportees).toEqual([
+      {
+        id: "cto",
+        name: "CTO",
+        role: "Chief Technology Officer",
+        totalReportees: 1
+      },
+      {
+        id: "qa",
+        name: "QA",
+        role: "QA Engineer",
+        totalReportees: 0
+      }
+    ]);
+  });
+
   it("creates a default board when creating a manager agent", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);

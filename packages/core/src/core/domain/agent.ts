@@ -37,6 +37,21 @@ export interface AgentManagerUpdateResult {
   updatedPaths: string[];
 }
 
+export interface AgentReporteeSummary {
+  id: string;
+  name: string;
+  role: string;
+  totalReportees: number;
+}
+
+export interface AgentInfo {
+  id: string;
+  name: string;
+  role: string;
+  totalReportees: number;
+  directReportees: AgentReporteeSummary[];
+}
+
 export interface AgentDeletionResult {
   agentId: string;
   existed: boolean;
