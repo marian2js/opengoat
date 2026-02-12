@@ -76,6 +76,7 @@ interface OpenGoatServiceDeps {
 }
 
 const OPENCLAW_PROVIDER_ID = "openclaw";
+const OPENCLAW_DEFAULT_AGENT_ID = "main";
 
 export interface RuntimeDefaultsSyncResult {
   ceoSyncCode?: number;
@@ -102,6 +103,18 @@ export interface TaskCronRunResult {
   sent: number;
   failed: number;
   dispatches: TaskCronDispatchResult[];
+}
+
+export interface HardResetResult {
+  homeDir: string;
+  homeRemoved: boolean;
+  deletedOpenClawAgents: string[];
+  failedOpenClawAgents: Array<{
+    agentId: string;
+    reason: string;
+  }>;
+  removedOpenClawManagedSkillDirs: string[];
+  warnings: string[];
 }
 
 export class OpenGoatService {
@@ -186,6 +199,101 @@ export class OpenGoatService {
 
   public initialize(): Promise<InitializationResult> {
     return this.initializeWithDefaultBoards();
+  }
+
+  public async hardReset(): Promise<HardResetResult> {
+    const paths = this.pathsProvider.getPaths();
+    const warnings: string[] = [];
+    const deletedOpenClawAgents: string[] = [];
+    const failedOpenClawAgents: Array<{
+      agentId: string;
+      reason: string;
+    }> = [];
+    const removedOpenClawManagedSkillDirs: string[] = [];
+    const candidateOpenClawAgentIds = new Set<string>();
+
+    const localAgents = await this.agentService.listAgents(paths);
+    for (const agent of localAgents) {
+      if (agent.id === OPENCLAW_DEFAULT_AGENT_ID) {
+        continue;
+      }
+      candidateOpenClawAgentIds.add(agent.id);
+    }
+
+    try {
+      const openClawAgents = await this.listOpenClawAgents(paths);
+      for (const entry of openClawAgents) {
+        if (
+          entry.id !== OPENCLAW_DEFAULT_AGENT_ID &&
+          (pathIsWithin(paths.homeDir, entry.workspace) ||
+            pathIsWithin(paths.homeDir, entry.agentDir))
+        ) {
+          candidateOpenClawAgentIds.add(entry.id);
+        }
+      }
+    } catch (error) {
+      warnings.push(
+        `OpenClaw agent discovery failed: ${toErrorMessage(error)}`,
+      );
+    }
+
+    for (const agentId of [...candidateOpenClawAgentIds].sort((left, right) =>
+      left.localeCompare(right),
+    )) {
+      if (agentId === OPENCLAW_DEFAULT_AGENT_ID) {
+        continue;
+      }
+      try {
+        const deleted = await this.providerService.deleteProviderAgent(
+          paths,
+          agentId,
+          { providerId: OPENCLAW_PROVIDER_ID },
+        );
+        if (
+          deleted.code === 0 ||
+          containsAgentNotFoundMessage(deleted.stdout, deleted.stderr)
+        ) {
+          deletedOpenClawAgents.push(agentId);
+          continue;
+        }
+        failedOpenClawAgents.push({
+          agentId,
+          reason:
+            deleted.stderr.trim() ||
+            deleted.stdout.trim() ||
+            `OpenClaw delete failed with code ${deleted.code}.`,
+        });
+      } catch (error) {
+        failedOpenClawAgents.push({
+          agentId,
+          reason: toErrorMessage(error),
+        });
+      }
+    }
+
+    try {
+      const managedSkillsCleanup = await this.removeOpenClawManagedRoleSkills(
+        paths,
+      );
+      removedOpenClawManagedSkillDirs.push(...managedSkillsCleanup.removedPaths);
+    } catch (error) {
+      warnings.push(
+        `OpenClaw managed skills cleanup failed: ${toErrorMessage(error)}`,
+      );
+    }
+
+    await this.fileSystem.removeDir(paths.homeDir);
+    this.openClawManagedSkillsDirCache = undefined;
+    const homeRemoved = !(await this.fileSystem.exists(paths.homeDir));
+
+    return {
+      homeDir: paths.homeDir,
+      homeRemoved,
+      deletedOpenClawAgents,
+      failedOpenClawAgents,
+      removedOpenClawManagedSkillDirs,
+      warnings,
+    };
   }
 
   public async syncRuntimeDefaults(): Promise<RuntimeDefaultsSyncResult> {
@@ -1158,6 +1266,37 @@ export class OpenGoatService {
     return managedSkillsDir;
   }
 
+  private async listOpenClawAgents(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+  ): Promise<OpenClawAgentPathEntry[]> {
+    if (!this.commandRunner) {
+      return [];
+    }
+
+    const env = await this.resolveOpenClawEnv(paths);
+    const listed = await this.runOpenClaw(["agents", "list", "--json"], {
+      env,
+    });
+    if (listed.code !== 0) {
+      throw new Error(
+        `OpenClaw agents list failed (exit ${listed.code}). ${
+          listed.stderr.trim() || listed.stdout.trim() || ""
+        }`.trim(),
+      );
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(listed.stdout);
+    } catch {
+      throw new Error(
+        "OpenClaw agents list returned non-JSON output; cannot inspect agents.",
+      );
+    }
+
+    return extractOpenClawAgents(parsed);
+  }
+
   private async ensureOpenClawAgentLocation(
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
     params: {
@@ -1312,6 +1451,13 @@ function containsAlreadyExistsMessage(stdout: string, stderr: string): boolean {
   return /\balready exists?\b/.test(text);
 }
 
+function containsAgentNotFoundMessage(stdout: string, stderr: string): boolean {
+  const text = `${stdout}\n${stderr}`.toLowerCase();
+  return /\b(not found|does not exist|no such agent|unknown agent)\b/.test(
+    text,
+  );
+}
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -1340,19 +1486,18 @@ function extractManagedSkillsDir(payload: unknown): string | null {
   return managedSkillsDir || null;
 }
 
-function extractOpenClawAgentEntry(
-  payload: unknown,
-  agentId: string,
-): { workspace: string; agentDir: string } | null {
+type OpenClawAgentPathEntry = {
+  id: string;
+  workspace: string;
+  agentDir: string;
+};
+
+function extractOpenClawAgents(payload: unknown): OpenClawAgentPathEntry[] {
   if (!Array.isArray(payload)) {
-    return null;
+    return [];
   }
 
-  const normalizedAgentId = normalizeAgentId(agentId);
-  if (!normalizedAgentId) {
-    return null;
-  }
-
+  const entries: OpenClawAgentPathEntry[] = [];
   for (const entry of payload) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
       continue;
@@ -1362,13 +1507,36 @@ function extractOpenClawAgentEntry(
       workspace?: unknown;
       agentDir?: unknown;
     };
-    const candidateId = normalizeAgentId(String(record.id ?? ""));
-    if (!candidateId || candidateId !== normalizedAgentId) {
+    const id = normalizeAgentId(String(record.id ?? ""));
+    if (!id) {
+      continue;
+    }
+    entries.push({
+      id,
+      workspace: typeof record.workspace === "string" ? record.workspace : "",
+      agentDir: typeof record.agentDir === "string" ? record.agentDir : "",
+    });
+  }
+
+  return entries;
+}
+
+function extractOpenClawAgentEntry(
+  payload: unknown,
+  agentId: string,
+): { workspace: string; agentDir: string } | null {
+  const normalizedAgentId = normalizeAgentId(agentId);
+  if (!normalizedAgentId) {
+    return null;
+  }
+
+  for (const entry of extractOpenClawAgents(payload)) {
+    if (entry.id !== normalizedAgentId) {
       continue;
     }
     return {
-      workspace: typeof record.workspace === "string" ? record.workspace : "",
-      agentDir: typeof record.agentDir === "string" ? record.agentDir : "",
+      workspace: entry.workspace,
+      agentDir: entry.agentDir,
     };
   }
 
@@ -1382,6 +1550,19 @@ function pathMatches(left: string, right: string): boolean {
     return false;
   }
   return leftNormalized === rightNormalized;
+}
+
+function pathIsWithin(containerPath: string, candidatePath: string): boolean {
+  const normalizedContainer = normalizePathForCompare(containerPath);
+  const normalizedCandidate = normalizePathForCompare(candidatePath);
+  if (!normalizedContainer || !normalizedCandidate) {
+    return false;
+  }
+  const relative = path.relative(normalizedContainer, normalizedCandidate);
+  if (!relative) {
+    return true;
+  }
+  return !relative.startsWith("..") && !path.isAbsolute(relative);
 }
 
 function normalizePathForCompare(value: string): string {

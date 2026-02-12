@@ -129,6 +129,21 @@ describe("runCli", () => {
     const code = await runCli(["agent", "--help", "--log-level", "debug", "--log-format", "pretty"]);
     expect(code).toBe(0);
   });
+
+  it("supports hard-reset --yes and removes OpenGoat home", async () => {
+    const root = await createTempDir("opengoat-runcli-");
+    roots.push(root);
+    process.env.OPENGOAT_HOME = root;
+    applyOpenClawIsolation(root);
+
+    const initCode = await runCli(["init"]);
+    expect(initCode).toBe(0);
+    await expect(access(path.join(root, "config.json"), constants.F_OK)).resolves.toBeUndefined();
+
+    const resetCode = await runCli(["hard-reset", "--yes"]);
+    expect(resetCode).toBe(0);
+    await expect(access(path.join(root, "config.json"), constants.F_OK)).rejects.toBeTruthy();
+  });
 });
 
 function applyOpenClawIsolation(root: string): void {

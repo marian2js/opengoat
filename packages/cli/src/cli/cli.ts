@@ -14,6 +14,7 @@ import { agentProviderGetCommand } from "./commands/agent-provider-get.command.j
 import { agentProviderSetCommand } from "./commands/agent-provider-set.command.js";
 import { agentRunCommand } from "./commands/agent-run.command.js";
 import { agentSetManagerCommand } from "./commands/agent-set-manager.command.js";
+import { hardResetCommand } from "./commands/hard-reset.command.js";
 import { initCommand } from "./commands/init.command.js";
 import { onboardCommand } from "./commands/onboard.command.js";
 import { providerCommand } from "./commands/provider.command.js";
@@ -50,6 +51,7 @@ export async function runCli(argv: string[]): Promise<number> {
   const router = new CommandRouter(
     [
       initCommand,
+      hardResetCommand,
       acpCommand,
       onboardCommand,
       routeCommand,

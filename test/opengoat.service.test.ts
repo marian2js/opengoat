@@ -701,6 +701,98 @@ describe("OpenGoatService", () => {
     expect(typeof result?.timestamp).toBe("number");
   });
 
+  it("hard-resets OpenGoat home and OpenClaw state associated with OpenGoat", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const managedSkillsDir = path.join(root, "openclaw-managed-skills");
+
+    const commandRunner = new FakeCommandRunner(async (request) => {
+      if (
+        request.args[0] === "skills" &&
+        request.args[1] === "list" &&
+        request.args.includes("--json")
+      ) {
+        return {
+          code: 0,
+          stdout: JSON.stringify({
+            workspaceDir: path.join(root, "openclaw-workspace"),
+            managedSkillsDir,
+            skills: [],
+          }),
+          stderr: "",
+        };
+      }
+      if (
+        request.args[0] === "agents" &&
+        request.args[1] === "list" &&
+        request.args.includes("--json")
+      ) {
+        return {
+          code: 0,
+          stdout: JSON.stringify([
+            {
+              id: "ceo",
+              workspace: path.join(root, "workspaces", "ceo"),
+              agentDir: path.join(root, "agents", "ceo"),
+            },
+            {
+              id: "orphan",
+              workspace: path.join(root, "workspaces", "orphan"),
+              agentDir: path.join(root, "agents", "orphan"),
+            },
+            {
+              id: "outsider",
+              workspace: path.join("/tmp", "other", "workspace"),
+              agentDir: path.join("/tmp", "other", "agent"),
+            },
+          ]),
+          stderr: "",
+        };
+      }
+      return {
+        code: 0,
+        stdout: "",
+        stderr: "",
+      };
+    });
+
+    const { service, provider } = createService(
+      root,
+      new FakeOpenClawProvider(),
+      commandRunner,
+    );
+    await service.initialize();
+    await service.createAgent("CTO", { type: "manager", reportsTo: "ceo" });
+    await new NodeFileSystem().ensureDir(path.join(managedSkillsDir, "board-manager"));
+    await new NodeFileSystem().ensureDir(path.join(managedSkillsDir, "manager"));
+    await writeFile(
+      path.join(managedSkillsDir, "board-manager", "SKILL.md"),
+      "# stale board-manager\n",
+      "utf-8",
+    );
+    await writeFile(
+      path.join(managedSkillsDir, "manager", "SKILL.md"),
+      "# stale manager\n",
+      "utf-8",
+    );
+
+    const result = await service.hardReset();
+
+    expect(result.homeDir).toBe(root);
+    expect(result.homeRemoved).toBe(true);
+    expect(result.failedOpenClawAgents).toHaveLength(0);
+    expect(result.deletedOpenClawAgents).toEqual(["ceo", "cto", "orphan"]);
+    expect(result.removedOpenClawManagedSkillDirs).toEqual([
+      path.join(managedSkillsDir, "board-manager"),
+      path.join(managedSkillsDir, "manager"),
+    ]);
+    expect(
+      provider.deletedAgents.map((entry) => entry.agentId).sort(),
+    ).toEqual(["ceo", "cto", "orphan"]);
+    await expect(access(root, constants.F_OK)).rejects.toBeTruthy();
+  });
+
   it("prepares a new session for a specific project path without invoking runtime", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
