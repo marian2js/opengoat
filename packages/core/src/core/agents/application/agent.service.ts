@@ -56,6 +56,12 @@ export interface CeoWorkspaceBootstrapResult {
   removedPaths: string[];
 }
 
+export interface AgentWorkspaceBootstrapInput {
+  agentId: string;
+  displayName: string;
+  role: string;
+}
+
 interface WorkspaceSkillSyncResult {
   createdPaths: string[];
   skippedPaths: string[];
@@ -167,9 +173,26 @@ export class AgentService {
   public async ensureCeoWorkspaceBootstrap(
     paths: OpenGoatPaths,
   ): Promise<CeoWorkspaceBootstrapResult> {
+    const displayName = await this.readAgentDisplayName(paths, DEFAULT_AGENT_ID);
+    const role = await this.readAgentRole(paths, DEFAULT_AGENT_ID);
+    return this.ensureAgentWorkspaceBootstrap(paths, {
+      agentId: DEFAULT_AGENT_ID,
+      displayName,
+      role,
+    });
+  }
+
+  public async ensureAgentWorkspaceBootstrap(
+    paths: OpenGoatPaths,
+    input: AgentWorkspaceBootstrapInput,
+  ): Promise<CeoWorkspaceBootstrapResult> {
+    const normalizedAgentId = normalizeAgentId(input.agentId);
+    if (!normalizedAgentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
     const workspaceDir = this.pathPort.join(
       paths.workspacesDir,
-      DEFAULT_AGENT_ID,
+      normalizedAgentId,
     );
     const agentsPath = this.pathPort.join(workspaceDir, "AGENTS.md");
     const soulPath = this.pathPort.join(workspaceDir, "SOUL.md");
@@ -180,30 +203,31 @@ export class AgentService {
 
     await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
 
-    const shouldOverwrite = await this.fileSystem.exists(bootstrapPath);
-    await this.writeMarkdown(
+    await this.rewriteAgentsMarkdown(
       agentsPath,
-      renderCeoAgentsMarkdown(),
+      normalizedAgentId,
       createdPaths,
       skippedPaths,
-      { overwrite: shouldOverwrite },
     );
-    await this.writeMarkdown(
+    await this.rewriteSoulMarkdown(
       soulPath,
-      renderCeoSoulMarkdown(),
+      {
+        agentId: normalizedAgentId,
+        displayName: input.displayName.trim() || normalizedAgentId,
+        role: input.role.trim() || "Individual Contributor",
+      },
       createdPaths,
       skippedPaths,
-      { overwrite: shouldOverwrite },
     );
     const workspaceSkillSync = await this.ensureAgentWorkspaceRoleSkills(
       paths,
-      DEFAULT_AGENT_ID,
+      normalizedAgentId,
     );
     createdPaths.push(...workspaceSkillSync.createdPaths);
     skippedPaths.push(...workspaceSkillSync.skippedPaths);
     removedPaths.push(...workspaceSkillSync.removedPaths);
 
-    if (shouldOverwrite) {
+    if (await this.fileSystem.exists(bootstrapPath)) {
       await this.fileSystem.removeDir(bootstrapPath);
       removedPaths.push(bootstrapPath);
     } else {
@@ -525,6 +549,58 @@ export class AgentService {
     createdPaths.push(filePath);
   }
 
+  private async rewriteAgentsMarkdown(
+    filePath: string,
+    agentId: string,
+    createdPaths: string[],
+    skippedPaths: string[],
+  ): Promise<void> {
+    const exists = await this.fileSystem.exists(filePath);
+    const source = exists
+      ? await this.fileSystem.readFile(filePath)
+      : this.renderDefaultAgentsMarkdown(agentId);
+    const next = removeFirstRunSection(source);
+    if (exists && normalizeMarkdown(source) === next) {
+      skippedPaths.push(filePath);
+      return;
+    }
+
+    await this.fileSystem.writeFile(filePath, `${next}\n`);
+    if (exists) {
+      skippedPaths.push(filePath);
+      return;
+    }
+    createdPaths.push(filePath);
+  }
+
+  private async rewriteSoulMarkdown(
+    filePath: string,
+    profile: {
+      agentId: string;
+      displayName: string;
+      role: string;
+    },
+    createdPaths: string[],
+    skippedPaths: string[],
+  ): Promise<void> {
+    const exists = await this.fileSystem.exists(filePath);
+    const source = exists
+      ? await this.fileSystem.readFile(filePath)
+      : this.renderDefaultSoulMarkdown(profile.agentId, profile.displayName);
+    const next = upsertSoulRoleSection(source, profile);
+    if (exists && normalizeMarkdown(source) === next) {
+      skippedPaths.push(filePath);
+      return;
+    }
+
+    await this.fileSystem.writeFile(filePath, `${next}\n`);
+    if (exists) {
+      skippedPaths.push(filePath);
+      return;
+    }
+    createdPaths.push(filePath);
+  }
+
   private async readJsonIfPresent<T>(filePath: string): Promise<T | null> {
     const exists = await this.fileSystem.exists(filePath);
     if (!exists) {
@@ -600,6 +676,23 @@ export class AgentService {
       return renderBoardIndividualSkillMarkdown();
     }
     throw new Error(`Unsupported workspace skill id: ${skillId}`);
+  }
+
+  private renderDefaultAgentsMarkdown(agentId: string): string {
+    if (isDefaultAgentId(agentId)) {
+      return renderCeoAgentsMarkdown();
+    }
+    return "# AGENTS.md";
+  }
+
+  private renderDefaultSoulMarkdown(
+    agentId: string,
+    displayName: string,
+  ): string {
+    if (isDefaultAgentId(agentId)) {
+      return renderCeoSoulMarkdown();
+    }
+    return `# SOUL.md - ${displayName}`;
   }
 
   private async assertNoReportingCycle(
@@ -760,4 +853,103 @@ function sameStringArray(left: string[], right: string[]): boolean {
     return false;
   }
   return left.every((value, index) => value === right[index]);
+}
+
+function removeFirstRunSection(markdown: string): string {
+  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  const kept: string[] = [];
+  let skipping = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!skipping && /^##\s+first run\s*$/i.test(trimmed)) {
+      skipping = true;
+      continue;
+    }
+    if (skipping) {
+      if (/^##\s+/.test(trimmed)) {
+        skipping = false;
+        kept.push(line);
+      }
+      continue;
+    }
+    kept.push(line);
+  }
+
+  return normalizeMarkdown(kept.join("\n"));
+}
+
+function upsertSoulRoleSection(
+  markdown: string,
+  profile: {
+    agentId: string;
+    displayName: string;
+    role: string;
+  },
+): string {
+  const withoutRole = removeSectionByHeading(markdown, /^##\s+your role\s*$/i);
+  const lines = withoutRole.replace(/\r\n/g, "\n").split("\n");
+  const firstNonEmptyIndex = lines.findIndex((line) => line.trim().length > 0);
+  const headingLine =
+    firstNonEmptyIndex >= 0
+      ? lines[firstNonEmptyIndex] ?? `# SOUL.md - ${profile.displayName}`
+      : `# SOUL.md - ${profile.displayName}`;
+  const remainder = lines
+    .slice(firstNonEmptyIndex >= 0 ? firstNonEmptyIndex + 1 : 0)
+    .join("\n")
+    .replace(/^\n+/, "")
+    .trimEnd();
+  const roleSection = renderSoulRoleSection(profile);
+  const merged = remainder
+    ? `${headingLine}\n\n${roleSection}\n\n${remainder}`
+    : `${headingLine}\n\n${roleSection}`;
+  return normalizeMarkdown(merged);
+}
+
+function renderSoulRoleSection(profile: {
+  agentId: string;
+  displayName: string;
+  role: string;
+}): string {
+  return [
+    "## Your Role",
+    "",
+    "You are part of an organization run by OpenGoat.",
+    "",
+    `- Your id: \`${profile.agentId}\` (agent id)`,
+    `- Your name: ${profile.displayName}`,
+    `- Role: ${profile.role}`,
+    "",
+    `You can run \`opengoat agent info ${profile.agentId}\` to learn more about yourself.`,
+    "",
+    "Your mission is the organization mission. You must help it succeed.",
+  ].join("\n");
+}
+
+function removeSectionByHeading(markdown: string, heading: RegExp): string {
+  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  const kept: string[] = [];
+  let skipping = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!skipping && heading.test(trimmed)) {
+      skipping = true;
+      continue;
+    }
+    if (skipping) {
+      if (/^##\s+/.test(trimmed)) {
+        skipping = false;
+        kept.push(line);
+      }
+      continue;
+    }
+    kept.push(line);
+  }
+
+  return normalizeMarkdown(kept.join("\n"));
+}
+
+function normalizeMarkdown(value: string): string {
+  return value.replace(/\r\n/g, "\n").trimEnd();
 }

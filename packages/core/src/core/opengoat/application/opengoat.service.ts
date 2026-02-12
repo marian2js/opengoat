@@ -476,6 +476,26 @@ export class OpenGoatService {
         }". ${toErrorMessage(error)}`,
       );
     }
+    try {
+      const workspaceBootstrap =
+        await this.agentService.ensureAgentWorkspaceBootstrap(paths, {
+          agentId: created.agent.id,
+          displayName: created.agent.displayName,
+          role: created.agent.role,
+        });
+      created.createdPaths.push(...workspaceBootstrap.createdPaths);
+      created.skippedPaths.push(...workspaceBootstrap.skippedPaths);
+      created.skippedPaths.push(...workspaceBootstrap.removedPaths);
+    } catch (error) {
+      if (!created.alreadyExisted) {
+        await this.agentService.removeAgent(paths, created.agent.id);
+      }
+      throw new Error(
+        `Failed to update workspace bootstrap for "${
+          created.agent.id
+        }". ${toErrorMessage(error)}`,
+      );
+    }
 
     await this.boardService.ensureDefaultBoardForAgent(paths, created.agent.id);
 

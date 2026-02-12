@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentService } from "../../packages/core/src/core/agents/index.js";
@@ -169,6 +169,48 @@ describe("AgentService", () => {
     expect(
       await fileSystem.exists(path.join(result.agent.workspaceDir, "SOUL.md")),
     ).toBe(false);
+  });
+
+  it("keeps AGENTS.md content while removing only the First Run section", async () => {
+    const { service, paths, fileSystem } = await createAgentServiceWithPaths();
+    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+
+    const ceoWorkspace = path.join(paths.workspacesDir, "ceo");
+    const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
+    const soulPath = path.join(ceoWorkspace, "SOUL.md");
+    const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
+    await fileSystem.ensureDir(ceoWorkspace);
+    await writeFile(
+      agentsPath,
+      ["foo", "", "## First Run", "bar", "", "## Another section", "baz", ""].join(
+        "\n",
+      ),
+      "utf-8",
+    );
+    await writeFile(
+      soulPath,
+      ["# SOUL.md - Custom", "", "Legacy body"].join("\n"),
+      "utf-8",
+    );
+    await writeFile(bootstrapPath, "# bootstrap\n", "utf-8");
+
+    await service.ensureCeoWorkspaceBootstrap(paths);
+
+    const agentsMarkdown = await readFile(agentsPath, "utf-8");
+    const soulMarkdown = await readFile(soulPath, "utf-8");
+    expect(agentsMarkdown).toContain("foo");
+    expect(agentsMarkdown).toContain("## Another section");
+    expect(agentsMarkdown).toContain("baz");
+    expect(agentsMarkdown).not.toContain("## First Run");
+    expect(agentsMarkdown).not.toContain("\nbar\n");
+    expect(soulMarkdown.startsWith("# SOUL.md - Custom")).toBe(true);
+    expect(soulMarkdown).toContain("## Your Role");
+    expect(soulMarkdown).toContain("- Your id: `ceo` (agent id)");
+    expect(soulMarkdown).toContain("- Your name: CEO");
+    expect(soulMarkdown).toContain("- Role: CEO");
+    expect(soulMarkdown).toContain("opengoat agent info ceo");
+    expect(soulMarkdown).toContain("Legacy body");
+    expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });
 
   it("never changes global default agent during agent creation", async () => {
