@@ -843,6 +843,24 @@ export function App(): ReactElement {
       .sort((left, right) => right.updatedAt - left.updatedAt);
   }, [sessions]);
 
+  const taskProjectOptions = useMemo(() => {
+    if (workspaceNodes.length === 0) {
+      return [
+        {
+          label: "~",
+          projectPath: "~",
+        },
+      ];
+    }
+
+    return workspaceNodes.map((workspace) => ({
+      label: workspace.name,
+      projectPath: workspace.projectPath,
+    }));
+  }, [workspaceNodes]);
+
+  const defaultTaskProjectPath = taskProjectOptions[0]?.projectPath ?? "~";
+
   const agentProjectOptions = useMemo<AgentProjectOption[]>(() => {
     if (workspaceNodes.length > 0) {
       return workspaceNodes.map((workspace) => ({
@@ -1709,7 +1727,7 @@ export function App(): ReactElement {
       const existing = current[taskWorkspaceId] ?? {
         title: "",
         description: "",
-        project: "~",
+        project: defaultTaskProjectPath,
         assignedTo: taskActorId,
         status: "todo",
       };
@@ -1780,9 +1798,16 @@ export function App(): ReactElement {
     options?: { fromDialog?: boolean },
   ): Promise<void> {
     const draft = taskDraftByWorkspaceId[taskWorkspaceId];
+    const validTaskProjects = new Set(
+      taskProjectOptions.map((option) => option.projectPath),
+    );
+    const rawProject = draft?.project.trim() ?? "";
     const title = draft?.title.trim() ?? "";
     const description = draft?.description.trim() ?? "";
-    const project = draft?.project.trim() || "~";
+    const project =
+      validTaskProjects.size > 0 && !validTaskProjects.has(rawProject)
+        ? defaultTaskProjectPath
+        : rawProject || defaultTaskProjectPath;
     const assignedTo = draft?.assignedTo?.trim();
     const status = draft?.status ?? "todo";
 
@@ -1838,7 +1863,7 @@ export function App(): ReactElement {
             ...(current[taskWorkspaceId] ?? {
               title: "",
               description: "",
-              project: "~",
+              project: defaultTaskProjectPath,
               assignedTo,
               status: "todo",
             }),
@@ -2872,18 +2897,22 @@ export function App(): ReactElement {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Create Task</DialogTitle>
-                  <DialogDescription>{`Add a task to ${selectedTaskWorkspace.title}.`}</DialogDescription>
                 </DialogHeader>
 
                 {(() => {
                   const draft = taskDraftByWorkspaceId[selectedTaskWorkspace.taskWorkspaceId] ?? {
                     title: "",
                     description: "",
-                    project: "~",
+                    project: defaultTaskProjectPath,
                     assignedTo: taskActorId,
                     status: "todo" as const,
                   };
                   const assignableAgents = getAssignableAgents(taskActorId);
+                  const projectValue = taskProjectOptions.some(
+                    (option) => option.projectPath === draft.project,
+                  )
+                    ? draft.project
+                    : defaultTaskProjectPath;
 
                   return (
                     <div className="space-y-3">
@@ -2892,7 +2921,7 @@ export function App(): ReactElement {
                           className="text-xs uppercase tracking-wide text-muted-foreground"
                           htmlFor="createTaskActor"
                         >
-                          Task Actor
+                          Task Owner
                         </label>
                         <select
                           id="createTaskActor"
@@ -2955,16 +2984,25 @@ export function App(): ReactElement {
                           >
                             Project
                           </label>
-                          <Input
+                          <select
                             id="createTaskProject"
-                            value={draft.project}
+                            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            value={projectValue}
                             onChange={(event) =>
                               updateTaskDraft(selectedTaskWorkspace.taskWorkspaceId, {
                                 project: event.target.value,
                               })
                             }
-                            placeholder="~"
-                          />
+                          >
+                            {taskProjectOptions.map((projectOption) => (
+                              <option
+                                key={projectOption.projectPath}
+                                value={projectOption.projectPath}
+                              >
+                                {projectOption.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div className="space-y-1.5">
                           <label
