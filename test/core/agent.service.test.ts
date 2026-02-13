@@ -224,6 +224,9 @@ describe("AgentService", () => {
     expect(roleMarkdown).toContain(
       "- For info about your reportees, run `opengoat agent info ceo`.",
     );
+    expect(roleMarkdown).toContain(
+      "- To delegate and coordinate work, use `og-*` skills.",
+    );
     expect(soulMarkdown).toBe(["# SOUL.md - Custom", "", "Legacy body"].join("\n"));
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });
@@ -257,6 +260,9 @@ describe("AgentService", () => {
     expect(roleMarkdown).toContain("- Role: Backend Engineer");
     expect(roleMarkdown).toContain(
       "- For info about your level on the organiztion, run `opengoat agent info engineer`.",
+    );
+    expect(roleMarkdown).toContain(
+      "- To delegate and coordinate work, use `og-*` skills.",
     );
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });

@@ -694,6 +694,9 @@ describe("OpenGoatService", () => {
     expect(roleMarkdown).toContain(
       "- For info about your reportees, run `opengoat agent info ceo`.",
     );
+    expect(roleMarkdown).toContain(
+      "- To delegate and coordinate work, use `og-*` skills.",
+    );
     expect(soulMarkdown).toBe(
       ["# SOUL.md - Legacy CEO", "", "Legacy body"].join("\n"),
     );

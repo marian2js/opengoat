@@ -902,6 +902,7 @@ function renderRoleMarkdown(profile: {
     `- Your name: ${profile.displayName}`,
     `- Role: ${profile.role}`,
     `- For info about your level on the organiztion, run \`opengoat agent info ${profile.agentId}\`.`,
+    "- To delegate and coordinate work, use `og-*` skills.",
     "",
     "---",
     "",
