@@ -100,34 +100,7 @@ export class OrchestrationService {
     });
     const durationMs = Date.now() - startedMs;
 
-    const routing: RoutingDecision = {
-      entryAgentId: resolvedEntryAgentId,
-      targetAgentId: resolvedEntryAgentId,
-      confidence: 1,
-      reason: "Direct OpenClaw runtime invocation.",
-      rewrittenMessage: options.message,
-      candidates: []
-    };
-
     const completedAt = this.nowIso();
-    const orchestration: OrchestrationRunResult["orchestration"] = {
-      mode: "single-agent",
-      steps: [],
-      finalMessage: direct.execution.stdout,
-      sessionGraph: {
-        nodes: [
-          {
-            agentId: resolvedEntryAgentId,
-            providerId: direct.execution.providerId,
-            sessionKey: direct.session?.sessionKey,
-            sessionId: direct.session?.sessionId,
-            providerSessionId: direct.execution.providerSessionId
-          }
-        ],
-        edges: []
-      }
-    };
-
     const trace = await this.buildAndWriteTrace({
       paths,
       runId,
@@ -135,11 +108,9 @@ export class OrchestrationService {
       completedAt,
       entryAgentId: resolvedEntryAgentId,
       userMessage: options.message,
-      routing,
       execution: direct.execution,
       durationMs,
-      session: direct.session,
-      orchestration
+      session: direct.session
     });
 
     this.logger.info("Completed manager runtime invocation.", {
@@ -159,10 +130,8 @@ export class OrchestrationService {
     return {
       ...direct.execution,
       entryAgentId: resolvedEntryAgentId,
-      routing,
       tracePath: trace.tracePath,
-      session: direct.session,
-      orchestration
+      session: direct.session
     };
   }
 
@@ -255,14 +224,12 @@ export class OrchestrationService {
     completedAt: string;
     entryAgentId: string;
     userMessage: string;
-    routing: RoutingDecision;
     execution: ProviderExecutionResult & AgentProviderBinding;
     durationMs: number;
     session?: SessionRunInfo & {
       preRunCompactionApplied: boolean;
       postRunCompaction: SessionCompactionResult;
     };
-    orchestration?: OrchestrationRunResult["orchestration"];
   }): Promise<{ tracePath: string; trace: AgentRunTrace }> {
     const trace: AgentRunTrace = {
       schemaVersion: 2,
@@ -271,7 +238,6 @@ export class OrchestrationService {
       completedAt: params.completedAt,
       entryAgentId: params.entryAgentId,
       userMessage: params.userMessage,
-      routing: params.routing,
       session: params.session
         ? {
             ...params.session,
@@ -286,8 +252,7 @@ export class OrchestrationService {
         stdout: params.execution.stdout,
         stderr: params.execution.stderr,
         durationMs: params.durationMs
-      },
-      orchestration: params.orchestration
+      }
     };
 
     await this.fileSystem.ensureDir(params.paths.runsDir);

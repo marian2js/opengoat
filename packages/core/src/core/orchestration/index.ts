@@ -4,8 +4,6 @@ export type {
   RoutingCandidate,
   RoutingDecision,
   AgentRunTrace,
-  ManagerRuntimeSessionGraph,
-  ManagerRuntimeStep,
   OrchestrationRunResult
 } from "./domain/routing.js";
 export type {

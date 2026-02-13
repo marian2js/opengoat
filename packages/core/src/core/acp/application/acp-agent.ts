@@ -532,11 +532,7 @@ function extractEmbeddedResourceText(resource: unknown): string | undefined {
 }
 
 function extractAssistantText(result: OrchestrationRunResult): string {
-  const text = result.stdout.trim();
-  if (text) {
-    return text;
-  }
-  return result.orchestration?.finalMessage?.trim() || "";
+  return result.stdout.trim();
 }
 
 function readPositiveInt(meta: unknown, keys: string[], fallback: number): number {

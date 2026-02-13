@@ -35,14 +35,6 @@ describe("scenario run command", () => {
         agentId: "ceo",
         providerId: "openclaw",
         entryAgentId: "ceo",
-        routing: {
-          entryAgentId: "ceo",
-          targetAgentId: "ceo",
-          confidence: 1,
-          reason: "test",
-          rewrittenMessage: "",
-          candidates: []
-        },
         tracePath: "/tmp/trace.json"
       })
     });
@@ -70,21 +62,7 @@ describe("scenario run command", () => {
         agentId: "ceo",
         providerId: "openclaw",
         entryAgentId: "ceo",
-        routing: {
-          entryAgentId: "ceo",
-          targetAgentId: "ceo",
-          confidence: 1,
-          reason: "test",
-          rewrittenMessage: "",
-          candidates: []
-        },
-        tracePath: "/tmp/trace.json",
-        orchestration: {
-          mode: "single-agent",
-          finalMessage: "done",
-          steps: [],
-          sessionGraph: { nodes: [], edges: [] }
-        }
+        tracePath: "/tmp/trace.json"
       })
     });
 

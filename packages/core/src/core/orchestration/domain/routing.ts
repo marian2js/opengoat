@@ -1,26 +1,6 @@
 import type { AgentProviderBinding, ProviderExecutionResult } from "../../providers/types.js";
 import type { SessionCompactionResult, SessionRunInfo } from "../../sessions/index.js";
 
-export interface ManagerRuntimeStep {
-  step: number;
-  note: string;
-}
-
-export interface ManagerRuntimeSessionGraph {
-  nodes: Array<{
-    agentId: string;
-    providerId?: string;
-    sessionKey?: string;
-    sessionId?: string;
-    providerSessionId?: string;
-  }>;
-  edges: Array<{
-    fromAgentId: string;
-    toAgentId: string;
-    reason?: string;
-  }>;
-}
-
 export interface RoutingCandidate {
   agentId: string;
   agentName: string;
@@ -45,7 +25,6 @@ export interface AgentRunTrace {
   completedAt: string;
   entryAgentId: string;
   userMessage: string;
-  routing: RoutingDecision;
   session?: SessionRunInfo & {
     preRunCompactionApplied: boolean;
     postRunCompactionApplied: boolean;
@@ -55,25 +34,12 @@ export interface AgentRunTrace {
     ProviderExecutionResult & {
       durationMs: number;
     };
-  orchestration?: {
-    mode: "single-agent";
-    steps: ManagerRuntimeStep[];
-    finalMessage: string;
-    sessionGraph: ManagerRuntimeSessionGraph;
-  };
 }
 
 export type OrchestrationRunResult = ProviderExecutionResult &
   AgentProviderBinding & {
     entryAgentId: string;
-    routing: RoutingDecision;
-  tracePath: string;
-  orchestration?: {
-      mode: "single-agent";
-      steps: ManagerRuntimeStep[];
-      finalMessage: string;
-      sessionGraph: ManagerRuntimeSessionGraph;
-    };
+    tracePath: string;
     session?: SessionRunInfo & {
       preRunCompactionApplied: boolean;
       postRunCompaction: SessionCompactionResult;

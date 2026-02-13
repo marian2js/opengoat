@@ -33,8 +33,6 @@ describe("manager runtime scenarios", () => {
 
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("Manager acknowledged request");
-    expect(result.orchestration?.mode).toBe("single-agent");
-    expect(result.orchestration?.steps).toEqual([]);
   });
 
   it("falls back to ceo when unknown entry agent is requested", async () => {
@@ -43,7 +41,6 @@ describe("manager runtime scenarios", () => {
     const result = await service.runAgent("missing-agent", { message: "Hello there" });
 
     expect(result.entryAgentId).toBe("ceo");
-    expect(result.orchestration?.mode).toBe("single-agent");
   });
 });
 

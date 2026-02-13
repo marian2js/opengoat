@@ -85,15 +85,13 @@ describe("OrchestrationService manager runtime", () => {
 
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("hello from ceo");
-    expect(result.orchestration?.mode).toBe("single-agent");
-    expect(result.orchestration?.steps).toEqual([]);
-    expect(result.orchestration?.sessionGraph.nodes[0]?.agentId).toBe("ceo");
 
     const trace = JSON.parse(await readFile(result.tracePath, "utf8")) as {
-      orchestration?: { mode?: string; steps?: unknown[] };
+      entryAgentId?: string;
+      execution?: { stdout?: string };
     };
-    expect(trace.orchestration?.mode).toBe("single-agent");
-    expect(trace.orchestration?.steps).toEqual([]);
+    expect(trace.entryAgentId).toBe("ceo");
+    expect(trace.execution?.stdout).toContain("hello from ceo");
   });
 
   it("uses prepared session project path as cwd when no cwd is provided", async () => {

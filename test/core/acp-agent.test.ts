@@ -49,14 +49,6 @@ describe("OpenGoatAcpAgent", () => {
       providerId: "openclaw",
       agentId: "ceo",
       entryAgentId: "ceo",
-      routing: {
-        entryAgentId: "ceo",
-        targetAgentId: "ceo",
-        confidence: 1,
-        reason: "test",
-        rewrittenMessage: "ping",
-        candidates: []
-      },
       tracePath: "/tmp/trace.json"
     }));
     const { agent, sessionUpdate } = createHarness({ runAgent });
@@ -125,14 +117,6 @@ describe("OpenGoatAcpAgent", () => {
       providerId: "openclaw",
       agentId: "ceo",
       entryAgentId: "ceo",
-      routing: {
-        entryAgentId: "ceo",
-        targetAgentId: "ceo",
-        confidence: 1,
-        reason: "test",
-        rewrittenMessage: "slow request",
-        candidates: []
-      },
       tracePath: "/tmp/trace.json"
     });
   });
@@ -200,14 +184,6 @@ function createDefaultService() {
       providerId: "openclaw",
       agentId: "ceo",
       entryAgentId: "ceo",
-      routing: {
-        entryAgentId: "ceo",
-        targetAgentId: "ceo",
-        confidence: 1,
-        reason: "test",
-        rewrittenMessage: "ok",
-        candidates: []
-      },
       tracePath: "/tmp/trace.json"
     })),
     listSessions: vi.fn(async () => []),
