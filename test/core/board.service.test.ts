@@ -318,6 +318,68 @@ describe("BoardService", () => {
     );
   });
 
+  it("supports legacy mixed-case task ids for show and updates", async () => {
+    const harness = await createHarness();
+
+    const board = await harness.boardService.createBoard(harness.paths, "ceo", {
+      title: "Legacy Tasks",
+    });
+
+    const legacyTaskId = "task-F62DA660";
+    const boardServiceInternals = harness.boardService as unknown as {
+      getDatabase: (paths: OpenGoatPaths) => Promise<unknown>;
+      execute: (db: unknown, sql: string, params?: unknown[]) => void;
+      persistDatabase: (paths: OpenGoatPaths, db: unknown) => Promise<void>;
+    };
+    const db = await boardServiceInternals.getDatabase(harness.paths);
+    boardServiceInternals.execute(
+      db,
+      `INSERT INTO tasks (
+         task_id,
+         board_id,
+         created_at,
+         project,
+         owner_agent_id,
+         assigned_to_agent_id,
+         title,
+         description,
+         status,
+         status_reason
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        legacyTaskId,
+        board.boardId,
+        "2026-02-10T00:00:00.000Z",
+        "~",
+        "ceo",
+        "cto",
+        "Write: Changlog",
+        "Fix typo and publish notes",
+        "todo",
+        null,
+      ],
+    );
+    await boardServiceInternals.persistDatabase(harness.paths, db);
+
+    const shown = await harness.boardService.getTask(harness.paths, legacyTaskId);
+    expect(shown.taskId).toBe(legacyTaskId);
+
+    const shownLowercase = await harness.boardService.getTask(
+      harness.paths,
+      legacyTaskId.toLowerCase(),
+    );
+    expect(shownLowercase.taskId).toBe(legacyTaskId);
+
+    const updated = await harness.boardService.updateTaskStatus(
+      harness.paths,
+      "cto",
+      legacyTaskId.toLowerCase(),
+      "doing",
+    );
+    expect(updated.taskId).toBe(legacyTaskId);
+    expect(updated.status).toBe("doing");
+  });
+
   it("creates an index for task status", async () => {
     const harness = await createHarness();
 

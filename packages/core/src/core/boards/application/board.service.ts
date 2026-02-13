@@ -51,6 +51,10 @@ interface EntryRow {
   content: string;
 }
 
+interface TaskIdRow {
+  task_id: string;
+}
+
 const TASK_STATUSES = ["todo", "doing", "pending", "blocked", "done"] as const;
 const DEFAULT_TASK_PROJECT = "~";
 const require = createRequire(import.meta.url);
@@ -278,8 +282,8 @@ export class BoardService {
 
   public async getTask(paths: OpenGoatPaths, taskId: string): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
-    const normalizedTaskId = normalizeEntityId(taskId, "task id");
-    return this.requireTask(db, normalizedTaskId);
+    const resolvedTaskId = this.resolveTaskId(db, taskId);
+    return this.requireTask(db, resolvedTaskId);
   }
 
   public async updateTaskStatus(
@@ -291,8 +295,8 @@ export class BoardService {
   ): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
     const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
-    const normalizedTaskId = normalizeEntityId(taskId, "task id");
-    const task = this.requireTask(db, normalizedTaskId);
+    const resolvedTaskId = this.resolveTaskId(db, taskId);
+    const task = this.requireTask(db, resolvedTaskId);
     this.assertTaskAssignee(task, normalizedActorId);
 
     const nextStatus = normalizeTaskStatus(status, true);
@@ -301,10 +305,10 @@ export class BoardService {
     this.execute(db, `UPDATE tasks SET status = ?, status_reason = ? WHERE task_id = ?`, [
       nextStatus,
       nextStatusReason,
-      normalizedTaskId
+      resolvedTaskId
     ]);
     await this.persistDatabase(paths, db);
-    return this.requireTask(db, normalizedTaskId);
+    return this.requireTask(db, resolvedTaskId);
   }
 
   public async addTaskBlocker(
@@ -315,24 +319,24 @@ export class BoardService {
   ): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
     const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
-    const normalizedTaskId = normalizeEntityId(taskId, "task id");
+    const resolvedTaskId = this.resolveTaskId(db, taskId);
     const content = blocker.trim();
     if (!content) {
       throw new Error("Blocker content cannot be empty.");
     }
 
-    const task = this.requireTask(db, normalizedTaskId);
+    const task = this.requireTask(db, resolvedTaskId);
     this.assertTaskAssignee(task, normalizedActorId);
 
     this.execute(
       db,
       `INSERT INTO task_blockers (task_id, created_at, created_by_agent_id, content)
        VALUES (?, ?, ?, ?)`,
-      [normalizedTaskId, this.nowIso(), normalizedActorId, content]
+      [resolvedTaskId, this.nowIso(), normalizedActorId, content]
     );
     await this.persistDatabase(paths, db);
 
-    return this.requireTask(db, normalizedTaskId);
+    return this.requireTask(db, resolvedTaskId);
   }
 
   public async addTaskArtifact(
@@ -343,24 +347,24 @@ export class BoardService {
   ): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
     const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
-    const normalizedTaskId = normalizeEntityId(taskId, "task id");
+    const resolvedTaskId = this.resolveTaskId(db, taskId);
     const cleaned = content.trim();
     if (!cleaned) {
       throw new Error("Artifact content cannot be empty.");
     }
 
-    const task = this.requireTask(db, normalizedTaskId);
+    const task = this.requireTask(db, resolvedTaskId);
     this.assertTaskAssignee(task, normalizedActorId);
 
     this.execute(
       db,
       `INSERT INTO task_artifacts (task_id, created_at, created_by_agent_id, content)
        VALUES (?, ?, ?, ?)`,
-      [normalizedTaskId, this.nowIso(), normalizedActorId, cleaned]
+      [resolvedTaskId, this.nowIso(), normalizedActorId, cleaned]
     );
     await this.persistDatabase(paths, db);
 
-    return this.requireTask(db, normalizedTaskId);
+    return this.requireTask(db, resolvedTaskId);
   }
 
   public async addTaskWorklog(
@@ -371,24 +375,24 @@ export class BoardService {
   ): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
     const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
-    const normalizedTaskId = normalizeEntityId(taskId, "task id");
+    const resolvedTaskId = this.resolveTaskId(db, taskId);
     const cleaned = content.trim();
     if (!cleaned) {
       throw new Error("Worklog content cannot be empty.");
     }
 
-    const task = this.requireTask(db, normalizedTaskId);
+    const task = this.requireTask(db, resolvedTaskId);
     this.assertTaskAssignee(task, normalizedActorId);
 
     this.execute(
       db,
       `INSERT INTO task_worklog (task_id, created_at, created_by_agent_id, content)
        VALUES (?, ?, ?, ?)`,
-      [normalizedTaskId, this.nowIso(), normalizedActorId, cleaned]
+      [resolvedTaskId, this.nowIso(), normalizedActorId, cleaned]
     );
     await this.persistDatabase(paths, db);
 
-    return this.requireTask(db, normalizedTaskId);
+    return this.requireTask(db, resolvedTaskId);
   }
 
   private assertTaskAssignee(task: TaskRecord, actorId: string): void {
@@ -429,6 +433,39 @@ export class BoardService {
     }
 
     return this.hydrateTaskRow(db, row);
+  }
+
+  private resolveTaskId(db: SqlJsDatabase, taskId: string): string {
+    const normalizedTaskId = normalizeEntityId(taskId, "task id");
+    const exactMatch = this.queryOne<TaskIdRow>(
+      db,
+      `SELECT task_id
+       FROM tasks
+       WHERE task_id = ?`,
+      [normalizedTaskId]
+    );
+    if (exactMatch?.task_id) {
+      return exactMatch.task_id;
+    }
+
+    const caseInsensitiveMatches = this.queryAll<TaskIdRow>(
+      db,
+      `SELECT task_id
+       FROM tasks
+       WHERE task_id = ? COLLATE NOCASE
+       ORDER BY task_id ASC`,
+      [normalizedTaskId]
+    );
+
+    if (caseInsensitiveMatches.length === 0) {
+      throw new Error(`Task \"${normalizedTaskId}\" does not exist.`);
+    }
+
+    if (caseInsensitiveMatches.length > 1) {
+      throw new Error(`Task id \"${normalizedTaskId}\" is ambiguous by case. Use exact task id.`);
+    }
+
+    return caseInsensitiveMatches[0]!.task_id;
   }
 
   private hydrateTaskRow(db: SqlJsDatabase, row: TaskRow): TaskRecord {
