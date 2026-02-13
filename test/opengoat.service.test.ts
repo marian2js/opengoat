@@ -656,6 +656,10 @@ describe("OpenGoatService", () => {
     expect(agentsMarkdown).toContain("baz");
     expect(agentsMarkdown).not.toContain("## First Run");
     expect(agentsMarkdown).not.toContain("\nbar\n");
+    expect(agentsMarkdown).toContain("## Your Role");
+    expect(agentsMarkdown).toContain(
+      "You are part of an organization run by AI agents. Read `ROLE.md` for details.",
+    );
     expect(roleMarkdown).toContain(
       "# ROLE.md - Your position in the organization",
     );

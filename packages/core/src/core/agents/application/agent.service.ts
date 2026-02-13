@@ -561,7 +561,7 @@ export class AgentService {
     }
 
     const source = await this.fileSystem.readFile(filePath);
-    const next = removeFirstRunSection(source);
+    const next = replaceFirstRunSection(source);
     if (source === next) {
       skippedPaths.push(filePath);
       return;
@@ -827,19 +827,25 @@ function sameStringArray(left: string[], right: string[]): boolean {
   return left.every((value, index) => value === right[index]);
 }
 
-function removeFirstRunSection(markdown: string): string {
+function replaceFirstRunSection(markdown: string): string {
   const lineBreak = markdown.includes("\r\n") ? "\r\n" : "\n";
   const lines = markdown.split(/\r?\n/);
   const hasTrailingLineBreak = /\r?\n$/.test(markdown);
   const kept: string[] = [];
   let skipping = false;
-  let removed = false;
+  let replaced = false;
+  const replacementLines = [
+    "## Your Role",
+    "",
+    "You are part of an organization run by AI agents. Read `ROLE.md` for details.",
+  ];
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (!skipping && /^##\s+first run\s*$/i.test(trimmed)) {
       skipping = true;
-      removed = true;
+      replaced = true;
+      kept.push(...replacementLines);
       continue;
     }
     if (skipping) {
@@ -852,7 +858,7 @@ function removeFirstRunSection(markdown: string): string {
     kept.push(line);
   }
 
-  if (!removed) {
+  if (!replaced) {
     return markdown;
   }
 
