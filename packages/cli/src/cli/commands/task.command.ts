@@ -365,7 +365,7 @@ function parseStatusArgs(args: string[]): ParseStatusResult {
   if (!taskId || !status) {
     return {
       ok: false,
-      error: "Usage: opengoat task status <task-id> <status> [--reason <text>] [--ass <agent-id>]"
+      error: "Usage: opengoat task status <task-id> <status> [--reason <text>] [--as <agent-id>]"
     };
   }
 
@@ -373,10 +373,10 @@ function parseStatusArgs(args: string[]): ParseStatusResult {
   let reason: string | undefined;
   for (let index = 2; index < args.length; index += 1) {
     const token = args[index];
-    if (token === "--ass") {
+    if (token === "--as") {
       const value = args[index + 1]?.trim();
       if (!value) {
-        return { ok: false, error: "Missing value for --ass." };
+        return { ok: false, error: "Missing value for --as." };
       }
       actorId = value;
       index += 1;
@@ -411,7 +411,7 @@ function parseStatusArgs(args: string[]): ParseStatusResult {
 function parseEntryArgs(args: string[], kind: "blocker" | "artifact" | "worklog"): ParseEntryResult {
   const action = args[0]?.trim().toLowerCase();
   if (action !== "add") {
-    return { ok: false, error: `Usage: opengoat task ${kind} add <task-id> <content> [--ass <agent-id>]` };
+    return { ok: false, error: `Usage: opengoat task ${kind} add <task-id> <content> [--as <agent-id>]` };
   }
 
   const taskId = args[1]?.trim();
@@ -428,10 +428,10 @@ function parseEntryArgs(args: string[], kind: "blocker" | "artifact" | "worklog"
       continue;
     }
 
-    if (token === "--ass") {
+    if (token === "--as") {
       const value = args[index + 1]?.trim();
       if (!value) {
-        return { ok: false, error: "Missing value for --ass." };
+        return { ok: false, error: "Missing value for --as." };
       }
       actorId = value;
       index += 1;
@@ -525,11 +525,11 @@ function parseListArgs(args: string[]): ParseListResult {
       continue;
     }
 
-    if (token === "--ass") {
+    if (token === "--as") {
       const value = args[index + 1]?.trim();
       const normalizedAssignee = normalizeAgentId(value || "");
       if (!normalizedAssignee) {
-        return { ok: false, error: "Missing value for --ass." };
+        return { ok: false, error: "Missing value for --as." };
       }
       assignee = normalizedAssignee;
       index += 1;
@@ -547,7 +547,7 @@ function parseListArgs(args: string[]): ParseListResult {
   }
 
   if (!boardId && !assignee) {
-    return { ok: false, error: "Missing <board-id> or --ass <agent-id>." };
+    return { ok: false, error: "Missing <board-id> or --as <agent-id>." };
   }
 
   return {
@@ -563,13 +563,13 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write(
     "  opengoat task create [board-id] --title <title> --description <text> [--project <path|~>] [--owner <agent-id>] [--assign <agent-id>] [--status <todo|doing|pending|blocked|done>]\n"
   );
-  output.write("  opengoat task list <board-id> [--ass <agent-id>] [--json]\n");
-  output.write("  opengoat task list --ass <agent-id> [--json]\n");
+  output.write("  opengoat task list <board-id> [--as <agent-id>] [--json]\n");
+  output.write("  opengoat task list --as <agent-id> [--json]\n");
   output.write("  opengoat task show <task-id> [--json]\n");
-  output.write("  opengoat task status <task-id> <todo|doing|pending|blocked|done> [--reason <text>] [--ass <agent-id>]\n");
-  output.write("  opengoat task blocker add <task-id> <content> [--ass <agent-id>]\n");
-  output.write("  opengoat task artifact add <task-id> <content> [--ass <agent-id>]\n");
-  output.write("  opengoat task worklog add <task-id> <content> [--ass <agent-id>]\n");
+  output.write("  opengoat task status <task-id> <todo|doing|pending|blocked|done> [--reason <text>] [--as <agent-id>]\n");
+  output.write("  opengoat task blocker add <task-id> <content> [--as <agent-id>]\n");
+  output.write("  opengoat task artifact add <task-id> <content> [--as <agent-id>]\n");
+  output.write("  opengoat task worklog add <task-id> <content> [--as <agent-id>]\n");
   output.write("  opengoat task cron [--once] [--interval-minutes <n>] [--inactive-minutes <n>]\n");
 }
 
