@@ -18,7 +18,7 @@ For `opengoat agent ...`:
 
 1. resolve target agent (fallback to `ceo` if missing)
 2. prepare/resolve the agent session id
-3. invoke that OpenClaw agent directly with `--session-id <opengoat-session-id>`
+3. invoke that OpenClaw agent through gateway RPC with session key `agent:<agent-id>:<opengoat-session-id>`
 4. record assistant reply into session transcript
 5. persist run trace (`runs/<run-id>.json`)
 
@@ -66,7 +66,7 @@ Session behavior:
 - continuity per agent/session key
 - tied to project path
 - same key + different path rotates to a new session id
-- OpenGoat session id is the OpenClaw session id for that session (1:1 mapping)
+- OpenGoat session id maps to OpenClaw session key `agent:<agent-id>:<session-id>` (1:1 mapping)
 - if project path is omitted on later runs, OpenGoat reuses the stored path for that session key
 - OpenGoat injects project-path runtime context so project sessions stay anchored to the selected repo path
 

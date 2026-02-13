@@ -20,16 +20,18 @@ describe("openclaw provider", () => {
     });
 
     expect(invocation.command).toBe("openclaw");
-    expect(invocation.args).toEqual([
-      "agent",
-      "--agent",
-      "builder",
-      "--model",
-      "gpt-5",
-      "--full-auto",
-      "--message",
-      "ship",
-    ]);
+    expect(invocation.args.slice(0, 3)).toEqual(["gateway", "call", "agent"]);
+    expect(invocation.args).toContain("--expect-final");
+    expect(invocation.args).toContain("--json");
+    expect(invocation.args).toContain("--full-auto");
+
+    const params = readGatewayParams(invocation.args);
+    expect(params).toMatchObject({
+      message: "ship",
+      agentId: "builder",
+      model: "gpt-5",
+    });
+    expect(typeof params.idempotencyKey).toBe("string");
   });
 
   it("maps auth invocation with and without passthrough args", () => {
@@ -51,20 +53,34 @@ describe("openclaw provider", () => {
     ]);
   });
 
-  it("passes provider session id through --session-id", () => {
+  it("maps OpenGoat session ids into OpenClaw session keys", () => {
     const provider = new OpenClawProvider();
     const invocation = provider.buildInvocation({
       message: "continue",
+      agent: "builder",
       providerSessionId: "claw-session-7",
     });
 
-    expect(invocation.args).toEqual([
-      "agent",
-      "--session-id",
-      "claw-session-7",
-      "--message",
-      "continue",
-    ]);
+    const params = readGatewayParams(invocation.args);
+    expect(params).toMatchObject({
+      agentId: "builder",
+      sessionId: "claw-session-7",
+      sessionKey: "agent:builder:claw-session-7",
+    });
+  });
+
+  it("keeps explicit OpenClaw session keys as-is", () => {
+    const provider = new OpenClawProvider();
+    const invocation = provider.buildInvocation({
+      message: "continue",
+      agent: "ceo",
+      providerSessionId: "agent:ceo:custom-key",
+    });
+
+    const params = readGatewayParams(invocation.args);
+    expect(params).toMatchObject({
+      sessionKey: "agent:ceo:custom-key",
+    });
   });
 
   it("maps external agent creation invocation to top-level agents add command", () => {
@@ -137,19 +153,22 @@ describe("openclaw provider", () => {
     const invocation = provider.buildInvocation({
       message: "hello remote",
       env: {
-        OPENCLAW_ARGUMENTS: "--remote ws://localhost:18789 --token secret",
+        OPENCLAW_ARGUMENTS:
+          "--profile team-a --remote ws://localhost:18789 --token secret",
       },
     });
 
-    expect(invocation.args).toEqual([
-      "--remote",
-      "ws://localhost:18789",
-      "--token",
-      "secret",
+    expect(invocation.args.slice(0, 5)).toEqual([
+      "--profile",
+      "team-a",
+      "gateway",
+      "call",
       "agent",
-      "--message",
-      "hello remote",
     ]);
+    expect(invocation.args).toContain("--url");
+    expect(invocation.args).toContain("ws://localhost:18789");
+    expect(invocation.args).toContain("--token");
+    expect(invocation.args).toContain("secret");
   });
 
   it("prepends OPENCLAW_ARGUMENTS for create/delete/auth commands", () => {
@@ -196,3 +215,11 @@ describe("openclaw provider", () => {
     expect(entries).toContain("/usr/bin");
   });
 });
+
+function readGatewayParams(args: string[]): Record<string, unknown> {
+  const index = args.indexOf("--params");
+  expect(index).toBeGreaterThanOrEqual(0);
+  const value = args[index + 1];
+  expect(typeof value).toBe("string");
+  return JSON.parse(value ?? "{}") as Record<string, unknown>;
+}

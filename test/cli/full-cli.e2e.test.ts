@@ -266,7 +266,10 @@ describe("CLI full e2e smoke", () => {
         entry.includes("agents provider set ceo openclaw"),
       ),
     ).toBe(true);
-    expect(flattened.some((entry) => entry.includes("agent --agent developer"))).toBe(
+    expect(flattened.some((entry) => entry.includes("gateway call agent"))).toBe(
+      true,
+    );
+    expect(flattened.some((entry) => entry.includes('"agentId":"developer"'))).toBe(
       true,
     );
   });
@@ -355,6 +358,10 @@ async function createOpenClawStub(
       "if (normalized[0] === 'agents' && normalized[1] === 'provider' && normalized[2] === 'set') { process.stdout.write('provider-set-ok\\n'); process.exit(0); }",
       "if (normalized[0] === 'agents' && normalized[1] === 'add') { process.stdout.write('agent-created\\n'); process.exit(0); }",
       "if (normalized[0] === 'agents' && normalized[1] === 'delete') { process.stdout.write('agent-deleted\\n'); process.exit(0); }",
+      "if (normalized[0] === 'gateway' && normalized[1] === 'call' && normalized[2] === 'agent') {",
+      "  process.stdout.write(JSON.stringify({ runId: 'stub-run', status: 'ok', summary: 'completed', result: { payloads: [{ text: 'stub-agent-reply', mediaUrl: null }], meta: { agentMeta: { sessionId: 'stub-provider-session' } } } }) + '\\n');",
+      "  process.exit(0);",
+      "}",
       "if (normalized[0] === 'agent') { process.stdout.write('stub-agent-reply\\n'); process.exit(0); }",
       "process.stdout.write('openclaw-stub-ok\\n');",
       "function normalizeArgs(input) {",

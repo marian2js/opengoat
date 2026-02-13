@@ -7,6 +7,7 @@ import type {
   ProviderExecutionResult,
   ProviderInvokeOptions,
 } from "../../types.js";
+import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 
@@ -30,24 +31,25 @@ export class OpenClawProvider extends BaseCliProvider {
   }
 
   protected buildInvocationArgs(options: ProviderInvokeOptions): string[] {
-    const args = ["agent"];
+    const runtime = resolveGatewayInvocationRuntime(options.env);
+    const sessionKey = buildOpenClawSessionKey(options.agent, options.providerSessionId);
+    const args = [...runtime.globalArgs, "gateway", "call", "agent"];
 
-    if (options.agent) {
-      args.push("--agent", options.agent);
-    }
-
-    if (options.providerSessionId?.trim()) {
-      args.push("--session-id", options.providerSessionId.trim());
-    }
-
-    if (options.model) {
-      args.push("--model", options.model);
+    if (runtime.gatewayUrl && runtime.gatewayToken) {
+      args.push("--url", runtime.gatewayUrl, "--token", runtime.gatewayToken);
     }
 
     args.push(...(options.passthroughArgs ?? []));
-    args.push("--message", options.message);
+    args.push(
+      "--expect-final",
+      "--json",
+      "--timeout",
+      "630000",
+      "--params",
+      JSON.stringify(buildGatewayAgentParams(options, sessionKey))
+    );
 
-    return [...resolveOpenClawArguments(options.env), ...args];
+    return args;
   }
 
   protected override prepareExecutionEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -118,10 +120,63 @@ export class OpenClawProvider extends BaseCliProvider {
   public override async invoke(
     options: ProviderInvokeOptions,
   ): Promise<ProviderExecutionResult> {
-    const sessionId = options.providerSessionId?.trim();
+    const sessionKey = buildOpenClawSessionKey(options.agent, options.providerSessionId);
     const result = await super.invoke(options);
-    return attachProviderSessionId(result, sessionId);
+    const parsed = parseGatewayAgentResponse(result.stdout);
+    const normalizedStdout = parsed?.assistantText || result.stdout;
+    return attachProviderSessionId(
+      {
+        ...result,
+        stdout: normalizedStdout,
+      },
+      sessionKey ?? parsed?.providerSessionId
+    );
   }
+}
+
+function buildOpenClawSessionKey(
+  agentId: string | undefined,
+  providerSessionId: string | undefined
+): string | undefined {
+  const raw = providerSessionId?.trim();
+  if (!raw) {
+    return undefined;
+  }
+  if (raw.includes(":")) {
+    return raw.toLowerCase();
+  }
+  return `agent:${normalizeSessionSegment(agentId) || "main"}:${normalizeSessionSegment(raw) || "main"}`;
+}
+
+function buildGatewayAgentParams(
+  options: ProviderInvokeOptions,
+  sessionKey: string | undefined
+): Record<string, unknown> {
+  const params: Record<string, unknown> = {
+    message: options.message,
+    idempotencyKey: randomUUID().toLowerCase(),
+  };
+
+  const agentId = options.agent?.trim();
+  if (agentId) {
+    params.agentId = agentId;
+  }
+
+  const model = options.model?.trim();
+  if (model) {
+    params.model = model;
+  }
+
+  const providerSessionId = options.providerSessionId?.trim();
+  if (providerSessionId) {
+    params.sessionId = providerSessionId;
+  }
+
+  if (sessionKey) {
+    params.sessionKey = sessionKey;
+  }
+
+  return params;
 }
 
 function resolveOpenClawArguments(env: NodeJS.ProcessEnv | undefined): string[] {
@@ -134,6 +189,147 @@ function resolveOpenClawArguments(env: NodeJS.ProcessEnv | undefined): string[] 
     .split(" ")
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
+}
+
+function resolveGatewayInvocationRuntime(env: NodeJS.ProcessEnv | undefined): {
+  globalArgs: string[];
+  gatewayUrl?: string;
+  gatewayToken?: string;
+} {
+  const parsed = tokenizeArguments(env?.OPENCLAW_ARGUMENTS);
+  let gatewayUrl = env?.OPENCLAW_GATEWAY_URL?.trim();
+  let gatewayToken = env?.OPENCLAW_GATEWAY_PASSWORD?.trim();
+  const globalArgs: string[] = [];
+
+  for (let index = 0; index < parsed.length; index += 1) {
+    const token = parsed[index]?.trim();
+    if (!token) {
+      continue;
+    }
+
+    if (token === "--remote") {
+      const next = parsed[index + 1]?.trim();
+      if (next && !next.startsWith("--")) {
+        if (!gatewayUrl) {
+          gatewayUrl = next;
+        }
+        index += 1;
+      }
+      continue;
+    }
+
+    if (token === "--token") {
+      const next = parsed[index + 1]?.trim();
+      if (next && !next.startsWith("--")) {
+        if (!gatewayToken) {
+          gatewayToken = next;
+        }
+        index += 1;
+      }
+      continue;
+    }
+
+    globalArgs.push(token);
+  }
+
+  return {
+    globalArgs,
+    gatewayUrl,
+    gatewayToken,
+  };
+}
+
+function tokenizeArguments(raw: string | undefined): string[] {
+  const value = raw?.trim();
+  if (!value) {
+    return [];
+  }
+  return value
+    .split(" ")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function normalizeSessionSegment(value: string | undefined): string {
+  const normalized = (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9:-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized;
+}
+
+function parseGatewayAgentResponse(raw: string): {
+  assistantText: string;
+  providerSessionId?: string;
+} | null {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed) as unknown;
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+
+  const record = parsed as {
+    result?: {
+      payloads?: Array<{ text?: unknown; mediaUrl?: unknown; mediaUrls?: unknown }>;
+      meta?: { agentMeta?: { sessionId?: unknown } };
+    };
+  };
+
+  const lines: string[] = [];
+  for (const payload of record.result?.payloads ?? []) {
+    const text = typeof payload?.text === "string" ? payload.text.trim() : "";
+    if (text) {
+      lines.push(text);
+    }
+    for (const mediaUrl of normalizeMediaUrls(payload?.mediaUrl, payload?.mediaUrls)) {
+      lines.push(`MEDIA:${mediaUrl}`);
+    }
+  }
+
+  return {
+    assistantText: lines.join("\n\n").trim(),
+    providerSessionId:
+      typeof record.result?.meta?.agentMeta?.sessionId === "string"
+        ? record.result.meta.agentMeta.sessionId.trim() || undefined
+        : undefined,
+  };
+}
+
+function normalizeMediaUrls(mediaUrl: unknown, mediaUrls: unknown): string[] {
+  const urls: string[] = [];
+  if (typeof mediaUrl === "string") {
+    const normalized = mediaUrl.trim();
+    if (normalized) {
+      urls.push(normalized);
+    }
+  }
+
+  if (!Array.isArray(mediaUrls)) {
+    return urls;
+  }
+
+  for (const entry of mediaUrls) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+    const normalized = entry.trim();
+    if (normalized) {
+      urls.push(normalized);
+    }
+  }
+
+  return urls;
 }
 
 function dedupePathEntries(entries: string[]): string[] {

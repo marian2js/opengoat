@@ -21,7 +21,7 @@ Current policy:
 4. creating/deleting an OpenGoat agent syncs create/delete in OpenClaw.
 5. managers only manage direct reportees by org definition.
 6. sessions are preserved and tied to project path.
-7. each OpenGoat session maps 1:1 to an OpenClaw session id.
+7. each OpenGoat session maps 1:1 to an OpenClaw session key.
 8. every manager has a default board; manager task creation without a board uses this default board.
 9. default manager boards are immutable for deletion.
 
@@ -108,7 +108,7 @@ Session invariants:
 - session binds to agent + session key/id + project path
 - if the same session key is reused with a different path, OpenGoat rotates to a new session id
 - if a follow-up run omits project path, OpenGoat reuses the stored project path for that session key
-- OpenGoat reuses that same session id as OpenClaw `--session-id` for every run in the session
+- OpenGoat derives OpenClaw session key `agent:<agent-id>:<opengoat-session-id>` for every run in the session
 - runtime invocation reuses session project path for cwd and injects project context when workspace and project paths differ
 
 Storage:
@@ -174,7 +174,7 @@ If rebuilding from scratch, preserve these behaviors:
 4. `ceo` is undeletable.
 5. onboarding only configures OpenClaw local/external gateway.
 6. sessions enforce project-path safety/rotation.
-7. session ids map 1:1 to OpenClaw `--session-id` during runs.
+7. session ids map 1:1 to OpenClaw session keys (`agent:<agent-id>:<session-id>`) during runs.
 8. run traces are persisted under `runs/`.
 
 ## 13) Extensibility
