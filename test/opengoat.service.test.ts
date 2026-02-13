@@ -1,5 +1,6 @@
 import { constants } from "node:fs";
 import { access, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -269,6 +270,40 @@ describe("OpenGoatService", () => {
     expect(
       provider.createdAgents.filter((entry) => entry.agentId === "ceo").length,
     ).toBeGreaterThanOrEqual(2);
+  });
+
+  it("uses command overrides from execution env for OpenClaw passthrough", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const commandRunner = new FakeCommandRunner(async () => {
+      return {
+        code: 0,
+        stdout: "2026.2.9\n",
+        stderr: "",
+      };
+    });
+    const { service } = createService(
+      root,
+      new FakeOpenClawProvider(),
+      commandRunner,
+    );
+
+    const customCommand = "/tmp/custom-openclaw";
+    await service.runOpenClaw(["--version"], {
+      env: {
+        OPENCLAW_CMD: customCommand,
+        PATH: "",
+      },
+    });
+
+    expect(commandRunner.requests).toHaveLength(1);
+    expect(commandRunner.requests[0]?.command).toBe(customCommand);
+    const commandPathEntries =
+      commandRunner.requests[0]?.env?.PATH?.split(path.delimiter) ?? [];
+    expect(commandPathEntries).toContain(
+      path.join(homedir(), ".npm-global", "bin"),
+    );
   });
 
   it("syncs OpenClaw role skills for the created agent and its manager", async () => {
