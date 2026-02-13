@@ -99,3 +99,32 @@ body {
   background: hsl(var(--card)) !important;
   border: 1px solid hsl(var(--border)) !important;
 }
+
+@keyframes opengoat-ai-shimmer {
+  from {
+    background-position: 100% center;
+  }
+  to {
+    background-position: 0% center;
+  }
+}
+
+.opengoat-ai-shimmer {
+  display: inline-block;
+  color: transparent;
+  background-clip: text;
+  background-repeat: no-repeat, padding-box;
+  background-size:
+    250% 100%,
+    auto;
+  background-image:
+    linear-gradient(
+      90deg,
+      transparent calc(50% - var(--opengoat-shimmer-spread)),
+      hsl(var(--background)),
+      transparent calc(50% + var(--opengoat-shimmer-spread))
+    ),
+    linear-gradient(hsl(var(--muted-foreground)), hsl(var(--muted-foreground)));
+  animation: opengoat-ai-shimmer var(--opengoat-shimmer-duration) linear
+    infinite;
+}

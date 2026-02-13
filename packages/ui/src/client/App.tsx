@@ -943,6 +943,18 @@ export function App(): ReactElement {
     return sessionReasoningById[activeChatContext.chatKey] ?? [];
   }, [activeChatContext, sessionReasoningById]);
 
+  const sessionReasoningTranscript = useMemo(() => {
+    if (sessionReasoningEvents.length === 0) {
+      return "";
+    }
+    return sessionReasoningEvents
+      .map((event) => {
+        const level = event.level.toUpperCase();
+        return `[${level}] ${event.message}`;
+      })
+      .join("\n");
+  }, [sessionReasoningEvents]);
+
   useEffect(() => {
     if (!activeChatContext?.historyRef) {
       return;
@@ -3707,44 +3719,23 @@ export function App(): ReactElement {
                                   </MessageContent>
                                 </Message>
                               ))}
-                              {sessionChatStatus === "streaming" ? (
+                              {sessionReasoningEvents.length > 0 ||
+                              sessionChatStatus === "streaming" ? (
                                 <Message
                                   from="assistant"
                                   key={`${activeChatContext.chatKey}:thinking`}
                                 >
                                   <MessageContent className="w-full max-w-full bg-transparent px-0 py-0">
-                                    <Reasoning isStreaming>
+                                    <Reasoning
+                                      defaultOpen
+                                      isStreaming={
+                                        sessionChatStatus === "streaming"
+                                      }
+                                    >
                                       <ReasoningTrigger />
-                                      <ReasoningContent className="w-full max-w-full">
-                                        <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
-                                          {sessionReasoningEvents.length ===
-                                          0 ? (
-                                            <p className="text-xs text-muted-foreground">
-                                              Waiting for runtime updates...
-                                            </p>
-                                          ) : (
-                                            sessionReasoningEvents.map(
-                                              (event) => (
-                                                <p
-                                                  key={event.id}
-                                                  className={cn(
-                                                    "text-xs",
-                                                    event.level === "stderr"
-                                                      ? "text-amber-300"
-                                                      : "text-muted-foreground",
-                                                  )}
-                                                >
-                                                  <span className="mr-2 text-[10px] uppercase tracking-wide text-muted-foreground/80">
-                                                    {event.level}
-                                                  </span>
-                                                  <span>
-                                                    {event.message}
-                                                  </span>
-                                                </p>
-                                              ),
-                                            )
-                                          )}
-                                        </div>
+                                      <ReasoningContent className="max-h-56 overflow-y-auto pr-1">
+                                        {sessionReasoningTranscript ||
+                                          "Waiting for runtime updates..."}
                                       </ReasoningContent>
                                     </Reasoning>
                                   </MessageContent>
