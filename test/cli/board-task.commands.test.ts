@@ -326,67 +326,75 @@ describe("board/task CLI commands", () => {
     });
   });
 
-  it("task list filters by assignee across all boards", async () => {
+  it("task list filters by assignee across all tasks", async () => {
     const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
-    const listBoards = vi.fn(async () => [
+    const listLatestTasks = vi.fn(async () => [
       {
+        taskId: "task-a",
         boardId: "ceo-board",
-        title: "CEO Board",
         createdAt: "2026-02-10T00:00:00.000Z",
-        owner: "ceo"
-      },
-      {
-        boardId: "cto-board",
-        title: "CTO Board",
-        createdAt: "2026-02-10T00:00:00.000Z",
-        owner: "cto"
+        project: "~",
+        owner: "ceo",
+        assignedTo: "ceo",
+        title: "CEO task",
+        description: "A",
+        status: "todo",
+        blockers: [],
+        artifacts: [],
+        worklog: []
       }
     ]);
-    const listTasks = vi
-      .fn()
-      .mockResolvedValueOnce([
-        {
-          taskId: "task-a",
-          boardId: "ceo-board",
-          createdAt: "2026-02-10T00:00:00.000Z",
-          project: "~",
-          owner: "ceo",
-          assignedTo: "ceo",
-          title: "CEO task",
-          description: "A",
-          status: "todo",
-          blockers: [],
-          artifacts: [],
-          worklog: []
-        }
-      ])
-      .mockResolvedValueOnce([
-        {
-          taskId: "task-b",
-          boardId: "cto-board",
-          createdAt: "2026-02-10T00:00:00.000Z",
-          project: "~",
-          owner: "cto",
-          assignedTo: "cto",
-          title: "CTO task",
-          description: "B",
-          status: "todo",
-          blockers: [],
-          artifacts: [],
-          worklog: []
-        }
-      ]);
 
-    const { context, stdout } = createContext({ initialize, listBoards, listTasks });
+    const { context, stdout } = createContext({ initialize, listLatestTasks });
     const code = await taskCommand.run(["list", "--as", "ceo"], context);
 
     expect(code).toBe(0);
-    expect(listBoards).toHaveBeenCalledOnce();
-    expect(listTasks).toHaveBeenCalledTimes(2);
-    expect(listTasks).toHaveBeenNthCalledWith(1, "ceo-board");
-    expect(listTasks).toHaveBeenNthCalledWith(2, "cto-board");
+    expect(listLatestTasks).toHaveBeenCalledOnce();
+    expect(listLatestTasks).toHaveBeenCalledWith({ assignee: "ceo", limit: 100 });
     expect(stdout.output()).toContain("task-a");
-    expect(stdout.output()).not.toContain("task-b");
     expect(stdout.output()).toContain("board=ceo-board");
+  });
+
+  it("task list without arguments returns latest tasks sorted descending", async () => {
+    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const listLatestTasks = vi.fn(async () => [
+      {
+        taskId: "task-old",
+        boardId: "ceo-board",
+        createdAt: "2026-02-10T00:00:00.000Z",
+        project: "~",
+        owner: "ceo",
+        assignedTo: "ceo",
+        title: "Old task",
+        description: "old",
+        status: "todo",
+        blockers: [],
+        artifacts: [],
+        worklog: []
+      },
+      {
+        taskId: "task-new",
+        boardId: "cto-board",
+        createdAt: "2026-02-11T00:00:00.000Z",
+        project: "~",
+        owner: "cto",
+        assignedTo: "cto",
+        title: "New task",
+        description: "new",
+        status: "doing",
+        blockers: [],
+        artifacts: [],
+        worklog: []
+      }
+    ]);
+
+    const { context, stdout } = createContext({ initialize, listLatestTasks });
+    const code = await taskCommand.run(["list"], context);
+
+    expect(code).toBe(0);
+    expect(listLatestTasks).toHaveBeenCalledOnce();
+    expect(listLatestTasks).toHaveBeenCalledWith({ limit: 100 });
+    const output = stdout.output();
+    expect(output.indexOf("task-new")).toBeLessThan(output.indexOf("task-old"));
   });
 });

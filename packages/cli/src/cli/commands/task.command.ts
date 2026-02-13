@@ -1,6 +1,8 @@
 import { DEFAULT_AGENT_ID, normalizeAgentId, type TaskRecord } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
 
+const MAX_TASK_LIST_RESULTS = 100;
+
 export const taskCommand: CliCommand = {
   path: ["task"],
   description: "Manage board tasks.",
@@ -90,16 +92,16 @@ export const taskCommand: CliCommand = {
         if (parsed.boardId) {
           tasks = await context.service.listTasks(parsed.boardId);
         } else {
-          const boards = await context.service.listBoards();
-          const tasksByBoard = await Promise.all(
-            boards.map((board) => context.service.listTasks(board.boardId))
-          );
-          tasks = tasksByBoard.flat();
+          const latestOptions = parsed.assignee
+            ? { assignee: parsed.assignee, limit: MAX_TASK_LIST_RESULTS }
+            : { limit: MAX_TASK_LIST_RESULTS };
+          tasks = await context.service.listLatestTasks(latestOptions);
         }
 
-        if (parsed.assignee) {
+        if (parsed.boardId && parsed.assignee) {
           tasks = tasks.filter((task) => task.assignedTo === parsed.assignee);
         }
+        tasks = sortTasksByLatest(tasks);
 
         if (parsed.json) {
           context.stdout.write(`${JSON.stringify(tasks, null, 2)}\n`);
@@ -546,10 +548,6 @@ function parseListArgs(args: string[]): ParseListResult {
     boardId = token;
   }
 
-  if (!boardId && !assignee) {
-    return { ok: false, error: "Missing <board-id> or --as <agent-id>." };
-  }
-
   return {
     ok: true,
     boardId,
@@ -563,8 +561,7 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write(
     "  opengoat task create [board-id] --title <title> --description <text> [--project <path|~>] [--owner <agent-id>] [--assign <agent-id>] [--status <todo|doing|pending|blocked|done>]\n"
   );
-  output.write("  opengoat task list <board-id> [--as <agent-id>] [--json]\n");
-  output.write("  opengoat task list --as <agent-id> [--json]\n");
+  output.write("  opengoat task list [board-id] [--as <agent-id>] [--json]\n");
   output.write("  opengoat task show <task-id> [--json]\n");
   output.write("  opengoat task status <task-id> <todo|doing|pending|blocked|done> [--reason <text>] [--as <agent-id>]\n");
   output.write("  opengoat task blocker add <task-id> <content> [--as <agent-id>]\n");
@@ -583,5 +580,15 @@ function toErrorMessage(error: unknown): string {
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
+  });
+}
+
+function sortTasksByLatest(tasks: TaskRecord[]): TaskRecord[] {
+  return [...tasks].sort((left, right) => {
+    const createdAtComparison = right.createdAt.localeCompare(left.createdAt);
+    if (createdAtComparison !== 0) {
+      return createdAtComparison;
+    }
+    return right.taskId.localeCompare(left.taskId);
   });
 }

@@ -789,6 +789,11 @@ export class OpenGoatService {
     return this.boardService.listTasks(paths, boardId);
   }
 
+  public async listLatestTasks(options: { assignee?: string; limit?: number } = {}): Promise<TaskRecord[]> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.listLatestTasks(paths, options);
+  }
+
   public async getTask(taskId: string): Promise<TaskRecord> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.getTask(paths, taskId);

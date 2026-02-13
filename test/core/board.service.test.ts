@@ -418,6 +418,150 @@ describe("BoardService", () => {
     expect(refreshedTasks[0]?.title).toBe("Synced from external process");
   });
 
+  it("lists latest tasks across boards with limit and assignee filters", async () => {
+    const harness = await createHarness();
+
+    const ceoBoard = await harness.boardService.createBoard(harness.paths, "ceo", {
+      title: "CEO Board",
+    });
+    const ctoBoard = await harness.boardService.createBoard(harness.paths, "cto", {
+      title: "CTO Board",
+    });
+
+    const boardServiceInternals = harness.boardService as unknown as {
+      getDatabase: (paths: OpenGoatPaths) => Promise<unknown>;
+      execute: (db: unknown, sql: string, params?: unknown[]) => void;
+      persistDatabase: (paths: OpenGoatPaths, db: unknown) => Promise<void>;
+    };
+    const db = await boardServiceInternals.getDatabase(harness.paths);
+    const rows = [
+      {
+        taskId: "task-old",
+        boardId: ceoBoard.boardId,
+        createdAt: "2026-02-10T00:00:00.000Z",
+        owner: "ceo",
+        assignedTo: "cto",
+        title: "Old",
+      },
+      {
+        taskId: "task-mid",
+        boardId: ctoBoard.boardId,
+        createdAt: "2026-02-11T00:00:00.000Z",
+        owner: "cto",
+        assignedTo: "cto",
+        title: "Mid",
+      },
+      {
+        taskId: "task-new",
+        boardId: ctoBoard.boardId,
+        createdAt: "2026-02-12T00:00:00.000Z",
+        owner: "cto",
+        assignedTo: "engineer",
+        title: "New",
+      },
+    ];
+
+    for (const row of rows) {
+      boardServiceInternals.execute(
+        db,
+        `INSERT INTO tasks (
+           task_id,
+           board_id,
+           created_at,
+           project,
+           owner_agent_id,
+           assigned_to_agent_id,
+           title,
+           description,
+           status,
+           status_reason
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          row.taskId,
+          row.boardId,
+          row.createdAt,
+          "~",
+          row.owner,
+          row.assignedTo,
+          row.title,
+          `Description for ${row.taskId}`,
+          "todo",
+          null,
+        ],
+      );
+    }
+    await boardServiceInternals.persistDatabase(harness.paths, db);
+
+    const latestTwo = await harness.boardService.listLatestTasks(harness.paths, {
+      limit: 2,
+    });
+    expect(latestTwo.map((task) => task.taskId)).toEqual(["task-new", "task-mid"]);
+
+    const latestForCto = await harness.boardService.listLatestTasks(
+      harness.paths,
+      {
+        assignee: "cto",
+        limit: 10,
+      },
+    );
+    expect(latestForCto.map((task) => task.taskId)).toEqual([
+      "task-mid",
+      "task-old",
+    ]);
+  });
+
+  it("caps latest task listing to 100 results", async () => {
+    const harness = await createHarness();
+    const board = await harness.boardService.createBoard(harness.paths, "ceo", {
+      title: "Latest Limit",
+    });
+
+    const boardServiceInternals = harness.boardService as unknown as {
+      getDatabase: (paths: OpenGoatPaths) => Promise<unknown>;
+      execute: (db: unknown, sql: string, params?: unknown[]) => void;
+      persistDatabase: (paths: OpenGoatPaths, db: unknown) => Promise<void>;
+    };
+    const db = await boardServiceInternals.getDatabase(harness.paths);
+    for (let index = 0; index < 101; index += 1) {
+      const sequence = String(index).padStart(3, "0");
+      boardServiceInternals.execute(
+        db,
+        `INSERT INTO tasks (
+           task_id,
+           board_id,
+           created_at,
+           project,
+           owner_agent_id,
+           assigned_to_agent_id,
+           title,
+           description,
+           status,
+           status_reason
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          `task-${sequence}`,
+          board.boardId,
+          `2026-02-10T00:00:00.${sequence}Z`,
+          "~",
+          "ceo",
+          "ceo",
+          `Task ${sequence}`,
+          `Description ${sequence}`,
+          "todo",
+          null,
+        ],
+      );
+    }
+    await boardServiceInternals.persistDatabase(harness.paths, db);
+
+    const latest = await harness.boardService.listLatestTasks(harness.paths, {
+      limit: 500,
+    });
+    expect(latest).toHaveLength(100);
+    expect(latest[0]?.taskId).toBe("task-100");
+    expect(latest[99]?.taskId).toBe("task-001");
+  });
+
   it("creates an index for task status", async () => {
     const harness = await createHarness();
 
@@ -438,6 +582,16 @@ describe("BoardService", () => {
       "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_tasks_status';",
     );
     expect(rows[0]?.values[0]?.[0]).toBe("idx_tasks_status");
+    const createdAtIndexRows = db.exec(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_tasks_created_at';",
+    );
+    expect(createdAtIndexRows[0]?.values[0]?.[0]).toBe("idx_tasks_created_at");
+    const assigneeCreatedAtIndexRows = db.exec(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_tasks_assignee_created_at';",
+    );
+    expect(assigneeCreatedAtIndexRows[0]?.values[0]?.[0]).toBe(
+      "idx_tasks_assignee_created_at",
+    );
     db.close();
   });
 });

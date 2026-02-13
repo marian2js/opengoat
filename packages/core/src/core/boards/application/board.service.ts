@@ -24,6 +24,11 @@ interface BoardServiceDeps {
   agentManifestService: AgentManifestService;
 }
 
+interface ListLatestTasksOptions {
+  assignee?: string;
+  limit?: number;
+}
+
 interface BoardRow {
   board_id: string;
   title: string;
@@ -57,6 +62,7 @@ interface TaskIdRow {
 
 const TASK_STATUSES = ["todo", "doing", "pending", "blocked", "done"] as const;
 const DEFAULT_TASK_PROJECT = "~";
+const MAX_TASK_LIST_LIMIT = 100;
 const require = createRequire(import.meta.url);
 
 export class BoardService {
@@ -281,6 +287,32 @@ export class BoardService {
     return this.listTasksByBoardId(db, normalizedBoardId);
   }
 
+  public async listLatestTasks(paths: OpenGoatPaths, options: ListLatestTasksOptions = {}): Promise<TaskRecord[]> {
+    const db = await this.getDatabase(paths);
+    const limit = resolveTaskListLimit(options.limit);
+    const assignee = normalizeOptionalAssignee(options.assignee);
+    const rows = assignee
+      ? this.queryAll<TaskRow>(
+          db,
+          `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+           FROM tasks
+           WHERE assigned_to_agent_id = ?
+           ORDER BY created_at DESC, task_id DESC
+           LIMIT ?`,
+          [assignee, limit]
+        )
+      : this.queryAll<TaskRow>(
+          db,
+          `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+           FROM tasks
+           ORDER BY created_at DESC, task_id DESC
+           LIMIT ?`,
+          [limit]
+        );
+
+    return this.hydrateTaskRows(db, rows);
+  }
+
   public async getTask(paths: OpenGoatPaths, taskId: string): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
     const resolvedTaskId = this.resolveTaskId(db, taskId);
@@ -412,6 +444,10 @@ export class BoardService {
       [boardId]
     );
 
+    return this.hydrateTaskRows(db, rows);
+  }
+
+  private hydrateTaskRows(db: SqlJsDatabase, rows: TaskRow[]): TaskRecord[] {
     const tasks: TaskRecord[] = [];
     for (const row of rows) {
       tasks.push(this.hydrateTaskRow(db, row));
@@ -630,6 +666,11 @@ export class BoardService {
     );
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_tasks_board_id ON tasks(board_id);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);");
+    this.execute(db, "CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at, task_id);");
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_tasks_assignee_created_at ON tasks(assigned_to_agent_id, created_at, task_id);"
+    );
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_boards_owner_default ON boards(owner_agent_id, is_default);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_blockers_task_id ON task_blockers(task_id);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_artifacts_task_id ON task_artifacts(task_id);");
@@ -966,6 +1007,28 @@ function toTaskEntry(row: EntryRow): TaskEntry {
 function createEntityId(prefixSource: string): string {
   const prefix = normalizeAgentId(prefixSource) || "item";
   return `${prefix}-${randomUUID().slice(0, 8)}`;
+}
+
+function resolveTaskListLimit(rawLimit: number | undefined): number {
+  if (!Number.isFinite(rawLimit)) {
+    return MAX_TASK_LIST_LIMIT;
+  }
+  const parsedLimit = Math.trunc(rawLimit ?? MAX_TASK_LIST_LIMIT);
+  if (parsedLimit <= 0) {
+    return 1;
+  }
+  return Math.min(parsedLimit, MAX_TASK_LIST_LIMIT);
+}
+
+function normalizeOptionalAssignee(rawAssignee: string | undefined): string | undefined {
+  if (rawAssignee === undefined) {
+    return undefined;
+  }
+  const normalized = normalizeAgentId(rawAssignee);
+  if (!normalized) {
+    throw new Error("assignee cannot be empty.");
+  }
+  return normalized;
 }
 
 function isNotFound(error: unknown): error is NodeJS.ErrnoException {
