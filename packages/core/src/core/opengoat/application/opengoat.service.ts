@@ -722,7 +722,7 @@ export class OpenGoatService {
 
   public async getOpenClawGatewayConfig(): Promise<OpenClawGatewayConfig> {
     const paths = this.pathsProvider.getPaths();
-    return this.providerService.getOpenClawGatewayConfig(paths);
+    return this.providerService.getOpenClawGatewayConfig(paths, process.env);
   }
 
   public async setOpenClawGatewayConfig(

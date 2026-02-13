@@ -112,6 +112,12 @@ interface UiRunAgentOptions {
   onStderr?: (chunk: string) => void;
 }
 
+interface UiOpenClawGatewayConfig {
+  mode: "local" | "external";
+  gatewayUrl?: string;
+  gatewayToken?: string;
+}
+
 export interface OpenClawUiService {
   initialize?: () => Promise<unknown>;
   getHomeDir: () => string;
@@ -122,6 +128,7 @@ export interface OpenClawUiService {
   listSessions: (agentId?: string, options?: { activeMinutes?: number }) => Promise<SessionSummary[]>;
   listSkills: (agentId?: string) => Promise<ResolvedSkill[]>;
   listGlobalSkills: () => Promise<ResolvedSkill[]>;
+  getOpenClawGatewayConfig?: () => Promise<UiOpenClawGatewayConfig>;
   prepareSession?: (
     agentId?: string,
     options?: { sessionRef?: string; projectPath?: string; forceNew?: boolean }
@@ -1062,10 +1069,22 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     };
 
     const startedAtMs = Date.now();
+    let lastActivityAtMs = startedAtMs;
+    let runtimeRunId: string | undefined;
+    let fallbackRuntimeRunId: string | undefined;
+    let logCursor: number | undefined;
+    let logPoller: NodeJS.Timeout | undefined;
+    let telemetryWarningEmitted = false;
+    let pollRuntimeLogs: (() => Promise<void>) | undefined;
+    const seenRuntimeLogMessages = new Set<string>();
+
     const writeProgress = (
       phase: SessionMessageProgressPhase,
       progressMessage: string,
     ): void => {
+      if (phase !== "heartbeat") {
+        lastActivityAtMs = Date.now();
+      }
       writeEvent({
         type: "progress",
         phase,
@@ -1076,12 +1095,79 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
 
     writeProgress("queued", "Queued request.");
     const heartbeat = setInterval(() => {
+      if (Date.now() - lastActivityAtMs < 10_000) {
+        return;
+      }
       const elapsedSeconds = Math.max(
         1,
         Math.round((Date.now() - startedAtMs) / 1000),
       );
       writeProgress("heartbeat", `Still running... ${elapsedSeconds}s elapsed.`);
     }, 5000);
+
+    const startRuntimeLogPolling = async (runId: string): Promise<void> => {
+      runtimeRunId = runId;
+      if (typeof service.getOpenClawGatewayConfig !== "function") {
+        return;
+      }
+
+      let inFlight = false;
+      const poll = async (): Promise<void> => {
+        const primaryRunId = runtimeRunId;
+        if (inFlight || !primaryRunId) {
+          return;
+        }
+        inFlight = true;
+        try {
+          const tailed = await fetchOpenClawGatewayLogTail(service, {
+            cursor: logCursor,
+            limit: 200,
+            maxBytes: 250000,
+          });
+          logCursor = tailed.cursor;
+          const extracted = extractRuntimeActivityFromLogLines(tailed.lines, {
+            primaryRunId,
+            fallbackRunId: fallbackRuntimeRunId,
+            startedAtMs,
+          });
+          if (!fallbackRuntimeRunId && extracted.nextFallbackRunId) {
+            fallbackRuntimeRunId = extracted.nextFallbackRunId;
+          }
+          for (const activity of extracted.activities) {
+            const dedupeKey = `${activity.level}:${activity.message}`;
+            if (seenRuntimeLogMessages.has(dedupeKey)) {
+              continue;
+            }
+            seenRuntimeLogMessages.add(dedupeKey);
+            if (seenRuntimeLogMessages.size > 600) {
+              const first = seenRuntimeLogMessages.values().next().value;
+              if (first) {
+                seenRuntimeLogMessages.delete(first);
+              }
+            }
+            writeProgress(activity.level, activity.message);
+          }
+        } catch (error) {
+          if (!telemetryWarningEmitted) {
+            telemetryWarningEmitted = true;
+            const details =
+              error instanceof Error ? error.message : "unknown error";
+            writeProgress(
+              "stderr",
+              `Runtime telemetry unavailable (${truncateProgressLine(details)}).`,
+            );
+          }
+        } finally {
+          inFlight = false;
+        }
+      };
+
+      pollRuntimeLogs = poll;
+      void poll();
+      logPoller = setInterval(() => {
+        void poll();
+      }, 900);
+    };
 
     const emitRuntimeChunk = (phase: "stdout" | "stderr", chunk: string): void => {
       const cleaned = sanitizeRuntimeProgressChunk(chunk);
@@ -1120,10 +1206,15 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
           onEvent: (event) => {
             const phase = mapRunStageToProgressPhase(event.stage);
             writeProgress(phase, formatRunStatusMessage(event));
+            if (
+              (event.stage === "run_started" ||
+                event.stage === "provider_invocation_started") &&
+              event.runId &&
+              !logPoller
+            ) {
+              void startRuntimeLogPolling(event.runId);
+            }
           },
-        },
-        onStdout: (chunk) => {
-          emitRuntimeChunk("stdout", chunk);
         },
         onStderr: (chunk) => {
           emitRuntimeChunk("stderr", chunk);
@@ -1158,6 +1249,16 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
       });
     } finally {
       clearInterval(heartbeat);
+      if (logPoller) {
+        clearInterval(logPoller);
+      }
+      if (pollRuntimeLogs) {
+        try {
+          await pollRuntimeLogs();
+        } catch {
+          // Best-effort final flush.
+        }
+      }
       if (!raw.destroyed && !raw.writableEnded) {
         raw.end();
       }
@@ -1341,18 +1442,366 @@ function mapRunStageToProgressPhase(stage: UiRunEvent["stage"]): SessionMessageP
 }
 
 function formatRunStatusMessage(event: UiRunEvent): string {
+  const runSuffix = event.runId ? ` [${event.runId.slice(0, 8)}]` : "";
   switch (event.stage) {
     case "run_started":
-      return `Run started for @${event.agentId ?? DEFAULT_AGENT_ID}.`;
+      return `Run started for @${event.agentId ?? DEFAULT_AGENT_ID}${runSuffix}.`;
     case "provider_invocation_started":
-      return `Invoking provider${event.providerId ? ` (${event.providerId})` : ""}.`;
+      return `Invoking provider${event.providerId ? ` (${event.providerId})` : ""}${runSuffix}.`;
     case "provider_invocation_completed":
-      return `Provider completed${typeof event.code === "number" ? ` with code ${event.code}` : ""}.`;
+      return `Provider completed${typeof event.code === "number" ? ` with code ${event.code}` : ""}${runSuffix}.`;
     case "run_completed":
-      return "Run completed.";
+      return `Run completed${runSuffix}.`;
     default:
       return "Runtime update.";
   }
+}
+
+interface OpenClawGatewayLogTail {
+  cursor: number;
+  lines: string[];
+  reset: boolean;
+}
+
+export interface RuntimeLogExtractionOptions {
+  primaryRunId: string;
+  fallbackRunId?: string;
+  startedAtMs: number;
+}
+
+export interface RuntimeLogExtractionResult {
+  activities: Array<{ level: "stdout" | "stderr"; message: string }>;
+  nextFallbackRunId?: string;
+}
+
+interface ParsedRuntimeLogLine {
+  message: string;
+  runId?: string;
+  logLevel: string;
+  timestampMs?: number;
+}
+
+async function fetchOpenClawGatewayLogTail(
+  service: OpenClawUiService,
+  params: {
+    cursor?: number;
+    limit: number;
+    maxBytes: number;
+  }
+): Promise<OpenClawGatewayLogTail> {
+  if (typeof service.getOpenClawGatewayConfig !== "function") {
+    throw new Error("Gateway config lookup is unavailable.");
+  }
+
+  const gatewayConfig = await service.getOpenClawGatewayConfig();
+  const args = [
+    "gateway",
+    "call",
+    "logs.tail",
+    "--json",
+    "--timeout",
+    "5000",
+    "--params",
+    JSON.stringify({
+      ...(typeof params.cursor === "number" ? { cursor: params.cursor } : {}),
+      limit: params.limit,
+      maxBytes: params.maxBytes
+    })
+  ];
+
+  if (
+    gatewayConfig.mode === "external" &&
+    gatewayConfig.gatewayUrl?.trim() &&
+    gatewayConfig.gatewayToken?.trim()
+  ) {
+    args.push(
+      "--url",
+      gatewayConfig.gatewayUrl.trim(),
+      "--token",
+      gatewayConfig.gatewayToken.trim()
+    );
+  }
+
+  const command = process.env.OPENCLAW_CMD?.trim() || "openclaw";
+  const { stdout } = await execFileAsync(command, args, {
+    timeout: 6000,
+    env: process.env
+  });
+  const parsed = parseCommandJson(stdout);
+  const payload = resolveCommandPayload(parsed);
+  const cursorValue =
+    typeof payload?.cursor === "number" && Number.isFinite(payload.cursor)
+      ? payload.cursor
+      : 0;
+  const lines = Array.isArray(payload?.lines)
+    ? payload.lines.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const reset = payload?.reset === true;
+
+  return {
+    cursor: cursorValue,
+    lines,
+    reset
+  };
+}
+
+function resolveCommandPayload(
+  parsed: Record<string, unknown> | null
+): Record<string, unknown> | null {
+  if (!parsed) {
+    return null;
+  }
+
+  const result = parsed.result;
+  if (result && typeof result === "object") {
+    return result as Record<string, unknown>;
+  }
+
+  return parsed;
+}
+
+function parseCommandJson(value: string): Record<string, unknown> | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (parsed && typeof parsed === "object") {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // fall through
+  }
+
+  const lines = trimmed
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (!line?.startsWith("{") || !line.endsWith("}")) {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(line) as unknown;
+      if (parsed && typeof parsed === "object") {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // keep scanning
+    }
+  }
+
+  return null;
+}
+
+export function extractRuntimeActivityFromLogLines(
+  lines: string[],
+  options: RuntimeLogExtractionOptions
+): RuntimeLogExtractionResult {
+  const primaryRunId = options.primaryRunId.trim();
+  if (!primaryRunId) {
+    return {
+      activities: []
+    };
+  }
+
+  const fallbackRunId = options.fallbackRunId?.trim();
+  const activities: Array<{ level: "stdout" | "stderr"; message: string }> = [];
+  let nextFallbackRunId: string | undefined;
+
+  for (const line of lines) {
+    const parsed = parseRuntimeLogLine(line);
+    if (!parsed) {
+      continue;
+    }
+
+    const matchesPrimaryRun =
+      parsed.runId === primaryRunId || parsed.message.includes(primaryRunId);
+    const boundFallbackRunId = fallbackRunId || nextFallbackRunId;
+    const matchesFallbackRun = Boolean(
+      boundFallbackRunId &&
+        (parsed.runId === boundFallbackRunId ||
+          parsed.message.includes(boundFallbackRunId)),
+    );
+
+    const activeFallback = boundFallbackRunId;
+    const shouldAdoptFallback =
+      !matchesPrimaryRun &&
+      !matchesFallbackRun &&
+      !activeFallback &&
+      isEmbeddedRunStartMessage(parsed.message) &&
+      Boolean(parsed.runId) &&
+      isRecentRuntimeLog(parsed.timestampMs, options.startedAtMs);
+
+    if (shouldAdoptFallback) {
+      nextFallbackRunId = parsed.runId;
+    }
+
+    const matchesRun = matchesPrimaryRun || matchesFallbackRun || shouldAdoptFallback;
+    const hasBoundRun = matchesPrimaryRun || matchesFallbackRun || Boolean(activeFallback) || shouldAdoptFallback;
+    const isToolFailure = parsed.message.toLowerCase().includes("[tools]");
+    if (!matchesRun) {
+      if (!isToolFailure || !isRecentRuntimeLog(parsed.timestampMs, options.startedAtMs)) {
+        continue;
+      }
+      if (!hasBoundRun) {
+        continue;
+      }
+    }
+
+    if (!isRuntimeRelevantMessage(parsed.message)) {
+      continue;
+    }
+
+    const normalizedMessage = normalizeRuntimeLogMessage(parsed.message, [
+      primaryRunId,
+      fallbackRunId,
+      nextFallbackRunId
+    ]);
+    if (!normalizedMessage) {
+      continue;
+    }
+
+    activities.push({
+      level: resolveRuntimeLogLevel(parsed.logLevel, normalizedMessage),
+      message: truncateProgressLine(normalizedMessage),
+    });
+  }
+
+  return {
+    activities,
+    nextFallbackRunId
+  };
+}
+
+function parseRuntimeLogLine(line: string): ParsedRuntimeLogLine | null {
+  const parsed = parseCommandJson(line);
+  if (!parsed) {
+    return null;
+  }
+
+  const message = selectRuntimeLogMessage(parsed);
+  if (!message) {
+    return null;
+  }
+
+  const normalizedMessage = sanitizeRuntimeProgressChunk(
+    message.replace(/\s+/g, " "),
+  );
+  if (!normalizedMessage) {
+    return null;
+  }
+
+  const meta = parsed._meta;
+  const metaRecord =
+    meta && typeof meta === "object" ? (meta as Record<string, unknown>) : null;
+  const logLevel =
+    typeof metaRecord?.logLevelName === "string"
+      ? metaRecord.logLevelName.toLowerCase()
+      : "";
+  const timeRaw = typeof parsed.time === "string" ? parsed.time : undefined;
+  const timestampMs =
+    typeof timeRaw === "string" && Number.isFinite(Date.parse(timeRaw))
+      ? Date.parse(timeRaw)
+      : undefined;
+
+  return {
+    message: normalizedMessage,
+    runId: extractRunIdFromMessage(normalizedMessage),
+    logLevel,
+    timestampMs
+  };
+}
+
+function selectRuntimeLogMessage(parsed: Record<string, unknown>): string | null {
+  const primaryCandidates = [parsed["1"], parsed.message];
+  for (const candidate of primaryCandidates) {
+    if (typeof candidate !== "string") {
+      continue;
+    }
+    if (isRuntimeRelevantMessage(candidate)) {
+      return candidate;
+    }
+  }
+
+  const fallbackCandidate = parsed["0"];
+  if (typeof fallbackCandidate === "string" && isRuntimeRelevantMessage(fallbackCandidate)) {
+    return fallbackCandidate;
+  }
+
+  return null;
+}
+
+function isRuntimeRelevantMessage(message: string): boolean {
+  return /embedded run|session state|lane task|\[tools\]|tool start|tool end|tool failed|prompt start|prompt end|agent start|agent end|run done|aborted/i.test(
+    message,
+  );
+}
+
+function isEmbeddedRunStartMessage(message: string): boolean {
+  return /embedded run start/i.test(message);
+}
+
+function extractRunIdFromMessage(message: string): string | undefined {
+  const equalsMatch = message.match(/\brunId=([^\s]+)/i);
+  if (equalsMatch?.[1]) {
+    return equalsMatch[1];
+  }
+
+  const jsonMatch = message.match(/"runId"\s*:\s*"([^"]+)"/i);
+  if (jsonMatch?.[1]) {
+    return jsonMatch[1];
+  }
+
+  return undefined;
+}
+
+function isRecentRuntimeLog(
+  timestampMs: number | undefined,
+  runStartedAtMs: number
+): boolean {
+  if (typeof timestampMs !== "number" || !Number.isFinite(timestampMs)) {
+    return false;
+  }
+  return timestampMs >= runStartedAtMs - 2_000;
+}
+
+function normalizeRuntimeLogMessage(message: string, runIds: Array<string | undefined>): string {
+  let normalized = sanitizeRuntimeProgressChunk(message.replace(/\s+/g, " "));
+  for (const runId of runIds) {
+    const value = runId?.trim();
+    if (!value) {
+      continue;
+    }
+    normalized = sanitizeRuntimeProgressChunk(
+      normalized.replace(new RegExp(`\\brunId=${escapeRegExp(value)}\\b\\s*`, "g"), ""),
+    );
+  }
+  normalized = sanitizeRuntimeProgressChunk(
+    normalized.replace(/^\{\s*"?subsystem"?\s*:\s*"[^"]+"\s*\}\s*/i, ""),
+  );
+  return normalized;
+}
+
+function resolveRuntimeLogLevel(logLevel: string, message: string): "stdout" | "stderr" {
+  const lower = message.toLowerCase();
+  if (
+    logLevel === "warn" ||
+    logLevel === "error" ||
+    lower.includes(" failed") ||
+    lower.includes(" error") ||
+    lower.includes("aborted=true")
+  ) {
+    return "stderr";
+  }
+  return "stdout";
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function prepareProjectSession(

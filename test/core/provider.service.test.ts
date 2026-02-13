@@ -84,6 +84,27 @@ describe("ProviderService (OpenClaw runtime)", () => {
     expect(local.mode).toBe("local");
   });
 
+  it("resolves gateway config from effective runtime env overrides", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+    const { paths, fileSystem } = await createPaths(root);
+    const service = createProviderService(fileSystem, createRegistry(new FakeOpenClawProvider()));
+
+    await service.setProviderConfig(paths, "openclaw", {
+      OPENGOAT_OPENCLAW_GATEWAY_MODE: "local"
+    });
+
+    const resolved = await service.getOpenClawGatewayConfig(paths, {
+      OPENCLAW_ARGUMENTS: "--remote ws://env-host:18789 --token env-secret"
+    });
+
+    expect(resolved).toEqual({
+      mode: "external",
+      gatewayUrl: "ws://env-host:18789",
+      gatewayToken: "env-secret"
+    });
+  });
+
   it("throws InvalidProviderConfigError for invalid stored config", async () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);

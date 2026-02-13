@@ -152,9 +152,10 @@ function buildGatewayAgentParams(
   options: ProviderInvokeOptions,
   sessionKey: string | undefined
 ): Record<string, unknown> {
+  const idempotencyKey = options.idempotencyKey?.trim() || randomUUID().toLowerCase();
   const params: Record<string, unknown> = {
     message: options.message,
-    idempotencyKey: randomUUID().toLowerCase(),
+    idempotencyKey,
   };
 
   const agentId = options.agent?.trim();

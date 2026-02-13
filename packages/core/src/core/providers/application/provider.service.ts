@@ -165,9 +165,11 @@ export class ProviderService {
     return next;
   }
 
-  public async getOpenClawGatewayConfig(paths: OpenGoatPaths): Promise<OpenClawGatewayConfig> {
-    const config = await this.getProviderConfig(paths, OPENCLAW_PROVIDER_ID);
-    const env = config?.env ?? {};
+  public async getOpenClawGatewayConfig(
+    paths: OpenGoatPaths,
+    inputEnv?: NodeJS.ProcessEnv
+  ): Promise<OpenClawGatewayConfig> {
+    const env = await this.resolveProviderEnv(paths, inputEnv);
     const explicitMode = env.OPENGOAT_OPENCLAW_GATEWAY_MODE?.trim().toLowerCase();
     const parsedArgs = parseOpenClawArguments(env.OPENCLAW_ARGUMENTS ?? "");
 

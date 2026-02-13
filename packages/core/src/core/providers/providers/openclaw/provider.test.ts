@@ -34,6 +34,21 @@ describe("openclaw provider", () => {
     expect(typeof params.idempotencyKey).toBe("string");
   });
 
+  it("uses provided idempotency key for gateway calls", () => {
+    const provider = new OpenClawProvider();
+    const invocation = provider.buildInvocation({
+      message: "ship",
+      agent: "builder",
+      idempotencyKey: "run-1234",
+    });
+
+    const params = readGatewayParams(invocation.args);
+    expect(params).toMatchObject({
+      message: "ship",
+      idempotencyKey: "run-1234",
+    });
+  });
+
   it("maps auth invocation with and without passthrough args", () => {
     const provider = new OpenClawProvider();
 

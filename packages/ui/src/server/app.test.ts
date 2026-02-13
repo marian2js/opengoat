@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createOpenGoatUiServer, type OpenClawUiService } from "./app.js";
+import {
+  createOpenGoatUiServer,
+  extractRuntimeActivityFromLogLines,
+  type OpenClawUiService,
+} from "./app.js";
 
 interface AgentDescriptor {
   id: string;
@@ -88,6 +92,65 @@ afterEach(async () => {
     await activeServer.close();
     activeServer = undefined;
   }
+});
+
+describe("runtime log extraction", () => {
+  it("extracts run-matched OpenClaw runtime activity and strips run ids", () => {
+    const startedAtMs = Date.parse("2026-02-13T00:00:00.000Z");
+    const lines = [
+      JSON.stringify({
+        "1": "embedded run tool start: runId=run-abc tool=exec",
+        time: "2026-02-13T00:00:01.000Z",
+        _meta: { logLevelName: "DEBUG" },
+      }),
+    ];
+
+    const extracted = extractRuntimeActivityFromLogLines(lines, {
+      primaryRunId: "run-abc",
+      startedAtMs,
+    });
+
+    expect(extracted.nextFallbackRunId).toBeUndefined();
+    expect(extracted.activities).toEqual([
+      {
+        level: "stdout",
+        message: "embedded run tool start: tool=exec",
+      },
+    ]);
+  });
+
+  it("binds to embedded runtime run id when primary run id is not present", () => {
+    const startedAtMs = Date.parse("2026-02-13T00:00:00.000Z");
+    const lines = [
+      JSON.stringify({
+        "1": "embedded run start: runId=runtime-42 sessionId=session-1",
+        time: "2026-02-13T00:00:01.000Z",
+        _meta: { logLevelName: "DEBUG" },
+      }),
+      JSON.stringify({
+        "1": "embedded run tool end: runId=runtime-42 tool=exec durationMs=120",
+        time: "2026-02-13T00:00:02.000Z",
+        _meta: { logLevelName: "DEBUG" },
+      }),
+    ];
+
+    const extracted = extractRuntimeActivityFromLogLines(lines, {
+      primaryRunId: "orchestration-run-1",
+      startedAtMs,
+    });
+
+    expect(extracted.nextFallbackRunId).toBe("runtime-42");
+    expect(extracted.activities).toEqual([
+      {
+        level: "stdout",
+        message: "embedded run start: sessionId=session-1",
+      },
+      {
+        level: "stdout",
+        message: "embedded run tool end: tool=exec durationMs=120",
+      },
+    ]);
+  });
 });
 
 describe("OpenGoat UI server API", () => {
@@ -638,7 +701,6 @@ describe("OpenGoat UI server API", () => {
       .map((line) => JSON.parse(line) as { type: string; phase?: string; message?: string });
 
     expect(lines.some((line) => line.type === "progress" && line.phase === "run_started")).toBe(true);
-    expect(lines.some((line) => line.type === "progress" && line.phase === "stdout")).toBe(true);
     expect(lines.some((line) => line.type === "progress" && line.phase === "stderr")).toBe(true);
     expect(lines.some((line) => line.type === "result")).toBe(true);
     expect(runAgent).toHaveBeenCalledWith(
@@ -648,7 +710,6 @@ describe("OpenGoat UI server API", () => {
         sessionRef: "workspace:tmp",
         cwd: "/tmp",
         hooks: expect.any(Object),
-        onStdout: expect.any(Function),
         onStderr: expect.any(Function),
       }),
     );

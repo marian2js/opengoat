@@ -24,6 +24,7 @@ export interface ProviderInvokeOptions {
   sessionRef?: string;
   forceNewSession?: boolean;
   disableSession?: boolean;
+  idempotencyKey?: string;
   providerSessionId?: string;
   agent?: string;
   model?: string;

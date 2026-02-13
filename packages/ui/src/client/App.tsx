@@ -2040,12 +2040,6 @@ export function App(): ReactElement {
       content: userMessage,
     });
     replaceSessionReasoningEvents(chatKey, []);
-    appendSessionReasoningEvent(chatKey, {
-      id: `${chatKey}:reasoning:${Date.now()}:queued`,
-      level: "info",
-      timestamp: new Date().toISOString(),
-      message: "Queued request.",
-    });
     setSessionChatStatus("streaming");
 
     try {

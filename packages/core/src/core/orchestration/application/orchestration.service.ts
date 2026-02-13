@@ -151,6 +151,9 @@ export class OrchestrationService {
     });
 
     const invokeOptions = sanitizeProviderInvokeOptions(options);
+    if (behavior.runId) {
+      invokeOptions.idempotencyKey = behavior.runId;
+    }
     if (preparedSession.enabled) {
       invokeOptions.providerSessionId = preparedSession.info.sessionId;
       invokeOptions.cwd = resolveInvocationCwd(invokeOptions.cwd, preparedSession.info.projectPath);
