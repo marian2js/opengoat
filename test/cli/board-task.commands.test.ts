@@ -147,7 +147,7 @@ describe("board/task CLI commands", () => {
 
     const { context, stdout } = createContext({ initialize, updateTaskStatus });
 
-    const code = await taskCommand.run(["status", "task-1234abcd", "Doing", "--ass", "cto"], context);
+    const code = await taskCommand.run(["status", "task-1234abcd", "Doing", "--as", "cto"], context);
 
     expect(code).toBe(0);
     expect(updateTaskStatus).toHaveBeenCalledWith("cto", "task-1234abcd", "Doing", undefined);
@@ -174,7 +174,7 @@ describe("board/task CLI commands", () => {
 
     const { context, stdout } = createContext({ initialize, updateTaskStatus });
     const code = await taskCommand.run(
-      ["status", "task-1234abcd", "blocked", "--reason", "Waiting for DB migration", "--ass", "cto"],
+      ["status", "task-1234abcd", "blocked", "--reason", "Waiting for DB migration", "--as", "cto"],
       context
     );
 
@@ -188,7 +188,7 @@ describe("board/task CLI commands", () => {
     const updateTaskStatus = vi.fn();
     const { context, stderr } = createContext({ initialize, updateTaskStatus });
 
-    const code = await taskCommand.run(["status", "task-1234abcd", "pending", "--ass", "cto"], context);
+    const code = await taskCommand.run(["status", "task-1234abcd", "pending", "--as", "cto"], context);
 
     expect(code).toBe(1);
     expect(updateTaskStatus).not.toHaveBeenCalled();
@@ -215,7 +215,7 @@ describe("board/task CLI commands", () => {
     const { context, stdout } = createContext({ initialize, addTaskBlocker });
 
     const code = await taskCommand.run(
-      ["blocker", "add", "task-1234abcd", "Waiting", "for", "auth", "token", "--ass", "cto"],
+      ["blocker", "add", "task-1234abcd", "Waiting", "for", "auth", "token", "--as", "cto"],
       context
     );
 
@@ -378,7 +378,7 @@ describe("board/task CLI commands", () => {
       ]);
 
     const { context, stdout } = createContext({ initialize, listBoards, listTasks });
-    const code = await taskCommand.run(["list", "--ass", "ceo"], context);
+    const code = await taskCommand.run(["list", "--as", "ceo"], context);
 
     expect(code).toBe(0);
     expect(listBoards).toHaveBeenCalledOnce();

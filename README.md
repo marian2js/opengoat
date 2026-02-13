@@ -108,7 +108,7 @@ opengoat agent ceo \
 ```bash
 opengoat board create "Platform"
 opengoat task create --title "Ship auth" --description "Finish middleware + tests" --owner cto --assign engineer
-opengoat task list --ass engineer
+opengoat task list --as engineer
 opengoat task status <task-id> doing
 ```
 

@@ -29,7 +29,7 @@ opengoat agent info <me>
 ```bash
 opengoat board list --owner <me>
 opengoat board show <board-id>
-opengoat task list --ass <me>
+opengoat task list --as <me>
 opengoat task create --owner <me> --title "..." --description "..." --assign <agent-id> [--project <path>]
 opengoat task show <task-id>
 ```
@@ -50,7 +50,7 @@ Use the output to ensure:
 ### 2. Review tasks
 
 ```bash
-opengoat task list --ass <me>
+opengoat task list --as <me>
 opengoat task show <task-id>
 ```
 

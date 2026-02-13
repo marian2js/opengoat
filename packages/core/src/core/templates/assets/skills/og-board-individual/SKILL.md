@@ -25,14 +25,14 @@ You will typically have:
 ## Relevant commands
 
 ```bash
-opengoat task list <board-id> [--ass <me>] [--json]
+opengoat task list <board-id> [--as <me>] [--json]
 opengoat task show <task-id> [--json]
 
-opengoat task status <task-id> <todo|doing|blocked|pending|done> [--reason <reason>] [--ass <me>]
+opengoat task status <task-id> <todo|doing|blocked|pending|done> [--reason <reason>] [--as <me>]
 
-opengoat task blocker add <task-id> <content> [--ass <me>]
-opengoat task artifact add <task-id> <content> [--ass <me>]
-opengoat task worklog add <task-id> <content> [--ass <me>]
+opengoat task blocker add <task-id> <content> [--as <me>]
+opengoat task artifact add <task-id> <content> [--as <me>]
+opengoat task worklog add <task-id> <content> [--as <me>]
 ```
 
 ## View tasks
@@ -54,7 +54,7 @@ opengoat task list <board-id>
 List tasks owned by an agent (often: you):
 
 ```bash
-opengoat task list --ass <me>
+opengoat task list --as <me>
 ```
 
 ### List tasks by status (practical approach)
@@ -119,7 +119,7 @@ opengoat task status <task-id> done --reason "Merged PR #123 and deployed"
 Some contexts require specifying an assignee context explicitly.
 
 ```bash
-opengoat task status <task-id> doing --ass <agent-id>
+opengoat task status <task-id> doing --as <agent-id>
 ```
 
 ## Blockers, artifacts, worklogs
@@ -129,7 +129,7 @@ opengoat task status <task-id> doing --ass <agent-id>
 Use this to capture what is blocking you and what unblocks you.
 
 ```bash
-opengoat task blocker add <task-id> "Blocked by <thing>. Unblocks when <condition>." --ass <me>
+opengoat task blocker add <task-id> "Blocked by <thing>. Unblocks when <condition>." --as <me>
 ```
 
 ### Add an artifact (proof of work)
@@ -137,7 +137,7 @@ opengoat task blocker add <task-id> "Blocked by <thing>. Unblocks when <conditio
 Use this for PR links, docs, screenshots, commands run, or final outputs.
 
 ```bash
-opengoat task artifact add <task-id> "PR: <link> | Docs: <link> | Output: <summary>" --ass <me>
+opengoat task artifact add <task-id> "PR: <link> | Docs: <link> | Output: <summary>" --as <me>
 ```
 
 ### Add a worklog update (progress notes)
@@ -145,7 +145,7 @@ opengoat task artifact add <task-id> "PR: <link> | Docs: <link> | Output: <summa
 Use for concise progress updates and handoffs.
 
 ```bash
-opengoat task worklog add <task-id> "Did X. Next: Y. Risk: Z." --ass <me>
+opengoat task worklog add <task-id> "Did X. Next: Y. Risk: Z." --as <me>
 ```
 
 ## Minimal hygiene
