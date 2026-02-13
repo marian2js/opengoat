@@ -60,8 +60,11 @@ import {
 import type { ChatStatus, FileUIPart } from "ai";
 import {
   Boxes,
+  CircleAlert,
+  CircleCheck,
   ChevronLeft,
   ChevronRight,
+  Download,
   Clock3,
   Folder,
   FolderOpen,
@@ -70,6 +73,7 @@ import {
   MessageSquare,
   MoreHorizontal,
   Plus,
+  RefreshCw,
   Settings,
   Sparkles,
   UsersRound,
@@ -195,6 +199,16 @@ interface TasksResponse {
 interface UiSettings {
   taskCronEnabled: boolean;
   taskCheckFrequencyMinutes: number;
+}
+
+interface UiVersionInfo {
+  packageName: string;
+  installedVersion: string | null;
+  latestVersion: string | null;
+  updateAvailable: boolean | null;
+  status: "latest" | "update-available" | "unknown";
+  checkedAt: string;
+  error?: string;
 }
 
 interface DashboardState {
@@ -524,6 +538,9 @@ export function App(): ReactElement {
   const [isTaskDetailsDialogOpen, setTaskDetailsDialogOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskDetailsError, setTaskDetailsError] = useState<string | null>(null);
+  const [versionInfo, setVersionInfo] = useState<UiVersionInfo | null>(null);
+  const [isVersionLoading, setVersionLoading] = useState(true);
+  const [versionError, setVersionError] = useState<string | null>(null);
   const [taskEntryDraft, setTaskEntryDraft] = useState<TaskEntryDraft>({
     kind: "worklog",
     content: "",
@@ -704,9 +721,46 @@ export function App(): ReactElement {
     });
   }, []);
 
+  const loadVersionInfo = useCallback(async () => {
+    setVersionLoading(true);
+    setVersionError(null);
+    try {
+      const payload = await fetchJson<{ version: UiVersionInfo }>(
+        "/api/version",
+      );
+      setVersionInfo(payload.version);
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to check OpenGoat updates.";
+      setVersionError(message);
+      setVersionInfo((current) => {
+        if (current) {
+          return current;
+        }
+        return {
+          packageName: "opengoat",
+          installedVersion: null,
+          latestVersion: null,
+          updateAvailable: null,
+          status: "unknown",
+          checkedAt: new Date().toISOString(),
+          error: message,
+        };
+      });
+    } finally {
+      setVersionLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    void loadVersionInfo();
+  }, [loadVersionInfo]);
 
   useEffect(() => {
     if (route.kind !== "agent") {
@@ -861,6 +915,60 @@ export function App(): ReactElement {
       projectPath: workspace.projectPath,
     }));
   }, [workspaceNodes]);
+
+  const versionStatus = useMemo(() => {
+    if (isVersionLoading && !versionInfo) {
+      return {
+        label: "Checking",
+        detail: "Checking npm for updates...",
+        icon: RefreshCw,
+        indicatorClassName: "text-muted-foreground",
+        badgeClassName:
+          "border-border/70 bg-muted/40 text-muted-foreground",
+      } as const;
+    }
+
+    if (versionInfo?.status === "update-available") {
+      return {
+        label: "Update",
+        detail: versionInfo.latestVersion
+          ? `Version ${versionInfo.latestVersion} is available.`
+          : "A newer version is available.",
+        icon: Download,
+        indicatorClassName: "text-amber-300",
+        badgeClassName:
+          "border-amber-500/40 bg-amber-500/10 text-amber-300",
+      } as const;
+    }
+
+    if (versionInfo?.status === "latest") {
+      return {
+        label: "Latest",
+        detail: versionInfo.latestVersion
+          ? `You're on the latest version (${versionInfo.latestVersion}).`
+          : "You're on the latest version.",
+        icon: CircleCheck,
+        indicatorClassName: "text-emerald-300",
+        badgeClassName:
+          "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+      } as const;
+    }
+
+    return {
+      label: "Unknown",
+      detail:
+        versionInfo?.error || versionError || "Unable to verify npm updates.",
+      icon: CircleAlert,
+      indicatorClassName: "text-muted-foreground",
+      badgeClassName:
+        "border-border/70 bg-muted/40 text-muted-foreground",
+    } as const;
+  }, [isVersionLoading, versionError, versionInfo]);
+
+  const installedVersionLabel =
+    versionInfo?.installedVersion?.trim() || "Unavailable";
+  const versionCheckedLabel = formatVersionCheckedAt(versionInfo?.checkedAt);
+  const versionSummaryLabel = `${versionStatus.label} · v${installedVersionLabel}`;
 
   const defaultTaskProjectPath = taskProjectOptions[0]?.projectPath ?? "~";
   const workspaceProjectNameByPath = useMemo(() => {
@@ -2815,6 +2923,86 @@ export function App(): ReactElement {
           </nav>
 
           <div className="border-t border-border p-3">
+            {!isSidebarCollapsed ? (
+              <div className="mb-2 rounded-lg border border-border/70 bg-gradient-to-br from-card to-accent/30 p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                      OpenGoat
+                    </p>
+                    <p className="truncate text-sm font-semibold">
+                      v{installedVersionLabel}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-medium uppercase tracking-wide",
+                      versionStatus.badgeClassName,
+                    )}
+                    title={versionStatus.detail}
+                  >
+                    <versionStatus.icon
+                      className={cn(
+                        "size-3",
+                        versionStatus.indicatorClassName,
+                        isVersionLoading && !versionInfo ? "animate-spin" : "",
+                      )}
+                    />
+                    {versionStatus.label}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {versionStatus.detail}
+                </p>
+                <div className="mt-2 flex items-center justify-between">
+                  <p className="text-[11px] text-muted-foreground">
+                    {versionCheckedLabel}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void loadVersionInfo();
+                    }}
+                    className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    aria-label="Refresh version status"
+                    title="Refresh version status"
+                    disabled={isVersionLoading}
+                  >
+                    <RefreshCw
+                      className={cn(
+                        "size-3.5",
+                        isVersionLoading ? "animate-spin" : "",
+                      )}
+                    />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-2 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void loadVersionInfo();
+                  }}
+                  className={cn(
+                    "inline-flex size-8 items-center justify-center rounded-md border transition-colors",
+                    "border-border/70 bg-accent/40 text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+                  )}
+                  aria-label="Refresh version status"
+                  title={versionSummaryLabel}
+                  disabled={isVersionLoading}
+                >
+                  <versionStatus.icon
+                    className={cn(
+                      "size-4",
+                      versionStatus.indicatorClassName,
+                      isVersionLoading && !versionInfo ? "animate-spin" : "",
+                    )}
+                  />
+                </button>
+              </div>
+            )}
+
             <div
               className={cn(
                 "flex items-center",
@@ -4620,6 +4808,36 @@ function resolveAgentRoleLabel(agent: Agent | undefined): string | undefined {
     return explicitRole;
   }
   return undefined;
+}
+
+function formatVersionCheckedAt(checkedAt: string | undefined): string {
+  const timestamp = checkedAt?.trim();
+  if (!timestamp) {
+    return "Version check pending";
+  }
+
+  const checkedAtMs = Date.parse(timestamp);
+  if (Number.isNaN(checkedAtMs)) {
+    return "Version check completed";
+  }
+
+  const ageMs = Math.max(0, Date.now() - checkedAtMs);
+  if (ageMs < 60_000) {
+    return "Checked just now";
+  }
+
+  const ageMinutes = Math.floor(ageMs / 60_000);
+  if (ageMinutes < 60) {
+    return `Checked ${ageMinutes}m ago`;
+  }
+
+  const ageHours = Math.floor(ageMinutes / 60);
+  if (ageHours < 24) {
+    return `Checked ${ageHours}h ago`;
+  }
+
+  const ageDays = Math.floor(ageHours / 24);
+  return `Checked ${ageDays}d ago`;
 }
 
 async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
