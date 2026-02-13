@@ -45,6 +45,7 @@ export interface ReasoningProps extends HTMLAttributes<HTMLDivElement> {
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   duration?: number;
+  autoCloseOnFinish?: boolean;
 }
 
 const AUTO_CLOSE_DELAY_MS = 1000;
@@ -58,6 +59,7 @@ export const Reasoning = memo(
     defaultOpen,
     onOpenChange,
     duration: durationProp,
+    autoCloseOnFinish = true,
     children,
     ...props
   }: ReasoningProps) => {
@@ -112,6 +114,9 @@ export const Reasoning = memo(
     }, [isStreaming, isOpen, isExplicitlyClosed, setIsOpen]);
 
     useEffect(() => {
+      if (!autoCloseOnFinish) {
+        return;
+      }
       if (
         hasEverStreamedRef.current &&
         !isStreaming &&
@@ -127,7 +132,7 @@ export const Reasoning = memo(
           window.clearTimeout(timer);
         };
       }
-    }, [isStreaming, isOpen, hasAutoClosed, setIsOpen]);
+    }, [autoCloseOnFinish, hasAutoClosed, isOpen, isStreaming, setIsOpen]);
 
     const value = useMemo<ReasoningContextValue>(
       () => ({

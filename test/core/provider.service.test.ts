@@ -72,7 +72,8 @@ describe("ProviderService (OpenClaw runtime)", () => {
     expect(resolved).toEqual({
       mode: "external",
       gatewayUrl: "ws://remote-host:18789",
-      gatewayToken: "secret-token"
+      gatewayToken: "secret-token",
+      command: "openclaw"
     });
 
     const config = await service.getProviderConfig(paths, "openclaw");
@@ -101,7 +102,8 @@ describe("ProviderService (OpenClaw runtime)", () => {
     expect(resolved).toEqual({
       mode: "external",
       gatewayUrl: "ws://env-host:18789",
-      gatewayToken: "env-secret"
+      gatewayToken: "env-secret",
+      command: "openclaw"
     });
   });
 

@@ -120,6 +120,7 @@ interface UiOpenClawGatewayConfig {
   mode: "local" | "external";
   gatewayUrl?: string;
   gatewayToken?: string;
+  command?: string;
 }
 
 export interface OpenClawUiService {
@@ -1144,7 +1145,6 @@ function registerApiRoutes(
     };
 
     const startedAtMs = Date.now();
-    let lastActivityAtMs = startedAtMs;
     let runtimeRunId: string | undefined;
     let fallbackRuntimeRunId: string | undefined;
     let logCursor: number | undefined;
@@ -1157,9 +1157,6 @@ function registerApiRoutes(
       phase: SessionMessageProgressPhase,
       progressMessage: string,
     ): void => {
-      if (phase !== "heartbeat") {
-        lastActivityAtMs = Date.now();
-      }
       writeEvent({
         type: "progress",
         phase,
@@ -1169,16 +1166,6 @@ function registerApiRoutes(
     };
 
     writeProgress("queued", "Queued request.");
-    const heartbeat = setInterval(() => {
-      if (Date.now() - lastActivityAtMs < 10_000) {
-        return;
-      }
-      const elapsedSeconds = Math.max(
-        1,
-        Math.round((Date.now() - startedAtMs) / 1000),
-      );
-      writeProgress("heartbeat", `Still running... ${elapsedSeconds}s elapsed.`);
-    }, 5000);
 
     const startRuntimeLogPolling = async (runId: string): Promise<void> => {
       runtimeRunId = runId;
@@ -1226,10 +1213,12 @@ function registerApiRoutes(
           if (!telemetryWarningEmitted) {
             telemetryWarningEmitted = true;
             const details =
-              error instanceof Error ? error.message : "unknown error";
+              error instanceof Error ? error.message.toLowerCase() : "";
             writeProgress(
               "stderr",
-              `Runtime telemetry unavailable (${truncateProgressLine(details)}).`,
+              details.includes("enoent")
+                ? "Live activity is unavailable in this environment."
+                : "Live activity stream is temporarily unavailable.",
             );
           }
         } finally {
@@ -1323,7 +1312,6 @@ function registerApiRoutes(
         error: streamError,
       });
     } finally {
-      clearInterval(heartbeat);
       if (logPoller) {
         clearInterval(logPoller);
       }
@@ -1512,21 +1500,22 @@ function mapRunStageToProgressPhase(stage: UiRunEvent["stage"]): SessionMessageP
     case "run_completed":
       return "run_completed";
     default:
-      return "heartbeat";
+      return "stdout";
   }
 }
 
 function formatRunStatusMessage(event: UiRunEvent): string {
-  const runSuffix = event.runId ? ` [${event.runId.slice(0, 8)}]` : "";
   switch (event.stage) {
     case "run_started":
-      return `Run started for @${event.agentId ?? DEFAULT_AGENT_ID}${runSuffix}.`;
+      return `Starting @${event.agentId ?? DEFAULT_AGENT_ID}.`;
     case "provider_invocation_started":
-      return `Invoking provider${event.providerId ? ` (${event.providerId})` : ""}${runSuffix}.`;
+      return "Sending request to OpenClaw.";
     case "provider_invocation_completed":
-      return `Provider completed${typeof event.code === "number" ? ` with code ${event.code}` : ""}${runSuffix}.`;
+      return typeof event.code === "number" && event.code !== 0
+        ? `Provider finished with code ${event.code}.`
+        : "Provider returned a response.";
     case "run_completed":
-      return `Run completed${runSuffix}.`;
+      return "Run completed.";
     default:
       return "Runtime update.";
   }
@@ -1597,10 +1586,12 @@ async function fetchOpenClawGatewayLogTail(
     );
   }
 
-  const command = process.env.OPENCLAW_CMD?.trim() || "openclaw";
+  const command =
+    gatewayConfig.command?.trim() || process.env.OPENCLAW_CMD?.trim() || "openclaw";
+  const env = buildOpenClawExecutionEnv(process.env);
   const { stdout } = await execFileAsync(command, args, {
     timeout: 6000,
-    env: process.env
+    env
   });
   const parsed = parseCommandJson(stdout);
   const payload = resolveCommandPayload(parsed);
@@ -1736,13 +1727,14 @@ export function extractRuntimeActivityFromLogLines(
       fallbackRunId,
       nextFallbackRunId
     ]);
-    if (!normalizedMessage) {
+    const userFacingMessage = toUserFacingRuntimeMessage(normalizedMessage);
+    if (!userFacingMessage) {
       continue;
     }
 
     activities.push({
       level: resolveRuntimeLogLevel(parsed.logLevel, normalizedMessage),
-      message: truncateProgressLine(normalizedMessage),
+      message: truncateProgressLine(userFacingMessage),
     });
   }
 
@@ -1861,6 +1853,66 @@ function normalizeRuntimeLogMessage(message: string, runIds: Array<string | unde
   return normalized;
 }
 
+function toUserFacingRuntimeMessage(message: string): string | null {
+  const normalized = message.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const lower = normalized.toLowerCase();
+  const toolName = extractTokenFromMessage(normalized, "tool");
+  const durationMs = extractTokenFromMessage(normalized, "durationMs");
+
+  if (lower.includes("embedded run start")) {
+    return "Run accepted by OpenClaw.";
+  }
+  if (lower.includes("embedded run prompt start")) {
+    return "Preparing prompt and context.";
+  }
+  if (lower.includes("embedded run agent start")) {
+    return "Agent is reasoning.";
+  }
+  if (lower.includes("embedded run tool start")) {
+    return toolName ? `Running tool: ${toolName}.` : "Running a tool.";
+  }
+  if (lower.includes("embedded run tool end")) {
+    if (toolName && durationMs) {
+      return `Finished tool: ${toolName} (${durationMs} ms).`;
+    }
+    return toolName ? `Finished tool: ${toolName}.` : "Finished tool run.";
+  }
+  if (lower.includes("[tools]") && lower.includes("failed")) {
+    return toolName ? `Tool failed: ${toolName}.` : "A tool failed during execution.";
+  }
+  if (lower.includes("embedded run agent end")) {
+    return "Agent finished reasoning.";
+  }
+  if (lower.includes("embedded run prompt end")) {
+    return "Prompt execution completed.";
+  }
+  if (lower.includes("embedded run done")) {
+    if (lower.includes("aborted=true")) {
+      return "Run was aborted by the runtime.";
+    }
+    return "OpenClaw marked the run as done.";
+  }
+  if (lower.includes("session state")) {
+    return "Updating session state.";
+  }
+  if (lower.includes("lane task")) {
+    return "Processing task step.";
+  }
+
+  return normalized;
+}
+
+function extractTokenFromMessage(message: string, tokenName: string): string | undefined {
+  const match = message.match(
+    new RegExp(`\\b${escapeRegExp(tokenName)}=([^\\s]+)`, "i"),
+  );
+  return match?.[1];
+}
+
 function resolveRuntimeLogLevel(logLevel: string, message: string): "stdout" | "stderr" {
   const lower = message.toLowerCase();
   if (
@@ -1877,6 +1929,66 @@ function resolveRuntimeLogLevel(logLevel: string, message: string): "stdout" | "
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildOpenClawExecutionEnv(baseEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const preferredNodePaths = resolvePreferredOpenClawCommandPaths(baseEnv);
+  const existingPathEntries = (baseEnv.PATH ?? "").split(path.delimiter);
+  const mergedPath = dedupePathEntries([...preferredNodePaths, ...existingPathEntries]);
+
+  return {
+    ...baseEnv,
+    PATH: mergedPath.join(path.delimiter),
+  };
+}
+
+function dedupePathEntries(entries: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const rawEntry of entries) {
+    const entry = rawEntry.trim();
+    if (!entry || seen.has(entry)) {
+      continue;
+    }
+    seen.add(entry);
+    result.push(entry);
+  }
+
+  return result;
+}
+
+function resolvePreferredOpenClawCommandPaths(env: NodeJS.ProcessEnv): string[] {
+  const preferredPaths: string[] = [
+    path.dirname(process.execPath),
+    path.join(homedir(), ".npm-global", "bin"),
+    path.join(homedir(), ".npm", "bin"),
+    path.join(homedir(), ".local", "bin"),
+    path.join(homedir(), ".volta", "bin"),
+    path.join(homedir(), ".fnm", "current", "bin"),
+    path.join(homedir(), ".asdf", "shims"),
+    path.join(homedir(), "bin"),
+  ];
+
+  const npmPrefixCandidates = dedupePathEntries([
+    env.npm_config_prefix ?? "",
+    env.NPM_CONFIG_PREFIX ?? "",
+    process.env.npm_config_prefix ?? "",
+    process.env.NPM_CONFIG_PREFIX ?? "",
+  ]);
+  for (const prefix of npmPrefixCandidates) {
+    preferredPaths.push(path.join(prefix, "bin"));
+  }
+
+  if (process.platform === "darwin") {
+    preferredPaths.push(
+      "/opt/homebrew/bin",
+      "/opt/homebrew/opt/node@22/bin",
+      "/usr/local/opt/node@22/bin",
+    );
+  }
+
+  return preferredPaths;
 }
 
 async function prepareProjectSession(
