@@ -76,6 +76,7 @@ import {
 } from "lucide-react";
 import type { ComponentType, ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment } from "react";
 import { toast } from "sonner";
 
 type PageView = "overview" | "boards" | "agents" | "skills" | "settings";
@@ -977,6 +978,33 @@ export function App(): ReactElement {
       .map((line) => `- ${line}`)
       .join("\n");
   }, [sessionReasoningEvents]);
+
+  const lastAssistantMessageIndex = useMemo(() => {
+    for (let index = sessionMessages.length - 1; index >= 0; index -= 1) {
+      if (sessionMessages[index]?.role === "assistant") {
+        return index;
+      }
+    }
+    return -1;
+  }, [sessionMessages]);
+
+  const shouldRenderReasoning = useMemo(() => {
+    return (
+      sessionReasoningEvents.length > 0 || sessionChatStatus === "streaming"
+    );
+  }, [sessionReasoningEvents.length, sessionChatStatus]);
+
+  const shouldRenderReasoningBeforeAssistant = useMemo(() => {
+    return (
+      shouldRenderReasoning &&
+      sessionChatStatus !== "streaming" &&
+      lastAssistantMessageIndex >= 0
+    );
+  }, [
+    lastAssistantMessageIndex,
+    sessionChatStatus,
+    shouldRenderReasoning,
+  ]);
 
   useEffect(() => {
     if (!activeChatContext?.historyRef) {
@@ -3796,17 +3824,43 @@ export function App(): ReactElement {
                             />
                           ) : (
                             <>
-                              {sessionMessages.map((message) => (
-                                <Message from={message.role} key={message.id}>
-                                  <MessageContent>
-                                    <MessageResponse>
-                                      {message.content}
-                                    </MessageResponse>
-                                  </MessageContent>
-                                </Message>
+                              {sessionMessages.map((message, index) => (
+                                <Fragment key={message.id}>
+                                  {shouldRenderReasoningBeforeAssistant &&
+                                  index === lastAssistantMessageIndex ? (
+                                    <Message
+                                      from="assistant"
+                                      key={`${message.id}:thinking`}
+                                    >
+                                      <MessageContent className="w-full max-w-full bg-transparent px-0 py-0">
+                                        <Reasoning
+                                          autoCloseOnFinish={false}
+                                          defaultOpen
+                                          isStreaming={
+                                            sessionChatStatus === "streaming"
+                                          }
+                                        >
+                                          <ReasoningTrigger />
+                                          <ReasoningContent className="max-h-56 overflow-y-auto pr-1">
+                                            {sessionReasoningTranscript ||
+                                              "Waiting for runtime updates..."}
+                                          </ReasoningContent>
+                                        </Reasoning>
+                                      </MessageContent>
+                                    </Message>
+                                  ) : null}
+
+                                  <Message from={message.role}>
+                                    <MessageContent>
+                                      <MessageResponse>
+                                        {message.content}
+                                      </MessageResponse>
+                                    </MessageContent>
+                                  </Message>
+                                </Fragment>
                               ))}
-                              {sessionReasoningEvents.length > 0 ||
-                              sessionChatStatus === "streaming" ? (
+                              {shouldRenderReasoning &&
+                              !shouldRenderReasoningBeforeAssistant ? (
                                 <Message
                                   from="assistant"
                                   key={`${activeChatContext.chatKey}:thinking`}
