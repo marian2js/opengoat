@@ -977,6 +977,19 @@ describe("OpenGoat UI server API", () => {
       };
     });
     const listTasks = vi.fn<NonNullable<OpenClawUiService["listTasks"]>>(async () => [baseTask]);
+    const listLatestTasksPage = vi.fn<NonNullable<OpenClawUiService["listLatestTasksPage"]>>(async (_options) => {
+      return {
+        tasks: [
+          {
+            ...baseTask,
+            status: "doing"
+          }
+        ],
+        total: 201,
+        limit: 100,
+        offset: 100
+      };
+    });
     const createTask = vi.fn<NonNullable<OpenClawUiService["createTask"]>>(async (_actorId, boardId, options) => {
       return {
         ...baseTask,
@@ -1039,6 +1052,7 @@ describe("OpenGoat UI server API", () => {
         createBoard,
         updateBoard,
         listTasks,
+        listLatestTasksPage,
         createTask,
         updateTaskStatus,
         addTaskBlocker,
@@ -1060,6 +1074,35 @@ describe("OpenGoat UI server API", () => {
           tasks: [{ taskId: "task-plan" }]
         }
       ]
+    });
+
+    const listLatestTasksResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/tasks?page=2&pageSize=100&status=doing&assignee=developer&owner=ceo"
+    });
+    expect(listLatestTasksResponse.statusCode).toBe(200);
+    expect(listLatestTasksPage).toHaveBeenCalledWith({
+      assignee: "developer",
+      owner: "ceo",
+      status: "doing",
+      limit: 100,
+      offset: 100
+    });
+    expect(listLatestTasksResponse.json()).toMatchObject({
+      tasks: [{ taskId: "task-plan", status: "doing" }],
+      pagination: {
+        page: 2,
+        pageSize: 100,
+        total: 201,
+        totalPages: 3,
+        hasPrevious: true,
+        hasNext: true
+      },
+      filters: {
+        status: "doing",
+        assignee: "developer",
+        owner: "ceo"
+      }
     });
 
     const createBoardResponse = await activeServer.inject({

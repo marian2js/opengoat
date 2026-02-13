@@ -418,7 +418,7 @@ describe("BoardService", () => {
     expect(refreshedTasks[0]?.title).toBe("Synced from external process");
   });
 
-  it("lists latest tasks across boards with limit and assignee filters", async () => {
+  it("lists latest tasks across boards with paging and filters", async () => {
     const harness = await createHarness();
 
     const ceoBoard = await harness.boardService.createBoard(harness.paths, "ceo", {
@@ -508,6 +508,31 @@ describe("BoardService", () => {
       "task-mid",
       "task-old",
     ]);
+
+    const latestByOwner = await harness.boardService.listLatestTasks(
+      harness.paths,
+      {
+        owner: "cto",
+        status: "todo",
+        limit: 10,
+      },
+    );
+    expect(latestByOwner.map((task) => task.taskId)).toEqual([
+      "task-new",
+      "task-mid",
+    ]);
+
+    const latestPage = await harness.boardService.listLatestTasksPage(
+      harness.paths,
+      {
+        limit: 1,
+        offset: 1,
+      },
+    );
+    expect(latestPage.tasks.map((task) => task.taskId)).toEqual(["task-mid"]);
+    expect(latestPage.total).toBe(3);
+    expect(latestPage.limit).toBe(1);
+    expect(latestPage.offset).toBe(1);
   });
 
   it("caps latest task listing to 100 results", async () => {
@@ -591,6 +616,18 @@ describe("BoardService", () => {
     );
     expect(assigneeCreatedAtIndexRows[0]?.values[0]?.[0]).toBe(
       "idx_tasks_assignee_created_at",
+    );
+    const ownerCreatedAtIndexRows = db.exec(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_tasks_owner_created_at';",
+    );
+    expect(ownerCreatedAtIndexRows[0]?.values[0]?.[0]).toBe(
+      "idx_tasks_owner_created_at",
+    );
+    const statusCreatedAtIndexRows = db.exec(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_tasks_status_created_at';",
+    );
+    expect(statusCreatedAtIndexRows[0]?.values[0]?.[0]).toBe(
+      "idx_tasks_status_created_at",
     );
     db.close();
   });

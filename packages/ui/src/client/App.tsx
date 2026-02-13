@@ -58,7 +58,6 @@ import {
 } from "@xyflow/react";
 import type { ChatStatus, FileUIPart } from "ai";
 import {
-  Boxes,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -66,6 +65,7 @@ import {
   FolderOpen,
   FolderPlus,
   Home,
+  ListTodo,
   MessageSquare,
   MoreHorizontal,
   PenLine,
@@ -187,6 +187,23 @@ interface BoardRecord {
 
 interface BoardsResponse {
   boards: BoardRecord[];
+}
+
+interface TasksPageResponse {
+  tasks: TaskRecord[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    hasPrevious: boolean;
+    hasNext: boolean;
+  };
+  filters: {
+    status: string | null;
+    assignee: string | null;
+    owner: string | null;
+  };
 }
 
 interface UiSettings {
@@ -435,10 +452,12 @@ const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
 const DEFAULT_AGENT_ID = "ceo";
 const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
+const TASKS_TABLE_PAGE_SIZE = 100;
+const TASK_STATUS_FILTERS = ["todo", "doing", "pending", "blocked", "done"];
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
-  { id: "boards", label: "Boards", icon: Boxes },
+  { id: "boards", label: "Tasks", icon: ListTodo },
   { id: "agents", label: "Agents", icon: UsersRound },
   { id: "skills", label: "Skills", icon: Sparkles },
 ];
@@ -492,6 +511,14 @@ export function App(): ReactElement {
   const hydratedSessionIdsRef = useRef<Set<string>>(new Set());
   const [boardActorId, setBoardActorId] = useState("ceo");
   const [taskActorId, setTaskActorId] = useState("ceo");
+  const [taskTablePage, setTaskTablePage] = useState(1);
+  const [taskFilterStatus, setTaskFilterStatus] = useState("all");
+  const [taskFilterAssignee, setTaskFilterAssignee] = useState("all");
+  const [taskFilterOwner, setTaskFilterOwner] = useState("all");
+  const [tasksPageResponse, setTasksPageResponse] =
+    useState<TasksPageResponse | null>(null);
+  const [isTasksPageLoading, setTasksPageLoading] = useState(true);
+  const [tasksPageError, setTasksPageError] = useState<string | null>(null);
   const [newBoardTitle, setNewBoardTitle] = useState("");
   const [taskDraftByBoardId, setTaskDraftByBoardId] = useState<
     Record<string, TaskCreateDraft>
@@ -686,9 +713,57 @@ export function App(): ReactElement {
     });
   }, []);
 
+  const refreshTasksPage = useCallback(async () => {
+    setTasksPageLoading(true);
+    setTasksPageError(null);
+    try {
+      const params = new URLSearchParams({
+        page: String(taskTablePage),
+        pageSize: String(TASKS_TABLE_PAGE_SIZE),
+      });
+      if (taskFilterStatus !== "all") {
+        params.set("status", taskFilterStatus);
+      }
+      if (taskFilterAssignee !== "all") {
+        params.set("assignee", taskFilterAssignee);
+      }
+      if (taskFilterOwner !== "all") {
+        params.set("owner", taskFilterOwner);
+      }
+
+      const response = await fetchJson<TasksPageResponse>(
+        `/api/tasks?${params.toString()}`,
+      );
+      setTasksPageResponse(response);
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to load tasks.";
+      setTasksPageError(message);
+    } finally {
+      setTasksPageLoading(false);
+    }
+  }, [taskFilterAssignee, taskFilterOwner, taskFilterStatus, taskTablePage]);
+
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    void refreshTasksPage();
+  }, [refreshTasksPage]);
+
+  useEffect(() => {
+    const totalPages = tasksPageResponse?.pagination.totalPages;
+    if (!totalPages) {
+      return;
+    }
+    if (taskTablePage <= totalPages) {
+      return;
+    }
+    setTaskTablePage(totalPages);
+  }, [taskTablePage, tasksPageResponse?.pagination.totalPages]);
 
   useEffect(() => {
     if (route.kind !== "agent") {
@@ -1061,6 +1136,11 @@ export function App(): ReactElement {
   }, [activeChatContext]);
 
   const boards = state?.boards.boards ?? [];
+  const pagedTasks = tasksPageResponse?.tasks ?? [];
+  const ownerFilterOptions = useMemo(() => {
+    return [...agents].sort((left, right) => left.id.localeCompare(right.id));
+  }, [agents]);
+  const assigneeFilterOptions = ownerFilterOptions;
   const selectedBoard = useMemo(() => {
     if (route.kind !== "board") {
       return null;
@@ -1068,13 +1148,19 @@ export function App(): ReactElement {
     return boards.find((board) => board.boardId === route.boardId) ?? null;
   }, [boards, route]);
   const selectedTask = useMemo(() => {
-    if (!selectedBoard || !selectedTaskId) {
+    if (!selectedTaskId) {
       return null;
     }
-    return (
-      selectedBoard.tasks.find((task) => task.taskId === selectedTaskId) ?? null
-    );
-  }, [selectedBoard, selectedTaskId]);
+    if (selectedBoard) {
+      const boardTask =
+        selectedBoard.tasks.find((task) => task.taskId === selectedTaskId) ??
+        null;
+      if (boardTask) {
+        return boardTask;
+      }
+    }
+    return pagedTasks.find((task) => task.taskId === selectedTaskId) ?? null;
+  }, [pagedTasks, selectedBoard, selectedTaskId]);
   const selectedTaskActivity = useMemo(() => {
     if (!selectedTask) {
       return [];
@@ -1154,6 +1240,10 @@ export function App(): ReactElement {
 
   useEffect(() => {
     if (route.kind === "board") {
+      return;
+    }
+
+    if (route.kind === "page" && route.view === "boards") {
       return;
     }
 
@@ -1263,7 +1353,7 @@ export function App(): ReactElement {
         label: "Open Tasks",
         value: openTaskCount,
         hint: "Tasks not marked done",
-        icon: Boxes,
+        icon: ListTodo,
       },
     ];
   }, [openTaskCount, state]);
@@ -1900,6 +1990,7 @@ export function App(): ReactElement {
         toast.success(response.message ?? `Task \"${title}\" created.`);
       }
       await refreshBoards();
+      await refreshTasksPage();
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -1989,6 +2080,7 @@ export function App(): ReactElement {
         toast.success(response.message ?? `Task \"${taskId}\" updated.`);
       }
       await refreshBoards();
+      await refreshTasksPage();
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -2052,6 +2144,7 @@ export function App(): ReactElement {
         toast.success(response.message ?? `${label} added.`);
       }
       await refreshBoards();
+      await refreshTasksPage();
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -3622,44 +3715,256 @@ export function App(): ReactElement {
                 {route.kind === "page" && route.view === "boards" ? (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Boards</CardTitle>
-                      <CardDescription>
-                        Open a board to view tasks and manage work.
-                      </CardDescription>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <CardTitle>Tasks</CardTitle>
+                          <CardDescription>
+                            Newest tasks first, with server-side pagination and
+                            filters.
+                          </CardDescription>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium">
+                            {tasksPageResponse?.pagination.total ?? 0} total
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {isTasksPageLoading
+                              ? "Refreshing..."
+                              : `${pagedTasks.length} shown`}
+                          </p>
+                        </div>
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                      {boards.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          No boards found yet. Use Create Board in the header.
-                        </p>
+                    <CardContent className="space-y-4">
+                      <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+                        <div className="space-y-1">
+                          <label
+                            className="text-[11px] uppercase tracking-wide text-muted-foreground"
+                            htmlFor="taskFilterStatus"
+                          >
+                            Status
+                          </label>
+                          <select
+                            id="taskFilterStatus"
+                            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            value={taskFilterStatus}
+                            onChange={(event) => {
+                              setTaskFilterStatus(event.target.value);
+                              setTaskTablePage(1);
+                            }}
+                          >
+                            <option value="all">All statuses</option>
+                            {TASK_STATUS_FILTERS.map((status) => (
+                              <option key={status} value={status}>
+                                {status}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label
+                            className="text-[11px] uppercase tracking-wide text-muted-foreground"
+                            htmlFor="taskFilterAssignee"
+                          >
+                            Assignee
+                          </label>
+                          <select
+                            id="taskFilterAssignee"
+                            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            value={taskFilterAssignee}
+                            onChange={(event) => {
+                              setTaskFilterAssignee(event.target.value);
+                              setTaskTablePage(1);
+                            }}
+                          >
+                            <option value="all">All assignees</option>
+                            {assigneeFilterOptions.map((agent) => (
+                              <option key={agent.id} value={agent.id}>
+                                {agent.displayName} ({agent.id})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label
+                            className="text-[11px] uppercase tracking-wide text-muted-foreground"
+                            htmlFor="taskFilterOwner"
+                          >
+                            Owner
+                          </label>
+                          <select
+                            id="taskFilterOwner"
+                            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            value={taskFilterOwner}
+                            onChange={(event) => {
+                              setTaskFilterOwner(event.target.value);
+                              setTaskTablePage(1);
+                            }}
+                          >
+                            <option value="all">All owners</option>
+                            {ownerFilterOptions.map((agent) => (
+                              <option key={agent.id} value={agent.id}>
+                                {agent.displayName} ({agent.id})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex items-end">
+                          <Button
+                            variant="outline"
+                            className="w-full md:w-auto"
+                            onClick={() => {
+                              setTaskFilterStatus("all");
+                              setTaskFilterAssignee("all");
+                              setTaskFilterOwner("all");
+                              setTaskTablePage(1);
+                            }}
+                            disabled={
+                              taskFilterStatus === "all" &&
+                              taskFilterAssignee === "all" &&
+                              taskFilterOwner === "all"
+                            }
+                          >
+                            Reset Filters
+                          </Button>
+                        </div>
+                      </div>
+
+                      {tasksPageError ? (
+                        <p className="text-sm text-danger">{tasksPageError}</p>
+                      ) : null}
+
+                      {pagedTasks.length === 0 ? (
+                        <div className="rounded-lg border border-border/70 bg-background/30 px-4 py-8">
+                          <p className="text-sm text-muted-foreground">
+                            {isTasksPageLoading
+                              ? "Loading tasks..."
+                              : "No tasks matched your filters."}
+                          </p>
+                        </div>
                       ) : (
-                        <div className="space-y-2">
-                          {boards.map((board) => (
-                            <button
-                              key={board.boardId}
-                              type="button"
-                              className="flex w-full items-center justify-between rounded-md border border-border/80 bg-background/30 px-4 py-3 text-left transition-colors hover:bg-accent/50"
-                              onClick={() => {
-                                navigateToRoute({
-                                  kind: "board",
-                                  boardId: board.boardId,
-                                });
-                              }}
-                            >
-                              <div>
-                                <p className="font-medium">{board.title}</p>
-                                <p className="text-xs text-muted-foreground">{`${board.boardId} • owner @${board.owner}`}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm">
-                                  {board.tasks.length} tasks
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  Open
-                                </p>
-                              </div>
-                            </button>
-                          ))}
+                        <div className="overflow-hidden rounded-lg border border-border/80">
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full">
+                              <thead>
+                                <tr className="border-b border-border/70 bg-accent/25 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                  <th className="px-4 py-2 font-medium">Task</th>
+                                  <th className="px-4 py-2 font-medium">
+                                    Status
+                                  </th>
+                                  <th className="px-4 py-2 font-medium">
+                                    Assignee
+                                  </th>
+                                  <th className="px-4 py-2 font-medium">
+                                    Owner
+                                  </th>
+                                  <th className="px-4 py-2 font-medium">
+                                    Board
+                                  </th>
+                                  <th className="px-4 py-2 font-medium">
+                                    Created
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border/60">
+                                {pagedTasks.map((task) => (
+                                  <tr
+                                    key={task.taskId}
+                                    className="transition-colors hover:bg-accent/20"
+                                  >
+                                    <td className="max-w-[360px] px-4 py-3 align-top">
+                                      <button
+                                        type="button"
+                                        className="text-left"
+                                        onClick={() => {
+                                          handleOpenTaskDetails(task.taskId);
+                                        }}
+                                      >
+                                        <span className="block font-medium hover:underline">
+                                          {task.title}
+                                        </span>
+                                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                                          {task.taskId}
+                                        </span>
+                                      </button>
+                                    </td>
+                                    <td className="px-4 py-3 align-top">
+                                      <span
+                                        className={cn(
+                                          "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+                                          taskStatusPillClasses(task.status),
+                                        )}
+                                      >
+                                        {task.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-sm text-muted-foreground align-top">{`@${task.assignedTo}`}</td>
+                                    <td className="px-4 py-3 text-sm text-muted-foreground align-top">{`@${task.owner}`}</td>
+                                    <td className="px-4 py-3 align-top">
+                                      <button
+                                        type="button"
+                                        className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                                        onClick={() => {
+                                          navigateToRoute({
+                                            kind: "board",
+                                            boardId: task.boardId,
+                                          });
+                                        }}
+                                      >
+                                        {task.boardId}
+                                      </button>
+                                    </td>
+                                    <td className="px-4 py-3 text-xs text-muted-foreground align-top">
+                                      {new Date(task.createdAt).toLocaleString()}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-background/40 px-3 py-2">
+                            <p className="text-xs text-muted-foreground">
+                              {`Page ${
+                                tasksPageResponse?.pagination.page ?? 1
+                              } of ${
+                                tasksPageResponse?.pagination.totalPages ?? 1
+                              }`}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setTaskTablePage((current) =>
+                                    Math.max(1, current - 1),
+                                  );
+                                }}
+                                disabled={
+                                  isTasksPageLoading ||
+                                  !tasksPageResponse?.pagination.hasPrevious
+                                }
+                              >
+                                Previous
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setTaskTablePage((current) => current + 1);
+                                }}
+                                disabled={
+                                  isTasksPageLoading ||
+                                  !tasksPageResponse?.pagination.hasNext
+                                }
+                              >
+                                Next
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </CardContent>
@@ -3731,7 +4036,7 @@ export function App(): ReactElement {
                                 });
                               }}
                             >
-                              Back to Boards
+                              Back to Tasks
                             </Button>
                           </div>
                         </div>
@@ -4601,7 +4906,7 @@ function viewTitle(
     case "overview":
       return "Dashboard";
     case "boards":
-      return "Boards";
+      return "Tasks";
     case "agents":
       return "Agents";
     case "skills":
@@ -4657,7 +4962,7 @@ function parseRoute(pathname: string): AppRoute {
     }
   }
 
-  if (normalized === "/boards") {
+  if (normalized === "/tasks" || normalized === "/boards") {
     return { kind: "page", view: "boards" };
   }
 
@@ -4699,6 +5004,10 @@ function routeToPath(route: AppRoute): string {
 
   if (route.view === "overview") {
     return "/overview";
+  }
+
+  if (route.view === "boards") {
+    return "/tasks";
   }
 
   return `/${route.view}`;

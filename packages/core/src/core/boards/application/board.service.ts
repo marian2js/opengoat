@@ -26,7 +26,17 @@ interface BoardServiceDeps {
 
 interface ListLatestTasksOptions {
   assignee?: string;
+  owner?: string;
+  status?: string;
   limit?: number;
+  offset?: number;
+}
+
+interface ListLatestTasksPage {
+  tasks: TaskRecord[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 interface BoardRow {
@@ -58,6 +68,10 @@ interface EntryRow {
 
 interface TaskIdRow {
   task_id: string;
+}
+
+interface CountRow {
+  total: number;
 }
 
 const TASK_STATUSES = ["todo", "doing", "pending", "blocked", "done"] as const;
@@ -288,29 +302,43 @@ export class BoardService {
   }
 
   public async listLatestTasks(paths: OpenGoatPaths, options: ListLatestTasksOptions = {}): Promise<TaskRecord[]> {
+    const page = await this.listLatestTasksPage(paths, options);
+    return page.tasks;
+  }
+
+  public async listLatestTasksPage(paths: OpenGoatPaths, options: ListLatestTasksOptions = {}): Promise<ListLatestTasksPage> {
     const db = await this.getDatabase(paths);
     const limit = resolveTaskListLimit(options.limit);
-    const assignee = normalizeOptionalAssignee(options.assignee);
-    const rows = assignee
-      ? this.queryAll<TaskRow>(
-          db,
-          `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
-           FROM tasks
-           WHERE assigned_to_agent_id = ?
-           ORDER BY created_at DESC, task_id DESC
-           LIMIT ?`,
-          [assignee, limit]
-        )
-      : this.queryAll<TaskRow>(
-          db,
-          `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
-           FROM tasks
-           ORDER BY created_at DESC, task_id DESC
-           LIMIT ?`,
-          [limit]
-        );
+    const offset = resolveTaskListOffset(options.offset);
+    const filters = {
+      assignee: normalizeOptionalAssignee(options.assignee),
+      owner: normalizeOptionalOwner(options.owner),
+      status: normalizeOptionalStatus(options.status)
+    };
+    const { whereClause, params } = toLatestTaskFilters(filters);
+    const rows = this.queryAll<TaskRow>(
+      db,
+      `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+       FROM tasks
+       ${whereClause}
+       ORDER BY created_at DESC, task_id DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+    const countRow = this.queryOne<CountRow>(
+      db,
+      `SELECT COUNT(*) AS total
+       FROM tasks
+       ${whereClause}`,
+      params
+    );
 
-    return this.hydrateTaskRows(db, rows);
+    return {
+      tasks: this.hydrateTaskRows(db, rows),
+      total: Number(countRow?.total ?? 0),
+      limit,
+      offset
+    };
   }
 
   public async getTask(paths: OpenGoatPaths, taskId: string): Promise<TaskRecord> {
@@ -671,6 +699,14 @@ export class BoardService {
       db,
       "CREATE INDEX IF NOT EXISTS idx_tasks_assignee_created_at ON tasks(assigned_to_agent_id, created_at, task_id);"
     );
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_tasks_owner_created_at ON tasks(owner_agent_id, created_at, task_id);"
+    );
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_tasks_status_created_at ON tasks(status, created_at, task_id);"
+    );
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_boards_owner_default ON boards(owner_agent_id, is_default);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_blockers_task_id ON task_blockers(task_id);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_artifacts_task_id ON task_artifacts(task_id);");
@@ -1020,6 +1056,13 @@ function resolveTaskListLimit(rawLimit: number | undefined): number {
   return Math.min(parsedLimit, MAX_TASK_LIST_LIMIT);
 }
 
+function resolveTaskListOffset(rawOffset: number | undefined): number {
+  if (!Number.isFinite(rawOffset)) {
+    return 0;
+  }
+  return Math.max(0, Math.trunc(rawOffset ?? 0));
+}
+
 function normalizeOptionalAssignee(rawAssignee: string | undefined): string | undefined {
   if (rawAssignee === undefined) {
     return undefined;
@@ -1029,6 +1072,61 @@ function normalizeOptionalAssignee(rawAssignee: string | undefined): string | un
     throw new Error("assignee cannot be empty.");
   }
   return normalized;
+}
+
+function normalizeOptionalOwner(rawOwner: string | undefined): string | undefined {
+  if (rawOwner === undefined) {
+    return undefined;
+  }
+  const normalized = normalizeAgentId(rawOwner);
+  if (!normalized) {
+    throw new Error("owner cannot be empty.");
+  }
+  return normalized;
+}
+
+function normalizeOptionalStatus(rawStatus: string | undefined): string | undefined {
+  const normalized = rawStatus?.trim().toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  return normalized;
+}
+
+function toLatestTaskFilters(filters: {
+  assignee?: string;
+  owner?: string;
+  status?: string;
+}): {
+  whereClause: string;
+  params: string[];
+} {
+  const predicates: string[] = [];
+  const params: string[] = [];
+  if (filters.assignee) {
+    predicates.push("assigned_to_agent_id = ?");
+    params.push(filters.assignee);
+  }
+  if (filters.owner) {
+    predicates.push("owner_agent_id = ?");
+    params.push(filters.owner);
+  }
+  if (filters.status) {
+    predicates.push("status = ?");
+    params.push(filters.status);
+  }
+
+  if (predicates.length === 0) {
+    return {
+      whereClause: "",
+      params
+    };
+  }
+
+  return {
+    whereClause: `WHERE ${predicates.join(" AND ")}`,
+    params
+  };
 }
 
 function isNotFound(error: unknown): error is NodeJS.ErrnoException {

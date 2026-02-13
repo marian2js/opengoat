@@ -17,6 +17,8 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
 const MIN_TASK_CHECK_FREQUENCY_MINUTES = 1;
 const MAX_TASK_CHECK_FREQUENCY_MINUTES = 1440;
+const DEFAULT_TASK_LIST_PAGE_SIZE = 100;
+const MAX_TASK_LIST_PAGE_SIZE = 100;
 const UI_SETTINGS_FILENAME = "ui-settings.json";
 
 interface AgentDescriptor {
@@ -161,6 +163,13 @@ export interface OpenClawUiService {
     }
   ) => Promise<TaskRecord>;
   listTasks?: (boardId: string) => Promise<TaskRecord[]>;
+  listLatestTasksPage?: (options?: {
+    assignee?: string;
+    owner?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }) => Promise<{ tasks: TaskRecord[]; total: number; limit: number; offset: number }>;
   getTask?: (taskId: string) => Promise<TaskRecord>;
   updateTaskStatus?: (actorId: string, taskId: string, status: string, reason?: string) => Promise<TaskRecord>;
   addTaskBlocker?: (actorId: string, taskId: string, blocker: string) => Promise<TaskRecord>;
@@ -665,6 +674,51 @@ function registerApiRoutes(
       return {
         boardId,
         tasks
+      };
+    });
+  });
+
+  app.get<{
+    Querystring: {
+      page?: string;
+      pageSize?: string;
+      status?: string;
+      assignee?: string;
+      owner?: string;
+    };
+  }>("/api/tasks", async (request, reply) => {
+    return safeReply(reply, async () => {
+      const page = parseTaskListPage(request.query.page);
+      const pageSize = parseTaskListPageSize(request.query.pageSize);
+      const status = normalizeTaskListFilter(request.query.status);
+      const assignee = normalizeTaskListFilter(request.query.assignee);
+      const owner = normalizeTaskListFilter(request.query.owner);
+      const offset = (page - 1) * pageSize;
+
+      const result = await listUiLatestTasksPage(service, {
+        assignee: assignee ?? undefined,
+        owner: owner ?? undefined,
+        status: status ?? undefined,
+        limit: pageSize,
+        offset
+      });
+      const totalPages = result.total > 0 ? Math.ceil(result.total / pageSize) : 1;
+
+      return {
+        tasks: result.tasks,
+        pagination: {
+          page,
+          pageSize,
+          total: result.total,
+          totalPages,
+          hasPrevious: page > 1,
+          hasNext: page < totalPages
+        },
+        filters: {
+          status,
+          assignee,
+          owner
+        }
       };
     });
   });
@@ -2216,6 +2270,68 @@ async function listUiTasks(service: OpenClawUiService, boardId: string): Promise
   throw new Error("Task listing is unavailable on this runtime.");
 }
 
+async function listUiLatestTasksPage(
+  service: OpenClawUiService,
+  options: {
+    assignee?: string;
+    owner?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<{ tasks: TaskRecord[]; total: number; limit: number; offset: number }> {
+  const limit = parseTaskListPageSize(options.limit);
+  const offset = parseTaskListOffset(options.offset);
+  const status = normalizeTaskListFilter(options.status) ?? undefined;
+  const assignee = normalizeTaskListFilter(options.assignee) ?? undefined;
+  const owner = normalizeTaskListFilter(options.owner) ?? undefined;
+
+  if (typeof service.listLatestTasksPage === "function") {
+    return service.listLatestTasksPage({
+      assignee,
+      owner,
+      status,
+      limit,
+      offset
+    });
+  }
+
+  const summaries = await listUiBoards(service);
+  const tasksByBoard = await Promise.all(
+    summaries.map(async (summary) => {
+      return listUiTasks(service, summary.boardId);
+    })
+  );
+  const allTasks = tasksByBoard.flat();
+  const filteredTasks = allTasks
+    .filter((task) => {
+      if (status && task.status.trim().toLowerCase() !== status) {
+        return false;
+      }
+      if (assignee && task.assignedTo.trim().toLowerCase() !== assignee) {
+        return false;
+      }
+      if (owner && task.owner.trim().toLowerCase() !== owner) {
+        return false;
+      }
+      return true;
+    })
+    .sort((left, right) => {
+      const createdAtComparison = right.createdAt.localeCompare(left.createdAt);
+      if (createdAtComparison !== 0) {
+        return createdAtComparison;
+      }
+      return right.taskId.localeCompare(left.taskId);
+    });
+
+  return {
+    tasks: filteredTasks.slice(offset, offset + limit),
+    total: filteredTasks.length,
+    limit,
+    offset
+  };
+}
+
 async function updateUiTaskStatus(
   service: OpenClawUiService,
   actorId: string,
@@ -2460,6 +2576,64 @@ function normalizeRoleValue(rawRole: string | undefined): string | undefined {
     return normalized;
   }
   return undefined;
+}
+
+function parseTaskListPage(value: unknown): number {
+  const parsed = parsePositiveInteger(value);
+  if (!parsed) {
+    return 1;
+  }
+  return parsed;
+}
+
+function parseTaskListPageSize(value: unknown): number {
+  const parsed = parsePositiveInteger(value);
+  if (!parsed) {
+    return DEFAULT_TASK_LIST_PAGE_SIZE;
+  }
+  return Math.min(parsed, MAX_TASK_LIST_PAGE_SIZE);
+}
+
+function parseTaskListOffset(value: unknown): number {
+  const parsed =
+    typeof value === "number"
+      ? Number.isFinite(value)
+        ? Math.trunc(value)
+        : Number.NaN
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return 0;
+  }
+  return parsed;
+}
+
+function parsePositiveInteger(value: unknown): number | undefined {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return undefined;
+  }
+  return parsed;
+}
+
+function normalizeTaskListFilter(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  if (normalized === "all") {
+    return null;
+  }
+  return normalized;
 }
 
 function defaultUiServerSettings(): UiServerSettings {
