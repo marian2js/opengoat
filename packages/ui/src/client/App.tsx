@@ -426,6 +426,7 @@ interface OrgNodeData {
   displayName: string;
   role?: string;
   directReports: number;
+  totalReports: number;
   collapsed: boolean;
   onToggle: (agentId: string) => void;
 }
@@ -4234,7 +4235,7 @@ function OrganizationChartNode({
   id,
   data,
 }: NodeProps<OrgChartNode>): ReactElement {
-  const hasChildren = data.directReports > 0;
+  const hasReportees = data.totalReports > 0;
 
   return (
     <div className="relative w-[260px] rounded-xl border border-border/80 bg-card/95 px-3 py-3 shadow-sm">
@@ -4262,7 +4263,7 @@ function OrganizationChartNode({
           </div>
         </div>
 
-        {hasChildren ? (
+        {hasReportees ? (
           <button
             type="button"
             onClick={(event) => {
@@ -4277,15 +4278,14 @@ function OrganizationChartNode({
                 : `Collapse ${data.displayName}`
             }
           >
-            {data.collapsed ? "+" : "-"}
-            {data.directReports}
+            {data.totalReports}
           </button>
         ) : null}
       </div>
 
       <div className="mt-2 flex items-center gap-2">
         <p className="text-xs text-muted-foreground">
-          {hasChildren
+          {hasReportees
             ? `${data.directReports} direct report${
                 data.directReports > 1 ? "s" : ""
               }`
@@ -4431,6 +4431,7 @@ function buildFlowModel(params: {
   }
 
   dagre.layout(graph);
+  const totalReportsById = buildTotalReportsById(hierarchy.childrenById);
 
   const nodes = visibleNodeIds.map((agentId) => {
     const agent = hierarchy.agentsById.get(agentId);
@@ -4449,6 +4450,7 @@ function buildFlowModel(params: {
         displayName: agent?.displayName ?? agentId,
         role: resolveAgentRoleLabel(agent),
         directReports,
+        totalReports: totalReportsById.get(agentId) ?? 0,
         collapsed: collapsedNodeIds.has(agentId),
         onToggle,
       },
@@ -4473,6 +4475,48 @@ function buildFlowModel(params: {
     nodes,
     edges,
   };
+}
+
+function buildTotalReportsById(
+  childrenById: Map<string, string[]>,
+): Map<string, number> {
+  const descendantsById = new Map<string, Set<string>>();
+
+  const collectDescendants = (
+    agentId: string,
+    lineage: Set<string>,
+  ): Set<string> => {
+    const cached = descendantsById.get(agentId);
+    if (cached) {
+      return cached;
+    }
+
+    if (lineage.has(agentId)) {
+      return new Set();
+    }
+
+    const nextLineage = new Set(lineage);
+    nextLineage.add(agentId);
+
+    const descendants = new Set<string>();
+    for (const childId of childrenById.get(agentId) ?? []) {
+      descendants.add(childId);
+      for (const descendantId of collectDescendants(childId, nextLineage)) {
+        descendants.add(descendantId);
+      }
+    }
+
+    descendants.delete(agentId);
+    descendantsById.set(agentId, descendants);
+    return descendants;
+  };
+
+  const totalsById = new Map<string, number>();
+  for (const agentId of childrenById.keys()) {
+    totalsById.set(agentId, collectDescendants(agentId, new Set()).size);
+  }
+
+  return totalsById;
 }
 
 function normalizeReportsTo(value: string | null | undefined): string | null {
