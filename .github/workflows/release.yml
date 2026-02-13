@@ -20,16 +20,20 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
         with:
-          # verifying later needs history, or we bump blindly
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v2
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
 
-      - name: Setup Node.js 20.x
+      # Trusted Publishing requires Node 22.14+ and npm 11.5.1+ (per npm docs)
+      - name: Setup Node.js 22.14.0
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: "pnpm"
+          node-version: 22.14.0
+          cache: pnpm
+
+      - name: Upgrade npm (required for Trusted Publishing)
+        run: npm i -g npm@11.5.1
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
@@ -38,10 +42,10 @@ jobs:
         id: check_changesets
         run: |
           if [ -n "$(find .changeset -name '*.md' -not -name 'README.md')" ]; then
-            echo "has_changesets=true" >> $GITHUB_OUTPUT
+            echo "has_changesets=true" >> "$GITHUB_OUTPUT"
             echo "Changesets found."
           else
-            echo "has_changesets=false" >> $GITHUB_OUTPUT
+            echo "has_changesets=false" >> "$GITHUB_OUTPUT"
             echo "No changesets found."
           fi
 
@@ -59,17 +63,35 @@ jobs:
         if: steps.check_changesets.outputs.has_changesets == 'true'
         run: pnpm run build
 
-      - name: Publish to NPM
+      - name: Pack tarballs
         if: steps.check_changesets.outputs.has_changesets == 'true'
         run: |
-          pnpm --filter @opengoat/core publish --access public --no-git-checks --provenance
-          pnpm --filter opengoat publish --access public --no-git-checks --provenance
+          mkdir -p /tmp/npm-publish
+          pnpm -C packages/core pack --pack-destination /tmp/npm-publish
+          pnpm -C packages/cli pack --pack-destination /tmp/npm-publish
 
-      - name: Push Changes
+      - name: Publish to npm (Trusted Publishing / OIDC)
         if: steps.check_changesets.outputs.has_changesets == 'true'
         run: |
+          VERSION="$(node -p "require('./packages/cli/package.json').version")"
+          CORE_TGZ="/tmp/npm-publish/opengoat-core-${VERSION}.tgz"
+          CLI_TGZ="/tmp/npm-publish/opengoat-${VERSION}.tgz"
+
+          echo "Publishing version: ${VERSION}"
+          ls -la "$CORE_TGZ" "$CLI_TGZ"
+
+          # publish @opengoat/core
+          npm publish "$CORE_TGZ" --access public
+
+          # publish opengoat (from packages/cli, name is "opengoat")
+          npm publish "$CLI_TGZ" --access public
+
+      - name: Push Changes + Tag
+        if: steps.check_changesets.outputs.has_changesets == 'true'
+        run: |
+          VERSION="$(node -p "require('./packages/cli/package.json').version")"
           git add packages/core/package.json packages/cli/package.json CHANGELOG.md .changeset
-          git commit -m "chore: release $(node -p "require('./packages/cli/package.json').version")"
+          git commit -m "chore: release ${VERSION}"
+          git tag "v${VERSION}"
           git push
-          git tag v$(node -p "require('./packages/cli/package.json').version")
           git push --tags
