@@ -207,6 +207,7 @@ interface TasksPageResponse {
 }
 
 interface UiSettings {
+  taskCronEnabled: boolean;
   taskCheckFrequencyMinutes: number;
 }
 
@@ -453,7 +454,13 @@ const NODE_HEIGHT = 108;
 const DEFAULT_AGENT_ID = "ceo";
 const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
 const TASKS_TABLE_PAGE_SIZE = 100;
-const TASK_STATUS_FILTERS = ["todo", "doing", "pending", "blocked", "done"];
+const TASK_STATUS_OPTIONS = [
+  { value: "todo", label: "To do" },
+  { value: "doing", label: "In progress" },
+  { value: "pending", label: "Pending" },
+  { value: "blocked", label: "Blocked" },
+  { value: "done", label: "Done" },
+] as const;
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
@@ -540,6 +547,7 @@ export function App(): ReactElement {
   >(null);
   const [taskCheckFrequencyMinutesInput, setTaskCheckFrequencyMinutesInput] =
     useState(String(DEFAULT_TASK_CHECK_FREQUENCY_MINUTES));
+  const [taskCronEnabledInput, setTaskCronEnabledInput] = useState(true);
   const [isTaskDetailsDialogOpen, setTaskDetailsDialogOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskDetailsError, setTaskDetailsError] = useState<string | null>(null);
@@ -628,6 +636,7 @@ export function App(): ReactElement {
             .then((payload) => payload.settings)
             .catch(() => {
               return {
+                taskCronEnabled: true,
                 taskCheckFrequencyMinutes: DEFAULT_TASK_CHECK_FREQUENCY_MINUTES,
               } satisfies UiSettings;
             }),
@@ -645,6 +654,7 @@ export function App(): ReactElement {
       setTaskCheckFrequencyMinutesInput(
         String(settings.taskCheckFrequencyMinutes),
       );
+      setTaskCronEnabledInput(settings.taskCronEnabled);
       setSessionsByAgentId({
         [sessions.agentId]: sessions.sessions,
       });
@@ -1857,18 +1867,15 @@ export function App(): ReactElement {
   }
 
   async function handleSaveSettings(): Promise<void> {
-    const parsedFrequency = Number.parseInt(
-      taskCheckFrequencyMinutesInput.trim(),
-      10,
-    );
-    if (
-      !Number.isFinite(parsedFrequency) ||
-      parsedFrequency < 1 ||
-      parsedFrequency > 1440
-    ) {
+    const parsedFrequency = Number.parseInt(taskCheckFrequencyMinutesInput.trim(), 10);
+    const isFrequencyValid =
+      Number.isFinite(parsedFrequency) && parsedFrequency >= 1 && parsedFrequency <= 1440;
+    if (taskCronEnabledInput && !isFrequencyValid) {
       toast.error("Task Check Frequency must be an integer between 1 and 1440.");
       return;
     }
+    const fallbackFrequency = state?.settings.taskCheckFrequencyMinutes ?? DEFAULT_TASK_CHECK_FREQUENCY_MINUTES;
+    const resolvedFrequency = isFrequencyValid ? parsedFrequency : fallbackFrequency;
 
     setMutating(true);
     try {
@@ -1881,7 +1888,8 @@ export function App(): ReactElement {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          taskCheckFrequencyMinutes: parsedFrequency,
+          taskCronEnabled: taskCronEnabledInput,
+          taskCheckFrequencyMinutes: resolvedFrequency,
         }),
       });
 
@@ -1897,6 +1905,7 @@ export function App(): ReactElement {
       setTaskCheckFrequencyMinutesInput(
         String(response.settings.taskCheckFrequencyMinutes),
       );
+      setTaskCronEnabledInput(response.settings.taskCronEnabled);
       toast.success(response.message ?? "Settings updated.");
     } catch (requestError) {
       const message =
@@ -3281,11 +3290,11 @@ export function App(): ReactElement {
                               })
                             }
                           >
-                            <option value="todo">todo</option>
-                            <option value="doing">doing</option>
-                            <option value="pending">pending</option>
-                            <option value="blocked">blocked</option>
-                            <option value="done">done</option>
+                            {TASK_STATUS_OPTIONS.map((status) => (
+                              <option key={status.value} value={status.value}>
+                                {status.label}
+                              </option>
+                            ))}
                           </select>
                         </div>
                       </div>
@@ -3353,7 +3362,7 @@ export function App(): ReactElement {
                             taskStatusPillClasses(selectedTask.status),
                           )}
                         >
-                          {selectedTask.status}
+                          {taskStatusLabel(selectedTask.status)}
                         </span>
                       </div>
                     </div>
@@ -3376,11 +3385,11 @@ export function App(): ReactElement {
                             }))
                           }
                         >
-                          <option value="todo">todo</option>
-                          <option value="doing">doing</option>
-                          <option value="pending">pending</option>
-                          <option value="blocked">blocked</option>
-                          <option value="done">done</option>
+                          {TASK_STATUS_OPTIONS.map((status) => (
+                            <option key={status.value} value={status.value}>
+                              {status.label}
+                            </option>
+                          ))}
                         </select>
                         <Button
                           variant="secondary"
@@ -3754,9 +3763,9 @@ export function App(): ReactElement {
                             }}
                           >
                             <option value="all">All statuses</option>
-                            {TASK_STATUS_FILTERS.map((status) => (
-                              <option key={status} value={status}>
-                                {status}
+                            {TASK_STATUS_OPTIONS.map((status) => (
+                              <option key={status.value} value={status.value}>
+                                {status.label}
                               </option>
                             ))}
                           </select>
@@ -3898,7 +3907,7 @@ export function App(): ReactElement {
                                           taskStatusPillClasses(task.status),
                                         )}
                                       >
-                                        {task.status}
+                                        {taskStatusLabel(task.status)}
                                       </span>
                                     </td>
                                     <td className="px-4 py-3 text-sm text-muted-foreground align-top">{`@${task.assignedTo}`}</td>
@@ -4101,7 +4110,7 @@ export function App(): ReactElement {
                                           taskStatusPillClasses(task.status),
                                         )}
                                       >
-                                        {task.status}
+                                        {taskStatusLabel(task.status)}
                                       </span>
                                     </td>
                                   </tr>
@@ -4309,41 +4318,88 @@ export function App(): ReactElement {
                 ) : null}
 
                 {route.kind === "page" && route.view === "settings" ? (
-                  <Card className="max-w-2xl">
+                  <Card className="max-w-3xl border-border/80 bg-card/60">
                     <CardHeader>
                       <CardTitle>Settings</CardTitle>
                       <CardDescription>
-                        Runtime settings for the UI server.
+                        Configure runtime behavior for the OpenGoat UI server.
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-5">
-                      <div className="space-y-2">
-                        <label
-                          className="text-sm font-medium text-foreground"
-                          htmlFor="taskCheckFrequencyMinutes"
-                        >
-                          Task Check Frequency (minutes)
-                        </label>
-                        <Input
-                          id="taskCheckFrequencyMinutes"
-                          type="number"
-                          min={1}
-                          max={1440}
-                          step={1}
-                          value={taskCheckFrequencyMinutesInput}
-                          onChange={(event) => {
-                            setTaskCheckFrequencyMinutesInput(
-                              event.target.value,
-                            );
-                          }}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Controls how often the UI server runs task cron while
-                          it is running. Default is 1 minute.
-                        </p>
-                      </div>
+                    <CardContent className="space-y-6">
+                      <section className="rounded-lg border border-border/70 bg-background/40 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">Cron</p>
+                            <p className="text-xs text-muted-foreground">
+                              Enable or disable background task cron execution.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={taskCronEnabledInput}
+                            onClick={() => {
+                              setTaskCronEnabledInput((current) => !current);
+                            }}
+                            className={cn(
+                              "inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium transition-colors",
+                              taskCronEnabledInput
+                                ? "border-success/60 bg-success/20 text-success"
+                                : "border-border bg-background text-muted-foreground",
+                            )}
+                          >
+                            {taskCronEnabledInput ? "Enabled" : "Disabled"}
+                          </button>
+                        </div>
+                      </section>
 
-                      <div className="flex justify-end">
+                      <section
+                        className={cn(
+                          "rounded-lg border border-border/70 p-4",
+                          taskCronEnabledInput ? "bg-background/40" : "bg-muted/20",
+                        )}
+                      >
+                        <div className="space-y-2">
+                          <label
+                            className={cn(
+                              "text-sm font-medium",
+                              taskCronEnabledInput
+                                ? "text-foreground"
+                                : "text-muted-foreground",
+                            )}
+                            htmlFor="taskCheckFrequencyMinutes"
+                          >
+                            Task Check Frequency (minutes)
+                          </label>
+                          <Input
+                            id="taskCheckFrequencyMinutes"
+                            type="number"
+                            min={1}
+                            max={1440}
+                            step={1}
+                            value={taskCheckFrequencyMinutesInput}
+                            disabled={!taskCronEnabledInput}
+                            onChange={(event) => {
+                              setTaskCheckFrequencyMinutesInput(
+                                event.target.value,
+                              );
+                            }}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            {taskCronEnabledInput
+                              ? "How often cron runs while the UI server is active (1-1440 minutes)."
+                              : "Enable Cron to edit frequency."}
+                          </p>
+                        </div>
+                      </section>
+
+                      <div className="flex items-center justify-between rounded-lg border border-border/70 bg-background/30 px-4 py-3">
+                        <p className="text-xs text-muted-foreground">
+                          Current status:{" "}
+                          <span className="font-medium text-foreground">
+                            {taskCronEnabledInput ? "Cron enabled" : "Cron disabled"}
+                          </span>
+                        </p>
                         <Button
                           onClick={() => {
                             void handleSaveSettings();
@@ -5124,6 +5180,23 @@ function taskStatusPillClasses(status: string): string {
       return "bg-amber-500/20 text-amber-300";
     default:
       return "bg-accent text-foreground";
+  }
+}
+
+function taskStatusLabel(status: string): string {
+  switch (status.trim().toLowerCase()) {
+    case "todo":
+      return "To do";
+    case "doing":
+      return "In progress";
+    case "pending":
+      return "Pending";
+    case "blocked":
+      return "Blocked";
+    case "done":
+      return "Done";
+    default:
+      return status;
   }
 }
 

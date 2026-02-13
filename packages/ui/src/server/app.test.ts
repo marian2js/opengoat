@@ -190,6 +190,7 @@ describe("OpenGoat UI server API", () => {
     expect(defaultResponse.statusCode).toBe(200);
     expect(defaultResponse.json()).toMatchObject({
       settings: {
+        taskCronEnabled: true,
         taskCheckFrequencyMinutes: 1
       }
     });
@@ -198,12 +199,14 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/settings",
       payload: {
+        taskCronEnabled: false,
         taskCheckFrequencyMinutes: 5
       }
     });
     expect(updateResponse.statusCode).toBe(200);
     expect(updateResponse.json()).toMatchObject({
       settings: {
+        taskCronEnabled: false,
         taskCheckFrequencyMinutes: 5
       }
     });
@@ -215,6 +218,7 @@ describe("OpenGoat UI server API", () => {
     expect(updatedResponse.statusCode).toBe(200);
     expect(updatedResponse.json()).toMatchObject({
       settings: {
+        taskCronEnabled: false,
         taskCheckFrequencyMinutes: 5
       }
     });

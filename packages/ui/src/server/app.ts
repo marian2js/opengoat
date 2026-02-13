@@ -273,6 +273,7 @@ interface TaskCronRunResult {
 }
 
 interface UiServerSettings {
+  taskCronEnabled: boolean;
   taskCheckFrequencyMinutes: number;
 }
 
@@ -349,7 +350,8 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
   const taskCronScheduler = createTaskCronScheduler(
     app,
     service,
-    uiSettings.taskCheckFrequencyMinutes
+    uiSettings.taskCheckFrequencyMinutes,
+    uiSettings.taskCronEnabled
   );
   app.addHook("onClose", async () => {
     taskCronScheduler.stop();
@@ -361,6 +363,7 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
     updateSettings: async (nextSettings) => {
       uiSettings = nextSettings;
       await writeUiServerSettings(service.getHomeDir(), uiSettings);
+      taskCronScheduler.setEnabled(uiSettings.taskCronEnabled);
       taskCronScheduler.setTaskCheckFrequencyMinutes(uiSettings.taskCheckFrequencyMinutes);
     }
   });
@@ -400,9 +403,15 @@ function registerApiRoutes(
     });
   });
 
-  app.post<{ Body: { taskCheckFrequencyMinutes?: number } }>("/api/settings", async (request, reply) => {
+  app.post<{ Body: { taskCronEnabled?: boolean; taskCheckFrequencyMinutes?: number } }>("/api/settings", async (request, reply) => {
     return safeReply(reply, async () => {
-      const parsedFrequency = parseTaskCheckFrequencyMinutes(request.body?.taskCheckFrequencyMinutes);
+      const currentSettings = deps.getSettings();
+      const hasFrequency = Object.prototype.hasOwnProperty.call(request.body ?? {}, "taskCheckFrequencyMinutes");
+      const hasTaskCronEnabled = Object.prototype.hasOwnProperty.call(request.body ?? {}, "taskCronEnabled");
+
+      const parsedFrequency = hasFrequency
+        ? parseTaskCheckFrequencyMinutes(request.body?.taskCheckFrequencyMinutes)
+        : currentSettings.taskCheckFrequencyMinutes;
       if (!parsedFrequency) {
         reply.code(400);
         return {
@@ -410,13 +419,24 @@ function registerApiRoutes(
         };
       }
 
+      const parsedTaskCronEnabled = hasTaskCronEnabled
+        ? parseTaskCronEnabled(request.body?.taskCronEnabled)
+        : currentSettings.taskCronEnabled;
+      if (parsedTaskCronEnabled === undefined) {
+        reply.code(400);
+        return {
+          error: "taskCronEnabled must be true or false"
+        };
+      }
+
       const nextSettings: UiServerSettings = {
+        taskCronEnabled: parsedTaskCronEnabled,
         taskCheckFrequencyMinutes: parsedFrequency
       };
       await deps.updateSettings(nextSettings);
       return {
         settings: nextSettings,
-        message: `Task check frequency set to ${nextSettings.taskCheckFrequencyMinutes} minute(s).`
+        message: `Task cron ${nextSettings.taskCronEnabled ? "enabled" : "disabled"}; frequency ${nextSettings.taskCheckFrequencyMinutes} minute(s).`
       };
     });
   });
@@ -2638,8 +2658,25 @@ function normalizeTaskListFilter(value: unknown): string | null {
 
 function defaultUiServerSettings(): UiServerSettings {
   return {
+    taskCronEnabled: true,
     taskCheckFrequencyMinutes: DEFAULT_TASK_CHECK_FREQUENCY_MINUTES
   };
+}
+
+function parseTaskCronEnabled(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1") {
+      return true;
+    }
+    if (normalized === "false" || normalized === "0") {
+      return false;
+    }
+  }
+  return undefined;
 }
 
 function parseTaskCheckFrequencyMinutes(value: unknown): number | undefined {
@@ -2666,13 +2703,16 @@ async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> 
 
   try {
     const raw = await readFile(settingsPath, "utf8");
-    const parsed = JSON.parse(raw) as { taskCheckFrequencyMinutes?: unknown };
+    const parsed = JSON.parse(raw) as {
+      taskCronEnabled?: unknown;
+      taskCheckFrequencyMinutes?: unknown;
+    };
+    const taskCronEnabled = parseTaskCronEnabled(parsed?.taskCronEnabled);
     const taskCheckFrequencyMinutes = parseTaskCheckFrequencyMinutes(parsed?.taskCheckFrequencyMinutes);
-    if (!taskCheckFrequencyMinutes) {
-      return defaultUiServerSettings();
-    }
+    const defaults = defaultUiServerSettings();
     return {
-      taskCheckFrequencyMinutes
+      taskCronEnabled: taskCronEnabled ?? defaults.taskCronEnabled,
+      taskCheckFrequencyMinutes: taskCheckFrequencyMinutes ?? defaults.taskCheckFrequencyMinutes
     };
   } catch {
     return defaultUiServerSettings();
@@ -2687,17 +2727,22 @@ async function writeUiServerSettings(homeDir: string, settings: UiServerSettings
 
 interface TaskCronScheduler {
   setTaskCheckFrequencyMinutes: (taskCheckFrequencyMinutes: number) => void;
+  setEnabled: (enabled: boolean) => void;
   stop: () => void;
 }
 
 function createTaskCronScheduler(
   app: FastifyInstance,
   service: OpenClawUiService,
-  initialTaskCheckFrequencyMinutes: number
+  initialTaskCheckFrequencyMinutes: number,
+  initialTaskCronEnabled: boolean
 ): TaskCronScheduler {
   if (typeof service.runTaskCronCycle !== "function") {
     return {
       setTaskCheckFrequencyMinutes: () => {
+        // no-op when runtime task cron is unavailable.
+      },
+      setEnabled: () => {
         // no-op when runtime task cron is unavailable.
       },
       stop: () => {
@@ -2709,6 +2754,7 @@ function createTaskCronScheduler(
   let taskCheckFrequencyMinutes =
     parseTaskCheckFrequencyMinutes(initialTaskCheckFrequencyMinutes) ??
     DEFAULT_TASK_CHECK_FREQUENCY_MINUTES;
+  let taskCronEnabled = parseTaskCronEnabled(initialTaskCronEnabled) ?? true;
   let intervalHandle: NodeJS.Timeout | undefined;
   let running = false;
 
@@ -2748,6 +2794,10 @@ function createTaskCronScheduler(
   const schedule = (): void => {
     if (intervalHandle) {
       clearInterval(intervalHandle);
+      intervalHandle = undefined;
+    }
+    if (!taskCronEnabled) {
+      return;
     }
     intervalHandle = setInterval(() => {
       void runCycle();
@@ -2770,6 +2820,20 @@ function createTaskCronScheduler(
           taskCheckFrequencyMinutes
         },
         "[task-cron] scheduler interval updated"
+      );
+    },
+    setEnabled: (nextEnabled: boolean) => {
+      const parsed = parseTaskCronEnabled(nextEnabled);
+      if (parsed === undefined || parsed === taskCronEnabled) {
+        return;
+      }
+      taskCronEnabled = parsed;
+      schedule();
+      app.log.info(
+        {
+          taskCronEnabled
+        },
+        "[task-cron] scheduler state updated"
       );
     },
     stop: () => {
