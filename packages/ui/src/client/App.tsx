@@ -42,9 +42,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/sonner";
+import { resolveAgentAvatarSource } from "@/lib/agent-avatar";
 import { cn } from "@/lib/utils";
 import dagre from "@dagrejs/dagre";
-import multiavatar from "@multiavatar/multiavatar/esm";
 import {
   Background,
   Controls,
@@ -431,7 +431,6 @@ interface OrgNodeData {
 
 const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
-const MULTIAVATAR_API_BASE_URL = "https://api.multiavatar.com";
 const DEFAULT_AGENT_ID = "ceo";
 const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
 
@@ -4140,18 +4139,14 @@ function AgentAvatar({
   size?: "sm" | "md";
   className?: string;
 }): ReactElement {
-  const remoteSrc = useMemo(() => {
-    return `${MULTIAVATAR_API_BASE_URL}/${encodeURIComponent(agentId)}.svg`;
+  const avatarSource = useMemo(() => {
+    return resolveAgentAvatarSource(agentId);
   }, [agentId]);
-  const fallbackSrc = useMemo(() => {
-    const svg = multiavatar(agentId);
-    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-  }, [agentId]);
-  const [avatarSrc, setAvatarSrc] = useState(remoteSrc);
+  const [avatarSrc, setAvatarSrc] = useState(avatarSource.src);
 
   useEffect(() => {
-    setAvatarSrc(remoteSrc);
-  }, [remoteSrc]);
+    setAvatarSrc(avatarSource.src);
+  }, [avatarSource.src]);
 
   return (
     <span
@@ -4168,6 +4163,10 @@ function AgentAvatar({
         loading="lazy"
         decoding="async"
         onError={() => {
+          const fallbackSrc = avatarSource.fallbackSrc;
+          if (!fallbackSrc) {
+            return;
+          }
           setAvatarSrc((current) => {
             return current === fallbackSrc ? current : fallbackSrc;
           });
