@@ -252,7 +252,12 @@ export class AgentService {
     const requiredSkillIds =
       type === "manager" ? MANAGER_ROLE_SKILLS : INDIVIDUAL_ROLE_SKILLS;
     const managedRoleSkillIds = [
-      ...new Set([...MANAGER_ROLE_SKILLS, ...INDIVIDUAL_ROLE_SKILLS]),
+      ...new Set([
+        ...MANAGER_ROLE_SKILLS,
+        ...INDIVIDUAL_ROLE_SKILLS,
+        ...LEGACY_MANAGER_ROLE_SKILLS,
+        ...LEGACY_INDIVIDUAL_ROLE_SKILLS,
+      ]),
     ];
     const workspaceDir = this.pathPort.join(
       paths.workspacesDir,
@@ -328,6 +333,8 @@ export class AgentService {
     const roleSkillIds = new Set<string>([
       ...MANAGER_ROLE_SKILLS,
       ...INDIVIDUAL_ROLE_SKILLS,
+      ...LEGACY_MANAGER_ROLE_SKILLS,
+      ...LEGACY_INDIVIDUAL_ROLE_SKILLS,
     ]);
     const runtimeRecord = toObject(config.runtime);
     const skillsRecord = toObject(runtimeRecord.skills);
@@ -658,10 +665,10 @@ export class AgentService {
   }
 
   private renderWorkspaceSkill(skillId: string): string {
-    if (skillId === "board-manager") {
+    if (skillId === "og-board-manager") {
       return renderBoardManagerSkillMarkdown();
     }
-    if (skillId === "board-individual") {
+    if (skillId === "og-board-individual") {
       return renderBoardIndividualSkillMarkdown();
     }
     throw new Error(`Unsupported workspace skill id: ${skillId}`);
@@ -749,8 +756,10 @@ export class AgentService {
   }
 }
 
-const MANAGER_ROLE_SKILLS = ["board-manager"];
-const INDIVIDUAL_ROLE_SKILLS = ["board-individual"];
+const MANAGER_ROLE_SKILLS = ["og-board-manager"];
+const INDIVIDUAL_ROLE_SKILLS = ["og-board-individual"];
+const LEGACY_MANAGER_ROLE_SKILLS = ["board-manager"];
+const LEGACY_INDIVIDUAL_ROLE_SKILLS = ["board-individual"];
 
 function toAgentTemplateOptions(
   agentId: string,
@@ -760,7 +769,12 @@ function toAgentTemplateOptions(
     options.type ?? (isDefaultAgentId(agentId) ? "manager" : "individual");
   const reportsTo = resolveReportsTo(agentId, options.reportsTo);
   const providedSkills = options.skills ?? [];
-  const roleSkillIds = new Set([...MANAGER_ROLE_SKILLS, ...INDIVIDUAL_ROLE_SKILLS]);
+  const roleSkillIds = new Set([
+    ...MANAGER_ROLE_SKILLS,
+    ...INDIVIDUAL_ROLE_SKILLS,
+    ...LEGACY_MANAGER_ROLE_SKILLS,
+    ...LEGACY_INDIVIDUAL_ROLE_SKILLS,
+  ]);
   const skills = dedupe(providedSkills.filter((skillId) => !roleSkillIds.has(skillId)));
   const role = resolveAgentRole(agentId, type, options.role);
   return {

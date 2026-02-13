@@ -214,7 +214,7 @@ describe("SkillService", () => {
 
     await service.installSkill(paths, {
       agentId: "ceo",
-      skillName: "board-manager",
+      skillName: "og-board-manager",
       description: "Manager role skill",
     });
 
@@ -229,7 +229,7 @@ describe("SkillService", () => {
 
     await service.installSkill(paths, {
       agentId: "ceo",
-      skillName: "board-individual",
+      skillName: "og-board-individual",
       description: "Individual role skill",
     });
 

@@ -7,7 +7,10 @@ export interface AgentDelegationMetadata {
 
 export type AgentType = "manager" | "individual";
 
-export const BOARD_MANAGER_SKILL_ID = "board-manager";
+export const BOARD_MANAGER_SKILL_ID = "og-board-manager";
+const LEGACY_BOARD_MANAGER_SKILL_ID = "board-manager";
+const BOARD_INDIVIDUAL_SKILL_ID = "og-board-individual";
+const LEGACY_BOARD_INDIVIDUAL_SKILL_ID = "board-individual";
 
 export interface AgentManifestMetadata {
   id: string;
@@ -36,7 +39,13 @@ export function isDiscoverableByManager(manifest: AgentManifest): boolean {
 }
 
 export function hasManagerSkill(skills: string[]): boolean {
-  return skills.some((skill) => sanitizeId(skill) === BOARD_MANAGER_SKILL_ID);
+  return skills.some((skill) => {
+    const normalized = sanitizeId(skill);
+    return (
+      normalized === BOARD_MANAGER_SKILL_ID ||
+      normalized === LEGACY_BOARD_MANAGER_SKILL_ID
+    );
+  });
 }
 
 export function isManagerAgent(manifest: AgentManifest): boolean {
@@ -202,7 +211,11 @@ export function normalizeAgentManifestMetadata(params: {
     (inferredType === "manager" ? "Manager agent coordinating direct reports." : `Agent ${name}.`);
   const discoverable = metadata.discoverable ?? true;
   const tags = dedupe(metadata.tags ?? []);
-  const normalizedSkills = dedupe((metadata.skills ?? []).map((skill) => sanitizeId(skill)).filter(Boolean));
+  const normalizedSkills = dedupe(
+    (metadata.skills ?? [])
+      .map((skill) => canonicalizeRoleSkillId(sanitizeId(skill)))
+      .filter(Boolean),
+  );
   const skills =
     inferredType === "manager" && !hasManagerSkill(normalizedSkills)
       ? dedupe([BOARD_MANAGER_SKILL_ID, ...normalizedSkills])
@@ -300,6 +313,16 @@ function parseStringListValue(
     values: dedupe(values),
     nextIndex: index
   };
+}
+
+function canonicalizeRoleSkillId(skillId: string): string {
+  if (skillId === LEGACY_BOARD_MANAGER_SKILL_ID) {
+    return BOARD_MANAGER_SKILL_ID;
+  }
+  if (skillId === LEGACY_BOARD_INDIVIDUAL_SKILL_ID) {
+    return BOARD_INDIVIDUAL_SKILL_ID;
+  }
+  return skillId;
 }
 
 function parseDelegation(lines: string[], startIndex: number): {

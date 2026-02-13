@@ -1,5 +1,5 @@
 ---
-name: board-manager
+name: og-board-manager
 description: Use when you need to delegate, track, or review work.
 metadata:
   version: "1.0.0"

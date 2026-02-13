@@ -45,7 +45,7 @@ describe("hard-reset command", () => {
       homeRemoved: true,
       deletedOpenClawAgents: ["ceo", "cto"],
       failedOpenClawAgents: [],
-      removedOpenClawManagedSkillDirs: ["/tmp/openclaw/skills/board-manager"],
+      removedOpenClawManagedSkillDirs: ["/tmp/openclaw/skills/og-board-manager"],
       warnings: [],
     }));
     const { context, stdout } = createContext({ hardReset });

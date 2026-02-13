@@ -1242,6 +1242,8 @@ export class OpenGoatService {
     for (const legacySkillId of [
       "board-manager",
       "board-individual",
+      "og-board-manager",
+      "og-board-individual",
       "manager",
       "board-user",
     ]) {

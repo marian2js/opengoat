@@ -46,11 +46,11 @@ export function renderCeoRoleMarkdown(): string {
 }
 
 export function renderBoardManagerSkillMarkdown(): string {
-  return readMarkdownTemplate("skills/board-manager/SKILL.md");
+  return readMarkdownTemplate("skills/og-board-manager/SKILL.md");
 }
 
 export function renderBoardIndividualSkillMarkdown(): string {
-  return readMarkdownTemplate("skills/board-individual/SKILL.md");
+  return readMarkdownTemplate("skills/og-board-individual/SKILL.md");
 }
 
 export function renderInternalAgentConfig(

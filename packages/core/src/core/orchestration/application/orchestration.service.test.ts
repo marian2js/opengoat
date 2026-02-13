@@ -294,7 +294,7 @@ function createManifestServiceStub(agentIds: string[]) {
           reportsTo: agentId === "ceo" ? null : "ceo",
           discoverable: true,
           tags: [],
-          skills: agentId === "ceo" ? ["board-manager"] : [],
+          skills: agentId === "ceo" ? ["og-board-manager"] : [],
           delegation: {
             canReceive: true,
             canDelegate: agentId === "ceo"

@@ -1,5 +1,5 @@
 ---
-name: board-individual
+name: og-board-individual
 description: "Use when you need to work with board tasks: view tasks, list tasks, update task status, add blockers, artifacts, and worklogs."
 metadata:
   version: "1.0.0"

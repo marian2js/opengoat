@@ -430,10 +430,7 @@ export class SkillService {
     skillId: string,
   ): Promise<void> {
     const normalizedSkill = skillId.trim().toLowerCase();
-    if (
-      normalizedSkill !== BOARD_MANAGER_SKILL_ID &&
-      normalizedSkill !== BOARD_INDIVIDUAL_SKILL_ID
-    ) {
+    if (!ROLE_SKILL_IDS.has(normalizedSkill)) {
       return;
     }
 
@@ -477,18 +474,17 @@ export class SkillService {
       ),
     ];
 
-    if (normalizedSkill === BOARD_MANAGER_SKILL_ID) {
+    if (
+      normalizedSkill === BOARD_MANAGER_SKILL_ID ||
+      normalizedSkill === LEGACY_BOARD_MANAGER_SKILL_ID
+    ) {
       organizationRecord.type = "manager";
     } else {
       organizationRecord.type = "individual";
     }
 
     // Role skills live in OpenClaw workspace skill folders, not local assigned metadata.
-    skillsRecord.assigned = assigned.filter(
-      (entry) =>
-        entry !== BOARD_MANAGER_SKILL_ID &&
-        entry !== BOARD_INDIVIDUAL_SKILL_ID,
-    );
+    skillsRecord.assigned = assigned.filter((entry) => !ROLE_SKILL_IDS.has(entry));
 
     runtimeRecord.skills = skillsRecord;
     parsed.runtime = runtimeRecord as AgentConfigShape["runtime"];
@@ -501,7 +497,15 @@ export class SkillService {
   }
 }
 
-const BOARD_INDIVIDUAL_SKILL_ID = "board-individual";
+const BOARD_INDIVIDUAL_SKILL_ID = "og-board-individual";
+const LEGACY_BOARD_MANAGER_SKILL_ID = "board-manager";
+const LEGACY_BOARD_INDIVIDUAL_SKILL_ID = "board-individual";
+const ROLE_SKILL_IDS = new Set([
+  BOARD_MANAGER_SKILL_ID,
+  BOARD_INDIVIDUAL_SKILL_ID,
+  LEGACY_BOARD_MANAGER_SKILL_ID,
+  LEGACY_BOARD_INDIVIDUAL_SKILL_ID,
+]);
 
 function renderSkillMarkdown(params: {
   skillId: string;

@@ -43,7 +43,7 @@ Canonical fields:
 
 Defaults:
 
-- `ceo`: `type=manager`, `reportsTo=null`, assigned `board-manager` skill
+- `ceo`: `type=manager`, `reportsTo=null`, assigned `og-board-manager` skill
 - other agents: `type=individual`, `reportsTo=ceo`
 
 ## 4) Manager Runtime Model
@@ -70,8 +70,8 @@ Agent runtime config stores assignment under `runtime.skills.assigned`.
 
 OpenGoat pre-installs role skills in each agent workspace so OpenClaw can resolve them:
 
-- managers: `board-manager`
-- individuals: `board-individual`
+- managers: `og-board-manager`
+- individuals: `og-board-individual`
 
 Role skills are mutually exclusive per agent. OpenGoat does not install role
 skills into OpenClaw shared managed skills.

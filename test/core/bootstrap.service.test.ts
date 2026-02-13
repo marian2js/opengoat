@@ -67,14 +67,14 @@ describe("BootstrapService", () => {
           paths.workspacesDir,
           "ceo",
           "skills",
-          "board-manager",
+          "og-board-manager",
           "SKILL.md",
         ),
       ),
     ).toBe(true);
     expect(
       await fileSystem.exists(
-        path.join(paths.workspacesDir, "ceo", "skills", "board-individual"),
+        path.join(paths.workspacesDir, "ceo", "skills", "og-board-individual"),
       ),
     ).toBe(false);
     expect(
