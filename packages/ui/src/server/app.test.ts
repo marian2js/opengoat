@@ -173,6 +173,53 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("gets and updates UI server settings through the api", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir
+      })
+    });
+
+    const defaultResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/settings"
+    });
+    expect(defaultResponse.statusCode).toBe(200);
+    expect(defaultResponse.json()).toMatchObject({
+      settings: {
+        taskCheckFrequencyMinutes: 1
+      }
+    });
+
+    const updateResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/settings",
+      payload: {
+        taskCheckFrequencyMinutes: 5
+      }
+    });
+    expect(updateResponse.statusCode).toBe(200);
+    expect(updateResponse.json()).toMatchObject({
+      settings: {
+        taskCheckFrequencyMinutes: 5
+      }
+    });
+
+    const updatedResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/settings"
+    });
+    expect(updatedResponse.statusCode).toBe(200);
+    expect(updatedResponse.json()).toMatchObject({
+      settings: {
+        taskCheckFrequencyMinutes: 5
+      }
+    });
+  });
+
   it("creates agents through the api", async () => {
     const createAgent = vi.fn<OpenClawUiService["createAgent"]>(async (name: string): Promise<AgentCreationResult> => {
       return {
@@ -1116,12 +1163,13 @@ describe("OpenGoat UI server API", () => {
   });
 });
 
-function createMockService(): OpenClawUiService {
+function createMockService(options: { homeDir?: string } = {}): OpenClawUiService {
+  const homeDir = options.homeDir ?? "/tmp/opengoat-home";
   return {
     initialize: async () => {
       return undefined;
     },
-    getHomeDir: () => "/tmp/opengoat-home",
+    getHomeDir: () => homeDir,
     listAgents: async (): Promise<AgentDescriptor[]> => [],
     createAgent: async (name: string): Promise<AgentCreationResult> => {
       return {

@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { readFile, stat } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +14,10 @@ import { createOpenGoatRuntime } from "@opengoat/core";
 
 const DEFAULT_AGENT_ID = "ceo";
 const execFileAsync = promisify(execFile);
+const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
+const MIN_TASK_CHECK_FREQUENCY_MINUTES = 1;
+const MAX_TASK_CHECK_FREQUENCY_MINUTES = 1440;
+const UI_SETTINGS_FILENAME = "ui-settings.json";
 
 interface AgentDescriptor {
   id: string;
@@ -161,6 +165,7 @@ export interface OpenClawUiService {
   addTaskBlocker?: (actorId: string, taskId: string, blocker: string) => Promise<TaskRecord>;
   addTaskArtifact?: (actorId: string, taskId: string, content: string) => Promise<TaskRecord>;
   addTaskWorklog?: (actorId: string, taskId: string, content: string) => Promise<TaskRecord>;
+  runTaskCronCycle?: (options?: { inactiveMinutes?: number }) => Promise<TaskCronRunResult>;
 }
 
 interface SessionRunInfo {
@@ -247,6 +252,20 @@ interface AgentRunResult {
   };
 }
 
+interface TaskCronRunResult {
+  ranAt: string;
+  scannedTasks: number;
+  todoTasks: number;
+  blockedTasks: number;
+  inactiveAgents: number;
+  sent: number;
+  failed: number;
+}
+
+interface UiServerSettings {
+  taskCheckFrequencyMinutes: number;
+}
+
 type SessionMessageProgressPhase =
   | "queued"
   | "run_started"
@@ -295,6 +314,11 @@ export interface OpenGoatUiServerOptions {
   attachFrontend?: boolean;
 }
 
+interface RegisterApiRoutesDeps {
+  getSettings: () => UiServerSettings;
+  updateSettings: (settings: UiServerSettings) => Promise<void>;
+}
+
 export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? true });
   const runtime = options.service ? undefined : createOpenGoatRuntime();
@@ -311,8 +335,25 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
     await service.initialize();
   }
 
+  let uiSettings = await readUiServerSettings(service.getHomeDir());
+  const taskCronScheduler = createTaskCronScheduler(
+    app,
+    service,
+    uiSettings.taskCheckFrequencyMinutes
+  );
+  app.addHook("onClose", async () => {
+    taskCronScheduler.stop();
+  });
+
   await app.register(cors, { origin: true });
-  registerApiRoutes(app, service, mode);
+  registerApiRoutes(app, service, mode, {
+    getSettings: () => uiSettings,
+    updateSettings: async (nextSettings) => {
+      uiSettings = nextSettings;
+      await writeUiServerSettings(service.getHomeDir(), uiSettings);
+      taskCronScheduler.setTaskCheckFrequencyMinutes(uiSettings.taskCheckFrequencyMinutes);
+    }
+  });
 
   if (attachFrontend) {
     await registerFrontend(app, {
@@ -324,7 +365,12 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
   return app;
 }
 
-function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mode: "development" | "production"): void {
+function registerApiRoutes(
+  app: FastifyInstance,
+  service: OpenClawUiService,
+  mode: "development" | "production",
+  deps: RegisterApiRoutesDeps
+): void {
   app.get("/api/health", async (_request, reply) => {
     return safeReply(reply, async () => {
       return {
@@ -332,6 +378,35 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
         mode,
         homeDir: service.getHomeDir(),
         timestamp: new Date().toISOString()
+      };
+    });
+  });
+
+  app.get("/api/settings", async (_request, reply) => {
+    return safeReply(reply, async () => {
+      return {
+        settings: deps.getSettings()
+      };
+    });
+  });
+
+  app.post<{ Body: { taskCheckFrequencyMinutes?: number } }>("/api/settings", async (request, reply) => {
+    return safeReply(reply, async () => {
+      const parsedFrequency = parseTaskCheckFrequencyMinutes(request.body?.taskCheckFrequencyMinutes);
+      if (!parsedFrequency) {
+        reply.code(400);
+        return {
+          error: `taskCheckFrequencyMinutes must be an integer between ${MIN_TASK_CHECK_FREQUENCY_MINUTES} and ${MAX_TASK_CHECK_FREQUENCY_MINUTES}`
+        };
+      }
+
+      const nextSettings: UiServerSettings = {
+        taskCheckFrequencyMinutes: parsedFrequency
+      };
+      await deps.updateSettings(nextSettings);
+      return {
+        settings: nextSettings,
+        message: `Task check frequency set to ${nextSettings.taskCheckFrequencyMinutes} minute(s).`
       };
     });
   });
@@ -2273,6 +2348,151 @@ function normalizeRoleValue(rawRole: string | undefined): string | undefined {
     return normalized;
   }
   return undefined;
+}
+
+function defaultUiServerSettings(): UiServerSettings {
+  return {
+    taskCheckFrequencyMinutes: DEFAULT_TASK_CHECK_FREQUENCY_MINUTES
+  };
+}
+
+function parseTaskCheckFrequencyMinutes(value: unknown): number | undefined {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isInteger(parsed)) {
+    return undefined;
+  }
+  if (parsed < MIN_TASK_CHECK_FREQUENCY_MINUTES || parsed > MAX_TASK_CHECK_FREQUENCY_MINUTES) {
+    return undefined;
+  }
+  return parsed;
+}
+
+async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> {
+  const settingsPath = path.resolve(homeDir, UI_SETTINGS_FILENAME);
+  if (!existsSync(settingsPath)) {
+    return defaultUiServerSettings();
+  }
+
+  try {
+    const raw = await readFile(settingsPath, "utf8");
+    const parsed = JSON.parse(raw) as { taskCheckFrequencyMinutes?: unknown };
+    const taskCheckFrequencyMinutes = parseTaskCheckFrequencyMinutes(parsed?.taskCheckFrequencyMinutes);
+    if (!taskCheckFrequencyMinutes) {
+      return defaultUiServerSettings();
+    }
+    return {
+      taskCheckFrequencyMinutes
+    };
+  } catch {
+    return defaultUiServerSettings();
+  }
+}
+
+async function writeUiServerSettings(homeDir: string, settings: UiServerSettings): Promise<void> {
+  const settingsPath = path.resolve(homeDir, UI_SETTINGS_FILENAME);
+  await mkdir(path.dirname(settingsPath), { recursive: true });
+  await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+}
+
+interface TaskCronScheduler {
+  setTaskCheckFrequencyMinutes: (taskCheckFrequencyMinutes: number) => void;
+  stop: () => void;
+}
+
+function createTaskCronScheduler(
+  app: FastifyInstance,
+  service: OpenClawUiService,
+  initialTaskCheckFrequencyMinutes: number
+): TaskCronScheduler {
+  if (typeof service.runTaskCronCycle !== "function") {
+    return {
+      setTaskCheckFrequencyMinutes: () => {
+        // no-op when runtime task cron is unavailable.
+      },
+      stop: () => {
+        // no-op when runtime task cron is unavailable.
+      }
+    };
+  }
+
+  let taskCheckFrequencyMinutes =
+    parseTaskCheckFrequencyMinutes(initialTaskCheckFrequencyMinutes) ??
+    DEFAULT_TASK_CHECK_FREQUENCY_MINUTES;
+  let intervalHandle: NodeJS.Timeout | undefined;
+  let running = false;
+
+  const runCycle = async (): Promise<void> => {
+    if (running) {
+      return;
+    }
+    running = true;
+    try {
+      const cycle = await service.runTaskCronCycle?.();
+      if (cycle) {
+        app.log.info(
+          {
+            ranAt: cycle.ranAt,
+            scanned: cycle.scannedTasks,
+            todo: cycle.todoTasks,
+            blocked: cycle.blockedTasks,
+            inactive: cycle.inactiveAgents,
+            sent: cycle.sent,
+            failed: cycle.failed
+          },
+          "[task-cron] cycle completed"
+        );
+      }
+    } catch (error) {
+      app.log.error(
+        {
+          error: error instanceof Error ? error.message : String(error)
+        },
+        "[task-cron] cycle failed"
+      );
+    } finally {
+      running = false;
+    }
+  };
+
+  const schedule = (): void => {
+    if (intervalHandle) {
+      clearInterval(intervalHandle);
+    }
+    intervalHandle = setInterval(() => {
+      void runCycle();
+    }, taskCheckFrequencyMinutes * 60_000);
+    intervalHandle.unref?.();
+  };
+
+  schedule();
+
+  return {
+    setTaskCheckFrequencyMinutes: (nextTaskCheckFrequencyMinutes: number) => {
+      const parsed = parseTaskCheckFrequencyMinutes(nextTaskCheckFrequencyMinutes);
+      if (!parsed || parsed === taskCheckFrequencyMinutes) {
+        return;
+      }
+      taskCheckFrequencyMinutes = parsed;
+      schedule();
+      app.log.info(
+        {
+          taskCheckFrequencyMinutes
+        },
+        "[task-cron] scheduler interval updated"
+      );
+    },
+    stop: () => {
+      if (intervalHandle) {
+        clearInterval(intervalHandle);
+        intervalHandle = undefined;
+      }
+    }
+  };
 }
 
 async function safeReply<T>(reply: FastifyReply, operation: () => Promise<T>): Promise<T | { error: string }> {

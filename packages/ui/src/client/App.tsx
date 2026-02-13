@@ -70,6 +70,7 @@ import {
   MoreHorizontal,
   PenLine,
   Plus,
+  Settings,
   Sparkles,
   UsersRound,
 } from "lucide-react";
@@ -77,7 +78,7 @@ import type { ComponentType, ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-type PageView = "overview" | "boards" | "agents" | "skills";
+type PageView = "overview" | "boards" | "agents" | "skills" | "settings";
 
 type AppRoute =
   | {
@@ -187,6 +188,10 @@ interface BoardsResponse {
   boards: BoardRecord[];
 }
 
+interface UiSettings {
+  taskCheckFrequencyMinutes: number;
+}
+
 interface DashboardState {
   health: HealthResponse;
   overview: OverviewResponse;
@@ -194,6 +199,7 @@ interface DashboardState {
   agentSkills: SkillsResponse;
   globalSkills: SkillsResponse;
   boards: BoardsResponse;
+  settings: UiSettings;
 }
 
 interface Project {
@@ -427,6 +433,7 @@ const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
 const MULTIAVATAR_API_BASE_URL = "https://api.multiavatar.com";
 const DEFAULT_AGENT_ID = "ceo";
+const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
@@ -503,6 +510,8 @@ export function App(): ReactElement {
   const [createTaskDialogError, setCreateTaskDialogError] = useState<
     string | null
   >(null);
+  const [taskCheckFrequencyMinutesInput, setTaskCheckFrequencyMinutesInput] =
+    useState(String(DEFAULT_TASK_CHECK_FREQUENCY_MINUTES));
   const [isTaskDetailsDialogOpen, setTaskDetailsDialogOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskDetailsError, setTaskDetailsError] = useState<string | null>(null);
@@ -573,7 +582,7 @@ export function App(): ReactElement {
     setError(null);
 
     try {
-      const [health, overview, sessions, agentSkills, globalSkills, boards] =
+      const [health, overview, sessions, agentSkills, globalSkills, boards, settings] =
         await Promise.all([
           fetchJson<HealthResponse>("/api/health"),
           fetchJson<OverviewResponse>("/api/openclaw/overview"),
@@ -587,6 +596,13 @@ export function App(): ReactElement {
           fetchJson<BoardsResponse>("/api/boards").catch(() => {
             return { boards: [] } satisfies BoardsResponse;
           }),
+          fetchJson<{ settings: UiSettings }>("/api/settings")
+            .then((payload) => payload.settings)
+            .catch(() => {
+              return {
+                taskCheckFrequencyMinutes: DEFAULT_TASK_CHECK_FREQUENCY_MINUTES,
+              } satisfies UiSettings;
+            }),
         ]);
 
       setState({
@@ -596,7 +612,11 @@ export function App(): ReactElement {
         agentSkills,
         globalSkills,
         boards,
+        settings,
       });
+      setTaskCheckFrequencyMinutesInput(
+        String(settings.taskCheckFrequencyMinutes),
+      );
       setSessionsByAgentId({
         [sessions.agentId]: sessions.sessions,
       });
@@ -1170,10 +1190,6 @@ export function App(): ReactElement {
     });
   }, [boards, getAssignableAgents, taskActorId]);
 
-  const healthTimestamp = state
-    ? new Date(state.health.timestamp).toLocaleString()
-    : "Loading...";
-
   const openTaskCount = useMemo(() => {
     if (!state) {
       return 0;
@@ -1712,6 +1728,59 @@ export function App(): ReactElement {
         requestError instanceof Error
           ? requestError.message
           : "Unable to rename board.";
+      toast.error(message);
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function handleSaveSettings(): Promise<void> {
+    const parsedFrequency = Number.parseInt(
+      taskCheckFrequencyMinutesInput.trim(),
+      10,
+    );
+    if (
+      !Number.isFinite(parsedFrequency) ||
+      parsedFrequency < 1 ||
+      parsedFrequency > 1440
+    ) {
+      toast.error("Task Check Frequency must be an integer between 1 and 1440.");
+      return;
+    }
+
+    setMutating(true);
+    try {
+      const response = await fetchJson<{
+        settings: UiSettings;
+        message?: string;
+      }>("/api/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          taskCheckFrequencyMinutes: parsedFrequency,
+        }),
+      });
+
+      setState((current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          settings: response.settings,
+        };
+      });
+      setTaskCheckFrequencyMinutesInput(
+        String(response.settings.taskCheckFrequencyMinutes),
+      );
+      toast.success(response.message ?? "Settings updated.");
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to update settings.";
       toast.error(message);
     } finally {
       setMutating(false);
@@ -2586,18 +2655,32 @@ export function App(): ReactElement {
           </nav>
 
           <div className="border-t border-border p-3">
-            {!isSidebarCollapsed ? (
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Last Sync
-                </p>
-                <p className="mt-1 text-xs text-foreground">
-                  {healthTimestamp}
-                </p>
-              </div>
-            ) : (
-              <div className="mx-auto h-2 w-2 rounded-full bg-success" />
-            )}
+            <div
+              className={cn(
+                "flex items-center",
+                isSidebarCollapsed ? "justify-center" : "justify-end",
+              )}
+            >
+              <button
+                type="button"
+                title="Settings"
+                aria-label="Settings"
+                onClick={() => {
+                  navigateToRoute({
+                    kind: "page",
+                    view: "settings",
+                  });
+                }}
+                className={cn(
+                  "inline-flex size-8 items-center justify-center rounded-md border transition-colors",
+                  route.kind === "page" && route.view === "settings"
+                    ? "border-border bg-accent/90 text-foreground"
+                    : "border-transparent text-muted-foreground hover:border-border/60 hover:bg-accent/60 hover:text-foreground",
+                )}
+              >
+                <Settings className="size-4" />
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -3860,6 +3943,55 @@ export function App(): ReactElement {
                     </Card>
                   </div>
                 ) : null}
+
+                {route.kind === "page" && route.view === "settings" ? (
+                  <Card className="max-w-2xl">
+                    <CardHeader>
+                      <CardTitle>Settings</CardTitle>
+                      <CardDescription>
+                        Runtime settings for the UI server.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                      <div className="space-y-2">
+                        <label
+                          className="text-sm font-medium text-foreground"
+                          htmlFor="taskCheckFrequencyMinutes"
+                        >
+                          Task Check Frequency (minutes)
+                        </label>
+                        <Input
+                          id="taskCheckFrequencyMinutes"
+                          type="number"
+                          min={1}
+                          max={1440}
+                          step={1}
+                          value={taskCheckFrequencyMinutesInput}
+                          onChange={(event) => {
+                            setTaskCheckFrequencyMinutesInput(
+                              event.target.value,
+                            );
+                          }}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Controls how often the UI server runs task cron while
+                          it is running. Default is 1 minute.
+                        </p>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={() => {
+                            void handleSaveSettings();
+                          }}
+                          disabled={isMutating || isLoading}
+                        >
+                          Save Settings
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : null}
               </div>
             ) : null}
           </main>
@@ -4372,6 +4504,8 @@ function viewTitle(
       return "Agents";
     case "skills":
       return "Skills";
+    case "settings":
+      return "Settings";
     default:
       return "Dashboard";
   }
@@ -4427,6 +4561,10 @@ function parseRoute(pathname: string): AppRoute {
 
   if (normalized === "/skills") {
     return { kind: "page", view: "skills" };
+  }
+
+  if (normalized === "/settings") {
+    return { kind: "page", view: "settings" };
   }
 
   if (normalized.startsWith("/sessions/")) {
