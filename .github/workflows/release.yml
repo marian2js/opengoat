@@ -63,8 +63,8 @@ jobs:
       - name: Publish to NPM
         if: steps.check_changesets.outputs.has_changesets == 'true'
         run: |
-          pnpm --filter @opengoat/core publish --access public --no-git-checks
-          pnpm --filter opengoat publish --access public --no-git-checks
+          pnpm --filter @opengoat/core publish --access public --no-git-checks --provenance
+          pnpm --filter opengoat publish --access public --no-git-checks --provenance
 
       - name: Push Changes
         if: steps.check_changesets.outputs.has_changesets == 'true'
