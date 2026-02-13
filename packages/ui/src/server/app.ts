@@ -80,6 +80,38 @@ interface UiImageInput {
   name?: string;
 }
 
+interface UiRunEvent {
+  stage:
+    | "run_started"
+    | "provider_invocation_started"
+    | "provider_invocation_completed"
+    | "run_completed";
+  timestamp: string;
+  runId: string;
+  step?: number;
+  agentId?: string;
+  targetAgentId?: string;
+  providerId?: string;
+  actionType?: string;
+  mode?: string;
+  code?: number;
+  detail?: string;
+}
+
+interface UiRunHooks {
+  onEvent?: (event: UiRunEvent) => void;
+}
+
+interface UiRunAgentOptions {
+  message: string;
+  sessionRef?: string;
+  cwd?: string;
+  images?: UiImageInput[];
+  hooks?: UiRunHooks;
+  onStdout?: (chunk: string) => void;
+  onStderr?: (chunk: string) => void;
+}
+
 export interface OpenClawUiService {
   initialize?: () => Promise<unknown>;
   getHomeDir: () => string;
@@ -94,10 +126,7 @@ export interface OpenClawUiService {
     agentId?: string,
     options?: { sessionRef?: string; projectPath?: string; forceNew?: boolean }
   ) => Promise<SessionRunInfo>;
-  runAgent?: (
-    agentId: string,
-    options: { message: string; sessionRef?: string; cwd?: string; images?: UiImageInput[] }
-  ) => Promise<AgentRunResult>;
+  runAgent?: (agentId: string, options: UiRunAgentOptions) => Promise<AgentRunResult>;
   getSessionHistory?: (
     agentId?: string,
     options?: { sessionRef?: string; limit?: number; includeCompaction?: boolean }
@@ -210,6 +239,47 @@ interface AgentRunResult {
     };
   };
 }
+
+type SessionMessageProgressPhase =
+  | "queued"
+  | "run_started"
+  | "provider_invocation_started"
+  | "provider_invocation_completed"
+  | "run_completed"
+  | "stdout"
+  | "stderr"
+  | "heartbeat";
+
+interface SessionMessageStreamProgressEvent {
+  type: "progress";
+  phase: SessionMessageProgressPhase;
+  timestamp: string;
+  message: string;
+}
+
+interface SessionMessageStreamResultEvent {
+  type: "result";
+  agentId: string;
+  sessionRef: string;
+  output: string;
+  result: {
+    code: number;
+    stdout: string;
+    stderr: string;
+  };
+  message: string;
+}
+
+interface SessionMessageStreamErrorEvent {
+  type: "error";
+  timestamp: string;
+  error: string;
+}
+
+type SessionMessageStreamEvent =
+  | SessionMessageStreamProgressEvent
+  | SessionMessageStreamResultEvent
+  | SessionMessageStreamErrorEvent;
 
 export interface OpenGoatUiServerOptions {
   logger?: boolean;
@@ -947,6 +1017,166 @@ function registerApiRoutes(app: FastifyInstance, service: OpenClawUiService, mod
     handleSessionMessage
   );
 
+  const handleSessionMessageStream = async (
+    request: {
+      body?: {
+        agentId?: string;
+        sessionRef?: string;
+        projectPath?: string;
+        message?: string;
+        images?: UiImageInput[];
+      };
+    },
+    reply: FastifyReply
+  ): Promise<void> => {
+    const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
+    const sessionRef = request.body?.sessionRef?.trim();
+    const message = request.body?.message?.trim();
+    const projectPath = request.body?.projectPath?.trim();
+    const images = normalizeUiImages(request.body?.images);
+
+    if (!sessionRef) {
+      reply.code(400).send({ error: "sessionRef is required" });
+      return;
+    }
+
+    if (!message && images.length === 0) {
+      reply.code(400).send({ error: "message or image is required" });
+      return;
+    }
+
+    const raw = reply.raw;
+    reply.hijack();
+    raw.statusCode = 200;
+    raw.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+    raw.setHeader("Cache-Control", "no-cache, no-transform");
+    raw.setHeader("Connection", "keep-alive");
+    raw.setHeader("X-Accel-Buffering", "no");
+    raw.flushHeaders?.();
+
+    const writeEvent = (event: SessionMessageStreamEvent): void => {
+      if (raw.destroyed || raw.writableEnded) {
+        return;
+      }
+      raw.write(`${JSON.stringify(event)}\n`);
+    };
+
+    const startedAtMs = Date.now();
+    const writeProgress = (
+      phase: SessionMessageProgressPhase,
+      progressMessage: string,
+    ): void => {
+      writeEvent({
+        type: "progress",
+        phase,
+        timestamp: new Date().toISOString(),
+        message: progressMessage,
+      });
+    };
+
+    writeProgress("queued", "Queued request.");
+    const heartbeat = setInterval(() => {
+      const elapsedSeconds = Math.max(
+        1,
+        Math.round((Date.now() - startedAtMs) / 1000),
+      );
+      writeProgress("heartbeat", `Still running... ${elapsedSeconds}s elapsed.`);
+    }, 5000);
+
+    const emitRuntimeChunk = (phase: "stdout" | "stderr", chunk: string): void => {
+      const cleaned = sanitizeRuntimeProgressChunk(chunk);
+      if (!cleaned) {
+        return;
+      }
+
+      const lines = cleaned
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      if (lines.length === 0) {
+        return;
+      }
+
+      const limit = 6;
+      for (const line of lines.slice(0, limit)) {
+        writeProgress(phase, truncateProgressLine(line));
+      }
+      if (lines.length > limit) {
+        writeProgress(phase, `... ${lines.length - limit} more line(s)`);
+      }
+    };
+
+    try {
+      const result = await runUiSessionMessage(service, agentId, {
+        sessionRef,
+        projectPath,
+        message:
+          message ||
+          (images.length === 1
+            ? "Please analyze the attached image."
+            : "Please analyze the attached images."),
+        images: images.length > 0 ? images : undefined,
+        hooks: {
+          onEvent: (event) => {
+            const phase = mapRunStageToProgressPhase(event.stage);
+            writeProgress(phase, formatRunStatusMessage(event));
+          },
+        },
+        onStdout: (chunk) => {
+          emitRuntimeChunk("stdout", chunk);
+        },
+        onStderr: (chunk) => {
+          emitRuntimeChunk("stderr", chunk);
+        },
+      });
+
+      const output = sanitizeConversationText(
+        result.stdout.trim() || result.stderr.trim(),
+      );
+      writeEvent({
+        type: "result",
+        agentId,
+        sessionRef,
+        output,
+        result: {
+          code: result.code,
+          stdout: result.stdout,
+          stderr: result.stderr,
+        },
+        message:
+          result.code === 0
+            ? "Message sent."
+            : "Message completed with non-zero exit code.",
+      });
+    } catch (error) {
+      const streamError =
+        error instanceof Error ? error.message : "Unexpected server error";
+      writeEvent({
+        type: "error",
+        timestamp: new Date().toISOString(),
+        error: streamError,
+      });
+    } finally {
+      clearInterval(heartbeat);
+      if (!raw.destroyed && !raw.writableEnded) {
+        raw.end();
+      }
+    }
+  };
+
+  app.post<{
+    Body: { agentId?: string; sessionRef?: string; projectPath?: string; message?: string; images?: UiImageInput[] };
+  }>(
+    "/api/sessions/message/stream",
+    handleSessionMessageStream
+  );
+  app.post<{
+    Body: { agentId?: string; sessionRef?: string; projectPath?: string; message?: string; images?: UiImageInput[] };
+  }>(
+    "/api/session/message/stream",
+    handleSessionMessageStream
+  );
+
 }
 
 interface FrontendOptions {
@@ -1078,6 +1308,51 @@ function stripAnsiCodes(value: string): string {
     /[\u001B\u009B][[\]()#;?]*(?:\d{1,4}(?:;\d{0,4})*)?[0-9A-ORZcf-ntqry=><]/g,
     ""
   );
+}
+
+function sanitizeRuntimeProgressChunk(value: string): string {
+  return stripAnsiCodes(value)
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+}
+
+function truncateProgressLine(value: string): string {
+  const maxLength = 260;
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 1)}…`;
+}
+
+function mapRunStageToProgressPhase(stage: UiRunEvent["stage"]): SessionMessageProgressPhase {
+  switch (stage) {
+    case "run_started":
+      return "run_started";
+    case "provider_invocation_started":
+      return "provider_invocation_started";
+    case "provider_invocation_completed":
+      return "provider_invocation_completed";
+    case "run_completed":
+      return "run_completed";
+    default:
+      return "heartbeat";
+  }
+}
+
+function formatRunStatusMessage(event: UiRunEvent): string {
+  switch (event.stage) {
+    case "run_started":
+      return `Run started for @${event.agentId ?? DEFAULT_AGENT_ID}.`;
+    case "provider_invocation_started":
+      return `Invoking provider${event.providerId ? ` (${event.providerId})` : ""}.`;
+    case "provider_invocation_completed":
+      return `Provider completed${typeof event.code === "number" ? ` with code ${event.code}` : ""}.`;
+    case "run_completed":
+      return "Run completed.";
+    default:
+      return "Runtime update.";
+  }
 }
 
 async function prepareProjectSession(
@@ -1213,6 +1488,9 @@ async function runUiSessionMessage(
     projectPath?: string;
     message: string;
     images?: UiImageInput[];
+    hooks?: UiRunHooks;
+    onStdout?: (chunk: string) => void;
+    onStderr?: (chunk: string) => void;
   }
 ): Promise<AgentRunResult> {
   if (typeof service.runAgent === "function") {
@@ -1220,7 +1498,10 @@ async function runUiSessionMessage(
       message: options.message,
       sessionRef: options.sessionRef,
       cwd: options.projectPath,
-      images: options.images
+      images: options.images,
+      ...(options.hooks ? { hooks: options.hooks } : {}),
+      ...(options.onStdout ? { onStdout: options.onStdout } : {}),
+      ...(options.onStderr ? { onStderr: options.onStderr } : {})
     });
   }
 

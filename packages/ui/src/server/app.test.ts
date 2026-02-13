@@ -579,6 +579,81 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("streams session message progress events and final result", async () => {
+    const runAgent = vi.fn<
+      NonNullable<OpenClawUiService["runAgent"]>
+    >(async (_agentId, options) => {
+      options.hooks?.onEvent?.({
+        stage: "run_started",
+        timestamp: "2026-02-13T00:00:00.000Z",
+        runId: "run-1",
+        agentId: "ceo",
+      });
+      options.onStdout?.("first stdout line");
+      options.onStderr?.("first stderr line");
+      options.hooks?.onEvent?.({
+        stage: "provider_invocation_completed",
+        timestamp: "2026-02-13T00:00:01.000Z",
+        runId: "run-1",
+        agentId: "ceo",
+        providerId: "openclaw",
+        code: 0,
+      });
+
+      return {
+        code: 0,
+        stdout: "assistant response",
+        stderr: "",
+        providerId: "openclaw",
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        runAgent,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message/stream",
+      payload: {
+        agentId: "ceo",
+        sessionRef: "workspace:tmp",
+        projectPath: "/tmp",
+        message: "hello",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("application/x-ndjson");
+
+    const lines = response.body
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { type: string; phase?: string; message?: string });
+
+    expect(lines.some((line) => line.type === "progress" && line.phase === "run_started")).toBe(true);
+    expect(lines.some((line) => line.type === "progress" && line.phase === "stdout")).toBe(true);
+    expect(lines.some((line) => line.type === "progress" && line.phase === "stderr")).toBe(true);
+    expect(lines.some((line) => line.type === "result")).toBe(true);
+    expect(runAgent).toHaveBeenCalledWith(
+      "ceo",
+      expect.objectContaining({
+        message: "hello",
+        sessionRef: "workspace:tmp",
+        cwd: "/tmp",
+        hooks: expect.any(Object),
+        onStdout: expect.any(Function),
+        onStderr: expect.any(Function),
+      }),
+    );
+  });
+
   it("sanitizes runtime prefixes and ansi sequences in session message output", async () => {
     const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(async (): Promise<{
       code: number;

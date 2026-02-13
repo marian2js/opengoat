@@ -19,6 +19,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import {
   Reasoning,
+  ReasoningContent,
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning";
 import { Badge } from "@/components/ui/badge";
@@ -300,6 +301,54 @@ interface SessionSendMessageResponse {
   message?: string;
 }
 
+type SessionMessageProgressPhase =
+  | "queued"
+  | "run_started"
+  | "provider_invocation_started"
+  | "provider_invocation_completed"
+  | "run_completed"
+  | "stdout"
+  | "stderr"
+  | "heartbeat";
+
+interface SessionMessageProgressStreamEvent {
+  type: "progress";
+  phase: SessionMessageProgressPhase;
+  timestamp: string;
+  message: string;
+}
+
+interface SessionMessageResultStreamEvent {
+  type: "result";
+  agentId: string;
+  sessionRef: string;
+  output: string;
+  result: {
+    code: number;
+    stdout: string;
+    stderr: string;
+  };
+  message?: string;
+}
+
+interface SessionMessageErrorStreamEvent {
+  type: "error";
+  timestamp: string;
+  error: string;
+}
+
+type SessionMessageStreamEvent =
+  | SessionMessageProgressStreamEvent
+  | SessionMessageResultStreamEvent
+  | SessionMessageErrorStreamEvent;
+
+interface SessionReasoningEvent {
+  id: string;
+  level: "info" | "stdout" | "stderr";
+  message: string;
+  timestamp: string;
+}
+
 interface SessionHistoryResponse {
   agentId: string;
   sessionRef: string;
@@ -422,6 +471,9 @@ export function App(): ReactElement {
     useState<ChatStatus>("ready");
   const [sessionMessagesById, setSessionMessagesById] = useState<
     Record<string, SessionChatMessage[]>
+  >({});
+  const [sessionReasoningById, setSessionReasoningById] = useState<
+    Record<string, SessionReasoningEvent[]>
   >({});
   const [sessionsByAgentId, setSessionsByAgentId] = useState<
     Record<string, Session[]>
@@ -883,6 +935,13 @@ export function App(): ReactElement {
     }
     return sessionMessagesById[activeChatContext.chatKey] ?? [];
   }, [activeChatContext, sessionMessagesById]);
+
+  const sessionReasoningEvents = useMemo(() => {
+    if (!activeChatContext) {
+      return [];
+    }
+    return sessionReasoningById[activeChatContext.chatKey] ?? [];
+  }, [activeChatContext, sessionReasoningById]);
 
   useEffect(() => {
     if (!activeChatContext?.historyRef) {
@@ -1892,6 +1951,34 @@ export function App(): ReactElement {
     });
   }
 
+  function replaceSessionReasoningEvents(
+    chatKey: string,
+    events: SessionReasoningEvent[],
+  ): void {
+    setSessionReasoningById((current) => ({
+      ...current,
+      [chatKey]: events,
+    }));
+  }
+
+  function appendSessionReasoningEvent(
+    chatKey: string,
+    event: SessionReasoningEvent,
+  ): void {
+    setSessionReasoningById((current) => {
+      const existing = current[chatKey] ?? [];
+      const maxEvents = 160;
+      const next =
+        existing.length >= maxEvents
+          ? [...existing.slice(existing.length - (maxEvents - 1)), event]
+          : [...existing, event];
+      return {
+        ...current,
+        [chatKey]: next,
+      };
+    });
+  }
+
   async function handleSessionPromptSubmit(
     promptMessage: PromptInputMessage,
   ): Promise<void> {
@@ -1924,10 +2011,18 @@ export function App(): ReactElement {
       : `Sent ${images.length} image${images.length === 1 ? "" : "s"}.`;
 
     const hydrationKey = `${activeChatContext.agentId}:${activeChatContext.sessionRef}`;
+    const chatKey = activeChatContext.chatKey;
     appendSessionMessage(activeChatContext.chatKey, hydrationKey, {
       id: `${activeChatContext.chatKey}:user:${Date.now()}`,
       role: "user",
       content: userMessage,
+    });
+    replaceSessionReasoningEvents(chatKey, []);
+    appendSessionReasoningEvent(chatKey, {
+      id: `${chatKey}:reasoning:${Date.now()}:queued`,
+      level: "info",
+      timestamp: new Date().toISOString(),
+      message: "Queued request.",
     });
     setSessionChatStatus("streaming");
 
@@ -1939,7 +2034,25 @@ export function App(): ReactElement {
         message,
         images,
       };
-      const response = await sendSessionMessage(payload);
+      const response = await sendSessionMessageStream(payload, {
+        onEvent: (event) => {
+          if (event.type !== "progress") {
+            return;
+          }
+
+          appendSessionReasoningEvent(chatKey, {
+            id: `${chatKey}:reasoning:${Date.now()}:${event.phase}`,
+            level:
+              event.phase === "stderr"
+                ? "stderr"
+                : event.phase === "stdout"
+                  ? "stdout"
+                  : "info",
+            timestamp: event.timestamp,
+            message: event.message,
+          });
+        },
+      });
 
       const assistantReply =
         response.output.trim() || "No output was returned.";
@@ -1947,6 +2060,15 @@ export function App(): ReactElement {
         id: `${activeChatContext.chatKey}:assistant:${Date.now()}`,
         role: "assistant",
         content: assistantReply,
+      });
+      appendSessionReasoningEvent(chatKey, {
+        id: `${chatKey}:reasoning:${Date.now()}:completed`,
+        level: "info",
+        timestamp: new Date().toISOString(),
+        message:
+          response.result.code === 0
+            ? "Run completed."
+            : `Run completed with code ${response.result.code}.`,
       });
       setSessionChatStatus(response.result.code === 0 ? "ready" : "error");
       await refreshSessions(activeChatContext.agentId);
@@ -1964,8 +2086,123 @@ export function App(): ReactElement {
         role: "assistant",
         content: normalizedError,
       });
+      appendSessionReasoningEvent(chatKey, {
+        id: `${chatKey}:reasoning:${Date.now()}:error`,
+        level: "stderr",
+        timestamp: new Date().toISOString(),
+        message: normalizedError,
+      });
       setSessionChatStatus("error");
     }
+  }
+
+  async function sendSessionMessageStream(
+    payload: {
+      agentId: string;
+      sessionRef: string;
+      projectPath?: string;
+      message: string;
+      images?: SessionMessageImageInput[];
+    },
+    options?: {
+      onEvent?: (event: SessionMessageStreamEvent) => void;
+    },
+  ): Promise<SessionSendMessageResponse> {
+    const routes = [
+      "/api/sessions/message/stream",
+      "/api/session/message/stream",
+    ];
+    let lastError: unknown;
+
+    for (const routePath of routes) {
+      try {
+        const response = await fetch(routePath, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const message = await readResponseError(response);
+          throw new Error(message);
+        }
+
+        const body = response.body;
+        if (!body) {
+          throw new Error("Streaming response body is unavailable.");
+        }
+
+        const reader = body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finalResponse: SessionSendMessageResponse | null = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          buffer += decoder.decode(value, { stream: !done });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) {
+              continue;
+            }
+
+            const event = JSON.parse(trimmed) as SessionMessageStreamEvent;
+            options?.onEvent?.(event);
+            if (event.type === "error") {
+              throw new Error(event.error || "Unable to send session message.");
+            }
+            if (event.type === "result") {
+              finalResponse = {
+                agentId: event.agentId,
+                sessionRef: event.sessionRef,
+                output: event.output,
+                result: event.result,
+                message: event.message,
+              };
+            }
+          }
+
+          if (done) {
+            break;
+          }
+        }
+
+        if (buffer.trim()) {
+          const event = JSON.parse(buffer.trim()) as SessionMessageStreamEvent;
+          options?.onEvent?.(event);
+          if (event.type === "error") {
+            throw new Error(event.error || "Unable to send session message.");
+          }
+          if (event.type === "result") {
+            finalResponse = {
+              agentId: event.agentId,
+              sessionRef: event.sessionRef,
+              output: event.output,
+              result: event.result,
+              message: event.message,
+            };
+          }
+        }
+
+        if (finalResponse) {
+          return finalResponse;
+        }
+
+        throw new Error("Session message stream ended without a final result.");
+      } catch (error) {
+        lastError = error;
+        if (!(error instanceof Error) || error.message !== "Not Found") {
+          throw error;
+        }
+      }
+    }
+
+    return sendSessionMessage(payload);
   }
 
   async function sendSessionMessage(payload: {
@@ -3462,6 +3699,37 @@ export function App(): ReactElement {
                                   <MessageContent className="w-full max-w-full bg-transparent px-0 py-0">
                                     <Reasoning isStreaming>
                                       <ReasoningTrigger />
+                                      <ReasoningContent className="w-full max-w-full">
+                                        <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                                          {sessionReasoningEvents.length ===
+                                          0 ? (
+                                            <p className="text-xs text-muted-foreground">
+                                              Waiting for runtime updates...
+                                            </p>
+                                          ) : (
+                                            sessionReasoningEvents.map(
+                                              (event) => (
+                                                <p
+                                                  key={event.id}
+                                                  className={cn(
+                                                    "text-xs",
+                                                    event.level === "stderr"
+                                                      ? "text-amber-300"
+                                                      : "text-muted-foreground",
+                                                  )}
+                                                >
+                                                  <span className="mr-2 text-[10px] uppercase tracking-wide text-muted-foreground/80">
+                                                    {event.level}
+                                                  </span>
+                                                  <span>
+                                                    {event.message}
+                                                  </span>
+                                                </p>
+                                              ),
+                                            )
+                                          )}
+                                        </div>
+                                      </ReasoningContent>
                                     </Reasoning>
                                   </MessageContent>
                                 </Message>
@@ -4052,6 +4320,23 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   }
 
   return payload as T;
+}
+
+async function readResponseError(response: Response): Promise<string> {
+  const payload = await response.json().catch(() => {
+    return null;
+  });
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "error" in payload &&
+    typeof payload.error === "string"
+  ) {
+    return payload.error;
+  }
+
+  return `Request failed with ${response.status}`;
 }
 
 function viewTitle(
