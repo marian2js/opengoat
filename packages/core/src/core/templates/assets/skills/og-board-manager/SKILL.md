@@ -7,15 +7,13 @@ metadata:
 
 # Board Manager
 
-Delegate and track work using a kanban board.
+Delegate and track work using tasks.
 
 ## Allowed Actions
 
-- Create boards.
-- Manage boards you own.
-- Create tasks for yourself or your direct reportees.
-- Assign tasks only to direct reportees.
-- Read board and task state.
+- Create tasks for yourself.
+- Assign tasks to your direct or indirect reportees.
+- Read task state.
 - If your session has an associated project, specify the path when creating tasks.
 
 Important: replace `<me>` with your agent ID.
@@ -24,11 +22,9 @@ Important: replace `<me>` with your agent ID.
 opengoat agent info <me>
 ```
 
-## Board and Task Commands
+## Task Commands
 
 ```bash
-opengoat board list --owner <me>
-opengoat board show <board-id>
 opengoat task list --as <me>
 opengoat task create --owner <me> --title "..." --description "..." --assign <agent-id> [--project <path>]
 opengoat task show <task-id>
@@ -44,7 +40,7 @@ opengoat agent info <me>
 
 Use the output to ensure:
 
-- You assign only to **your** direct reportees (or yourself)
+- You assign only to **your** reportees (direct or indirect) or yourself
 - You choose task granularity appropriate to your layer in the org
 
 ### 2. Review tasks
@@ -69,7 +65,7 @@ opengoat task create \
 
 ## Self-assigning (do the work yourself)
 
-If the task is small enough and you have the tools and context to complete it efficiently, **do not delegate**. Create a task for yourself so the work is still tracked on the board.
+If the task is small enough and you have the tools and context to complete it efficiently, **do not delegate**. Create a task for yourself so the work is still tracked.
 
 Rules:
 
@@ -140,5 +136,5 @@ Constraints:
 
 ## Troubleshooting
 
-- Task creation fails: you are likely assigning to someone who is not your direct reportee. Reassign to the correct direct reportee or assign to yourself.
-- You can use `opengoat board --help` and `opengoat task --help` to see available commands and options.
+- Task creation fails: you are likely assigning to someone who is not in your reportee tree. Reassign to a valid reportee (direct or indirect) or assign to yourself.
+- You can use `opengoat task --help` to see available commands and options.

@@ -17,8 +17,6 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
 const MIN_TASK_CHECK_FREQUENCY_MINUTES = 1;
 const MAX_TASK_CHECK_FREQUENCY_MINUTES = 1440;
-const DEFAULT_TASK_LIST_PAGE_SIZE = 100;
-const MAX_TASK_LIST_PAGE_SIZE = 100;
 const UI_SETTINGS_FILENAME = "ui-settings.json";
 
 interface AgentDescriptor {
@@ -147,13 +145,8 @@ export interface OpenClawUiService {
   ) => Promise<SessionHistoryResult>;
   renameSession?: (agentId?: string, title?: string, sessionRef?: string) => Promise<SessionSummary>;
   removeSession?: (agentId?: string, sessionRef?: string) => Promise<SessionRemoveResult>;
-  createBoard?: (actorId: string, options: { title: string }) => Promise<BoardSummary>;
-  listBoards?: () => Promise<BoardSummary[]>;
-  getBoard?: (boardId: string) => Promise<BoardRecord>;
-  updateBoard?: (actorId: string, boardId: string, options: { title?: string }) => Promise<BoardSummary>;
   createTask?: (
     actorId: string,
-    boardId: string,
     options: {
       title: string;
       description: string;
@@ -162,14 +155,7 @@ export interface OpenClawUiService {
       status?: string;
     }
   ) => Promise<TaskRecord>;
-  listTasks?: (boardId: string) => Promise<TaskRecord[]>;
-  listLatestTasksPage?: (options?: {
-    assignee?: string;
-    owner?: string;
-    status?: string;
-    limit?: number;
-    offset?: number;
-  }) => Promise<{ tasks: TaskRecord[]; total: number; limit: number; offset: number }>;
+  listTasks?: (options?: { assignee?: string; limit?: number }) => Promise<TaskRecord[]>;
   getTask?: (taskId: string) => Promise<TaskRecord>;
   updateTaskStatus?: (actorId: string, taskId: string, status: string, reason?: string) => Promise<TaskRecord>;
   addTaskBlocker?: (actorId: string, taskId: string, blocker: string) => Promise<TaskRecord>;
@@ -222,7 +208,6 @@ interface TaskEntry {
 
 interface TaskRecord {
   taskId: string;
-  boardId: string;
   createdAt: string;
   project: string;
   owner: string;
@@ -234,17 +219,6 @@ interface TaskRecord {
   blockers: string[];
   artifacts: TaskEntry[];
   worklog: TaskEntry[];
-}
-
-interface BoardSummary {
-  boardId: string;
-  title: string;
-  createdAt: string;
-  owner: string;
-}
-
-interface BoardRecord extends BoardSummary {
-  tasks: TaskRecord[];
 }
 
 interface AgentRunResult {
@@ -589,164 +563,28 @@ function registerApiRoutes(
     });
   });
 
-  app.get("/api/boards", async (_request, reply) => {
-    return safeReply(reply, async () => {
-      const summaries = await listUiBoards(service);
-      const boards = await Promise.all(
-        summaries.map(async (summary) => {
-          return getUiBoard(service, summary.boardId);
-        })
-      );
-
-      return {
-        boards
-      };
-    });
-  });
-
-  app.get<{ Params: { boardId: string } }>("/api/boards/:boardId", async (request, reply) => {
-    return safeReply(reply, async () => {
-      const boardId = request.params.boardId?.trim();
-      if (!boardId) {
-        reply.code(400);
-        return {
-          error: "boardId is required"
-        };
-      }
-
-      const board = await getUiBoard(service, boardId);
-      return {
-        board
-      };
-    });
-  });
-
-  const handleBoardCreate = async (
-    request: {
-      body?: {
-        actorId?: string;
-        title?: string;
-      };
-    },
-    reply: FastifyReply
-  ): Promise<unknown> => {
-    return safeReply(reply, async () => {
-      const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
-      const title = request.body?.title?.trim();
-      if (!title) {
-        reply.code(400);
-        return {
-          error: "title is required"
-        };
-      }
-
-      const board = await createUiBoard(service, actorId, { title });
-      return {
-        board,
-        message: `Board \"${board.title}\" created.`
-      };
-    });
-  };
-
-  app.post<{ Body: { actorId?: string; title?: string } }>("/api/boards", handleBoardCreate);
-  app.post<{ Body: { actorId?: string; title?: string } }>("/api/board/create", handleBoardCreate);
-
-  app.post<{ Params: { boardId: string }; Body: { actorId?: string; title?: string } }>(
-    "/api/boards/:boardId",
+  app.get<{ Querystring: { assignee?: string; limit?: string } }>(
+    "/api/tasks",
     async (request, reply) => {
       return safeReply(reply, async () => {
-        const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
-        const boardId = request.params.boardId?.trim();
-        const title = request.body?.title?.trim();
-        if (!boardId) {
-          reply.code(400);
-          return {
-            error: "boardId is required"
-          };
-        }
-        if (!title) {
-          reply.code(400);
-          return {
-            error: "title is required"
-          };
-        }
-
-        const board = await updateUiBoard(service, actorId, boardId, { title });
+        const assignee = request.query.assignee?.trim();
+        const rawLimit = request.query.limit?.trim();
+        const parsedLimit = rawLimit ? Number.parseInt(rawLimit, 10) : undefined;
+        const limit = Number.isFinite(parsedLimit) && (parsedLimit ?? 0) > 0 ? parsedLimit : undefined;
+        const tasks = await listUiTasks(service, {
+          assignee,
+          limit
+        });
         return {
-          board,
-          message: `Board \"${board.title}\" updated.`
+          tasks
         };
       });
     }
   );
 
-  app.get<{ Params: { boardId: string } }>("/api/boards/:boardId/tasks", async (request, reply) => {
-    return safeReply(reply, async () => {
-      const boardId = request.params.boardId?.trim();
-      if (!boardId) {
-        reply.code(400);
-        return {
-          error: "boardId is required"
-        };
-      }
-
-      const tasks = await listUiTasks(service, boardId);
-      return {
-        boardId,
-        tasks
-      };
-    });
-  });
-
-  app.get<{
-    Querystring: {
-      page?: string;
-      pageSize?: string;
-      status?: string;
-      assignee?: string;
-      owner?: string;
-    };
-  }>("/api/tasks", async (request, reply) => {
-    return safeReply(reply, async () => {
-      const page = parseTaskListPage(request.query.page);
-      const pageSize = parseTaskListPageSize(request.query.pageSize);
-      const status = normalizeTaskListFilter(request.query.status);
-      const assignee = normalizeTaskListFilter(request.query.assignee);
-      const owner = normalizeTaskListFilter(request.query.owner);
-      const offset = (page - 1) * pageSize;
-
-      const result = await listUiLatestTasksPage(service, {
-        assignee: assignee ?? undefined,
-        owner: owner ?? undefined,
-        status: status ?? undefined,
-        limit: pageSize,
-        offset
-      });
-      const totalPages = result.total > 0 ? Math.ceil(result.total / pageSize) : 1;
-
-      return {
-        tasks: result.tasks,
-        pagination: {
-          page,
-          pageSize,
-          total: result.total,
-          totalPages,
-          hasPrevious: page > 1,
-          hasNext: page < totalPages
-        },
-        filters: {
-          status,
-          assignee,
-          owner
-        }
-      };
-    });
-  });
-
   app.post<{
     Body: {
       actorId?: string;
-      boardId?: string;
       title?: string;
       description?: string;
       project?: string;
@@ -756,19 +594,12 @@ function registerApiRoutes(
   }>("/api/tasks", async (request, reply) => {
     return safeReply(reply, async () => {
       const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
-      const boardId = request.body?.boardId?.trim();
       const title = request.body?.title?.trim();
       const description = request.body?.description?.trim();
       const project = request.body?.project?.trim();
       const assignedTo = request.body?.assignedTo?.trim();
       const status = request.body?.status?.trim();
 
-      if (!boardId) {
-        reply.code(400);
-        return {
-          error: "boardId is required"
-        };
-      }
       if (!title) {
         reply.code(400);
         return {
@@ -782,7 +613,7 @@ function registerApiRoutes(
         };
       }
 
-      const task = await createUiTask(service, actorId, boardId, {
+      const task = await createUiTask(service, actorId, {
         title,
         description,
         project,
@@ -2218,55 +2049,9 @@ async function runUiSessionMessage(
   throw new Error("Session messaging is unavailable on this runtime.");
 }
 
-async function listUiBoards(service: OpenClawUiService): Promise<BoardSummary[]> {
-  if (typeof service.listBoards === "function") {
-    return service.listBoards();
-  }
-
-  throw new Error("Board listing is unavailable on this runtime.");
-}
-
-async function getUiBoard(service: OpenClawUiService, boardId: string): Promise<BoardRecord> {
-  if (typeof service.getBoard === "function") {
-    return service.getBoard(boardId);
-  }
-
-  throw new Error("Board details are unavailable on this runtime.");
-}
-
-async function createUiBoard(
-  service: OpenClawUiService,
-  actorId: string,
-  options: {
-    title: string;
-  }
-): Promise<BoardSummary> {
-  if (typeof service.createBoard === "function") {
-    return service.createBoard(actorId, options);
-  }
-
-  throw new Error("Board creation is unavailable on this runtime.");
-}
-
-async function updateUiBoard(
-  service: OpenClawUiService,
-  actorId: string,
-  boardId: string,
-  options: {
-    title?: string;
-  }
-): Promise<BoardSummary> {
-  if (typeof service.updateBoard === "function") {
-    return service.updateBoard(actorId, boardId, options);
-  }
-
-  throw new Error("Board updates are unavailable on this runtime.");
-}
-
 async function createUiTask(
   service: OpenClawUiService,
   actorId: string,
-  boardId: string,
   options: {
     title: string;
     description: string;
@@ -2276,80 +2061,21 @@ async function createUiTask(
   }
 ): Promise<TaskRecord> {
   if (typeof service.createTask === "function") {
-    return service.createTask(actorId, boardId, options);
+    return service.createTask(actorId, options);
   }
 
   throw new Error("Task creation is unavailable on this runtime.");
 }
 
-async function listUiTasks(service: OpenClawUiService, boardId: string): Promise<TaskRecord[]> {
+async function listUiTasks(
+  service: OpenClawUiService,
+  options: { assignee?: string; limit?: number } = {}
+): Promise<TaskRecord[]> {
   if (typeof service.listTasks === "function") {
-    return service.listTasks(boardId);
+    return service.listTasks(options);
   }
 
   throw new Error("Task listing is unavailable on this runtime.");
-}
-
-async function listUiLatestTasksPage(
-  service: OpenClawUiService,
-  options: {
-    assignee?: string;
-    owner?: string;
-    status?: string;
-    limit?: number;
-    offset?: number;
-  }
-): Promise<{ tasks: TaskRecord[]; total: number; limit: number; offset: number }> {
-  const limit = parseTaskListPageSize(options.limit);
-  const offset = parseTaskListOffset(options.offset);
-  const status = normalizeTaskListFilter(options.status) ?? undefined;
-  const assignee = normalizeTaskListFilter(options.assignee) ?? undefined;
-  const owner = normalizeTaskListFilter(options.owner) ?? undefined;
-
-  if (typeof service.listLatestTasksPage === "function") {
-    return service.listLatestTasksPage({
-      assignee,
-      owner,
-      status,
-      limit,
-      offset
-    });
-  }
-
-  const summaries = await listUiBoards(service);
-  const tasksByBoard = await Promise.all(
-    summaries.map(async (summary) => {
-      return listUiTasks(service, summary.boardId);
-    })
-  );
-  const allTasks = tasksByBoard.flat();
-  const filteredTasks = allTasks
-    .filter((task) => {
-      if (status && task.status.trim().toLowerCase() !== status) {
-        return false;
-      }
-      if (assignee && task.assignedTo.trim().toLowerCase() !== assignee) {
-        return false;
-      }
-      if (owner && task.owner.trim().toLowerCase() !== owner) {
-        return false;
-      }
-      return true;
-    })
-    .sort((left, right) => {
-      const createdAtComparison = right.createdAt.localeCompare(left.createdAt);
-      if (createdAtComparison !== 0) {
-        return createdAtComparison;
-      }
-      return right.taskId.localeCompare(left.taskId);
-    });
-
-  return {
-    tasks: filteredTasks.slice(offset, offset + limit),
-    total: filteredTasks.length,
-    limit,
-    offset
-  };
 }
 
 async function updateUiTaskStatus(
@@ -2596,64 +2322,6 @@ function normalizeRoleValue(rawRole: string | undefined): string | undefined {
     return normalized;
   }
   return undefined;
-}
-
-function parseTaskListPage(value: unknown): number {
-  const parsed = parsePositiveInteger(value);
-  if (!parsed) {
-    return 1;
-  }
-  return parsed;
-}
-
-function parseTaskListPageSize(value: unknown): number {
-  const parsed = parsePositiveInteger(value);
-  if (!parsed) {
-    return DEFAULT_TASK_LIST_PAGE_SIZE;
-  }
-  return Math.min(parsed, MAX_TASK_LIST_PAGE_SIZE);
-}
-
-function parseTaskListOffset(value: unknown): number {
-  const parsed =
-    typeof value === "number"
-      ? Number.isFinite(value)
-        ? Math.trunc(value)
-        : Number.NaN
-      : typeof value === "string"
-        ? Number.parseInt(value, 10)
-        : Number.NaN;
-  if (!Number.isInteger(parsed) || parsed < 0) {
-    return 0;
-  }
-  return parsed;
-}
-
-function parsePositiveInteger(value: unknown): number | undefined {
-  const parsed =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number.parseInt(value, 10)
-        : Number.NaN;
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    return undefined;
-  }
-  return parsed;
-}
-
-function normalizeTaskListFilter(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) {
-    return null;
-  }
-  if (normalized === "all") {
-    return null;
-  }
-  return normalized;
 }
 
 function defaultUiServerSettings(): UiServerSettings {

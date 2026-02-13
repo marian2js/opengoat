@@ -64,7 +64,6 @@ interface TaskEntry {
 
 interface TaskRecord {
   taskId: string;
-  boardId: string;
   createdAt: string;
   project: string;
   owner: string;
@@ -75,14 +74,6 @@ interface TaskRecord {
   blockers: string[];
   artifacts: TaskEntry[];
   worklog: TaskEntry[];
-}
-
-interface BoardRecord {
-  boardId: string;
-  title: string;
-  createdAt: string;
-  owner: string;
-  tasks: TaskRecord[];
 }
 
 let activeServer: Awaited<ReturnType<typeof createOpenGoatUiServer>> | undefined;
@@ -930,10 +921,9 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
-  it("manages boards and tasks through the api", async () => {
+  it("manages tasks through the api", async () => {
     const baseTask: TaskRecord = {
       taskId: "task-plan",
-      boardId: "board-roadmap",
       createdAt: "2026-02-11T08:00:00.000Z",
       project: "~",
       owner: "ceo",
@@ -945,59 +935,10 @@ describe("OpenGoat UI server API", () => {
       artifacts: [],
       worklog: []
     };
-    const board: BoardRecord = {
-      boardId: "board-roadmap",
-      title: "Roadmap",
-      createdAt: "2026-02-11T08:00:00.000Z",
-      owner: "ceo",
-      tasks: [baseTask]
-    };
-
-    const listBoards = vi.fn<NonNullable<OpenClawUiService["listBoards"]>>(async () => {
-      return [
-        {
-          boardId: board.boardId,
-          title: board.title,
-          createdAt: board.createdAt,
-          owner: board.owner
-        }
-      ];
-    });
-    const getBoard = vi.fn<NonNullable<OpenClawUiService["getBoard"]>>(async () => board);
-    const createBoard = vi.fn<NonNullable<OpenClawUiService["createBoard"]>>(async (_actorId, options) => {
-      return {
-        boardId: "board-new",
-        title: options.title,
-        createdAt: "2026-02-11T08:01:00.000Z",
-        owner: "ceo"
-      };
-    });
-    const updateBoard = vi.fn<NonNullable<OpenClawUiService["updateBoard"]>>(async (_actorId, boardId, options) => {
-      return {
-        boardId,
-        title: options.title ?? "Roadmap",
-        createdAt: "2026-02-11T08:00:00.000Z",
-        owner: "ceo"
-      };
-    });
     const listTasks = vi.fn<NonNullable<OpenClawUiService["listTasks"]>>(async () => [baseTask]);
-    const listLatestTasksPage = vi.fn<NonNullable<OpenClawUiService["listLatestTasksPage"]>>(async (_options) => {
-      return {
-        tasks: [
-          {
-            ...baseTask,
-            status: "doing"
-          }
-        ],
-        total: 201,
-        limit: 100,
-        offset: 100
-      };
-    });
-    const createTask = vi.fn<NonNullable<OpenClawUiService["createTask"]>>(async (_actorId, boardId, options) => {
+    const createTask = vi.fn<NonNullable<OpenClawUiService["createTask"]>>(async (_actorId, options) => {
       return {
         ...baseTask,
-        boardId,
         title: options.title,
         description: options.description,
         assignedTo: options.assignedTo ?? "ceo",
@@ -1051,12 +992,7 @@ describe("OpenGoat UI server API", () => {
       attachFrontend: false,
       service: {
         ...createMockService(),
-        listBoards,
-        getBoard,
-        createBoard,
-        updateBoard,
         listTasks,
-        listLatestTasksPage,
         createTask,
         updateTaskStatus,
         addTaskBlocker,
@@ -1065,89 +1001,20 @@ describe("OpenGoat UI server API", () => {
       }
     });
 
-    const boardsResponse = await activeServer.inject({
+    const tasksResponse = await activeServer.inject({
       method: "GET",
-      url: "/api/boards"
+      url: "/api/tasks"
     });
-    expect(boardsResponse.statusCode).toBe(200);
-    expect(boardsResponse.json()).toMatchObject({
-      boards: [
-        {
-          boardId: "board-roadmap",
-          title: "Roadmap",
-          tasks: [{ taskId: "task-plan" }]
-        }
-      ]
+    expect(tasksResponse.statusCode).toBe(200);
+    expect(tasksResponse.json()).toMatchObject({
+      tasks: [{ taskId: "task-plan" }]
     });
-
-    const listLatestTasksResponse = await activeServer.inject({
-      method: "GET",
-      url: "/api/tasks?page=2&pageSize=100&status=doing&assignee=developer&owner=ceo"
-    });
-    expect(listLatestTasksResponse.statusCode).toBe(200);
-    expect(listLatestTasksPage).toHaveBeenCalledWith({
-      assignee: "developer",
-      owner: "ceo",
-      status: "doing",
-      limit: 100,
-      offset: 100
-    });
-    expect(listLatestTasksResponse.json()).toMatchObject({
-      tasks: [{ taskId: "task-plan", status: "doing" }],
-      pagination: {
-        page: 2,
-        pageSize: 100,
-        total: 201,
-        totalPages: 3,
-        hasPrevious: true,
-        hasNext: true
-      },
-      filters: {
-        status: "doing",
-        assignee: "developer",
-        owner: "ceo"
-      }
-    });
-
-    const createBoardResponse = await activeServer.inject({
-      method: "POST",
-      url: "/api/boards",
-      payload: {
-        actorId: "ceo",
-        title: "Platform"
-      }
-    });
-    expect(createBoardResponse.statusCode).toBe(200);
-    expect(createBoard).toHaveBeenCalledWith("ceo", { title: "Platform" });
-
-    const createBoardAliasResponse = await activeServer.inject({
-      method: "POST",
-      url: "/api/board/create",
-      payload: {
-        actorId: "ceo",
-        title: "Platform Alias"
-      }
-    });
-    expect(createBoardAliasResponse.statusCode).toBe(200);
-    expect(createBoard).toHaveBeenCalledWith("ceo", { title: "Platform Alias" });
-
-    const updateBoardResponse = await activeServer.inject({
-      method: "POST",
-      url: "/api/boards/board-roadmap",
-      payload: {
-        actorId: "ceo",
-        title: "Roadmap v2"
-      }
-    });
-    expect(updateBoardResponse.statusCode).toBe(200);
-    expect(updateBoard).toHaveBeenCalledWith("ceo", "board-roadmap", { title: "Roadmap v2" });
 
     const createTaskResponse = await activeServer.inject({
       method: "POST",
       url: "/api/tasks",
       payload: {
         actorId: "ceo",
-        boardId: "board-roadmap",
         title: "Design API",
         description: "Document API contracts",
         assignedTo: "developer",
@@ -1156,7 +1023,7 @@ describe("OpenGoat UI server API", () => {
       }
     });
     expect(createTaskResponse.statusCode).toBe(200);
-    expect(createTask).toHaveBeenCalledWith("ceo", "board-roadmap", {
+    expect(createTask).toHaveBeenCalledWith("ceo", {
       title: "Design API",
       description: "Document API contracts",
       assignedTo: "developer",

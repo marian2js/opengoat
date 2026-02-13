@@ -22,8 +22,8 @@ Current policy:
 5. managers only manage direct reportees by org definition.
 6. sessions are preserved and tied to project path.
 7. each OpenGoat session maps 1:1 to an OpenClaw session key.
-8. every manager has a default board; manager task creation without a board uses this default board.
-9. default manager boards are immutable for deletion.
+8. agents can assign tasks only to themselves or their reportees (direct or indirect).
+9. agents can update their own tasks and tasks of their reportees (direct or indirect).
 
 ## 3) Agent Model
 

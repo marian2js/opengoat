@@ -58,6 +58,7 @@ import {
 } from "@xyflow/react";
 import type { ChatStatus, FileUIPart } from "ai";
 import {
+  Boxes,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -65,10 +66,8 @@ import {
   FolderOpen,
   FolderPlus,
   Home,
-  ListTodo,
   MessageSquare,
   MoreHorizontal,
-  PenLine,
   Plus,
   Settings,
   Sparkles,
@@ -79,7 +78,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Fragment } from "react";
 import { toast } from "sonner";
 
-type PageView = "overview" | "boards" | "agents" | "skills" | "settings";
+type PageView = "overview" | "tasks" | "agents" | "skills" | "settings";
 
 type AppRoute =
   | {
@@ -91,8 +90,8 @@ type AppRoute =
       agentId: string;
     }
   | {
-      kind: "board";
-      boardId: string;
+      kind: "taskWorkspace";
+      taskWorkspaceId: string;
     }
   | {
       kind: "session";
@@ -163,7 +162,6 @@ interface TaskEntry {
 
 interface TaskRecord {
   taskId: string;
-  boardId: string;
   createdAt: string;
   project: string;
   owner: string;
@@ -177,33 +175,20 @@ interface TaskRecord {
   worklog: TaskEntry[];
 }
 
-interface BoardRecord {
-  boardId: string;
+interface TaskWorkspaceRecord {
+  taskWorkspaceId: string;
   title: string;
   createdAt: string;
   owner: string;
   tasks: TaskRecord[];
 }
 
-interface BoardsResponse {
-  boards: BoardRecord[];
+interface TaskWorkspacesResponse {
+  taskWorkspaces: TaskWorkspaceRecord[];
 }
 
-interface TasksPageResponse {
+interface TasksResponse {
   tasks: TaskRecord[];
-  pagination: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-    hasPrevious: boolean;
-    hasNext: boolean;
-  };
-  filters: {
-    status: string | null;
-    assignee: string | null;
-    owner: string | null;
-  };
 }
 
 interface UiSettings {
@@ -217,7 +202,7 @@ interface DashboardState {
   sessions: SessionsResponse;
   agentSkills: SkillsResponse;
   globalSkills: SkillsResponse;
-  boards: BoardsResponse;
+  taskWorkspaces: TaskWorkspacesResponse;
   settings: UiSettings;
 }
 
@@ -453,7 +438,6 @@ const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
 const DEFAULT_AGENT_ID = "ceo";
 const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
-const TASKS_TABLE_PAGE_SIZE = 100;
 const TASK_STATUS_OPTIONS = [
   { value: "todo", label: "To do" },
   { value: "doing", label: "In progress" },
@@ -464,7 +448,7 @@ const TASK_STATUS_OPTIONS = [
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
-  { id: "boards", label: "Tasks", icon: ListTodo },
+  { id: "tasks", label: "Tasks", icon: Boxes },
   { id: "agents", label: "Agents", icon: UsersRound },
   { id: "skills", label: "Skills", icon: Sparkles },
 ];
@@ -516,27 +500,13 @@ export function App(): ReactElement {
     Record<string, string>
   >({});
   const hydratedSessionIdsRef = useRef<Set<string>>(new Set());
-  const [boardActorId, setBoardActorId] = useState("ceo");
   const [taskActorId, setTaskActorId] = useState("ceo");
-  const [taskTablePage, setTaskTablePage] = useState(1);
-  const [taskFilterStatus, setTaskFilterStatus] = useState("all");
-  const [taskFilterAssignee, setTaskFilterAssignee] = useState("all");
-  const [taskFilterOwner, setTaskFilterOwner] = useState("all");
-  const [tasksPageResponse, setTasksPageResponse] =
-    useState<TasksPageResponse | null>(null);
-  const [isTasksPageLoading, setTasksPageLoading] = useState(true);
-  const [tasksPageError, setTasksPageError] = useState<string | null>(null);
-  const [newBoardTitle, setNewBoardTitle] = useState("");
-  const [taskDraftByBoardId, setTaskDraftByBoardId] = useState<
+  const [taskDraftByWorkspaceId, setTaskDraftByWorkspaceId] = useState<
     Record<string, TaskCreateDraft>
   >({});
   const [taskStatusDraftById, setTaskStatusDraftById] = useState<
     Record<string, string>
   >({});
-  const [isCreateBoardDialogOpen, setCreateBoardDialogOpen] = useState(false);
-  const [createBoardDialogError, setCreateBoardDialogError] = useState<
-    string | null
-  >(null);
   const [isCreateAgentDialogOpen, setCreateAgentDialogOpen] = useState(false);
   const [createAgentDialogError, setCreateAgentDialogError] = useState<
     string | null
@@ -618,7 +588,7 @@ export function App(): ReactElement {
     setError(null);
 
     try {
-      const [health, overview, sessions, agentSkills, globalSkills, boards, settings] =
+      const [health, overview, sessions, agentSkills, globalSkills, tasks, settings] =
         await Promise.all([
           fetchJson<HealthResponse>("/api/health"),
           fetchJson<OverviewResponse>("/api/openclaw/overview"),
@@ -629,8 +599,8 @@ export function App(): ReactElement {
             `/api/skills?agentId=${encodeURIComponent(DEFAULT_AGENT_ID)}`,
           ),
           fetchJson<SkillsResponse>("/api/skills?global=true"),
-          fetchJson<BoardsResponse>("/api/boards").catch(() => {
-            return { boards: [] } satisfies BoardsResponse;
+          fetchJson<TasksResponse>("/api/tasks").catch(() => {
+            return { tasks: [] } satisfies TasksResponse;
           }),
           fetchJson<{ settings: UiSettings }>("/api/settings")
             .then((payload) => payload.settings)
@@ -648,7 +618,7 @@ export function App(): ReactElement {
         sessions,
         agentSkills,
         globalSkills,
-        boards,
+        taskWorkspaces: buildTaskWorkspaceResponse(tasks),
         settings,
       });
       setTaskCheckFrequencyMinutesInput(
@@ -710,70 +680,22 @@ export function App(): ReactElement {
     [],
   );
 
-  const refreshBoards = useCallback(async () => {
-    const boards = await fetchJson<BoardsResponse>("/api/boards");
+  const refreshTasks = useCallback(async () => {
+    const tasks = await fetchJson<TasksResponse>("/api/tasks");
     setState((current) => {
       if (!current) {
         return current;
       }
       return {
         ...current,
-        boards,
+        taskWorkspaces: buildTaskWorkspaceResponse(tasks),
       };
     });
   }, []);
 
-  const refreshTasksPage = useCallback(async () => {
-    setTasksPageLoading(true);
-    setTasksPageError(null);
-    try {
-      const params = new URLSearchParams({
-        page: String(taskTablePage),
-        pageSize: String(TASKS_TABLE_PAGE_SIZE),
-      });
-      if (taskFilterStatus !== "all") {
-        params.set("status", taskFilterStatus);
-      }
-      if (taskFilterAssignee !== "all") {
-        params.set("assignee", taskFilterAssignee);
-      }
-      if (taskFilterOwner !== "all") {
-        params.set("owner", taskFilterOwner);
-      }
-
-      const response = await fetchJson<TasksPageResponse>(
-        `/api/tasks?${params.toString()}`,
-      );
-      setTasksPageResponse(response);
-    } catch (requestError) {
-      const message =
-        requestError instanceof Error
-          ? requestError.message
-          : "Failed to load tasks.";
-      setTasksPageError(message);
-    } finally {
-      setTasksPageLoading(false);
-    }
-  }, [taskFilterAssignee, taskFilterOwner, taskFilterStatus, taskTablePage]);
-
   useEffect(() => {
     void loadData();
   }, [loadData]);
-
-  useEffect(() => {
-    void refreshTasksPage();
-  }, [refreshTasksPage]);
-
-  useEffect(() => {
-    const totalPages = tasksPageResponse?.pagination.totalPages;
-    if (!totalPages) {
-      return;
-    }
-    if (taskTablePage <= totalPages) {
-      return;
-    }
-    setTaskTablePage(totalPages);
-  }, [taskTablePage, tasksPageResponse?.pagination.totalPages]);
 
   useEffect(() => {
     if (route.kind !== "agent") {
@@ -810,16 +732,11 @@ export function App(): ReactElement {
       };
     });
 
-    const hasBoardActor = agentIds.includes(boardActorId);
-    if (!hasBoardActor) {
-      setBoardActorId(agentIds[0] ?? "ceo");
-    }
-
     const hasTaskActor = agentIds.includes(taskActorId);
     if (!hasTaskActor) {
       setTaskActorId(agentIds[0] ?? "ceo");
     }
-  }, [state, boardActorId, taskActorId]);
+  }, [state, taskActorId]);
 
   const agents = state?.overview.agents ?? [];
   const sessions = state?.sessions.sessions ?? [];
@@ -1145,32 +1062,26 @@ export function App(): ReactElement {
     };
   }, [activeChatContext]);
 
-  const boards = state?.boards.boards ?? [];
-  const pagedTasks = tasksPageResponse?.tasks ?? [];
-  const ownerFilterOptions = useMemo(() => {
-    return [...agents].sort((left, right) => left.id.localeCompare(right.id));
-  }, [agents]);
-  const assigneeFilterOptions = ownerFilterOptions;
-  const selectedBoard = useMemo(() => {
-    if (route.kind !== "board") {
+  const taskWorkspaces = state?.taskWorkspaces.taskWorkspaces ?? [];
+  const selectedTaskWorkspace = useMemo(() => {
+    if (route.kind !== "taskWorkspace") {
       return null;
     }
-    return boards.find((board) => board.boardId === route.boardId) ?? null;
-  }, [boards, route]);
+    return (
+      taskWorkspaces.find(
+        (taskWorkspace) =>
+          taskWorkspace.taskWorkspaceId === route.taskWorkspaceId,
+      ) ?? null
+    );
+  }, [taskWorkspaces, route]);
   const selectedTask = useMemo(() => {
-    if (!selectedTaskId) {
+    if (!selectedTaskWorkspace || !selectedTaskId) {
       return null;
     }
-    if (selectedBoard) {
-      const boardTask =
-        selectedBoard.tasks.find((task) => task.taskId === selectedTaskId) ??
-        null;
-      if (boardTask) {
-        return boardTask;
-      }
-    }
-    return pagedTasks.find((task) => task.taskId === selectedTaskId) ?? null;
-  }, [pagedTasks, selectedBoard, selectedTaskId]);
+    return (
+      selectedTaskWorkspace.tasks.find((task) => task.taskId === selectedTaskId) ?? null
+    );
+  }, [selectedTaskWorkspace, selectedTaskId]);
   const selectedTaskActivity = useMemo(() => {
     if (!selectedTask) {
       return [];
@@ -1220,14 +1131,34 @@ export function App(): ReactElement {
         return [];
       }
 
-      if (actor.type === "manager") {
-        const directReportees = agents.filter(
-          (candidate) => candidate.reportsTo === actorId,
-        );
-        return [actor, ...directReportees];
+      if (actor.type !== "manager") {
+        return [actor];
       }
 
-      return [actor];
+      const queue = [actor.id];
+      const seen = new Set<string>([actor.id]);
+      const assignable = [actor];
+
+      while (queue.length > 0) {
+        const managerId = queue.shift();
+        if (!managerId) {
+          continue;
+        }
+
+        const directReportees = agents.filter(
+          (candidate) => candidate.reportsTo === managerId,
+        );
+        for (const reportee of directReportees) {
+          if (seen.has(reportee.id)) {
+            continue;
+          }
+          seen.add(reportee.id);
+          assignable.push(reportee);
+          queue.push(reportee.id);
+        }
+      }
+
+      return assignable;
     },
     [agentById, agents],
   );
@@ -1249,11 +1180,7 @@ export function App(): ReactElement {
   }, [workspaceNodes]);
 
   useEffect(() => {
-    if (route.kind === "board") {
-      return;
-    }
-
-    if (route.kind === "page" && route.view === "boards") {
+    if (route.kind === "taskWorkspace") {
       return;
     }
 
@@ -1274,14 +1201,14 @@ export function App(): ReactElement {
   }, [isTaskDetailsDialogOpen, selectedTask]);
 
   useEffect(() => {
-    setTaskDraftByBoardId((current) => {
-      if (boards.length === 0) {
+    setTaskDraftByWorkspaceId((current) => {
+      if (taskWorkspaces.length === 0) {
         return {};
       }
 
       const next: Record<string, TaskCreateDraft> = {};
-      for (const board of boards) {
-        const existing = current[board.boardId];
+      for (const taskWorkspace of taskWorkspaces) {
+        const existing = current[taskWorkspace.taskWorkspaceId];
         const allowed = getAssignableAgents(taskActorId);
         const fallbackAssignee = allowed[0]?.id ?? taskActorId;
         const assignedTo = allowed.some(
@@ -1290,7 +1217,7 @@ export function App(): ReactElement {
           ? existing?.assignedTo ?? fallbackAssignee
           : fallbackAssignee;
 
-        next[board.boardId] = existing
+        next[taskWorkspace.taskWorkspaceId] = existing
           ? {
               ...existing,
               assignedTo,
@@ -1308,8 +1235,8 @@ export function App(): ReactElement {
 
     setTaskStatusDraftById((current) => {
       const statusByTaskId = new Map<string, string>();
-      for (const board of boards) {
-        for (const task of board.tasks) {
+      for (const taskWorkspace of taskWorkspaces) {
+        for (const task of taskWorkspace.tasks) {
           statusByTaskId.set(task.taskId, task.status);
         }
       }
@@ -1320,7 +1247,7 @@ export function App(): ReactElement {
       }
       return next;
     });
-  }, [boards, getAssignableAgents, taskActorId]);
+  }, [taskWorkspaces, getAssignableAgents, taskActorId]);
 
   const openTaskCount = useMemo(() => {
     if (!state) {
@@ -1328,8 +1255,8 @@ export function App(): ReactElement {
     }
 
     let count = 0;
-    for (const board of state.boards.boards) {
-      for (const task of board.tasks) {
+    for (const taskWorkspace of state.taskWorkspaces.taskWorkspaces) {
+      for (const task of taskWorkspace.tasks) {
         if (task.status.trim().toLowerCase() !== "done") {
           count += 1;
         }
@@ -1363,7 +1290,7 @@ export function App(): ReactElement {
         label: "Open Tasks",
         value: openTaskCount,
         hint: "Tasks not marked done",
-        icon: ListTodo,
+        icon: Boxes,
       },
     ];
   }, [openTaskCount, state]);
@@ -1767,11 +1694,11 @@ export function App(): ReactElement {
   }
 
   function updateTaskDraft(
-    boardId: string,
+    taskWorkspaceId: string,
     patch: Partial<TaskCreateDraft>,
   ): void {
-    setTaskDraftByBoardId((current) => {
-      const existing = current[boardId] ?? {
+    setTaskDraftByWorkspaceId((current) => {
+      const existing = current[taskWorkspaceId] ?? {
         title: "",
         description: "",
         project: "~",
@@ -1780,90 +1707,12 @@ export function App(): ReactElement {
       };
       return {
         ...current,
-        [boardId]: {
+        [taskWorkspaceId]: {
           ...existing,
           ...patch,
         },
       };
     });
-  }
-
-  async function handleCreateBoard(): Promise<void> {
-    const title = newBoardTitle.trim();
-    if (!title) {
-      setCreateBoardDialogError("Board title is required.");
-      return;
-    }
-
-    setMutating(true);
-    setCreateBoardDialogError(null);
-    try {
-      const response = await createBoardRequest({
-        actorId: boardActorId,
-        title,
-      });
-
-      setNewBoardTitle("");
-      toast.success(response.message ?? `Board \"${title}\" created.`);
-      await refreshBoards();
-      const boardId = response.board?.boardId?.trim();
-      if (boardId) {
-        navigateToRoute({
-          kind: "board",
-          boardId,
-        });
-      }
-      setCreateBoardDialogOpen(false);
-    } catch (requestError) {
-      const message =
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to create board.";
-      const normalizedError =
-        message === "Not Found"
-          ? "Board create endpoint is unavailable. Refresh/restart the UI server to load the latest API routes."
-          : message;
-      setCreateBoardDialogError(normalizedError);
-    } finally {
-      setMutating(false);
-    }
-  }
-
-  async function handleRenameBoard(board: BoardRecord): Promise<void> {
-    const nextTitle = window
-      .prompt(`Rename board \"${board.title}\"`, board.title)
-      ?.trim();
-    if (!nextTitle || nextTitle === board.title) {
-      return;
-    }
-
-    setMutating(true);
-    try {
-      const response = await fetchJson<{ message?: string }>(
-        `/api/boards/${encodeURIComponent(board.boardId)}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            actorId: boardActorId,
-            title: nextTitle,
-          }),
-        },
-      );
-
-      toast.success(response.message ?? `Board \"${nextTitle}\" updated.`);
-      await refreshBoards();
-    } catch (requestError) {
-      const message =
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to rename board.";
-      toast.error(message);
-    } finally {
-      setMutating(false);
-    }
   }
 
   async function handleSaveSettings(): Promise<void> {
@@ -1919,10 +1768,10 @@ export function App(): ReactElement {
   }
 
   async function handleCreateTask(
-    boardId: string,
+    taskWorkspaceId: string,
     options?: { fromDialog?: boolean },
   ): Promise<void> {
-    const draft = taskDraftByBoardId[boardId];
+    const draft = taskDraftByWorkspaceId[taskWorkspaceId];
     const title = draft?.title.trim() ?? "";
     const description = draft?.description.trim() ?? "";
     const project = draft?.project.trim() || "~";
@@ -1957,7 +1806,6 @@ export function App(): ReactElement {
     setMutating(true);
     if (options?.fromDialog) {
       setCreateTaskDialogError(null);
-    } else {
     }
     try {
       const response = await fetchJson<{ message?: string }>("/api/tasks", {
@@ -1967,7 +1815,6 @@ export function App(): ReactElement {
         },
         body: JSON.stringify({
           actorId: taskActorId,
-          boardId,
           title,
           description,
           project,
@@ -1976,11 +1823,11 @@ export function App(): ReactElement {
         }),
       });
 
-      setTaskDraftByBoardId((current) => {
+      setTaskDraftByWorkspaceId((current) => {
         return {
           ...current,
-          [boardId]: {
-            ...(current[boardId] ?? {
+          [taskWorkspaceId]: {
+            ...(current[taskWorkspaceId] ?? {
               title: "",
               description: "",
               project: "~",
@@ -1998,8 +1845,7 @@ export function App(): ReactElement {
       } else {
         toast.success(response.message ?? `Task \"${title}\" created.`);
       }
-      await refreshBoards();
-      await refreshTasksPage();
+      await refreshTasks();
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -2088,8 +1934,7 @@ export function App(): ReactElement {
       } else {
         toast.success(response.message ?? `Task \"${taskId}\" updated.`);
       }
-      await refreshBoards();
-      await refreshTasksPage();
+      await refreshTasks();
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -2152,8 +1997,7 @@ export function App(): ReactElement {
       } else {
         toast.success(response.message ?? `${label} added.`);
       }
-      await refreshBoards();
-      await refreshTasksPage();
+      await refreshTasks();
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -2468,38 +2312,6 @@ export function App(): ReactElement {
       : new Error("Unable to send session message.");
   }
 
-  async function createBoardRequest(payload: {
-    actorId: string;
-    title: string;
-  }): Promise<{ message?: string; board?: { boardId?: string } }> {
-    const routes = ["/api/boards", "/api/board/create"];
-    let lastError: unknown;
-
-    for (const routePath of routes) {
-      try {
-        return await fetchJson<{
-          message?: string;
-          board?: { boardId?: string };
-        }>(routePath, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
-      } catch (error) {
-        lastError = error;
-        if (!(error instanceof Error) || error.message !== "Not Found") {
-          throw error;
-        }
-      }
-    }
-
-    throw lastError instanceof Error
-      ? lastError
-      : new Error("Unable to create board.");
-  }
-
   return (
     <div className="h-screen bg-background text-[14px] text-foreground">
       <Toaster />
@@ -2543,7 +2355,7 @@ export function App(): ReactElement {
               const Icon = item.icon;
               const active =
                 (route.kind === "page" && item.id === route.view) ||
-                (route.kind === "board" && item.id === "boards") ||
+                (route.kind === "taskWorkspace" && item.id === "tasks") ||
                 (route.kind === "agent" && item.id === "agents");
 
               return (
@@ -2841,23 +2653,10 @@ export function App(): ReactElement {
                       "font-semibold tracking-tight text-xl sm:text-2xl",
                     )}
                   >
-                    {viewTitle(route, selectedSession, selectedBoard)}
+                    {viewTitle(route, selectedSession, selectedTaskWorkspace)}
                   </h1>
                 </div>
               )}
-
-              {route.kind === "page" && route.view === "boards" ? (
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setCreateBoardDialogError(null);
-                    setCreateBoardDialogOpen(true);
-                  }}
-                  disabled={isLoading || isMutating}
-                >
-                  Create Board
-                </Button>
-              ) : null}
 
               {route.kind === "page" && route.view === "agents" ? (
                 <Button
@@ -2901,109 +2700,20 @@ export function App(): ReactElement {
                 </div>
               ) : null}
 
-              {route.kind === "board" ? (
+              {route.kind === "taskWorkspace" ? (
                 <Button
                   size="sm"
                   onClick={() => {
                     setCreateTaskDialogError(null);
                     setCreateTaskDialogOpen(true);
                   }}
-                  disabled={isLoading || isMutating || !selectedBoard}
+                  disabled={isLoading || isMutating || !selectedTaskWorkspace}
                 >
                   Create Task
                 </Button>
               ) : null}
             </div>
           </header>
-
-          <Dialog
-            open={isCreateBoardDialogOpen}
-            onOpenChange={(open) => {
-              setCreateBoardDialogOpen(open);
-              setCreateBoardDialogError(null);
-            }}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create Board</DialogTitle>
-                <DialogDescription>
-                  Create a board as a manager. Core permission checks are
-                  enforced by the backend.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <label
-                    className="text-xs uppercase tracking-wide text-muted-foreground"
-                    htmlFor="createBoardActor"
-                  >
-                    Act As
-                  </label>
-                  <select
-                    id="createBoardActor"
-                    className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    value={boardActorId}
-                    onChange={(event) => setBoardActorId(event.target.value)}
-                  >
-                    {agents.map((agent) => (
-                      <option key={agent.id} value={agent.id}>
-                        {agent.displayName} ({agent.id})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    className="text-xs uppercase tracking-wide text-muted-foreground"
-                    htmlFor="createBoardTitle"
-                  >
-                    Title
-                  </label>
-                  <Input
-                    id="createBoardTitle"
-                    value={newBoardTitle}
-                    onChange={(event) => setNewBoardTitle(event.target.value)}
-                    placeholder="Q2 Delivery"
-                    onKeyDown={(event) => {
-                      if (
-                        event.key === "Enter" &&
-                        newBoardTitle.trim() &&
-                        !isMutating &&
-                        !isLoading
-                      ) {
-                        event.preventDefault();
-                        void handleCreateBoard();
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-
-              {createBoardDialogError ? (
-                <p className="text-sm text-danger">{createBoardDialogError}</p>
-              ) : null}
-
-              <DialogFooter>
-                <Button
-                  variant="secondary"
-                  onClick={() => setCreateBoardDialogOpen(false)}
-                  disabled={isMutating}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    void handleCreateBoard();
-                  }}
-                  disabled={isMutating || isLoading || !newBoardTitle.trim()}
-                >
-                  Create
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
 
           <Dialog
             open={isCreateAgentDialogOpen}
@@ -3143,7 +2853,7 @@ export function App(): ReactElement {
             </DialogContent>
           </Dialog>
 
-          {selectedBoard ? (
+          {selectedTaskWorkspace ? (
             <Dialog
               open={isCreateTaskDialogOpen}
               onOpenChange={(open) => {
@@ -3154,11 +2864,11 @@ export function App(): ReactElement {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Create Task</DialogTitle>
-                  <DialogDescription>{`Add a task to ${selectedBoard.title}.`}</DialogDescription>
+                  <DialogDescription>{`Add a task to ${selectedTaskWorkspace.title}.`}</DialogDescription>
                 </DialogHeader>
 
                 {(() => {
-                  const draft = taskDraftByBoardId[selectedBoard.boardId] ?? {
+                  const draft = taskDraftByWorkspaceId[selectedTaskWorkspace.taskWorkspaceId] ?? {
                     title: "",
                     description: "",
                     project: "~",
@@ -3204,7 +2914,7 @@ export function App(): ReactElement {
                             id="createTaskTitle"
                             value={draft.title}
                             onChange={(event) =>
-                              updateTaskDraft(selectedBoard.boardId, {
+                              updateTaskDraft(selectedTaskWorkspace.taskWorkspaceId, {
                                 title: event.target.value,
                               })
                             }
@@ -3223,7 +2933,7 @@ export function App(): ReactElement {
                             className="min-h-[96px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             value={draft.description}
                             onChange={(event) =>
-                              updateTaskDraft(selectedBoard.boardId, {
+                              updateTaskDraft(selectedTaskWorkspace.taskWorkspaceId, {
                                 description: event.target.value,
                               })
                             }
@@ -3241,7 +2951,7 @@ export function App(): ReactElement {
                             id="createTaskProject"
                             value={draft.project}
                             onChange={(event) =>
-                              updateTaskDraft(selectedBoard.boardId, {
+                              updateTaskDraft(selectedTaskWorkspace.taskWorkspaceId, {
                                 project: event.target.value,
                               })
                             }
@@ -3260,7 +2970,7 @@ export function App(): ReactElement {
                             className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             value={draft.assignedTo}
                             onChange={(event) =>
-                              updateTaskDraft(selectedBoard.boardId, {
+                              updateTaskDraft(selectedTaskWorkspace.taskWorkspaceId, {
                                 assignedTo: event.target.value,
                               })
                             }
@@ -3284,7 +2994,7 @@ export function App(): ReactElement {
                             className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             value={draft.status}
                             onChange={(event) =>
-                              updateTaskDraft(selectedBoard.boardId, {
+                              updateTaskDraft(selectedTaskWorkspace.taskWorkspaceId, {
                                 status: event.target
                                   .value as TaskCreateDraft["status"],
                               })
@@ -3316,7 +3026,7 @@ export function App(): ReactElement {
                   </Button>
                   <Button
                     onClick={() => {
-                      void handleCreateTask(selectedBoard.boardId, {
+                      void handleCreateTask(selectedTaskWorkspace.taskWorkspaceId, {
                         fromDialog: true,
                       });
                     }}
@@ -3539,7 +3249,7 @@ export function App(): ReactElement {
                 const Icon = item.icon;
                 const active =
                   (route.kind === "page" && item.id === route.view) ||
-                  (route.kind === "board" && item.id === "boards");
+                  (route.kind === "taskWorkspace" && item.id === "tasks");
 
                 return (
                   <button
@@ -3721,306 +3431,73 @@ export function App(): ReactElement {
                   </section>
                 ) : null}
 
-                {route.kind === "page" && route.view === "boards" ? (
+                {route.kind === "page" && route.view === "tasks" ? (
                   <Card>
                     <CardHeader>
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <CardTitle>Tasks</CardTitle>
-                          <CardDescription>
-                            Newest tasks first, with server-side pagination and
-                            filters.
-                          </CardDescription>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium">
-                            {tasksPageResponse?.pagination.total ?? 0} total
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {isTasksPageLoading
-                              ? "Refreshing..."
-                              : `${pagedTasks.length} shown`}
-                          </p>
-                        </div>
-                      </div>
+                      <CardTitle>Tasks</CardTitle>
+                      <CardDescription>
+                        Open the task workspace to view and manage work.
+                      </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
-                        <div className="space-y-1">
-                          <label
-                            className="text-[11px] uppercase tracking-wide text-muted-foreground"
-                            htmlFor="taskFilterStatus"
-                          >
-                            Status
-                          </label>
-                          <select
-                            id="taskFilterStatus"
-                            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                            value={taskFilterStatus}
-                            onChange={(event) => {
-                              setTaskFilterStatus(event.target.value);
-                              setTaskTablePage(1);
-                            }}
-                          >
-                            <option value="all">All statuses</option>
-                            {TASK_STATUS_OPTIONS.map((status) => (
-                              <option key={status.value} value={status.value}>
-                                {status.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label
-                            className="text-[11px] uppercase tracking-wide text-muted-foreground"
-                            htmlFor="taskFilterAssignee"
-                          >
-                            Assignee
-                          </label>
-                          <select
-                            id="taskFilterAssignee"
-                            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                            value={taskFilterAssignee}
-                            onChange={(event) => {
-                              setTaskFilterAssignee(event.target.value);
-                              setTaskTablePage(1);
-                            }}
-                          >
-                            <option value="all">All assignees</option>
-                            {assigneeFilterOptions.map((agent) => (
-                              <option key={agent.id} value={agent.id}>
-                                {agent.displayName} ({agent.id})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label
-                            className="text-[11px] uppercase tracking-wide text-muted-foreground"
-                            htmlFor="taskFilterOwner"
-                          >
-                            Owner
-                          </label>
-                          <select
-                            id="taskFilterOwner"
-                            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                            value={taskFilterOwner}
-                            onChange={(event) => {
-                              setTaskFilterOwner(event.target.value);
-                              setTaskTablePage(1);
-                            }}
-                          >
-                            <option value="all">All owners</option>
-                            {ownerFilterOptions.map((agent) => (
-                              <option key={agent.id} value={agent.id}>
-                                {agent.displayName} ({agent.id})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="flex items-end">
-                          <Button
-                            variant="outline"
-                            className="w-full md:w-auto"
-                            onClick={() => {
-                              setTaskFilterStatus("all");
-                              setTaskFilterAssignee("all");
-                              setTaskFilterOwner("all");
-                              setTaskTablePage(1);
-                            }}
-                            disabled={
-                              taskFilterStatus === "all" &&
-                              taskFilterAssignee === "all" &&
-                              taskFilterOwner === "all"
-                            }
-                          >
-                            Reset Filters
-                          </Button>
-                        </div>
-                      </div>
-
-                      {tasksPageError ? (
-                        <p className="text-sm text-danger">{tasksPageError}</p>
-                      ) : null}
-
-                      {pagedTasks.length === 0 ? (
-                        <div className="rounded-lg border border-border/70 bg-background/30 px-4 py-8">
-                          <p className="text-sm text-muted-foreground">
-                            {isTasksPageLoading
-                              ? "Loading tasks..."
-                              : "No tasks matched your filters."}
-                          </p>
-                        </div>
+                    <CardContent>
+                      {taskWorkspaces.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No tasks found yet.
+                        </p>
                       ) : (
-                        <div className="overflow-hidden rounded-lg border border-border/80">
-                          <div className="overflow-x-auto">
-                            <table className="min-w-full">
-                              <thead>
-                                <tr className="border-b border-border/70 bg-accent/25 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                                  <th className="px-4 py-2 font-medium">Task</th>
-                                  <th className="px-4 py-2 font-medium">
-                                    Status
-                                  </th>
-                                  <th className="px-4 py-2 font-medium">
-                                    Assignee
-                                  </th>
-                                  <th className="px-4 py-2 font-medium">
-                                    Owner
-                                  </th>
-                                  <th className="px-4 py-2 font-medium">
-                                    Board
-                                  </th>
-                                  <th className="px-4 py-2 font-medium">
-                                    Created
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-border/60">
-                                {pagedTasks.map((task) => (
-                                  <tr
-                                    key={task.taskId}
-                                    className="transition-colors hover:bg-accent/20"
-                                  >
-                                    <td className="max-w-[360px] px-4 py-3 align-top">
-                                      <button
-                                        type="button"
-                                        className="text-left"
-                                        onClick={() => {
-                                          handleOpenTaskDetails(task.taskId);
-                                        }}
-                                      >
-                                        <span className="block font-medium hover:underline">
-                                          {task.title}
-                                        </span>
-                                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                                          {task.taskId}
-                                        </span>
-                                      </button>
-                                    </td>
-                                    <td className="px-4 py-3 align-top">
-                                      <span
-                                        className={cn(
-                                          "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
-                                          taskStatusPillClasses(task.status),
-                                        )}
-                                      >
-                                        {taskStatusLabel(task.status)}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-muted-foreground align-top">{`@${task.assignedTo}`}</td>
-                                    <td className="px-4 py-3 text-sm text-muted-foreground align-top">{`@${task.owner}`}</td>
-                                    <td className="px-4 py-3 align-top">
-                                      <button
-                                        type="button"
-                                        className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                                        onClick={() => {
-                                          navigateToRoute({
-                                            kind: "board",
-                                            boardId: task.boardId,
-                                          });
-                                        }}
-                                      >
-                                        {task.boardId}
-                                      </button>
-                                    </td>
-                                    <td className="px-4 py-3 text-xs text-muted-foreground align-top">
-                                      {new Date(task.createdAt).toLocaleString()}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 bg-background/40 px-3 py-2">
-                            <p className="text-xs text-muted-foreground">
-                              {`Page ${
-                                tasksPageResponse?.pagination.page ?? 1
-                              } of ${
-                                tasksPageResponse?.pagination.totalPages ?? 1
-                              }`}
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setTaskTablePage((current) =>
-                                    Math.max(1, current - 1),
-                                  );
-                                }}
-                                disabled={
-                                  isTasksPageLoading ||
-                                  !tasksPageResponse?.pagination.hasPrevious
-                                }
-                              >
-                                Previous
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setTaskTablePage((current) => current + 1);
-                                }}
-                                disabled={
-                                  isTasksPageLoading ||
-                                  !tasksPageResponse?.pagination.hasNext
-                                }
-                              >
-                                Next
-                              </Button>
-                            </div>
-                          </div>
+                        <div className="space-y-2">
+                          {taskWorkspaces.map((taskWorkspace) => (
+                            <button
+                              key={taskWorkspace.taskWorkspaceId}
+                              type="button"
+                              className="flex w-full items-center justify-between rounded-md border border-border/80 bg-background/30 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+                              onClick={() => {
+                                navigateToRoute({
+                                  kind: "taskWorkspace",
+                                  taskWorkspaceId: taskWorkspace.taskWorkspaceId,
+                                });
+                              }}
+                            >
+                              <div>
+                                <p className="font-medium">{taskWorkspace.title}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm">
+                                  {taskWorkspace.tasks.length} tasks
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Open
+                                </p>
+                              </div>
+                            </button>
+                          ))}
                         </div>
                       )}
                     </CardContent>
                   </Card>
                 ) : null}
 
-                {route.kind === "board" ? (
-                  selectedBoard ? (
+                {route.kind === "taskWorkspace" ? (
+                  selectedTaskWorkspace ? (
                     <div className="space-y-4">
                       <section className="rounded-lg border border-border/80 bg-card/40 px-4 py-4 sm:px-5">
                         <div className="flex flex-wrap items-end justify-between gap-4">
                           <div className="min-w-0 flex-1">
-                            <div className="group inline-flex max-w-full items-center gap-1.5">
-                              <h2 className="truncate text-2xl font-semibold tracking-tight">
-                                {selectedBoard.title}
-                              </h2>
-                              <button
-                                type="button"
-                                className="rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary group-hover:opacity-100"
-                                aria-label="Rename board"
-                                onClick={() => {
-                                  void handleRenameBoard(selectedBoard);
-                                }}
-                                disabled={isMutating || isLoading}
-                              >
-                                <PenLine className="size-4" />
-                              </button>
-                            </div>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {`${selectedBoard.boardId} • owner @${
-                                selectedBoard.owner
-                              } • created ${new Date(
-                                selectedBoard.createdAt,
-                              ).toLocaleString()}`}
-                            </p>
+                            <h2 className="truncate text-2xl font-semibold tracking-tight">
+                              {selectedTaskWorkspace.title}
+                            </h2>
                           </div>
 
                           <div className="flex flex-wrap items-end gap-2">
                             <div className="space-y-1">
                               <label
                                 className="text-[11px] uppercase tracking-wide text-muted-foreground"
-                                htmlFor="boardTaskActor"
+                                htmlFor="taskWorkspaceTaskActor"
                               >
                                 Act As
                               </label>
                               <select
-                                id="boardTaskActor"
+                                id="taskWorkspaceTaskActor"
                                 className="h-9 min-w-[220px] rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                 value={taskActorId}
                                 onChange={(event) =>
@@ -4041,7 +3518,7 @@ export function App(): ReactElement {
                               onClick={() => {
                                 navigateToRoute({
                                   kind: "page",
-                                  view: "boards",
+                                  view: "tasks",
                                 });
                               }}
                             >
@@ -4060,11 +3537,10 @@ export function App(): ReactElement {
                           </p>
                         </div>
 
-                        {selectedBoard.tasks.length === 0 ? (
+                        {selectedTaskWorkspace.tasks.length === 0 ? (
                           <div className="px-4 py-8">
                             <p className="text-sm text-muted-foreground">
-                              No tasks on this board yet. Use Create Task in the
-                              top right.
+                              No tasks yet. Use Create Task in the top right.
                             </p>
                           </div>
                         ) : (
@@ -4084,7 +3560,7 @@ export function App(): ReactElement {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-border/60">
-                                {selectedBoard.tasks.map((task) => (
+                                {selectedTaskWorkspace.tasks.map((task) => (
                                   <tr
                                     key={task.taskId}
                                     className="transition-colors hover:bg-accent/20"
@@ -4122,7 +3598,7 @@ export function App(): ReactElement {
                       </section>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">{`No board was found for id ${route.boardId}.`}</p>
+                    <p className="text-sm text-muted-foreground">{`No task workspace was found for id ${route.taskWorkspaceId}.`}</p>
                   )
                 ) : null}
 
@@ -4941,10 +4417,24 @@ async function readResponseError(response: Response): Promise<string> {
   return `Request failed with ${response.status}`;
 }
 
+function buildTaskWorkspaceResponse(response: TasksResponse): TaskWorkspacesResponse {
+  return {
+    taskWorkspaces: [
+      {
+        taskWorkspaceId: "tasks",
+        title: "Tasks",
+        createdAt: "",
+        owner: DEFAULT_AGENT_ID,
+        tasks: response.tasks,
+      },
+    ],
+  };
+}
+
 function viewTitle(
   route: AppRoute,
   selectedSession: Session | null,
-  selectedBoard: BoardRecord | null,
+  selectedTaskWorkspace: TaskWorkspaceRecord | null,
 ): string {
   if (route.kind === "session") {
     return selectedSession?.title ?? "Session";
@@ -4954,14 +4444,14 @@ function viewTitle(
     return "Agent";
   }
 
-  if (route.kind === "board") {
-    return selectedBoard?.title ?? "Board";
+  if (route.kind === "taskWorkspace") {
+    return selectedTaskWorkspace?.title ?? "Tasks";
   }
 
   switch (route.view) {
     case "overview":
       return "Dashboard";
-    case "boards":
+    case "tasks":
       return "Tasks";
     case "agents":
       return "Agents";
@@ -5006,20 +4496,20 @@ function parseRoute(pathname: string): AppRoute {
     }
   }
 
-  if (normalized.startsWith("/boards/")) {
-    const boardId = decodeURIComponent(
-      normalized.slice("/boards/".length),
+  if (normalized.startsWith("/tasks/")) {
+    const taskWorkspaceId = decodeURIComponent(
+      normalized.slice("/tasks/".length),
     ).trim();
-    if (boardId) {
+    if (taskWorkspaceId) {
       return {
-        kind: "board",
-        boardId,
+        kind: "taskWorkspace",
+        taskWorkspaceId,
       };
     }
   }
 
-  if (normalized === "/tasks" || normalized === "/boards") {
-    return { kind: "page", view: "boards" };
+  if (normalized === "/tasks") {
+    return { kind: "page", view: "tasks" };
   }
 
   if (normalized === "/skills") {
@@ -5054,16 +4544,12 @@ function routeToPath(route: AppRoute): string {
     return `/agents/${encodeURIComponent(route.agentId)}`;
   }
 
-  if (route.kind === "board") {
-    return `/boards/${encodeURIComponent(route.boardId)}`;
+  if (route.kind === "taskWorkspace") {
+    return `/tasks/${encodeURIComponent(route.taskWorkspaceId)}`;
   }
 
   if (route.view === "overview") {
     return "/overview";
-  }
-
-  if (route.view === "boards") {
-    return "/tasks";
   }
 
   return `/${route.view}`;

@@ -199,17 +199,24 @@ describe("OpenGoatService", () => {
     ]);
   });
 
-  it("creates a default board when creating a manager agent", async () => {
+  it("allows managers to assign tasks to indirect reportees", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
     const { service } = createService(root);
     await service.initialize();
     await service.createAgent("CTO", { type: "manager", reportsTo: "ceo" });
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "cto",
+    });
 
-    const boards = await service.listBoards();
-    const ctoBoards = boards.filter((board) => board.owner === "cto");
-    expect(ctoBoards).toHaveLength(1);
+    const task = await service.createTask("ceo", {
+      title: "Ship core endpoint",
+      description: "Implement and test endpoint",
+      assignedTo: "engineer",
+    });
+    expect(task.assignedTo).toBe("engineer");
   });
 
   it("repairs stale OpenClaw ceo workspace mapping during initialize", async () => {
@@ -758,32 +765,34 @@ describe("OpenGoatService", () => {
     expect(updated.reportsTo).toBe("cto");
   });
 
-  it("creates a default board when an agent becomes manager via skill install", async () => {
+  it("enforces assignment restrictions through the service facade", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
     const { service } = createService(root);
     await service.initialize();
+    await service.createAgent("CTO", {
+      type: "manager",
+      reportsTo: "ceo",
+    });
     await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "cto",
+    });
+    await service.createAgent("QA", {
       type: "individual",
       reportsTo: "ceo",
     });
 
-    await service.installSkill({
-      agentId: "engineer",
-      skillName: "og-board-manager",
-      description: "Promote to manager",
-    });
-
-    const boards = await service.listBoards();
-    const engineerBoards = boards.filter((board) => board.owner === "engineer");
-    expect(engineerBoards).toHaveLength(1);
-
-    const task = await service.createTask("engineer", undefined, {
-      title: "Plan sprint",
-      description: "Create sprint plan",
-    });
-    expect(task.boardId).toBe(engineerBoards[0]?.boardId);
+    await expect(
+      service.createTask("cto", {
+        title: "Cross-team assignment",
+        description: "Should fail",
+        assignedTo: "qa",
+      }),
+    ).rejects.toThrow(
+      "Agents can only assign tasks to themselves or their reportees (direct or indirect).",
+    );
   });
 
   it("returns the latest agent AI action timestamp", async () => {
@@ -934,14 +943,13 @@ describe("OpenGoatService", () => {
       reportsTo: "ceo",
     });
 
-    const board = await service.createBoard("ceo", { title: "Delivery" });
-    const todoTask = await service.createTask("ceo", board.boardId, {
+    const todoTask = await service.createTask("ceo", {
       title: "Implement endpoint",
       description: "Build endpoint and tests",
       assignedTo: "engineer",
       status: "todo",
     });
-    const blockedTask = await service.createTask("ceo", board.boardId, {
+    const blockedTask = await service.createTask("ceo", {
       title: "Prepare release",
       description: "Finalize release notes",
       project: "/workspace/release",
