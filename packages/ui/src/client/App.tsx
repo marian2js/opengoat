@@ -1039,6 +1039,12 @@ export function App(): ReactElement {
         toTimestamp(right.createdAt) - toTimestamp(left.createdAt),
     );
   }, [selectedTask]);
+  const selectedTaskDescription = useMemo(() => {
+    if (!selectedTask) {
+      return "";
+    }
+    return decodeEscapedMarkdown(selectedTask.description);
+  }, [selectedTask]);
   const agentById = useMemo(() => {
     const map = new Map<string, Agent>();
     for (const agent of agents) {
@@ -1156,6 +1162,22 @@ export function App(): ReactElement {
     ? new Date(state.health.timestamp).toLocaleString()
     : "Loading...";
 
+  const openTaskCount = useMemo(() => {
+    if (!state) {
+      return 0;
+    }
+
+    let count = 0;
+    for (const board of state.boards.boards) {
+      for (const task of board.tasks) {
+        if (task.status.trim().toLowerCase() !== "done") {
+          count += 1;
+        }
+      }
+    }
+    return count;
+  }, [state]);
+
   const metrics = useMemo<MetricCard[]>(() => {
     if (!state) {
       return [];
@@ -1177,14 +1199,14 @@ export function App(): ReactElement {
         icon: Clock3,
       },
       {
-        id: "skills",
-        label: "Global Skills",
-        value: state.globalSkills.skills.length,
-        hint: "Reusable capabilities",
-        icon: Sparkles,
+        id: "open-tasks",
+        label: "Open Tasks",
+        value: openTaskCount,
+        hint: "Tasks not marked done",
+        icon: Boxes,
       },
     ];
-  }, [state]);
+  }, [openTaskCount, state]);
 
   async function handleCreateAgent(options?: {
     fromDialog?: boolean;
@@ -3167,9 +3189,9 @@ export function App(): ReactElement {
                 <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                   <section>
                     <h3 className="text-base font-medium">Description</h3>
-                    <p className="mt-2 text-base leading-relaxed whitespace-pre-wrap text-foreground">
-                      {selectedTask.description}
-                    </p>
+                    <div className="mt-2 text-base leading-relaxed text-foreground">
+                      <MessageResponse>{selectedTaskDescription}</MessageResponse>
+                    </div>
                   </section>
 
                   <section className="mt-7">
@@ -4570,4 +4592,20 @@ function formatEntryDate(timestamp: string): string {
     return timestamp;
   }
   return date.toLocaleString();
+}
+
+function decodeEscapedMarkdown(value: string): string {
+  if (
+    !value.includes("\\n") &&
+    !value.includes("\\r") &&
+    !value.includes("\\t")
+  ) {
+    return value;
+  }
+
+  return value
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\n")
+    .replace(/\\t/g, "\t");
 }
