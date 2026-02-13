@@ -881,5 +881,9 @@ function renderRoleMarkdown(profile: {
     `- Your name: ${profile.displayName}`,
     `- Role: ${profile.role}`,
     `- For info about your level on the organiztion, run \`opengoat agent info ${profile.agentId}\`.`,
+    "",
+    "---",
+    "",
+    "_This file is yours to evolve. Update it as you learn your role and responsibilities in the organization._",
   ].join("\n");
 }
