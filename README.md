@@ -1,5 +1,5 @@
 <h1 align="center">OpenGoat</h1>
-<p align="center"><strong>Build AI organizations on top of OpenClaw.</strong></p>
+<p align="center"><strong>Run AI teams with a real org chart.</strong></p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License" /></a>
@@ -8,27 +8,18 @@
   <img src="https://img.shields.io/badge/node-%3E%3D20.11-brightgreen?style=flat-square" alt="Node >= 20.11" />
 </p>
 
-OpenGoat is a CLI for running AI teams as organizations, not agent spaghetti.
+OpenGoat turns "one agent with a huge prompt" into an operating team.
 
-You define who reports to whom, assign skills, and run work through real roles.  
-OpenGoat keeps your org structure as source-of-truth and syncs agent lifecycle to OpenClaw.
+You create a CEO, managers, and individual contributors. You define reporting lines once, then run real work through the right role. OpenGoat keeps sessions, project context, and task flow organized while using OpenClaw as the runtime.
+
+[Getting Started](#quick-start-2-minutes) - [Examples](#a-typical-workflow) - [Docs](#learn-more)
 
 ## Why OpenGoat
 
-- Organization-first: model managers and reportees with clear hierarchy.
-- OpenClaw-native: every OpenGoat agent maps 1:1 to an OpenClaw agent.
-- Skill-driven behavior: coordination lives in skills (for example, `board-manager`), not hardcoded orchestration loops.
-- Session continuity: each OpenGoat session maps 1:1 to one OpenClaw session id.
-
-## What You Get
-
-- `ceo` as the default head of organization (CEO entry point).
-- Hierarchical teams via `reportsTo`.
-- OpenClaw-owned skills with per-agent role-skill assignment metadata.
-- CLI-first workflows for create, run, restructure, and audit sessions.
-- Manager default boards: every manager has a non-deletable default board.
-- Task default routing: manager task creation without `<board-id>` uses that manager default board.
-- CEO workspace pre-seeded with `AGENTS.md` + `SOUL.md` to skip first-run OpenClaw bootstrap prompts.
+- Work like a company, not a chat thread: route decisions through leaders, execution through contributors.
+- Keep projects separated: sessions stay tied to the intended project path.
+- Scale without chaos: assign roles, skills, and ownership explicitly.
+- Stay CLI-native: scriptable workflows for local usage, CI, and automation.
 
 ## Install
 
@@ -38,20 +29,20 @@ Runtime: Node `>=20.11`.
 npm i -g openclaw@latest opengoat@latest
 ```
 
-## 2-Minute Start
+## Quick Start (2 Minutes)
 
 ```bash
 # 1) Initialize OpenGoat home (~/.opengoat)
 opengoat init
 
-# 2) Connect to OpenClaw (local runtime)
+# 2) Connect OpenGoat to OpenClaw
 opengoat onboard --local --non-interactive
 
-# 3) Talk to the default organization head (ceo)
+# 3) Start with the default leader (ceo)
 opengoat agent --message "Set up a CTO and two engineers for this project."
 ```
 
-Use an external OpenClaw runtime:
+Use an external OpenClaw gateway:
 
 ```bash
 opengoat onboard --external \
@@ -60,68 +51,78 @@ opengoat onboard --external \
   --non-interactive
 ```
 
-## Organization Workflow
+## A Typical Workflow
 
 ```bash
-# Create roles
+# Build your org
 opengoat agent create "CTO" --manager --reports-to ceo --skill board-manager
 opengoat agent create "Engineer" --individual --reports-to cto --skill coding
+opengoat agent create "Designer" --individual --reports-to cto
 
-# If --reports-to is omitted, it defaults to ceo
-opengoat agent create "Designer" --individual
+# Ask leadership for planning
+opengoat agent cto --message "Plan the Q2 engineering roadmap and split it into streams."
 
-# Run work through any role
-opengoat agent cto --message "Plan the Q2 engineering roadmap."
+# Run direct execution through a role
+opengoat agent engineer --message "Implement the auth middleware for this sprint."
 
-# Restructure reporting lines
-opengoat agent set-manager engineer ceo
+# Evolve structure as the team changes
+opengoat agent set-manager designer ceo
 
-# Inspect structure
+# Inspect current organization
 opengoat agent list
 ```
 
-## Skills
+## Project Sessions (No Cross-Repo Drift)
 
-Skills are owned by OpenClaw (bundled + `~/.openclaw/skills` + workspace-local `skills/`).
-
-On bootstrap, OpenGoat pre-installs role skills in agent workspaces:
-
-- managers: `board-manager`
-- individuals: `board-individual`
-
-Role skills are mutually exclusive per agent. OpenGoat does not install these role
-skills into OpenClaw shared managed skills.
-
-For `ceo`, this is written under `workspaces/ceo/skills/`.
-
-OpenGoat keeps per-agent skill assignment metadata and includes compatibility install/list commands:
+Use session keys plus project paths to keep work scoped to the right repository.
 
 ```bash
-opengoat skill install board-manager --from /path/to/skill
-opengoat skill install jira-tools --from /path/to/skill
-opengoat skill list
+# Start a named session for a specific project
+opengoat agent ceo \
+  --session saaslib-planning \
+  --project-path /Users/you/workspace/saaslib \
+  --message "Create a release checklist for v1.2"
+
+# Continue the same session later
+opengoat agent ceo \
+  --session saaslib-planning \
+  --message "Now draft the changelog"
 ```
 
-## Sessions
-
-Sessions are first-class and preserved across runs.
-
-- same session key + same project path -> same OpenClaw session id
-- same session key + different project path -> new session id (safety rotation)
-- when a follow-up run omits `--project-path`, OpenGoat reuses the stored project path for that session key
-
-Useful commands:
+Helpful session commands:
 
 ```bash
 opengoat session list
 opengoat session history --agent ceo
-opengoat session rename --agent ceo --title "Planning"
-opengoat session reset --agent ceo
+opengoat session rename --agent ceo --title "SaaSLib Planning"
+opengoat session reset --agent ceo --session saaslib-planning
+```
+
+## Boards And Tasks
+
+```bash
+# Board lifecycle
+opengoat board create "Platform"
+opengoat board list
+
+# Task lifecycle
+opengoat task create --title "Ship auth" --description "Finish middleware + tests" --owner cto --assign engineer
+opengoat task list --ass engineer
+opengoat task status <task-id> doing
+opengoat task worklog add <task-id> "Implemented middleware and added coverage"
+```
+
+## Skills
+
+OpenGoat works with OpenClaw skills and keeps role assignments practical for team operation.
+
+```bash
+opengoat skill install board-manager --from /path/to/skill
+opengoat skill install jira-tools --from /path/to/skill
+opengoat skill list --agent ceo
 ```
 
 ## Docker
-
-Build and run OpenGoat with OpenClaw in one image:
 
 ```bash
 docker build -t opengoat:latest .
@@ -129,30 +130,23 @@ docker run --rm -p 19123:19123 -v opengoat-data:/data/opengoat opengoat:latest
 
 # CLI in container
 docker run --rm -v opengoat-data:/data/opengoat opengoat:latest cli --help
-
-# Verify bundled OpenClaw
-docker run --rm opengoat:latest openclaw --version
 ```
 
-Compose:
+## Learn More
 
-```bash
-docker compose up --build
-docker compose run --rm opengoat cli --help
-```
-
-## Documentation
+User docs and references:
 
 - [OpenClaw Getting Started](https://docs.openclaw.ai/start/getting-started)
 - [OpenClaw Agents](https://docs.openclaw.ai/cli/agents)
 - [OpenClaw Skills](https://docs.openclaw.ai/skills/introduction)
+
+Project docs:
+
 - `/docs/organization-runtime.md`
 - `/docs/acp.md`
 - `/docs/docker.md`
 
-## For Contributors
+Contributor and architecture docs:
 
-Contributor-facing details live in:
-
-- `ABOUT.md` (architecture context)
-- `CONTRIBUTING.md` (workflow and standards)
+- `/ABOUT.md`
+- `/CONTRIBUTING.md`
