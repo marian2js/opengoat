@@ -213,7 +213,7 @@ export class AgentService {
       {
         agentId: normalizedAgentId,
         displayName: input.displayName.trim() || normalizedAgentId,
-        role: input.role.trim() || "Individual Contributor",
+        role: input.role.trim(),
       },
       createdPaths,
       skippedPaths,
@@ -838,6 +838,7 @@ function replaceFirstRunSection(markdown: string): string {
     "## Your Role",
     "",
     "You are part of an organization run by AI agents. Read `ROLE.md` for details.",
+    "",
   ];
 
   for (const line of lines) {

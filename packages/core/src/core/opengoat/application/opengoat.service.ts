@@ -492,7 +492,9 @@ export class OpenGoatService {
         await this.agentService.ensureAgentWorkspaceBootstrap(paths, {
           agentId: created.agent.id,
           displayName: created.agent.displayName,
-          role: created.agent.role,
+          role:
+            options.role?.trim() ??
+            (created.alreadyExisted ? created.agent.role : ""),
         });
       created.createdPaths.push(...workspaceBootstrap.createdPaths);
       created.skippedPaths.push(...workspaceBootstrap.skippedPaths);
