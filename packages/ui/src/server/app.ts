@@ -630,12 +630,17 @@ function registerApiRoutes(
     });
   });
 
-  app.delete<{
-    Body: {
-      actorId?: string;
-      taskIds?: unknown;
-    };
-  }>("/api/tasks", async (request, reply) => {
+  const deleteTasksHandler = async (
+    request: {
+      body?: {
+        actorId?: string;
+        taskIds?: unknown;
+      };
+    },
+    reply: FastifyReply
+  ): Promise<
+    { error: string } | { deletedTaskIds: string[]; deletedCount: number; message: string }
+  > => {
     return safeReply(reply, async () => {
       const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
       const rawTaskIds = Array.isArray(request.body?.taskIds)
@@ -659,7 +664,21 @@ function registerApiRoutes(
         message: `Deleted ${result.deletedCount} task${result.deletedCount === 1 ? "" : "s"}.`
       };
     });
-  });
+  };
+
+  app.delete<{
+    Body: {
+      actorId?: string;
+      taskIds?: unknown;
+    };
+  }>("/api/tasks", deleteTasksHandler);
+
+  app.post<{
+    Body: {
+      actorId?: string;
+      taskIds?: unknown;
+    };
+  }>("/api/tasks/delete", deleteTasksHandler);
 
   app.post<{ Params: { taskId: string }; Body: { actorId?: string; status?: string; reason?: string } }>(
     "/api/tasks/:taskId/status",

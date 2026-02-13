@@ -1039,8 +1039,8 @@ describe("OpenGoat UI server API", () => {
     });
 
     const deleteTaskResponse = await activeServer.inject({
-      method: "DELETE",
-      url: "/api/tasks",
+      method: "POST",
+      url: "/api/tasks/delete",
       payload: {
         actorId: "ceo",
         taskIds: ["task-plan", "task-archive"]

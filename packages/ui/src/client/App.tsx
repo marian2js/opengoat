@@ -2007,8 +2007,8 @@ export function App(): ReactElement {
         deletedTaskIds: string[];
         deletedCount: number;
         message?: string;
-      }>("/api/tasks", {
-        method: "DELETE",
+      }>("/api/tasks/delete", {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
