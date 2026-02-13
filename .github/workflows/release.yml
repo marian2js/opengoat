@@ -30,6 +30,7 @@ jobs:
         with:
           node-version: 20
           cache: "pnpm"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
@@ -61,12 +62,9 @@ jobs:
 
       - name: Publish to NPM
         if: steps.check_changesets.outputs.has_changesets == 'true'
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          pnpm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
-          pnpm --filter @opengoat/core publish --access public --no-git-checks
-          pnpm --filter opengoat publish --access public --no-git-checks
+          pnpm --filter @opengoat/core publish --access public --no-git-checks --provenance
+          pnpm --filter opengoat publish --access public --no-git-checks --provenance
 
       - name: Push Changes
         if: steps.check_changesets.outputs.has_changesets == 'true'
