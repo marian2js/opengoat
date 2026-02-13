@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile as readFileBuffer, writeFile as writeFileBuffer } from "node:fs/promises";
+import { readFile as readFileBuffer, stat as statFile, writeFile as writeFileBuffer } from "node:fs/promises";
 import { createRequire } from "node:module";
 import initSqlJs, { type Database as SqlJsDatabase, type SqlJsStatic } from "sql.js";
 import { isManagerAgent, type AgentManifest, type AgentManifestService } from "../../agents/index.js";
@@ -67,6 +67,7 @@ export class BoardService {
   private sqlPromise?: Promise<SqlJsStatic>;
   private dbPromise?: Promise<SqlJsDatabase>;
   private dbPath?: string;
+  private dbFileFingerprint?: string | null;
 
   public constructor(deps: BoardServiceDeps) {
     this.fileSystem = deps.fileSystem;
@@ -529,8 +530,17 @@ export class BoardService {
 
   private async getDatabase(paths: OpenGoatPaths): Promise<SqlJsDatabase> {
     const dbPath = this.pathPort.join(paths.homeDir, "boards.sqlite");
-    if (!this.dbPromise || this.dbPath !== dbPath) {
+    const pathChanged = this.dbPath !== dbPath;
+    const diskFingerprint = await this.readDbFileFingerprint(dbPath);
+    const fileChangedExternally =
+      !pathChanged &&
+      Boolean(this.dbPromise) &&
+      this.dbFileFingerprint !== undefined &&
+      this.dbFileFingerprint !== diskFingerprint;
+
+    if (!this.dbPromise || pathChanged || fileChangedExternally) {
       this.dbPath = dbPath;
+      this.dbFileFingerprint = diskFingerprint;
       this.dbPromise = this.openAndMigrate(dbPath, paths);
     }
     return this.dbPromise;
@@ -645,6 +655,21 @@ export class BoardService {
     const dbPath = this.pathPort.join(paths.homeDir, "boards.sqlite");
     const data = db.export();
     await writeFileBuffer(dbPath, data);
+    if (this.dbPath === dbPath) {
+      this.dbFileFingerprint = await this.readDbFileFingerprint(dbPath);
+    }
+  }
+
+  private async readDbFileFingerprint(dbPath: string): Promise<string | null> {
+    try {
+      const fileStats = await statFile(dbPath);
+      return `${fileStats.size}:${fileStats.mtimeMs}`;
+    } catch (error) {
+      if (isNotFound(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   private execute(db: SqlJsDatabase, sql: string, params: Array<string | number | null> = []): void {
@@ -941,4 +966,12 @@ function toTaskEntry(row: EntryRow): TaskEntry {
 function createEntityId(prefixSource: string): string {
   const prefix = normalizeAgentId(prefixSource) || "item";
   return `${prefix}-${randomUUID().slice(0, 8)}`;
+}
+
+function isNotFound(error: unknown): error is NodeJS.ErrnoException {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  return (error as NodeJS.ErrnoException).code === "ENOENT";
 }
