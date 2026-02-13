@@ -63,6 +63,12 @@ opengoat onboard --local --non-interactive
 opengoat agent --message "Set up a CTO and two engineers for this project."
 ```
 
+Run the production UI server from the CLI:
+
+```bash
+opengoat start
+```
+
 Use an external OpenClaw gateway:
 
 ```bash

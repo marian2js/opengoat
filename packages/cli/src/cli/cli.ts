@@ -25,6 +25,7 @@ import { scenarioRunCommand } from "./commands/scenario-run.command.js";
 import { skillCommand } from "./commands/skill.command.js";
 import { skillInstallCommand } from "./commands/skill-install.command.js";
 import { skillListCommand } from "./commands/skill-list.command.js";
+import { startCommand } from "./commands/start.command.js";
 import { sessionCommand } from "./commands/session.command.js";
 import { sessionCompactCommand } from "./commands/session-compact.command.js";
 import { sessionHistoryCommand } from "./commands/session-history.command.js";
@@ -53,6 +54,7 @@ export async function runCli(argv: string[]): Promise<number> {
       hardResetCommand,
       acpCommand,
       onboardCommand,
+      startCommand,
       routeCommand,
       taskCommand,
       scenarioCommand,

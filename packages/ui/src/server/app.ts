@@ -9,7 +9,6 @@ import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import cors from "@fastify/cors";
 import middie from "@fastify/middie";
 import fastifyStatic from "@fastify/static";
-import { createServer as createViteServer } from "vite";
 import { createOpenGoatRuntime } from "@opengoat/core";
 
 const DEFAULT_AGENT_ID = "ceo";
@@ -1259,6 +1258,7 @@ async function registerFrontend(app: FastifyInstance, options: FrontendOptions):
   if (options.mode === "development") {
     await app.register(middie);
 
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       root: options.packageRoot,
       appType: "custom",
