@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.2.13
+
+- Release CalVer 2026.2.13
+
 ## 2026.2.9
 
 - Initial public release of OpenGoat

@@ -1,6 +1,6 @@
 {
   "name": "@opengoat/core",
-  "version": "2026.2.9",
+  "version": "2026.2.13",
   "description": "OpenGoat core organization runtime and OpenClaw adapters",
   "repository": {
     "type": "git",
