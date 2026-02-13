@@ -863,6 +863,36 @@ export function App(): ReactElement {
   }, [workspaceNodes]);
 
   const defaultTaskProjectPath = taskProjectOptions[0]?.projectPath ?? "~";
+  const workspaceProjectNameByPath = useMemo(() => {
+    const next = new Map<string, string>();
+    for (const workspace of workspaceNodes) {
+      const key = normalizePathForComparison(workspace.projectPath);
+      if (!key) {
+        continue;
+      }
+      next.set(key, workspace.name);
+    }
+    return next;
+  }, [workspaceNodes]);
+  const resolveTaskProjectLabel = useCallback(
+    (projectPath: string | undefined): string => {
+      const cleanedPath = projectPath?.trim() ?? "";
+      if (!cleanedPath || cleanedPath === "~") {
+        return "Home";
+      }
+
+      const normalizedPath = normalizePathForComparison(cleanedPath);
+      if (normalizedPath) {
+        const workspaceName = workspaceProjectNameByPath.get(normalizedPath);
+        if (workspaceName) {
+          return workspaceName;
+        }
+      }
+
+      return deriveWorkspaceName(cleanedPath);
+    },
+    [workspaceProjectNameByPath],
+  );
 
   const agentProjectOptions = useMemo<AgentProjectOption[]>(() => {
     if (workspaceNodes.length > 0) {
@@ -3784,10 +3814,10 @@ export function App(): ReactElement {
                                     </td>
                                     <td className="px-4 py-3">
                                       <p
-                                        className="max-w-[360px] truncate font-mono text-xs text-muted-foreground"
-                                        title={task.project || "~"}
+                                        className="max-w-[240px] truncate text-sm text-muted-foreground"
+                                        title={resolveTaskProjectLabel(task.project)}
                                       >
-                                        {task.project || "~"}
+                                        {resolveTaskProjectLabel(task.project)}
                                       </p>
                                     </td>
                                     <td className="px-4 py-3 text-sm text-muted-foreground">{`@${task.assignedTo}`}</td>
