@@ -47,12 +47,14 @@ export const startCommand: CliCommand = {
       parsed.host?.trim() ||
       process.env.OPENGOAT_UI_HOST?.trim() ||
       DEFAULT_UI_HOST;
+    const packageVersion = readCliPackageVersion(cliPackageRoot);
 
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       NODE_ENV: "production",
       OPENGOAT_UI_PORT: String(effectivePort),
       OPENGOAT_UI_HOST: effectiveHost,
+      ...(packageVersion ? { OPENGOAT_VERSION: packageVersion } : {}),
     };
 
     context.stdout.write(
@@ -220,6 +222,23 @@ function resolveCliPackageRoot(startDir: string): string {
       throw new Error("Unable to resolve opengoat package root.");
     }
     currentDir = parentDir;
+  }
+}
+
+function readCliPackageVersion(cliPackageRoot: string): string | undefined {
+  const packageJsonPath = path.join(cliPackageRoot, "package.json");
+  if (!existsSync(packageJsonPath)) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as {
+      version?: string;
+    };
+    const version = parsed.version?.trim();
+    return version || undefined;
+  } catch {
+    return undefined;
   }
 }
 

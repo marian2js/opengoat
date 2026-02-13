@@ -77,8 +77,15 @@ interface TaskRecord {
 }
 
 let activeServer: Awaited<ReturnType<typeof createOpenGoatUiServer>> | undefined;
+const originalOpenGoatVersion = process.env.OPENGOAT_VERSION;
 
 afterEach(async () => {
+  vi.restoreAllMocks();
+  if (originalOpenGoatVersion === undefined) {
+    delete process.env.OPENGOAT_VERSION;
+  } else {
+    process.env.OPENGOAT_VERSION = originalOpenGoatVersion;
+  }
   if (activeServer) {
     await activeServer.close();
     activeServer = undefined;
@@ -211,6 +218,73 @@ describe("OpenGoat UI server API", () => {
       settings: {
         taskCronEnabled: false,
         taskCheckFrequencyMinutes: 5
+      }
+    });
+  });
+
+  it("returns installed and latest versions from the version api", async () => {
+    process.env.OPENGOAT_VERSION = "2026.2.9";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          version: "2026.2.10"
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }
+      )
+    );
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService()
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/version"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      version: {
+        packageName: "opengoat",
+        installedVersion: "2026.2.9",
+        latestVersion: "2026.2.10",
+        updateAvailable: true,
+        status: "update-available"
+      }
+    });
+  });
+
+  it("handles npm lookup failures in the version api", async () => {
+    process.env.OPENGOAT_VERSION = "2026.2.9";
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network down"));
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService()
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/version"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      version: {
+        packageName: "opengoat",
+        installedVersion: "2026.2.9",
+        latestVersion: null,
+        updateAvailable: null,
+        status: "unknown",
+        error: "network down"
       }
     });
   });

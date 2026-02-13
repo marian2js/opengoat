@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -17,6 +17,9 @@ const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
 const MIN_TASK_CHECK_FREQUENCY_MINUTES = 1;
 const MAX_TASK_CHECK_FREQUENCY_MINUTES = 1440;
 const UI_SETTINGS_FILENAME = "ui-settings.json";
+const OPENGOAT_PACKAGE_NAME = "opengoat";
+const VERSION_CACHE_TTL_MS = 5 * 60_000;
+const VERSION_CHECK_TIMEOUT_MS = 2_000;
 
 interface AgentDescriptor {
   id: string;
@@ -254,6 +257,16 @@ interface UiServerSettings {
   taskCheckFrequencyMinutes: number;
 }
 
+interface UiVersionInfo {
+  packageName: string;
+  installedVersion: string | null;
+  latestVersion: string | null;
+  updateAvailable: boolean | null;
+  status: "latest" | "update-available" | "unknown";
+  checkedAt: string;
+  error?: string;
+}
+
 type SessionMessageProgressPhase =
   | "queued"
   | "run_started"
@@ -305,6 +318,7 @@ export interface OpenGoatUiServerOptions {
 interface RegisterApiRoutesDeps {
   getSettings: () => UiServerSettings;
   updateSettings: (settings: UiServerSettings) => Promise<void>;
+  getVersionInfo: () => Promise<UiVersionInfo>;
 }
 
 export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = {}): Promise<FastifyInstance> {
@@ -324,6 +338,7 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
   }
 
   let uiSettings = await readUiServerSettings(service.getHomeDir());
+  const getVersionInfo = createVersionInfoProvider();
   const taskCronScheduler = createTaskCronScheduler(
     app,
     service,
@@ -342,7 +357,8 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
       await writeUiServerSettings(service.getHomeDir(), uiSettings);
       taskCronScheduler.setEnabled(uiSettings.taskCronEnabled);
       taskCronScheduler.setTaskCheckFrequencyMinutes(uiSettings.taskCheckFrequencyMinutes);
-    }
+    },
+    getVersionInfo
   });
 
   if (attachFrontend) {
@@ -414,6 +430,14 @@ function registerApiRoutes(
       return {
         settings: nextSettings,
         message: `Task cron ${nextSettings.taskCronEnabled ? "enabled" : "disabled"}; frequency ${nextSettings.taskCheckFrequencyMinutes} minute(s).`
+      };
+    });
+  });
+
+  app.get("/api/version", async (_request, reply) => {
+    return safeReply(reply, async () => {
+      return {
+        version: await deps.getVersionInfo()
       };
     });
   });
@@ -1361,6 +1385,200 @@ async function registerFrontend(app: FastifyInstance, options: FrontendOptions):
 
 function resolveMode(): "development" | "production" {
   return process.env.NODE_ENV === "production" ? "production" : "development";
+}
+
+function createVersionInfoProvider(): () => Promise<UiVersionInfo> {
+  let cached: UiVersionInfo | null = null;
+  let expiresAt = 0;
+  let pending: Promise<UiVersionInfo> | null = null;
+
+  return async () => {
+    const now = Date.now();
+    if (cached && now < expiresAt) {
+      return cached;
+    }
+
+    if (pending) {
+      return pending;
+    }
+
+    pending = (async () => {
+      const installedVersion = resolveInstalledVersion();
+      let latestVersion: string | null = null;
+      let error: string | undefined;
+
+      try {
+        latestVersion = await fetchLatestPackageVersion(OPENGOAT_PACKAGE_NAME);
+      } catch (fetchError) {
+        error = fetchError instanceof Error ? fetchError.message : String(fetchError);
+      }
+
+      const status = resolveVersionStatus(installedVersion, latestVersion);
+      const next: UiVersionInfo = {
+        packageName: OPENGOAT_PACKAGE_NAME,
+        installedVersion,
+        latestVersion,
+        updateAvailable: status.updateAvailable,
+        status: status.status,
+        checkedAt: new Date().toISOString(),
+        error
+      };
+
+      cached = next;
+      expiresAt = Date.now() + VERSION_CACHE_TTL_MS;
+      return next;
+    })();
+
+    try {
+      return await pending;
+    } finally {
+      pending = null;
+    }
+  };
+}
+
+function resolveInstalledVersion(): string | null {
+  const envVersion = normalizeVersion(process.env.OPENGOAT_VERSION);
+  if (envVersion) {
+    return envVersion;
+  }
+
+  const currentFile = fileURLToPath(import.meta.url);
+  const currentDir = path.dirname(currentFile);
+
+  const candidates = dedupePathEntries([
+    path.resolve(process.cwd(), "package.json"),
+    path.resolve(process.cwd(), "packages", "cli", "package.json"),
+    path.resolve(currentDir, "../../../../package.json"),
+    path.resolve(currentDir, "../../../../../package.json"),
+    path.resolve(currentDir, "../../../../packages/cli/package.json"),
+    path.resolve(currentDir, "../../../../../packages/cli/package.json")
+  ]);
+
+  for (const packageJsonPath of candidates) {
+    const version = readOpengoatPackageVersion(packageJsonPath);
+    if (version) {
+      return version;
+    }
+  }
+
+  return null;
+}
+
+function readOpengoatPackageVersion(packageJsonPath: string): string | null {
+  if (!existsSync(packageJsonPath)) {
+    return null;
+  }
+
+  try {
+    const raw = readFileSync(packageJsonPath, "utf8");
+    const parsed = JSON.parse(raw) as {
+      name?: string;
+      version?: string;
+    };
+    if (parsed.name !== OPENGOAT_PACKAGE_NAME) {
+      return null;
+    }
+    return normalizeVersion(parsed.version) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeVersion(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function resolveVersionStatus(
+  installedVersion: string | null,
+  latestVersion: string | null
+): { updateAvailable: boolean | null; status: UiVersionInfo["status"] } {
+  if (!installedVersion || !latestVersion) {
+    return {
+      updateAvailable: null,
+      status: "unknown"
+    };
+  }
+
+  const comparison = compareVersionStrings(latestVersion, installedVersion);
+  if (comparison > 0) {
+    return {
+      updateAvailable: true,
+      status: "update-available"
+    };
+  }
+
+  return {
+    updateAvailable: false,
+    status: "latest"
+  };
+}
+
+async function fetchLatestPackageVersion(packageName: string): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, VERSION_CHECK_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(
+      `https://registry.npmjs.org/${encodeURIComponent(packageName)}/latest`,
+      {
+        method: "GET",
+        headers: {
+          accept: "application/json"
+        },
+        signal: controller.signal
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to check npm registry (status ${response.status}).`);
+    }
+
+    const payload = (await response.json()) as {
+      version?: string;
+    };
+    const version = normalizeVersion(payload.version);
+    if (!version) {
+      throw new Error("npm registry response did not include a version.");
+    }
+    return version;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Timed out while checking npm for updates.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function compareVersionStrings(left: string, right: string): number {
+  const leftParts = parseVersionParts(left);
+  const rightParts = parseVersionParts(right);
+  const maxLength = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const leftValue = leftParts[index] ?? 0;
+    const rightValue = rightParts[index] ?? 0;
+    if (leftValue > rightValue) {
+      return 1;
+    }
+    if (leftValue < rightValue) {
+      return -1;
+    }
+  }
+
+  return 0;
+}
+
+function parseVersionParts(version: string): number[] {
+  return version
+    .split(".")
+    .map((segment) => Number.parseInt(segment, 10))
+    .filter((segment) => Number.isFinite(segment) && segment >= 0);
 }
 
 function resolvePackageRoot(): string {
