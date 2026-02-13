@@ -3219,9 +3219,6 @@ export function App(): ReactElement {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              {agent.id === "ceo" ? (
-                                <Badge variant="secondary">Head of Org</Badge>
-                              ) : null}
                               <Button
                                 size="sm"
                                 variant="ghost"
