@@ -6,7 +6,7 @@ import type { CliCommand } from "../framework/command.js";
 
 const DEFAULT_UI_PORT = 19123;
 const DEFAULT_UI_HOST = "127.0.0.1";
-const CLI_PACKAGE_NAME = "@opengoat/cli";
+const CLI_PACKAGE_NAME = "opengoat";
 
 export const startCommand: CliCommand = {
   path: ["start"],
@@ -217,7 +217,7 @@ function resolveCliPackageRoot(startDir: string): string {
 
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir) {
-      throw new Error("Unable to resolve @opengoat/cli package root.");
+      throw new Error("Unable to resolve opengoat package root.");
     }
     currentDir = parentDir;
   }

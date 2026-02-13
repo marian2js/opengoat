@@ -9,7 +9,8 @@ import { join } from "node:path";
 
 const CWD = process.cwd();
 const CHANGESET_DIR = join(CWD, ".changeset");
-const PACKAGE_JSON_PATH = join(CWD, "packages", "cli", "package.json");
+const CLI_PACKAGE_JSON_PATH = join(CWD, "packages", "cli", "package.json");
+const CORE_PACKAGE_JSON_PATH = join(CWD, "packages", "core", "package.json");
 const CHANGELOG_PATH = join(CWD, "CHANGELOG.md");
 
 function getCalVer() {
@@ -31,21 +32,24 @@ function run() {
   }
 
   // 2. Determine target version
-  const pkg = JSON.parse(readFileSync(PACKAGE_JSON_PATH, "utf8"));
+  const cliPkg = JSON.parse(readFileSync(CLI_PACKAGE_JSON_PATH, "utf8"));
+  const corePkg = JSON.parse(readFileSync(CORE_PACKAGE_JSON_PATH, "utf8"));
   const todayVer = getCalVer();
   let nextVer = todayVer;
 
-  if (pkg.version === todayVer) {
+  if (cliPkg.version === todayVer) {
     // If released today already, add patch: 2026.2.7 -> 2026.2.7.1
     nextVer = `${todayVer}.1`;
-  } else if (pkg.version.startsWith(todayVer + ".")) {
+  } else if (cliPkg.version.startsWith(todayVer + ".")) {
     // already has patch, increment it
-    const parts = pkg.version.split(".");
+    const parts = cliPkg.version.split(".");
     const patch = parseInt(parts[3] || "0", 10) + 1;
     nextVer = `${todayVer}.${patch}`;
   }
 
-  console.log(`Bumping version: ${pkg.version} -> ${nextVer}`);
+  console.log(
+    `Bumping versions: cli=${cliPkg.version}, core=${corePkg.version} -> ${nextVer}`,
+  );
 
   // 3. Aggregate Changelog
   let changelogEntry = `## ${nextVer}\n\n`;
@@ -62,8 +66,10 @@ function run() {
 
   // 4. Update files
   // Update package.json
-  pkg.version = nextVer;
-  writeFileSync(PACKAGE_JSON_PATH, JSON.stringify(pkg, null, 2) + "\n");
+  cliPkg.version = nextVer;
+  corePkg.version = nextVer;
+  writeFileSync(CLI_PACKAGE_JSON_PATH, JSON.stringify(cliPkg, null, 2) + "\n");
+  writeFileSync(CORE_PACKAGE_JSON_PATH, JSON.stringify(corePkg, null, 2) + "\n");
 
   // Update CHANGELOG.md
   const currentLog = existsSync(CHANGELOG_PATH)

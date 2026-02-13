@@ -20,7 +20,7 @@ WORKDIR /app
 COPY . .
 
 RUN pnpm --filter @opengoat/core build \
-  && pnpm --filter @opengoat/cli build \
+  && pnpm --filter opengoat build \
   && pnpm --filter @opengoat/ui build
 
 FROM node:22 AS runtime

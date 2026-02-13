@@ -6,5 +6,5 @@ Command-line interface package for OpenGoat.
 
 ```bash
 pnpm install
-pnpm --filter @opengoat/cli dev
+pnpm --filter opengoat dev
 ```

@@ -6,13 +6,13 @@
   "type": "module",
   "packageManager": "pnpm@10.18.2",
   "scripts": {
-    "build": "pnpm --filter @opengoat/core build && pnpm --filter @opengoat/ui build && pnpm --filter @opengoat/cli build",
-    "clean": "pnpm --filter @opengoat/core clean && pnpm --filter @opengoat/ui clean && pnpm --filter @opengoat/cli clean && rm -rf coverage",
-    "dev": "pnpm --filter @opengoat/cli dev",
-    "start": "pnpm --filter @opengoat/cli start",
+    "build": "pnpm --filter @opengoat/core build && pnpm --filter @opengoat/ui build && pnpm --filter opengoat build",
+    "clean": "pnpm --filter @opengoat/core clean && pnpm --filter @opengoat/ui clean && pnpm --filter opengoat clean && rm -rf coverage",
+    "dev": "pnpm --filter opengoat dev",
+    "start": "pnpm --filter opengoat start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "pnpm --filter @opengoat/core typecheck && pnpm --filter @opengoat/cli typecheck",
+    "typecheck": "pnpm --filter @opengoat/core typecheck && pnpm --filter opengoat typecheck",
     "changeset": "changeset",
     "version-packages": "node scripts/release.mjs",
     "release": "node scripts/release.mjs"
