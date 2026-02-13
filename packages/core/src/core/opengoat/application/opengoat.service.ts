@@ -1,4 +1,5 @@
 import path from "node:path";
+import { homedir } from "node:os";
 import { AgentManifestService } from "../../agents/application/agent-manifest.service.js";
 import { AgentService } from "../../agents/application/agent.service.js";
 import {
@@ -1002,15 +1003,29 @@ export class OpenGoatService {
       throw new Error("OpenClaw passthrough requires at least one argument.");
     }
 
-    return this.commandRunner.run({
-      command:
-        process.env.OPENGOAT_OPENCLAW_CMD?.trim() ||
-        process.env.OPENCLAW_CMD?.trim() ||
-        "openclaw",
-      args: sanitized,
-      cwd: options.cwd,
-      env: options.env,
-    });
+    const executionEnv = prepareOpenClawCommandEnv(
+      options.env ?? process.env,
+    );
+    const command =
+      executionEnv.OPENGOAT_OPENCLAW_CMD?.trim() ||
+      executionEnv.OPENCLAW_CMD?.trim() ||
+      process.env.OPENGOAT_OPENCLAW_CMD?.trim() ||
+      process.env.OPENCLAW_CMD?.trim() ||
+      "openclaw";
+
+    try {
+      return await this.commandRunner.run({
+        command,
+        args: sanitized,
+        cwd: options.cwd,
+        env: executionEnv,
+      });
+    } catch (error) {
+      if (isSpawnPermissionOrMissing(error)) {
+        throw new ProviderCommandNotFoundError(OPENCLAW_PROVIDER_ID, command);
+      }
+      throw error;
+    }
   }
 
   public async listSessions(
@@ -1788,4 +1803,76 @@ function collectAllReportees(
   }
 
   return [...visited].sort((left, right) => left.localeCompare(right));
+}
+
+function prepareOpenClawCommandEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const mergedPath = dedupePathEntries([
+    ...resolvePreferredOpenClawCommandPaths(env),
+    ...(env.PATH?.split(path.delimiter) ?? []),
+  ]);
+
+  return {
+    ...env,
+    PATH: mergedPath.join(path.delimiter),
+  };
+}
+
+function resolvePreferredOpenClawCommandPaths(env: NodeJS.ProcessEnv): string[] {
+  const homeDir = homedir();
+  const preferredPaths: string[] = [
+    path.dirname(process.execPath),
+    path.join(homeDir, ".npm-global", "bin"),
+    path.join(homeDir, ".npm", "bin"),
+    path.join(homeDir, ".local", "bin"),
+    path.join(homeDir, ".volta", "bin"),
+    path.join(homeDir, ".fnm", "current", "bin"),
+    path.join(homeDir, ".asdf", "shims"),
+    path.join(homeDir, "bin"),
+  ];
+
+  const npmPrefixCandidates = dedupePathEntries([
+    env.npm_config_prefix ?? "",
+    env.NPM_CONFIG_PREFIX ?? "",
+    process.env.npm_config_prefix ?? "",
+    process.env.NPM_CONFIG_PREFIX ?? "",
+  ]);
+  for (const prefix of npmPrefixCandidates) {
+    preferredPaths.push(path.join(prefix, "bin"));
+  }
+
+  if (process.platform === "darwin") {
+    preferredPaths.push(
+      "/opt/homebrew/bin",
+      "/opt/homebrew/opt/node@22/bin",
+      "/usr/local/opt/node@22/bin",
+    );
+  }
+
+  return preferredPaths;
+}
+
+function dedupePathEntries(entries: string[]): string[] {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const rawEntry of entries) {
+    const entry = rawEntry.trim();
+    if (!entry || seen.has(entry)) {
+      continue;
+    }
+    seen.add(entry);
+    deduped.push(entry);
+  }
+  return deduped;
+}
+
+function isSpawnPermissionOrMissing(
+  error: unknown,
+): error is NodeJS.ErrnoException {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (((error as NodeJS.ErrnoException).code ?? "") === "ENOENT" ||
+      ((error as NodeJS.ErrnoException).code ?? "") === "EACCES")
+  );
 }
