@@ -1,5 +1,5 @@
 <h1 align="center">OpenGoat</h1>
-<p align="center"><strong>Run AI teams with a real org chart.</strong></p>
+<p align="center"><strong>Build organizations of OpenClaw agents that coordinate work across Codex, Claude Code, Cursor, Lovable, and more.</strong></p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License" /></a>
@@ -8,37 +8,58 @@
   <img src="https://img.shields.io/badge/node-%3E%3D20.11-brightgreen?style=flat-square" alt="Node >= 20.11" />
 </p>
 
-OpenGoat turns "one agent with a huge prompt" into an operating team.
+OpenGoat is for teams that want AI workers to act like a real company, not a pile of disconnected chats.
 
-You create a CEO, managers, and individual contributors. You define reporting lines once, then run real work through the right role. OpenGoat keeps sessions, project context, and task flow organized while using OpenClaw as the runtime.
+Use the UI to create projects, open sessions, and run work through role-based agents (CEO, managers, contributors). Use the CLI when you want scripting, automation, and deeper operational control.
 
-[Getting Started](#quick-start-2-minutes) - [Examples](#a-typical-workflow) - [Docs](#learn-more)
+[Start With UI](#start-with-ui-recommended) · [CLI Quick Start](#cli-quick-start) · [Workflows](#typical-workflows) · [Docs](#learn-more)
 
 ## Why OpenGoat
 
-- Work like a company, not a chat thread: route decisions through leaders, execution through contributors.
-- Keep projects separated: sessions stay tied to the intended project path.
-- Scale without chaos: assign roles, skills, and ownership explicitly.
-- Stay CLI-native: scriptable workflows for local usage, CI, and automation.
+- Clear ownership: each agent has a role and manager.
+- Better coordination: planning and execution can happen through different roles.
+- Safer project work: sessions stay anchored to project paths.
+- Works with your stack: built on OpenClaw and designed to coordinate with modern coding agents.
 
-## Install
+## Start With UI (Recommended)
+
+For most users, the UI is the best experience.
+
+### Option A: Docker (fastest UI path)
+
+```bash
+docker build -t opengoat:latest .
+docker run --rm -p 19123:19123 -v opengoat-data:/data/opengoat opengoat:latest
+```
+
+Then open `http://127.0.0.1:19123`.
+
+### Option B: Run UI from source
+
+```bash
+pnpm install
+pnpm --filter @opengoat/ui dev
+```
+
+Then open `http://127.0.0.1:19123`.
+
+## UI-First Workflow
+
+1. Add a project (repository path).
+2. Create or open a session for that project.
+3. Message your CEO or another role from the session.
+4. Track progress in boards/tasks from the same interface.
+5. Open additional sessions per project stream when needed.
+
+## CLI Quick Start
 
 Runtime: Node `>=20.11`.
 
 ```bash
 npm i -g openclaw@latest opengoat@latest
-```
 
-## Quick Start (2 Minutes)
-
-```bash
-# 1) Initialize OpenGoat home (~/.opengoat)
 opengoat init
-
-# 2) Connect OpenGoat to OpenClaw
 opengoat onboard --local --non-interactive
-
-# 3) Start with the default leader (ceo)
 opengoat agent --message "Set up a CTO and two engineers for this project."
 ```
 
@@ -51,70 +72,47 @@ opengoat onboard --external \
   --non-interactive
 ```
 
-## A Typical Workflow
+## Typical Workflows
+
+### Build the organization
 
 ```bash
-# Build your org
 opengoat agent create "CTO" --manager --reports-to ceo --skill board-manager
 opengoat agent create "Engineer" --individual --reports-to cto --skill coding
 opengoat agent create "Designer" --individual --reports-to cto
-
-# Ask leadership for planning
-opengoat agent cto --message "Plan the Q2 engineering roadmap and split it into streams."
-
-# Run direct execution through a role
-opengoat agent engineer --message "Implement the auth middleware for this sprint."
-
-# Evolve structure as the team changes
-opengoat agent set-manager designer ceo
-
-# Inspect current organization
 opengoat agent list
 ```
 
-## Project Sessions (No Cross-Repo Drift)
-
-Use session keys plus project paths to keep work scoped to the right repository.
+### Run role-based work
 
 ```bash
-# Start a named session for a specific project
+opengoat agent cto --message "Plan the Q2 engineering roadmap and split it into streams."
+opengoat agent engineer --message "Implement the auth middleware for this sprint."
+```
+
+### Keep project sessions scoped
+
+```bash
 opengoat agent ceo \
   --session saaslib-planning \
   --project-path /Users/you/workspace/saaslib \
   --message "Create a release checklist for v1.2"
 
-# Continue the same session later
 opengoat agent ceo \
   --session saaslib-planning \
   --message "Now draft the changelog"
 ```
 
-Helpful session commands:
+### Operate with boards and tasks
 
 ```bash
-opengoat session list
-opengoat session history --agent ceo
-opengoat session rename --agent ceo --title "SaaSLib Planning"
-opengoat session reset --agent ceo --session saaslib-planning
-```
-
-## Boards And Tasks
-
-```bash
-# Board lifecycle
 opengoat board create "Platform"
-opengoat board list
-
-# Task lifecycle
 opengoat task create --title "Ship auth" --description "Finish middleware + tests" --owner cto --assign engineer
 opengoat task list --ass engineer
 opengoat task status <task-id> doing
-opengoat task worklog add <task-id> "Implemented middleware and added coverage"
 ```
 
 ## Skills
-
-OpenGoat works with OpenClaw skills and keeps role assignments practical for team operation.
 
 ```bash
 opengoat skill install board-manager --from /path/to/skill
@@ -122,31 +120,13 @@ opengoat skill install jira-tools --from /path/to/skill
 opengoat skill list --agent ceo
 ```
 
-## Docker
-
-```bash
-docker build -t opengoat:latest .
-docker run --rm -p 19123:19123 -v opengoat-data:/data/opengoat opengoat:latest
-
-# CLI in container
-docker run --rm -v opengoat-data:/data/opengoat opengoat:latest cli --help
-```
-
 ## Learn More
-
-User docs and references:
 
 - [OpenClaw Getting Started](https://docs.openclaw.ai/start/getting-started)
 - [OpenClaw Agents](https://docs.openclaw.ai/cli/agents)
 - [OpenClaw Skills](https://docs.openclaw.ai/skills/introduction)
-
-Project docs:
-
 - `/docs/organization-runtime.md`
 - `/docs/acp.md`
 - `/docs/docker.md`
-
-Contributor and architecture docs:
-
 - `/ABOUT.md`
 - `/CONTRIBUTING.md`
