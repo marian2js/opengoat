@@ -4,12 +4,9 @@ import { AgentManifestService } from "../../agents/application/agent-manifest.se
 import { AgentService } from "../../agents/application/agent.service.js";
 import {
   BoardService,
-  type BoardRecord,
-  type BoardSummary,
-  type CreateBoardOptions,
   type CreateTaskOptions,
+  type ListTasksOptions,
   type TaskRecord,
-  type UpdateBoardOptions,
 } from "../../boards/index.js";
 import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
@@ -202,7 +199,7 @@ export class OpenGoatService {
   }
 
   public initialize(): Promise<InitializationResult> {
-    return this.initializeWithDefaultBoards();
+    return this.initializeRuntimeDefaults();
   }
 
   public async hardReset(): Promise<HardResetResult> {
@@ -396,17 +393,6 @@ export class OpenGoatService {
       );
     }
 
-    try {
-      await this.boardService.ensureDefaultBoardForAgent(
-        paths,
-        DEFAULT_AGENT_ID,
-      );
-    } catch (error) {
-      warnings.push(
-        `Default board ensure for "ceo" failed: ${toErrorMessage(error)}`,
-      );
-    }
-
     return {
       ceoSyncCode,
       ceoSynced,
@@ -510,9 +496,6 @@ export class OpenGoatService {
         }". ${toErrorMessage(error)}`,
       );
     }
-
-    await this.boardService.ensureDefaultBoardForAgent(paths, created.agent.id);
-
     return {
       ...created,
       runtimeSync: {
@@ -748,45 +731,17 @@ export class OpenGoatService {
     return this.orchestrationService.runAgent(paths, agentId, options);
   }
 
-  public async createBoard(
-    actorId: string,
-    options: CreateBoardOptions,
-  ): Promise<BoardSummary> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.createBoard(paths, actorId, options);
-  }
-
-  public async listBoards(): Promise<BoardSummary[]> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.listBoards(paths);
-  }
-
-  public async getBoard(boardId: string): Promise<BoardRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.getBoard(paths, boardId);
-  }
-
-  public async updateBoard(
-    actorId: string,
-    boardId: string,
-    options: UpdateBoardOptions,
-  ): Promise<BoardSummary> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.updateBoard(paths, actorId, boardId, options);
-  }
-
   public async createTask(
     actorId: string,
-    boardId: string | null | undefined,
     options: CreateTaskOptions,
   ): Promise<TaskRecord> {
     const paths = this.pathsProvider.getPaths();
-    return this.boardService.createTask(paths, actorId, boardId, options);
+    return this.boardService.createTask(paths, actorId, options);
   }
 
-  public async listTasks(boardId: string): Promise<TaskRecord[]> {
+  public async listTasks(options: ListTasksOptions = {}): Promise<TaskRecord[]> {
     const paths = this.pathsProvider.getPaths();
-    return this.boardService.listTasks(paths, boardId);
+    return this.boardService.listTasks(paths, options);
   }
 
   public async listLatestTasks(options: { assignee?: string; limit?: number } = {}): Promise<TaskRecord[]> {
@@ -871,73 +826,60 @@ export class OpenGoatService {
       inactiveMinutes,
     );
 
-    const boards = await this.boardService.listBoards(paths);
+    const tasks = await this.boardService.listTasks(paths, { limit: 10_000 });
     const dispatches: TaskCronDispatchResult[] = [];
-    let scannedTasks = 0;
+    let scannedTasks = tasks.length;
     let todoTasks = 0;
     let blockedTasks = 0;
 
-    for (const board of boards) {
-      const tasks = await this.boardService.listTasks(paths, board.boardId);
-      scannedTasks += tasks.length;
+    for (const task of tasks) {
+      if (task.status !== "todo" && task.status !== "blocked") {
+        continue;
+      }
 
-      for (const task of tasks) {
-        if (task.status !== "todo" && task.status !== "blocked") {
-          continue;
-        }
-
-        if (task.status === "todo") {
-          todoTasks += 1;
-          const targetAgentId = task.assignedTo;
-          const sessionRef = buildTaskSessionRef(targetAgentId, task.taskId);
-          const message = buildTodoTaskMessage({
-            boardId: board.boardId,
-            boardTitle: board.title,
-            task,
-          });
-          const result = await this.dispatchAutomationMessage(
-            paths,
-            targetAgentId,
-            sessionRef,
-            message,
-          );
-          dispatches.push({
-            kind: "todo",
-            targetAgentId,
-            sessionRef,
-            taskId: task.taskId,
-            ok: result.ok,
-            error: result.error,
-          });
-          continue;
-        }
-
-        blockedTasks += 1;
-        const assigneeManifest = manifestsById.get(task.assignedTo);
-        const managerAgentId =
-          normalizeAgentId(assigneeManifest?.metadata.reportsTo ?? "") ||
-          DEFAULT_AGENT_ID;
-        const sessionRef = buildTaskSessionRef(managerAgentId, task.taskId);
-        const message = buildBlockedTaskMessage({
-          boardId: board.boardId,
-          boardTitle: board.title,
-          task,
-        });
+      if (task.status === "todo") {
+        todoTasks += 1;
+        const targetAgentId = task.assignedTo;
+        const sessionRef = buildTaskSessionRef(targetAgentId, task.taskId);
+        const message = buildTodoTaskMessage({ task });
         const result = await this.dispatchAutomationMessage(
           paths,
-          managerAgentId,
+          targetAgentId,
           sessionRef,
           message,
         );
         dispatches.push({
-          kind: "blocked",
-          targetAgentId: managerAgentId,
+          kind: "todo",
+          targetAgentId,
           sessionRef,
           taskId: task.taskId,
           ok: result.ok,
           error: result.error,
         });
+        continue;
       }
+
+      blockedTasks += 1;
+      const assigneeManifest = manifestsById.get(task.assignedTo);
+      const managerAgentId =
+        normalizeAgentId(assigneeManifest?.metadata.reportsTo ?? "") ||
+        DEFAULT_AGENT_ID;
+      const sessionRef = buildTaskSessionRef(managerAgentId, task.taskId);
+      const message = buildBlockedTaskMessage({ task });
+      const result = await this.dispatchAutomationMessage(
+        paths,
+        managerAgentId,
+        sessionRef,
+        message,
+      );
+      dispatches.push({
+        kind: "blocked",
+        targetAgentId: managerAgentId,
+        sessionRef,
+        taskId: task.taskId,
+        ok: result.ok,
+        error: result.error,
+      });
     }
 
     for (const candidate of inactiveCandidates) {
@@ -1001,7 +943,6 @@ export class OpenGoatService {
     const result = await this.skillService.installSkill(paths, request);
     if (result.scope === "agent" && result.agentId) {
       await this.syncOpenClawRoleSkills(paths, result.agentId);
-      await this.boardService.ensureDefaultBoardForAgent(paths, result.agentId);
     }
     return result;
   }
@@ -1176,10 +1117,8 @@ export class OpenGoatService {
     return this.nowIso();
   }
 
-  private async initializeWithDefaultBoards(): Promise<InitializationResult> {
+  private async initializeRuntimeDefaults(): Promise<InitializationResult> {
     const initialization = await this.bootstrapService.initialize();
-    const paths = this.pathsProvider.getPaths();
-    await this.boardService.ensureDefaultBoardsForManagers(paths);
     try {
       await this.syncRuntimeDefaults();
     } catch {
@@ -1662,11 +1601,7 @@ function buildInactiveSessionRef(
   return `agent:${manager}:agent_${manager}_inactive_${subject}`;
 }
 
-function buildTodoTaskMessage(params: {
-  boardId: string;
-  boardTitle: string;
-  task: TaskRecord;
-}): string {
+function buildTodoTaskMessage(params: { task: TaskRecord }): string {
   const blockers =
     params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "None";
   const artifacts =
@@ -1691,7 +1626,6 @@ function buildTodoTaskMessage(params: {
   return [
     `Task #${params.task.taskId} is assigned to you and currently in TODO. Please work on it now.`,
     "",
-    `Board: ${params.boardTitle} (${params.boardId})`,
     `Task ID: ${params.task.taskId}`,
     `Title: ${params.task.title}`,
     `Description: ${params.task.description}`,
@@ -1708,11 +1642,7 @@ function buildTodoTaskMessage(params: {
   ].join("\n");
 }
 
-function buildBlockedTaskMessage(params: {
-  boardId: string;
-  boardTitle: string;
-  task: TaskRecord;
-}): string {
+function buildBlockedTaskMessage(params: { task: TaskRecord }): string {
   const blockerReason =
     params.task.blockers.length > 0
       ? params.task.blockers.join("; ")
@@ -1739,7 +1669,6 @@ function buildBlockedTaskMessage(params: {
   return [
     `Task #${params.task.taskId}, assigned to your reportee "@${params.task.assignedTo}" is blocked because of ${blockerReason}. Help unblocking it.`,
     "",
-    `Board: ${params.boardTitle} (${params.boardId})`,
     `Task ID: ${params.task.taskId}`,
     `Title: ${params.task.title}`,
     `Description: ${params.task.description}`,

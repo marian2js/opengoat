@@ -1,6 +1,6 @@
 ---
 name: og-board-individual
-description: "Use when you need to work with board tasks: view tasks, list tasks, update task status, add blockers, artifacts, and worklogs."
+description: "Use when you need to work with tasks: view tasks, list tasks, update task status, add blockers, artifacts, and worklogs."
 metadata:
   version: "1.0.0"
 ---
@@ -17,15 +17,12 @@ Replace `<me>` with your agent id.
 opengoat agent info <me>
 ```
 
-You will typically have:
-
-- a `<board-id>` to list tasks
-- one or more `<task-id>` values to update
+You will typically have one or more `<task-id>` values to update.
 
 ## Relevant commands
 
 ```bash
-opengoat task list <board-id> [--as <me>] [--json]
+opengoat task list [--as <me>] [--json]
 opengoat task show <task-id> [--json]
 
 opengoat task status <task-id> <todo|doing|blocked|pending|done> [--reason <reason>] [--as <me>]
@@ -45,12 +42,6 @@ opengoat task show <task-id>
 
 ### List tasks
 
-List tasks on a board:
-
-```bash
-opengoat task list <board-id>
-```
-
 List tasks owned by an agent (often: you):
 
 ```bash
@@ -62,7 +53,7 @@ opengoat task list --as <me>
 Use JSON output and filter locally. The JSON includes task status (`todo|doing|blocked|pending|done`).
 
 ```bash
-opengoat task list <board-id> --json
+opengoat task list --json
 ```
 
 Filter examples (adjust the jq selector to match the JSON shape you see):
@@ -71,11 +62,11 @@ Filter examples (adjust the jq selector to match the JSON shape you see):
 
 # If the JSON is an array of tasks
 
-opengoat task list <board-id> --json | jq '.[] | select(.status=="doing")'
+opengoat task list --json | jq '.[] | select(.status=="doing")'
 
 # If the JSON is an object that contains a tasks array
 
-opengoat task list <board-id> --json | jq '.tasks[] | select(.status=="doing")'
+opengoat task list --json | jq '.tasks[] | select(.status=="doing")'
 ```
 
 ## Update task status

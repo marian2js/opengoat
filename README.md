@@ -48,7 +48,7 @@ Then open `http://127.0.0.1:19123`.
 1. Add a project (repository path).
 2. Create or open a session for that project.
 3. Message your CEO or another role from the session.
-4. Track progress in boards/tasks from the same interface.
+4. Track progress in tasks from the same interface.
 5. Open additional sessions per project stream when needed.
 
 ## CLI Quick Start
@@ -103,10 +103,9 @@ opengoat agent ceo \
   --message "Now draft the changelog"
 ```
 
-### Operate with boards and tasks
+### Operate with tasks
 
 ```bash
-opengoat board create "Platform"
 opengoat task create --title "Ship auth" --description "Finish middleware + tests" --owner cto --assign engineer
 opengoat task list --as engineer
 opengoat task status <task-id> doing

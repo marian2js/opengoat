@@ -1,20 +1,27 @@
 import { randomUUID } from "node:crypto";
-import { readFile as readFileBuffer, stat as statFile, writeFile as writeFileBuffer } from "node:fs/promises";
+import {
+  readFile as readFileBuffer,
+  stat as statFile,
+  writeFile as writeFileBuffer,
+} from "node:fs/promises";
 import { createRequire } from "node:module";
-import initSqlJs, { type Database as SqlJsDatabase, type SqlJsStatic } from "sql.js";
-import { isManagerAgent, type AgentManifest, type AgentManifestService } from "../../agents/index.js";
+import initSqlJs, {
+  type Database as SqlJsDatabase,
+  type SqlJsStatic,
+} from "sql.js";
+import {
+  type AgentManifest,
+  type AgentManifestService,
+} from "../../agents/index.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import type {
-  BoardRecord,
-  BoardSummary,
-  CreateBoardOptions,
   CreateTaskOptions,
+  ListTasksOptions,
   TaskEntry,
   TaskRecord,
-  UpdateBoardOptions
 } from "../domain/board.js";
 
 interface BoardServiceDeps {
@@ -22,21 +29,6 @@ interface BoardServiceDeps {
   pathPort: PathPort;
   nowIso: () => string;
   agentManifestService: AgentManifestService;
-}
-
-interface ListLatestTasksOptions {
-  assignee?: string;
-  owner?: string;
-  status?: string;
-  limit?: number;
-  offset?: number;
-}
-
-interface ListLatestTasksPage {
-  tasks: TaskRecord[];
-  total: number;
-  limit: number;
-  offset: number;
 }
 
 interface BoardRow {
@@ -70,13 +62,11 @@ interface TaskIdRow {
   task_id: string;
 }
 
-interface CountRow {
-  total: number;
-}
-
 const TASK_STATUSES = ["todo", "doing", "pending", "blocked", "done"] as const;
 const DEFAULT_TASK_PROJECT = "~";
 const MAX_TASK_LIST_LIMIT = 100;
+const INTERNAL_TASK_BUCKET_ID = "tasks";
+const INTERNAL_TASK_BUCKET_TITLE = "Tasks";
 const require = createRequire(import.meta.url);
 
 export class BoardService {
@@ -96,99 +86,10 @@ export class BoardService {
     this.agentManifestService = deps.agentManifestService;
   }
 
-  public async createBoard(paths: OpenGoatPaths, actorId: string, options: CreateBoardOptions): Promise<BoardSummary> {
-    const db = await this.getDatabase(paths);
-    const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
-    const title = options.title.trim();
-    if (!title) {
-      throw new Error("Board title cannot be empty.");
-    }
-
-    const manifests = await this.agentManifestService.listManifests(paths);
-    const actor = manifests.find((manifest) => manifest.agentId === normalizedActorId);
-    if (!actor) {
-      throw new Error(`Agent \"${normalizedActorId}\" does not exist.`);
-    }
-    if (!isManagerAgent(actor)) {
-      throw new Error("Only managers can create boards.");
-    }
-
-    const hasDefaultBoard = this.getDefaultBoardByOwner(db, normalizedActorId) !== undefined;
-    const board = this.insertBoard(db, {
-      title,
-      owner: normalizedActorId,
-      makeDefault: !hasDefaultBoard
-    });
-    await this.persistDatabase(paths, db);
-
-    return board;
-  }
-
-  public async listBoards(paths: OpenGoatPaths): Promise<BoardSummary[]> {
-    const db = await this.getDatabase(paths);
-    const rows = this.queryAll<BoardRow>(
-      db,
-      `SELECT board_id, title, created_at, owner_agent_id, is_default
-       FROM boards
-       ORDER BY created_at ASC`
-    );
-
-    return rows.map((row) => toBoardSummary(row));
-  }
-
-  public async getBoard(paths: OpenGoatPaths, boardId: string): Promise<BoardRecord> {
-    const db = await this.getDatabase(paths);
-    const normalizedBoardId = normalizeEntityId(boardId, "board id");
-    const board = this.requireBoard(db, normalizedBoardId);
-    const tasks = await this.listTasksByBoardId(db, normalizedBoardId);
-    return {
-      ...toBoardSummary(board),
-      tasks
-    };
-  }
-
-  public async updateBoard(
-    paths: OpenGoatPaths,
-    actorId: string,
-    boardId: string,
-    options: UpdateBoardOptions
-  ): Promise<BoardSummary> {
-    const db = await this.getDatabase(paths);
-    const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
-    const normalizedBoardId = normalizeEntityId(boardId, "board id");
-    const board = this.requireBoard(db, normalizedBoardId);
-
-    if (board.owner_agent_id !== normalizedActorId) {
-      throw new Error("Only board owners can update their own board.");
-    }
-
-    const nextTitle = options.title?.trim() || board.title;
-    if (!nextTitle) {
-      throw new Error("Board title cannot be empty.");
-    }
-
-    this.execute(
-      db,
-      `UPDATE boards
-       SET title = ?
-       WHERE board_id = ?`,
-      [nextTitle, normalizedBoardId]
-    );
-    await this.persistDatabase(paths, db);
-
-    return {
-      boardId: normalizedBoardId,
-      title: nextTitle,
-      createdAt: board.created_at,
-      owner: board.owner_agent_id
-    };
-  }
-
   public async createTask(
     paths: OpenGoatPaths,
     actorId: string,
-    boardId: string | null | undefined,
-    options: CreateTaskOptions
+    options: CreateTaskOptions,
   ): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
     const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
@@ -201,33 +102,32 @@ export class BoardService {
       throw new Error("Task description cannot be empty.");
     }
 
-    const assignedTo = normalizeAgentId(options.assignedTo ?? normalizedActorId) || normalizedActorId;
+    const assignedTo =
+      normalizeAgentId(options.assignedTo ?? normalizedActorId) || normalizedActorId;
     const manifests = await this.agentManifestService.listManifests(paths);
-    const actor = manifests.find((manifest) => manifest.agentId === normalizedActorId);
-    const assignee = manifests.find((manifest) => manifest.agentId === assignedTo);
+    const manifestsById = new Map(
+      manifests.map((manifest) => [manifest.agentId, manifest]),
+    );
 
-    if (!actor) {
+    if (!manifestsById.has(normalizedActorId)) {
       throw new Error(`Agent \"${normalizedActorId}\" does not exist.`);
     }
-    if (!assignee) {
+    if (!manifestsById.has(assignedTo)) {
       throw new Error(`Agent \"${assignedTo}\" does not exist.`);
     }
 
-    if (assignedTo !== normalizedActorId) {
-      if (!isManagerAgent(actor)) {
-        throw new Error("Only managers can assign tasks to other agents.");
-      }
-      if ((assignee.metadata.reportsTo ?? "") !== normalizedActorId) {
-        throw new Error("Managers can only assign tasks to their direct reportees.");
-      }
+    const allowedAssignees = collectAssignableAgents(manifests, normalizedActorId);
+    if (!allowedAssignees.has(assignedTo)) {
+      throw new Error(
+        "Agents can only assign tasks to themselves or their reportees (direct or indirect).",
+      );
     }
 
     const status = normalizeTaskStatus(options.status);
     const project = normalizeTaskProject(options.project);
-    const { boardId: resolvedBoardId } = this.resolveBoardForTaskCreation(db, actor, boardId);
-
     const taskId = createEntityId(`task-${title}`);
     const createdAt = this.nowIso();
+
     this.execute(
       db,
       `INSERT INTO tasks (
@@ -242,103 +142,59 @@ export class BoardService {
          status,
          status_reason
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [taskId, resolvedBoardId, createdAt, project, normalizedActorId, assignedTo, title, description, status, null]
+      [
+        taskId,
+        INTERNAL_TASK_BUCKET_ID,
+        createdAt,
+        project,
+        normalizedActorId,
+        assignedTo,
+        title,
+        description,
+        status,
+        null,
+      ],
     );
     await this.persistDatabase(paths, db);
 
     return this.requireTask(db, taskId);
   }
 
-  public async ensureDefaultBoardForAgent(paths: OpenGoatPaths, agentId: string): Promise<BoardSummary | null> {
-    const normalizedAgentId = normalizeAgentId(agentId);
-    if (!normalizedAgentId) {
-      throw new Error("Agent id cannot be empty.");
-    }
-
-    const db = await this.getDatabase(paths);
-    const manifests = await this.agentManifestService.listManifests(paths);
-    const agent = manifests.find((manifest) => manifest.agentId === normalizedAgentId);
-    if (!agent) {
-      throw new Error(`Agent \"${normalizedAgentId}\" does not exist.`);
-    }
-    if (!isManagerAgent(agent)) {
-      return null;
-    }
-
-    const ensured = this.ensureDefaultBoardForManager(db, normalizedAgentId, agent.metadata.name);
-    if (ensured.changed) {
-      await this.persistDatabase(paths, db);
-    }
-    return ensured.board;
-  }
-
-  public async ensureDefaultBoardsForManagers(paths: OpenGoatPaths): Promise<BoardSummary[]> {
-    const db = await this.getDatabase(paths);
-    const manifests = await this.agentManifestService.listManifests(paths);
-    const managers = manifests.filter((manifest) => isManagerAgent(manifest));
-    const ensuredBoards: BoardSummary[] = [];
-    let changed = false;
-
-    for (const manager of managers) {
-      const ensured = this.ensureDefaultBoardForManager(db, manager.agentId, manager.metadata.name);
-      ensuredBoards.push(ensured.board);
-      if (ensured.changed) {
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      await this.persistDatabase(paths, db);
-    }
-
-    return ensuredBoards;
-  }
-
-  public async listTasks(paths: OpenGoatPaths, boardId: string): Promise<TaskRecord[]> {
-    const db = await this.getDatabase(paths);
-    const normalizedBoardId = normalizeEntityId(boardId, "board id");
-    this.requireBoard(db, normalizedBoardId);
-    return this.listTasksByBoardId(db, normalizedBoardId);
-  }
-
-  public async listLatestTasks(paths: OpenGoatPaths, options: ListLatestTasksOptions = {}): Promise<TaskRecord[]> {
-    const page = await this.listLatestTasksPage(paths, options);
-    return page.tasks;
-  }
-
-  public async listLatestTasksPage(paths: OpenGoatPaths, options: ListLatestTasksOptions = {}): Promise<ListLatestTasksPage> {
+  public async listTasks(
+    paths: OpenGoatPaths,
+    options: ListTasksOptions = {},
+  ): Promise<TaskRecord[]> {
     const db = await this.getDatabase(paths);
     const limit = resolveTaskListLimit(options.limit);
-    const offset = resolveTaskListOffset(options.offset);
-    const filters = {
-      assignee: normalizeOptionalAssignee(options.assignee),
-      owner: normalizeOptionalOwner(options.owner),
-      status: normalizeOptionalStatus(options.status)
-    };
-    const { whereClause, params } = toLatestTaskFilters(filters);
-    const rows = this.queryAll<TaskRow>(
-      db,
-      `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
-       FROM tasks
-       ${whereClause}
-       ORDER BY created_at DESC, task_id DESC
-       LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
-    );
-    const countRow = this.queryOne<CountRow>(
-      db,
-      `SELECT COUNT(*) AS total
-       FROM tasks
-       ${whereClause}`,
-      params
-    );
+    const assignee = normalizeOptionalAssignee(options.assignee);
 
-    return {
-      tasks: this.hydrateTaskRows(db, rows),
-      total: Number(countRow?.total ?? 0),
-      limit,
-      offset
-    };
+    const rows = assignee
+      ? this.queryAll<TaskRow>(
+          db,
+          `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+           FROM tasks
+           WHERE assigned_to_agent_id = ?
+           ORDER BY created_at DESC, task_id DESC
+           LIMIT ?`,
+          [assignee, limit],
+        )
+      : this.queryAll<TaskRow>(
+          db,
+          `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+           FROM tasks
+           ORDER BY created_at DESC, task_id DESC
+           LIMIT ?`,
+          [limit],
+        );
+
+    return this.hydrateTaskRows(db, rows);
+  }
+
+  public async listLatestTasks(
+    paths: OpenGoatPaths,
+    options: ListTasksOptions = {},
+  ): Promise<TaskRecord[]> {
+    return this.listTasks(paths, options);
   }
 
   public async getTask(paths: OpenGoatPaths, taskId: string): Promise<TaskRecord> {
@@ -352,13 +208,14 @@ export class BoardService {
     actorId: string,
     taskId: string,
     status: string,
-    reason?: string
+    reason?: string,
   ): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
     const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
     const resolvedTaskId = this.resolveTaskId(db, taskId);
     const task = this.requireTask(db, resolvedTaskId);
-    this.assertTaskAssignee(task, normalizedActorId);
+    const manifests = await this.agentManifestService.listManifests(paths);
+    this.assertTaskUpdatePermission(task, normalizedActorId, manifests);
 
     const nextStatus = normalizeTaskStatus(status, true);
     const nextStatusReason = normalizeTaskStatusReason(nextStatus, reason);
@@ -366,7 +223,7 @@ export class BoardService {
     this.execute(db, `UPDATE tasks SET status = ?, status_reason = ? WHERE task_id = ?`, [
       nextStatus,
       nextStatusReason,
-      resolvedTaskId
+      resolvedTaskId,
     ]);
     await this.persistDatabase(paths, db);
     return this.requireTask(db, resolvedTaskId);
@@ -376,7 +233,7 @@ export class BoardService {
     paths: OpenGoatPaths,
     actorId: string,
     taskId: string,
-    blocker: string
+    blocker: string,
   ): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
     const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
@@ -387,13 +244,14 @@ export class BoardService {
     }
 
     const task = this.requireTask(db, resolvedTaskId);
-    this.assertTaskAssignee(task, normalizedActorId);
+    const manifests = await this.agentManifestService.listManifests(paths);
+    this.assertTaskUpdatePermission(task, normalizedActorId, manifests);
 
     this.execute(
       db,
       `INSERT INTO task_blockers (task_id, created_at, created_by_agent_id, content)
        VALUES (?, ?, ?, ?)`,
-      [resolvedTaskId, this.nowIso(), normalizedActorId, content]
+      [resolvedTaskId, this.nowIso(), normalizedActorId, content],
     );
     await this.persistDatabase(paths, db);
 
@@ -404,7 +262,7 @@ export class BoardService {
     paths: OpenGoatPaths,
     actorId: string,
     taskId: string,
-    content: string
+    content: string,
   ): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
     const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
@@ -415,13 +273,14 @@ export class BoardService {
     }
 
     const task = this.requireTask(db, resolvedTaskId);
-    this.assertTaskAssignee(task, normalizedActorId);
+    const manifests = await this.agentManifestService.listManifests(paths);
+    this.assertTaskUpdatePermission(task, normalizedActorId, manifests);
 
     this.execute(
       db,
       `INSERT INTO task_artifacts (task_id, created_at, created_by_agent_id, content)
        VALUES (?, ?, ?, ?)`,
-      [resolvedTaskId, this.nowIso(), normalizedActorId, cleaned]
+      [resolvedTaskId, this.nowIso(), normalizedActorId, cleaned],
     );
     await this.persistDatabase(paths, db);
 
@@ -432,7 +291,7 @@ export class BoardService {
     paths: OpenGoatPaths,
     actorId: string,
     taskId: string,
-    content: string
+    content: string,
   ): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
     const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
@@ -443,36 +302,37 @@ export class BoardService {
     }
 
     const task = this.requireTask(db, resolvedTaskId);
-    this.assertTaskAssignee(task, normalizedActorId);
+    const manifests = await this.agentManifestService.listManifests(paths);
+    this.assertTaskUpdatePermission(task, normalizedActorId, manifests);
 
     this.execute(
       db,
       `INSERT INTO task_worklog (task_id, created_at, created_by_agent_id, content)
        VALUES (?, ?, ?, ?)`,
-      [resolvedTaskId, this.nowIso(), normalizedActorId, cleaned]
+      [resolvedTaskId, this.nowIso(), normalizedActorId, cleaned],
     );
     await this.persistDatabase(paths, db);
 
     return this.requireTask(db, resolvedTaskId);
   }
 
-  private assertTaskAssignee(task: TaskRecord, actorId: string): void {
-    if (task.assignedTo !== actorId) {
-      throw new Error("Only the assigned agent can update task status, blockers, artifacts, and worklog.");
+  private assertTaskUpdatePermission(
+    task: TaskRecord,
+    actorId: string,
+    manifests: AgentManifest[],
+  ): void {
+    if (task.owner === actorId || task.assignedTo === actorId) {
+      return;
     }
-  }
 
-  private async listTasksByBoardId(db: SqlJsDatabase, boardId: string): Promise<TaskRecord[]> {
-    const rows = this.queryAll<TaskRow>(
-      db,
-      `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
-       FROM tasks
-       WHERE board_id = ?
-       ORDER BY created_at ASC`,
-      [boardId]
+    const reportees = collectAssignableAgents(manifests, actorId);
+    if (reportees.has(task.owner) || reportees.has(task.assignedTo)) {
+      return;
+    }
+
+    throw new Error(
+      "Agents can only update their own tasks or tasks owned/assigned to their reportees (direct or indirect).",
     );
-
-    return this.hydrateTaskRows(db, rows);
   }
 
   private hydrateTaskRows(db: SqlJsDatabase, rows: TaskRow[]): TaskRecord[] {
@@ -490,7 +350,7 @@ export class BoardService {
       `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
        FROM tasks
        WHERE task_id = ?`,
-      [taskId]
+      [taskId],
     );
 
     if (!row) {
@@ -507,7 +367,7 @@ export class BoardService {
       `SELECT task_id
        FROM tasks
        WHERE task_id = ?`,
-      [normalizedTaskId]
+      [normalizedTaskId],
     );
     if (exactMatch?.task_id) {
       return exactMatch.task_id;
@@ -519,7 +379,7 @@ export class BoardService {
        FROM tasks
        WHERE task_id = ? COLLATE NOCASE
        ORDER BY task_id ASC`,
-      [normalizedTaskId]
+      [normalizedTaskId],
     );
 
     if (caseInsensitiveMatches.length === 0) {
@@ -527,7 +387,9 @@ export class BoardService {
     }
 
     if (caseInsensitiveMatches.length > 1) {
-      throw new Error(`Task id \"${normalizedTaskId}\" is ambiguous by case. Use exact task id.`);
+      throw new Error(
+        `Task id \"${normalizedTaskId}\" is ambiguous by case. Use exact task id.`,
+      );
     }
 
     return caseInsensitiveMatches[0]!.task_id;
@@ -540,7 +402,7 @@ export class BoardService {
        FROM task_blockers
        WHERE task_id = ?
        ORDER BY id ASC`,
-      [row.task_id]
+      [row.task_id],
     );
     const artifactsRows = this.queryAll<EntryRow>(
       db,
@@ -548,7 +410,7 @@ export class BoardService {
        FROM task_artifacts
        WHERE task_id = ?
        ORDER BY id ASC`,
-      [row.task_id]
+      [row.task_id],
     );
     const worklogRows = this.queryAll<EntryRow>(
       db,
@@ -556,12 +418,11 @@ export class BoardService {
        FROM task_worklog
        WHERE task_id = ?
        ORDER BY id ASC`,
-      [row.task_id]
+      [row.task_id],
     );
 
     return {
       taskId: row.task_id,
-      boardId: row.board_id,
       createdAt: row.created_at,
       project: row.project || DEFAULT_TASK_PROJECT,
       owner: row.owner_agent_id,
@@ -572,24 +433,8 @@ export class BoardService {
       statusReason: row.status_reason?.trim() || undefined,
       blockers: blockersRows.map((entry) => entry.content),
       artifacts: artifactsRows.map((entry) => toTaskEntry(entry)),
-      worklog: worklogRows.map((entry) => toTaskEntry(entry))
+      worklog: worklogRows.map((entry) => toTaskEntry(entry)),
     };
-  }
-
-  private requireBoard(db: SqlJsDatabase, boardId: string): BoardRow {
-    const row = this.queryOne<BoardRow>(
-      db,
-      `SELECT board_id, title, created_at, owner_agent_id, is_default
-       FROM boards
-       WHERE board_id = ?`,
-      [boardId]
-    );
-
-    if (!row) {
-      throw new Error(`Board \"${boardId}\" does not exist.`);
-    }
-
-    return row;
   }
 
   private async getDatabase(paths: OpenGoatPaths): Promise<SqlJsDatabase> {
@@ -610,7 +455,10 @@ export class BoardService {
     return this.dbPromise;
   }
 
-  private async openAndMigrate(dbPath: string, paths: OpenGoatPaths): Promise<SqlJsDatabase> {
+  private async openAndMigrate(
+    dbPath: string,
+    paths: OpenGoatPaths,
+  ): Promise<SqlJsDatabase> {
     await this.fileSystem.ensureDir(paths.homeDir);
     const SQL = await this.getSqlJs();
     const exists = await this.fileSystem.exists(dbPath);
@@ -627,10 +475,10 @@ export class BoardService {
          created_at TEXT NOT NULL,
          owner_agent_id TEXT NOT NULL,
          is_default INTEGER NOT NULL DEFAULT 0
-       );`
+       );`,
     );
     this.ensureBoardDefaultColumn(db);
-    this.normalizeDefaultBoardsByOwner(db);
+    this.ensureInternalTaskBucket(db);
     this.execute(
       db,
       `CREATE TABLE IF NOT EXISTS tasks (
@@ -645,7 +493,7 @@ export class BoardService {
          status TEXT NOT NULL,
          status_reason TEXT,
          FOREIGN KEY(board_id) REFERENCES boards(board_id) ON DELETE CASCADE
-       );`
+       );`,
     );
     this.ensureTaskProjectColumn(db);
     this.ensureTaskStatusReasonColumn(db);
@@ -658,7 +506,7 @@ export class BoardService {
          created_by_agent_id TEXT NOT NULL,
          content TEXT NOT NULL,
          FOREIGN KEY(task_id) REFERENCES tasks(task_id) ON DELETE CASCADE
-       );`
+       );`,
     );
     this.execute(
       db,
@@ -669,7 +517,7 @@ export class BoardService {
          created_by_agent_id TEXT NOT NULL,
          content TEXT NOT NULL,
          FOREIGN KEY(task_id) REFERENCES tasks(task_id) ON DELETE CASCADE
-       );`
+       );`,
     );
     this.execute(
       db,
@@ -680,55 +528,66 @@ export class BoardService {
          created_by_agent_id TEXT NOT NULL,
          content TEXT NOT NULL,
          FOREIGN KEY(task_id) REFERENCES tasks(task_id) ON DELETE CASCADE
-       );`
-    );
-    this.execute(
-      db,
-      `CREATE TRIGGER IF NOT EXISTS prevent_default_board_delete
-       BEFORE DELETE ON boards
-       FOR EACH ROW
-       WHEN OLD.is_default = 1
-       BEGIN
-         SELECT RAISE(ABORT, 'Default boards cannot be deleted.');
-       END;`
+       );`,
     );
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_tasks_board_id ON tasks(board_id);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);");
-    this.execute(db, "CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at, task_id);");
     this.execute(
       db,
-      "CREATE INDEX IF NOT EXISTS idx_tasks_assignee_created_at ON tasks(assigned_to_agent_id, created_at, task_id);"
+      "CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at, task_id);",
     );
     this.execute(
       db,
-      "CREATE INDEX IF NOT EXISTS idx_tasks_owner_created_at ON tasks(owner_agent_id, created_at, task_id);"
+      "CREATE INDEX IF NOT EXISTS idx_tasks_assignee_created_at ON tasks(assigned_to_agent_id, created_at, task_id);",
     );
-    this.execute(
-      db,
-      "CREATE INDEX IF NOT EXISTS idx_tasks_status_created_at ON tasks(status, created_at, task_id);"
-    );
-    this.execute(db, "CREATE INDEX IF NOT EXISTS idx_boards_owner_default ON boards(owner_agent_id, is_default);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_blockers_task_id ON task_blockers(task_id);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_artifacts_task_id ON task_artifacts(task_id);");
     this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_worklog_task_id ON task_worklog(task_id);");
-    await this.ensureDefaultBoardsForManagersInDatabase(paths, db);
 
     await this.persistDatabase(paths, db);
     return db;
+  }
+
+  private ensureInternalTaskBucket(db: SqlJsDatabase): void {
+    const existing = this.queryOne<BoardRow>(
+      db,
+      `SELECT board_id, title, created_at, owner_agent_id, is_default
+       FROM boards
+       WHERE board_id = ?`,
+      [INTERNAL_TASK_BUCKET_ID],
+    );
+    if (existing) {
+      return;
+    }
+
+    this.execute(
+      db,
+      `INSERT INTO boards (board_id, title, created_at, owner_agent_id, is_default)
+       VALUES (?, ?, ?, ?, 0)`,
+      [
+        INTERNAL_TASK_BUCKET_ID,
+        INTERNAL_TASK_BUCKET_TITLE,
+        this.nowIso(),
+        DEFAULT_AGENT_ID,
+      ],
+    );
   }
 
   private async getSqlJs(): Promise<SqlJsStatic> {
     if (!this.sqlPromise) {
       const wasmPath = require.resolve("sql.js/dist/sql-wasm.wasm");
       this.sqlPromise = initSqlJs({
-        locateFile: () => wasmPath
+        locateFile: () => wasmPath,
       });
     }
 
     return this.sqlPromise;
   }
 
-  private async persistDatabase(paths: OpenGoatPaths, db: SqlJsDatabase): Promise<void> {
+  private async persistDatabase(
+    paths: OpenGoatPaths,
+    db: SqlJsDatabase,
+  ): Promise<void> {
     const dbPath = this.pathPort.join(paths.homeDir, "boards.sqlite");
     const data = db.export();
     await writeFileBuffer(dbPath, data);
@@ -749,7 +608,11 @@ export class BoardService {
     }
   }
 
-  private execute(db: SqlJsDatabase, sql: string, params: Array<string | number | null> = []): void {
+  private execute(
+    db: SqlJsDatabase,
+    sql: string,
+    params: Array<string | number | null> = [],
+  ): void {
     const statement = db.prepare(sql);
     statement.bind(params);
     while (statement.step()) {
@@ -758,7 +621,11 @@ export class BoardService {
     statement.free();
   }
 
-  private queryAll<T>(db: SqlJsDatabase, sql: string, params: Array<string | number | null> = []): T[] {
+  private queryAll<T>(
+    db: SqlJsDatabase,
+    sql: string,
+    params: Array<string | number | null> = [],
+  ): T[] {
     const statement = db.prepare(sql);
     statement.bind(params);
     const rows: T[] = [];
@@ -769,7 +636,11 @@ export class BoardService {
     return rows;
   }
 
-  private queryOne<T>(db: SqlJsDatabase, sql: string, params: Array<string | number | null> = []): T | undefined {
+  private queryOne<T>(
+    db: SqlJsDatabase,
+    sql: string,
+    params: Array<string | number | null> = [],
+  ): T | undefined {
     const all = this.queryAll<T>(db, sql, params);
     return all[0];
   }
@@ -783,7 +654,7 @@ export class BoardService {
 
     this.execute(
       db,
-      `ALTER TABLE tasks ADD COLUMN project TEXT NOT NULL DEFAULT '${DEFAULT_TASK_PROJECT}';`
+      `ALTER TABLE tasks ADD COLUMN project TEXT NOT NULL DEFAULT '${DEFAULT_TASK_PROJECT}';`,
     );
 
     const hasWorkspace = columns.some((column) => column.name === "workspace");
@@ -793,14 +664,16 @@ export class BoardService {
         `UPDATE tasks
          SET project = workspace
          WHERE workspace IS NOT NULL
-           AND TRIM(workspace) <> '';`
+           AND TRIM(workspace) <> '';`,
       );
     }
   }
 
   private ensureTaskStatusReasonColumn(db: SqlJsDatabase): void {
     const columns = this.queryAll<{ name: string }>(db, "PRAGMA table_info(tasks);");
-    const hasStatusReason = columns.some((column) => column.name === "status_reason");
+    const hasStatusReason = columns.some(
+      (column) => column.name === "status_reason",
+    );
     if (hasStatusReason) {
       return;
     }
@@ -817,175 +690,6 @@ export class BoardService {
 
     this.execute(db, "ALTER TABLE boards ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0;");
   }
-
-  private normalizeDefaultBoardsByOwner(db: SqlJsDatabase): void {
-    const owners = this.queryAll<{ owner_agent_id: string }>(
-      db,
-      `SELECT DISTINCT owner_agent_id
-       FROM boards
-       ORDER BY owner_agent_id ASC`
-    );
-    for (const ownerRow of owners) {
-      const ownerId = ownerRow.owner_agent_id;
-      if (!ownerId) {
-        continue;
-      }
-      const ownedBoards = this.queryAll<BoardRow>(
-        db,
-        `SELECT board_id, title, created_at, owner_agent_id, is_default
-         FROM boards
-         WHERE owner_agent_id = ?
-         ORDER BY is_default DESC, created_at ASC, board_id ASC`,
-        [ownerId]
-      );
-      const selectedBoardId = ownedBoards[0]?.board_id;
-      if (!selectedBoardId) {
-        continue;
-      }
-      this.assignDefaultBoard(db, ownerId, selectedBoardId);
-    }
-  }
-
-  private async ensureDefaultBoardsForManagersInDatabase(paths: OpenGoatPaths, db: SqlJsDatabase): Promise<void> {
-    const manifests = await this.agentManifestService.listManifests(paths);
-    const managers = manifests.filter((manifest) => isManagerAgent(manifest));
-    for (const manager of managers) {
-      this.ensureDefaultBoardForManager(db, manager.agentId, manager.metadata.name);
-    }
-  }
-
-  private ensureDefaultBoardForManager(
-    db: SqlJsDatabase,
-    managerId: string,
-    displayName: string
-  ): {
-    board: BoardSummary;
-    changed: boolean;
-  } {
-    const existingDefault = this.getDefaultBoardByOwner(db, managerId);
-    if (existingDefault) {
-      return {
-        board: toBoardSummary(existingDefault),
-        changed: false
-      };
-    }
-
-    const existingBoard = this.queryOne<BoardRow>(
-      db,
-      `SELECT board_id, title, created_at, owner_agent_id, is_default
-       FROM boards
-       WHERE owner_agent_id = ?
-       ORDER BY created_at ASC, board_id ASC`,
-      [managerId]
-    );
-    if (existingBoard) {
-      this.assignDefaultBoard(db, managerId, existingBoard.board_id);
-      return {
-        board: {
-          boardId: existingBoard.board_id,
-          title: existingBoard.title,
-          createdAt: existingBoard.created_at,
-          owner: existingBoard.owner_agent_id
-        },
-        changed: true
-      };
-    }
-
-    const created = this.insertBoard(db, {
-      title: `${displayName.trim() || managerId} Board`,
-      owner: managerId,
-      makeDefault: true
-    });
-    return {
-      board: created,
-      changed: true
-    };
-  }
-
-  private resolveBoardForTaskCreation(
-    db: SqlJsDatabase,
-    actor: AgentManifest,
-    rawBoardId: string | null | undefined
-  ): {
-    boardId: string;
-  } {
-    const providedBoardId = rawBoardId?.trim();
-    if (providedBoardId) {
-      const normalizedBoardId = normalizeEntityId(providedBoardId, "board id");
-      this.requireBoard(db, normalizedBoardId);
-      return {
-        boardId: normalizedBoardId
-      };
-    }
-
-    if (!isManagerAgent(actor)) {
-      throw new Error("Board id is required for non-manager agents.");
-    }
-
-    const ensured = this.ensureDefaultBoardForManager(db, actor.agentId, actor.metadata.name);
-    return {
-      boardId: ensured.board.boardId
-    };
-  }
-
-  private getDefaultBoardByOwner(db: SqlJsDatabase, ownerAgentId: string): BoardRow | undefined {
-    return this.queryOne<BoardRow>(
-      db,
-      `SELECT board_id, title, created_at, owner_agent_id, is_default
-       FROM boards
-       WHERE owner_agent_id = ?
-         AND is_default = 1
-       ORDER BY created_at ASC, board_id ASC`,
-      [ownerAgentId]
-    );
-  }
-
-  private assignDefaultBoard(db: SqlJsDatabase, ownerAgentId: string, boardId: string): void {
-    this.execute(
-      db,
-      `UPDATE boards
-       SET is_default = 0
-       WHERE owner_agent_id = ?`,
-      [ownerAgentId]
-    );
-    this.execute(
-      db,
-      `UPDATE boards
-       SET is_default = 1
-       WHERE board_id = ?`,
-      [boardId]
-    );
-  }
-
-  private insertBoard(
-    db: SqlJsDatabase,
-    params: {
-      title: string;
-      owner: string;
-      makeDefault: boolean;
-    }
-  ): BoardSummary {
-    const boardId = createEntityId(params.title);
-    const createdAt = this.nowIso();
-
-    if (params.makeDefault) {
-      this.assignDefaultBoard(db, params.owner, boardId);
-    }
-
-    this.execute(
-      db,
-      `INSERT INTO boards (board_id, title, created_at, owner_agent_id, is_default)
-       VALUES (?, ?, ?, ?, ?)`,
-      [boardId, params.title, createdAt, params.owner, params.makeDefault ? 1 : 0]
-    );
-
-    return {
-      boardId,
-      title: params.title,
-      createdAt,
-      owner: params.owner
-    };
-  }
 }
 
 function normalizeEntityId(value: string, label: string): string {
@@ -994,15 +698,6 @@ function normalizeEntityId(value: string, label: string): string {
     throw new Error(`${label} cannot be empty.`);
   }
   return normalized;
-}
-
-function toBoardSummary(row: BoardRow): BoardSummary {
-  return {
-    boardId: row.board_id,
-    title: row.title,
-    createdAt: row.created_at,
-    owner: row.owner_agent_id
-  };
 }
 
 function normalizeTaskStatus(rawStatus: string | undefined, allowEmpty = false): string {
@@ -1019,7 +714,7 @@ function normalizeTaskStatus(rawStatus: string | undefined, allowEmpty = false):
 function normalizeTaskStatusReason(status: string, rawReason: string | undefined): string | null {
   const reason = rawReason?.trim();
   if ((status === "pending" || status === "blocked") && !reason) {
-    throw new Error(`Reason is required when task status is "${status}".`);
+    throw new Error(`Reason is required when task status is \"${status}\".`);
   }
   return reason || null;
 }
@@ -1036,7 +731,7 @@ function toTaskEntry(row: EntryRow): TaskEntry {
   return {
     createdAt: row.created_at,
     createdBy: row.created_by_agent_id,
-    content: row.content
+    content: row.content,
   };
 }
 
@@ -1056,13 +751,6 @@ function resolveTaskListLimit(rawLimit: number | undefined): number {
   return Math.min(parsedLimit, MAX_TASK_LIST_LIMIT);
 }
 
-function resolveTaskListOffset(rawOffset: number | undefined): number {
-  if (!Number.isFinite(rawOffset)) {
-    return 0;
-  }
-  return Math.max(0, Math.trunc(rawOffset ?? 0));
-}
-
 function normalizeOptionalAssignee(rawAssignee: string | undefined): string | undefined {
   if (rawAssignee === undefined) {
     return undefined;
@@ -1074,59 +762,42 @@ function normalizeOptionalAssignee(rawAssignee: string | undefined): string | un
   return normalized;
 }
 
-function normalizeOptionalOwner(rawOwner: string | undefined): string | undefined {
-  if (rawOwner === undefined) {
-    return undefined;
-  }
-  const normalized = normalizeAgentId(rawOwner);
-  if (!normalized) {
-    throw new Error("owner cannot be empty.");
-  }
-  return normalized;
-}
+function collectAssignableAgents(
+  manifests: AgentManifest[],
+  actorId: string,
+): Set<string> {
+  const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
+  const directReporteesByManager = new Map<string, string[]>();
 
-function normalizeOptionalStatus(rawStatus: string | undefined): string | undefined {
-  const normalized = rawStatus?.trim().toLowerCase();
-  if (!normalized) {
-    return undefined;
-  }
-  return normalized;
-}
+  for (const manifest of manifests) {
+    const managerId = normalizeAgentId(manifest.metadata.reportsTo ?? "");
+    if (!managerId) {
+      continue;
+    }
 
-function toLatestTaskFilters(filters: {
-  assignee?: string;
-  owner?: string;
-  status?: string;
-}): {
-  whereClause: string;
-  params: string[];
-} {
-  const predicates: string[] = [];
-  const params: string[] = [];
-  if (filters.assignee) {
-    predicates.push("assigned_to_agent_id = ?");
-    params.push(filters.assignee);
-  }
-  if (filters.owner) {
-    predicates.push("owner_agent_id = ?");
-    params.push(filters.owner);
-  }
-  if (filters.status) {
-    predicates.push("status = ?");
-    params.push(filters.status);
+    const reportees = directReporteesByManager.get(managerId) ?? [];
+    reportees.push(manifest.agentId);
+    directReporteesByManager.set(managerId, reportees);
   }
 
-  if (predicates.length === 0) {
-    return {
-      whereClause: "",
-      params
-    };
+  const allowed = new Set<string>([normalizedActorId]);
+  const queue = [...(directReporteesByManager.get(normalizedActorId) ?? [])];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || allowed.has(current)) {
+      continue;
+    }
+
+    allowed.add(current);
+    const nested = directReporteesByManager.get(current) ?? [];
+    for (const reporteeId of nested) {
+      if (!allowed.has(reporteeId)) {
+        queue.push(reporteeId);
+      }
+    }
   }
 
-  return {
-    whereClause: `WHERE ${predicates.join(" AND ")}`,
-    params
-  };
+  return allowed;
 }
 
 function isNotFound(error: unknown): error is NodeJS.ErrnoException {

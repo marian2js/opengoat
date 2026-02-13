@@ -5,7 +5,7 @@ const MAX_TASK_LIST_RESULTS = 100;
 
 export const taskCommand: CliCommand = {
   path: ["task"],
-  description: "Manage board tasks.",
+  description: "Manage tasks.",
   async run(args, context): Promise<number> {
     const command = args[0]?.trim().toLowerCase();
 
@@ -25,7 +25,7 @@ export const taskCommand: CliCommand = {
           return 1;
         }
 
-        const task = await context.service.createTask(parsed.actorId, parsed.boardId, {
+        const task = await context.service.createTask(parsed.actorId, {
           title: parsed.title,
           description: parsed.description,
           project: parsed.project,
@@ -34,7 +34,6 @@ export const taskCommand: CliCommand = {
         });
 
         context.stdout.write(`Task created: ${task.title} (${task.taskId})\n`);
-        context.stdout.write(`Board: ${task.boardId}\n`);
         context.stdout.write(`Project: ${task.project}\n`);
         context.stdout.write(`Assigned to: ${task.assignedTo}\n`);
         context.stdout.write(`Status: ${task.status}\n`);
@@ -88,19 +87,10 @@ export const taskCommand: CliCommand = {
           return 1;
         }
 
-        let tasks: TaskRecord[] = [];
-        if (parsed.boardId) {
-          tasks = await context.service.listTasks(parsed.boardId);
-        } else {
-          const latestOptions = parsed.assignee
-            ? { assignee: parsed.assignee, limit: MAX_TASK_LIST_RESULTS }
-            : { limit: MAX_TASK_LIST_RESULTS };
-          tasks = await context.service.listLatestTasks(latestOptions);
-        }
-
-        if (parsed.boardId && parsed.assignee) {
-          tasks = tasks.filter((task) => task.assignedTo === parsed.assignee);
-        }
+        let tasks = await context.service.listTasks({
+          assignee: parsed.assignee,
+          limit: MAX_TASK_LIST_RESULTS
+        });
         tasks = sortTasksByLatest(tasks);
 
         if (parsed.json) {
@@ -114,10 +104,7 @@ export const taskCommand: CliCommand = {
         }
 
         for (const task of tasks) {
-          const boardFragment = parsed.boardId ? "" : `\tboard=${task.boardId}`;
-          context.stdout.write(
-            `${task.taskId}\t${task.title}\t[${task.status}]\tassigned=${task.assignedTo}${boardFragment}\n`
-          );
+          context.stdout.write(`${task.taskId}\t${task.title}\t[${task.status}]\tassigned=${task.assignedTo}\n`);
         }
         return 0;
       }
@@ -137,7 +124,6 @@ export const taskCommand: CliCommand = {
         }
 
         context.stdout.write(`Task: ${task.title} (${task.taskId})\n`);
-        context.stdout.write(`Board: ${task.boardId}\n`);
         context.stdout.write(`Project: ${task.project}\n`);
         context.stdout.write(`Owner: ${task.owner}\n`);
         context.stdout.write(`Assigned to: ${task.assignedTo}\n`);
@@ -217,7 +203,6 @@ export const taskCommand: CliCommand = {
 interface TaskCreateArgsOk {
   ok: true;
   actorId: string;
-  boardId?: string;
   title: string;
   description: string;
   project?: string;
@@ -249,7 +234,6 @@ interface TaskCronArgsOk {
 
 interface TaskListArgsOk {
   ok: true;
-  boardId?: string;
   assignee?: string;
   json: boolean;
 }
@@ -261,14 +245,6 @@ type ParseCronResult = { ok: false; error: string } | TaskCronArgsOk;
 type ParseListResult = { ok: false; error: string } | TaskListArgsOk;
 
 function parseCreateArgs(args: string[]): ParseCreateResult {
-  let boardId: string | undefined;
-  let indexOffset = 0;
-  const firstToken = args[0]?.trim();
-  if (firstToken && !firstToken.startsWith("--")) {
-    boardId = firstToken;
-    indexOffset = 1;
-  }
-
   let actorId = DEFAULT_AGENT_ID;
   let title: string | undefined;
   let description: string | undefined;
@@ -276,7 +252,7 @@ function parseCreateArgs(args: string[]): ParseCreateResult {
   let assignedTo: string | undefined;
   let status: string | undefined;
 
-  for (let index = indexOffset; index < args.length; index += 1) {
+  for (let index = 0; index < args.length; index += 1) {
     const token = args[index];
 
     if (token === "--owner") {
@@ -352,7 +328,6 @@ function parseCreateArgs(args: string[]): ParseCreateResult {
   return {
     ok: true,
     actorId,
-    boardId,
     title,
     description,
     project,
@@ -512,7 +487,6 @@ function parseCronArgs(args: string[]): ParseCronResult {
 }
 
 function parseListArgs(args: string[]): ParseListResult {
-  let boardId: string | undefined;
   let assignee: string | undefined;
   let json = false;
 
@@ -541,16 +515,11 @@ function parseListArgs(args: string[]): ParseListResult {
     if (token.startsWith("--")) {
       return { ok: false, error: `Unknown option: ${token}` };
     }
-
-    if (boardId) {
-      return { ok: false, error: `Unexpected argument: ${token}` };
-    }
-    boardId = token;
+    return { ok: false, error: `Unexpected argument: ${token}` };
   }
 
   return {
     ok: true,
-    boardId,
     assignee,
     json
   };
@@ -559,9 +528,9 @@ function parseListArgs(args: string[]): ParseListResult {
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write(
-    "  opengoat task create [board-id] --title <title> --description <text> [--project <path|~>] [--owner <agent-id>] [--assign <agent-id>] [--status <todo|doing|pending|blocked|done>]\n"
+    "  opengoat task create --title <title> --description <text> [--project <path|~>] [--owner <agent-id>] [--assign <agent-id>] [--status <todo|doing|pending|blocked|done>]\n"
   );
-  output.write("  opengoat task list [board-id] [--as <agent-id>] [--json]\n");
+  output.write("  opengoat task list [--as <agent-id>] [--json]\n");
   output.write("  opengoat task show <task-id> [--json]\n");
   output.write("  opengoat task status <task-id> <todo|doing|pending|blocked|done> [--reason <text>] [--as <agent-id>]\n");
   output.write("  opengoat task blocker add <task-id> <content> [--as <agent-id>]\n");
