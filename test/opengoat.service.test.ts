@@ -105,6 +105,25 @@ describe("OpenGoatService", () => {
     );
   });
 
+  it("leaves ROLE.md role empty when agent role is not provided", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    const roleMarkdown = await readFile(
+      path.join(root, "workspaces", "engineer", "ROLE.md"),
+      "utf-8",
+    );
+    expect(roleMarkdown).toContain("- Role: ");
+    expect(roleMarkdown).not.toContain("- Role: Individual Contributor");
+  });
+
   it("lists direct and recursive reportees", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
@@ -659,6 +678,9 @@ describe("OpenGoatService", () => {
     expect(agentsMarkdown).toContain("## Your Role");
     expect(agentsMarkdown).toContain(
       "You are part of an organization run by AI agents. Read `ROLE.md` for details.",
+    );
+    expect(agentsMarkdown).toContain(
+      "Read `ROLE.md` for details.\n\n## Another section",
     );
     expect(roleMarkdown).toContain(
       "# ROLE.md - Your position in the organization",

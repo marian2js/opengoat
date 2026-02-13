@@ -209,6 +209,9 @@ describe("AgentService", () => {
     expect(agentsMarkdown).toContain(
       "You are part of an organization run by AI agents. Read `ROLE.md` for details.",
     );
+    expect(agentsMarkdown).toContain(
+      "Read `ROLE.md` for details.\n\n## Another section",
+    );
     expect(roleMarkdown).toContain(
       "# ROLE.md - Your position in the organization",
     );
