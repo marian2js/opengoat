@@ -167,16 +167,17 @@ describe("AgentService", () => {
       ),
     ).toBe(false);
     expect(
-      await fileSystem.exists(path.join(result.agent.workspaceDir, "SOUL.md")),
+      await fileSystem.exists(path.join(result.agent.workspaceDir, "ROLE.md")),
     ).toBe(false);
   });
 
-  it("keeps AGENTS.md content while removing only the First Run section", async () => {
+  it("keeps AGENTS.md content, preserves SOUL.md, and writes ROLE.md", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
 
     const ceoWorkspace = path.join(paths.workspacesDir, "ceo");
     const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
+    const rolePath = path.join(ceoWorkspace, "ROLE.md");
     const soulPath = path.join(ceoWorkspace, "SOUL.md");
     const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
     await fileSystem.ensureDir(ceoWorkspace);
@@ -197,36 +198,59 @@ describe("AgentService", () => {
     await service.ensureCeoWorkspaceBootstrap(paths);
 
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
+    const roleMarkdown = await readFile(rolePath, "utf-8");
     const soulMarkdown = await readFile(soulPath, "utf-8");
     expect(agentsMarkdown).toContain("foo");
     expect(agentsMarkdown).toContain("## Another section");
     expect(agentsMarkdown).toContain("baz");
     expect(agentsMarkdown).not.toContain("## First Run");
     expect(agentsMarkdown).not.toContain("\nbar\n");
-    expect(soulMarkdown.startsWith("# SOUL.md - Custom")).toBe(true);
-    expect(soulMarkdown).toContain(
-      [
-        "Legacy body",
-        "",
-        "",
-        "## Your Role",
-        "",
-        "You are part of an organization run by OpenGoat.",
-        "",
-        "- Your id: ceo (agent id)",
-        "- Your name: CEO",
-        "- Role: CEO",
-        "",
-        "",
-      ].join("\n"),
+    expect(roleMarkdown).toContain(
+      "# ROLE.md - Your position in the organization",
     );
-    expect(soulMarkdown).toContain("## Your Role");
-    expect(soulMarkdown).toContain("- Your id: ceo (agent id)");
-    expect(soulMarkdown).toContain("- Your name: CEO");
-    expect(soulMarkdown).toContain("- Role: CEO");
-    expect(soulMarkdown).not.toContain("## Core Behavior");
-    expect(soulMarkdown).not.toContain("## Guardrails");
-    expect(soulMarkdown).toContain("Legacy body");
+    expect(roleMarkdown).toContain(
+      "You are the CEO of an organization fully run by AI agents.",
+    );
+    expect(roleMarkdown).toContain("- Your id: ceo (agent id)");
+    expect(roleMarkdown).toContain("- Your name: CEO");
+    expect(roleMarkdown).toContain("- Role: CEO");
+    expect(roleMarkdown).toContain(
+      "- For info about your reportees, run `opengoat agent info ceo`.",
+    );
+    expect(soulMarkdown).toBe(["# SOUL.md - Custom", "", "Legacy body"].join("\n"));
+    expect(await fileSystem.exists(bootstrapPath)).toBe(false);
+  });
+
+  it("writes ROLE.md for non-ceo agents with id/name/role details", async () => {
+    const { service, paths, fileSystem } = await createAgentServiceWithPaths();
+
+    await service.ensureAgent(paths, { id: "engineer", displayName: "Avery" });
+
+    const workspace = path.join(paths.workspacesDir, "engineer");
+    const rolePath = path.join(workspace, "ROLE.md");
+    const bootstrapPath = path.join(workspace, "BOOTSTRAP.md");
+    await fileSystem.ensureDir(workspace);
+    await writeFile(bootstrapPath, "# bootstrap\n", "utf-8");
+
+    await service.ensureAgentWorkspaceBootstrap(paths, {
+      agentId: "engineer",
+      displayName: "Avery",
+      role: "Backend Engineer",
+    });
+
+    const roleMarkdown = await readFile(rolePath, "utf-8");
+    expect(roleMarkdown).toContain(
+      "# ROLE.md - Your position in the organization",
+    );
+    expect(roleMarkdown).toContain(
+      "You are part of an organization fully run by AI agents.",
+    );
+    expect(roleMarkdown).toContain("- Your id: engineer (agent id)");
+    expect(roleMarkdown).toContain("- Your name: Avery");
+    expect(roleMarkdown).toContain("- Role: Backend Engineer");
+    expect(roleMarkdown).toContain(
+      "- For info about your level on the organiztion, run `opengoat agent info engineer`.",
+    );
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });
 

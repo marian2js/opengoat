@@ -51,6 +51,9 @@ describe("BootstrapService", () => {
       ),
     ).toBe(false);
     expect(
+      await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "ROLE.md")),
+    ).toBe(true);
+    expect(
       await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "SOUL.md")),
     ).toBe(false);
     expect(

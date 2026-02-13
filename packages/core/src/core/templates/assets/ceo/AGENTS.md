@@ -16,5 +16,5 @@ This workspace is pre-seeded by OpenGoat so `ceo` can run immediately without fi
 
 ## Notes
 
-- Keep this file and `SOUL.md` aligned when role/behavior changes.
+- Keep this file and `ROLE.md` aligned when role/behavior changes.
 - `BOOTSTRAP.md` is intentionally removed for pre-seeded deployments.

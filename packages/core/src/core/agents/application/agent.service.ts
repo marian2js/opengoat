@@ -20,6 +20,7 @@ import {
   renderAgentsIndex,
   renderBoardIndividualSkillMarkdown,
   renderBoardManagerSkillMarkdown,
+  renderCeoRoleMarkdown,
   renderInternalAgentConfig,
   resolveAgentRole,
   type AgentTemplateOptions,
@@ -193,7 +194,7 @@ export class AgentService {
       normalizedAgentId,
     );
     const agentsPath = this.pathPort.join(workspaceDir, "AGENTS.md");
-    const soulPath = this.pathPort.join(workspaceDir, "SOUL.md");
+    const rolePath = this.pathPort.join(workspaceDir, "ROLE.md");
     const bootstrapPath = this.pathPort.join(workspaceDir, "BOOTSTRAP.md");
     const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
@@ -207,8 +208,8 @@ export class AgentService {
       createdPaths,
       skippedPaths,
     );
-    await this.rewriteSoulMarkdown(
-      soulPath,
+    await this.writeRoleMarkdown(
+      rolePath,
       {
         agentId: normalizedAgentId,
         displayName: input.displayName.trim() || normalizedAgentId,
@@ -570,7 +571,7 @@ export class AgentService {
     skippedPaths.push(filePath);
   }
 
-  private async rewriteSoulMarkdown(
+  private async writeRoleMarkdown(
     filePath: string,
     profile: {
       agentId: string;
@@ -580,25 +581,13 @@ export class AgentService {
     createdPaths: string[],
     skippedPaths: string[],
   ): Promise<void> {
-    const exists = await this.fileSystem.exists(filePath);
-    if (!exists) {
-      skippedPaths.push(filePath);
-      return;
-    }
-
-    const source = await this.fileSystem.readFile(filePath);
-    const next = upsertSoulRoleSection(source, profile);
-    if (source === next) {
-      skippedPaths.push(filePath);
-      return;
-    }
-
-    await this.fileSystem.writeFile(filePath, next);
-    if (exists) {
-      skippedPaths.push(filePath);
-      return;
-    }
-    createdPaths.push(filePath);
+    await this.writeMarkdown(
+      filePath,
+      renderRoleMarkdown(profile),
+      createdPaths,
+      skippedPaths,
+      { overwrite: true },
+    );
   }
 
   private async readJsonIfPresent<T>(filePath: string): Promise<T | null> {
@@ -874,85 +863,23 @@ function removeFirstRunSection(markdown: string): string {
   return next;
 }
 
-function upsertSoulRoleSection(
-  markdown: string,
-  profile: {
-    agentId: string;
-    displayName: string;
-    role: string;
-  },
-): string {
-  const withoutRole = removeSectionByHeading(markdown, /^##\s+your role\s*$/i);
-  const lineBreak = withoutRole.includes("\r\n") ? "\r\n" : "\n";
-  const lines = withoutRole.split(/\r?\n/);
-  while (lines.length < 3) {
-    lines.push("");
-  }
-
-  const insertionIndex = 3;
-  const roleSection = renderSoulRoleSection(profile);
-  const roleSectionLines = roleSection.split("\n");
-  const merged = [
-    ...lines.slice(0, insertionIndex),
-    "",
-    "",
-    ...roleSectionLines,
-    "",
-    "",
-    ...lines.slice(insertionIndex),
-  ];
-
-  return merged.join(lineBreak);
-}
-
-function renderSoulRoleSection(profile: {
+function renderRoleMarkdown(profile: {
   agentId: string;
   displayName: string;
   role: string;
 }): string {
+  if (isDefaultAgentId(profile.agentId)) {
+    return renderCeoRoleMarkdown();
+  }
+
   return [
-    "## Your Role",
+    "# ROLE.md - Your position in the organization",
     "",
-    "You are part of an organization run by OpenGoat.",
+    "You are part of an organization fully run by AI agents.",
     "",
     `- Your id: ${profile.agentId} (agent id)`,
     `- Your name: ${profile.displayName}`,
     `- Role: ${profile.role}`,
+    `- For info about your level on the organiztion, run \`opengoat agent info ${profile.agentId}\`.`,
   ].join("\n");
-}
-
-function removeSectionByHeading(markdown: string, heading: RegExp): string {
-  const lineBreak = markdown.includes("\r\n") ? "\r\n" : "\n";
-  const lines = markdown.split(/\r?\n/);
-  const hasTrailingLineBreak = /\r?\n$/.test(markdown);
-  const kept: string[] = [];
-  let skipping = false;
-  let removed = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!skipping && heading.test(trimmed)) {
-      skipping = true;
-      removed = true;
-      continue;
-    }
-    if (skipping) {
-      if (/^##\s+/.test(trimmed)) {
-        skipping = false;
-        kept.push(line);
-      }
-      continue;
-    }
-    kept.push(line);
-  }
-
-  if (!removed) {
-    return markdown;
-  }
-
-  let next = kept.join(lineBreak);
-  if (hasTrailingLineBreak && !next.endsWith(lineBreak)) {
-    next = `${next}${lineBreak}`;
-  }
-  return next;
 }

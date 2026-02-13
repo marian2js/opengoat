@@ -616,6 +616,7 @@ describe("OpenGoatService", () => {
     const ceoWorkspace = path.join(root, "workspaces", "ceo");
     const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
     const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
+    const rolePath = path.join(ceoWorkspace, "ROLE.md");
     const soulPath = path.join(ceoWorkspace, "SOUL.md");
     await writeFile(bootstrapPath, "# legacy bootstrap\n", "utf-8");
     await writeFile(
@@ -644,6 +645,7 @@ describe("OpenGoatService", () => {
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
 
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
+    const roleMarkdown = await readFile(rolePath, "utf-8");
     const soulMarkdown = await readFile(soulPath, "utf-8");
     const boardManagerSkillMarkdown = await readFile(
       path.join(ceoWorkspace, "skills", "board-manager", "SKILL.md"),
@@ -654,14 +656,21 @@ describe("OpenGoatService", () => {
     expect(agentsMarkdown).toContain("baz");
     expect(agentsMarkdown).not.toContain("## First Run");
     expect(agentsMarkdown).not.toContain("\nbar\n");
-    expect(soulMarkdown.startsWith("# SOUL.md - Legacy CEO")).toBe(true);
-    expect(soulMarkdown).toContain("## Your Role");
-    expect(soulMarkdown).toContain("- Your id: ceo (agent id)");
-    expect(soulMarkdown).toContain("- Your name: CEO");
-    expect(soulMarkdown).toContain("- Role: CEO");
-    expect(soulMarkdown).not.toContain("## Core Behavior");
-    expect(soulMarkdown).not.toContain("## Guardrails");
-    expect(soulMarkdown).toContain("Legacy body");
+    expect(roleMarkdown).toContain(
+      "# ROLE.md - Your position in the organization",
+    );
+    expect(roleMarkdown).toContain(
+      "You are the CEO of an organization fully run by AI agents.",
+    );
+    expect(roleMarkdown).toContain("- Your id: ceo (agent id)");
+    expect(roleMarkdown).toContain("- Your name: CEO");
+    expect(roleMarkdown).toContain("- Role: CEO");
+    expect(roleMarkdown).toContain(
+      "- For info about your reportees, run `opengoat agent info ceo`.",
+    );
+    expect(soulMarkdown).toBe(
+      ["# SOUL.md - Legacy CEO", "", "Legacy body"].join("\n"),
+    );
     expect(boardManagerSkillMarkdown).toContain("name: board-manager");
     await expect(
       access(

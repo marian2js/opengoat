@@ -41,8 +41,8 @@ export function renderCeoAgentsMarkdown(): string {
   return readMarkdownTemplate("ceo/AGENTS.md");
 }
 
-export function renderCeoSoulMarkdown(): string {
-  return readMarkdownTemplate("ceo/SOUL.md");
+export function renderCeoRoleMarkdown(): string {
+  return readMarkdownTemplate("ceo/ROLE.md");
 }
 
 export function renderBoardManagerSkillMarkdown(): string {
