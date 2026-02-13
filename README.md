@@ -1,5 +1,5 @@
 <h1 align="center">OpenGoat</h1>
-<p align="center"><strong>Build organizations of OpenClaw agents that coordinate work across Codex, Claude Code, Cursor, Lovable, and more.</strong></p>
+<p align="center"><strong>Build AI Autonomous Organizations of OpenClaw Agents.</strong></p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License" /></a>
@@ -8,24 +8,28 @@
   <img src="https://img.shields.io/badge/node-%3E%3D20.11-brightgreen?style=flat-square" alt="Node >= 20.11" />
 </p>
 
-OpenGoat is for teams that want AI workers to act like a real company, not a pile of disconnected chats.
+**OpenGoat** allows you to build herarchical organizations of AI agents that coordinate work across multiple tools.
 
-Use the UI to create projects, open sessions, and run work through role-based agents (CEO, managers, contributors). Use the CLI when you want scripting, automation, and deeper operational control.
+[![OpenGoat UI](/assets/org-example.png)](https://opengoat.ai)
 
-[Start With UI](#start-with-ui-recommended) · [CLI Quick Start](#cli-quick-start) · [Workflows](#typical-workflows) · [Docs](#learn-more)
+---
 
-## Why OpenGoat
+## Installation
 
-- Clear ownership: each agent has a role and manager.
-- Better coordination: planning and execution can happen through different roles.
-- Safer project work: sessions stay anchored to project paths.
-- Works with your stack: built on OpenClaw and designed to coordinate with modern coding agents.
+```bash
+# Install OpenClaw and OpenGoat
+npm i -g openclaw opengoat
 
-## Start With UI (Recommended)
+# Setup OpenClaw
+openclaw onboard
 
-For most users, the UI is the best experience.
+# Start OpenGoat
+opengoat start
+```
 
-### Option A: Docker (fastest UI path)
+That's it. Open `http://127.0.0.1:19123`, add a project, and start messaging the CEO. He will take care of the rest.
+
+### Alternative: Docker
 
 ```bash
 docker build -t opengoat:latest .
@@ -34,32 +38,14 @@ docker run --rm -p 19123:19123 -v opengoat-data:/data/opengoat opengoat:latest
 
 Then open `http://127.0.0.1:19123`.
 
-### Option B: Run UI from source
-
-```bash
-pnpm install
-pnpm --filter @opengoat/ui dev
-```
-
-Then open `http://127.0.0.1:19123`.
-
-## UI-First Workflow
-
-1. Add a project (repository path).
-2. Create or open a session for that project.
-3. Message your CEO or another role from the session.
-4. Track progress in tasks from the same interface.
-5. Open additional sessions per project stream when needed.
-
-## CLI Quick Start
+### CLI Quick Start (Optional)
 
 Runtime: Node `>=20.11`.
 
 ```bash
-npm i -g openclaw@latest opengoat@latest
-
+npm i -g openclaw opengoat
+openclaw onboard
 opengoat init
-opengoat onboard --local --non-interactive
 opengoat agent --message "Set up a CTO and two engineers for this project."
 ```
 
@@ -101,7 +87,7 @@ opengoat agent engineer --message "Implement the auth middleware for this sprint
 ```bash
 opengoat agent ceo \
   --session saaslib-planning \
-  --project-path /Users/you/workspace/saaslib \
+  --project-path /Users/you/workspace/project \
   --message "Create a release checklist for v1.2"
 
 opengoat agent ceo \
@@ -125,13 +111,6 @@ opengoat skill install jira-tools --from /path/to/skill
 opengoat skill list --agent ceo
 ```
 
-## Learn More
+# License
 
-- [OpenClaw Getting Started](https://docs.openclaw.ai/start/getting-started)
-- [OpenClaw Agents](https://docs.openclaw.ai/cli/agents)
-- [OpenClaw Skills](https://docs.openclaw.ai/skills/introduction)
-- `/docs/organization-runtime.md`
-- `/docs/acp.md`
-- `/docs/docker.md`
-- `/ABOUT.md`
-- `/CONTRIBUTING.md`
+MIT
