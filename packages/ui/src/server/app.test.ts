@@ -114,7 +114,7 @@ describe("runtime log extraction", () => {
     expect(extracted.activities).toEqual([
       {
         level: "stdout",
-        message: "embedded run tool start: tool=exec",
+        message: "Running tool: exec.",
       },
     ]);
   });
@@ -143,11 +143,11 @@ describe("runtime log extraction", () => {
     expect(extracted.activities).toEqual([
       {
         level: "stdout",
-        message: "embedded run start: sessionId=session-1",
+        message: "Run accepted by OpenClaw.",
       },
       {
         level: "stdout",
-        message: "embedded run tool end: tool=exec durationMs=120",
+        message: "Finished tool: exec (120 ms).",
       },
     ]);
   });

@@ -46,6 +46,7 @@ export interface OpenClawGatewayConfig {
   mode: "local" | "external";
   gatewayUrl?: string;
   gatewayToken?: string;
+  command?: string;
 }
 
 const OPENCLAW_PROVIDER_ID = "openclaw";
@@ -179,7 +180,8 @@ export class ProviderService {
     return {
       mode,
       gatewayUrl: env.OPENCLAW_GATEWAY_URL?.trim() || parsedArgs.remoteUrl,
-      gatewayToken: env.OPENCLAW_GATEWAY_PASSWORD?.trim() || parsedArgs.token
+      gatewayToken: env.OPENCLAW_GATEWAY_PASSWORD?.trim() || parsedArgs.token,
+      command: env.OPENCLAW_CMD?.trim() || "openclaw"
     };
   }
 

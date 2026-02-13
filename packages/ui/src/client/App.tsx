@@ -968,10 +968,14 @@ export function App(): ReactElement {
       return "";
     }
     return sessionReasoningEvents
-      .map((event) => {
-        const level = event.level.toUpperCase();
-        return `[${level}] ${event.message}`;
+      .map((event) => normalizeReasoningLine(event.message))
+      .filter((line, index, allLines) => {
+        if (!line) {
+          return false;
+        }
+        return index === 0 || line !== allLines[index - 1];
       })
+      .map((line) => `- ${line}`)
       .join("\n");
   }, [sessionReasoningEvents]);
 
@@ -3810,6 +3814,7 @@ export function App(): ReactElement {
                                 >
                                   <MessageContent className="w-full max-w-full bg-transparent px-0 py-0">
                                     <Reasoning
+                                      autoCloseOnFinish={false}
                                       defaultOpen
                                       isStreaming={
                                         sessionChatStatus === "streaming"
@@ -4694,6 +4699,13 @@ function mapHistoryToSessionMessages(
   }
 
   return messages;
+}
+
+function normalizeReasoningLine(value: string): string {
+  return value
+    .replace(/\s+/g, " ")
+    .replace(/^\[(?:info|stderr|stdout)\]\s*/i, "")
+    .trim();
 }
 
 function taskStatusPillClasses(status: string): string {
