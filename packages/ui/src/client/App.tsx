@@ -24,6 +24,7 @@ import {
 } from "@/components/ai-elements/reasoning";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -509,7 +510,6 @@ export function App(): ReactElement {
   >({});
   const [selectedTaskIdsByWorkspaceId, setSelectedTaskIdsByWorkspaceId] =
     useState<Record<string, string[]>>({});
-  const selectAllTasksCheckboxRef = useRef<HTMLInputElement | null>(null);
   const [isCreateAgentDialogOpen, setCreateAgentDialogOpen] = useState(false);
   const [createAgentDialogError, setCreateAgentDialogError] = useState<
     string | null
@@ -1133,6 +1133,9 @@ export function App(): ReactElement {
     selectedTaskIds.length === allTaskIdsInWorkspace.length;
   const hasSelectedTasks = selectedTaskIds.length > 0;
   const hasPartialTaskSelection = hasSelectedTasks && !allTasksSelected;
+  const selectAllCheckboxState = hasPartialTaskSelection
+    ? "indeterminate"
+    : allTasksSelected;
   const selectedTaskActivity = useMemo(() => {
     if (!selectedTask) {
       return [];
@@ -1321,13 +1324,6 @@ export function App(): ReactElement {
       return next;
     });
   }, [taskWorkspaces, getAssignableAgents, taskActorId, defaultTaskProjectPath]);
-
-  useEffect(() => {
-    if (!selectAllTasksCheckboxRef.current) {
-      return;
-    }
-    selectAllTasksCheckboxRef.current.indeterminate = hasPartialTaskSelection;
-  }, [hasPartialTaskSelection]);
 
   const openTaskCount = useMemo(() => {
     if (!state) {
@@ -3693,43 +3689,21 @@ export function App(): ReactElement {
                               </p>
                             </div>
 
-                            {selectedTaskWorkspace.tasks.length > 0 ? (
-                              <div className="flex flex-wrap items-center gap-3">
-                                <label className="inline-flex items-center gap-2 rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5 text-xs font-medium text-foreground">
-                                  <input
-                                    ref={selectAllTasksCheckboxRef}
-                                    type="checkbox"
-                                    className="size-4 rounded border-border accent-primary"
-                                    checked={allTasksSelected}
-                                    onChange={(event) => {
-                                      handleToggleSelectAllTasks(
-                                        selectedTaskWorkspace.taskWorkspaceId,
-                                        allTaskIdsInWorkspace,
-                                        event.target.checked,
-                                      );
-                                    }}
-                                    aria-label="Select all tasks"
-                                  />
-                                  Select all
-                                </label>
-
-                                {hasSelectedTasks ? (
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    className="h-8 px-3"
-                                    disabled={isMutating || isLoading}
-                                    onClick={() => {
-                                      void handleDeleteSelectedTasks(
-                                        selectedTaskWorkspace.taskWorkspaceId,
-                                        selectedTaskIds,
-                                      );
-                                    }}
-                                  >
-                                    {`Delete ${selectedTaskIds.length}`}
-                                  </Button>
-                                ) : null}
-                              </div>
+                            {hasSelectedTasks ? (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="h-8 px-3"
+                                disabled={isMutating || isLoading}
+                                onClick={() => {
+                                  void handleDeleteSelectedTasks(
+                                    selectedTaskWorkspace.taskWorkspaceId,
+                                    selectedTaskIds,
+                                  );
+                                }}
+                              >
+                                {`Delete ${selectedTaskIds.length}`}
+                              </Button>
                             ) : null}
                           </div>
                         </div>
@@ -3746,7 +3720,17 @@ export function App(): ReactElement {
                               <thead>
                                 <tr className="border-b border-border/70 bg-accent/25 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                                   <th className="w-12 px-3 py-2 font-medium">
-                                    <span className="sr-only">Select</span>
+                                    <Checkbox
+                                      checked={selectAllCheckboxState}
+                                      onCheckedChange={(checked) => {
+                                        handleToggleSelectAllTasks(
+                                          selectedTaskWorkspace.taskWorkspaceId,
+                                          allTaskIdsInWorkspace,
+                                          checked === true,
+                                        );
+                                      }}
+                                      aria-label="Select all tasks"
+                                    />
                                   </th>
                                   <th className="px-4 py-2 font-medium">
                                     Task
@@ -3770,15 +3754,13 @@ export function App(): ReactElement {
                                     )}
                                   >
                                     <td className="px-3 py-3">
-                                      <input
-                                        type="checkbox"
-                                        className="size-4 rounded border-border accent-primary"
+                                      <Checkbox
                                         checked={selectedTaskIdSet.has(task.taskId)}
-                                        onChange={(event) => {
+                                        onCheckedChange={(checked) => {
                                           handleToggleTaskSelection(
                                             selectedTaskWorkspace.taskWorkspaceId,
                                             task.taskId,
-                                            event.target.checked,
+                                            checked === true,
                                           );
                                         }}
                                         aria-label={`Select task ${task.title}`}
