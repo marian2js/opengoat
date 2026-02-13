@@ -542,6 +542,14 @@ export function App(): ReactElement {
 
   const handleViewChange = useCallback(
     (nextView: PageView) => {
+      if (nextView === "tasks") {
+        navigateToRoute({
+          kind: "taskWorkspace",
+          taskWorkspaceId: "tasks",
+        });
+        return;
+      }
+
       navigateToRoute({
         kind: "page",
         view: nextView,
@@ -3431,52 +3439,6 @@ export function App(): ReactElement {
                   </section>
                 ) : null}
 
-                {route.kind === "page" && route.view === "tasks" ? (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Tasks</CardTitle>
-                      <CardDescription>
-                        Open the task workspace to view and manage work.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {taskWorkspaces.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          No tasks found yet.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {taskWorkspaces.map((taskWorkspace) => (
-                            <button
-                              key={taskWorkspace.taskWorkspaceId}
-                              type="button"
-                              className="flex w-full items-center justify-between rounded-md border border-border/80 bg-background/30 px-4 py-3 text-left transition-colors hover:bg-accent/50"
-                              onClick={() => {
-                                navigateToRoute({
-                                  kind: "taskWorkspace",
-                                  taskWorkspaceId: taskWorkspace.taskWorkspaceId,
-                                });
-                              }}
-                            >
-                              <div>
-                                <p className="font-medium">{taskWorkspace.title}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm">
-                                  {taskWorkspace.tasks.length} tasks
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  Open
-                                </p>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ) : null}
-
                 {route.kind === "taskWorkspace" ? (
                   selectedTaskWorkspace ? (
                     <div className="space-y-4">
@@ -3517,8 +3479,8 @@ export function App(): ReactElement {
                               size="sm"
                               onClick={() => {
                                 navigateToRoute({
-                                  kind: "page",
-                                  view: "tasks",
+                                  kind: "taskWorkspace",
+                                  taskWorkspaceId: "tasks",
                                 });
                               }}
                             >
@@ -4496,6 +4458,13 @@ function parseRoute(pathname: string): AppRoute {
     }
   }
 
+  if (normalized === "/tasks") {
+    return {
+      kind: "taskWorkspace",
+      taskWorkspaceId: "tasks",
+    };
+  }
+
   if (normalized.startsWith("/tasks/")) {
     const taskWorkspaceId = decodeURIComponent(
       normalized.slice("/tasks/".length),
@@ -4506,10 +4475,6 @@ function parseRoute(pathname: string): AppRoute {
         taskWorkspaceId,
       };
     }
-  }
-
-  if (normalized === "/tasks") {
-    return { kind: "page", view: "tasks" };
   }
 
   if (normalized === "/skills") {
@@ -4545,6 +4510,9 @@ function routeToPath(route: AppRoute): string {
   }
 
   if (route.kind === "taskWorkspace") {
+    if (route.taskWorkspaceId === "tasks") {
+      return "/tasks";
+    }
     return `/tasks/${encodeURIComponent(route.taskWorkspaceId)}`;
   }
 
