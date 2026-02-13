@@ -103,7 +103,8 @@ export class BoardService {
     }
 
     const assignedTo =
-      normalizeAgentId(options.assignedTo ?? normalizedActorId) || normalizedActorId;
+      normalizeAgentId(options.assignedTo ?? normalizedActorId) ||
+      normalizedActorId;
     const manifests = await this.agentManifestService.listManifests(paths);
     const manifestsById = new Map(
       manifests.map((manifest) => [manifest.agentId, manifest]),
@@ -116,7 +117,10 @@ export class BoardService {
       throw new Error(`Agent \"${assignedTo}\" does not exist.`);
     }
 
-    const allowedAssignees = collectAssignableAgents(manifests, normalizedActorId);
+    const allowedAssignees = collectAssignableAgents(
+      manifests,
+      normalizedActorId,
+    );
     if (!allowedAssignees.has(assignedTo)) {
       throw new Error(
         "Agents can only assign tasks to themselves or their reportees (direct or indirect).",
@@ -197,7 +201,80 @@ export class BoardService {
     return this.listTasks(paths, options);
   }
 
-  public async getTask(paths: OpenGoatPaths, taskId: string): Promise<TaskRecord> {
+  public async listLatestTasksPage(
+    paths: OpenGoatPaths,
+    options: {
+      assignee?: string;
+      owner?: string;
+      status?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): Promise<{
+    tasks: TaskRecord[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    const db = await this.getDatabase(paths);
+    const limit = resolveTaskListLimit(options.limit);
+    const offset = Math.max(0, options.offset ?? 0);
+    const assignee = normalizeOptionalAssignee(options.assignee);
+    const owner = options.owner
+      ? normalizeEntityId(options.owner, "owner")
+      : undefined;
+    const status = options.status?.trim() || undefined;
+
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (assignee) {
+      conditions.push("assigned_to_agent_id = ?");
+      params.push(assignee);
+    }
+    if (owner) {
+      conditions.push("owner_agent_id = ?");
+      params.push(owner);
+    }
+    if (status) {
+      conditions.push("status = ?");
+      params.push(status);
+    }
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const countRow = this.queryOne<{ count: number }>(
+      db,
+      `SELECT COUNT(*) as count FROM tasks ${whereClause}`,
+      params,
+    );
+    const total = countRow?.count ?? 0;
+
+    const rows = this.queryAll<TaskRow>(
+      db,
+      `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+       FROM tasks
+       ${whereClause}
+       ORDER BY created_at DESC, task_id DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset],
+    );
+
+    const tasks = this.hydrateTaskRows(db, rows);
+
+    return {
+      tasks,
+      total,
+      limit,
+      offset,
+    };
+  }
+
+  public async getTask(
+    paths: OpenGoatPaths,
+    taskId: string,
+  ): Promise<TaskRecord> {
     const db = await this.getDatabase(paths);
     const resolvedTaskId = this.resolveTaskId(db, taskId);
     return this.requireTask(db, resolvedTaskId);
@@ -220,11 +297,11 @@ export class BoardService {
     const nextStatus = normalizeTaskStatus(status, true);
     const nextStatusReason = normalizeTaskStatusReason(nextStatus, reason);
 
-    this.execute(db, `UPDATE tasks SET status = ?, status_reason = ? WHERE task_id = ?`, [
-      nextStatus,
-      nextStatusReason,
-      resolvedTaskId,
-    ]);
+    this.execute(
+      db,
+      `UPDATE tasks SET status = ?, status_reason = ? WHERE task_id = ?`,
+      [nextStatus, nextStatusReason, resolvedTaskId],
+    );
     await this.persistDatabase(paths, db);
     return this.requireTask(db, resolvedTaskId);
   }
@@ -530,8 +607,14 @@ export class BoardService {
          FOREIGN KEY(task_id) REFERENCES tasks(task_id) ON DELETE CASCADE
        );`,
     );
-    this.execute(db, "CREATE INDEX IF NOT EXISTS idx_tasks_board_id ON tasks(board_id);");
-    this.execute(db, "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);");
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_tasks_board_id ON tasks(board_id);",
+    );
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);",
+    );
     this.execute(
       db,
       "CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at, task_id);",
@@ -540,9 +623,18 @@ export class BoardService {
       db,
       "CREATE INDEX IF NOT EXISTS idx_tasks_assignee_created_at ON tasks(assigned_to_agent_id, created_at, task_id);",
     );
-    this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_blockers_task_id ON task_blockers(task_id);");
-    this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_artifacts_task_id ON task_artifacts(task_id);");
-    this.execute(db, "CREATE INDEX IF NOT EXISTS idx_task_worklog_task_id ON task_worklog(task_id);");
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_task_blockers_task_id ON task_blockers(task_id);",
+    );
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_task_artifacts_task_id ON task_artifacts(task_id);",
+    );
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_task_worklog_task_id ON task_worklog(task_id);",
+    );
 
     await this.persistDatabase(paths, db);
     return db;
@@ -646,7 +738,10 @@ export class BoardService {
   }
 
   private ensureTaskProjectColumn(db: SqlJsDatabase): void {
-    const columns = this.queryAll<{ name: string }>(db, "PRAGMA table_info(tasks);");
+    const columns = this.queryAll<{ name: string }>(
+      db,
+      "PRAGMA table_info(tasks);",
+    );
     const hasProject = columns.some((column) => column.name === "project");
     if (hasProject) {
       return;
@@ -670,7 +765,10 @@ export class BoardService {
   }
 
   private ensureTaskStatusReasonColumn(db: SqlJsDatabase): void {
-    const columns = this.queryAll<{ name: string }>(db, "PRAGMA table_info(tasks);");
+    const columns = this.queryAll<{ name: string }>(
+      db,
+      "PRAGMA table_info(tasks);",
+    );
     const hasStatusReason = columns.some(
       (column) => column.name === "status_reason",
     );
@@ -682,13 +780,21 @@ export class BoardService {
   }
 
   private ensureBoardDefaultColumn(db: SqlJsDatabase): void {
-    const columns = this.queryAll<{ name: string }>(db, "PRAGMA table_info(boards);");
-    const hasDefaultColumn = columns.some((column) => column.name === "is_default");
+    const columns = this.queryAll<{ name: string }>(
+      db,
+      "PRAGMA table_info(boards);",
+    );
+    const hasDefaultColumn = columns.some(
+      (column) => column.name === "is_default",
+    );
     if (hasDefaultColumn) {
       return;
     }
 
-    this.execute(db, "ALTER TABLE boards ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0;");
+    this.execute(
+      db,
+      "ALTER TABLE boards ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0;",
+    );
   }
 }
 
@@ -700,8 +806,13 @@ function normalizeEntityId(value: string, label: string): string {
   return normalized;
 }
 
-function normalizeTaskStatus(rawStatus: string | undefined, allowEmpty = false): string {
-  const normalized = (rawStatus?.trim().toLowerCase() || (allowEmpty ? "" : TASK_STATUSES[0])).trim();
+function normalizeTaskStatus(
+  rawStatus: string | undefined,
+  allowEmpty = false,
+): string {
+  const normalized = (
+    rawStatus?.trim().toLowerCase() || (allowEmpty ? "" : TASK_STATUSES[0])
+  ).trim();
   if (!normalized) {
     throw new Error("Task status cannot be empty.");
   }
@@ -711,7 +822,10 @@ function normalizeTaskStatus(rawStatus: string | undefined, allowEmpty = false):
   return normalized;
 }
 
-function normalizeTaskStatusReason(status: string, rawReason: string | undefined): string | null {
+function normalizeTaskStatusReason(
+  status: string,
+  rawReason: string | undefined,
+): string | null {
   const reason = rawReason?.trim();
   if ((status === "pending" || status === "blocked") && !reason) {
     throw new Error(`Reason is required when task status is \"${status}\".`);
@@ -751,7 +865,9 @@ function resolveTaskListLimit(rawLimit: number | undefined): number {
   return Math.min(parsedLimit, MAX_TASK_LIST_LIMIT);
 }
 
-function normalizeOptionalAssignee(rawAssignee: string | undefined): string | undefined {
+function normalizeOptionalAssignee(
+  rawAssignee: string | undefined,
+): string | undefined {
   if (rawAssignee === undefined) {
     return undefined;
   }
