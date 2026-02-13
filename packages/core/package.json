@@ -2,6 +2,11 @@
   "name": "@opengoat/core",
   "version": "2026.2.9",
   "description": "OpenGoat core organization runtime and OpenClaw adapters",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marian2js/opengoat.git",
+    "directory": "packages/core"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

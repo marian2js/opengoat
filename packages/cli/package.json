@@ -2,6 +2,11 @@
   "name": "opengoat",
   "version": "2026.2.9",
   "description": "OpenGoat organization runtime CLI",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marian2js/opengoat.git",
+    "directory": "packages/cli"
+  },
   "type": "module",
   "main": "dist/index.js",
   "bin": {
