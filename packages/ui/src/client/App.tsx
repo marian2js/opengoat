@@ -3736,6 +3736,9 @@ export function App(): ReactElement {
                                     Task
                                   </th>
                                   <th className="px-4 py-2 font-medium">
+                                    Project
+                                  </th>
+                                  <th className="px-4 py-2 font-medium">
                                     Assignee
                                   </th>
                                   <th className="px-4 py-2 font-medium">
@@ -3778,6 +3781,14 @@ export function App(): ReactElement {
                                           {task.title}
                                         </span>
                                       </button>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <p
+                                        className="max-w-[360px] truncate font-mono text-xs text-muted-foreground"
+                                        title={task.project || "~"}
+                                      >
+                                        {task.project || "~"}
+                                      </p>
                                     </td>
                                     <td className="px-4 py-3 text-sm text-muted-foreground">{`@${task.assignedTo}`}</td>
                                     <td className="px-4 py-3">
