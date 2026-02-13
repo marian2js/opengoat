@@ -380,6 +380,44 @@ describe("BoardService", () => {
     expect(updated.status).toBe("doing");
   });
 
+  it("reloads database state when another process updates boards.sqlite", async () => {
+    const harness = await createHarness();
+
+    const board = await harness.boardService.createBoard(harness.paths, "ceo", {
+      title: "External Sync Board",
+    });
+
+    const baselineTasks = await harness.boardService.listTasks(
+      harness.paths,
+      board.boardId,
+    );
+    expect(baselineTasks).toHaveLength(0);
+
+    const externalWriter = new BoardService({
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => new Date().toISOString(),
+      agentManifestService: new AgentManifestService({
+        fileSystem: new NodeFileSystem(),
+        pathPort: new NodePathPort(),
+      }),
+    });
+
+    await externalWriter.createTask(harness.paths, "ceo", board.boardId, {
+      title: "Synced from external process",
+      description: "Added from a second BoardService instance",
+      assignedTo: "cto",
+      status: "todo",
+    });
+
+    const refreshedTasks = await harness.boardService.listTasks(
+      harness.paths,
+      board.boardId,
+    );
+    expect(refreshedTasks).toHaveLength(1);
+    expect(refreshedTasks[0]?.title).toBe("Synced from external process");
+  });
+
   it("creates an index for task status", async () => {
     const harness = await createHarness();
 
