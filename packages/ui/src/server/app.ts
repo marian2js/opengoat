@@ -155,6 +155,10 @@ export interface OpenClawUiService {
     }
   ) => Promise<TaskRecord>;
   listTasks?: (options?: { assignee?: string; limit?: number }) => Promise<TaskRecord[]>;
+  deleteTasks?: (
+    actorId: string,
+    taskIds: string[]
+  ) => Promise<{ deletedTaskIds: string[]; deletedCount: number }>;
   getTask?: (taskId: string) => Promise<TaskRecord>;
   updateTaskStatus?: (actorId: string, taskId: string, status: string, reason?: string) => Promise<TaskRecord>;
   addTaskBlocker?: (actorId: string, taskId: string, blocker: string) => Promise<TaskRecord>;
@@ -622,6 +626,37 @@ function registerApiRoutes(
       return {
         task,
         message: `Task \"${task.title}\" created.`
+      };
+    });
+  });
+
+  app.delete<{
+    Body: {
+      actorId?: string;
+      taskIds?: unknown;
+    };
+  }>("/api/tasks", async (request, reply) => {
+    return safeReply(reply, async () => {
+      const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
+      const rawTaskIds = Array.isArray(request.body?.taskIds)
+        ? request.body.taskIds
+        : [];
+      const taskIds = [...new Set(rawTaskIds)]
+        .filter((taskId): taskId is string => typeof taskId === "string")
+        .map((taskId) => taskId.trim())
+        .filter((taskId) => taskId.length > 0);
+
+      if (taskIds.length === 0) {
+        reply.code(400);
+        return {
+          error: "taskIds must be a non-empty array"
+        };
+      }
+
+      const result = await deleteUiTasks(service, actorId, taskIds);
+      return {
+        ...result,
+        message: `Deleted ${result.deletedCount} task${result.deletedCount === 1 ? "" : "s"}.`
       };
     });
   });
@@ -2076,6 +2111,18 @@ async function listUiTasks(
   }
 
   throw new Error("Task listing is unavailable on this runtime.");
+}
+
+async function deleteUiTasks(
+  service: OpenClawUiService,
+  actorId: string,
+  taskIds: string[]
+): Promise<{ deletedTaskIds: string[]; deletedCount: number }> {
+  if (typeof service.deleteTasks === "function") {
+    return service.deleteTasks(actorId, taskIds);
+  }
+
+  throw new Error("Task deletion is unavailable on this runtime.");
 }
 
 async function updateUiTaskStatus(

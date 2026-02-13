@@ -767,6 +767,14 @@ export class OpenGoatService {
     return this.boardService.getTask(paths, taskId);
   }
 
+  public async deleteTasks(
+    actorId: string,
+    taskIds: string[],
+  ): Promise<{ deletedTaskIds: string[]; deletedCount: number }> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.deleteTasks(paths, actorId, taskIds);
+  }
+
   public async updateTaskStatus(
     actorId: string,
     taskId: string,

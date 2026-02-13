@@ -280,6 +280,54 @@ export class BoardService {
     return this.requireTask(db, resolvedTaskId);
   }
 
+  public async deleteTasks(
+    paths: OpenGoatPaths,
+    actorId: string,
+    taskIds: string[],
+  ): Promise<{ deletedTaskIds: string[]; deletedCount: number }> {
+    const db = await this.getDatabase(paths);
+    const normalizedActorId = normalizeAgentId(actorId) || DEFAULT_AGENT_ID;
+    const manifests = await this.agentManifestService.listManifests(paths);
+
+    const seenTaskIds = new Set<string>();
+    const resolvedTaskIds: string[] = [];
+    for (const taskId of taskIds) {
+      const normalizedTaskId = taskId.trim();
+      if (!normalizedTaskId) {
+        continue;
+      }
+      const resolvedTaskId = this.resolveTaskId(db, normalizedTaskId);
+      if (seenTaskIds.has(resolvedTaskId)) {
+        continue;
+      }
+
+      const task = this.requireTask(db, resolvedTaskId);
+      this.assertTaskUpdatePermission(task, normalizedActorId, manifests);
+      seenTaskIds.add(resolvedTaskId);
+      resolvedTaskIds.push(resolvedTaskId);
+    }
+
+    if (resolvedTaskIds.length === 0) {
+      return {
+        deletedTaskIds: [],
+        deletedCount: 0,
+      };
+    }
+
+    const placeholders = resolvedTaskIds.map(() => "?").join(", ");
+    this.execute(
+      db,
+      `DELETE FROM tasks WHERE task_id IN (${placeholders})`,
+      resolvedTaskIds,
+    );
+    await this.persistDatabase(paths, db);
+
+    return {
+      deletedTaskIds: resolvedTaskIds,
+      deletedCount: resolvedTaskIds.length,
+    };
+  }
+
   public async updateTaskStatus(
     paths: OpenGoatPaths,
     actorId: string,

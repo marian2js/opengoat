@@ -507,6 +507,9 @@ export function App(): ReactElement {
   const [taskStatusDraftById, setTaskStatusDraftById] = useState<
     Record<string, string>
   >({});
+  const [selectedTaskIdsByWorkspaceId, setSelectedTaskIdsByWorkspaceId] =
+    useState<Record<string, string[]>>({});
+  const selectAllTasksCheckboxRef = useRef<HTMLInputElement | null>(null);
   const [isCreateAgentDialogOpen, setCreateAgentDialogOpen] = useState(false);
   const [createAgentDialogError, setCreateAgentDialogError] = useState<
     string | null
@@ -1108,6 +1111,28 @@ export function App(): ReactElement {
       selectedTaskWorkspace.tasks.find((task) => task.taskId === selectedTaskId) ?? null
     );
   }, [selectedTaskWorkspace, selectedTaskId]);
+  const selectedTaskIds = useMemo(() => {
+    if (!selectedTaskWorkspace) {
+      return [];
+    }
+    return (
+      selectedTaskIdsByWorkspaceId[selectedTaskWorkspace.taskWorkspaceId] ?? []
+    );
+  }, [selectedTaskIdsByWorkspaceId, selectedTaskWorkspace]);
+  const selectedTaskIdSet = useMemo(() => {
+    return new Set(selectedTaskIds);
+  }, [selectedTaskIds]);
+  const allTaskIdsInWorkspace = useMemo(() => {
+    if (!selectedTaskWorkspace) {
+      return [];
+    }
+    return selectedTaskWorkspace.tasks.map((task) => task.taskId);
+  }, [selectedTaskWorkspace]);
+  const allTasksSelected =
+    allTaskIdsInWorkspace.length > 0 &&
+    selectedTaskIds.length === allTaskIdsInWorkspace.length;
+  const hasSelectedTasks = selectedTaskIds.length > 0;
+  const hasPartialTaskSelection = hasSelectedTasks && !allTasksSelected;
   const selectedTaskActivity = useMemo(() => {
     if (!selectedTask) {
       return [];
@@ -1227,6 +1252,28 @@ export function App(): ReactElement {
   }, [isTaskDetailsDialogOpen, selectedTask]);
 
   useEffect(() => {
+    setSelectedTaskIdsByWorkspaceId((current) => {
+      if (taskWorkspaces.length === 0) {
+        return {};
+      }
+
+      const next: Record<string, string[]> = {};
+      for (const taskWorkspace of taskWorkspaces) {
+        const existing = current[taskWorkspace.taskWorkspaceId] ?? [];
+        const allowedTaskIds = new Set(
+          taskWorkspace.tasks.map((task) => task.taskId),
+        );
+        const filtered = existing.filter((taskId) => allowedTaskIds.has(taskId));
+        if (filtered.length > 0) {
+          next[taskWorkspace.taskWorkspaceId] = filtered;
+        }
+      }
+
+      return next;
+    });
+  }, [taskWorkspaces]);
+
+  useEffect(() => {
     setTaskDraftByWorkspaceId((current) => {
       if (taskWorkspaces.length === 0) {
         return {};
@@ -1251,7 +1298,7 @@ export function App(): ReactElement {
           : {
               title: "",
               description: "",
-              project: "~",
+              project: defaultTaskProjectPath,
               assignedTo,
               status: "todo",
             };
@@ -1273,7 +1320,14 @@ export function App(): ReactElement {
       }
       return next;
     });
-  }, [taskWorkspaces, getAssignableAgents, taskActorId]);
+  }, [taskWorkspaces, getAssignableAgents, taskActorId, defaultTaskProjectPath]);
+
+  useEffect(() => {
+    if (!selectAllTasksCheckboxRef.current) {
+      return;
+    }
+    selectAllTasksCheckboxRef.current.indeterminate = hasPartialTaskSelection;
+  }, [hasPartialTaskSelection]);
 
   const openTaskCount = useMemo(() => {
     if (!state) {
@@ -1889,6 +1943,107 @@ export function App(): ReactElement {
       } else {
         toast.error(message);
       }
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  function updateSelectedTasks(
+    taskWorkspaceId: string,
+    updater: (currentSelected: Set<string>) => Set<string>,
+  ): void {
+    setSelectedTaskIdsByWorkspaceId((current) => {
+      const currentSelected = new Set(current[taskWorkspaceId] ?? []);
+      const nextSelected = updater(currentSelected);
+      const next = { ...current };
+      if (nextSelected.size === 0) {
+        delete next[taskWorkspaceId];
+      } else {
+        next[taskWorkspaceId] = [...nextSelected];
+      }
+      return next;
+    });
+  }
+
+  function handleToggleTaskSelection(
+    taskWorkspaceId: string,
+    taskId: string,
+    checked: boolean,
+  ): void {
+    updateSelectedTasks(taskWorkspaceId, (currentSelected) => {
+      if (checked) {
+        currentSelected.add(taskId);
+      } else {
+        currentSelected.delete(taskId);
+      }
+      return currentSelected;
+    });
+  }
+
+  function handleToggleSelectAllTasks(
+    taskWorkspaceId: string,
+    taskIds: string[],
+    checked: boolean,
+  ): void {
+    updateSelectedTasks(taskWorkspaceId, () => {
+      return checked ? new Set(taskIds) : new Set<string>();
+    });
+  }
+
+  async function handleDeleteSelectedTasks(
+    taskWorkspaceId: string,
+    taskIds: string[],
+  ): Promise<void> {
+    if (taskIds.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${taskIds.length} task${taskIds.length === 1 ? "" : "s"}? This cannot be undone.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setMutating(true);
+    try {
+      const response = await fetchJson<{
+        deletedTaskIds: string[];
+        deletedCount: number;
+        message?: string;
+      }>("/api/tasks", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          actorId: taskActorId,
+          taskIds,
+        }),
+      });
+
+      setSelectedTaskIdsByWorkspaceId((current) => {
+        const next = { ...current };
+        delete next[taskWorkspaceId];
+        return next;
+      });
+      if (selectedTaskId && response.deletedTaskIds.includes(selectedTaskId)) {
+        setTaskDetailsDialogOpen(false);
+        setSelectedTaskId(null);
+        setTaskDetailsError(null);
+      }
+
+      toast.success(
+        response.message ??
+          `Deleted ${response.deletedCount} task${response.deletedCount === 1 ? "" : "s"}.`,
+      );
+      await refreshTasks();
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to delete selected tasks.";
+      toast.error(message);
     } finally {
       setMutating(false);
     }
@@ -3530,11 +3685,53 @@ export function App(): ReactElement {
 
                       <section className="overflow-hidden rounded-lg border border-border/80 bg-card/25">
                         <div className="border-b border-border/70 px-4 py-3">
-                          <p className="text-sm font-medium">Tasks</p>
-                          <p className="text-xs text-muted-foreground">
-                            Open a task for full details. Table focuses on
-                            title, assignee, and status.
-                          </p>
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-medium">Tasks</p>
+                              <p className="text-xs text-muted-foreground">
+                                Select tasks to delete in bulk or open one for full details.
+                              </p>
+                            </div>
+
+                            {selectedTaskWorkspace.tasks.length > 0 ? (
+                              <div className="flex flex-wrap items-center gap-3">
+                                <label className="inline-flex items-center gap-2 rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5 text-xs font-medium text-foreground">
+                                  <input
+                                    ref={selectAllTasksCheckboxRef}
+                                    type="checkbox"
+                                    className="size-4 rounded border-border accent-primary"
+                                    checked={allTasksSelected}
+                                    onChange={(event) => {
+                                      handleToggleSelectAllTasks(
+                                        selectedTaskWorkspace.taskWorkspaceId,
+                                        allTaskIdsInWorkspace,
+                                        event.target.checked,
+                                      );
+                                    }}
+                                    aria-label="Select all tasks"
+                                  />
+                                  Select all
+                                </label>
+
+                                {hasSelectedTasks ? (
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    className="h-8 px-3"
+                                    disabled={isMutating || isLoading}
+                                    onClick={() => {
+                                      void handleDeleteSelectedTasks(
+                                        selectedTaskWorkspace.taskWorkspaceId,
+                                        selectedTaskIds,
+                                      );
+                                    }}
+                                  >
+                                    {`Delete ${selectedTaskIds.length}`}
+                                  </Button>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
 
                         {selectedTaskWorkspace.tasks.length === 0 ? (
@@ -3548,6 +3745,9 @@ export function App(): ReactElement {
                             <table className="min-w-full">
                               <thead>
                                 <tr className="border-b border-border/70 bg-accent/25 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                  <th className="w-12 px-3 py-2 font-medium">
+                                    <span className="sr-only">Select</span>
+                                  </th>
                                   <th className="px-4 py-2 font-medium">
                                     Task
                                   </th>
@@ -3563,8 +3763,27 @@ export function App(): ReactElement {
                                 {selectedTaskWorkspace.tasks.map((task) => (
                                   <tr
                                     key={task.taskId}
-                                    className="transition-colors hover:bg-accent/20"
+                                    className={cn(
+                                      "transition-colors hover:bg-accent/20",
+                                      selectedTaskIdSet.has(task.taskId) &&
+                                        "bg-accent/10",
+                                    )}
                                   >
+                                    <td className="px-3 py-3">
+                                      <input
+                                        type="checkbox"
+                                        className="size-4 rounded border-border accent-primary"
+                                        checked={selectedTaskIdSet.has(task.taskId)}
+                                        onChange={(event) => {
+                                          handleToggleTaskSelection(
+                                            selectedTaskWorkspace.taskWorkspaceId,
+                                            task.taskId,
+                                            event.target.checked,
+                                          );
+                                        }}
+                                        aria-label={`Select task ${task.title}`}
+                                      />
+                                    </td>
                                     <td className="px-4 py-3">
                                       <button
                                         type="button"

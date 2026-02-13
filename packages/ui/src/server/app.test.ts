@@ -946,6 +946,12 @@ describe("OpenGoat UI server API", () => {
         project: options.project ?? "~"
       };
     });
+    const deleteTasks = vi.fn<NonNullable<OpenClawUiService["deleteTasks"]>>(async (_actorId, taskIds) => {
+      return {
+        deletedTaskIds: taskIds,
+        deletedCount: taskIds.length
+      };
+    });
     const updateTaskStatus = vi.fn<NonNullable<OpenClawUiService["updateTaskStatus"]>>(async (_actorId, taskId, status) => {
       return {
         ...baseTask,
@@ -994,6 +1000,7 @@ describe("OpenGoat UI server API", () => {
         ...createMockService(),
         listTasks,
         createTask,
+        deleteTasks,
         updateTaskStatus,
         addTaskBlocker,
         addTaskArtifact,
@@ -1030,6 +1037,17 @@ describe("OpenGoat UI server API", () => {
       status: "todo",
       project: "~"
     });
+
+    const deleteTaskResponse = await activeServer.inject({
+      method: "DELETE",
+      url: "/api/tasks",
+      payload: {
+        actorId: "ceo",
+        taskIds: ["task-plan", "task-archive"]
+      }
+    });
+    expect(deleteTaskResponse.statusCode).toBe(200);
+    expect(deleteTasks).toHaveBeenCalledWith("ceo", ["task-plan", "task-archive"]);
 
     const statusResponse = await activeServer.inject({
       method: "POST",

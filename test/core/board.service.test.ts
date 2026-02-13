@@ -130,6 +130,52 @@ describe("BoardService (tasks-only)", () => {
     );
   });
 
+  it("deletes tasks in bulk when actor has permission", async () => {
+    const harness = await createHarness();
+
+    const first = await harness.boardService.createTask(harness.paths, "ceo", {
+      title: "Delete first",
+      description: "Clean this up",
+      assignedTo: "cto",
+    });
+    const second = await harness.boardService.createTask(harness.paths, "cto", {
+      title: "Delete second",
+      description: "Clean this up too",
+      assignedTo: "engineer",
+    });
+
+    const result = await harness.boardService.deleteTasks(harness.paths, "ceo", [
+      first.taskId,
+      second.taskId,
+      second.taskId,
+    ]);
+    expect(result).toEqual({
+      deletedTaskIds: [first.taskId, second.taskId],
+      deletedCount: 2,
+    });
+
+    const remaining = await harness.boardService.listTasks(harness.paths, {
+      limit: 10,
+    });
+    expect(remaining).toHaveLength(0);
+  });
+
+  it("rejects task deletion when actor lacks permission", async () => {
+    const harness = await createHarness();
+
+    const qaTask = await harness.boardService.createTask(harness.paths, "qa", {
+      title: "QA owned task",
+      description: "Restricted to QA tree",
+      assignedTo: "qa",
+    });
+
+    await expect(
+      harness.boardService.deleteTasks(harness.paths, "cto", [qaTask.taskId]),
+    ).rejects.toThrow(
+      "Agents can only update their own tasks or tasks owned/assigned to their reportees (direct or indirect).",
+    );
+  });
+
   it("accepts only todo/doing/pending/blocked/done as task status values", async () => {
     const harness = await createHarness();
 
