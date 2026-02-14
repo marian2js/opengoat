@@ -16,6 +16,7 @@ import type {
 } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
+import { basename, isAbsolute, resolve as resolvePath } from "node:path";
 import {
   renderAgentsIndex,
   renderBoardIndividualSkillMarkdown,
@@ -206,6 +207,11 @@ export class AgentService {
     const removedPaths: string[] = [];
 
     await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
+    await this.writeOpenGoatWorkspaceShim(
+      workspaceDir,
+      createdPaths,
+      skippedPaths,
+    );
 
     await this.rewriteAgentsMarkdown(
       agentsPath,
@@ -636,6 +642,21 @@ export class AgentService {
     );
   }
 
+  private async writeOpenGoatWorkspaceShim(
+    workspaceDir: string,
+    createdPaths: string[],
+    skippedPaths: string[],
+  ): Promise<void> {
+    const shimPath = this.pathPort.join(workspaceDir, "opengoat");
+    await this.writeMarkdown(
+      shimPath,
+      renderOpenGoatWorkspaceShim(),
+      createdPaths,
+      skippedPaths,
+      { overwrite: true },
+    );
+  }
+
   private async readJsonIfPresent<T>(filePath: string): Promise<T | null> {
     const exists = await this.fileSystem.exists(filePath);
     if (!exists) {
@@ -980,7 +1001,7 @@ function renderRoleMarkdown(profile: {
     `- Your id: ${profile.agentId} (agent id)`,
     `- Your name: ${profile.displayName}`,
     `- Role: ${profile.role}`,
-    `- For info about your level on the organiztion, run \`opengoat agent info ${profile.agentId}\`.`,
+    `- For info about your level on the organiztion, run \`sh ./opengoat agent info ${profile.agentId}\`.`,
     "- To delegate and coordinate work, use `og-*` skills.",
     "- Organization context is available in `../../organization` - read them",
     "- You can view and edit the wiki in `../../organization/wiki`",
@@ -989,4 +1010,61 @@ function renderRoleMarkdown(profile: {
     "",
     "_This file is yours to evolve. Update it as you learn your role and responsibilities in the organization._",
   ].join("\n");
+}
+
+function renderOpenGoatWorkspaceShim(): string {
+  const cliEntrypoint = resolveOpenGoatCliEntrypoint();
+  if (!cliEntrypoint) {
+    return [
+      "#!/usr/bin/env sh",
+      "set -eu",
+      "",
+      'exec opengoat "$@"',
+    ].join("\n");
+  }
+
+  return [
+    "#!/usr/bin/env sh",
+    "set -eu",
+    "",
+    `exec ${quoteForShell(process.execPath)} ${quoteForShell(cliEntrypoint)} "$@"`,
+  ].join("\n");
+}
+
+function resolveOpenGoatCliEntrypoint(): string | undefined {
+  const explicit = process.env.OPENGOAT_CLI_ENTRYPOINT?.trim();
+  if (explicit) {
+    return normalizeEntrypointPath(explicit);
+  }
+
+  const argvEntrypoint = process.argv[1]?.trim();
+  if (!argvEntrypoint) {
+    return undefined;
+  }
+
+  const normalizedBasename = basename(argvEntrypoint).toLowerCase();
+  if (!isLikelyOpenGoatEntrypointName(normalizedBasename)) {
+    return undefined;
+  }
+
+  return normalizeEntrypointPath(argvEntrypoint);
+}
+
+function normalizeEntrypointPath(value: string): string {
+  if (isAbsolute(value)) {
+    return value;
+  }
+  return resolvePath(process.cwd(), value);
+}
+
+function isLikelyOpenGoatEntrypointName(value: string): boolean {
+  return (
+    value === "opengoat" ||
+    value === "opengoat.js" ||
+    value === "opengoat.mjs"
+  );
+}
+
+function quoteForShell(value: string): string {
+  return `'${value.replace(/'/g, `'\"'\"'`)}'`;
 }

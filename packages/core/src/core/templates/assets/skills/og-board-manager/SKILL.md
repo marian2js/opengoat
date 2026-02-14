@@ -19,15 +19,15 @@ Delegate and track work using tasks.
 Important: replace `<me>` with your agent ID.
 
 ```bash
-opengoat agent info <me>
+sh ./opengoat agent info <me>
 ```
 
 ## Task Commands
 
 ```bash
-opengoat task list --as <me>
-opengoat task create --owner <me> --title "..." --description "..." --assign <agent-id> [--project <path>]
-opengoat task show <task-id>
+sh ./opengoat task list --as <me>
+sh ./opengoat task create --owner <me> --title "..." --description "..." --assign <agent-id> [--project <path>]
+sh ./opengoat task show <task-id>
 ```
 
 ## Standard workflow
@@ -35,7 +35,7 @@ opengoat task show <task-id>
 ### 1. Confirm org context
 
 ```bash
-opengoat agent info <me>
+sh ./opengoat agent info <me>
 ```
 
 Use the output to ensure:
@@ -46,8 +46,8 @@ Use the output to ensure:
 ### 2. Review tasks
 
 ```bash
-opengoat task list --as <me>
-opengoat task show <task-id>
+sh ./opengoat task list --as <me>
+sh ./opengoat task show <task-id>
 ```
 
 ### 3. Delegate by creating a task
@@ -55,7 +55,7 @@ opengoat task show <task-id>
 Create one task per owner and outcome.
 
 ```bash
-opengoat task create \
+sh ./opengoat task create \
   --owner <me> \
   --title "<verb>: <deliverable>" \
   --description "<context + deliverable + acceptance criteria>" \
@@ -76,7 +76,7 @@ Rules:
 Example:
 
 ```bash
-opengoat task create \
+sh ./opengoat task create \
   --owner <me> \
   --title "Fix: <short description>" \
   --description "Context:\n- ...\n\nDeliverable:\n- ...\n\nAcceptance criteria:\n- ..." \
@@ -137,4 +137,4 @@ Constraints:
 ## Troubleshooting
 
 - Task creation fails: you are likely assigning to someone who is not in your reportee tree. Reassign to a valid reportee (direct or indirect) or assign to yourself.
-- You can use `opengoat task --help` to see available commands and options.
+- You can use `sh ./opengoat task --help` to see available commands and options.
