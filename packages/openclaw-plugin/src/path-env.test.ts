@@ -125,6 +125,41 @@ describe("ensureOpenGoatCommandOnPath", () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
+  it("discovers command from npm prefix bin fallback when PATH is empty", () => {
+    const prefix = createTempDir("opengoat-prefix-");
+    const prefixBin = join(prefix, "bin");
+    writeCommandFile(prefixBin);
+
+    const env = {
+      PATH: "",
+      npm_config_prefix: prefix,
+    };
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+
+    const result = ensureOpenGoatCommandOnPath({
+      env,
+      logger,
+      cwd: createTempDir("opengoat-empty-cwd-"),
+      pluginSource: join(createTempDir("opengoat-empty-plugin-"), "index.ts"),
+      homeDir: createTempDir("opengoat-home-"),
+      processExecPath: "/tmp/node",
+      processArgv: ["node", "/tmp/openclaw"],
+    });
+
+    expect(result).toEqual({
+      alreadyAvailable: false,
+      added: true,
+      addedPath: prefixBin,
+    });
+    expect(env.PATH).toBe(prefixBin);
+    expect(logger.info).toHaveBeenCalledOnce();
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
   it("warns when command cannot be discovered", () => {
     const env = { PATH: "" };
     const logger = {
@@ -138,6 +173,10 @@ describe("ensureOpenGoatCommandOnPath", () => {
       logger,
       cwd: createTempDir("opengoat-empty-cwd-"),
       pluginSource: join(createTempDir("opengoat-empty-plugin-"), "index.ts"),
+      homeDir: createTempDir("opengoat-home-"),
+      processExecPath: "/tmp/node",
+      processArgv: ["node", "/tmp/openclaw"],
+      includeProcessEnvPrefixes: false,
     });
 
     expect(result).toEqual({

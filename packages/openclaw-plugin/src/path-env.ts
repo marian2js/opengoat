@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import type { PluginLogger } from "./openclaw-types.js";
 
@@ -8,6 +9,10 @@ interface EnsureOpenGoatPathOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   platform?: NodeJS.Platform;
+  homeDir?: string;
+  processExecPath?: string;
+  processArgv?: readonly string[];
+  includeProcessEnvPrefixes?: boolean;
   fileExists?: (path: string) => boolean;
   logger?: PluginLogger;
 }
@@ -40,7 +45,12 @@ export function ensureOpenGoatCommandOnPath(
     command,
     cwd,
     options.pluginSource,
+    env,
     platform,
+    options.homeDir ?? homedir(),
+    options.processExecPath ?? process.execPath,
+    options.processArgv ?? process.argv,
+    options.includeProcessEnvPrefixes ?? true,
     fileExists,
   );
 
@@ -73,7 +83,12 @@ function resolveCandidateBinDirs(
   command: string,
   cwd: string,
   pluginSource: string | undefined,
+  env: NodeJS.ProcessEnv,
   platform: NodeJS.Platform,
+  homeDir: string,
+  processExecPath: string,
+  processArgv: readonly string[],
+  includeProcessEnvPrefixes: boolean,
   fileExists: (path: string) => boolean,
 ): string[] {
   const roots = new Set<string>([resolve(cwd)]);
@@ -98,7 +113,69 @@ function resolveCandidateBinDirs(
     }
   }
 
+  for (const preferred of resolvePreferredBinDirs(
+    env,
+    platform,
+    homeDir,
+    processExecPath,
+    processArgv,
+    includeProcessEnvPrefixes,
+  )) {
+    if (containsCommand(preferred, commandNames, fileExists)) {
+      candidateDirs.push(preferred);
+    }
+  }
+
   return dedupe(candidateDirs);
+}
+
+function resolvePreferredBinDirs(
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
+  homeDir: string,
+  processExecPath: string,
+  processArgv: readonly string[],
+  includeProcessEnvPrefixes: boolean,
+): string[] {
+  const preferred = [
+    dirname(processExecPath),
+    join(homeDir, ".npm-global", "bin"),
+    join(homeDir, ".npm", "bin"),
+    join(homeDir, ".local", "bin"),
+    join(homeDir, ".volta", "bin"),
+    join(homeDir, ".fnm", "current", "bin"),
+    join(homeDir, ".asdf", "shims"),
+    join(homeDir, "bin"),
+  ];
+
+  const openClawArgvPath = processArgv[1]?.trim();
+  if (openClawArgvPath) {
+    preferred.push(dirname(resolve(openClawArgvPath)));
+  }
+
+  const prefixCandidates = [
+    env.npm_config_prefix ?? "",
+    env.NPM_CONFIG_PREFIX ?? "",
+  ];
+  if (includeProcessEnvPrefixes) {
+    prefixCandidates.push(
+      process.env.npm_config_prefix ?? "",
+      process.env.NPM_CONFIG_PREFIX ?? "",
+    );
+  }
+
+  for (const prefix of dedupe(prefixCandidates)) {
+    if (!prefix) {
+      continue;
+    }
+    preferred.push(join(prefix, "bin"));
+  }
+
+  if (platform === "darwin") {
+    preferred.push("/opt/homebrew/bin", "/usr/local/bin");
+  }
+
+  return dedupe(preferred.map((entry) => entry.trim()).filter(Boolean));
 }
 
 function isCommandOnPath(
@@ -177,5 +254,5 @@ function *iterateAncestors(start: string): Generator<string> {
 }
 
 function dedupe(entries: readonly string[]): string[] {
-  return [...new Set(entries)];
+  return [...new Set(entries.map((entry) => entry.trim()).filter(Boolean))];
 }

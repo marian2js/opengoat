@@ -19,7 +19,11 @@ export function resolveOpenGoatCommand(params: ResolveOpenGoatCommandParams): st
 
   if (params.pluginSource) {
     const pluginRoot = dirname(params.pluginSource);
-    candidates.push(resolve(pluginRoot, "../../bin/opengoat"));
+    candidates.push(
+      resolve(pluginRoot, "bin/opengoat"),
+      resolve(pluginRoot, "../bin/opengoat"),
+      resolve(pluginRoot, "../../bin/opengoat"),
+    );
   }
 
   for (const candidate of candidates) {

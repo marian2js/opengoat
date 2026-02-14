@@ -63,6 +63,26 @@ describe("openclaw plugin command resolution", () => {
     expect(command).toBe(join(root, "bin/opengoat"));
   });
 
+  it("uses root-level plugin source bin path when plugin source points to repository root", () => {
+    const root = mkdtempSync(join(tmpdir(), "opengoat-plugin-root-entry-"));
+    tempDirs.push(root);
+
+    const pluginSource = join(root, "index.ts");
+    writeFileSync(pluginSource, "", "utf8");
+
+    const binDir = join(root, "bin");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(join(binDir, "opengoat"), "#!/usr/bin/env node\n", "utf8");
+
+    const command = resolveOpenGoatCommand({
+      configuredCommand: "opengoat",
+      invocationCwd: join(root, "some-other-dir"),
+      pluginSource,
+    });
+
+    expect(command).toBe(join(root, "bin/opengoat"));
+  });
+
   it("falls back to PATH command when no shim is found", () => {
     const cwd = mkdtempSync(join(tmpdir(), "opengoat-plugin-empty-"));
     tempDirs.push(cwd);
