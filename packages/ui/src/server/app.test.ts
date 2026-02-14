@@ -220,6 +220,7 @@ describe("OpenGoat UI server API", () => {
     expect(defaultResponse.statusCode).toBe(200);
     expect(defaultResponse.json()).toMatchObject({
       settings: {
+        taskCronEnabled: true,
         notifyManagersOfInactiveAgents: true,
         maxInactivityMinutes: 30,
         inactiveAgentNotificationTarget: "all-managers",
@@ -230,6 +231,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/settings",
       payload: {
+        taskCronEnabled: false,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
         inactiveAgentNotificationTarget: "ceo-only",
@@ -238,6 +240,27 @@ describe("OpenGoat UI server API", () => {
     expect(updateResponse.statusCode).toBe(200);
     expect(updateResponse.json()).toMatchObject({
       settings: {
+        taskCronEnabled: false,
+        notifyManagersOfInactiveAgents: false,
+        maxInactivityMinutes: 45,
+        inactiveAgentNotificationTarget: "ceo-only",
+      },
+    });
+
+    const automationOnlyResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/settings",
+      payload: {
+        taskCronEnabled: true,
+        notifyManagersOfInactiveAgents: false,
+        maxInactivityMinutes: 45,
+        inactiveAgentNotificationTarget: "ceo-only",
+      },
+    });
+    expect(automationOnlyResponse.statusCode).toBe(200);
+    expect(automationOnlyResponse.json()).toMatchObject({
+      settings: {
+        taskCronEnabled: true,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
         inactiveAgentNotificationTarget: "ceo-only",
@@ -251,6 +274,7 @@ describe("OpenGoat UI server API", () => {
     expect(updatedResponse.statusCode).toBe(200);
     expect(updatedResponse.json()).toMatchObject({
       settings: {
+        taskCronEnabled: true,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
         inactiveAgentNotificationTarget: "ceo-only",
@@ -289,6 +313,7 @@ describe("OpenGoat UI server API", () => {
       await writeFile(
         `${uniqueHomeDir}/ui-settings.json`,
         `${JSON.stringify({
+          taskCronEnabled: false,
           notifyManagersOfInactiveAgents: false,
           maxInactivityMinutes: 30,
           inactiveAgentNotificationTarget: "ceo-only",
@@ -303,7 +328,7 @@ describe("OpenGoat UI server API", () => {
     }
   });
 
-  it("maps legacy taskCronEnabled setting to inactivity notifications", async () => {
+  it("maps legacy taskCronEnabled setting to cron and notifications", async () => {
     const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     await mkdir(uniqueHomeDir, { recursive: true });
     await writeFile(
@@ -334,6 +359,7 @@ describe("OpenGoat UI server API", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       settings: {
+        taskCronEnabled: false,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 30,
         inactiveAgentNotificationTarget: "all-managers",

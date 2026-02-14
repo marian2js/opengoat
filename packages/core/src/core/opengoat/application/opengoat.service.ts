@@ -839,6 +839,7 @@ export class OpenGoatService {
     options: {
       inactiveMinutes?: number;
       notificationTarget?: InactiveAgentNotificationTarget;
+      notifyInactiveAgents?: boolean;
     } = {},
   ): Promise<TaskCronRunResult> {
     const paths = this.pathsProvider.getPaths();
@@ -851,16 +852,18 @@ export class OpenGoatService {
     const notificationTarget = resolveInactiveAgentNotificationTarget(
       options.notificationTarget,
     );
-    const inactiveCandidates = await this.collectInactiveAgents(
-      paths,
-      manifests,
-      inactiveMinutes,
-      notificationTarget,
-    );
-    const latestCeoProjectPath = await this.resolveLatestProjectPathForAgent(
-      paths,
-      DEFAULT_AGENT_ID,
-    );
+    const notifyInactiveAgents = options.notifyInactiveAgents ?? true;
+    const inactiveCandidates = notifyInactiveAgents
+      ? await this.collectInactiveAgents(
+          paths,
+          manifests,
+          inactiveMinutes,
+          notificationTarget,
+        )
+      : [];
+    const latestCeoProjectPath = notifyInactiveAgents
+      ? await this.resolveLatestProjectPathForAgent(paths, DEFAULT_AGENT_ID)
+      : undefined;
 
     const tasks = await this.boardService.listTasks(paths, { limit: 10_000 });
     const dispatches: TaskCronDispatchResult[] = [];

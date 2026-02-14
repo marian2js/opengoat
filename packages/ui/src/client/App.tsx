@@ -214,6 +214,7 @@ interface TasksResponse {
 }
 
 interface UiSettings {
+  taskCronEnabled: boolean;
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
@@ -511,6 +512,7 @@ const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
 const DEFAULT_AGENT_ID = "ceo";
 const DEFAULT_MAX_INACTIVITY_MINUTES = 30;
+const TASK_CRON_INTERVAL_MINUTES = 1;
 const MIN_MAX_INACTIVITY_MINUTES = 1;
 const MAX_MAX_INACTIVITY_MINUTES = 10_080;
 const DEFAULT_LOG_STREAM_LIMIT = 300;
@@ -600,6 +602,7 @@ export function App(): ReactElement {
   const [maxInactivityMinutesInput, setMaxInactivityMinutesInput] = useState(
     String(DEFAULT_MAX_INACTIVITY_MINUTES),
   );
+  const [taskCronEnabledInput, setTaskCronEnabledInput] = useState(true);
   const [
     notifyManagersOfInactiveAgentsInput,
     setNotifyManagersOfInactiveAgentsInput,
@@ -728,6 +731,7 @@ export function App(): ReactElement {
           .then((payload) => payload.settings)
           .catch(() => {
             return {
+              taskCronEnabled: true,
               notifyManagersOfInactiveAgents: true,
               maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
               inactiveAgentNotificationTarget: "all-managers",
@@ -744,6 +748,7 @@ export function App(): ReactElement {
         taskWorkspaces: buildTaskWorkspaceResponse(tasks),
         settings,
       });
+      setTaskCronEnabledInput(settings.taskCronEnabled);
       setMaxInactivityMinutesInput(String(settings.maxInactivityMinutes));
       setNotifyManagersOfInactiveAgentsInput(
         settings.notifyManagersOfInactiveAgents,
@@ -2049,7 +2054,11 @@ export function App(): ReactElement {
       Number.isFinite(parsedMaxInactivityMinutes) &&
       parsedMaxInactivityMinutes >= MIN_MAX_INACTIVITY_MINUTES &&
       parsedMaxInactivityMinutes <= MAX_MAX_INACTIVITY_MINUTES;
-    if (notifyManagersOfInactiveAgentsInput && !isMaxInactivityValid) {
+    if (
+      taskCronEnabledInput &&
+      notifyManagersOfInactiveAgentsInput &&
+      !isMaxInactivityValid
+    ) {
       toast.error(
         `Max inactivity time must be an integer between ${MIN_MAX_INACTIVITY_MINUTES} and ${MAX_MAX_INACTIVITY_MINUTES} minutes.`,
       );
@@ -2064,15 +2073,18 @@ export function App(): ReactElement {
     setMutating(true);
     try {
       const response = await persistUiSettings({
+        taskCronEnabled: taskCronEnabledInput,
         notifyManagersOfInactiveAgents: notifyManagersOfInactiveAgentsInput,
         maxInactivityMinutes: resolvedMaxInactivityMinutes,
         inactiveAgentNotificationTarget:
           inactiveAgentNotificationTargetInput,
       });
       applyUiSettingsResponse(response);
-      const statusMessage = notifyManagersOfInactiveAgentsInput
-        ? `Manager inactivity notifications enabled (${resolvedMaxInactivityMinutes} minutes).`
-        : "Manager inactivity notifications disabled.";
+      const statusMessage = !taskCronEnabledInput
+        ? "Task automation checks disabled."
+        : notifyManagersOfInactiveAgentsInput
+          ? `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); inactivity notifications enabled (${resolvedMaxInactivityMinutes} minutes).`
+          : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); inactivity notifications disabled.`;
       toast.success(response.message ?? statusMessage);
     } catch (requestError) {
       const message =
@@ -2110,6 +2122,7 @@ export function App(): ReactElement {
         settings: response.settings,
       };
     });
+    setTaskCronEnabledInput(response.settings.taskCronEnabled);
     setMaxInactivityMinutesInput(
       String(response.settings.maxInactivityMinutes),
     );
@@ -3339,18 +3352,16 @@ export function App(): ReactElement {
                   }}
                   className={cn(
                     "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
-                    state?.settings.notifyManagersOfInactiveAgents ??
-                      notifyManagersOfInactiveAgentsInput
+                    state?.settings.taskCronEnabled ?? taskCronEnabledInput
                       ? "border-success/50 bg-success/15 text-success hover:bg-success/20"
                       : "border-red-500/70 bg-red-600/25 text-red-200 hover:bg-red-600/35",
                   )}
                   title="Open settings"
                   aria-label="Open settings"
                 >
-                  {state?.settings.notifyManagersOfInactiveAgents ??
-                  notifyManagersOfInactiveAgentsInput
-                    ? "Inactive Alerts On"
-                    : "Inactive Alerts Off"}
+                  {state?.settings.taskCronEnabled ?? taskCronEnabledInput
+                    ? "Automation On"
+                    : "Automation Off"}
                 </button>
               ) : null}
 
@@ -4698,8 +4709,8 @@ export function App(): ReactElement {
                   <section className="mx-auto w-full max-w-3xl space-y-6">
                     <div className="space-y-1">
                       <p className="text-sm text-muted-foreground">
-                        Configure how managers are alerted when reportees become
-                        inactive.
+                        Control background automation checks and inactive-agent
+                        alerts.
                       </p>
                     </div>
 
@@ -4707,32 +4718,36 @@ export function App(): ReactElement {
                       <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
                         <div className="space-y-1">
                           <h2 className="text-sm font-semibold text-foreground">
-                            Notify Managers of Inactive Agents
+                            Background Task Automation
                           </h2>
                           <p className="text-xs text-muted-foreground">
-                            When enabled, OpenGoat continuously checks for
-                            inactive reportees and prompts managers to unblock
-                            work.
+                            Keep this on to run recurring background checks.
+                            These checks drive task follow-ups (like todo and
+                            blocked reminders) and optional inactivity alerts.
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Check cadence: every {TASK_CRON_INTERVAL_MINUTES}{" "}
+                            minute.
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Switch
-                            checked={notifyManagersOfInactiveAgentsInput}
+                            checked={taskCronEnabledInput}
                             disabled={isMutating || isLoading}
                             onCheckedChange={(checked) => {
-                              setNotifyManagersOfInactiveAgentsInput(checked);
+                              setTaskCronEnabledInput(checked);
                             }}
-                            aria-label="Toggle inactive-agent manager notifications"
+                            aria-label="Toggle task automation checks"
                           />
                           <span
                             className={cn(
                               "text-xs font-medium",
-                              notifyManagersOfInactiveAgentsInput
+                              taskCronEnabledInput
                                 ? "text-success"
                                 : "text-muted-foreground",
                             )}
                           >
-                            {notifyManagersOfInactiveAgentsInput
+                            {taskCronEnabledInput
                               ? "Enabled"
                               : "Disabled"}
                           </span>
@@ -4741,8 +4756,51 @@ export function App(): ReactElement {
 
                       <Separator className="bg-border/60" />
 
-                      {notifyManagersOfInactiveAgentsInput ? (
-                        <div className="space-y-3 px-5 py-4">
+                      <div
+                        className={cn(
+                          "space-y-4 px-5 py-4",
+                          !taskCronEnabledInput && "opacity-60",
+                        )}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                          <div className="space-y-1">
+                            <h3 className="text-sm font-semibold text-foreground">
+                              Notify Managers of Inactive Agents
+                            </h3>
+                            <p className="text-xs text-muted-foreground">
+                              Alert managers when their reportees have no recent
+                              assistant activity.
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={notifyManagersOfInactiveAgentsInput}
+                              disabled={
+                                !taskCronEnabledInput || isMutating || isLoading
+                              }
+                              onCheckedChange={(checked) => {
+                                setNotifyManagersOfInactiveAgentsInput(checked);
+                              }}
+                              aria-label="Toggle inactive-agent manager notifications"
+                            />
+                            <span
+                              className={cn(
+                                "text-xs font-medium",
+                                notifyManagersOfInactiveAgentsInput &&
+                                  taskCronEnabledInput
+                                  ? "text-success"
+                                  : "text-muted-foreground",
+                              )}
+                            >
+                              {notifyManagersOfInactiveAgentsInput &&
+                              taskCronEnabledInput
+                                ? "Enabled"
+                                : "Disabled"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
                           <label
                             className="text-sm font-medium text-foreground"
                             htmlFor="maxInactivityMinutes"
@@ -4757,6 +4815,12 @@ export function App(): ReactElement {
                               max={MAX_MAX_INACTIVITY_MINUTES}
                               step={1}
                               value={maxInactivityMinutesInput}
+                              disabled={
+                                !taskCronEnabledInput ||
+                                !notifyManagersOfInactiveAgentsInput ||
+                                isMutating ||
+                                isLoading
+                              }
                               onChange={(event) => {
                                 setMaxInactivityMinutesInput(
                                   event.target.value,
@@ -4771,64 +4835,82 @@ export function App(): ReactElement {
                             Managers are notified after this many minutes with
                             no assistant activity.
                           </p>
-
-                          <Separator className="bg-border/50" />
-
-                          <div className="space-y-2">
-                            <label
-                              className="text-sm font-medium text-foreground"
-                              htmlFor="inactiveAgentNotificationTarget"
-                            >
-                              Notify CEO only
-                            </label>
-                            <Select
-                              value={inactiveAgentNotificationTargetInput}
-                              onValueChange={(nextValue) => {
-                                setInactiveAgentNotificationTargetInput(
-                                  nextValue as InactiveAgentNotificationTarget,
-                                );
-                              }}
-                            >
-                              <SelectTrigger
-                                id="inactiveAgentNotificationTarget"
-                                className="max-w-sm"
-                              >
-                                <SelectValue placeholder="Select who gets inactivity notifications" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all-managers">
-                                  Notify all managers
-                                </SelectItem>
-                                <SelectItem value="ceo-only">
-                                  Notify only CEO
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <p className="text-xs text-muted-foreground">
-                              {inactiveAgentNotificationTargetInput ===
-                              "ceo-only"
-                                ? "Only the CEO receives inactivity alerts, and only for agents that report directly to the CEO."
-                                : "Every manager receives inactivity alerts for their own direct reports."}
-                            </p>
-                          </div>
                         </div>
-                      ) : (
-                        <p className="px-5 py-4 text-xs text-muted-foreground">
-                          Manager inactivity notifications are currently paused.
-                        </p>
-                      )}
+
+                        <Separator className="bg-border/50" />
+
+                        <div className="space-y-2">
+                          <label
+                            className="text-sm font-medium text-foreground"
+                            htmlFor="inactiveAgentNotificationTarget"
+                          >
+                            Notify CEO only
+                          </label>
+                          <Select
+                            value={inactiveAgentNotificationTargetInput}
+                            onValueChange={(nextValue) => {
+                              setInactiveAgentNotificationTargetInput(
+                                nextValue as InactiveAgentNotificationTarget,
+                              );
+                            }}
+                            disabled={
+                              !taskCronEnabledInput ||
+                              !notifyManagersOfInactiveAgentsInput ||
+                              isMutating ||
+                              isLoading
+                            }
+                          >
+                            <SelectTrigger
+                              id="inactiveAgentNotificationTarget"
+                              className="max-w-sm"
+                            >
+                              <SelectValue placeholder="Select who gets inactivity notifications" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all-managers">
+                                Notify all managers
+                              </SelectItem>
+                              <SelectItem value="ceo-only">
+                                Notify only CEO
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            {inactiveAgentNotificationTargetInput === "ceo-only"
+                              ? "Only the CEO receives inactivity alerts, and only for agents that report directly to the CEO."
+                              : "Every manager receives inactivity alerts for their own direct reports."}
+                          </p>
+                        </div>
+
+                        {!taskCronEnabledInput ? (
+                          <p className="text-xs text-muted-foreground">
+                            Background checks are paused. Enable task automation
+                            above to resume todo, blocked, and inactivity
+                            checks.
+                          </p>
+                        ) : !notifyManagersOfInactiveAgentsInput ? (
+                          <p className="text-xs text-muted-foreground">
+                            Task automation is still running every{" "}
+                            {TASK_CRON_INTERVAL_MINUTES} minute for todo and
+                            blocked follow-ups. Only inactivity alerts are
+                            paused.
+                          </p>
+                        ) : null}
+                      </div>
                     </section>
 
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-xs text-muted-foreground">
                         Status:{" "}
                         <span className="font-medium text-foreground">
-                          {notifyManagersOfInactiveAgentsInput
-                            ? inactiveAgentNotificationTargetInput ===
-                              "ceo-only"
-                              ? "Monitoring direct CEO reportees only"
-                              : "Monitoring inactive agents for all managers"
-                            : "Notifications paused"}
+                          {!taskCronEnabledInput
+                            ? "Background checks paused"
+                            : !notifyManagersOfInactiveAgentsInput
+                              ? "Background checks active (inactivity notifications paused)"
+                              : inactiveAgentNotificationTargetInput ===
+                                  "ceo-only"
+                                ? "Background checks active (direct CEO inactivity notifications only)"
+                                : "Background checks active for all managers"}
                         </span>
                       </p>
                       <Button

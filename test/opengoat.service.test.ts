@@ -1119,6 +1119,69 @@ describe("OpenGoatService", () => {
       ),
     ).toBe(false);
   });
+
+  it("runs todo and blocked checks even when inactivity notifications are disabled", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service, provider } = createService(root);
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    const todoTask = await service.createTask("ceo", {
+      title: "Review API",
+      description: "Review API task status",
+      assignedTo: "engineer",
+      status: "todo",
+    });
+    const blockedTask = await service.createTask("ceo", {
+      title: "Release prep",
+      description: "Prepare release checklist",
+      assignedTo: "engineer",
+      status: "blocked",
+    });
+    await service.addTaskBlocker(
+      "engineer",
+      blockedTask.taskId,
+      "Waiting for approvals",
+    );
+
+    const cycle = await service.runTaskCronCycle({
+      inactiveMinutes: 30,
+      notifyInactiveAgents: false,
+    });
+
+    expect(cycle.todoTasks).toBe(1);
+    expect(cycle.blockedTasks).toBe(1);
+    expect(cycle.inactiveAgents).toBe(0);
+    expect(cycle.dispatches).toHaveLength(2);
+    expect(cycle.dispatches.every((entry) => entry.kind !== "inactive")).toBe(
+      true,
+    );
+    expect(
+      provider.invocations.some((entry) => entry.agent === "engineer"),
+    ).toBe(true);
+    expect(
+      provider.invocations.some(
+        (entry) =>
+          entry.agent === "ceo" &&
+          entry.message.includes(`Task #${blockedTask.taskId}`),
+      ),
+    ).toBe(true);
+    expect(
+      provider.invocations.some((entry) =>
+        entry.message.includes('Your reportee "@engineer"'),
+      ),
+    ).toBe(false);
+    expect(
+      provider.invocations.some((entry) =>
+        entry.message.includes(`Task ID: ${todoTask.taskId}`),
+      ),
+    ).toBe(true);
+  });
 });
 
 function createService(

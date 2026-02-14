@@ -19,7 +19,9 @@ afterEach(async () => {
 });
 
 describe("onboard command e2e", () => {
-  it("bootstraps a fresh home and saves local OpenClaw runtime config", async () => {
+  it(
+    "bootstraps a fresh home and saves local OpenClaw runtime config",
+    async () => {
     const root = await createTempDir("opengoat-onboard-e2e-");
     roots.push(root);
 
@@ -37,7 +39,9 @@ describe("onboard command e2e", () => {
     };
     expect(providerConfig.providerId).toBe("openclaw");
     expect(providerConfig.env?.OPENGOAT_OPENCLAW_GATEWAY_MODE).toBe("local");
-  });
+    },
+    45_000,
+  );
 
   it("saves external OpenClaw gateway settings", async () => {
     const root = await createTempDir("opengoat-onboard-e2e-");

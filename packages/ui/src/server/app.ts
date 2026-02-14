@@ -180,6 +180,7 @@ export interface OpenClawUiService {
   runTaskCronCycle?: (options?: {
     inactiveMinutes?: number;
     notificationTarget?: InactiveAgentNotificationTarget;
+    notifyInactiveAgents?: boolean;
   }) => Promise<TaskCronRunResult>;
 }
 
@@ -266,6 +267,7 @@ interface TaskCronRunResult {
 }
 
 interface UiServerSettings {
+  taskCronEnabled: boolean;
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
@@ -552,6 +554,7 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
     updateSettings: async (nextSettings) => {
       uiSettings = nextSettings;
       await writeUiServerSettings(service.getHomeDir(), uiSettings);
+      taskCronScheduler.setTaskCronEnabled(uiSettings.taskCronEnabled);
       taskCronScheduler.setNotifyManagersOfInactiveAgents(
         uiSettings.notifyManagersOfInactiveAgents,
       );
@@ -603,6 +606,7 @@ function registerApiRoutes(
 
   app.post<{
     Body: {
+      taskCronEnabled?: boolean;
       notifyManagersOfInactiveAgents?: boolean;
       maxInactivityMinutes?: number;
       inactiveAgentNotificationTarget?: InactiveAgentNotificationTarget;
@@ -610,6 +614,10 @@ function registerApiRoutes(
   }>("/api/settings", async (request, reply) => {
     return safeReply(reply, async () => {
       const currentSettings = deps.getSettings();
+      const hasTaskCronEnabledSetting = Object.prototype.hasOwnProperty.call(
+        request.body ?? {},
+        "taskCronEnabled",
+      );
       const hasNotifyManagersSetting = Object.prototype.hasOwnProperty.call(
         request.body ?? {},
         "notifyManagersOfInactiveAgents",
@@ -623,6 +631,16 @@ function registerApiRoutes(
           request.body ?? {},
           "inactiveAgentNotificationTarget",
         );
+
+      const parsedTaskCronEnabled = hasTaskCronEnabledSetting
+        ? parseTaskCronEnabled(request.body?.taskCronEnabled)
+        : currentSettings.taskCronEnabled;
+      if (parsedTaskCronEnabled === undefined) {
+        reply.code(400);
+        return {
+          error: "taskCronEnabled must be true or false",
+        };
+      }
 
       const parsedNotifyManagers = hasNotifyManagersSetting
         ? parseNotifyManagersOfInactiveAgents(
@@ -659,6 +677,7 @@ function registerApiRoutes(
       }
 
       const nextSettings: UiServerSettings = {
+        taskCronEnabled: parsedTaskCronEnabled,
         notifyManagersOfInactiveAgents: parsedNotifyManagers,
         maxInactivityMinutes: parsedMaxInactivityMinutes,
         inactiveAgentNotificationTarget: parsedNotificationTarget,
@@ -668,11 +687,13 @@ function registerApiRoutes(
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `UI settings updated: notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes} inactiveAgentNotificationTarget=${nextSettings.inactiveAgentNotificationTarget}`,
+        message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes} inactiveAgentNotificationTarget=${nextSettings.inactiveAgentNotificationTarget}`,
       });
       return {
         settings: nextSettings,
-        message: `Inactive-agent manager notifications ${
+        message: `Task automation checks ${
+          nextSettings.taskCronEnabled ? "enabled" : "disabled"
+        } (runs every ${DEFAULT_TASK_CHECK_FREQUENCY_MINUTES} minute(s)). Inactive-agent manager notifications ${
           nextSettings.notifyManagersOfInactiveAgents
             ? "enabled"
             : "disabled"
@@ -3293,6 +3314,7 @@ function normalizeRoleValue(rawRole: string | undefined): string | undefined {
 
 function defaultUiServerSettings(): UiServerSettings {
   return {
+    taskCronEnabled: true,
     notifyManagersOfInactiveAgents: true,
     maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
     inactiveAgentNotificationTarget: "all-managers",
@@ -3316,6 +3338,10 @@ function parseBooleanSetting(value: unknown): boolean | undefined {
 }
 
 function parseNotifyManagersOfInactiveAgents(value: unknown): boolean | undefined {
+  return parseBooleanSetting(value);
+}
+
+function parseTaskCronEnabled(value: unknown): boolean | undefined {
   return parseBooleanSetting(value);
 }
 
@@ -3398,15 +3424,16 @@ async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> 
   try {
     const raw = await readFile(settingsPath, "utf8");
     const parsed = JSON.parse(raw) as {
+      taskCronEnabled?: unknown;
       notifyManagersOfInactiveAgents?: unknown;
       maxInactivityMinutes?: unknown;
       inactiveAgentNotificationTarget?: unknown;
-      taskCronEnabled?: unknown;
     };
+    const taskCronEnabled = parseTaskCronEnabled(parsed?.taskCronEnabled);
     const notifyManagersOfInactiveAgents =
       parseNotifyManagersOfInactiveAgents(
         parsed?.notifyManagersOfInactiveAgents,
-      ) ?? parseBooleanSetting(parsed?.taskCronEnabled);
+      ) ?? taskCronEnabled;
     const maxInactivityMinutes = parseMaxInactivityMinutes(
       parsed?.maxInactivityMinutes,
     );
@@ -3416,6 +3443,7 @@ async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> 
       );
     const defaults = defaultUiServerSettings();
     return {
+      taskCronEnabled: taskCronEnabled ?? defaults.taskCronEnabled,
       notifyManagersOfInactiveAgents:
         notifyManagersOfInactiveAgents ??
         defaults.notifyManagersOfInactiveAgents,
@@ -3437,6 +3465,7 @@ async function writeUiServerSettings(homeDir: string, settings: UiServerSettings
 }
 
 interface TaskCronScheduler {
+  setTaskCronEnabled: (enabled: boolean) => void;
   setNotifyManagersOfInactiveAgents: (enabled: boolean) => void;
   setMaxInactivityMinutes: (maxInactivityMinutes: number) => void;
   setInactiveAgentNotificationTarget: (
@@ -3453,6 +3482,9 @@ function createTaskCronScheduler(
 ): TaskCronScheduler {
   if (typeof service.runTaskCronCycle !== "function") {
     return {
+      setTaskCronEnabled: () => {
+        // no-op when runtime task cron is unavailable.
+      },
       setNotifyManagersOfInactiveAgents: () => {
         // no-op when runtime task cron is unavailable.
       },
@@ -3468,6 +3500,9 @@ function createTaskCronScheduler(
     };
   }
 
+  let taskCronEnabled =
+    parseTaskCronEnabled(initialSettings.taskCronEnabled) ??
+    defaultUiServerSettings().taskCronEnabled;
   let notifyManagersOfInactiveAgents =
     parseNotifyManagersOfInactiveAgents(
       initialSettings.notifyManagersOfInactiveAgents,
@@ -3494,6 +3529,8 @@ function createTaskCronScheduler(
       parseNotifyManagersOfInactiveAgents(
         persisted.notifyManagersOfInactiveAgents,
       ) ?? notifyManagersOfInactiveAgents;
+    const persistedTaskCronEnabled =
+      parseTaskCronEnabled(persisted.taskCronEnabled) ?? taskCronEnabled;
     const persistedMaxInactivityMinutes =
       parseMaxInactivityMinutes(persisted.maxInactivityMinutes) ??
       maxInactivityMinutes;
@@ -3502,6 +3539,8 @@ function createTaskCronScheduler(
         persisted.inactiveAgentNotificationTarget,
       ) ?? inactiveAgentNotificationTarget;
 
+    const hasTaskCronEnabledChange =
+      persistedTaskCronEnabled !== taskCronEnabled;
     const hasNotifyManagersChange =
       persistedNotifyManagers !== notifyManagersOfInactiveAgents;
     const hasMaxInactivityChange =
@@ -3509,6 +3548,7 @@ function createTaskCronScheduler(
     const hasNotificationTargetChange =
       persistedNotificationTarget !== inactiveAgentNotificationTarget;
     if (
+      !hasTaskCronEnabledChange &&
       !hasNotifyManagersChange &&
       !hasMaxInactivityChange &&
       !hasNotificationTargetChange
@@ -3516,12 +3556,16 @@ function createTaskCronScheduler(
       return;
     }
 
+    taskCronEnabled = persistedTaskCronEnabled;
     notifyManagersOfInactiveAgents = persistedNotifyManagers;
     maxInactivityMinutes = persistedMaxInactivityMinutes;
     inactiveAgentNotificationTarget = persistedNotificationTarget;
-    schedule();
+    if (hasTaskCronEnabledChange) {
+      schedule();
+    }
     app.log.info(
       {
+        taskCronEnabled,
         notifyManagersOfInactiveAgents,
         maxInactivityMinutes,
         inactiveAgentNotificationTarget,
@@ -3537,12 +3581,13 @@ function createTaskCronScheduler(
     running = true;
     try {
       await syncFromPersistedSettings();
-      if (!notifyManagersOfInactiveAgents) {
+      if (!taskCronEnabled) {
         return;
       }
       const cycle = await service.runTaskCronCycle?.({
         inactiveMinutes: maxInactivityMinutes,
         notificationTarget: inactiveAgentNotificationTarget,
+        notifyInactiveAgents: notifyManagersOfInactiveAgents,
       });
       if (cycle) {
         app.log.info(
@@ -3590,7 +3635,7 @@ function createTaskCronScheduler(
       clearInterval(intervalHandle);
       intervalHandle = undefined;
     }
-    if (!notifyManagersOfInactiveAgents) {
+    if (!taskCronEnabled) {
       return;
     }
     intervalHandle = setInterval(() => {
@@ -3602,18 +3647,39 @@ function createTaskCronScheduler(
   schedule();
 
   return {
+    setTaskCronEnabled: (nextEnabled: boolean) => {
+      const parsed = parseTaskCronEnabled(nextEnabled);
+      if (parsed === undefined || parsed === taskCronEnabled) {
+        return;
+      }
+      taskCronEnabled = parsed;
+      schedule();
+      app.log.info(
+        {
+          taskCronEnabled,
+        },
+        "[task-cron] scheduler state updated"
+      );
+      logs.append({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "opengoat",
+        message: `[task-cron] automation checks ${
+          taskCronEnabled ? "enabled" : "disabled"
+        }.`,
+      });
+    },
     setNotifyManagersOfInactiveAgents: (nextEnabled: boolean) => {
       const parsed = parseNotifyManagersOfInactiveAgents(nextEnabled);
       if (parsed === undefined || parsed === notifyManagersOfInactiveAgents) {
         return;
       }
       notifyManagersOfInactiveAgents = parsed;
-      schedule();
       app.log.info(
         {
           notifyManagersOfInactiveAgents,
         },
-        "[task-cron] scheduler state updated"
+        "[task-cron] inactivity notification state updated"
       );
       logs.append({
         timestamp: new Date().toISOString(),
