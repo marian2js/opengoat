@@ -43,6 +43,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/sonner";
+import { Switch } from "@/components/ui/switch";
 import { resolveAgentAvatarSource } from "@/lib/agent-avatar";
 import { cn } from "@/lib/utils";
 import dagre from "@dagrejs/dagre";
@@ -1924,33 +1925,11 @@ export function App(): ReactElement {
 
     setMutating(true);
     try {
-      const response = await fetchJson<{
-        settings: UiSettings;
-        message?: string;
-      }>("/api/settings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          taskCronEnabled: taskCronEnabledInput,
-          taskCheckFrequencyMinutes: resolvedFrequency,
-        }),
-      });
-
-      setState((current) => {
-        if (!current) {
-          return current;
-        }
-        return {
-          ...current,
-          settings: response.settings,
-        };
-      });
-      setTaskCheckFrequencyMinutesInput(
-        String(response.settings.taskCheckFrequencyMinutes),
+      const response = await persistUiSettings(
+        taskCronEnabledInput,
+        resolvedFrequency,
       );
-      setTaskCronEnabledInput(response.settings.taskCronEnabled);
+      applyUiSettingsResponse(response);
       toast.success(response.message ?? "Settings updated.");
     } catch (requestError) {
       const message =
@@ -1961,6 +1940,79 @@ export function App(): ReactElement {
     } finally {
       setMutating(false);
     }
+  }
+
+  async function handleToggleTaskCron(nextValue: boolean): Promise<void> {
+    const previousValue = taskCronEnabledInput;
+    const parsedFrequency = Number.parseInt(
+      taskCheckFrequencyMinutesInput.trim(),
+      10,
+    );
+    const isFrequencyValid =
+      Number.isFinite(parsedFrequency) &&
+      parsedFrequency >= 1 &&
+      parsedFrequency <= 1440;
+    const fallbackFrequency =
+      state?.settings.taskCheckFrequencyMinutes ??
+      DEFAULT_TASK_CHECK_FREQUENCY_MINUTES;
+    const resolvedFrequency = isFrequencyValid ? parsedFrequency : fallbackFrequency;
+
+    setTaskCronEnabledInput(nextValue);
+    setMutating(true);
+    try {
+      const response = await persistUiSettings(nextValue, resolvedFrequency);
+      applyUiSettingsResponse(response);
+      toast.success(
+        response.message ??
+          `Cron ${nextValue ? "enabled" : "disabled"}.`,
+      );
+    } catch (requestError) {
+      setTaskCronEnabledInput(previousValue);
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to update cron setting.";
+      toast.error(message);
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function persistUiSettings(
+    taskCronEnabled: boolean,
+    taskCheckFrequencyMinutes: number,
+  ): Promise<{ settings: UiSettings; message?: string }> {
+    return fetchJson<{
+      settings: UiSettings;
+      message?: string;
+    }>("/api/settings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        taskCronEnabled,
+        taskCheckFrequencyMinutes,
+      }),
+    });
+  }
+
+  function applyUiSettingsResponse(response: {
+    settings: UiSettings;
+  }): void {
+    setState((current) => {
+      if (!current) {
+        return current;
+      }
+      return {
+        ...current,
+        settings: response.settings,
+      };
+    });
+    setTaskCheckFrequencyMinutesInput(
+      String(response.settings.taskCheckFrequencyMinutes),
+    );
+    setTaskCronEnabledInput(response.settings.taskCronEnabled);
   }
 
   async function handleCreateTask(
@@ -4170,22 +4222,26 @@ export function App(): ReactElement {
                               Enable or disable background task cron execution.
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={taskCronEnabledInput}
-                            onClick={() => {
-                              setTaskCronEnabledInput((current) => !current);
-                            }}
-                            className={cn(
-                              "inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium transition-colors",
-                              taskCronEnabledInput
-                                ? "border-success/60 bg-success/20 text-success"
-                                : "border-border bg-background text-muted-foreground",
-                            )}
-                          >
-                            {taskCronEnabledInput ? "Enabled" : "Disabled"}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={taskCronEnabledInput}
+                              disabled={isMutating || isLoading}
+                              onCheckedChange={(checked) => {
+                                void handleToggleTaskCron(checked);
+                              }}
+                              aria-label="Toggle task cron"
+                            />
+                            <span
+                              className={cn(
+                                "text-xs font-medium",
+                                taskCronEnabledInput
+                                  ? "text-success"
+                                  : "text-muted-foreground",
+                              )}
+                            >
+                              {taskCronEnabledInput ? "Enabled" : "Disabled"}
+                            </span>
+                          </div>
                         </div>
                       </section>
 
