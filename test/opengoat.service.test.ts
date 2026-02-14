@@ -687,6 +687,104 @@ describe("OpenGoatService", () => {
     expect(provider.deletedAgents).toHaveLength(0);
   });
 
+  it("enforces OpenClaw agent policy: sandbox off and tools allow all", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const commandRunner = new FakeCommandRunner(async (request) => {
+      if (
+        request.args[0] === "skills" &&
+        request.args[1] === "list" &&
+        request.args.includes("--json")
+      ) {
+        return {
+          code: 0,
+          stdout: JSON.stringify({
+            workspaceDir: path.join(root, "openclaw-workspace"),
+            managedSkillsDir: path.join(root, "openclaw-managed-skills"),
+            skills: [],
+          }),
+          stderr: "",
+        };
+      }
+      if (
+        request.args[0] === "agents" &&
+        request.args[1] === "list" &&
+        request.args.includes("--json")
+      ) {
+        return {
+          code: 0,
+          stdout: JSON.stringify([
+            {
+              id: "ceo",
+              workspace: path.join(root, "workspaces", "ceo"),
+              agentDir: path.join(root, "agents", "ceo"),
+            },
+          ]),
+          stderr: "",
+        };
+      }
+      if (
+        request.args[0] === "config" &&
+        request.args[1] === "get" &&
+        request.args[2] === "agents.list"
+      ) {
+        return {
+          code: 0,
+          stdout: JSON.stringify([
+            {
+              id: "ceo",
+              workspace: path.join(root, "workspaces", "ceo"),
+              agentDir: path.join(root, "agents", "ceo"),
+            },
+          ]),
+          stderr: "",
+        };
+      }
+      if (
+        request.args[0] === "config" &&
+        request.args[1] === "set"
+      ) {
+        return {
+          code: 0,
+          stdout: "",
+          stderr: "",
+        };
+      }
+      return {
+        code: 0,
+        stdout: "",
+        stderr: "",
+      };
+    });
+
+    const { service } = createService(
+      root,
+      new FakeOpenClawProvider(),
+      commandRunner,
+    );
+    await service.initialize();
+
+    expect(
+      commandRunner.requests.some(
+        (request) =>
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
+          request.args[2] === "agents.list[0].sandbox.mode" &&
+          request.args[3] === "off",
+      ),
+    ).toBe(true);
+    expect(
+      commandRunner.requests.some(
+        (request) =>
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
+          request.args[2] === "agents.list[0].tools.allow" &&
+          request.args[3] === "[\"*\"]",
+      ),
+    ).toBe(true);
+  });
+
   it("pre-seeds ceo workspace, keeps First Run, replaces Every Session, and replaces BOOTSTRAP after runtime sync", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
@@ -748,6 +846,9 @@ describe("OpenGoatService", () => {
     expect(agentsMarkdown).toContain(
       "4. **If in MAIN SESSION**: Also read `MEMORY.md`",
     );
+    expect(agentsMarkdown).toContain(
+      "Use OpenGoat tools directly (`opengoat_*`). Do not rely on shell CLI commands.",
+    );
     expect(agentsMarkdown).toContain("## The Organization");
     expect(agentsMarkdown).toContain(
       "You have access to the organization's context and wiki on `../../organization`",
@@ -762,7 +863,10 @@ describe("OpenGoatService", () => {
     expect(roleMarkdown).toContain("- Your name: CEO");
     expect(roleMarkdown).toContain("- Role: CEO");
     expect(roleMarkdown).toContain(
-      "- For info about your reportees, run `sh ./opengoat agent info ceo`.",
+      '- For info about your reportees, call tool `opengoat_agent_info` with `{"agentId":"ceo"}`.',
+    );
+    expect(roleMarkdown).toContain(
+      "- Use OpenGoat tools directly (`opengoat_*`), not shell CLI commands.",
     );
     expect(roleMarkdown).toContain(
       "- To delegate and coordinate work, use `og-*` skills.",

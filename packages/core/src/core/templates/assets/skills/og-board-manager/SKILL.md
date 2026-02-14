@@ -7,90 +7,109 @@ metadata:
 
 # Board Manager
 
-Delegate and track work using tasks.
+Delegate and track work using OpenGoat tools.
+
+Use tools directly. Do not run shell CLI commands like `sh ./opengoat ...`.
 
 ## Allowed Actions
 
 - Create tasks for yourself.
 - Assign tasks to your direct or indirect reportees.
-- Read task state.
-- If your session has an associated project, specify the path when creating tasks.
+- Read and update task state.
+- Add blockers, artifacts, and worklogs.
 
 Important: replace `<me>` with your agent ID.
 
-```bash
-sh ./opengoat agent info <me>
+```text
+opengoat_agent_info({ "agentId": "<me>" })
 ```
 
-## Task Commands
+## Task Tools
 
-```bash
-sh ./opengoat task list --as <me>
-sh ./opengoat task create --owner <me> --title "..." --description "..." --assign <agent-id> [--project <path>]
-sh ./opengoat task show <task-id>
+```text
+opengoat_task_list({ "assignee": "<me>" })
+opengoat_task_get({ "taskId": "<task-id>" })
+opengoat_task_create({
+  "actorId": "<me>",
+  "title": "...",
+  "description": "...",
+  "assignedTo": "<agent-id>",
+  "project": "<path>"
+})
+opengoat_task_update_status({
+  "actorId": "<me>",
+  "taskId": "<task-id>",
+  "status": "todo|doing|blocked|pending|done",
+  "reason": "<optional-reason>"
+})
+opengoat_task_add_blocker({ "actorId": "<me>", "taskId": "<task-id>", "blocker": "..." })
+opengoat_task_add_artifact({ "actorId": "<me>", "taskId": "<task-id>", "content": "..." })
+opengoat_task_add_worklog({ "actorId": "<me>", "taskId": "<task-id>", "content": "..." })
 ```
 
-## Standard workflow
+## Standard Workflow
 
 ### 1. Confirm org context
 
-```bash
-sh ./opengoat agent info <me>
+```text
+opengoat_agent_info({ "agentId": "<me>" })
 ```
 
 Use the output to ensure:
 
-- You assign only to **your** reportees (direct or indirect) or yourself
-- You choose task granularity appropriate to your layer in the org
+- You assign only to your reportees (direct or indirect) or yourself.
+- You choose task granularity appropriate to your layer in the org.
 
 ### 2. Review tasks
 
-```bash
-sh ./opengoat task list --as <me>
-sh ./opengoat task show <task-id>
+```text
+opengoat_task_list({ "assignee": "<me>" })
+opengoat_task_get({ "taskId": "<task-id>" })
 ```
 
 ### 3. Delegate by creating a task
 
 Create one task per owner and outcome.
 
-```bash
-sh ./opengoat task create \
-  --owner <me> \
-  --title "<verb>: <deliverable>" \
-  --description "<context + deliverable + acceptance criteria>" \
-  --assign <agent-id> \
-  [--project <path>]
+```text
+opengoat_task_create({
+  "actorId": "<me>",
+  "title": "<verb>: <deliverable>",
+  "description": "<context + deliverable + acceptance criteria>",
+  "assignedTo": "<agent-id>",
+  "project": "<path>"
+})
 ```
 
 ## Self-assigning (do the work yourself)
 
-If the task is small enough and you have the tools and context to complete it efficiently, **do not delegate**. Create a task for yourself so the work is still tracked.
+If the task is small enough and you have the tools and context to complete it efficiently, do not delegate. Create a task for yourself so the work is still tracked.
 
 Rules:
 
-- Use `--assign <me>`
-- Keep the task scoped to a single, verifiable outcome
-- Include acceptance criteria so “done” is unambiguous
+- Use `"assignedTo": "<me>"`.
+- Keep the task scoped to a single, verifiable outcome.
+- Include acceptance criteria so done is unambiguous.
 
 Example:
 
-```bash
-sh ./opengoat task create \
-  --owner <me> \
-  --title "Fix: <short description>" \
-  --description "Context:\n- ...\n\nDeliverable:\n- ...\n\nAcceptance criteria:\n- ..." \
-  --assign <me> \
-  [--project <path>]
+```text
+opengoat_task_create({
+  "actorId": "<me>",
+  "title": "Fix: <short description>",
+  "description": "Context:\n- ...\n\nDeliverable:\n- ...\n\nAcceptance criteria:\n- ...",
+  "assignedTo": "<me>",
+  "project": "<path>"
+})
 ```
 
-## Task sizing and detail level (depends on your layer)
+## Task sizing and detail level
 
-Do not blindly "break tasks down small." Size tasks based on where you sit in the org and who you are assigning to. You already know your org shape (direct and indirect reportees, and which reportees are managers). Use that.
+Do not blindly break tasks down small. Size tasks based on where you sit in the org and who you are assigning to.
 
 ### If you are a higher-level manager
 
-Write **outcome-focused** tasks:
+Write outcome-focused tasks:
 
 - What result is needed
 - Why it matters
@@ -101,13 +120,13 @@ Expect your reportee to create smaller tasks for their own direct reportees if n
 
 ### If you are the last manager before execution
 
-Write **execution-ready** tasks:
+Write execution-ready tasks:
 
 - Concrete steps when helpful
-- File paths, commands, edge cases
-- Clear validation steps (how to verify)
+- File paths and edge cases
+- Clear validation steps
 
-## Task writing template (not enforced, but recommended)
+## Task writing template
 
 ### Title
 
@@ -118,7 +137,7 @@ Use a verb + deliverable:
 - `Investigate: <question>`
 - `Decide: <tradeoff>`
 
-### Description (pasteable)
+### Description
 
 ```text
 Context:
@@ -137,4 +156,4 @@ Constraints:
 ## Troubleshooting
 
 - Task creation fails: you are likely assigning to someone who is not in your reportee tree. Reassign to a valid reportee (direct or indirect) or assign to yourself.
-- You can use `sh ./opengoat task --help` to see available commands and options.
+- If a tool call fails, inspect the tool error and retry with corrected parameters.

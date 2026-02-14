@@ -226,6 +226,9 @@ describe("AgentService", () => {
     expect(agentsMarkdown).toContain(
       "4. **If in MAIN SESSION**: Also read `MEMORY.md`",
     );
+    expect(agentsMarkdown).toContain(
+      "Use OpenGoat tools directly (`opengoat_*`). Do not rely on shell CLI commands.",
+    );
     expect(agentsMarkdown).toContain("## The Organization");
     expect(agentsMarkdown).toContain(
       "You have access to the organization's context and wiki on `../../organization`",
@@ -240,7 +243,10 @@ describe("AgentService", () => {
     expect(roleMarkdown).toContain("- Your name: CEO");
     expect(roleMarkdown).toContain("- Role: CEO");
     expect(roleMarkdown).toContain(
-      "- For info about your reportees, run `sh ./opengoat agent info ceo`.",
+      '- For info about your reportees, call tool `opengoat_agent_info` with `{"agentId":"ceo"}`.',
+    );
+    expect(roleMarkdown).toContain(
+      "- Use OpenGoat tools directly (`opengoat_*`), not shell CLI commands.",
     );
     expect(roleMarkdown).toContain(
       "- To delegate and coordinate work, use `og-*` skills.",
@@ -291,6 +297,9 @@ describe("AgentService", () => {
     expect(agentsMarkdown).not.toContain("legacy session content");
     expect(agentsMarkdown).toContain("## Every Session");
     expect(agentsMarkdown).toContain("Read `SOUL.md` — this is who you are");
+    expect(agentsMarkdown).toContain(
+      "Use OpenGoat tools directly (`opengoat_*`). Do not rely on shell CLI commands.",
+    );
     expect(agentsMarkdown).toContain("## The Organization");
   });
 
@@ -324,7 +333,10 @@ describe("AgentService", () => {
     expect(roleMarkdown).toContain("- Your name: Avery");
     expect(roleMarkdown).toContain("- Role: Backend Engineer");
     expect(roleMarkdown).toContain(
-      "- For info about your level on the organiztion, run `sh ./opengoat agent info engineer`.",
+      '- For info about your level on the organization, call tool `opengoat_agent_info` with `{"agentId":"engineer"}`.',
+    );
+    expect(roleMarkdown).toContain(
+      "- Use OpenGoat tools directly (`opengoat_*`), not shell CLI commands.",
     );
     expect(roleMarkdown).toContain(
       "- To delegate and coordinate work, use `og-*` skills.",

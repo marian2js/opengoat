@@ -99,6 +99,8 @@ interface OpenGoatServiceDeps {
 
 const OPENCLAW_PROVIDER_ID = "openclaw";
 const OPENCLAW_DEFAULT_AGENT_ID = "main";
+const OPENCLAW_AGENT_SANDBOX_MODE = "off";
+const OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON = "[\"*\"]";
 
 export interface RuntimeDefaultsSyncResult {
   ceoSyncCode?: number;
@@ -357,6 +359,7 @@ export class OpenGoatService {
     const warnings: string[] = [];
     let ceoSynced = false;
     let ceoSyncCode: number | undefined;
+    let localAgents: AgentDescriptor[] = [];
 
     const ceoExists = (await this.agentService.listAgents(paths)).some(
       (agent) => agent.id === DEFAULT_AGENT_ID,
@@ -400,8 +403,8 @@ export class OpenGoatService {
     }
 
     try {
-      const agents = await this.agentService.listAgents(paths);
-      for (const agent of agents) {
+      localAgents = await this.agentService.listAgents(paths);
+      for (const agent of localAgents) {
         const sync = await this.syncOpenClawAgentRegistration(paths, {
           descriptor: agent,
           existingEntry: openClawAgentEntriesById?.get(agent.id),
@@ -415,6 +418,19 @@ export class OpenGoatService {
     } catch (error) {
       warnings.push(
         `OpenClaw startup sync failed: ${toErrorMessage(error)}`,
+      );
+    }
+
+    try {
+      warnings.push(
+        ...(await this.syncOpenClawAgentExecutionPolicies(
+          paths,
+          localAgents.map((agent) => agent.id),
+        )),
+      );
+    } catch (error) {
+      warnings.push(
+        `OpenClaw agent policy sync failed: ${toErrorMessage(error)}`,
       );
     }
 
@@ -523,6 +539,7 @@ export class OpenGoatService {
         }". ${toErrorMessage(error)}`,
       );
     }
+    await this.syncOpenClawAgentExecutionPolicies(paths, [created.agent.id]);
     try {
       const workspaceBootstrap =
         await this.agentService.ensureAgentWorkspaceBootstrap(paths, {
@@ -1605,6 +1622,113 @@ export class OpenGoatService {
     }
   }
 
+  private async syncOpenClawAgentExecutionPolicies(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    rawAgentIds: string[],
+  ): Promise<string[]> {
+    if (!this.commandRunner) {
+      return [];
+    }
+
+    const agentIds = [
+      ...new Set(
+        rawAgentIds
+          .map((agentId) => normalizeAgentId(agentId))
+          .filter((agentId): agentId is string => Boolean(agentId)),
+      ),
+    ];
+    if (agentIds.length === 0) {
+      return [];
+    }
+
+    const warnings: string[] = [];
+    const env = await this.resolveOpenClawEnv(paths);
+    const listResult = await this.runOpenClaw(["config", "get", "agents.list"], {
+      env,
+    });
+
+    if (listResult.code !== 0) {
+      warnings.push(
+        `OpenClaw config read failed (agents.list, code ${listResult.code}). ${
+          listResult.stderr.trim() || listResult.stdout.trim() || ""
+        }`.trim(),
+      );
+      return warnings;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(listResult.stdout);
+    } catch {
+      warnings.push(
+        "OpenClaw config read returned non-JSON for agents.list; skipping sandbox/tools policy sync.",
+      );
+      return warnings;
+    }
+
+    if (!Array.isArray(parsed)) {
+      warnings.push(
+        "OpenClaw config agents.list is not an array; skipping sandbox/tools policy sync.",
+      );
+      return warnings;
+    }
+
+    const entries = parsed;
+    const indexById = new Map<string, number>();
+    for (let index = 0; index < entries.length; index += 1) {
+      const entry = entries[index];
+      if (!entry) {
+        continue;
+      }
+      const id = normalizeAgentConfigEntryId(entry);
+      if (!id || indexById.has(id)) {
+        continue;
+      }
+      indexById.set(id, index);
+    }
+
+    for (const agentId of agentIds) {
+      const index = indexById.get(agentId);
+      if (index === undefined) {
+        warnings.push(
+          `OpenClaw config policy sync skipped for "${agentId}" because no agents.list entry was found.`,
+        );
+        continue;
+      }
+
+      const entry = asRecord(entries[index]);
+      if (readAgentSandboxMode(entry) !== OPENCLAW_AGENT_SANDBOX_MODE) {
+        const sandboxSet = await this.runOpenClaw(
+          ["config", "set", `agents.list[${index}].sandbox.mode`, OPENCLAW_AGENT_SANDBOX_MODE],
+          { env },
+        );
+        if (sandboxSet.code !== 0) {
+          warnings.push(
+            `OpenClaw sandbox policy sync failed for "${agentId}" (code ${sandboxSet.code}). ${
+              sandboxSet.stderr.trim() || sandboxSet.stdout.trim() || ""
+            }`.trim(),
+          );
+        }
+      }
+
+      if (!hasAgentToolsAllowAll(entry)) {
+        const toolsSet = await this.runOpenClaw(
+          ["config", "set", `agents.list[${index}].tools.allow`, OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON],
+          { env },
+        );
+        if (toolsSet.code !== 0) {
+          warnings.push(
+            `OpenClaw tools policy sync failed for "${agentId}" (code ${toolsSet.code}). ${
+              toolsSet.stderr.trim() || toolsSet.stdout.trim() || ""
+            }`.trim(),
+          );
+        }
+      }
+    }
+
+    return warnings;
+  }
+
   private async resolveOpenClawEnv(
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
   ): Promise<NodeJS.ProcessEnv> {
@@ -1686,4 +1810,42 @@ export class OpenGoatService {
     const latestProjectPath = sessions[0]?.projectPath?.trim();
     return latestProjectPath || undefined;
   }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function normalizeAgentConfigEntryId(value: unknown): string | undefined {
+  const entry = asRecord(value);
+  const id = entry.id;
+  if (typeof id !== "string") {
+    return undefined;
+  }
+  return normalizeAgentId(id);
+}
+
+function readAgentSandboxMode(entry: Record<string, unknown>): string | undefined {
+  const sandbox = asRecord(entry.sandbox);
+  const mode = sandbox.mode;
+  if (typeof mode !== "string") {
+    return undefined;
+  }
+  const trimmed = mode.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function hasAgentToolsAllowAll(entry: Record<string, unknown>): boolean {
+  const tools = asRecord(entry.tools);
+  const allow = tools.allow;
+  if (!Array.isArray(allow)) {
+    return false;
+  }
+
+  return allow.some(
+    (value) => typeof value === "string" && value.trim() === "*",
+  );
 }

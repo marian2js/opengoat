@@ -7,142 +7,119 @@ metadata:
 
 # Board Individual
 
-Use this skill to read and update tasks assigned to you. Follow your manager’s instructions for what to do, and use the commands below to keep task state accurate.
+Use this skill to read and update tasks assigned to you.
 
-## Quick start
+Use tools directly. Do not run shell CLI commands like `sh ./opengoat ...`.
+
+## Quick Start
 
 Replace `<me>` with your agent id.
 
-```bash
-sh ./opengoat agent info <me>
+```text
+opengoat_agent_info({ "agentId": "<me>" })
 ```
 
 You will typically have one or more `<task-id>` values to update.
 
-## Relevant commands
+## Relevant Tools
 
-```bash
-sh ./opengoat task list [--as <me>] [--json]
-sh ./opengoat task show <task-id> [--json]
-
-sh ./opengoat task status <task-id> <todo|doing|blocked|pending|done> [--reason <reason>] [--as <me>]
-
-sh ./opengoat task blocker add <task-id> <content> [--as <me>]
-sh ./opengoat task artifact add <task-id> <content> [--as <me>]
-sh ./opengoat task worklog add <task-id> <content> [--as <me>]
+```text
+opengoat_task_list({ "assignee": "<me>" })
+opengoat_task_get({ "taskId": "<task-id>" })
+opengoat_task_update_status({
+  "actorId": "<me>",
+  "taskId": "<task-id>",
+  "status": "todo|doing|blocked|pending|done",
+  "reason": "<optional-reason>"
+})
+opengoat_task_add_blocker({ "actorId": "<me>", "taskId": "<task-id>", "blocker": "..." })
+opengoat_task_add_artifact({ "actorId": "<me>", "taskId": "<task-id>", "content": "..." })
+opengoat_task_add_worklog({ "actorId": "<me>", "taskId": "<task-id>", "content": "..." })
 ```
 
-## View tasks
+## View Tasks
 
 ### Show a single task
 
-```bash
-sh ./opengoat task show <task-id>
+```text
+opengoat_task_get({ "taskId": "<task-id>" })
 ```
 
 ### List tasks
 
-List tasks owned by an agent (often: you):
-
-```bash
-sh ./opengoat task list --as <me>
+```text
+opengoat_task_list({ "assignee": "<me>" })
 ```
 
-### List tasks by status (practical approach)
+### List latest tasks
 
-Use JSON output and filter locally. The JSON includes task status (`todo|doing|blocked|pending|done`).
-
-```bash
-sh ./opengoat task list --json
+```text
+opengoat_task_list_latest({ "assignee": "<me>", "limit": 20 })
 ```
 
-Filter examples (adjust the jq selector to match the JSON shape you see):
-
-```bash
-
-# If the JSON is an array of tasks
-
-sh ./opengoat task list --json | jq '.[] | select(.status=="doing")'
-
-# If the JSON is an object that contains a tasks array
-
-sh ./opengoat task list --json | jq '.tasks[] | select(.status=="doing")'
-```
-
-## Update task status
+## Update Task Status
 
 Statuses: `todo`, `doing`, `blocked`, `pending`, `done`.
 
-```bash
-sh ./opengoat task status <task-id> <todo|doing|blocked|pending|done> [--reason "<reason>"]
+```text
+opengoat_task_update_status({
+  "actorId": "<me>",
+  "taskId": "<task-id>",
+  "status": "doing|blocked|pending|done|todo",
+  "reason": "<reason when needed>"
+})
 ```
 
 ### Reason rules
 
-- `--reason` is **mandatory** when moving to:
-  - `blocked`
-  - `pending`
-- `--reason` is optional for other statuses, but recommended when it improves clarity.
+- `reason` is mandatory when moving to `blocked` or `pending`.
+- `reason` is optional for other statuses, but recommended when it improves clarity.
 
 Examples:
 
-```bash
-
-# Start work
-
-sh ./opengoat task status <task-id> doing
-
-# Blocked (reason required)
-
-sh ./opengoat task status <task-id> blocked --reason "Need API token from platform team"
-
-# Pending (reason required)
-
-sh ./opengoat task status <task-id> pending --reason "Waiting for review window on Friday"
-
-# Done (reason optional but useful)
-
-sh ./opengoat task status <task-id> done --reason "Merged PR #123 and deployed"
+```text
+opengoat_task_update_status({ "actorId": "<me>", "taskId": "<task-id>", "status": "doing" })
+opengoat_task_update_status({ "actorId": "<me>", "taskId": "<task-id>", "status": "blocked", "reason": "Need API token from platform team" })
+opengoat_task_update_status({ "actorId": "<me>", "taskId": "<task-id>", "status": "pending", "reason": "Waiting for review window on Friday" })
+opengoat_task_update_status({ "actorId": "<me>", "taskId": "<task-id>", "status": "done", "reason": "Merged PR #123 and deployed" })
 ```
 
-### Assignee override (only if you must)
+## Blockers, Artifacts, Worklogs
 
-Some contexts require specifying an assignee context explicitly.
+### Add a blocker entry
 
-```bash
-sh ./opengoat task status <task-id> doing --as <agent-id>
-```
-
-## Blockers, artifacts, worklogs
-
-### Add a blocker entry (recommended when blocked)
-
-Use this to capture what is blocking you and what unblocks you.
-
-```bash
-sh ./opengoat task blocker add <task-id> "Blocked by <thing>. Unblocks when <condition>." --as <me>
+```text
+opengoat_task_add_blocker({
+  "actorId": "<me>",
+  "taskId": "<task-id>",
+  "blocker": "Blocked by <thing>. Unblocks when <condition>."
+})
 ```
 
 ### Add an artifact (proof of work)
 
-Use this for PR links, docs, screenshots, commands run, or final outputs.
-
-```bash
-sh ./opengoat task artifact add <task-id> "PR: <link> | Docs: <link> | Output: <summary>" --as <me>
+```text
+opengoat_task_add_artifact({
+  "actorId": "<me>",
+  "taskId": "<task-id>",
+  "content": "PR: <link> | Docs: <link> | Output: <summary>"
+})
 ```
 
 ### Add a worklog update (progress notes)
 
-Use for concise progress updates and handoffs.
-
-```bash
-sh ./opengoat task worklog add <task-id> "Did X. Next: Y. Risk: Z." --as <me>
+```text
+opengoat_task_add_worklog({
+  "actorId": "<me>",
+  "taskId": "<task-id>",
+  "content": "Did X. Next: Y. Risk: Z."
+})
 ```
 
-## Minimal hygiene
+## Minimal Hygiene
 
-- Keep status accurate (`todo` → `doing` → `blocked/pending/done`).
-- When moving to `blocked` or `pending`, always include a specific `--reason`.
+- Keep status accurate (`todo` -> `doing` -> `blocked/pending/done`).
+- When moving to `blocked` or `pending`, include a specific reason.
 - When blocked, add a blocker entry that states what unblocks you.
 - When done, add at least one artifact that proves completion.
 - Use worklogs when progress is non-obvious or when handing off.
