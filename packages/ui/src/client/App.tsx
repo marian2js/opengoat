@@ -3262,7 +3262,7 @@ export function App(): ReactElement {
                     "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
                     (state?.settings.taskCronEnabled ?? taskCronEnabledInput)
                       ? "border-success/50 bg-success/15 text-success hover:bg-success/20"
-                      : "border-danger/50 bg-danger/15 text-danger hover:bg-danger/20",
+                      : "border-red-500/70 bg-red-600/25 text-red-200 hover:bg-red-600/35",
                   )}
                   title="Open settings"
                   aria-label="Open settings"
@@ -5315,7 +5315,7 @@ function parseRoute(pathname: string): AppRoute {
   const trimmed = pathname.trim() || "/";
   const normalized = trimmed.length > 1 ? trimmed.replace(/\/+$/, "") : trimmed;
 
-  if (normalized === "/" || normalized === "/overview") {
+  if (normalized === "/" || normalized === "/dashboard" || normalized === "/overview") {
     return { kind: "page", view: "overview" };
   }
 
@@ -5398,7 +5398,7 @@ function routeToPath(route: AppRoute): string {
   }
 
   if (route.view === "overview") {
-    return "/overview";
+    return "/dashboard";
   }
 
   return `/${route.view}`;
