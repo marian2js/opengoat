@@ -3690,6 +3690,18 @@ export function App(): ReactElement {
 
             <Separator className="my-2 bg-border/70" />
 
+            {!isSidebarCollapsed && pinnedWorkspaceSessions.length > 0 ? (
+              <div className="mb-1 mt-0.5 space-y-0.5">
+                {pinnedWorkspaceSessions.map((session) =>
+                  renderWorkspaceSessionRow(
+                    session,
+                    `pinned:${session.workspaceId}:${session.sessionId}`,
+                  ),
+                )}
+                <Separator className="my-2 bg-border/60" />
+              </div>
+            ) : null}
+
             <button
               type="button"
               title="Add Project"
@@ -3707,18 +3719,6 @@ export function App(): ReactElement {
                 <span className="ml-2">Add Project</span>
               ) : null}
             </button>
-
-            {!isSidebarCollapsed && pinnedWorkspaceSessions.length > 0 ? (
-              <div className="mb-1 mt-0.5 space-y-0.5">
-                {pinnedWorkspaceSessions.map((session) =>
-                  renderWorkspaceSessionRow(
-                    session,
-                    `pinned:${session.workspaceId}:${session.sessionId}`,
-                  ),
-                )}
-                <Separator className="my-2 bg-border/60" />
-              </div>
-            ) : null}
 
             {workspaceNodes.map((workspace) => {
               const isWorkspaceCollapsed = collapsedWorkspaceIds.has(
