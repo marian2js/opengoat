@@ -26,13 +26,17 @@ RUN pnpm --filter @opengoat/core build \
 FROM node:22 AS runtime
 WORKDIR /app
 
+ARG OPENCLAW_VERSION=latest
+
 ENV NODE_ENV=production
 ENV OPENGOAT_USE_DIST=1
 ENV OPENGOAT_UI_HOST=0.0.0.0
 ENV OPENGOAT_UI_PORT=19123
 ENV OPENGOAT_HOME=/data/opengoat
+ENV HOME=/data/opengoat
 
-RUN npm install -g openclaw@latest
+RUN npm install -g "openclaw@${OPENCLAW_VERSION}" \
+  && openclaw --version
 
 COPY --from=build /app /app
 COPY docker/entrypoint.sh /usr/local/bin/opengoat-entrypoint
