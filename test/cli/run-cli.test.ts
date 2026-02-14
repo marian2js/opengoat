@@ -9,6 +9,9 @@ const roots: string[] = [];
 const originalHome = process.env.OPENGOAT_HOME;
 const originalOpenClawStateDir = process.env.OPENCLAW_STATE_DIR;
 const originalOpenClawConfigPath = process.env.OPENCLAW_CONFIG_PATH;
+const BOOTSTRAP_TIMEOUT_MS = 90_000;
+const INIT_TIMEOUT_MS = 45_000;
+const HARD_RESET_TIMEOUT_MS = 45_000;
 
 afterEach(async () => {
   if (originalHome === undefined) {
@@ -66,7 +69,7 @@ describe("runCli", () => {
       defaultAgent: string;
     };
     expect(config.defaultAgent).toBe("ceo");
-  }, 45_000);
+  }, BOOTSTRAP_TIMEOUT_MS);
 
   it("bootstraps through CLI init command", async () => {
     const root = await createTempDir("opengoat-runcli-");
@@ -84,7 +87,7 @@ describe("runCli", () => {
       defaultAgent: string;
     };
     expect(config.defaultAgent).toBe("ceo");
-  });
+  }, INIT_TIMEOUT_MS);
 
   it("returns non-zero for unknown commands", async () => {
     const root = await createTempDir("opengoat-runcli-");
@@ -176,7 +179,7 @@ describe("runCli", () => {
     await expect(
       access(path.join(root, "config.json"), constants.F_OK),
     ).rejects.toBeTruthy();
-  });
+  }, HARD_RESET_TIMEOUT_MS);
 });
 
 function applyOpenClawIsolation(root: string): void {

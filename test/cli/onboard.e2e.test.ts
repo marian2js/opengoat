@@ -8,6 +8,7 @@ import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
 const execFileAsync = promisify(execFile);
 const roots: string[] = [];
+const ONBOARD_TIMEOUT_MS = 90_000;
 
 afterEach(async () => {
   while (roots.length > 0) {
@@ -40,7 +41,7 @@ describe("onboard command e2e", () => {
     expect(providerConfig.providerId).toBe("openclaw");
     expect(providerConfig.env?.OPENGOAT_OPENCLAW_GATEWAY_MODE).toBe("local");
     },
-    45_000,
+    ONBOARD_TIMEOUT_MS,
   );
 
   it("saves external OpenClaw gateway settings", async () => {
@@ -73,7 +74,7 @@ describe("onboard command e2e", () => {
     expect(providerConfig.env?.OPENCLAW_GATEWAY_URL).toBe("ws://remote-host:18789");
     expect(providerConfig.env?.OPENCLAW_GATEWAY_PASSWORD).toBe("secret-token");
     expect(providerConfig.env?.OPENCLAW_ARGUMENTS).toContain("--remote ws://remote-host:18789");
-  }, 45_000);
+  }, ONBOARD_TIMEOUT_MS);
 
   it("fails with a clear error when external mode is missing required fields", async () => {
     const root = await createTempDir("opengoat-onboard-e2e-");

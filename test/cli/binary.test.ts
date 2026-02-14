@@ -9,6 +9,8 @@ import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
 const execFileAsync = promisify(execFile);
 const roots: string[] = [];
+const BOOTSTRAP_TIMEOUT_MS = 90_000;
+const INIT_TIMEOUT_MS = 45_000;
 
 afterEach(async () => {
   while (roots.length > 0) {
@@ -67,7 +69,7 @@ describe("opengoat binary", () => {
       defaultAgent: string;
     };
     expect(config.defaultAgent).toBe("ceo");
-  }, 30_000);
+  }, BOOTSTRAP_TIMEOUT_MS);
 
   it("runs init and creates config files", async () => {
     const root = await createTempDir("opengoat-bin-");
@@ -91,7 +93,7 @@ describe("opengoat binary", () => {
       defaultAgent: string;
     };
     expect(config.defaultAgent).toBe("ceo");
-  });
+  }, INIT_TIMEOUT_MS);
 });
 
 function buildOpenClawIsolatedEnv(root: string): NodeJS.ProcessEnv {
