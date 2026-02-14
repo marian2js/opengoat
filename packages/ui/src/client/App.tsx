@@ -780,6 +780,11 @@ export function App(): ReactElement {
     });
   }, []);
 
+  const openCreateAgentDialog = useCallback(() => {
+    setCreateAgentDialogError(null);
+    setCreateAgentDialogOpen(true);
+  }, []);
+
   const refreshSessions = useCallback(
     async (agentId: string = DEFAULT_AGENT_ID) => {
       const response = await fetchJson<SessionsResponse>(
@@ -3308,10 +3313,7 @@ export function App(): ReactElement {
               {route.kind === "page" && route.view === "agents" ? (
                 <Button
                   size="sm"
-                  onClick={() => {
-                    setCreateAgentDialogError(null);
-                    setCreateAgentDialogOpen(true);
-                  }}
+                  onClick={openCreateAgentDialog}
                   disabled={isLoading || isMutating}
                 >
                   Create Agent
@@ -4078,7 +4080,11 @@ export function App(): ReactElement {
                     </section>
 
                     {agents.length >= 2 ? (
-                      <OrganizationChartPanel agents={agents} />
+                      <OrganizationChartPanel
+                        agents={agents}
+                        onCreateAgentClick={openCreateAgentDialog}
+                        isCreateAgentDisabled={isLoading || isMutating}
+                      />
                     ) : null}
                   </>
                 ) : null}
@@ -4827,7 +4833,15 @@ export function App(): ReactElement {
   );
 }
 
-function OrganizationChartPanel({ agents }: { agents: Agent[] }): ReactElement {
+function OrganizationChartPanel({
+  agents,
+  onCreateAgentClick,
+  isCreateAgentDisabled,
+}: {
+  agents: Agent[];
+  onCreateAgentClick: () => void;
+  isCreateAgentDisabled: boolean;
+}): ReactElement {
   const hierarchy = useMemo(() => buildOrgHierarchy(agents), [agents]);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(
     new Set(),
@@ -4866,25 +4880,6 @@ function OrganizationChartPanel({ agents }: { agents: Agent[] }): ReactElement {
     });
   }, [hierarchy, collapsedNodeIds, toggleNode]);
 
-  const collapseAll = useCallback(() => {
-    const collapsible = new Set<string>();
-    for (const [id, children] of hierarchy.childrenById.entries()) {
-      if (children.length > 0) {
-        collapsible.add(id);
-      }
-    }
-
-    for (const rootId of hierarchy.roots) {
-      collapsible.delete(rootId);
-    }
-
-    setCollapsedNodeIds(collapsible);
-  }, [hierarchy]);
-
-  const expandAll = useCallback(() => {
-    setCollapsedNodeIds(new Set());
-  }, []);
-
   return (
     <Card className="border-border/70 bg-card/70">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 pb-3">
@@ -4901,19 +4896,10 @@ function OrganizationChartPanel({ agents }: { agents: Agent[] }): ReactElement {
         <div className="flex items-center gap-2">
           <Button
             size="sm"
-            variant="secondary"
-            className="h-9 px-3 text-[14px]"
-            onClick={expandAll}
+            onClick={onCreateAgentClick}
+            disabled={isCreateAgentDisabled}
           >
-            Expand All
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-9 px-3 text-[14px]"
-            onClick={collapseAll}
-          >
-            Collapse Branches
+            Create Agent
           </Button>
         </div>
       </CardHeader>
