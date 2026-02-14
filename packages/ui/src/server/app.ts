@@ -25,6 +25,8 @@ const DEFAULT_LOG_STREAM_LIMIT = 300;
 const MAX_LOG_STREAM_LIMIT = 1000;
 const LOG_STREAM_HEARTBEAT_MS = 15_000;
 const OPENCLAW_LOG_POLL_INTERVAL_MS = 1200;
+const DEFAULT_ORGANIZATION_PROJECT_NAME = "Organization";
+const DEFAULT_ORGANIZATION_PROJECT_DIRNAME = "organization";
 
 interface AgentDescriptor {
   id: string;
@@ -522,6 +524,7 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
     message: "OpenGoat UI server started.",
   });
   logs.start();
+  await ensureDefaultOrganizationWorkspace(service, logs);
 
   let uiSettings = await readUiServerSettings(service.getHomeDir());
   const getVersionInfo = createVersionInfoProvider();
@@ -2646,6 +2649,91 @@ async function prepareProjectSession(
   throw new Error("Project session preparation is unavailable. Restart the UI server after updating dependencies.");
 }
 
+async function ensureDefaultOrganizationWorkspace(
+  service: OpenClawUiService,
+  logs: UiLogBuffer
+): Promise<void> {
+  try {
+    const organizationPath = path.resolve(
+      service.getHomeDir(),
+      DEFAULT_ORGANIZATION_PROJECT_DIRNAME
+    );
+    await mkdir(organizationPath, { recursive: true });
+
+    const sessions = await service.listSessions(DEFAULT_AGENT_ID);
+    const normalizedOrganizationPath = normalizeComparableProjectPath(organizationPath);
+    const existingProjectSession = sessions.find((session) => {
+      return (
+        session.sessionKey.startsWith("project:") &&
+        normalizeComparableProjectPath(session.projectPath) === normalizedOrganizationPath
+      );
+    });
+    const hasOrganizationWorkspaceSession = sessions.some((session) => {
+      return (
+        session.sessionKey.startsWith("workspace:") &&
+        normalizeComparableProjectPath(session.projectPath) === normalizedOrganizationPath
+      );
+    });
+
+    if (existingProjectSession) {
+      const hasExpectedProjectName =
+        existingProjectSession.title.trim() === DEFAULT_ORGANIZATION_PROJECT_NAME;
+      if (!hasExpectedProjectName) {
+        await renameUiSession(
+          service,
+          DEFAULT_AGENT_ID,
+          DEFAULT_ORGANIZATION_PROJECT_NAME,
+          existingProjectSession.sessionKey
+        );
+      }
+    } else {
+      const projectSessionRef = buildProjectSessionRef(
+        DEFAULT_ORGANIZATION_PROJECT_NAME,
+        organizationPath
+      );
+      await prepareProjectSession(service, DEFAULT_AGENT_ID, {
+        sessionRef: projectSessionRef,
+        projectPath: organizationPath,
+        forceNew: false
+      });
+      await renameUiSession(
+        service,
+        DEFAULT_AGENT_ID,
+        DEFAULT_ORGANIZATION_PROJECT_NAME,
+        projectSessionRef
+      );
+    }
+
+    if (!hasOrganizationWorkspaceSession) {
+      const workspaceSessionRef = buildWorkspaceSessionRef(
+        DEFAULT_ORGANIZATION_PROJECT_NAME,
+        organizationPath
+      );
+      await prepareProjectSession(service, DEFAULT_AGENT_ID, {
+        sessionRef: workspaceSessionRef,
+        projectPath: organizationPath,
+        forceNew: true
+      });
+      await renameUiSession(
+        service,
+        DEFAULT_AGENT_ID,
+        resolveDefaultWorkspaceSessionTitle(),
+        workspaceSessionRef
+      );
+    }
+  } catch (error) {
+    logs.append({
+      timestamp: new Date().toISOString(),
+      level: "warn",
+      source: "opengoat",
+      message:
+        error instanceof Error
+          ? `Default Organization workspace setup skipped: ${error.message}`
+          : "Default Organization workspace setup skipped."
+    });
+  }
+}
+
 async function renameUiSession(
   service: OpenClawUiService,
   agentId: string,
@@ -2925,6 +3013,15 @@ function buildWorkspaceSessionRef(workspaceName: string, workspacePath: string):
 
 function resolveDefaultWorkspaceSessionTitle(): string {
   return "New Session";
+}
+
+function normalizeComparableProjectPath(value: string | undefined): string {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return "";
+  }
+  const resolved = path.resolve(trimmed);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
 function normalizeProjectSegment(value: string): string {

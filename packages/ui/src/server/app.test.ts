@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createOpenGoatUiServer,
@@ -506,6 +507,86 @@ describe("OpenGoat UI server API", () => {
     expect(payload.project.path).toBe("/tmp");
     expect(payload.project.sessionRef.startsWith("project:")).toBe(true);
     expect(payload.session.sessionKey.startsWith("workspace:")).toBe(true);
+  });
+
+  it("bootstraps default Organization project and New Session on startup", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const listSessions = vi.fn<OpenClawUiService["listSessions"]>(async (): Promise<SessionSummary[]> => []);
+    const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(async (_agentId, options): Promise<SessionRunInfo> => {
+      const sessionKey = options?.sessionRef ?? "agent:ceo:main";
+      return {
+        agentId: "ceo",
+        sessionKey,
+        sessionId: sessionKey.startsWith("project:") ? "project-org-1" : "workspace-org-1",
+        transcriptPath: "/tmp/transcript.jsonl",
+        workspacePath: "/tmp/workspace",
+        projectPath: options?.projectPath ?? "/tmp/opengoat-home/organization",
+        isNewSession: sessionKey.startsWith("workspace:")
+      };
+    });
+    const renameSession = vi.fn<NonNullable<OpenClawUiService["renameSession"]>>(async (_agentId, title = "Session", sessionRef = "agent:ceo:main"): Promise<SessionSummary> => {
+      return {
+        sessionKey: sessionRef,
+        sessionId: sessionRef.startsWith("project:") ? "project-org-1" : "workspace-org-1",
+        title,
+        updatedAt: Date.now(),
+        transcriptPath: "/tmp/transcript.jsonl",
+        workspacePath: "/tmp/workspace",
+        projectPath: path.resolve(uniqueHomeDir, "organization"),
+        inputChars: 0,
+        outputChars: 0,
+        totalChars: 0,
+        compactionCount: 0
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService({
+          homeDir: uniqueHomeDir
+        }),
+        listSessions,
+        prepareSession,
+        renameSession
+      }
+    });
+
+    const organizationPath = path.resolve(uniqueHomeDir, "organization");
+    expect(listSessions).toHaveBeenCalledWith("ceo");
+    expect(prepareSession).toHaveBeenCalledTimes(2);
+    expect(renameSession).toHaveBeenCalledTimes(2);
+    expect(prepareSession).toHaveBeenNthCalledWith(
+      1,
+      "ceo",
+      expect.objectContaining({
+        sessionRef: expect.stringMatching(/^project:/),
+        projectPath: organizationPath,
+        forceNew: false
+      })
+    );
+    expect(prepareSession).toHaveBeenNthCalledWith(
+      2,
+      "ceo",
+      expect.objectContaining({
+        sessionRef: expect.stringMatching(/^workspace:/),
+        projectPath: organizationPath,
+        forceNew: true
+      })
+    );
+    expect(renameSession).toHaveBeenNthCalledWith(
+      1,
+      "ceo",
+      "Organization",
+      expect.stringMatching(/^project:/)
+    );
+    expect(renameSession).toHaveBeenNthCalledWith(
+      2,
+      "ceo",
+      "New Session",
+      expect.stringMatching(/^workspace:/)
+    );
   });
 
   it("creates project session through legacy core fallback when prepareSession is unavailable", async () => {
@@ -1251,6 +1332,7 @@ describe("OpenGoat UI server API", () => {
 
 function createMockService(options: { homeDir?: string } = {}): OpenClawUiService {
   const homeDir = options.homeDir ?? "/tmp/opengoat-home";
+  const organizationPath = path.resolve(homeDir, "organization");
   return {
     initialize: async () => {
       return undefined;
@@ -1277,7 +1359,34 @@ function createMockService(options: { homeDir?: string } = {}): OpenClawUiServic
         skippedPaths: []
       };
     },
-    listSessions: async (): Promise<SessionSummary[]> => [],
+    listSessions: async (): Promise<SessionSummary[]> => [
+      {
+        sessionKey: "project:organization-default",
+        sessionId: "session-project-organization",
+        title: "Organization",
+        updatedAt: Date.now(),
+        transcriptPath: "/tmp/transcript-project.jsonl",
+        workspacePath: "/tmp/workspace",
+        projectPath: organizationPath,
+        inputChars: 0,
+        outputChars: 0,
+        totalChars: 0,
+        compactionCount: 0
+      },
+      {
+        sessionKey: "workspace:organization-default",
+        sessionId: "session-workspace-organization",
+        title: "New Session",
+        updatedAt: Date.now(),
+        transcriptPath: "/tmp/transcript-workspace.jsonl",
+        workspacePath: "/tmp/workspace",
+        projectPath: organizationPath,
+        inputChars: 0,
+        outputChars: 0,
+        totalChars: 0,
+        compactionCount: 0
+      }
+    ],
     listSkills: async (): Promise<ResolvedSkill[]> => [],
     listGlobalSkills: async (): Promise<ResolvedSkill[]> => [],
     renameSession: async (_agentId, title = "Session", sessionRef = "agent:ceo:main"): Promise<SessionSummary> => {
