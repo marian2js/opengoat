@@ -409,9 +409,9 @@ describe("AgentService", () => {
 
     expect(agents.map((agent) => agent.id)).toEqual(["a-agent", "z-agent"]);
     expect(agents[0]?.displayName).toBe("a-agent");
-    expect(agents[0]?.role).toBe("Individual Contributor");
+    expect(agents[0]?.role).toBe("Team Member");
     expect(agents[1]?.displayName).toBe("Zed");
-    expect(agents[1]?.role).toBe("Individual Contributor");
+    expect(agents[1]?.role).toBe("Team Member");
   });
 
   it("is idempotent and does not overwrite existing config.json", async () => {

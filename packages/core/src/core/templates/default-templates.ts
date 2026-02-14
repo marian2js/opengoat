@@ -150,7 +150,7 @@ export function resolveAgentRole(
     return "CEO";
   }
 
-  return type === "manager" ? "Manager" : "Individual Contributor";
+  return type === "manager" ? "Manager" : "Team Member";
 }
 
 function dedupe(values: string[]): string[] {
