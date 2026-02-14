@@ -519,6 +519,8 @@ const DEFAULT_LOG_STREAM_LIMIT = 300;
 const MAX_UI_LOG_ENTRIES = 1200;
 const LOG_FLUSH_INTERVAL_MS = 100;
 const LOG_AUTOSCROLL_BOTTOM_THRESHOLD_PX = 24;
+const TASK_AUTO_REFRESH_INTERVAL_MS = 10_000;
+const TASK_AUTO_REFRESH_HIDDEN_INTERVAL_MS = 30_000;
 const TASK_STATUS_OPTIONS = [
   { value: "todo", label: "To do" },
   { value: "doing", label: "In progress" },
@@ -635,6 +637,16 @@ export function App(): ReactElement {
   const logsViewportRef = useRef<HTMLDivElement | null>(null);
   const pendingUiLogsRef = useRef<UiLogEntry[]>([]);
   const logsFlushTimerRef = useRef<number | null>(null);
+  const isLoadingRef = useRef(isLoading);
+  const isMutatingRef = useRef(isMutating);
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
+
+  useEffect(() => {
+    isMutatingRef.current = isMutating;
+  }, [isMutating]);
 
   const navigateToRoute = useCallback((nextRoute: AppRoute) => {
     const nextPath = routeToPath(nextRoute);
@@ -830,6 +842,13 @@ export function App(): ReactElement {
       if (!current) {
         return current;
       }
+
+      const currentTasks =
+        current.taskWorkspaces.taskWorkspaces[0]?.tasks ?? [];
+      if (areTaskRecordListsEqual(currentTasks, tasks.tasks)) {
+        return current;
+      }
+
       return {
         ...current,
         taskWorkspaces: buildTaskWorkspaceResponse(tasks),
@@ -918,6 +937,7 @@ export function App(): ReactElement {
   }, [state, taskActorId]);
 
   const agents = state?.overview.agents ?? [];
+  const hasLoadedState = state !== null;
   const sessions = state?.sessions.sessions ?? [];
   const selectedSession = useMemo(() => {
     if (route.kind !== "session") {
@@ -1489,6 +1509,83 @@ export function App(): ReactElement {
     setSelectedTaskId(null);
     setTaskDetailsError(null);
   }, [route]);
+
+  useEffect(() => {
+    if (route.kind !== "taskWorkspace" || !hasLoadedState) {
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId: number | undefined;
+    let inFlight = false;
+
+    const scheduleNext = (delayMs: number): void => {
+      if (cancelled) {
+        return;
+      }
+      timeoutId = window.setTimeout(() => {
+        void tick();
+      }, delayMs);
+    };
+
+    const tick = async (): Promise<void> => {
+      if (cancelled) {
+        return;
+      }
+
+      if (document.visibilityState !== "visible") {
+        scheduleNext(TASK_AUTO_REFRESH_HIDDEN_INTERVAL_MS);
+        return;
+      }
+
+      if (isLoadingRef.current || isMutatingRef.current || inFlight) {
+        scheduleNext(TASK_AUTO_REFRESH_INTERVAL_MS);
+        return;
+      }
+
+      inFlight = true;
+      try {
+        await refreshTasks();
+      } catch {
+        // Best-effort background refresh.
+      } finally {
+        inFlight = false;
+        scheduleNext(TASK_AUTO_REFRESH_INTERVAL_MS);
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (cancelled || document.visibilityState !== "visible") {
+        return;
+      }
+      if (isLoadingRef.current || isMutatingRef.current || inFlight) {
+        return;
+      }
+      void refreshTasks().catch(() => {
+        // Best-effort background refresh.
+      });
+    };
+
+    if (
+      document.visibilityState === "visible" &&
+      !isLoadingRef.current &&
+      !isMutatingRef.current
+    ) {
+      void refreshTasks().catch(() => {
+        // Best-effort initial refresh when entering task views.
+      });
+    }
+    scheduleNext(TASK_AUTO_REFRESH_INTERVAL_MS);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [route.kind, hasLoadedState, refreshTasks]);
 
   useEffect(() => {
     if (!isTaskDetailsDialogOpen) {
@@ -5604,6 +5701,84 @@ function uiLogMessageClassName(level: UiLogLevel): string {
     default:
       return "text-emerald-100";
   }
+}
+
+function areTaskRecordListsEqual(left: TaskRecord[], right: TaskRecord[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftTask = left[index];
+    const rightTask = right[index];
+    if (!leftTask || !rightTask) {
+      return false;
+    }
+
+    if (
+      leftTask.taskId !== rightTask.taskId ||
+      leftTask.createdAt !== rightTask.createdAt ||
+      leftTask.project !== rightTask.project ||
+      leftTask.owner !== rightTask.owner ||
+      leftTask.assignedTo !== rightTask.assignedTo ||
+      leftTask.title !== rightTask.title ||
+      leftTask.description !== rightTask.description ||
+      leftTask.status !== rightTask.status ||
+      (leftTask.statusReason ?? "") !== (rightTask.statusReason ?? "")
+    ) {
+      return false;
+    }
+
+    if (!areStringArraysEqual(leftTask.blockers, rightTask.blockers)) {
+      return false;
+    }
+    if (!areTaskEntryListsEqual(leftTask.artifacts, rightTask.artifacts)) {
+      return false;
+    }
+    if (!areTaskEntryListsEqual(leftTask.worklog, rightTask.worklog)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function areTaskEntryListsEqual(left: TaskEntry[], right: TaskEntry[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftEntry = left[index];
+    const rightEntry = right[index];
+    if (!leftEntry || !rightEntry) {
+      return false;
+    }
+
+    if (
+      leftEntry.createdAt !== rightEntry.createdAt ||
+      leftEntry.createdBy !== rightEntry.createdBy ||
+      leftEntry.content !== rightEntry.content
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function areStringArraysEqual(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function buildTaskWorkspaceResponse(
