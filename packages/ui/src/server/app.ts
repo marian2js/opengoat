@@ -2252,13 +2252,19 @@ function resolveUiLogTimestamp(parsed: Record<string, unknown> | null): string {
 
 function resolveUiLogLevel(parsed: Record<string, unknown> | null): UiLogLevel {
   const meta = parsed?._meta;
-  const level =
-    meta && typeof meta === "object" && typeof (meta as Record<string, unknown>).logLevelName === "string"
+  const levelFromMeta =
+    meta &&
+    typeof meta === "object" &&
+    typeof (meta as Record<string, unknown>).logLevelName === "string"
       ? (meta as Record<string, unknown>).logLevelName
+      : undefined;
+  const levelText =
+    typeof levelFromMeta === "string"
+      ? levelFromMeta
       : typeof parsed?.level === "string"
         ? parsed.level
         : "";
-  const normalized = level.trim().toLowerCase();
+  const normalized = levelText.trim().toLowerCase();
   if (normalized === "error" || normalized === "fatal") {
     return "error";
   }
