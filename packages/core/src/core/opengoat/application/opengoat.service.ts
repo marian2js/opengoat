@@ -358,11 +358,11 @@ export class OpenGoatService {
     let ceoSynced = false;
     let ceoSyncCode: number | undefined;
 
-    let ceoDescriptor = (await this.agentService.listAgents(paths)).find(
+    const ceoExists = (await this.agentService.listAgents(paths)).some(
       (agent) => agent.id === DEFAULT_AGENT_ID,
     );
-    if (!ceoDescriptor) {
-      const created = await this.agentService.ensureAgent(
+    if (!ceoExists) {
+      await this.agentService.ensureAgent(
         paths,
         {
           id: DEFAULT_AGENT_ID,
@@ -374,7 +374,6 @@ export class OpenGoatService {
           role: "CEO",
         },
       );
-      ceoDescriptor = created.agent;
     }
 
     try {
@@ -387,45 +386,36 @@ export class OpenGoatService {
       );
     }
 
+    let openClawAgentEntriesById:
+      | Map<string, OpenClawAgentPathEntry>
+      | undefined;
     try {
-      const ceoSync = await this.providerService.createProviderAgent(
-        paths,
-        DEFAULT_AGENT_ID,
-        {
-          providerId: OPENCLAW_PROVIDER_ID,
-          displayName: ceoDescriptor.displayName,
-          workspaceDir: ceoDescriptor.workspaceDir,
-          internalConfigDir: ceoDescriptor.internalConfigDir,
-        },
+      openClawAgentEntriesById = new Map(
+        (await this.listOpenClawAgents(paths)).map((entry) => [entry.id, entry]),
       );
-      ceoSyncCode = ceoSync.code;
-      ceoSynced =
-        ceoSync.code === 0 ||
-        containsAlreadyExistsMessage(ceoSync.stdout, ceoSync.stderr);
-      if (!ceoSynced) {
-        warnings.push(
-          `OpenClaw sync for "ceo" failed (code ${ceoSync.code}). ${(
-            ceoSync.stderr || ceoSync.stdout
-          ).trim()}`,
-        );
-      }
     } catch (error) {
-      warnings.push(`OpenClaw sync for "ceo" failed: ${toErrorMessage(error)}`);
+      warnings.push(
+        `OpenClaw startup inventory check failed: ${toErrorMessage(error)}`,
+      );
     }
 
-    if (ceoSynced) {
-      try {
-        await this.ensureOpenClawAgentLocation(paths, {
-          agentId: DEFAULT_AGENT_ID,
-          displayName: ceoDescriptor.displayName,
-          workspaceDir: ceoDescriptor.workspaceDir,
-          internalConfigDir: ceoDescriptor.internalConfigDir,
+    try {
+      const agents = await this.agentService.listAgents(paths);
+      for (const agent of agents) {
+        const sync = await this.syncOpenClawAgentRegistration(paths, {
+          descriptor: agent,
+          existingEntry: openClawAgentEntriesById?.get(agent.id),
         });
-      } catch (error) {
-        warnings.push(
-          `OpenClaw ceo location sync failed: ${toErrorMessage(error)}`,
-        );
+        warnings.push(...sync.warnings);
+        if (agent.id === DEFAULT_AGENT_ID) {
+          ceoSynced = sync.synced;
+          ceoSyncCode = sync.code;
+        }
       }
+    } catch (error) {
+      warnings.push(
+        `OpenClaw startup sync failed: ${toErrorMessage(error)}`,
+      );
     }
 
     try {
@@ -1463,6 +1453,87 @@ export class OpenGoatService {
     }
   }
 
+  private async syncOpenClawAgentRegistration(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    params: {
+      descriptor: AgentDescriptor;
+      existingEntry?: OpenClawAgentPathEntry;
+    },
+  ): Promise<{
+    synced: boolean;
+    code?: number;
+    warnings: string[];
+  }> {
+    const warnings: string[] = [];
+
+    let runtimeSync:
+      | Awaited<ReturnType<ProviderService["createProviderAgent"]>>
+      | undefined;
+    try {
+      runtimeSync = await this.providerService.createProviderAgent(
+        paths,
+        params.descriptor.id,
+        {
+          providerId: OPENCLAW_PROVIDER_ID,
+          displayName: params.descriptor.displayName,
+          workspaceDir: params.descriptor.workspaceDir,
+          internalConfigDir: params.descriptor.internalConfigDir,
+        },
+      );
+    } catch (error) {
+      warnings.push(
+        `OpenClaw sync for "${params.descriptor.id}" failed: ${toErrorMessage(
+          error,
+        )}`,
+      );
+      return {
+        synced: false,
+        warnings,
+      };
+    }
+
+    const synced =
+      runtimeSync.code === 0 ||
+      containsAlreadyExistsMessage(runtimeSync.stdout, runtimeSync.stderr);
+    if (!synced) {
+      warnings.push(
+        `OpenClaw sync for "${params.descriptor.id}" failed (code ${
+          runtimeSync.code
+        }). ${(runtimeSync.stderr || runtimeSync.stdout).trim()}`,
+      );
+      return {
+        synced,
+        code: runtimeSync.code,
+        warnings,
+      };
+    }
+
+    try {
+      await this.ensureOpenClawAgentLocation(
+        paths,
+        {
+          agentId: params.descriptor.id,
+          displayName: params.descriptor.displayName,
+          workspaceDir: params.descriptor.workspaceDir,
+          internalConfigDir: params.descriptor.internalConfigDir,
+        },
+        params.existingEntry,
+      );
+    } catch (error) {
+      warnings.push(
+        `OpenClaw location sync for "${
+          params.descriptor.id
+        }" failed: ${toErrorMessage(error)}`,
+      );
+    }
+
+    return {
+      synced,
+      code: runtimeSync.code,
+      warnings,
+    };
+  }
+
   private async ensureOpenClawAgentLocation(
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
     params: {
@@ -1471,33 +1542,20 @@ export class OpenGoatService {
       workspaceDir: string;
       internalConfigDir: string;
     },
+    existingEntry?: {
+      workspace: string;
+      agentDir: string;
+    },
   ): Promise<void> {
     if (!this.commandRunner) {
       return;
     }
 
-    const env = await this.resolveOpenClawEnv(paths);
-    const listed = await this.runOpenClaw(["agents", "list", "--json"], {
-      env,
-    });
-    if (listed.code !== 0) {
-      throw new Error(
-        `OpenClaw agents list failed (exit ${listed.code}). ${
-          listed.stderr.trim() || listed.stdout.trim() || ""
-        }`.trim(),
+    const entry =
+      existingEntry ??
+      (await this.listOpenClawAgents(paths)).find(
+        (candidate) => candidate.id === normalizeAgentId(params.agentId),
       );
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(listed.stdout);
-    } catch {
-      throw new Error(
-        "OpenClaw agents list returned non-JSON output; cannot verify agent location.",
-      );
-    }
-
-    const entry = extractOpenClawAgentEntry(parsed, params.agentId);
     if (!entry) {
       return;
     }

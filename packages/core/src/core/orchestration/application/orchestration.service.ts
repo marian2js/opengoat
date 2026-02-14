@@ -163,32 +163,56 @@ export class OrchestrationService {
       }
     }
 
-    const execution = await this.providerService.invokeAgent(paths, agentId, invokeOptions, {
+    const runtimeHooks = {
+      onInvocationStarted: (event: {
+        runId?: string;
+        timestamp: string;
+        step?: number;
+        agentId: string;
+        providerId: string;
+      }) => {
+        emitRunStatusEvent(options, {
+          stage: "provider_invocation_started",
+          runId: event.runId ?? behavior.runId ?? "unknown-run",
+          timestamp: event.timestamp,
+          step: event.step ?? behavior.step,
+          agentId: event.agentId,
+          providerId: event.providerId
+        });
+      },
+      onInvocationCompleted: (event: {
+        runId?: string;
+        timestamp: string;
+        step?: number;
+        agentId: string;
+        providerId: string;
+        code: number;
+      }) => {
+        emitRunStatusEvent(options, {
+          stage: "provider_invocation_completed",
+          runId: event.runId ?? behavior.runId ?? "unknown-run",
+          timestamp: event.timestamp,
+          step: event.step ?? behavior.step,
+          agentId: event.agentId,
+          providerId: event.providerId,
+          code: event.code
+        });
+      }
+    };
+
+    let execution = await this.providerService.invokeAgent(paths, agentId, invokeOptions, {
       runId: behavior.runId,
       step: behavior.step,
-      hooks: {
-        onInvocationStarted: (event) => {
-          emitRunStatusEvent(options, {
-            stage: "provider_invocation_started",
-            runId: event.runId ?? behavior.runId ?? "unknown-run",
-            timestamp: event.timestamp,
-            step: event.step ?? behavior.step,
-            agentId: event.agentId,
-            providerId: event.providerId
-          });
-        },
-        onInvocationCompleted: (event) => {
-          emitRunStatusEvent(options, {
-            stage: "provider_invocation_completed",
-            runId: event.runId ?? behavior.runId ?? "unknown-run",
-            timestamp: event.timestamp,
-            step: event.step ?? behavior.step,
-            agentId: event.agentId,
-            providerId: event.providerId,
-            code: event.code
-          });
-        }
-      }
+      hooks: runtimeHooks
+    });
+    execution = await this.repairMissingAgentRegistrationAndRetry({
+      paths,
+      agentId,
+      invokeOptions,
+      execution,
+      runId: behavior.runId,
+      step: behavior.step,
+      hooks: runtimeHooks
     });
 
     if (!preparedSession.enabled) {
@@ -218,6 +242,91 @@ export class OrchestrationService {
         postRunCompaction
       }
     };
+  }
+
+  private async repairMissingAgentRegistrationAndRetry(params: {
+    paths: OpenGoatPaths;
+    agentId: string;
+    invokeOptions: ProviderInvokeOptions;
+    execution: ProviderExecutionResult & AgentProviderBinding;
+    runId?: string;
+    step?: number;
+    hooks: {
+      onInvocationStarted: (event: {
+        runId?: string;
+        timestamp: string;
+        step?: number;
+        agentId: string;
+        providerId: string;
+      }) => void;
+      onInvocationCompleted: (event: {
+        runId?: string;
+        timestamp: string;
+        step?: number;
+        agentId: string;
+        providerId: string;
+        code: number;
+      }) => void;
+    };
+  }): Promise<ProviderExecutionResult & AgentProviderBinding> {
+    if (!containsMissingAgentMessage(params.execution.stdout, params.execution.stderr)) {
+      return params.execution;
+    }
+
+    let manifest:
+      | {
+          agentId: string;
+          workspaceDir: string;
+          metadata: { name: string };
+        }
+      | undefined;
+
+    try {
+      const fetched = await this.agentManifestService.getManifest(params.paths, params.agentId);
+      manifest = {
+        agentId: fetched.agentId,
+        workspaceDir: fetched.workspaceDir,
+        metadata: {
+          name: fetched.metadata.name
+        }
+      };
+    } catch (error) {
+      this.logger.warn("OpenClaw missing-agent auto-repair skipped: local manifest unavailable.", {
+        agentId: params.agentId,
+        error: toErrorMessage(error)
+      });
+      return params.execution;
+    }
+
+    const internalConfigDir = this.pathPort.join(params.paths.agentsDir, manifest.agentId);
+    const displayName = manifest.metadata.name?.trim() || manifest.agentId;
+
+    const repair = await this.providerService.createProviderAgent(params.paths, manifest.agentId, {
+      displayName,
+      workspaceDir: manifest.workspaceDir,
+      internalConfigDir
+    });
+
+    if (repair.code !== 0 && !containsAlreadyExistsMessage(repair.stdout, repair.stderr)) {
+      this.logger.warn("OpenClaw missing-agent auto-repair failed.", {
+        agentId: manifest.agentId,
+        code: repair.code,
+        stderr: repair.stderr.trim() || undefined,
+        stdout: repair.stdout.trim() || undefined
+      });
+      return params.execution;
+    }
+
+    this.logger.warn("OpenClaw missing-agent auto-repair succeeded; retrying invocation.", {
+      agentId: manifest.agentId,
+      code: repair.code
+    });
+
+    return this.providerService.invokeAgent(params.paths, params.agentId, params.invokeOptions, {
+      runId: params.runId,
+      step: params.step,
+      hooks: params.hooks
+    });
   }
 
   private async buildAndWriteTrace(params: {
@@ -325,4 +434,21 @@ function mergeSystemPrompts(current: string | undefined, extra: string): string 
     return extra;
   }
   return `${normalizedCurrent}\n\n${extra}`;
+}
+
+function containsMissingAgentMessage(stdout: string, stderr: string): boolean {
+  return /\b(not found|does not exist|no such agent|unknown agent|could not find|no agent found|not exist)\b/i.test(
+    `${stdout}\n${stderr}`
+  );
+}
+
+function containsAlreadyExistsMessage(stdout: string, stderr: string): boolean {
+  return /\balready exists?\b/i.test(`${stdout}\n${stderr}`);
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }

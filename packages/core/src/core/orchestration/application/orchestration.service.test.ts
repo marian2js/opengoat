@@ -62,7 +62,7 @@ describe("OrchestrationService manager runtime", () => {
 
     const service = new OrchestrationService({
       providerService: providerService as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["ceo"]) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["ceo"], paths.workspacesDir) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
@@ -135,7 +135,7 @@ describe("OrchestrationService manager runtime", () => {
 
     const service = new OrchestrationService({
       providerService: providerService as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["ceo"]) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["ceo"], paths.workspacesDir) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
@@ -198,7 +198,7 @@ describe("OrchestrationService manager runtime", () => {
 
     const service = new OrchestrationService({
       providerService: providerService as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["ceo"]) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["ceo"], paths.workspacesDir) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
@@ -258,6 +258,94 @@ describe("OrchestrationService manager runtime", () => {
     );
   });
 
+  it("recreates missing provider agent registration and retries once", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-manager-repair-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+
+    const providerService = {
+      invokeAgent: vi
+        .fn()
+        .mockResolvedValueOnce({
+          code: 1,
+          stdout: "",
+          stderr: 'invalid agent params: unknown agent id "ceo"',
+          agentId: "ceo",
+          providerId: "openclaw"
+        })
+        .mockResolvedValueOnce({
+          code: 0,
+          stdout: "Recovered after repair\n",
+          stderr: "",
+          agentId: "ceo",
+          providerId: "openclaw"
+        }),
+      createProviderAgent: vi.fn(async () => ({
+        code: 0,
+        stdout: "",
+        stderr: "",
+        agentId: "ceo",
+        providerId: "openclaw"
+      }))
+    };
+
+    const sessionService = {
+      prepareRunSession: vi.fn(async () => ({
+        enabled: true,
+        info: {
+          agentId: "ceo",
+          sessionKey: "agent:ceo:main",
+          sessionId: "session-repair",
+          transcriptPath: path.join(paths.sessionsDir, "ceo", "session-repair.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "ceo"),
+          projectPath: tempDir,
+          isNewSession: true
+        },
+        compactionApplied: false
+      })),
+      recordAssistantReply: vi.fn(async () => ({
+        sessionKey: "agent:ceo:main",
+        sessionId: "session-repair",
+        transcriptPath: path.join(paths.sessionsDir, "ceo", "session-repair.jsonl"),
+        applied: false,
+        compactedMessages: 0
+      }))
+    };
+
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      agentManifestService: createManifestServiceStub(["ceo"], paths.workspacesDir) as unknown as AgentManifestService,
+      sessionService: sessionService as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-10T10:00:00.000Z"
+    });
+
+    const result = await service.runAgent(paths, "ceo", {
+      message: "hello"
+    });
+
+    expect(providerService.invokeAgent).toHaveBeenCalledTimes(2);
+    expect(providerService.createProviderAgent).toHaveBeenCalledWith(
+      paths,
+      "ceo",
+      expect.objectContaining({
+        displayName: "ceo",
+        workspaceDir: path.join(paths.workspacesDir, "ceo"),
+        internalConfigDir: path.join(paths.agentsDir, "ceo")
+      })
+    );
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("Recovered after repair");
+    expect(sessionService.recordAssistantReply).toHaveBeenCalledWith(
+      paths,
+      expect.objectContaining({
+        sessionId: "session-repair"
+      }),
+      "Recovered after repair"
+    );
+  });
+
 });
 
 function createPaths(root: string): OpenGoatPaths {
@@ -276,31 +364,41 @@ function createPaths(root: string): OpenGoatPaths {
   };
 }
 
-function createManifestServiceStub(agentIds: string[]) {
+function createManifestServiceStub(
+  agentIds: string[],
+  workspaceRoot = path.join("/tmp", "opengoat", "workspaces")
+) {
+  const manifests = agentIds.map((agentId) => ({
+    agentId,
+    filePath: "",
+    workspaceDir: path.join(workspaceRoot, agentId),
+    body: "",
+    source: "derived",
+    metadata: {
+      id: agentId,
+      name: agentId,
+      description: `${agentId} agent`,
+      type: agentId === "ceo" ? "manager" : "individual",
+      reportsTo: agentId === "ceo" ? null : "ceo",
+      discoverable: true,
+      tags: [],
+      skills: agentId === "ceo" ? ["og-board-manager"] : [],
+      delegation: {
+        canReceive: true,
+        canDelegate: agentId === "ceo"
+      },
+      priority: 50
+    }
+  }));
+
   return {
-    listManifests: vi.fn(async () =>
-      agentIds.map((agentId) => ({
-        agentId,
-        filePath: "",
-        workspaceDir: "",
-        body: "",
-        source: "derived",
-        metadata: {
-          id: agentId,
-          name: agentId,
-          description: `${agentId} agent`,
-          type: agentId === "ceo" ? "manager" : "individual",
-          reportsTo: agentId === "ceo" ? null : "ceo",
-          discoverable: true,
-          tags: [],
-          skills: agentId === "ceo" ? ["og-board-manager"] : [],
-          delegation: {
-            canReceive: true,
-            canDelegate: agentId === "ceo"
-          },
-          priority: 50
-        }
-      }))
-    )
+    listManifests: vi.fn(async () => manifests),
+    getManifest: vi.fn(async (_paths: OpenGoatPaths, agentId: string) => {
+      const manifest = manifests.find((entry) => entry.agentId === agentId);
+      if (!manifest) {
+        throw new Error(`missing manifest for ${agentId}`);
+      }
+      return manifest;
+    })
   };
 }
