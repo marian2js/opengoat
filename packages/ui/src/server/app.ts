@@ -2757,12 +2757,48 @@ function createTaskCronScheduler(
   let intervalHandle: NodeJS.Timeout | undefined;
   let running = false;
 
+  const syncFromPersistedSettings = async (): Promise<void> => {
+    const persisted = await readUiServerSettings(service.getHomeDir()).catch(() => {
+      return null;
+    });
+    if (!persisted) {
+      return;
+    }
+
+    const persistedFrequency =
+      parseTaskCheckFrequencyMinutes(persisted.taskCheckFrequencyMinutes) ??
+      taskCheckFrequencyMinutes;
+    const persistedEnabled =
+      parseTaskCronEnabled(persisted.taskCronEnabled) ?? taskCronEnabled;
+
+    const hasFrequencyChange = persistedFrequency !== taskCheckFrequencyMinutes;
+    const hasEnabledChange = persistedEnabled !== taskCronEnabled;
+    if (!hasFrequencyChange && !hasEnabledChange) {
+      return;
+    }
+
+    taskCheckFrequencyMinutes = persistedFrequency;
+    taskCronEnabled = persistedEnabled;
+    schedule();
+    app.log.info(
+      {
+        taskCronEnabled,
+        taskCheckFrequencyMinutes
+      },
+      "[task-cron] scheduler synchronized from persisted settings"
+    );
+  };
+
   const runCycle = async (): Promise<void> => {
     if (running) {
       return;
     }
     running = true;
     try {
+      await syncFromPersistedSettings();
+      if (!taskCronEnabled) {
+        return;
+      }
       const cycle = await service.runTaskCronCycle?.();
       if (cycle) {
         app.log.info(

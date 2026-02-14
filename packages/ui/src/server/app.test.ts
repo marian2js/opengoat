@@ -1,3 +1,4 @@
+import { mkdir, writeFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createOpenGoatUiServer,
@@ -220,6 +221,50 @@ describe("OpenGoat UI server API", () => {
         taskCheckFrequencyMinutes: 5
       }
     });
+  });
+
+  it("honors persisted cron disable setting during scheduler cycles", async () => {
+    vi.useFakeTimers();
+    try {
+      const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      const runTaskCronCycle = vi.fn<NonNullable<OpenClawUiService["runTaskCronCycle"]>>(async () => {
+        return {
+          ranAt: new Date().toISOString(),
+          scannedTasks: 0,
+          todoTasks: 0,
+          blockedTasks: 0,
+          inactiveAgents: 0,
+          sent: 0,
+          failed: 0
+        };
+      });
+
+      activeServer = await createOpenGoatUiServer({
+        logger: false,
+        attachFrontend: false,
+        service: {
+          ...createMockService({
+            homeDir: uniqueHomeDir
+          }),
+          runTaskCronCycle
+        }
+      });
+
+      await mkdir(uniqueHomeDir, { recursive: true });
+      await writeFile(
+        `${uniqueHomeDir}/ui-settings.json`,
+        `${JSON.stringify({
+          taskCronEnabled: false,
+          taskCheckFrequencyMinutes: 1
+        }, null, 2)}\n`,
+        "utf8"
+      );
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(runTaskCronCycle).toHaveBeenCalledTimes(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("returns installed and latest versions from the version api", async () => {
