@@ -178,9 +178,9 @@ function readMarkdownTemplate(relativePath: string): string {
 function discoverOrganizationMarkdownTemplates(): OrganizationMarkdownTemplate[] {
   let fileNames: string[];
   try {
-    fileNames = readdirSync(new URL("./assets/organization/", import.meta.url))
-      .filter((name) => isMarkdownFile(name))
-      .sort((left, right) => left.localeCompare(right));
+    fileNames = listOrganizationMarkdownFileNames(
+      new URL("./assets/organization/", import.meta.url),
+    );
   } catch (error) {
     if (isNotFoundError(error)) {
       return [];
@@ -196,6 +196,34 @@ function discoverOrganizationMarkdownTemplates(): OrganizationMarkdownTemplate[]
 
 function isMarkdownFile(fileName: string): boolean {
   return fileName.toLowerCase().endsWith(".md");
+}
+
+function listOrganizationMarkdownFileNames(
+  directory: URL,
+  relativePrefix = "",
+): string[] {
+  const entries = readdirSync(directory, { withFileTypes: true }).sort((left, right) =>
+    left.name.localeCompare(right.name),
+  );
+  const fileNames: string[] = [];
+
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      fileNames.push(
+        ...listOrganizationMarkdownFileNames(
+          new URL(`${entry.name}/`, directory),
+          `${relativePrefix}${entry.name}/`,
+        ),
+      );
+      continue;
+    }
+
+    if (entry.isFile() && isMarkdownFile(entry.name)) {
+      fileNames.push(`${relativePrefix}${entry.name}`);
+    }
+  }
+
+  return fileNames;
 }
 
 function isNotFoundError(error: unknown): error is NodeJS.ErrnoException {

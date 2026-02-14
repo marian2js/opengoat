@@ -41,6 +41,9 @@ describe("BootstrapService", () => {
         await fileSystem.exists(path.join(paths.organizationDir, template.fileName)),
       ).toBe(true);
     }
+    expect(
+      await fileSystem.exists(path.join(paths.organizationDir, "wiki", "index.md")),
+    ).toBe(true);
 
     const config = JSON.parse(
       await readFile(paths.globalConfigJsonPath, "utf-8"),

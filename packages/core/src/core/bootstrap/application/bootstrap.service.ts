@@ -190,6 +190,15 @@ export class BootstrapService {
     const templates = listOrganizationMarkdownTemplates();
     for (const template of templates) {
       const filePath = this.pathPort.join(organizationDir, template.fileName);
+      const parentSegments = template.fileName
+        .split(/[\\/]/)
+        .slice(0, -1)
+        .filter(Boolean);
+      if (parentSegments.length > 0) {
+        await this.fileSystem.ensureDir(
+          this.pathPort.join(organizationDir, ...parentSegments),
+        );
+      }
       const exists = await this.fileSystem.exists(filePath);
       if (exists) {
         skippedPaths.push(filePath);
