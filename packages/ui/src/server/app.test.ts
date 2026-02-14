@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -278,6 +278,206 @@ describe("OpenGoat UI server API", () => {
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
         inactiveAgentNotificationTarget: "ceo-only",
+      },
+    });
+  });
+
+  it("protects API routes with username/password authentication when enabled", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const enableAuthResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/settings",
+      payload: {
+        authentication: {
+          enabled: true,
+          username: "admin.user",
+          password: "StrongPassphrase#2026",
+        },
+      },
+    });
+    expect(enableAuthResponse.statusCode).toBe(200);
+
+    const settingsFile = await readFile(
+      `${uniqueHomeDir}/ui-settings.json`,
+      "utf8",
+    );
+    expect(settingsFile).toContain("\"passwordHash\"");
+    expect(settingsFile).not.toContain("StrongPassphrase#2026");
+
+    const blockedAgentsResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/agents",
+    });
+    expect(blockedAgentsResponse.statusCode).toBe(401);
+    expect(blockedAgentsResponse.json()).toMatchObject({
+      code: "AUTH_REQUIRED",
+    });
+
+    const failedLoginResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: {
+        username: "admin.user",
+        password: "wrong-password",
+      },
+    });
+    expect(failedLoginResponse.statusCode).toBe(401);
+
+    const loginResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: {
+        username: "admin.user",
+        password: "StrongPassphrase#2026",
+      },
+    });
+    expect(loginResponse.statusCode).toBe(200);
+    const authCookie = extractCookieHeader(loginResponse);
+    expect(authCookie).toBeTruthy();
+
+    const allowedAgentsResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/agents",
+      headers: {
+        cookie: authCookie,
+      },
+    });
+    expect(allowedAgentsResponse.statusCode).toBe(200);
+    expect(allowedAgentsResponse.json()).toMatchObject({
+      agents: [],
+    });
+  });
+
+  it("rate limits repeated failed sign-in attempts", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const enableAuthResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/settings",
+      payload: {
+        authentication: {
+          enabled: true,
+          username: "security",
+          password: "StrongPassphrase#2026",
+        },
+      },
+    });
+    expect(enableAuthResponse.statusCode).toBe(200);
+
+    let lastStatusCode = 0;
+    for (let index = 0; index < 5; index += 1) {
+      const loginResponse = await activeServer.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: {
+          username: "security",
+          password: "not-correct",
+        },
+      });
+      lastStatusCode = loginResponse.statusCode;
+    }
+
+    expect(lastStatusCode).toBe(429);
+  });
+
+  it("requires current password before changing existing authentication settings", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const enableAuthResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/settings",
+      payload: {
+        authentication: {
+          enabled: true,
+          username: "ops",
+          password: "StrongPassphrase#2026",
+        },
+      },
+    });
+    expect(enableAuthResponse.statusCode).toBe(200);
+
+    const loginResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: {
+        username: "ops",
+        password: "StrongPassphrase#2026",
+      },
+    });
+    expect(loginResponse.statusCode).toBe(200);
+    const authCookie = extractCookieHeader(loginResponse);
+    expect(authCookie).toBeTruthy();
+
+    const missingCurrentPasswordResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/settings",
+      headers: {
+        cookie: authCookie,
+      },
+      payload: {
+        authentication: {
+          enabled: false,
+        },
+      },
+    });
+    expect(missingCurrentPasswordResponse.statusCode).toBe(400);
+
+    const wrongCurrentPasswordResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/settings",
+      headers: {
+        cookie: authCookie,
+      },
+      payload: {
+        authentication: {
+          enabled: false,
+          currentPassword: "wrong-password",
+        },
+      },
+    });
+    expect(wrongCurrentPasswordResponse.statusCode).toBe(401);
+
+    const disableAuthResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/settings",
+      headers: {
+        cookie: authCookie,
+      },
+      payload: {
+        authentication: {
+          enabled: false,
+          currentPassword: "StrongPassphrase#2026",
+        },
+      },
+    });
+    expect(disableAuthResponse.statusCode).toBe(200);
+    expect(disableAuthResponse.json()).toMatchObject({
+      settings: {
+        authentication: {
+          enabled: false,
+        },
       },
     });
   });
@@ -1565,6 +1765,20 @@ describe("OpenGoat UI server API", () => {
     expect(addTaskWorklog).toHaveBeenCalledWith("developer", "task-plan", "Initial draft complete");
   });
 });
+
+function extractCookieHeader(response: { headers: Record<string, unknown> }): string {
+  const headerValue = response.headers["set-cookie"];
+  if (Array.isArray(headerValue)) {
+    const first = headerValue[0];
+    if (typeof first === "string") {
+      return first.split(";")[0] ?? "";
+    }
+  }
+  if (typeof headerValue === "string") {
+    return headerValue.split(";")[0] ?? "";
+  }
+  return "";
+}
 
 function createMockService(options: { homeDir?: string } = {}): OpenClawUiService {
   const homeDir = options.homeDir ?? "/tmp/opengoat-home";

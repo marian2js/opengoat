@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
+import { createHmac, randomBytes, scrypt as scryptWithCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import cors from "@fastify/cors";
@@ -28,6 +29,17 @@ const LOG_STREAM_HEARTBEAT_MS = 15_000;
 const OPENCLAW_LOG_POLL_INTERVAL_MS = 1200;
 const DEFAULT_ORGANIZATION_PROJECT_NAME = "Organization";
 const DEFAULT_ORGANIZATION_PROJECT_DIRNAME = "organization";
+const UI_AUTH_COOKIE_NAME = "opengoat_ui_session";
+const UI_AUTH_MIN_PASSWORD_LENGTH = 12;
+const UI_AUTH_SESSION_TTL_SECONDS = 12 * 60 * 60;
+const UI_AUTH_MAX_FAILED_ATTEMPTS = 5;
+const UI_AUTH_ATTEMPT_WINDOW_MS = 10 * 60_000;
+const UI_AUTH_BLOCK_MS = 15 * 60_000;
+const SCRYPT_KEY_LENGTH = 64;
+const SCRYPT_COST = 32_768;
+const SCRYPT_BLOCK_SIZE = 8;
+const SCRYPT_PARALLELIZATION = 1;
+const scryptAsync = promisify(scryptWithCallback);
 
 interface AgentDescriptor {
   id: string;
@@ -271,6 +283,32 @@ interface UiServerSettings {
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+  authentication: UiServerAuthenticationSettings;
+}
+
+interface UiServerAuthenticationSettings {
+  enabled: boolean;
+  username?: string;
+  passwordHash?: string;
+}
+
+interface UiAuthenticationStatus {
+  enabled: boolean;
+  authenticated: boolean;
+}
+
+interface UiAuthenticationSettingsResponse {
+  enabled: boolean;
+  username: string;
+  hasPassword: boolean;
+}
+
+interface UiServerSettingsResponse {
+  taskCronEnabled: boolean;
+  notifyManagersOfInactiveAgents: boolean;
+  maxInactivityMinutes: number;
+  inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+  authentication: UiAuthenticationSettingsResponse;
 }
 
 interface UiVersionInfo {
@@ -382,6 +420,34 @@ interface RegisterApiRoutesDeps {
   updateSettings: (settings: UiServerSettings) => Promise<void>;
   getVersionInfo: () => Promise<UiVersionInfo>;
   logs: UiLogBuffer;
+  auth: UiAuthController;
+}
+
+interface UiAuthController {
+  isAuthenticationRequired: () => boolean;
+  isAuthenticatedRequest: (request: { headers: Record<string, unknown> }) => boolean;
+  issueSessionCookie: (
+    reply: FastifyReply,
+    request: { headers: Record<string, unknown> },
+    username: string,
+  ) => {
+    ok: boolean;
+    error?: string;
+  };
+  clearSessionCookie: (reply: FastifyReply, request: { headers: Record<string, unknown> }) => void;
+  getStatusForRequest: (request: { headers: Record<string, unknown> }) => UiAuthenticationStatus;
+  verifyCredentials: (username: string, password: string) => Promise<boolean>;
+  verifyCurrentPassword: (password: string) => Promise<boolean>;
+  checkAttemptStatus: (request: { ip?: string }) => { blocked: boolean; retryAfterSeconds?: number };
+  registerFailedAttempt: (request: { ip?: string }) => { blocked: boolean; retryAfterSeconds?: number };
+  clearFailedAttempts: (request: { ip?: string }) => void;
+  validatePasswordStrength: (password: string) => string | undefined;
+  hashPassword: (password: string) => Promise<string>;
+  getSettingsResponse: () => UiAuthenticationSettingsResponse;
+  handleSettingsMutation: (
+    previous: UiServerAuthenticationSettings,
+    next: UiServerAuthenticationSettings,
+  ) => void;
 }
 
 function createUiLogBuffer(service: OpenClawUiService): UiLogBuffer {
@@ -509,6 +575,647 @@ function createUiLogBuffer(service: OpenClawUiService): UiLogBuffer {
   };
 }
 
+interface UiLoginAttemptState {
+  failures: number[];
+  blockedUntil: number;
+}
+
+interface ScryptPasswordHashParts {
+  cost: number;
+  blockSize: number;
+  parallelization: number;
+  salt: Buffer;
+  digest: Buffer;
+}
+
+interface UiSignedSessionPayload {
+  u: string;
+  e: number;
+  v: number;
+  n: string;
+}
+
+function createUiAuthController(
+  app: FastifyInstance,
+  getSettings: () => UiServerAuthenticationSettings,
+): UiAuthController {
+  const sessionSecret = randomBytes(32);
+  const loginAttemptsByKey = new Map<string, UiLoginAttemptState>();
+  let sessionVersion = 1;
+  const fallbackPasswordHashPromise = hashUiAuthenticationPassword(
+    `fallback-${randomBytes(24).toString("hex")}`,
+  );
+
+  const resolveActiveConfiguration = (): {
+    enabled: boolean;
+    username?: string;
+    passwordHash?: string;
+  } => {
+    const current = getSettings();
+    const username = normalizeUiAuthenticationUsername(current.username);
+    const passwordHash = normalizeUiAuthenticationPasswordHash(
+      current.passwordHash,
+    );
+    const enabled = current.enabled === true && Boolean(username && passwordHash);
+    return {
+      enabled,
+      username,
+      passwordHash,
+    };
+  };
+
+  return {
+    isAuthenticationRequired: () => {
+      return resolveActiveConfiguration().enabled;
+    },
+    isAuthenticatedRequest: (request) => {
+      const active = resolveActiveConfiguration();
+      if (!active.enabled || !active.username) {
+        return true;
+      }
+
+      const cookies = parseCookieHeader(request.headers.cookie);
+      const token = cookies[UI_AUTH_COOKIE_NAME];
+      if (!token) {
+        return false;
+      }
+
+      return verifySignedUiAuthenticationSession(
+        token,
+        sessionSecret,
+        sessionVersion,
+        active.username,
+      );
+    },
+    issueSessionCookie: (reply, request, username) => {
+      const active = resolveActiveConfiguration();
+      if (!active.enabled || !active.username) {
+        return { ok: true };
+      }
+
+      const normalizedUsername = normalizeUiAuthenticationUsername(username);
+      if (!normalizedUsername || normalizedUsername !== active.username) {
+        return {
+          ok: false,
+          error: "Unable to issue authentication session.",
+        };
+      }
+
+      const cookieSecurity = resolveUiAuthenticationCookieSecurity(request);
+      if (cookieSecurity.requiresHttps && !cookieSecurity.isHttps) {
+        return {
+          ok: false,
+          error:
+            "HTTPS is required to sign in when UI authentication is enabled on non-local hosts.",
+        };
+      }
+
+      const token = signUiAuthenticationSession(
+        {
+          u: normalizedUsername,
+          e: Date.now() + UI_AUTH_SESSION_TTL_SECONDS * 1000,
+          v: sessionVersion,
+          n: randomBytes(12).toString("base64url"),
+        },
+        sessionSecret,
+      );
+      appendSetCookieHeader(
+        reply,
+        serializeCookie(UI_AUTH_COOKIE_NAME, token, {
+          path: "/",
+          httpOnly: true,
+          sameSite: "Strict",
+          secure: cookieSecurity.useSecureCookie,
+          maxAge: UI_AUTH_SESSION_TTL_SECONDS,
+        }),
+      );
+      return { ok: true };
+    },
+    clearSessionCookie: (reply) => {
+      appendSetCookieHeader(
+        reply,
+        serializeCookie(UI_AUTH_COOKIE_NAME, "", {
+          path: "/",
+          httpOnly: true,
+          sameSite: "Strict",
+          secure: false,
+          maxAge: 0,
+        }),
+      );
+      appendSetCookieHeader(
+        reply,
+        serializeCookie(UI_AUTH_COOKIE_NAME, "", {
+          path: "/",
+          httpOnly: true,
+          sameSite: "Strict",
+          secure: true,
+          maxAge: 0,
+        }),
+      );
+    },
+    getStatusForRequest: (request) => {
+      return {
+        enabled: resolveActiveConfiguration().enabled,
+        authenticated: resolveActiveConfiguration().enabled
+          ? (() => {
+              const active = resolveActiveConfiguration();
+              if (!active.username) {
+                return false;
+              }
+              const cookies = parseCookieHeader(request.headers.cookie);
+              const token = cookies[UI_AUTH_COOKIE_NAME];
+              if (!token) {
+                return false;
+              }
+              return verifySignedUiAuthenticationSession(
+                token,
+                sessionSecret,
+                sessionVersion,
+                active.username,
+              );
+            })()
+          : true,
+      };
+    },
+    verifyCredentials: async (username, password) => {
+      const active = resolveActiveConfiguration();
+      if (!active.enabled || !active.username || !active.passwordHash) {
+        return false;
+      }
+
+      const normalizedUsername = normalizeUiAuthenticationUsername(username);
+      const suppliedPassword = normalizePasswordInput(password);
+      const expectedHash =
+        normalizedUsername === active.username
+          ? active.passwordHash
+          : await fallbackPasswordHashPromise;
+      const passwordMatches = await verifyUiAuthenticationPassword(
+        suppliedPassword,
+        expectedHash,
+      );
+      return normalizedUsername === active.username && passwordMatches;
+    },
+    verifyCurrentPassword: async (password) => {
+      const active = resolveActiveConfiguration();
+      if (!active.enabled || !active.passwordHash) {
+        return false;
+      }
+      return verifyUiAuthenticationPassword(
+        normalizePasswordInput(password),
+        active.passwordHash,
+      );
+    },
+    checkAttemptStatus: (request) => {
+      const key = resolveLoginAttemptKey(request.ip);
+      const now = Date.now();
+      const state = loginAttemptsByKey.get(key);
+      if (!state) {
+        return { blocked: false };
+      }
+      pruneLoginAttemptFailures(state, now);
+      if (state.blockedUntil > now) {
+        return {
+          blocked: true,
+          retryAfterSeconds: Math.ceil((state.blockedUntil - now) / 1000),
+        };
+      }
+      if (state.failures.length === 0) {
+        loginAttemptsByKey.delete(key);
+      } else {
+        loginAttemptsByKey.set(key, state);
+      }
+      return { blocked: false };
+    },
+    registerFailedAttempt: (request) => {
+      const key = resolveLoginAttemptKey(request.ip);
+      const now = Date.now();
+      const state = loginAttemptsByKey.get(key) ?? {
+        failures: [],
+        blockedUntil: 0,
+      };
+      pruneLoginAttemptFailures(state, now);
+      if (state.blockedUntil > now) {
+        return {
+          blocked: true,
+          retryAfterSeconds: Math.ceil((state.blockedUntil - now) / 1000),
+        };
+      }
+
+      state.failures.push(now);
+      if (state.failures.length >= UI_AUTH_MAX_FAILED_ATTEMPTS) {
+        state.failures = [];
+        state.blockedUntil = now + UI_AUTH_BLOCK_MS;
+        loginAttemptsByKey.set(key, state);
+        app.log.warn(
+          {
+            ip: key,
+            retryAfterSeconds: Math.ceil(UI_AUTH_BLOCK_MS / 1000),
+          },
+          "UI authentication temporarily blocked due to repeated failed sign-in attempts.",
+        );
+        return {
+          blocked: true,
+          retryAfterSeconds: Math.ceil(UI_AUTH_BLOCK_MS / 1000),
+        };
+      }
+      loginAttemptsByKey.set(key, state);
+      return { blocked: false };
+    },
+    clearFailedAttempts: (request) => {
+      const key = resolveLoginAttemptKey(request.ip);
+      loginAttemptsByKey.delete(key);
+    },
+    validatePasswordStrength: (password) => {
+      return validateUiAuthenticationPasswordStrength(password);
+    },
+    hashPassword: (password) => {
+      return hashUiAuthenticationPassword(password);
+    },
+    getSettingsResponse: () => {
+      const current = getSettings();
+      const username = normalizeUiAuthenticationUsername(current.username) ?? "";
+      const hasPassword = Boolean(
+        normalizeUiAuthenticationPasswordHash(current.passwordHash),
+      );
+      return {
+        enabled: current.enabled === true && hasPassword && Boolean(username),
+        username,
+        hasPassword,
+      };
+    },
+    handleSettingsMutation: (previous, next) => {
+      const previousUsername = normalizeUiAuthenticationUsername(previous.username);
+      const nextUsername = normalizeUiAuthenticationUsername(next.username);
+      const previousPasswordHash = normalizeUiAuthenticationPasswordHash(
+        previous.passwordHash,
+      );
+      const nextPasswordHash = normalizeUiAuthenticationPasswordHash(
+        next.passwordHash,
+      );
+      const changed =
+        previous.enabled !== next.enabled ||
+        previousUsername !== nextUsername ||
+        previousPasswordHash !== nextPasswordHash;
+      if (changed) {
+        sessionVersion += 1;
+      }
+      if (next.enabled !== true) {
+        loginAttemptsByKey.clear();
+      }
+    },
+  };
+}
+
+function stripQueryStringFromUrl(url: string): string {
+  const separatorIndex = url.indexOf("?");
+  if (separatorIndex < 0) {
+    return url;
+  }
+  return url.slice(0, separatorIndex);
+}
+
+function parseCookieHeader(rawCookieHeader: unknown): Record<string, string> {
+  if (typeof rawCookieHeader !== "string" || !rawCookieHeader.trim()) {
+    return {};
+  }
+
+  const entries = rawCookieHeader.split(";");
+  const parsed: Record<string, string> = {};
+  for (const entry of entries) {
+    const separatorIndex = entry.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+    const key = entry.slice(0, separatorIndex).trim();
+    const value = entry.slice(separatorIndex + 1).trim();
+    if (!key) {
+      continue;
+    }
+    try {
+      parsed[key] = decodeURIComponent(value);
+    } catch {
+      parsed[key] = value;
+    }
+  }
+  return parsed;
+}
+
+function appendSetCookieHeader(reply: FastifyReply, cookie: string): void {
+  const existing = reply.getHeader("set-cookie");
+  if (!existing) {
+    reply.header("set-cookie", cookie);
+    return;
+  }
+  if (Array.isArray(existing)) {
+    reply.header("set-cookie", [...existing, cookie]);
+    return;
+  }
+  if (typeof existing === "string") {
+    reply.header("set-cookie", [existing, cookie]);
+  }
+}
+
+function serializeCookie(
+  name: string,
+  value: string,
+  options: {
+    path: string;
+    httpOnly: boolean;
+    sameSite: "Strict" | "Lax" | "None";
+    secure: boolean;
+    maxAge: number;
+  },
+): string {
+  const encodedValue = encodeURIComponent(value);
+  const parts = [`${name}=${encodedValue}`];
+  parts.push(`Path=${options.path}`);
+  parts.push(`Max-Age=${Math.max(0, Math.floor(options.maxAge))}`);
+  parts.push("Priority=High");
+  if (options.httpOnly) {
+    parts.push("HttpOnly");
+  }
+  if (options.secure) {
+    parts.push("Secure");
+  }
+  parts.push(`SameSite=${options.sameSite}`);
+  return parts.join("; ");
+}
+
+function resolveUiAuthenticationCookieSecurity(request: {
+  headers: Record<string, unknown>;
+  raw?: {
+    socket?: {
+      encrypted?: boolean;
+    };
+  };
+}): { isHttps: boolean; requiresHttps: boolean; useSecureCookie: boolean } {
+  const host = normalizeRequestHost(request.headers.host);
+  const forwardedProto = normalizeForwardedProto(request.headers["x-forwarded-proto"]);
+  const isHttps =
+    request.raw?.socket?.encrypted === true ||
+    forwardedProto === "https";
+  const isLocalHost =
+    host === "" ||
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1";
+  const requiresHttps = !isLocalHost;
+  return {
+    isHttps,
+    requiresHttps,
+    useSecureCookie: requiresHttps || isHttps,
+  };
+}
+
+function normalizeForwardedProto(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    return normalizeForwardedProto(value[0]);
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const [first] = value.split(",");
+  const normalized = first?.trim().toLowerCase();
+  return normalized || undefined;
+}
+
+function normalizeRequestHost(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return "";
+  }
+  if (trimmed.startsWith("[")) {
+    const endBracket = trimmed.indexOf("]");
+    if (endBracket > 0) {
+      return trimmed.slice(1, endBracket);
+    }
+    return trimmed;
+  }
+  const [host] = trimmed.split(":", 1);
+  return host ?? "";
+}
+
+function signUiAuthenticationSession(
+  payload: UiSignedSessionPayload,
+  secret: Buffer,
+): string {
+  const payloadJson = JSON.stringify(payload);
+  const payloadEncoded = Buffer.from(payloadJson, "utf8").toString("base64url");
+  const signature = createHmac("sha256", secret)
+    .update(payloadEncoded)
+    .digest("base64url");
+  return `${payloadEncoded}.${signature}`;
+}
+
+function verifySignedUiAuthenticationSession(
+  token: string,
+  secret: Buffer,
+  expectedSessionVersion: number,
+  expectedUsername: string,
+): boolean {
+  const segments = token.split(".");
+  if (segments.length !== 2) {
+    return false;
+  }
+  const payloadEncoded = segments[0];
+  const signatureEncoded = segments[1];
+  if (!payloadEncoded || !signatureEncoded) {
+    return false;
+  }
+
+  const expectedSignature = createHmac("sha256", secret)
+    .update(payloadEncoded)
+    .digest("base64url");
+  const expectedBuffer = Buffer.from(expectedSignature);
+  const signatureBuffer = Buffer.from(signatureEncoded);
+  if (expectedBuffer.length !== signatureBuffer.length) {
+    return false;
+  }
+  if (!timingSafeEqual(expectedBuffer, signatureBuffer)) {
+    return false;
+  }
+
+  try {
+    const payloadRaw = Buffer.from(payloadEncoded, "base64url").toString("utf8");
+    const payload = JSON.parse(payloadRaw) as UiSignedSessionPayload;
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      typeof payload.u !== "string" ||
+      typeof payload.e !== "number" ||
+      typeof payload.v !== "number"
+    ) {
+      return false;
+    }
+    if (payload.u !== expectedUsername) {
+      return false;
+    }
+    if (payload.v !== expectedSessionVersion) {
+      return false;
+    }
+    if (!Number.isFinite(payload.e) || payload.e <= Date.now()) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function hashUiAuthenticationPassword(password: string): Promise<string> {
+  const normalizedPassword = normalizePasswordInput(password);
+  const salt = randomBytes(16);
+  const digest = (await scryptAsync(normalizedPassword, salt, SCRYPT_KEY_LENGTH, {
+    N: SCRYPT_COST,
+    r: SCRYPT_BLOCK_SIZE,
+    p: SCRYPT_PARALLELIZATION,
+    maxmem: 128 * 1024 * 1024,
+  })) as Buffer;
+  return [
+    "scrypt",
+    String(SCRYPT_COST),
+    String(SCRYPT_BLOCK_SIZE),
+    String(SCRYPT_PARALLELIZATION),
+    salt.toString("base64url"),
+    digest.toString("base64url"),
+  ].join("$");
+}
+
+async function verifyUiAuthenticationPassword(
+  password: string,
+  passwordHash: string,
+): Promise<boolean> {
+  const parsed = parseScryptPasswordHash(passwordHash);
+  if (!parsed) {
+    return false;
+  }
+
+  try {
+    const computedDigest = (await scryptAsync(
+      normalizePasswordInput(password),
+      parsed.salt,
+      parsed.digest.length,
+      {
+        N: parsed.cost,
+        r: parsed.blockSize,
+        p: parsed.parallelization,
+        maxmem: 128 * 1024 * 1024,
+      },
+    )) as Buffer;
+    if (computedDigest.length !== parsed.digest.length) {
+      return false;
+    }
+    return timingSafeEqual(computedDigest, parsed.digest);
+  } catch {
+    return false;
+  }
+}
+
+function parseScryptPasswordHash(value: string): ScryptPasswordHashParts | undefined {
+  const segments = value.split("$");
+  if (segments.length !== 6 || segments[0] !== "scrypt") {
+    return undefined;
+  }
+
+  const cost = Number.parseInt(segments[1] ?? "", 10);
+  const blockSize = Number.parseInt(segments[2] ?? "", 10);
+  const parallelization = Number.parseInt(segments[3] ?? "", 10);
+  const saltSegment = segments[4] ?? "";
+  const digestSegment = segments[5] ?? "";
+  if (
+    !Number.isInteger(cost) ||
+    !Number.isInteger(blockSize) ||
+    !Number.isInteger(parallelization) ||
+    cost < 1_024 ||
+    blockSize <= 0 ||
+    parallelization <= 0 ||
+    !saltSegment ||
+    !digestSegment
+  ) {
+    return undefined;
+  }
+
+  try {
+    const salt = Buffer.from(saltSegment, "base64url");
+    const digest = Buffer.from(digestSegment, "base64url");
+    if (salt.length < 8 || digest.length < 16) {
+      return undefined;
+    }
+    return {
+      cost,
+      blockSize,
+      parallelization,
+      salt,
+      digest,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeUiAuthenticationUsername(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  if (!/^[a-z0-9](?:[a-z0-9._-]{1,62}[a-z0-9])?$/.test(normalized)) {
+    return undefined;
+  }
+  return normalized;
+}
+
+function normalizeUiAuthenticationPasswordHash(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim();
+  if (!normalized) {
+    return undefined;
+  }
+  return parseScryptPasswordHash(normalized) ? normalized : undefined;
+}
+
+function normalizePasswordInput(value: string): string {
+  return value.normalize("NFKC");
+}
+
+function validateUiAuthenticationPasswordStrength(password: string): string | undefined {
+  const normalized = normalizePasswordInput(password);
+  if (normalized.length < UI_AUTH_MIN_PASSWORD_LENGTH) {
+    return `Password must be at least ${UI_AUTH_MIN_PASSWORD_LENGTH} characters long.`;
+  }
+  if (!/[A-Z]/.test(normalized)) {
+    return "Password must include at least one uppercase letter.";
+  }
+  if (!/[a-z]/.test(normalized)) {
+    return "Password must include at least one lowercase letter.";
+  }
+  if (!/\d/.test(normalized)) {
+    return "Password must include at least one number.";
+  }
+  if (!/[^A-Za-z0-9]/.test(normalized)) {
+    return "Password must include at least one symbol.";
+  }
+  return undefined;
+}
+
+function resolveLoginAttemptKey(ipAddress: string | undefined): string {
+  const normalized = ipAddress?.trim();
+  return normalized || "unknown";
+}
+
+function pruneLoginAttemptFailures(state: UiLoginAttemptState, now: number): void {
+  state.failures = state.failures.filter((timestamp) => {
+    return now - timestamp <= UI_AUTH_ATTEMPT_WINDOW_MS;
+  });
+}
+
 export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? true });
   const runtime = options.service ? undefined : createOpenGoatRuntime();
@@ -536,6 +1243,7 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
   await ensureDefaultOrganizationWorkspace(service, logs);
 
   let uiSettings = await readUiServerSettings(service.getHomeDir());
+  const auth = createUiAuthController(app, () => uiSettings.authentication);
   const getVersionInfo = createVersionInfoProvider();
   const taskCronScheduler = createTaskCronScheduler(
     app,
@@ -549,11 +1257,41 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
   });
 
   await app.register(cors, { origin: true });
+  app.addHook("onRequest", async (request, reply) => {
+    if (!auth.isAuthenticationRequired()) {
+      return;
+    }
+
+    const pathname = stripQueryStringFromUrl(request.url);
+    if (
+      pathname === "/api/auth/status" ||
+      pathname === "/api/auth/login" ||
+      pathname === "/api/auth/logout"
+    ) {
+      return;
+    }
+
+    if (!pathname.startsWith("/api/")) {
+      return;
+    }
+
+    if (auth.isAuthenticatedRequest(request)) {
+      return;
+    }
+
+    reply.code(401).send({
+      error: "Authentication required.",
+      code: "AUTH_REQUIRED",
+    });
+  });
+
   registerApiRoutes(app, service, mode, {
     getSettings: () => uiSettings,
     updateSettings: async (nextSettings) => {
+      const previousAuth = uiSettings.authentication;
       uiSettings = nextSettings;
       await writeUiServerSettings(service.getHomeDir(), uiSettings);
+      auth.handleSettingsMutation(previousAuth, uiSettings.authentication);
       taskCronScheduler.setTaskCronEnabled(uiSettings.taskCronEnabled);
       taskCronScheduler.setNotifyManagersOfInactiveAgents(
         uiSettings.notifyManagersOfInactiveAgents,
@@ -567,6 +1305,7 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
     },
     getVersionInfo,
     logs,
+    auth,
   });
 
   if (attachFrontend) {
@@ -585,6 +1324,109 @@ function registerApiRoutes(
   mode: "development" | "production",
   deps: RegisterApiRoutesDeps
 ): void {
+  app.get("/api/auth/status", async (request, reply) => {
+    return safeReply(reply, async () => {
+      return {
+        authentication: deps.auth.getStatusForRequest(request),
+      };
+    });
+  });
+
+  app.post<{
+    Body: {
+      username?: string;
+      password?: string;
+    };
+  }>("/api/auth/login", async (request, reply) => {
+    return safeReply(reply, async () => {
+      if (!deps.auth.isAuthenticationRequired()) {
+        return {
+          authentication: {
+            enabled: false,
+            authenticated: true,
+          },
+          message: "UI authentication is disabled.",
+        };
+      }
+
+      const blockedAttempt = deps.auth.checkAttemptStatus(request);
+      if (blockedAttempt.blocked) {
+        const retryAfterSeconds = blockedAttempt.retryAfterSeconds ?? 60;
+        reply.code(429);
+        reply.header("Retry-After", String(retryAfterSeconds));
+        return {
+          error: "Too many failed sign-in attempts. Try again later.",
+          code: "AUTH_RATE_LIMITED",
+          retryAfterSeconds,
+        };
+      }
+
+      const username = request.body?.username ?? "";
+      const password = request.body?.password ?? "";
+      const validCredentials = await deps.auth.verifyCredentials(
+        username,
+        password,
+      );
+      if (!validCredentials) {
+        const lockState = deps.auth.registerFailedAttempt(request);
+        if (lockState.blocked) {
+          const retryAfterSeconds = lockState.retryAfterSeconds ?? 60;
+          reply.code(429);
+          reply.header("Retry-After", String(retryAfterSeconds));
+          return {
+            error: "Too many failed sign-in attempts. Try again later.",
+            code: "AUTH_RATE_LIMITED",
+            retryAfterSeconds,
+          };
+        }
+        reply.code(401);
+        return {
+          error: "Invalid username or password.",
+          code: "AUTH_INVALID_CREDENTIALS",
+        };
+      }
+
+      const issueCookieResult = deps.auth.issueSessionCookie(
+        reply,
+        request,
+        username,
+      );
+      if (!issueCookieResult.ok) {
+        reply.code(400);
+        return {
+          error:
+            issueCookieResult.error ??
+            "Unable to establish an authentication session.",
+          code: "AUTH_SESSION_ISSUE_FAILED",
+        };
+      }
+
+      deps.auth.clearFailedAttempts(request);
+      return {
+        authentication: {
+          enabled: true,
+          authenticated: true,
+        },
+        message: "Signed in.",
+      };
+    });
+  });
+
+  app.post("/api/auth/logout", async (request, reply) => {
+    return safeReply(reply, async () => {
+      deps.auth.clearSessionCookie(reply, request);
+      deps.auth.clearFailedAttempts(request);
+      const status = deps.auth.getStatusForRequest(request);
+      return {
+        authentication: {
+          enabled: status.enabled,
+          authenticated: false,
+        },
+        message: "Signed out.",
+      };
+    });
+  });
+
   app.get("/api/health", async (_request, reply) => {
     return safeReply(reply, async () => {
       return {
@@ -599,7 +1441,10 @@ function registerApiRoutes(
   app.get("/api/settings", async (_request, reply) => {
     return safeReply(reply, async () => {
       return {
-        settings: deps.getSettings()
+        settings: toPublicUiServerSettings(
+          deps.getSettings(),
+          deps.auth.getSettingsResponse(),
+        ),
       };
     });
   });
@@ -610,6 +1455,12 @@ function registerApiRoutes(
       notifyManagersOfInactiveAgents?: boolean;
       maxInactivityMinutes?: number;
       inactiveAgentNotificationTarget?: InactiveAgentNotificationTarget;
+      authentication?: {
+        enabled?: boolean;
+        username?: string;
+        password?: string;
+        currentPassword?: string;
+      };
     };
   }>("/api/settings", async (request, reply) => {
     return safeReply(reply, async () => {
@@ -631,6 +1482,10 @@ function registerApiRoutes(
           request.body ?? {},
           "inactiveAgentNotificationTarget",
         );
+      const hasAuthenticationSetting = Object.prototype.hasOwnProperty.call(
+        request.body ?? {},
+        "authentication",
+      );
 
       const parsedTaskCronEnabled = hasTaskCronEnabledSetting
         ? parseTaskCronEnabled(request.body?.taskCronEnabled)
@@ -676,21 +1531,197 @@ function registerApiRoutes(
         };
       }
 
+      let nextAuthentication: UiServerAuthenticationSettings =
+        currentSettings.authentication;
+      if (hasAuthenticationSetting) {
+        const authenticationBody = request.body?.authentication ?? {};
+        const hasEnabled = Object.prototype.hasOwnProperty.call(
+          authenticationBody,
+          "enabled",
+        );
+        const hasUsername = Object.prototype.hasOwnProperty.call(
+          authenticationBody,
+          "username",
+        );
+        const hasPassword = Object.prototype.hasOwnProperty.call(
+          authenticationBody,
+          "password",
+        );
+        const hasCurrentPassword = Object.prototype.hasOwnProperty.call(
+          authenticationBody,
+          "currentPassword",
+        );
+
+        const currentAuthentication = currentSettings.authentication;
+        const parsedEnabled = hasEnabled
+          ? parseBooleanSetting(authenticationBody.enabled)
+          : currentAuthentication.enabled;
+        if (parsedEnabled === undefined) {
+          reply.code(400);
+          return {
+            error: "authentication.enabled must be true or false",
+          };
+        }
+
+        const providedUsername = hasUsername
+          ? normalizeUiAuthenticationUsername(authenticationBody.username)
+          : normalizeUiAuthenticationUsername(currentAuthentication.username);
+        if (hasUsername && !providedUsername) {
+          reply.code(400);
+          return {
+            error:
+              "authentication.username must use 3-64 lowercase characters, numbers, dots, dashes, or underscores.",
+          };
+        }
+
+        const rawNewPassword = hasPassword
+          ? normalizePasswordInput(authenticationBody.password ?? "")
+          : "";
+        const hasNewPassword = rawNewPassword.length > 0;
+        if (hasPassword && !hasNewPassword) {
+          reply.code(400);
+          return {
+            error: "authentication.password cannot be empty when provided.",
+          };
+        }
+        if (hasNewPassword) {
+          const passwordValidationError =
+            deps.auth.validatePasswordStrength(rawNewPassword);
+          if (passwordValidationError) {
+            reply.code(400);
+            return {
+              error: passwordValidationError,
+            };
+          }
+        }
+
+        const currentEnabledSettings = deps.auth.getSettingsResponse().enabled;
+        const changingEnabledState = parsedEnabled !== currentAuthentication.enabled;
+        const changingUsername =
+          hasUsername &&
+          providedUsername !==
+            normalizeUiAuthenticationUsername(currentAuthentication.username);
+        const changingPassword = hasNewPassword;
+        const requiresCurrentPasswordVerification =
+          currentEnabledSettings &&
+          (changingEnabledState || changingUsername || changingPassword);
+        if (requiresCurrentPasswordVerification) {
+          const currentPassword = hasCurrentPassword
+            ? normalizePasswordInput(authenticationBody.currentPassword ?? "")
+            : "";
+          if (!currentPassword) {
+            reply.code(400);
+            return {
+              error:
+                "authentication.currentPassword is required to modify UI authentication settings.",
+            };
+          }
+          const currentPasswordValid = await deps.auth.verifyCurrentPassword(
+            currentPassword,
+          );
+          if (!currentPasswordValid) {
+            reply.code(401);
+            return {
+              error: "Current password is incorrect.",
+              code: "AUTH_INVALID_CURRENT_PASSWORD",
+            };
+          }
+        }
+
+        const nextUsername =
+          providedUsername ??
+          normalizeUiAuthenticationUsername(currentAuthentication.username);
+        const nextPasswordHash = hasNewPassword
+          ? await deps.auth.hashPassword(rawNewPassword)
+          : normalizeUiAuthenticationPasswordHash(
+              currentAuthentication.passwordHash,
+            );
+        if (parsedEnabled && (!nextUsername || !nextPasswordHash)) {
+          reply.code(400);
+          return {
+            error:
+              "authentication.username and authentication.password are required when enabling UI authentication.",
+          };
+        }
+
+        nextAuthentication = {
+          enabled: parsedEnabled,
+          username: nextUsername,
+          passwordHash: nextPasswordHash,
+        };
+      }
+
       const nextSettings: UiServerSettings = {
         taskCronEnabled: parsedTaskCronEnabled,
         notifyManagersOfInactiveAgents: parsedNotifyManagers,
         maxInactivityMinutes: parsedMaxInactivityMinutes,
         inactiveAgentNotificationTarget: parsedNotificationTarget,
+        authentication: nextAuthentication,
       };
       await deps.updateSettings(nextSettings);
+
+      const nextAuthResponse = deps.auth.getSettingsResponse();
+      if (nextAuthResponse.enabled) {
+        const currentAuthStatus = deps.auth.getStatusForRequest(request);
+        let issuedSession = false;
+        if (currentAuthStatus.authenticated) {
+          const issued = deps.auth.issueSessionCookie(
+            reply,
+            request,
+            nextAuthResponse.username,
+          );
+          if (!issued.ok) {
+            reply.code(400);
+            return {
+              error:
+                issued.error ??
+                "Unable to establish an authentication session.",
+              code: "AUTH_SESSION_ISSUE_FAILED",
+            };
+          }
+          issuedSession = true;
+        } else if (
+          hasAuthenticationSetting &&
+          normalizeUiAuthenticationUsername(
+            request.body?.authentication?.username,
+          ) === nextAuthResponse.username &&
+          typeof request.body?.authentication?.password === "string" &&
+          request.body.authentication.password.length > 0
+        ) {
+          const issued = deps.auth.issueSessionCookie(
+            reply,
+            request,
+            nextAuthResponse.username,
+          );
+          if (!issued.ok) {
+            reply.code(400);
+            return {
+              error:
+                issued.error ??
+                "Unable to establish an authentication session.",
+              code: "AUTH_SESSION_ISSUE_FAILED",
+            };
+          }
+          issuedSession = true;
+        }
+        if (!issuedSession) {
+          reply.code(400);
+          return {
+            error:
+              "Sign-in credentials are required when enabling UI authentication.",
+            code: "AUTH_LOGIN_REQUIRED",
+          };
+        }
+      }
+
       deps.logs.append({
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes} inactiveAgentNotificationTarget=${nextSettings.inactiveAgentNotificationTarget}`,
+        message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes} inactiveAgentNotificationTarget=${nextSettings.inactiveAgentNotificationTarget} authEnabled=${nextSettings.authentication.enabled}`,
       });
       return {
-        settings: nextSettings,
+        settings: toPublicUiServerSettings(nextSettings, nextAuthResponse),
         message: `Task automation checks ${
           nextSettings.taskCronEnabled ? "enabled" : "disabled"
         } (runs every ${DEFAULT_TASK_CHECK_FREQUENCY_MINUTES} minute(s)). Inactive-agent manager notifications ${
@@ -3318,6 +4349,11 @@ function defaultUiServerSettings(): UiServerSettings {
     notifyManagersOfInactiveAgents: true,
     maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
     inactiveAgentNotificationTarget: "all-managers",
+    authentication: {
+      enabled: false,
+      username: undefined,
+      passwordHash: undefined,
+    },
   };
 }
 
@@ -3428,6 +4464,11 @@ async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> 
       notifyManagersOfInactiveAgents?: unknown;
       maxInactivityMinutes?: unknown;
       inactiveAgentNotificationTarget?: unknown;
+      authentication?: {
+        enabled?: unknown;
+        username?: unknown;
+        passwordHash?: unknown;
+      };
     };
     const taskCronEnabled = parseTaskCronEnabled(parsed?.taskCronEnabled);
     const notifyManagersOfInactiveAgents =
@@ -3441,6 +4482,13 @@ async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> 
       parseInactiveAgentNotificationTarget(
         parsed?.inactiveAgentNotificationTarget,
       );
+    const authEnabled = parseBooleanSetting(parsed.authentication?.enabled);
+    const authUsername = normalizeUiAuthenticationUsername(
+      parsed.authentication?.username,
+    );
+    const authPasswordHash = normalizeUiAuthenticationPasswordHash(
+      parsed.authentication?.passwordHash,
+    );
     const defaults = defaultUiServerSettings();
     return {
       taskCronEnabled: taskCronEnabled ?? defaults.taskCronEnabled,
@@ -3452,6 +4500,13 @@ async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> 
       inactiveAgentNotificationTarget:
         inactiveAgentNotificationTarget ??
         defaults.inactiveAgentNotificationTarget,
+      authentication: {
+        enabled:
+          authEnabled === true &&
+          Boolean(authUsername && authPasswordHash),
+        username: authUsername,
+        passwordHash: authPasswordHash,
+      },
     };
   } catch {
     return defaultUiServerSettings();
@@ -3462,6 +4517,19 @@ async function writeUiServerSettings(homeDir: string, settings: UiServerSettings
   const settingsPath = path.resolve(homeDir, UI_SETTINGS_FILENAME);
   await mkdir(path.dirname(settingsPath), { recursive: true });
   await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+}
+
+function toPublicUiServerSettings(
+  settings: UiServerSettings,
+  authentication: UiAuthenticationSettingsResponse,
+): UiServerSettingsResponse {
+  return {
+    taskCronEnabled: settings.taskCronEnabled,
+    notifyManagersOfInactiveAgents: settings.notifyManagersOfInactiveAgents,
+    maxInactivityMinutes: settings.maxInactivityMinutes,
+    inactiveAgentNotificationTarget: settings.inactiveAgentNotificationTarget,
+    authentication,
+  };
 }
 
 interface TaskCronScheduler {
