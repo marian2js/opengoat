@@ -38,6 +38,21 @@ docker run --rm -p 19123:19123 -v opengoat-data:/data/opengoat opengoat:latest
 
 Then open `http://127.0.0.1:19123`.
 
+### From Source (without global npm install)
+
+```bash
+pnpm install
+pnpm build
+./bin/opengoat --help
+```
+
+When agents execute commands from their OpenGoat workspace, use the workspace shim:
+
+```bash
+sh ./opengoat agent list
+sh ./opengoat agent info ceo
+```
+
 ### CLI Quick Start (Optional)
 
 Runtime: Node `>=20.11`.

@@ -240,7 +240,7 @@ describe("AgentService", () => {
     expect(roleMarkdown).toContain("- Your name: CEO");
     expect(roleMarkdown).toContain("- Role: CEO");
     expect(roleMarkdown).toContain(
-      "- For info about your reportees, run `opengoat agent info ceo`.",
+      "- For info about your reportees, run `sh ./opengoat agent info ceo`.",
     );
     expect(roleMarkdown).toContain(
       "- To delegate and coordinate work, use `og-*` skills.",
@@ -324,13 +324,16 @@ describe("AgentService", () => {
     expect(roleMarkdown).toContain("- Your name: Avery");
     expect(roleMarkdown).toContain("- Role: Backend Engineer");
     expect(roleMarkdown).toContain(
-      "- For info about your level on the organiztion, run `opengoat agent info engineer`.",
+      "- For info about your level on the organiztion, run `sh ./opengoat agent info engineer`.",
     );
     expect(roleMarkdown).toContain(
       "- To delegate and coordinate work, use `og-*` skills.",
     );
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
     expect(await fileSystem.exists(userPath)).toBe(false);
+    expect(await fileSystem.exists(path.join(workspace, "opengoat"))).toBe(
+      true,
+    );
   });
 
   it("never changes global default agent during agent creation", async () => {

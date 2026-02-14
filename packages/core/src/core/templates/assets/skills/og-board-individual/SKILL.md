@@ -14,7 +14,7 @@ Use this skill to read and update tasks assigned to you. Follow your manager’s
 Replace `<me>` with your agent id.
 
 ```bash
-opengoat agent info <me>
+sh ./opengoat agent info <me>
 ```
 
 You will typically have one or more `<task-id>` values to update.
@@ -22,14 +22,14 @@ You will typically have one or more `<task-id>` values to update.
 ## Relevant commands
 
 ```bash
-opengoat task list [--as <me>] [--json]
-opengoat task show <task-id> [--json]
+sh ./opengoat task list [--as <me>] [--json]
+sh ./opengoat task show <task-id> [--json]
 
-opengoat task status <task-id> <todo|doing|blocked|pending|done> [--reason <reason>] [--as <me>]
+sh ./opengoat task status <task-id> <todo|doing|blocked|pending|done> [--reason <reason>] [--as <me>]
 
-opengoat task blocker add <task-id> <content> [--as <me>]
-opengoat task artifact add <task-id> <content> [--as <me>]
-opengoat task worklog add <task-id> <content> [--as <me>]
+sh ./opengoat task blocker add <task-id> <content> [--as <me>]
+sh ./opengoat task artifact add <task-id> <content> [--as <me>]
+sh ./opengoat task worklog add <task-id> <content> [--as <me>]
 ```
 
 ## View tasks
@@ -37,7 +37,7 @@ opengoat task worklog add <task-id> <content> [--as <me>]
 ### Show a single task
 
 ```bash
-opengoat task show <task-id>
+sh ./opengoat task show <task-id>
 ```
 
 ### List tasks
@@ -45,7 +45,7 @@ opengoat task show <task-id>
 List tasks owned by an agent (often: you):
 
 ```bash
-opengoat task list --as <me>
+sh ./opengoat task list --as <me>
 ```
 
 ### List tasks by status (practical approach)
@@ -53,7 +53,7 @@ opengoat task list --as <me>
 Use JSON output and filter locally. The JSON includes task status (`todo|doing|blocked|pending|done`).
 
 ```bash
-opengoat task list --json
+sh ./opengoat task list --json
 ```
 
 Filter examples (adjust the jq selector to match the JSON shape you see):
@@ -62,11 +62,11 @@ Filter examples (adjust the jq selector to match the JSON shape you see):
 
 # If the JSON is an array of tasks
 
-opengoat task list --json | jq '.[] | select(.status=="doing")'
+sh ./opengoat task list --json | jq '.[] | select(.status=="doing")'
 
 # If the JSON is an object that contains a tasks array
 
-opengoat task list --json | jq '.tasks[] | select(.status=="doing")'
+sh ./opengoat task list --json | jq '.tasks[] | select(.status=="doing")'
 ```
 
 ## Update task status
@@ -74,7 +74,7 @@ opengoat task list --json | jq '.tasks[] | select(.status=="doing")'
 Statuses: `todo`, `doing`, `blocked`, `pending`, `done`.
 
 ```bash
-opengoat task status <task-id> <todo|doing|blocked|pending|done> [--reason "<reason>"]
+sh ./opengoat task status <task-id> <todo|doing|blocked|pending|done> [--reason "<reason>"]
 ```
 
 ### Reason rules
@@ -90,19 +90,19 @@ Examples:
 
 # Start work
 
-opengoat task status <task-id> doing
+sh ./opengoat task status <task-id> doing
 
 # Blocked (reason required)
 
-opengoat task status <task-id> blocked --reason "Need API token from platform team"
+sh ./opengoat task status <task-id> blocked --reason "Need API token from platform team"
 
 # Pending (reason required)
 
-opengoat task status <task-id> pending --reason "Waiting for review window on Friday"
+sh ./opengoat task status <task-id> pending --reason "Waiting for review window on Friday"
 
 # Done (reason optional but useful)
 
-opengoat task status <task-id> done --reason "Merged PR #123 and deployed"
+sh ./opengoat task status <task-id> done --reason "Merged PR #123 and deployed"
 ```
 
 ### Assignee override (only if you must)
@@ -110,7 +110,7 @@ opengoat task status <task-id> done --reason "Merged PR #123 and deployed"
 Some contexts require specifying an assignee context explicitly.
 
 ```bash
-opengoat task status <task-id> doing --as <agent-id>
+sh ./opengoat task status <task-id> doing --as <agent-id>
 ```
 
 ## Blockers, artifacts, worklogs
@@ -120,7 +120,7 @@ opengoat task status <task-id> doing --as <agent-id>
 Use this to capture what is blocking you and what unblocks you.
 
 ```bash
-opengoat task blocker add <task-id> "Blocked by <thing>. Unblocks when <condition>." --as <me>
+sh ./opengoat task blocker add <task-id> "Blocked by <thing>. Unblocks when <condition>." --as <me>
 ```
 
 ### Add an artifact (proof of work)
@@ -128,7 +128,7 @@ opengoat task blocker add <task-id> "Blocked by <thing>. Unblocks when <conditio
 Use this for PR links, docs, screenshots, commands run, or final outputs.
 
 ```bash
-opengoat task artifact add <task-id> "PR: <link> | Docs: <link> | Output: <summary>" --as <me>
+sh ./opengoat task artifact add <task-id> "PR: <link> | Docs: <link> | Output: <summary>" --as <me>
 ```
 
 ### Add a worklog update (progress notes)
@@ -136,7 +136,7 @@ opengoat task artifact add <task-id> "PR: <link> | Docs: <link> | Output: <summa
 Use for concise progress updates and handoffs.
 
 ```bash
-opengoat task worklog add <task-id> "Did X. Next: Y. Risk: Z." --as <me>
+sh ./opengoat task worklog add <task-id> "Did X. Next: Y. Risk: Z." --as <me>
 ```
 
 ## Minimal hygiene

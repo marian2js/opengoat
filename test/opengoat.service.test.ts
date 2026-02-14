@@ -762,7 +762,7 @@ describe("OpenGoatService", () => {
     expect(roleMarkdown).toContain("- Your name: CEO");
     expect(roleMarkdown).toContain("- Role: CEO");
     expect(roleMarkdown).toContain(
-      "- For info about your reportees, run `opengoat agent info ceo`.",
+      "- For info about your reportees, run `sh ./opengoat agent info ceo`.",
     );
     expect(roleMarkdown).toContain(
       "- To delegate and coordinate work, use `og-*` skills.",
