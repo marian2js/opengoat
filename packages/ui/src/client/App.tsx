@@ -3953,6 +3953,7 @@ export function App(): ReactElement {
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="h-10"
                       disabled={wikiController.isSaving || wikiController.isDeleting}
                       onClick={wikiController.cancelEditing}
                     >
@@ -3961,6 +3962,7 @@ export function App(): ReactElement {
                   ) : null}
                   <Button
                     size="sm"
+                    className="h-10"
                     onClick={() => {
                       if (wikiController.isEditing) {
                         void wikiController.save();
@@ -3984,6 +3986,7 @@ export function App(): ReactElement {
                   <Button
                     size="sm"
                     variant="destructive"
+                    className="h-10"
                     disabled={
                       wikiController.isLoading ||
                       wikiController.isSaving ||
