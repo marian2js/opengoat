@@ -1132,7 +1132,7 @@ function registerApiRoutes(
           };
         }
 
-        const resolvedProjectPath = path.resolve(projectPath);
+        const resolvedProjectPath = resolveAbsolutePath(projectPath);
         const stats = await stat(resolvedProjectPath).catch(() => {
           return null;
         });
@@ -1281,7 +1281,6 @@ function registerApiRoutes(
       const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
       const sessionRef = request.body?.sessionRef?.trim();
       const message = request.body?.message?.trim();
-      const projectPath = request.body?.projectPath?.trim();
       const images = normalizeUiImages(request.body?.images);
 
       if (!sessionRef) {
@@ -1297,6 +1296,13 @@ function registerApiRoutes(
           error: "message or image is required"
         };
       }
+
+      const projectPath = await resolveSessionProjectPathForRequest(
+        service,
+        agentId,
+        sessionRef,
+        request.body?.projectPath
+      );
 
       deps.logs.append({
         timestamp: new Date().toISOString(),
@@ -1384,7 +1390,6 @@ function registerApiRoutes(
     const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
     const sessionRef = request.body?.sessionRef?.trim();
     const message = request.body?.message?.trim();
-    const projectPath = request.body?.projectPath?.trim();
     const images = normalizeUiImages(request.body?.images);
 
     if (!sessionRef) {
@@ -1394,6 +1399,21 @@ function registerApiRoutes(
 
     if (!message && images.length === 0) {
       reply.code(400).send({ error: "message or image is required" });
+      return;
+    }
+
+    let projectPath: string | undefined;
+    try {
+      projectPath = await resolveSessionProjectPathForRequest(
+        service,
+        agentId,
+        sessionRef,
+        request.body?.projectPath
+      );
+    } catch (error) {
+      const streamError =
+        error instanceof Error ? error.message : "Unexpected server error";
+      reply.code(500).send({ error: streamError });
       return;
     }
 
@@ -2842,6 +2862,71 @@ async function runUiSessionMessage(
   throw new Error("Session messaging is unavailable on this runtime.");
 }
 
+async function resolveSessionProjectPathForRequest(
+  service: OpenClawUiService,
+  agentId: string,
+  sessionRef: string,
+  requestedProjectPath: string | undefined
+): Promise<string | undefined> {
+  const explicitPath = normalizeOptionalAbsolutePath(requestedProjectPath);
+  if (explicitPath) {
+    return explicitPath;
+  }
+
+  const storedProjectPath = await resolveStoredSessionProjectPath(
+    service,
+    agentId,
+    sessionRef
+  );
+  if (storedProjectPath) {
+    return storedProjectPath;
+  }
+
+  const organizationPath = resolveAbsolutePath(
+    path.join(service.getHomeDir(), DEFAULT_ORGANIZATION_PROJECT_DIRNAME)
+  );
+  const organizationStats = await stat(organizationPath).catch(() => {
+    return null;
+  });
+  if (organizationStats?.isDirectory()) {
+    return organizationPath;
+  }
+
+  const homePath = resolveAbsolutePath(service.getHomeDir());
+  const homeStats = await stat(homePath).catch(() => {
+    return null;
+  });
+  if (homeStats?.isDirectory()) {
+    return homePath;
+  }
+
+  return undefined;
+}
+
+async function resolveStoredSessionProjectPath(
+  service: OpenClawUiService,
+  agentId: string,
+  sessionRef: string
+): Promise<string | undefined> {
+  const normalizedSessionRef = sessionRef.trim();
+  if (!normalizedSessionRef) {
+    return undefined;
+  }
+
+  try {
+    const sessions = await service.listSessions(agentId);
+    const matchingSession = sessions.find((session) => {
+      return (
+        session.sessionKey === normalizedSessionRef ||
+        session.sessionId === normalizedSessionRef
+      );
+    });
+    return normalizeOptionalAbsolutePath(matchingSession?.projectPath);
+  } catch {
+    return undefined;
+  }
+}
+
 async function createUiTask(
   service: OpenClawUiService,
   actorId: string,
@@ -2927,7 +3012,7 @@ async function resolveProjectFolder(
 ): Promise<{ name: string; path: string }> {
   const explicitPath = folderPath?.trim();
   if (explicitPath) {
-    const resolvedPath = path.resolve(explicitPath);
+    const resolvedPath = resolveAbsolutePath(explicitPath);
     const stats = await stat(resolvedPath).catch(() => {
       return null;
     });
@@ -3019,8 +3104,27 @@ function normalizeComparableProjectPath(value: string | undefined): string {
   if (!trimmed) {
     return "";
   }
-  const resolved = path.resolve(trimmed);
+  const resolved = resolveAbsolutePath(trimmed);
   return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+function resolveAbsolutePath(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed === "~") {
+    return homedir();
+  }
+  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
+    return path.resolve(homedir(), trimmed.slice(2));
+  }
+  return path.resolve(trimmed);
+}
+
+function normalizeOptionalAbsolutePath(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return resolveAbsolutePath(trimmed);
 }
 
 function normalizeProjectSegment(value: string): string {

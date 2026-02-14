@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -860,6 +861,103 @@ describe("OpenGoat UI server API", () => {
     expect(aliasResponse.statusCode).toBe(200);
   });
 
+  it("reuses stored session project path when projectPath is omitted", async () => {
+    const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(async () => {
+      return {
+        code: 0,
+        stdout: "assistant response",
+        stderr: "",
+        providerId: "openclaw",
+      };
+    });
+    const listSessions = vi.fn<NonNullable<OpenClawUiService["listSessions"]>>(async () => {
+      return [
+        {
+          sessionKey: "workspace:tmp",
+          sessionId: "session-1",
+          title: "New Session",
+          updatedAt: Date.now(),
+          transcriptPath: "/tmp/transcript.jsonl",
+          workspacePath: "/tmp/workspace",
+          projectPath: "/tmp/stored-path",
+          inputChars: 0,
+          outputChars: 0,
+          totalChars: 0,
+          compactionCount: 0,
+        },
+      ];
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        listSessions,
+        runAgent,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message",
+      payload: {
+        agentId: "ceo",
+        sessionRef: "workspace:tmp",
+        message: "hello",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(runAgent).toHaveBeenCalledWith(
+      "ceo",
+      expect.objectContaining({
+        message: "hello",
+        sessionRef: "workspace:tmp",
+        cwd: "/tmp/stored-path",
+      }),
+    );
+  });
+
+  it("expands tilde project paths before sending session messages", async () => {
+    const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(async () => {
+      return {
+        code: 0,
+        stdout: "assistant response",
+        stderr: "",
+        providerId: "openclaw",
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        runAgent,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message",
+      payload: {
+        agentId: "ceo",
+        sessionRef: "workspace:tmp",
+        projectPath: "~/.opengoat/organization",
+        message: "hello",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(runAgent).toHaveBeenCalledWith(
+      "ceo",
+      expect.objectContaining({
+        cwd: path.resolve(homedir(), ".opengoat/organization"),
+      }),
+    );
+  });
+
   it("sends attached images to an existing session", async () => {
     const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(async (): Promise<{
       code: number;
@@ -988,6 +1086,75 @@ describe("OpenGoat UI server API", () => {
         cwd: "/tmp",
         hooks: expect.any(Object),
         onStderr: expect.any(Function),
+      }),
+    );
+  });
+
+  it("streams session messages using stored project path when projectPath is omitted", async () => {
+    const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(
+      async (_agentId, options) => {
+        options.hooks?.onEvent?.({
+          stage: "run_started",
+          timestamp: "2026-02-13T00:00:00.000Z",
+          runId: "run-stored-cwd",
+          agentId: "ceo",
+        });
+
+        return {
+          code: 0,
+          stdout: "assistant response",
+          stderr: "",
+          providerId: "openclaw",
+        };
+      },
+    );
+    const listSessions = vi.fn<NonNullable<OpenClawUiService["listSessions"]>>(
+      async () => {
+        return [
+          {
+            sessionKey: "workspace:tmp",
+            sessionId: "session-1",
+            title: "New Session",
+            updatedAt: Date.now(),
+            transcriptPath: "/tmp/transcript.jsonl",
+            workspacePath: "/tmp/workspace",
+            projectPath: "/tmp/stored-path",
+            inputChars: 0,
+            outputChars: 0,
+            totalChars: 0,
+            compactionCount: 0,
+          },
+        ];
+      },
+    );
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        listSessions,
+        runAgent,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message/stream",
+      payload: {
+        agentId: "ceo",
+        sessionRef: "workspace:tmp",
+        message: "hello",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(runAgent).toHaveBeenCalledWith(
+      "ceo",
+      expect.objectContaining({
+        message: "hello",
+        sessionRef: "workspace:tmp",
+        cwd: "/tmp/stored-path",
       }),
     );
   });
