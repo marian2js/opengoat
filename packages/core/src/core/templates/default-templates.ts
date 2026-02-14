@@ -46,6 +46,10 @@ export function renderCeoRoleMarkdown(): string {
   return readMarkdownTemplate("ceo/ROLE.md");
 }
 
+export function renderCeoBootstrapMarkdown(): string {
+  return readMarkdownTemplate("ceo/BOOTSTRAP.md");
+}
+
 export function renderBoardManagerSkillMarkdown(): string {
   return readMarkdownTemplate("skills/og-board-manager/SKILL.md");
 }

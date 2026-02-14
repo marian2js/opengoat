@@ -90,7 +90,7 @@ describe("BootstrapService", () => {
       await fileSystem.exists(
         path.join(paths.workspacesDir, "ceo", "BOOTSTRAP.md"),
       ),
-    ).toBe(false);
+    ).toBe(true);
     expect(await fileSystem.exists(paths.skillsDir)).toBe(false);
   });
 

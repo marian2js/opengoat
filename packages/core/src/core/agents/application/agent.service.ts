@@ -18,6 +18,7 @@ import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import {
   renderAgentsIndex,
+  renderCeoBootstrapMarkdown,
   renderBoardIndividualSkillMarkdown,
   renderBoardManagerSkillMarkdown,
   renderCeoRoleMarkdown,
@@ -229,7 +230,13 @@ export class AgentService {
     skippedPaths.push(...workspaceSkillSync.skippedPaths);
     removedPaths.push(...workspaceSkillSync.removedPaths);
 
-    if (await this.fileSystem.exists(bootstrapPath)) {
+    if (isDefaultAgentId(normalizedAgentId)) {
+      await this.writeBootstrapMarkdown(
+        bootstrapPath,
+        createdPaths,
+        skippedPaths,
+      );
+    } else if (await this.fileSystem.exists(bootstrapPath)) {
       await this.fileSystem.removeDir(bootstrapPath);
       removedPaths.push(bootstrapPath);
     } else {
@@ -560,7 +567,7 @@ export class AgentService {
 
   private async rewriteAgentsMarkdown(
     filePath: string,
-    _agentId: string,
+    agentId: string,
     createdPaths: string[],
     skippedPaths: string[],
   ): Promise<void> {
@@ -571,7 +578,9 @@ export class AgentService {
     }
 
     const source = await this.fileSystem.readFile(filePath);
-    const next = replaceFirstRunSection(source);
+    const next = isDefaultAgentId(agentId)
+      ? appendYourRoleAfterFirstRunSection(source)
+      : replaceFirstRunSection(source);
     if (source === next) {
       skippedPaths.push(filePath);
       return;
@@ -594,6 +603,20 @@ export class AgentService {
     await this.writeMarkdown(
       filePath,
       renderRoleMarkdown(profile),
+      createdPaths,
+      skippedPaths,
+      { overwrite: true },
+    );
+  }
+
+  private async writeBootstrapMarkdown(
+    filePath: string,
+    createdPaths: string[],
+    skippedPaths: string[],
+  ): Promise<void> {
+    await this.writeMarkdown(
+      filePath,
+      renderCeoBootstrapMarkdown(),
       createdPaths,
       skippedPaths,
       { overwrite: true },
@@ -853,19 +876,13 @@ function replaceFirstRunSection(markdown: string): string {
   const kept: string[] = [];
   let skipping = false;
   let replaced = false;
-  const replacementLines = [
-    "## Your Role",
-    "",
-    "You are part of an organization run by AI agents. Read `ROLE.md` for details about your role, and read `../../organization` for details about the organization.",
-    "",
-  ];
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (!skipping && /^##\s+first run\s*$/i.test(trimmed)) {
       skipping = true;
       replaced = true;
-      kept.push(...replacementLines);
+      kept.push(...createYourRoleSectionLines());
       continue;
     }
     if (skipping) {
@@ -887,6 +904,63 @@ function replaceFirstRunSection(markdown: string): string {
     next = `${next}${lineBreak}`;
   }
   return next;
+}
+
+function appendYourRoleAfterFirstRunSection(markdown: string): string {
+  const lineBreak = markdown.includes("\r\n") ? "\r\n" : "\n";
+  const lines = markdown.split(/\r?\n/);
+  const hasTrailingLineBreak = /\r?\n$/.test(markdown);
+  const kept: string[] = [];
+  let insideFirstRunSection = false;
+  let foundFirstRunSection = false;
+  let insertedRoleSection = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const isSecondLevelHeading = /^##\s+/.test(trimmed);
+
+    if (!foundFirstRunSection && /^##\s+first run\s*$/i.test(trimmed)) {
+      foundFirstRunSection = true;
+      insideFirstRunSection = true;
+      kept.push(line);
+      continue;
+    }
+
+    if (insideFirstRunSection && isSecondLevelHeading) {
+      if (/^##\s+your role\s*$/i.test(trimmed)) {
+        insertedRoleSection = true;
+      } else if (!insertedRoleSection) {
+        kept.push(...createYourRoleSectionLines());
+        insertedRoleSection = true;
+      }
+      insideFirstRunSection = false;
+    }
+
+    kept.push(line);
+  }
+
+  if (!foundFirstRunSection) {
+    return markdown;
+  }
+
+  if (!insertedRoleSection) {
+    kept.push(...createYourRoleSectionLines());
+  }
+
+  let next = kept.join(lineBreak);
+  if (hasTrailingLineBreak && !next.endsWith(lineBreak)) {
+    next = `${next}${lineBreak}`;
+  }
+  return next;
+}
+
+function createYourRoleSectionLines(): string[] {
+  return [
+    "## Your Role",
+    "",
+    "You are part of an organization run by AI agents. Read `ROLE.md` for details about your role, and read `../../organization` for details about the organization.",
+    "",
+  ];
 }
 
 function renderRoleMarkdown(profile: {

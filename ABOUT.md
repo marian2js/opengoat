@@ -133,8 +133,8 @@ Main structure:
 
 OpenClaw owns workspace bootstrap markdown semantics.
 
-OpenGoat pre-seeds `workspaces/ceo/ROLE.md` and removes `BOOTSTRAP.md`
-to avoid first-run bootstrap prompts for the default manager.
+OpenGoat pre-seeds `workspaces/ceo/ROLE.md` and replaces `BOOTSTRAP.md`
+for the default manager after OpenClaw bootstrap.
 OpenGoat also pre-seeds `organization/*.md` from `packages/core/src/core/templates/assets/organization/`.
 
 ## 10) Module Layout
