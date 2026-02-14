@@ -262,7 +262,7 @@ interface UiVersionInfo {
   installedVersion: string | null;
   latestVersion: string | null;
   updateAvailable: boolean | null;
-  status: "latest" | "update-available" | "unknown";
+  status: "latest" | "update-available" | "unpublished" | "unknown";
   checkedAt: string;
   error?: string;
 }
@@ -1405,15 +1405,20 @@ function createVersionInfoProvider(): () => Promise<UiVersionInfo> {
     pending = (async () => {
       const installedVersion = resolveInstalledVersion();
       let latestVersion: string | null = null;
+      let unpublished = false;
       let error: string | undefined;
 
       try {
         latestVersion = await fetchLatestPackageVersion(OPENGOAT_PACKAGE_NAME);
       } catch (fetchError) {
-        error = fetchError instanceof Error ? fetchError.message : String(fetchError);
+        if (fetchError instanceof NpmPackageNotFoundError) {
+          unpublished = true;
+        } else {
+          error = fetchError instanceof Error ? fetchError.message : String(fetchError);
+        }
       }
 
-      const status = resolveVersionStatus(installedVersion, latestVersion);
+      const status = resolveVersionStatus(installedVersion, latestVersion, unpublished);
       const next: UiVersionInfo = {
         packageName: OPENGOAT_PACKAGE_NAME,
         installedVersion,
@@ -1447,16 +1452,23 @@ function resolveInstalledVersion(): string | null {
   const currentDir = path.dirname(currentFile);
 
   const candidates = dedupePathEntries([
-    path.resolve(process.cwd(), "package.json"),
     path.resolve(process.cwd(), "packages", "cli", "package.json"),
-    path.resolve(currentDir, "../../../../package.json"),
-    path.resolve(currentDir, "../../../../../package.json"),
     path.resolve(currentDir, "../../../../packages/cli/package.json"),
-    path.resolve(currentDir, "../../../../../packages/cli/package.json")
+    path.resolve(currentDir, "../../../../../packages/cli/package.json"),
+    path.resolve(process.cwd(), "package.json"),
+    path.resolve(currentDir, "../../../../package.json"),
+    path.resolve(currentDir, "../../../../../package.json")
   ]);
 
   for (const packageJsonPath of candidates) {
     const version = readOpengoatPackageVersion(packageJsonPath);
+    if (version) {
+      return version;
+    }
+  }
+
+  for (const packageJsonPath of candidates) {
+    const version = readAnyPackageVersion(packageJsonPath);
     if (version) {
       return version;
     }
@@ -1475,10 +1487,31 @@ function readOpengoatPackageVersion(packageJsonPath: string): string | null {
     const parsed = JSON.parse(raw) as {
       name?: string;
       version?: string;
+      bin?: Record<string, unknown>;
     };
-    if (parsed.name !== OPENGOAT_PACKAGE_NAME) {
+    const isCliPackage =
+      parsed.name === OPENGOAT_PACKAGE_NAME ||
+      parsed.name === "@opengoat/cli" ||
+      Boolean(parsed.bin && typeof parsed.bin === "object" && "opengoat" in parsed.bin);
+    if (!isCliPackage) {
       return null;
     }
+    return normalizeVersion(parsed.version) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function readAnyPackageVersion(packageJsonPath: string): string | null {
+  if (!existsSync(packageJsonPath)) {
+    return null;
+  }
+
+  try {
+    const raw = readFileSync(packageJsonPath, "utf8");
+    const parsed = JSON.parse(raw) as {
+      version?: string;
+    };
     return normalizeVersion(parsed.version) ?? null;
   } catch {
     return null;
@@ -1492,8 +1525,16 @@ function normalizeVersion(value: string | undefined): string | undefined {
 
 function resolveVersionStatus(
   installedVersion: string | null,
-  latestVersion: string | null
+  latestVersion: string | null,
+  unpublished: boolean
 ): { updateAvailable: boolean | null; status: UiVersionInfo["status"] } {
+  if (unpublished) {
+    return {
+      updateAvailable: null,
+      status: "unpublished"
+    };
+  }
+
   if (!installedVersion || !latestVersion) {
     return {
       updateAvailable: null,
@@ -1533,8 +1574,12 @@ async function fetchLatestPackageVersion(packageName: string): Promise<string> {
       }
     );
 
+    if (response.status === 404) {
+      throw new NpmPackageNotFoundError(`${packageName} is not published on npm yet.`);
+    }
+
     if (!response.ok) {
-      throw new Error(`Failed to check npm registry (status ${response.status}).`);
+      throw new Error("Unable to check npm registry for updates.");
     }
 
     const payload = (await response.json()) as {
@@ -1554,6 +1599,8 @@ async function fetchLatestPackageVersion(packageName: string): Promise<string> {
     clearTimeout(timeout);
   }
 }
+
+class NpmPackageNotFoundError extends Error {}
 
 function compareVersionStrings(left: string, right: string): number {
   const leftParts = parseVersionParts(left);
