@@ -31,7 +31,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -53,8 +52,12 @@ import { Toaster } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 import { resolveAgentAvatarSource } from "@/lib/agent-avatar";
 import { cn } from "@/lib/utils";
+import { AgentsPage } from "@/pages/agents/AgentsPage";
+import { LogsPage } from "@/pages/logs/LogsPage";
 import { SkillsPage } from "@/pages/skills/SkillsPage";
 import type { SkillsResponse } from "@/pages/skills/types";
+import { TasksPage } from "@/pages/tasks/TasksPage";
+import { taskStatusLabel, taskStatusPillClasses } from "@/pages/tasks/utils";
 import { WikiPage } from "@/pages/wiki/WikiPage";
 import { useWikiPageController } from "@/pages/wiki/useWikiPageController";
 import { normalizeWikiPath } from "@/pages/wiki/utils";
@@ -4855,266 +4858,78 @@ export function App(): ReactElement {
                 ) : null}
 
                 {route.kind === "page" && route.view === "agents" ? (
-                  <section className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Current organization members.
-                    </p>
-                    {agents.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No agents found.
-                      </p>
-                    ) : (
-                      <div className="overflow-hidden rounded-xl border border-border/80">
-                        {agents.map((agent, index) => (
-                          <div
-                            key={agent.id}
-                            className={cn(
-                              "flex cursor-pointer items-center justify-between gap-3 bg-background/30 px-4 py-3 transition-colors hover:bg-accent/30",
-                              index !== agents.length - 1 &&
-                                "border-b border-border/70",
-                            )}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => {
-                              navigateToRoute({
-                                kind: "agent",
-                                agentId: agent.id,
-                              });
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                navigateToRoute({
-                                  kind: "agent",
-                                  agentId: agent.id,
-                                });
-                              }
-                            }}
-                          >
-                            <div className="flex min-w-0 items-center gap-3">
-                              <AgentAvatar
-                                agentId={agent.id}
-                                displayName={agent.displayName}
-                              />
-                              <div className="min-w-0">
-                                <p className="truncate font-medium">
-                                  {agent.displayName}
-                                </p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                  {agent.id}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={agent.id === "ceo" || isMutating}
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  void handleDeleteAgent(agent.id);
-                                }}
-                              >
-                                Delete
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                  <AgentsPage
+                    agents={agents}
+                    isMutating={isMutating}
+                    onSelectAgent={(agentId) => {
+                      navigateToRoute({
+                        kind: "agent",
+                        agentId,
+                      });
+                    }}
+                    onDeleteAgent={(agentId) => {
+                      void handleDeleteAgent(agentId);
+                    }}
+                    renderAgentAvatar={(agent) => (
+                      <AgentAvatar
+                        agentId={agent.id}
+                        displayName={agent.displayName}
+                      />
                     )}
-                  </section>
+                  />
                 ) : null}
 
                 {route.kind === "taskWorkspace" ? (
-                  selectedTaskWorkspace ? (
-                    <div className="space-y-4">
-                      <section className="rounded-lg border border-border/80 bg-card/40 px-4 py-4 sm:px-5">
-                        <div className="flex flex-wrap items-end justify-between gap-4">
-                          <div className="min-w-0 flex-1">
-                            <h2 className="truncate text-2xl font-semibold tracking-tight">
-                              {selectedTaskWorkspace.title}
-                            </h2>
-                          </div>
-
-                          <div className="flex flex-wrap items-end gap-2">
-                            <div className="space-y-1">
-                              <label
-                                className="text-[11px] uppercase tracking-wide text-muted-foreground"
-                                htmlFor="taskWorkspaceTaskActor"
-                              >
-                                Act As
-                              </label>
-                              <select
-                                id="taskWorkspaceTaskActor"
-                                className="h-9 min-w-[220px] rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                                value={taskActorId}
-                                onChange={(event) =>
-                                  setTaskActorId(event.target.value)
-                                }
-                              >
-                                {agents.map((agent) => (
-                                  <option key={agent.id} value={agent.id}>
-                                    {agent.displayName} ({agent.id})
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => {
-                                navigateToRoute({
-                                  kind: "taskWorkspace",
-                                  taskWorkspaceId: "tasks",
-                                });
-                              }}
-                            >
-                              Back to Tasks
-                            </Button>
-                          </div>
-                        </div>
-                      </section>
-
-                      <section className="overflow-hidden rounded-lg border border-border/80 bg-card/25">
-                        <div className="border-b border-border/70 px-4 py-3">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-medium">Tasks</p>
-                              <p className="text-xs text-muted-foreground">
-                                Select tasks to delete in bulk or open one for
-                                full details.
-                              </p>
-                            </div>
-
-                            {hasSelectedTasks ? (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                className="h-8 px-3"
-                                disabled={isMutating || isLoading}
-                                onClick={() => {
-                                  void handleDeleteSelectedTasks(
-                                    selectedTaskWorkspace.taskWorkspaceId,
-                                    selectedTaskIds,
-                                  );
-                                }}
-                              >
-                                {`Delete ${selectedTaskIds.length}`}
-                              </Button>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {selectedTaskWorkspace.tasks.length === 0 ? (
-                          <div className="px-4 py-8">
-                            <p className="text-sm text-muted-foreground">
-                              No tasks yet. Use Create Task in the top right.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="overflow-x-auto">
-                            <table className="min-w-full">
-                              <thead>
-                                <tr className="border-b border-border/70 bg-accent/25 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                                  <th className="w-12 px-3 py-2 font-medium">
-                                    <Checkbox
-                                      checked={selectAllCheckboxState}
-                                      onCheckedChange={(checked) => {
-                                        handleToggleSelectAllTasks(
-                                          selectedTaskWorkspace.taskWorkspaceId,
-                                          allTaskIdsInWorkspace,
-                                          checked === true,
-                                        );
-                                      }}
-                                      aria-label="Select all tasks"
-                                    />
-                                  </th>
-                                  <th className="px-4 py-2 font-medium">
-                                    Task
-                                  </th>
-                                  <th className="px-4 py-2 font-medium">
-                                    Project
-                                  </th>
-                                  <th className="px-4 py-2 font-medium">
-                                    Assignee
-                                  </th>
-                                  <th className="px-4 py-2 font-medium">
-                                    Status
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-border/60">
-                                {selectedTaskWorkspace.tasks.map((task) => (
-                                  <tr
-                                    key={task.taskId}
-                                    className={cn(
-                                      "transition-colors hover:bg-accent/20",
-                                      selectedTaskIdSet.has(task.taskId) &&
-                                        "bg-accent/10",
-                                    )}
-                                  >
-                                    <td className="px-3 py-3">
-                                      <Checkbox
-                                        checked={selectedTaskIdSet.has(
-                                          task.taskId,
-                                        )}
-                                        onCheckedChange={(checked) => {
-                                          handleToggleTaskSelection(
-                                            selectedTaskWorkspace.taskWorkspaceId,
-                                            task.taskId,
-                                            checked === true,
-                                          );
-                                        }}
-                                        aria-label={`Select task ${task.title}`}
-                                      />
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <button
-                                        type="button"
-                                        className="group text-left"
-                                        onClick={() => {
-                                          handleOpenTaskDetails(task.taskId);
-                                        }}
-                                      >
-                                        <span className="block font-medium text-foreground group-hover:underline">
-                                          {task.title}
-                                        </span>
-                                      </button>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <p
-                                        className="max-w-[240px] truncate text-sm text-muted-foreground"
-                                        title={resolveTaskProjectLabel(
-                                          task.project,
-                                        )}
-                                      >
-                                        {resolveTaskProjectLabel(task.project)}
-                                      </p>
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-muted-foreground">{`@${task.assignedTo}`}</td>
-                                    <td className="px-4 py-3">
-                                      <span
-                                        className={cn(
-                                          "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
-                                          taskStatusPillClasses(task.status),
-                                        )}
-                                      >
-                                        {taskStatusLabel(task.status)}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </section>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">{`No task workspace was found for id ${route.taskWorkspaceId}.`}</p>
-                  )
+                  <TasksPage
+                    selectedTaskWorkspace={selectedTaskWorkspace}
+                    missingTaskWorkspaceId={route.taskWorkspaceId}
+                    taskActorId={taskActorId}
+                    agents={agents}
+                    onTaskActorChange={setTaskActorId}
+                    onBackToTasks={() => {
+                      navigateToRoute({
+                        kind: "taskWorkspace",
+                        taskWorkspaceId: "tasks",
+                      });
+                    }}
+                    hasSelectedTasks={hasSelectedTasks}
+                    selectedTaskIdsCount={selectedTaskIds.length}
+                    onDeleteSelectedTasks={() => {
+                      if (!selectedTaskWorkspace) {
+                        return;
+                      }
+                      void handleDeleteSelectedTasks(
+                        selectedTaskWorkspace.taskWorkspaceId,
+                        selectedTaskIds,
+                      );
+                    }}
+                    isMutating={isMutating}
+                    isLoading={isLoading}
+                    selectAllCheckboxState={selectAllCheckboxState}
+                    onToggleSelectAllTasks={(checked) => {
+                      if (!selectedTaskWorkspace) {
+                        return;
+                      }
+                      handleToggleSelectAllTasks(
+                        selectedTaskWorkspace.taskWorkspaceId,
+                        allTaskIdsInWorkspace,
+                        checked,
+                      );
+                    }}
+                    selectedTaskIdSet={selectedTaskIdSet}
+                    onToggleTaskSelection={(taskId, checked) => {
+                      if (!selectedTaskWorkspace) {
+                        return;
+                      }
+                      handleToggleTaskSelection(
+                        selectedTaskWorkspace.taskWorkspaceId,
+                        taskId,
+                        checked,
+                      );
+                    }}
+                    onOpenTaskDetails={handleOpenTaskDetails}
+                    resolveTaskProjectLabel={resolveTaskProjectLabel}
+                  />
                 ) : null}
 
                 {route.kind === "session" || route.kind === "agent" ? (
@@ -5250,136 +5065,33 @@ export function App(): ReactElement {
                 ) : null}
 
                 {route.kind === "page" && route.view === "logs" ? (
-                  <section className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm text-muted-foreground">
-                        Real-time runtime activity from OpenGoat and OpenClaw.
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-[#041004] px-2 py-1 text-[11px]">
-                          <span className="uppercase tracking-wide text-emerald-300/80">
-                            Sources
-                          </span>
-                          <label className="inline-flex items-center gap-1.5 text-emerald-100">
-                            <Checkbox
-                              checked={logSourceFilters.opengoat}
-                              onCheckedChange={(checked) => {
-                                setLogSourceFilters((current) => ({
-                                  ...current,
-                                  opengoat: checked === true,
-                                }));
-                              }}
-                              aria-label="Show OpenGoat logs"
-                            />
-                            <span>OpenGoat</span>
-                          </label>
-                          <label className="inline-flex items-center gap-1.5 text-emerald-100">
-                            <Checkbox
-                              checked={logSourceFilters.openclaw}
-                              onCheckedChange={(checked) => {
-                                setLogSourceFilters((current) => ({
-                                  ...current,
-                                  openclaw: checked === true,
-                                }));
-                              }}
-                              aria-label="Show OpenClaw logs"
-                            />
-                            <span>OpenClaw</span>
-                          </label>
-                        </div>
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide",
-                            logsConnectionState === "live"
-                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-                              : logsConnectionState === "connecting"
-                              ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
-                              : "border-rose-500/40 bg-rose-500/10 text-rose-200",
-                          )}
-                        >
-                          {logsConnectionState}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => {
-                            setUiLogs([]);
-                            pendingUiLogsRef.current = [];
-                          }}
-                        >
-                          Clear
-                        </Button>
-                        {!logsAutoScrollEnabled ? (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => {
-                              const viewport = logsViewportRef.current;
-                              if (viewport) {
-                                viewport.scrollTop = viewport.scrollHeight;
-                              }
-                              setLogsAutoScrollEnabled(true);
-                            }}
-                          >
-                            Jump to Latest
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="overflow-hidden rounded-xl border border-emerald-500/20 bg-[#030a03] shadow-[0_0_0_1px_rgba(16,185,129,0.08)]">
-                      <div className="flex items-center justify-between border-b border-emerald-500/15 bg-[#041004] px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-emerald-300/90">
-                        <span>OpenGoat Terminal</span>
-                        <span>{`${filteredUiLogs.length} visible / ${uiLogs.length} total`}</span>
-                      </div>
-                      <div
-                        ref={logsViewportRef}
-                        onScroll={handleLogsViewportScroll}
-                        className="max-h-[68vh] min-h-[340px] overflow-y-auto px-3 py-2 font-mono text-[12px] leading-5"
-                      >
-                        {logsError ? (
-                          <div className="mb-2 rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-rose-200">
-                            {logsError}
-                          </div>
-                        ) : null}
-                        {uiLogs.length === 0 ? (
-                          <p className="text-emerald-200/70">
-                            Waiting for runtime activity...
-                          </p>
-                        ) : filteredUiLogs.length === 0 ? (
-                          <p className="text-emerald-200/70">
-                            No entries match the selected source filters.
-                          </p>
-                        ) : (
-                          filteredUiLogs.map((entry) => (
-                            <div
-                              key={entry.id}
-                              className="grid grid-cols-[76px_124px_minmax(0,1fr)] items-start gap-x-3 py-0.5"
-                            >
-                              <span className="text-emerald-200/60">
-                                {formatUiLogTimestamp(entry.timestamp)}
-                              </span>
-                              <span
-                                className={cn(
-                                  "font-semibold uppercase whitespace-nowrap",
-                                  uiLogLevelClassName(entry.level),
-                                )}
-                              >
-                                {`${entry.source}:${entry.level}`}
-                              </span>
-                              <span
-                                className={cn(
-                                  "whitespace-pre-wrap break-words",
-                                  uiLogMessageClassName(entry.level),
-                                )}
-                              >
-                                {entry.message}
-                              </span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </section>
+                  <LogsPage
+                    logSourceFilters={logSourceFilters}
+                    onLogSourceFilterChange={(source, checked) => {
+                      setLogSourceFilters((current) => ({
+                        ...current,
+                        [source]: checked,
+                      }));
+                    }}
+                    logsConnectionState={logsConnectionState}
+                    onClear={() => {
+                      setUiLogs([]);
+                      pendingUiLogsRef.current = [];
+                    }}
+                    logsAutoScrollEnabled={logsAutoScrollEnabled}
+                    onJumpToLatest={() => {
+                      const viewport = logsViewportRef.current;
+                      if (viewport) {
+                        viewport.scrollTop = viewport.scrollHeight;
+                      }
+                      setLogsAutoScrollEnabled(true);
+                    }}
+                    logsViewportRef={logsViewportRef}
+                    onViewportScroll={handleLogsViewportScroll}
+                    logsError={logsError}
+                    uiLogs={uiLogs}
+                    filteredUiLogs={filteredUiLogs}
+                  />
                 ) : null}
 
                 {route.kind === "page" && route.view === "settings" ? (
@@ -6497,36 +6209,6 @@ async function streamUiLogs(
   }
 }
 
-function formatUiLogTimestamp(value: string): string {
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) {
-    return value;
-  }
-  return new Date(parsed).toISOString().slice(11, 19);
-}
-
-function uiLogLevelClassName(level: UiLogLevel): string {
-  switch (level) {
-    case "error":
-      return "text-rose-300";
-    case "warn":
-      return "text-amber-200";
-    default:
-      return "text-emerald-300";
-  }
-}
-
-function uiLogMessageClassName(level: UiLogLevel): string {
-  switch (level) {
-    case "error":
-      return "text-rose-100";
-    case "warn":
-      return "text-amber-50";
-    default:
-      return "text-emerald-100";
-  }
-}
-
 function areTaskRecordListsEqual(left: TaskRecord[], right: TaskRecord[]): boolean {
   if (left.length !== right.length) {
     return false;
@@ -6888,36 +6570,6 @@ function normalizeReasoningLine(value: string): string {
     .replace(/\s+/g, " ")
     .replace(/^\[(?:info|stderr|stdout)\]\s*/i, "")
     .trim();
-}
-
-function taskStatusPillClasses(status: string): string {
-  switch (status.trim().toLowerCase()) {
-    case "done":
-      return "bg-success/20 text-success";
-    case "doing":
-      return "bg-sky-500/20 text-sky-300";
-    case "blocked":
-      return "bg-amber-500/20 text-amber-300";
-    default:
-      return "bg-accent text-foreground";
-  }
-}
-
-function taskStatusLabel(status: string): string {
-  switch (status.trim().toLowerCase()) {
-    case "todo":
-      return "To do";
-    case "doing":
-      return "In progress";
-    case "pending":
-      return "Pending";
-    case "blocked":
-      return "Blocked";
-    case "done":
-      return "Done";
-    default:
-      return status;
-  }
 }
 
 function formatEntryDate(timestamp: string): string {
