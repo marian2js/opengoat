@@ -218,9 +218,23 @@ interface UiSettings {
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+  authentication: UiAuthenticationSettings;
 }
 
 type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
+
+interface UiAuthenticationSettings {
+  enabled: boolean;
+  username: string;
+  hasPassword: boolean;
+}
+
+interface UiAuthenticationStatusResponse {
+  authentication: {
+    enabled: boolean;
+    authenticated: boolean;
+  };
+}
 
 interface UiVersionInfo {
   packageName: string;
@@ -529,6 +543,24 @@ const TASK_STATUS_OPTIONS = [
   { value: "done", label: "Done" },
 ] as const;
 
+function defaultAuthenticationSettings(): UiAuthenticationSettings {
+  return {
+    enabled: false,
+    username: "",
+    hasPassword: false,
+  };
+}
+
+function defaultUiSettings(): UiSettings {
+  return {
+    taskCronEnabled: true,
+    notifyManagersOfInactiveAgents: true,
+    maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
+    inactiveAgentNotificationTarget: "all-managers",
+    authentication: defaultAuthenticationSettings(),
+  };
+}
+
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
   { id: "tasks", label: "Tasks", icon: Boxes },
@@ -553,6 +585,13 @@ export function App(): ReactElement {
   const [route, setRoute] = useState<AppRoute>(() => getInitialRoute());
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [state, setState] = useState<DashboardState | null>(null);
+  const [isAuthenticationEnabled, setAuthenticationEnabled] = useState(false);
+  const [isAuthenticated, setAuthenticated] = useState(true);
+  const [isAuthChecking, setAuthChecking] = useState(true);
+  const [isAuthenticating, setAuthenticating] = useState(false);
+  const [authLoginUsername, setAuthLoginUsername] = useState("");
+  const [authLoginPassword, setAuthLoginPassword] = useState("");
+  const [authLoginError, setAuthLoginError] = useState<string | null>(null);
   const [isLoading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMutating, setMutating] = useState(false);
@@ -613,6 +652,30 @@ export function App(): ReactElement {
     inactiveAgentNotificationTargetInput,
     setInactiveAgentNotificationTargetInput,
   ] = useState<InactiveAgentNotificationTarget>("all-managers");
+  const [
+    uiAuthenticationEnabledInput,
+    setUiAuthenticationEnabledInput,
+  ] = useState(false);
+  const [
+    uiAuthenticationUsernameInput,
+    setUiAuthenticationUsernameInput,
+  ] = useState("");
+  const [
+    uiAuthenticationHasPassword,
+    setUiAuthenticationHasPassword,
+  ] = useState(false);
+  const [
+    uiAuthenticationCurrentPasswordInput,
+    setUiAuthenticationCurrentPasswordInput,
+  ] = useState("");
+  const [
+    uiAuthenticationPasswordInput,
+    setUiAuthenticationPasswordInput,
+  ] = useState("");
+  const [
+    uiAuthenticationPasswordConfirmationInput,
+    setUiAuthenticationPasswordConfirmationInput,
+  ] = useState("");
   const [isTaskDetailsDialogOpen, setTaskDetailsDialogOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskDetailsError, setTaskDetailsError] = useState<string | null>(null);
@@ -680,6 +743,28 @@ export function App(): ReactElement {
     [navigateToRoute],
   );
 
+  const refreshAuthenticationStatus = useCallback(async (): Promise<void> => {
+    setAuthChecking(true);
+    setAuthLoginError(null);
+    try {
+      const payload = await fetchJson<UiAuthenticationStatusResponse>(
+        "/api/auth/status",
+      );
+      setAuthenticationEnabled(payload.authentication.enabled);
+      setAuthenticated(payload.authentication.authenticated);
+    } catch (requestError) {
+      setAuthenticationEnabled(false);
+      setAuthenticated(true);
+      setAuthLoginError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to verify UI authentication status.",
+      );
+    } finally {
+      setAuthChecking(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -742,12 +827,7 @@ export function App(): ReactElement {
         fetchJson<{ settings: UiSettings }>("/api/settings")
           .then((payload) => payload.settings)
           .catch(() => {
-            return {
-              taskCronEnabled: true,
-              notifyManagersOfInactiveAgents: true,
-              maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
-              inactiveAgentNotificationTarget: "all-managers",
-            } satisfies UiSettings;
+            return defaultUiSettings();
           }),
       ]);
 
@@ -768,6 +848,9 @@ export function App(): ReactElement {
       setInactiveAgentNotificationTargetInput(
         settings.inactiveAgentNotificationTarget,
       );
+      setUiAuthenticationEnabledInput(settings.authentication.enabled);
+      setUiAuthenticationUsernameInput(settings.authentication.username);
+      setUiAuthenticationHasPassword(settings.authentication.hasPassword);
       setSessionsByAgentId({
         [sessions.agentId]: sessions.sessions,
       });
@@ -888,12 +971,30 @@ export function App(): ReactElement {
   }, []);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void refreshAuthenticationStatus().catch(() => {
+      // handled in refreshAuthenticationStatus
+    });
+  }, [refreshAuthenticationStatus]);
 
   useEffect(() => {
+    if (isAuthChecking) {
+      return;
+    }
+    if (isAuthenticationEnabled && !isAuthenticated) {
+      setState(null);
+      setLoading(false);
+      setVersionLoading(false);
+      return;
+    }
+    void loadData();
     void loadVersionInfo();
-  }, [loadVersionInfo]);
+  }, [
+    isAuthChecking,
+    isAuthenticationEnabled,
+    isAuthenticated,
+    loadData,
+    loadVersionInfo,
+  ]);
 
   useEffect(() => {
     if (route.kind !== "agent") {
@@ -908,6 +1009,24 @@ export function App(): ReactElement {
       // Non-fatal: agent page can still render and allow new messages.
     });
   }, [route, sessionsByAgentId, refreshSessions]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const onAuthRequired = (): void => {
+      setAuthenticationEnabled(true);
+      setAuthenticated(false);
+      setState(null);
+      setLoading(false);
+      setVersionLoading(false);
+      setAuthLoginPassword("");
+    };
+    window.addEventListener("opengoat:auth-required", onAuthRequired);
+    return () => {
+      window.removeEventListener("opengoat:auth-required", onAuthRequired);
+    };
+  }, []);
 
   useEffect(() => {
     if (!state) {
@@ -2120,6 +2239,73 @@ export function App(): ReactElement {
     }
   }
 
+  async function handleSignIn(): Promise<void> {
+    const username = authLoginUsername.trim().toLowerCase();
+    const password = authLoginPassword;
+    if (!username || !password) {
+      setAuthLoginError("Username and password are required.");
+      return;
+    }
+
+    setAuthenticating(true);
+    setAuthLoginError(null);
+    try {
+      const response = await fetchJson<{
+        authentication: {
+          enabled: boolean;
+          authenticated: boolean;
+        };
+        message?: string;
+      }>("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username,
+          password,
+        }),
+      });
+      setAuthenticationEnabled(response.authentication.enabled);
+      setAuthenticated(response.authentication.authenticated);
+      setAuthLoginPassword("");
+      setAuthLoginError(null);
+      toast.success(response.message ?? "Signed in.");
+      await refreshAuthenticationStatus();
+    } catch (requestError) {
+      setAuthLoginError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to sign in.",
+      );
+    } finally {
+      setAuthenticating(false);
+    }
+  }
+
+  async function handleSignOut(): Promise<void> {
+    setMutating(true);
+    try {
+      await fetchJson<{ message?: string }>("/api/auth/logout", {
+        method: "POST",
+      });
+      setAuthenticated(false);
+      setState(null);
+      setLoading(false);
+      setVersionLoading(false);
+      setAuthLoginPassword("");
+      toast.success("Signed out.");
+    } catch (requestError) {
+      toast.error(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to sign out.",
+      );
+    } finally {
+      setMutating(false);
+    }
+  }
+
   function updateTaskDraft(
     taskWorkspaceId: string,
     patch: Partial<TaskCreateDraft>,
@@ -2143,6 +2329,56 @@ export function App(): ReactElement {
   }
 
   async function handleSaveSettings(): Promise<void> {
+    const normalizedAuthUsername = uiAuthenticationUsernameInput
+      .trim()
+      .toLowerCase();
+    const nextAuthPassword = uiAuthenticationPasswordInput;
+    const nextAuthPasswordConfirmation =
+      uiAuthenticationPasswordConfirmationInput;
+    const hasNewAuthPassword = nextAuthPassword.length > 0;
+    const currentAuthenticationSettings =
+      state?.settings.authentication ?? defaultAuthenticationSettings();
+    const authenticationSettingsChanged =
+      currentAuthenticationSettings.enabled !== uiAuthenticationEnabledInput ||
+      currentAuthenticationSettings.username !== normalizedAuthUsername ||
+      hasNewAuthPassword;
+    const requiresCurrentPassword =
+      currentAuthenticationSettings.enabled && authenticationSettingsChanged;
+
+    if (uiAuthenticationEnabledInput && !normalizedAuthUsername) {
+      toast.error("Authentication username is required when protection is enabled.");
+      return;
+    }
+    if (
+      uiAuthenticationEnabledInput &&
+      !currentAuthenticationSettings.hasPassword &&
+      !hasNewAuthPassword
+    ) {
+      toast.error(
+        "Set a password before enabling UI authentication protection.",
+      );
+      return;
+    }
+    if (hasNewAuthPassword && nextAuthPassword !== nextAuthPasswordConfirmation) {
+      toast.error("Password confirmation does not match.");
+      return;
+    }
+    if (hasNewAuthPassword) {
+      const passwordValidationError =
+        validateAuthenticationPasswordStrength(nextAuthPassword);
+      if (passwordValidationError) {
+        toast.error(passwordValidationError);
+        return;
+      }
+    }
+    if (
+      requiresCurrentPassword &&
+      uiAuthenticationCurrentPasswordInput.trim().length === 0
+    ) {
+      toast.error("Current password is required to change authentication settings.");
+      return;
+    }
+
     const parsedMaxInactivityMinutes = Number.parseInt(
       maxInactivityMinutesInput.trim(),
       10,
@@ -2175,14 +2411,36 @@ export function App(): ReactElement {
         maxInactivityMinutes: resolvedMaxInactivityMinutes,
         inactiveAgentNotificationTarget:
           inactiveAgentNotificationTargetInput,
+        authentication: {
+          enabled: uiAuthenticationEnabledInput,
+          ...(normalizedAuthUsername
+            ? {
+                username: normalizedAuthUsername,
+              }
+            : {}),
+          ...(hasNewAuthPassword
+            ? {
+                password: nextAuthPassword,
+              }
+            : {}),
+          ...(uiAuthenticationCurrentPasswordInput.trim().length > 0
+            ? {
+                currentPassword: uiAuthenticationCurrentPasswordInput,
+              }
+            : {}),
+        },
       });
       applyUiSettingsResponse(response);
+      setUiAuthenticationCurrentPasswordInput("");
+      setUiAuthenticationPasswordInput("");
+      setUiAuthenticationPasswordConfirmationInput("");
       const statusMessage = !taskCronEnabledInput
         ? "Task automation checks disabled."
         : notifyManagersOfInactiveAgentsInput
           ? `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); inactivity notifications enabled (${resolvedMaxInactivityMinutes} minutes).`
           : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); inactivity notifications disabled.`;
       toast.success(response.message ?? statusMessage);
+      await refreshAuthenticationStatus();
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -2195,7 +2453,18 @@ export function App(): ReactElement {
   }
 
   async function persistUiSettings(
-    settings: UiSettings,
+    settings: {
+      taskCronEnabled: boolean;
+      notifyManagersOfInactiveAgents: boolean;
+      maxInactivityMinutes: number;
+      inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+      authentication: {
+        enabled: boolean;
+        username?: string;
+        password?: string;
+        currentPassword?: string;
+      };
+    },
   ): Promise<{ settings: UiSettings; message?: string }> {
     return fetchJson<{
       settings: UiSettings;
@@ -2229,6 +2498,9 @@ export function App(): ReactElement {
     setInactiveAgentNotificationTargetInput(
       response.settings.inactiveAgentNotificationTarget,
     );
+    setUiAuthenticationEnabledInput(response.settings.authentication.enabled);
+    setUiAuthenticationUsernameInput(response.settings.authentication.username);
+    setUiAuthenticationHasPassword(response.settings.authentication.hasPassword);
   }
 
   async function handleCreateTask(
@@ -3026,6 +3298,82 @@ export function App(): ReactElement {
       flushPendingUiLogs();
     };
   }, [flushPendingUiLogs, queueUiLogEntry, route]);
+
+  if (isAuthChecking) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        <Toaster />
+        <div className="rounded-xl border border-border/70 bg-card/70 px-6 py-5 text-sm text-muted-foreground">
+          Checking UI authentication status...
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticationEnabled && !isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background px-4 text-foreground">
+        <Toaster />
+        <Card className="w-full max-w-md border-border/70 bg-card/80">
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-lg">UI Sign In Required</CardTitle>
+            <CardDescription>
+              This OpenGoat UI is password protected. Sign in to continue.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground" htmlFor="ui-signin-username">
+                Username
+              </label>
+              <Input
+                id="ui-signin-username"
+                autoComplete="username"
+                value={authLoginUsername}
+                disabled={isAuthenticating}
+                onChange={(event) => {
+                  setAuthLoginUsername(event.target.value);
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground" htmlFor="ui-signin-password">
+                Password
+              </label>
+              <Input
+                id="ui-signin-password"
+                type="password"
+                autoComplete="current-password"
+                value={authLoginPassword}
+                disabled={isAuthenticating}
+                onChange={(event) => {
+                  setAuthLoginPassword(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleSignIn();
+                  }
+                }}
+              />
+            </div>
+            {authLoginError ? (
+              <p className="text-xs text-destructive">{authLoginError}</p>
+            ) : null}
+            <Button
+              className="w-full"
+              disabled={isAuthenticating}
+              onClick={() => {
+                void handleSignIn();
+              }}
+            >
+              {isAuthenticating ? "Signing In..." : "Sign In"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen bg-background text-[14px] text-foreground">
@@ -4996,6 +5344,138 @@ export function App(): ReactElement {
                       </div>
                     </section>
 
+                    <section className="overflow-hidden rounded-xl border border-border/70 bg-background/40">
+                      <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+                        <div className="space-y-1">
+                          <h2 className="text-sm font-semibold text-foreground">
+                            UI Authentication
+                          </h2>
+                          <p className="text-xs text-muted-foreground">
+                            Require a username and password before API access to this UI.
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Use HTTPS when exposing this port publicly.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={uiAuthenticationEnabledInput}
+                            disabled={isMutating || isLoading}
+                            onCheckedChange={(checked) => {
+                              setUiAuthenticationEnabledInput(checked);
+                            }}
+                            aria-label="Toggle UI authentication"
+                          />
+                          <span
+                            className={cn(
+                              "text-xs font-medium",
+                              uiAuthenticationEnabledInput
+                                ? "text-success"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            {uiAuthenticationEnabledInput ? "Enabled" : "Disabled"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <Separator className="bg-border/60" />
+
+                      <div className="space-y-4 px-5 py-4">
+                        <div className="space-y-2">
+                          <label
+                            className="text-sm font-medium text-foreground"
+                            htmlFor="uiAuthenticationUsername"
+                          >
+                            Username
+                          </label>
+                          <Input
+                            id="uiAuthenticationUsername"
+                            autoComplete="username"
+                            value={uiAuthenticationUsernameInput}
+                            disabled={isMutating || isLoading}
+                            onChange={(event) => {
+                              setUiAuthenticationUsernameInput(event.target.value);
+                            }}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            3-64 characters: lowercase letters, numbers, dots, dashes, or underscores.
+                          </p>
+                        </div>
+
+                        {uiAuthenticationHasPassword ? (
+                          <div className="space-y-2">
+                            <label
+                              className="text-sm font-medium text-foreground"
+                              htmlFor="uiAuthenticationCurrentPassword"
+                            >
+                              Current Password
+                            </label>
+                            <Input
+                              id="uiAuthenticationCurrentPassword"
+                              type="password"
+                              autoComplete="current-password"
+                              value={uiAuthenticationCurrentPasswordInput}
+                              disabled={isMutating || isLoading}
+                              onChange={(event) => {
+                                setUiAuthenticationCurrentPasswordInput(
+                                  event.target.value,
+                                );
+                              }}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Required when changing authentication settings.
+                            </p>
+                          </div>
+                        ) : null}
+
+                        <div className="space-y-2">
+                          <label
+                            className="text-sm font-medium text-foreground"
+                            htmlFor="uiAuthenticationPassword"
+                          >
+                            {uiAuthenticationHasPassword
+                              ? "New Password (optional)"
+                              : "Password"}
+                          </label>
+                          <Input
+                            id="uiAuthenticationPassword"
+                            type="password"
+                            autoComplete="new-password"
+                            value={uiAuthenticationPasswordInput}
+                            disabled={isMutating || isLoading}
+                            onChange={(event) => {
+                              setUiAuthenticationPasswordInput(event.target.value);
+                            }}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label
+                            className="text-sm font-medium text-foreground"
+                            htmlFor="uiAuthenticationPasswordConfirm"
+                          >
+                            Confirm Password
+                          </label>
+                          <Input
+                            id="uiAuthenticationPasswordConfirm"
+                            type="password"
+                            autoComplete="new-password"
+                            value={uiAuthenticationPasswordConfirmationInput}
+                            disabled={isMutating || isLoading}
+                            onChange={(event) => {
+                              setUiAuthenticationPasswordConfirmationInput(
+                                event.target.value,
+                              );
+                            }}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Use at least 12 characters with uppercase, lowercase, number, and symbol.
+                          </p>
+                        </div>
+                      </div>
+                    </section>
+
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-xs text-muted-foreground">
                         Status:{" "}
@@ -5008,16 +5488,29 @@ export function App(): ReactElement {
                                   "ceo-only"
                                 ? "Background checks active (direct CEO inactivity notifications only)"
                                 : "Background checks active for all managers"}
-                        </span>
+                          </span>
                       </p>
-                      <Button
-                        onClick={() => {
-                          void handleSaveSettings();
-                        }}
-                        disabled={isMutating || isLoading}
-                      >
-                        Save Settings
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {isAuthenticationEnabled && isAuthenticated ? (
+                          <Button
+                            variant="secondary"
+                            onClick={() => {
+                              void handleSignOut();
+                            }}
+                            disabled={isMutating || isLoading}
+                          >
+                            Sign Out
+                          </Button>
+                        ) : null}
+                        <Button
+                          onClick={() => {
+                            void handleSaveSettings();
+                          }}
+                          disabled={isMutating || isLoading}
+                        >
+                          Save Settings
+                        </Button>
+                      </div>
                     </div>
                   </section>
                 ) : null}
@@ -5561,6 +6054,25 @@ function resolveAgentRoleLabel(agent: Agent | undefined): string | undefined {
   return undefined;
 }
 
+function validateAuthenticationPasswordStrength(password: string): string | undefined {
+  if (password.length < 12) {
+    return "Password must be at least 12 characters long.";
+  }
+  if (!/[A-Z]/.test(password)) {
+    return "Password must include at least one uppercase letter.";
+  }
+  if (!/[a-z]/.test(password)) {
+    return "Password must include at least one lowercase letter.";
+  }
+  if (!/\d/.test(password)) {
+    return "Password must include at least one number.";
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return "Password must include at least one symbol.";
+  }
+  return undefined;
+}
+
 async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
   const payload = await response.json().catch(() => {
@@ -5575,6 +6087,17 @@ async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
       typeof payload.error === "string"
         ? payload.error
         : `Request failed with ${response.status}`;
+    const code =
+      payload &&
+      typeof payload === "object" &&
+      "code" in payload &&
+      typeof payload.code === "string"
+        ? payload.code
+        : undefined;
+    if (response.status === 401 && code === "AUTH_REQUIRED") {
+      dispatchAuthRequiredEvent();
+      throw new Error("Authentication required. Sign in to continue.");
+    }
     throw new Error(message);
   }
 
@@ -5586,6 +6109,18 @@ async function readResponseError(response: Response): Promise<string> {
     return null;
   });
 
+  const errorCode =
+    payload &&
+    typeof payload === "object" &&
+    "code" in payload &&
+    typeof payload.code === "string"
+      ? payload.code
+      : undefined;
+  if (response.status === 401 && errorCode === "AUTH_REQUIRED") {
+    dispatchAuthRequiredEvent();
+    return "Authentication required. Sign in to continue.";
+  }
+
   if (
     payload &&
     typeof payload === "object" &&
@@ -5596,6 +6131,13 @@ async function readResponseError(response: Response): Promise<string> {
   }
 
   return `Request failed with ${response.status}`;
+}
+
+function dispatchAuthRequiredEvent(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.dispatchEvent(new Event("opengoat:auth-required"));
 }
 
 async function streamUiLogs(
