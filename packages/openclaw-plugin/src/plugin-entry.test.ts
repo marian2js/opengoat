@@ -46,8 +46,14 @@ beforeEach(() => {
 describe("openclaw plugin entrypoint", () => {
   it("registers CLI bridge and tool factories", () => {
     const api = new FakePluginApi();
+    const originalArgv = process.argv;
+    process.argv = ["node", "openclaw", "gateway", "call", "agent"];
 
-    plugin.register(api);
+    try {
+      plugin.register(api);
+    } finally {
+      process.argv = originalArgv;
+    }
 
     expect(api.cliRegistrars.length).toBe(1);
     expect(api.toolRegistrations.length).toBeGreaterThan(15);
@@ -61,10 +67,12 @@ describe("openclaw plugin entrypoint", () => {
 
     const originalCwd = process.cwd();
     const originalPath = process.env.PATH;
+    const originalArgv = process.argv;
 
     try {
       process.chdir(cwd);
       process.env.PATH = "";
+      process.argv = ["node", "openclaw", "gateway", "call", "agent"];
 
       plugin.register(new FakePluginApi());
 
@@ -73,6 +81,7 @@ describe("openclaw plugin entrypoint", () => {
     } finally {
       process.chdir(originalCwd);
       process.env.PATH = originalPath;
+      process.argv = originalArgv;
       rmSync(cwd, { recursive: true, force: true });
     }
   });
@@ -82,13 +91,34 @@ describe("openclaw plugin entrypoint", () => {
     firstApi.source = "/tmp/plugin-a/index.ts";
     const secondApi = new FakePluginApi();
     secondApi.source = "/tmp/plugin-b/index.ts";
+    const originalArgv = process.argv;
+    process.argv = ["node", "openclaw", "gateway", "call", "agent"];
 
-    plugin.register(firstApi);
-    plugin.register(secondApi);
+    try {
+      plugin.register(firstApi);
+      plugin.register(secondApi);
+    } finally {
+      process.argv = originalArgv;
+    }
 
     expect(firstApi.cliRegistrars.length).toBe(1);
     expect(firstApi.toolRegistrations.length).toBeGreaterThan(15);
     expect(secondApi.cliRegistrars.length).toBe(0);
     expect(secondApi.toolRegistrations.length).toBe(0);
+  });
+
+  it("skips tool registration for generic openclaw calls", () => {
+    const api = new FakePluginApi();
+    const originalArgv = process.argv;
+    process.argv = ["node", "openclaw"];
+
+    try {
+      plugin.register(api);
+    } finally {
+      process.argv = originalArgv;
+    }
+
+    expect(api.cliRegistrars.length).toBe(1);
+    expect(api.toolRegistrations.length).toBe(0);
   });
 });

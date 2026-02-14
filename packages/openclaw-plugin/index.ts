@@ -1,5 +1,6 @@
 import { createOpenGoatCliRegistrar } from "./src/cli-registrar.js";
 import { parseOpenGoatPluginConfig } from "./src/config.js";
+import { shouldRegisterOpenGoatToolsForArgv } from "./src/invocation.js";
 import type { OpenClawPluginApiLike } from "./src/openclaw-types.js";
 import { ensureOpenGoatCommandOnPath } from "./src/path-env.js";
 import { runOpenGoatProcess } from "./src/process-runner.js";
@@ -40,10 +41,12 @@ const openGoatPlugin = {
         cwd: pluginConfig.cwd,
         logger: api.logger,
       });
-      const registeredTools = registerOpenGoatTools(api);
-      api.logger.info(
-        `[opengoat-plugin] registered ${registeredTools.length} OpenGoat tools.`,
-      );
+      if (shouldRegisterOpenGoatToolsForArgv(process.argv)) {
+        const registeredTools = registerOpenGoatTools(api);
+        api.logger.info(
+          `[opengoat-plugin] registered ${registeredTools.length} OpenGoat tools.`,
+        );
+      }
 
       api.registerCli(
         createOpenGoatCliRegistrar({

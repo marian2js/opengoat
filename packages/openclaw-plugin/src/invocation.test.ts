@@ -1,0 +1,76 @@
+import { describe, expect, it } from "vitest";
+import { shouldRegisterOpenGoatToolsForArgv } from "./invocation.js";
+
+describe("shouldRegisterOpenGoatToolsForArgv", () => {
+  it("returns true for gateway call agent invocations", () => {
+    expect(
+      shouldRegisterOpenGoatToolsForArgv([
+        "node",
+        "openclaw",
+        "gateway",
+        "call",
+        "agent",
+      ]),
+    ).toBe(true);
+  });
+
+  it("returns true when gateway call agent has global flags", () => {
+    expect(
+      shouldRegisterOpenGoatToolsForArgv([
+        "node",
+        "openclaw",
+        "--profile",
+        "team-a",
+        "gateway",
+        "call",
+        "agent",
+      ]),
+    ).toBe(true);
+  });
+
+  it("returns true for openclaw opengoat start", () => {
+    expect(
+      shouldRegisterOpenGoatToolsForArgv([
+        "node",
+        "openclaw",
+        "opengoat",
+        "start",
+      ]),
+    ).toBe(true);
+    expect(
+      shouldRegisterOpenGoatToolsForArgv([
+        "node",
+        "openclaw",
+        "opengoat",
+        "--",
+        "start",
+      ]),
+    ).toBe(true);
+  });
+
+  it("returns false for non-runtime OpenClaw invocations", () => {
+    expect(shouldRegisterOpenGoatToolsForArgv(["node", "openclaw"])).toBe(
+      false,
+    );
+    expect(
+      shouldRegisterOpenGoatToolsForArgv(["node", "openclaw", "--help"]),
+    ).toBe(false);
+    expect(
+      shouldRegisterOpenGoatToolsForArgv([
+        "node",
+        "openclaw",
+        "agents",
+        "list",
+      ]),
+    ).toBe(false);
+    expect(
+      shouldRegisterOpenGoatToolsForArgv([
+        "node",
+        "openclaw",
+        "opengoat",
+        "agent",
+        "list",
+      ]),
+    ).toBe(false);
+  });
+});
