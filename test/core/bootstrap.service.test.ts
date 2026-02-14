@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AgentService } from "../../packages/core/src/core/agents/index.js";
 import { BootstrapService } from "../../packages/core/src/core/bootstrap/index.js";
 import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
+import { listOrganizationMarkdownTemplates } from "../../packages/core/src/core/templates/default-templates.js";
 import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
 import { NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
 import {
@@ -33,9 +34,13 @@ describe("BootstrapService", () => {
     expect(result.defaultAgent).toBe("ceo");
     expect(result.createdPaths.length).toBeGreaterThan(0);
     expect(await fileSystem.exists(paths.organizationDir)).toBe(true);
-    expect(
-      await fileSystem.exists(path.join(paths.organizationDir, "ORGANIZATION.md")),
-    ).toBe(true);
+    const organizationTemplates = listOrganizationMarkdownTemplates();
+    expect(organizationTemplates.length).toBeGreaterThan(0);
+    for (const template of organizationTemplates) {
+      expect(
+        await fileSystem.exists(path.join(paths.organizationDir, template.fileName)),
+      ).toBe(true);
+    }
 
     const config = JSON.parse(
       await readFile(paths.globalConfigJsonPath, "utf-8"),

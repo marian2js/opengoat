@@ -51,8 +51,9 @@ describe("default templates", () => {
   it("discovers default organization markdown templates", () => {
     const templates = listOrganizationMarkdownTemplates();
     expect(templates.length).toBeGreaterThan(0);
-    expect(templates.map((template) => template.fileName)).toContain(
-      "ORGANIZATION.md",
-    );
+    for (const template of templates) {
+      expect(template.fileName.toLowerCase().endsWith(".md")).toBe(true);
+      expect(template.content.length).toBeGreaterThan(0);
+    }
   });
 });

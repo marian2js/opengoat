@@ -59,14 +59,7 @@ export function renderBoardIndividualSkillMarkdown(): string {
 }
 
 export function listOrganizationMarkdownTemplates(): OrganizationMarkdownTemplate[] {
-  const cached = organizationMarkdownTemplateCache;
-  if (cached) {
-    return cloneOrganizationMarkdownTemplates(cached);
-  }
-
-  const discovered = discoverOrganizationMarkdownTemplates();
-  organizationMarkdownTemplateCache = discovered;
-  return cloneOrganizationMarkdownTemplates(discovered);
+  return discoverOrganizationMarkdownTemplates();
 }
 
 export function renderInternalAgentConfig(
@@ -165,7 +158,6 @@ function dedupe(values: string[]): string[] {
 }
 
 const markdownTemplateCache = new Map<string, string>();
-let organizationMarkdownTemplateCache: OrganizationMarkdownTemplate[] | undefined;
 
 function readMarkdownTemplate(relativePath: string): string {
   const cached = markdownTemplateCache.get(relativePath);
@@ -198,7 +190,7 @@ function discoverOrganizationMarkdownTemplates(): OrganizationMarkdownTemplate[]
 
   return fileNames.map((fileName) => ({
     fileName,
-    content: readMarkdownTemplate(`organization/${fileName}`),
+    content: readOrganizationMarkdownTemplate(fileName),
   }));
 }
 
@@ -214,11 +206,11 @@ function isNotFoundError(error: unknown): error is NodeJS.ErrnoException {
   return (error as NodeJS.ErrnoException).code === "ENOENT";
 }
 
-function cloneOrganizationMarkdownTemplates(
-  templates: OrganizationMarkdownTemplate[],
-): OrganizationMarkdownTemplate[] {
-  return templates.map((template) => ({
-    fileName: template.fileName,
-    content: template.content,
-  }));
+function readOrganizationMarkdownTemplate(fileName: string): string {
+  return readFileSync(
+    new URL(`./assets/organization/${fileName}`, import.meta.url),
+    "utf-8",
+  )
+    .replace(/\r\n/g, "\n")
+    .trimEnd();
 }
