@@ -785,6 +785,14 @@ export function App(): ReactElement {
     setCreateAgentDialogOpen(true);
   }, []);
 
+  const openCreateAgentDialogForCeo = useCallback(() => {
+    setCreateForm((current) => ({
+      ...current,
+      reportsTo: DEFAULT_AGENT_ID,
+    }));
+    openCreateAgentDialog();
+  }, [openCreateAgentDialog]);
+
   const refreshSessions = useCallback(
     async (agentId: string = DEFAULT_AGENT_ID) => {
       const response = await fetchJson<SessionsResponse>(
@@ -4085,6 +4093,16 @@ export function App(): ReactElement {
                         onCreateAgentClick={openCreateAgentDialog}
                         isCreateAgentDisabled={isLoading || isMutating}
                       />
+                    ) : agents.length === 1 ? (
+                      <OrganizationGetStartedPanel
+                        ceoAgent={
+                          agents.find((agent) => agent.id === DEFAULT_AGENT_ID) ??
+                          agents[0] ??
+                          null
+                        }
+                        onCreateAgentClick={openCreateAgentDialogForCeo}
+                        isCreateAgentDisabled={isLoading || isMutating}
+                      />
                     ) : null}
                   </>
                 ) : null}
@@ -4830,6 +4848,74 @@ export function App(): ReactElement {
         </div>
       </div>
     </div>
+  );
+}
+
+function OrganizationGetStartedPanel({
+  ceoAgent,
+  onCreateAgentClick,
+  isCreateAgentDisabled,
+}: {
+  ceoAgent: Agent | null;
+  onCreateAgentClick: () => void;
+  isCreateAgentDisabled: boolean;
+}): ReactElement {
+  const ceoName =
+    ceoAgent?.displayName?.trim() || DEFAULT_AGENT_ID.toUpperCase();
+  const ceoRole = ceoAgent?.role?.trim() || "Organization CEO";
+
+  return (
+    <Card className="border-border/70 bg-card/70">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-[20px] font-medium">
+          Build Your Organization
+        </CardTitle>
+        <CardDescription className="text-[14px]">
+          Your CEO is ready. Create the next agent and they will report to CEO
+          by default.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="relative overflow-hidden rounded-xl border border-border/70 bg-gradient-to-br from-background via-background/95 to-accent/25 p-6 sm:p-8">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_55%)]" />
+          <div className="relative flex flex-col items-center gap-3">
+            <div className="w-full max-w-md rounded-xl border border-border/70 bg-card/80 px-4 py-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <AgentAvatar
+                  agentId={ceoAgent?.id ?? DEFAULT_AGENT_ID}
+                  displayName={ceoName}
+                  size="md"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-lg font-medium text-foreground">
+                    {ceoName}
+                  </p>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {ceoRole}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex h-10 w-px bg-border/70" />
+
+            <Button
+              size="sm"
+              onClick={onCreateAgentClick}
+              disabled={isCreateAgentDisabled}
+              className="h-10 px-4 text-[14px]"
+            >
+              <Plus className="mr-1 size-4" />
+              Create Agent
+            </Button>
+
+            <p className="text-center text-xs text-muted-foreground sm:text-sm">
+              The new agent will be created as a direct report to CEO.
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
