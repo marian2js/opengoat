@@ -20,8 +20,8 @@ WORKDIR /app
 COPY . .
 
 RUN pnpm --filter @opengoat/core build \
-  && pnpm --filter opengoat build \
-  && pnpm --filter @opengoat/ui build
+  && pnpm --filter @opengoat/ui build \
+  && pnpm --filter opengoat build
 
 FROM node:22 AS runtime
 WORKDIR /app
@@ -34,6 +34,7 @@ ENV OPENGOAT_UI_HOST=0.0.0.0
 ENV OPENGOAT_UI_PORT=19123
 ENV OPENGOAT_HOME=/data/opengoat
 ENV HOME=/data/opengoat
+ENV OPENCLAW_GATEWAY_TOKEN=opengoat
 
 RUN npm install -g "openclaw@${OPENCLAW_VERSION}" \
   && openclaw --version
@@ -47,6 +48,7 @@ RUN chmod +x /usr/local/bin/opengoat-entrypoint /app/bin/opengoat /app/packages/
 
 VOLUME ["/data/opengoat"]
 EXPOSE 19123
+EXPOSE 18789
 
 ENTRYPOINT ["opengoat-entrypoint"]
 CMD ["ui"]

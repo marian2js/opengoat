@@ -10,6 +10,9 @@ fi
 
 case "$mode" in
   ui)
+    # Start OpenClaw gateway in background
+    openclaw gateway --allow-unconfigured --bind lan &
+    
     exec node /app/packages/ui/dist/server/index.js "$@"
     ;;
   cli)
