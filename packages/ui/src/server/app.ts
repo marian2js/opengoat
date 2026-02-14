@@ -39,7 +39,12 @@ const SCRYPT_KEY_LENGTH = 64;
 const SCRYPT_COST = 32_768;
 const SCRYPT_BLOCK_SIZE = 8;
 const SCRYPT_PARALLELIZATION = 1;
-const scryptAsync = promisify(scryptWithCallback);
+const scryptAsync = promisify(scryptWithCallback) as (
+  password: string | Buffer,
+  salt: string | Buffer,
+  keylen: number,
+  options?: { N?: number; r?: number; p?: number; maxmem?: number }
+) => Promise<Buffer>;
 
 interface AgentDescriptor {
   id: string;
@@ -108,10 +113,10 @@ interface UiImageInput {
 
 interface UiRunEvent {
   stage:
-    | "run_started"
-    | "provider_invocation_started"
-    | "provider_invocation_completed"
-    | "run_completed";
+  | "run_started"
+  | "provider_invocation_started"
+  | "provider_invocation_completed"
+  | "run_completed";
   timestamp: string;
   runId: string;
   step?: number;
@@ -718,22 +723,22 @@ function createUiAuthController(
         enabled: resolveActiveConfiguration().enabled,
         authenticated: resolveActiveConfiguration().enabled
           ? (() => {
-              const active = resolveActiveConfiguration();
-              if (!active.username) {
-                return false;
-              }
-              const cookies = parseCookieHeader(request.headers.cookie);
-              const token = cookies[UI_AUTH_COOKIE_NAME];
-              if (!token) {
-                return false;
-              }
-              return verifySignedUiAuthenticationSession(
-                token,
-                sessionSecret,
-                sessionVersion,
-                active.username,
-              );
-            })()
+            const active = resolveActiveConfiguration();
+            if (!active.username) {
+              return false;
+            }
+            const cookies = parseCookieHeader(request.headers.cookie);
+            const token = cookies[UI_AUTH_COOKIE_NAME];
+            if (!token) {
+              return false;
+            }
+            return verifySignedUiAuthenticationSession(
+              token,
+              sessionSecret,
+              sessionVersion,
+              active.username,
+            );
+          })()
           : true,
       };
     },
@@ -1499,8 +1504,8 @@ function registerApiRoutes(
 
       const parsedNotifyManagers = hasNotifyManagersSetting
         ? parseNotifyManagersOfInactiveAgents(
-            request.body?.notifyManagersOfInactiveAgents,
-          )
+          request.body?.notifyManagersOfInactiveAgents,
+        )
         : currentSettings.notifyManagersOfInactiveAgents;
       if (parsedNotifyManagers === undefined) {
         reply.code(400);
@@ -1520,8 +1525,8 @@ function registerApiRoutes(
       }
       const parsedNotificationTarget = hasNotificationTargetSetting
         ? parseInactiveAgentNotificationTarget(
-            request.body?.inactiveAgentNotificationTarget,
-          )
+          request.body?.inactiveAgentNotificationTarget,
+        )
         : currentSettings.inactiveAgentNotificationTarget;
       if (!parsedNotificationTarget) {
         reply.code(400);
@@ -1600,7 +1605,7 @@ function registerApiRoutes(
         const changingUsername =
           hasUsername &&
           providedUsername !==
-            normalizeUiAuthenticationUsername(currentAuthentication.username);
+          normalizeUiAuthenticationUsername(currentAuthentication.username);
         const changingPassword = hasNewPassword;
         const requiresCurrentPasswordVerification =
           currentEnabledSettings &&
@@ -1634,8 +1639,8 @@ function registerApiRoutes(
         const nextPasswordHash = hasNewPassword
           ? await deps.auth.hashPassword(rawNewPassword)
           : normalizeUiAuthenticationPasswordHash(
-              currentAuthentication.passwordHash,
-            );
+            currentAuthentication.passwordHash,
+          );
         if (parsedEnabled && (!nextUsername || !nextPasswordHash)) {
           reply.code(400);
           return {
@@ -1722,13 +1727,11 @@ function registerApiRoutes(
       });
       return {
         settings: toPublicUiServerSettings(nextSettings, nextAuthResponse),
-        message: `Task automation checks ${
-          nextSettings.taskCronEnabled ? "enabled" : "disabled"
-        } (runs every ${DEFAULT_TASK_CHECK_FREQUENCY_MINUTES} minute(s)). Inactive-agent manager notifications ${
-          nextSettings.notifyManagersOfInactiveAgents
+        message: `Task automation checks ${nextSettings.taskCronEnabled ? "enabled" : "disabled"
+          } (runs every ${DEFAULT_TASK_CHECK_FREQUENCY_MINUTES} minute(s)). Inactive-agent manager notifications ${nextSettings.notifyManagersOfInactiveAgents
             ? "enabled"
             : "disabled"
-        }; threshold ${nextSettings.maxInactivityMinutes} minute(s); audience ${nextSettings.inactiveAgentNotificationTarget}.`,
+          }; threshold ${nextSettings.maxInactivityMinutes} minute(s); audience ${nextSettings.inactiveAgentNotificationTarget}.`,
       };
     });
   });
@@ -2427,8 +2430,8 @@ function registerApiRoutes(
               timestamp: event.timestamp || new Date().toISOString(),
               level:
                 event.stage === "provider_invocation_completed" &&
-                typeof event.code === "number" &&
-                event.code !== 0
+                  typeof event.code === "number" &&
+                  event.code !== 0
                   ? "warn"
                   : "info",
               source: "opengoat",
@@ -2675,8 +2678,8 @@ function registerApiRoutes(
               timestamp: event.timestamp || new Date().toISOString(),
               level:
                 event.stage === "provider_invocation_completed" &&
-                typeof event.code === "number" &&
-                event.code !== 0
+                  typeof event.code === "number" &&
+                  event.code !== 0
                   ? "warn"
                   : "info",
               source: "opengoat",
@@ -3047,7 +3050,7 @@ async function fetchLatestPackageVersion(packageName: string): Promise<string> {
   }
 }
 
-class NpmPackageNotFoundError extends Error {}
+class NpmPackageNotFoundError extends Error { }
 
 function compareVersionStrings(left: string, right: string): number {
   const leftParts = parseVersionParts(left);
@@ -3377,8 +3380,8 @@ function resolveUiLogLevel(parsed: Record<string, unknown> | null): UiLogLevel {
   const meta = parsed?._meta;
   const levelFromMeta =
     meta &&
-    typeof meta === "object" &&
-    typeof (meta as Record<string, unknown>).logLevelName === "string"
+      typeof meta === "object" &&
+      typeof (meta as Record<string, unknown>).logLevelName === "string"
       ? (meta as Record<string, unknown>).logLevelName
       : undefined;
   const levelText =
@@ -3423,8 +3426,8 @@ export function extractRuntimeActivityFromLogLines(
     const boundFallbackRunId = fallbackRunId || nextFallbackRunId;
     const matchesFallbackRun = Boolean(
       boundFallbackRunId &&
-        (parsed.runId === boundFallbackRunId ||
-          parsed.message.includes(boundFallbackRunId)),
+      (parsed.runId === boundFallbackRunId ||
+        parsed.message.includes(boundFallbackRunId)),
     );
 
     const activeFallback = boundFallbackRunId;
@@ -4732,9 +4735,8 @@ function createTaskCronScheduler(
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `[task-cron] automation checks ${
-          taskCronEnabled ? "enabled" : "disabled"
-        }.`,
+        message: `[task-cron] automation checks ${taskCronEnabled ? "enabled" : "disabled"
+          }.`,
       });
     },
     setNotifyManagersOfInactiveAgents: (nextEnabled: boolean) => {
@@ -4753,9 +4755,8 @@ function createTaskCronScheduler(
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `[task-cron] inactive-manager notifications ${
-          notifyManagersOfInactiveAgents ? "enabled" : "disabled"
-        }.`,
+        message: `[task-cron] inactive-manager notifications ${notifyManagersOfInactiveAgents ? "enabled" : "disabled"
+          }.`,
       });
     },
     setMaxInactivityMinutes: (nextMaxInactivityMinutes: number) => {
