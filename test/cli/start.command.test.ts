@@ -60,7 +60,11 @@ describe("start command", () => {
     roots.push(root);
 
     const uiEntrypoint = path.join(root, "ui-entry.mjs");
-    await writeFile(uiEntrypoint, "process.exit(0);\n", "utf-8");
+    await writeFile(
+      uiEntrypoint,
+      "process.exit(process.env.OPENGOAT_OPENCLAW_REGISTER_TOOLS === '1' ? 0 : 3);\n",
+      "utf-8",
+    );
     process.env.OPENGOAT_UI_SERVER_ENTRY = uiEntrypoint;
 
     const stdout = createStreamCapture();

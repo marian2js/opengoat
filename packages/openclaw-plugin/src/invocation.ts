@@ -2,10 +2,16 @@ const TOOL_REGISTRATION_PATTERNS: readonly (readonly string[])[] = [
   ["gateway", "call", "agent"],
   ["opengoat", "start"],
 ];
+const FORCE_TOOL_REGISTRATION_ENV = "OPENGOAT_OPENCLAW_REGISTER_TOOLS";
 
 export function shouldRegisterOpenGoatToolsForArgv(
   rawArgv: readonly string[],
+  env: NodeJS.ProcessEnv = process.env,
 ): boolean {
+  if (env[FORCE_TOOL_REGISTRATION_ENV]?.trim() === "1") {
+    return true;
+  }
+
   const args = normalizeArgv(rawArgv.slice(2));
   if (args.length === 0) {
     return false;

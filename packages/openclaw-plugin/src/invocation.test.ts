@@ -2,6 +2,15 @@ import { describe, expect, it } from "vitest";
 import { shouldRegisterOpenGoatToolsForArgv } from "./invocation.js";
 
 describe("shouldRegisterOpenGoatToolsForArgv", () => {
+  it("returns true when startup explicitly forces registration", () => {
+    expect(
+      shouldRegisterOpenGoatToolsForArgv(
+        ["node", "openclaw", "config", "get", "plugins.load.paths"],
+        { OPENGOAT_OPENCLAW_REGISTER_TOOLS: "1" },
+      ),
+    ).toBe(true);
+  });
+
   it("returns true for gateway call agent invocations", () => {
     expect(
       shouldRegisterOpenGoatToolsForArgv([

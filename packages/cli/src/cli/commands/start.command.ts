@@ -7,6 +7,7 @@ import type { CliCommand } from "../framework/command.js";
 const DEFAULT_UI_PORT = 19123;
 const DEFAULT_UI_HOST = "127.0.0.1";
 const CLI_PACKAGE_NAME = "opengoat";
+const FORCE_TOOL_REGISTRATION_ENV = "OPENGOAT_OPENCLAW_REGISTER_TOOLS";
 
 export const startCommand: CliCommand = {
   path: ["start"],
@@ -54,11 +55,15 @@ export const startCommand: CliCommand = {
       NODE_ENV: "production",
       OPENGOAT_UI_PORT: String(effectivePort),
       OPENGOAT_UI_HOST: effectiveHost,
+      [FORCE_TOOL_REGISTRATION_ENV]: "1",
       ...(packageVersion ? { OPENGOAT_VERSION: packageVersion } : {}),
     };
 
     context.stdout.write(
       `Starting OpenGoat UI at http://${effectiveHost}:${effectivePort}\n`,
+    );
+    context.stdout.write(
+      "OpenClaw OpenGoat tools will be registered during startup.\n",
     );
 
     return new Promise<number>((resolve) => {
