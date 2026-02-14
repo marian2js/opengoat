@@ -948,8 +948,6 @@ function rewriteSecondLevelSection(
 const EVERY_SESSION_SECTION_LINES = [
   "## Every Session",
   "",
-  "You are part of an organization run by AI agents.",
-  "",
   "Before doing anything else:",
   "",
   "1. Read `SOUL.md` — this is who you are",
