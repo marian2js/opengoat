@@ -25,7 +25,12 @@ import type {
   UiServerAuthenticationSettings,
 } from "./types.js";
 
-const scryptAsync = promisify(scryptWithCallback);
+const scryptAsync = promisify(scryptWithCallback) as (
+  password: string | Buffer,
+  salt: string | Buffer,
+  keylen: number,
+  options?: { N?: number; r?: number; p?: number; maxmem?: number },
+) => Promise<Buffer>;
 
 interface UiLoginAttemptState {
   failures: number[];

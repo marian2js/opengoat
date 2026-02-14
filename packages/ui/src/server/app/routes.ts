@@ -66,6 +66,8 @@ import type {
   InactiveAgentNotificationTarget,
   OpenClawUiService,
   RegisterApiRoutesDeps,
+  UiServerAuthenticationSettings,
+  UiServerSettings,
   SessionHistoryResult,
   SessionMessageProgressPhase,
   SessionMessageStreamEvent,
