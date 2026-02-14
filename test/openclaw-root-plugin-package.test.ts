@@ -15,7 +15,7 @@ describe("openclaw root plugin package metadata", () => {
       files?: unknown;
     };
 
-    expect(pkg.name).toBe("@opengoat/openclaw-plugin-pack");
+    expect(pkg.name).toBe("@opengoat/opengoat-plugin");
     expect(pkg.openclaw?.extensions).toEqual(["./index.ts"]);
     expect(pkg.files).toEqual([
       "index.ts",
@@ -43,7 +43,7 @@ describe("openclaw root plugin package metadata", () => {
       uiHints?: unknown;
     };
 
-    expect(manifest.id).toBe("openclaw-plugin-pack");
+    expect(manifest.id).toBe("opengoat-plugin");
     expect(typeof manifest.name).toBe("string");
     expect(typeof manifest.description).toBe("string");
     expect(manifest.configSchema).toBeTruthy();
@@ -60,7 +60,7 @@ describe("openclaw root plugin package metadata", () => {
       };
     };
 
-    expect(module.default?.id).toBe("openclaw-plugin-pack");
+    expect(module.default?.id).toBe("opengoat-plugin");
     expect(typeof module.default?.register).toBe("function");
   });
 });

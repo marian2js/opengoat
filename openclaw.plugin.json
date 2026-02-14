@@ -1,5 +1,5 @@
 {
-  "id": "openclaw-plugin-pack",
+  "id": "opengoat-plugin",
   "name": "OpenGoat",
   "description": "Expose OpenGoat CLI through OpenClaw as an alternative execution path.",
   "configSchema": {

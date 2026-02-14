@@ -1103,7 +1103,7 @@ describe("OpenGoatService", () => {
     ).toBe(true);
   });
 
-  it("falls back to workspace plugin id when openclaw-plugin id is not found", async () => {
+  it("falls back to root plugin id when openclaw-plugin id is not found", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -1135,7 +1135,7 @@ describe("OpenGoatService", () => {
         if (
           request.args[0] === "config" &&
           request.args[1] === "set" &&
-          request.args[2] === "plugins.entries.workspace.enabled"
+          request.args[2] === "plugins.entries.opengoat-plugin.enabled"
         ) {
           return {
             code: 0,
@@ -1179,7 +1179,7 @@ describe("OpenGoatService", () => {
         (request) =>
           request.args[0] === "config" &&
           request.args[1] === "set" &&
-          request.args[2] === "plugins.entries.openclaw-plugin-pack.enabled" &&
+          request.args[2] === "plugins.entries.opengoat-plugin.enabled" &&
           request.args[3] === "true",
       ),
     ).toBe(true);
@@ -1215,6 +1215,17 @@ describe("OpenGoatService", () => {
             code: 1,
             stdout: "",
             stderr: "plugin not found: openclaw-plugin",
+          };
+        }
+        if (
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
+          request.args[2] === "plugins.entries.opengoat-plugin.enabled"
+        ) {
+          return {
+            code: 1,
+            stdout: "",
+            stderr: "plugin not found: opengoat-plugin",
           };
         }
         if (
@@ -1264,7 +1275,7 @@ describe("OpenGoatService", () => {
     expect(
       result?.warnings.some((warning) =>
         warning.includes(
-          "OpenClaw plugin enable failed: no matching plugin id was found (openclaw-plugin, openclaw-plugin-pack, workspace).",
+          "OpenClaw plugin enable failed: no matching plugin id was found (openclaw-plugin, opengoat-plugin, openclaw-plugin-pack, workspace).",
         ),
       ),
     ).toBe(true);

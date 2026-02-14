@@ -2,7 +2,7 @@ import openGoatPlugin from "./packages/openclaw-plugin/index.ts";
 
 const rootPlugin = {
   ...openGoatPlugin,
-  id: "openclaw-plugin-pack",
+  id: "opengoat-plugin",
 };
 
 export default rootPlugin;
