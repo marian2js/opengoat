@@ -107,6 +107,25 @@ describe("OpenGoatService", () => {
     );
   });
 
+  it("removes OpenClaw USER.md after agent runtime setup", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const provider = new FakeOpenClawProvider();
+    provider.seedUserMarkdownOnCreate = true;
+    const { service } = createService(root, provider);
+    await service.initialize();
+
+    await service.createAgent("Designer");
+
+    await expect(
+      access(
+        path.join(root, "workspaces", "designer", "USER.md"),
+        constants.F_OK,
+      ),
+    ).rejects.toBeTruthy();
+  });
+
   it("leaves ROLE.md role empty when agent role is not provided", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
@@ -1214,6 +1233,7 @@ class FakeOpenClawProvider extends BaseProvider {
   public createFailureStderr = "create failed";
   public createAlreadyExists = false;
   public failDelete = false;
+  public seedUserMarkdownOnCreate = false;
 
   public constructor() {
     super({
@@ -1259,6 +1279,13 @@ class FakeOpenClawProvider extends BaseProvider {
         stdout: "",
         stderr: "agent already exists",
       };
+    }
+    if (this.seedUserMarkdownOnCreate) {
+      await writeFile(
+        path.join(options.workspaceDir, "USER.md"),
+        "# USER.md\n",
+        "utf-8",
+      );
     }
     return {
       code: 0,

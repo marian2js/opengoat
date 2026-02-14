@@ -181,6 +181,7 @@ describe("AgentService", () => {
     const rolePath = path.join(ceoWorkspace, "ROLE.md");
     const soulPath = path.join(ceoWorkspace, "SOUL.md");
     const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
+    const userPath = path.join(ceoWorkspace, "USER.md");
     await fileSystem.ensureDir(ceoWorkspace);
     await writeFile(
       agentsPath,
@@ -205,6 +206,7 @@ describe("AgentService", () => {
       "utf-8",
     );
     await writeFile(bootstrapPath, "# bootstrap\n", "utf-8");
+    await writeFile(userPath, "# user\n", "utf-8");
 
     await service.ensureCeoWorkspaceBootstrap(paths);
 
@@ -246,6 +248,7 @@ describe("AgentService", () => {
     expect(soulMarkdown).toBe(["# SOUL.md - Custom", "", "Legacy body"].join("\n"));
     expect(bootstrapMarkdown.trimEnd()).toBe(renderCeoBootstrapMarkdown());
     expect(bootstrapMarkdown).not.toContain("# bootstrap");
+    expect(await fileSystem.exists(userPath)).toBe(false);
   });
 
   it("removes First Run and replaces Every Session for non-ceo AGENTS.md", async () => {
@@ -299,8 +302,10 @@ describe("AgentService", () => {
     const workspace = path.join(paths.workspacesDir, "engineer");
     const rolePath = path.join(workspace, "ROLE.md");
     const bootstrapPath = path.join(workspace, "BOOTSTRAP.md");
+    const userPath = path.join(workspace, "USER.md");
     await fileSystem.ensureDir(workspace);
     await writeFile(bootstrapPath, "# bootstrap\n", "utf-8");
+    await writeFile(userPath, "# user\n", "utf-8");
 
     await service.ensureAgentWorkspaceBootstrap(paths, {
       agentId: "engineer",
@@ -325,6 +330,7 @@ describe("AgentService", () => {
       "- To delegate and coordinate work, use `og-*` skills.",
     );
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
+    expect(await fileSystem.exists(userPath)).toBe(false);
   });
 
   it("never changes global default agent during agent creation", async () => {

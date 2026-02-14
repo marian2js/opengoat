@@ -200,6 +200,7 @@ export class AgentService {
     const agentsPath = this.pathPort.join(workspaceDir, "AGENTS.md");
     const rolePath = this.pathPort.join(workspaceDir, "ROLE.md");
     const bootstrapPath = this.pathPort.join(workspaceDir, "BOOTSTRAP.md");
+    const userPath = this.pathPort.join(workspaceDir, "USER.md");
     const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
     const removedPaths: string[] = [];
@@ -236,12 +237,10 @@ export class AgentService {
         createdPaths,
         skippedPaths,
       );
-    } else if (await this.fileSystem.exists(bootstrapPath)) {
-      await this.fileSystem.removeDir(bootstrapPath);
-      removedPaths.push(bootstrapPath);
     } else {
-      skippedPaths.push(bootstrapPath);
+      await this.removePathIfExists(bootstrapPath, removedPaths, skippedPaths);
     }
+    await this.removePathIfExists(userPath, removedPaths, skippedPaths);
 
     return {
       createdPaths,
@@ -525,6 +524,20 @@ export class AgentService {
       return;
     }
     createdPaths.push(directoryPath);
+  }
+
+  private async removePathIfExists(
+    filePath: string,
+    removedPaths: string[],
+    skippedPaths: string[],
+  ): Promise<void> {
+    const exists = await this.fileSystem.exists(filePath);
+    if (!exists) {
+      skippedPaths.push(filePath);
+      return;
+    }
+    await this.fileSystem.removeDir(filePath);
+    removedPaths.push(filePath);
   }
 
   private async writeJsonIfMissing(
