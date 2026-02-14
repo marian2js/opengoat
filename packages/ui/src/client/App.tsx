@@ -878,6 +878,9 @@ export function App(): ReactElement {
     }
     return agents.find((agent) => agent.id === route.agentId) ?? null;
   }, [route, agents]);
+  const defaultEntryAgent = useMemo(() => {
+    return agents.find((agent) => agent.id === DEFAULT_AGENT_ID) ?? null;
+  }, [agents]);
 
   const workspaceNodes = useMemo<WorkspaceNode[]>(() => {
     const sessionsByPath = new Map<
@@ -1131,6 +1134,12 @@ export function App(): ReactElement {
 
     return candidates[0] ?? null;
   }, [route, selectedAgentProject, selectedAgentSessions]);
+  const selectedSessionProjectName = useMemo(() => {
+    if (route.kind !== "session" || !selectedSession) {
+      return null;
+    }
+    return resolveTaskProjectLabel(selectedSession.projectPath);
+  }, [route, selectedSession, resolveTaskProjectLabel]);
 
   const activeChatContext = useMemo(() => {
     if (route.kind === "session" && selectedSession) {
@@ -3234,6 +3243,31 @@ export function App(): ReactElement {
                     {selectedAgent?.displayName ?? route.agentId}
                   </h1>
                 </div>
+              ) : route.kind === "session" ? (
+                <div className="flex min-w-0 items-center gap-3">
+                  <AgentAvatar
+                    agentId={defaultEntryAgent?.id ?? DEFAULT_AGENT_ID}
+                    displayName={
+                      defaultEntryAgent?.displayName ?? DEFAULT_AGENT_ID.toUpperCase()
+                    }
+                    size="md"
+                  />
+                  <div className="flex min-w-0 items-center gap-2">
+                    <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
+                      {defaultEntryAgent?.displayName ?? DEFAULT_AGENT_ID.toUpperCase()}
+                    </h1>
+                    <span
+                      className="h-5 w-px shrink-0 bg-border/80"
+                      aria-hidden="true"
+                    />
+                    <span
+                      className="max-w-[42vw] truncate rounded-full border border-border/70 bg-accent/40 px-3 py-1 text-sm font-medium text-foreground/90"
+                      title={selectedSession?.title ?? "Session"}
+                    >
+                      {selectedSession?.title ?? "Session"}
+                    </span>
+                  </div>
+                </div>
               ) : (
                 <div>
                   <h1
@@ -3309,6 +3343,22 @@ export function App(): ReactElement {
                       </option>
                     ))}
                   </select>
+                </div>
+              ) : null}
+
+              {route.kind === "session" ? (
+                <div className="flex min-w-[220px] items-center gap-2">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Project
+                  </span>
+                  <span
+                    className="inline-flex h-9 min-w-0 flex-1 items-center rounded-md border border-border bg-background px-3 text-sm text-foreground"
+                    title={selectedSessionProjectName ?? "Home"}
+                  >
+                    <span className="truncate">
+                      {selectedSessionProjectName ?? "Home"}
+                    </span>
+                  </span>
                 </div>
               ) : null}
 
