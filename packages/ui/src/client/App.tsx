@@ -676,6 +676,10 @@ export function App(): ReactElement {
     uiAuthenticationPasswordConfirmationInput,
     setUiAuthenticationPasswordConfirmationInput,
   ] = useState("");
+  const [
+    uiAuthenticationPasswordEditorOpen,
+    setUiAuthenticationPasswordEditorOpen,
+  ] = useState(false);
   const [isTaskDetailsDialogOpen, setTaskDetailsDialogOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskDetailsError, setTaskDetailsError] = useState<string | null>(null);
@@ -2338,9 +2342,13 @@ export function App(): ReactElement {
     const hasNewAuthPassword = nextAuthPassword.length > 0;
     const currentAuthenticationSettings =
       state?.settings.authentication ?? defaultAuthenticationSettings();
+    const authenticationEnabledChanged =
+      currentAuthenticationSettings.enabled !== uiAuthenticationEnabledInput;
+    const authenticationUsernameChanged =
+      currentAuthenticationSettings.username !== normalizedAuthUsername;
     const authenticationSettingsChanged =
-      currentAuthenticationSettings.enabled !== uiAuthenticationEnabledInput ||
-      currentAuthenticationSettings.username !== normalizedAuthUsername ||
+      authenticationEnabledChanged ||
+      authenticationUsernameChanged ||
       hasNewAuthPassword;
     const requiresCurrentPassword =
       currentAuthenticationSettings.enabled && authenticationSettingsChanged;
@@ -2405,13 +2413,26 @@ export function App(): ReactElement {
 
     setMutating(true);
     try {
-      const response = await persistUiSettings({
+      const settingsPayload: {
+        taskCronEnabled: boolean;
+        notifyManagersOfInactiveAgents: boolean;
+        maxInactivityMinutes: number;
+        inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+        authentication?: {
+          enabled: boolean;
+          username?: string;
+          password?: string;
+          currentPassword?: string;
+        };
+      } = {
         taskCronEnabled: taskCronEnabledInput,
         notifyManagersOfInactiveAgents: notifyManagersOfInactiveAgentsInput,
         maxInactivityMinutes: resolvedMaxInactivityMinutes,
         inactiveAgentNotificationTarget:
           inactiveAgentNotificationTargetInput,
-        authentication: {
+      };
+      if (authenticationSettingsChanged) {
+        settingsPayload.authentication = {
           enabled: uiAuthenticationEnabledInput,
           ...(normalizedAuthUsername
             ? {
@@ -2423,17 +2444,21 @@ export function App(): ReactElement {
                 password: nextAuthPassword,
               }
             : {}),
-          ...(uiAuthenticationCurrentPasswordInput.trim().length > 0
+          ...(requiresCurrentPassword &&
+          uiAuthenticationCurrentPasswordInput.trim().length > 0
             ? {
                 currentPassword: uiAuthenticationCurrentPasswordInput,
               }
             : {}),
-        },
-      });
+        };
+      }
+
+      const response = await persistUiSettings(settingsPayload);
       applyUiSettingsResponse(response);
       setUiAuthenticationCurrentPasswordInput("");
       setUiAuthenticationPasswordInput("");
       setUiAuthenticationPasswordConfirmationInput("");
+      setUiAuthenticationPasswordEditorOpen(false);
       const statusMessage = !taskCronEnabledInput
         ? "Task automation checks disabled."
         : notifyManagersOfInactiveAgentsInput
@@ -2458,7 +2483,7 @@ export function App(): ReactElement {
       notifyManagersOfInactiveAgents: boolean;
       maxInactivityMinutes: number;
       inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
-      authentication: {
+      authentication?: {
         enabled: boolean;
         username?: string;
         password?: string;
@@ -3298,6 +3323,28 @@ export function App(): ReactElement {
       flushPendingUiLogs();
     };
   }, [flushPendingUiLogs, queueUiLogEntry, route]);
+
+  const currentAuthenticationSettings =
+    state?.settings.authentication ?? defaultAuthenticationSettings();
+  const normalizedUiAuthenticationUsernameInput = uiAuthenticationUsernameInput
+    .trim()
+    .toLowerCase();
+  const authenticationEnabledChanged =
+    currentAuthenticationSettings.enabled !== uiAuthenticationEnabledInput;
+  const authenticationUsernameChanged =
+    currentAuthenticationSettings.username !==
+    normalizedUiAuthenticationUsernameInput;
+  const hasPendingAuthenticationPasswordUpdate =
+    uiAuthenticationPasswordInput.length > 0;
+  const showAuthenticationPasswordEditor =
+    !uiAuthenticationEnabledInput ||
+    !uiAuthenticationHasPassword ||
+    uiAuthenticationPasswordEditorOpen;
+  const showAuthenticationCurrentPasswordInput =
+    currentAuthenticationSettings.enabled &&
+    (authenticationEnabledChanged ||
+      authenticationUsernameChanged ||
+      hasPendingAuthenticationPasswordUpdate);
 
   if (isAuthChecking) {
     return (
@@ -5363,6 +5410,9 @@ export function App(): ReactElement {
                             disabled={isMutating || isLoading}
                             onCheckedChange={(checked) => {
                               setUiAuthenticationEnabledInput(checked);
+                              if (!checked) {
+                                setUiAuthenticationPasswordEditorOpen(false);
+                              }
                             }}
                             aria-label="Toggle UI authentication"
                           />
@@ -5403,76 +5453,123 @@ export function App(): ReactElement {
                           </p>
                         </div>
 
-                        {uiAuthenticationHasPassword ? (
-                          <div className="space-y-2">
-                            <label
-                              className="text-sm font-medium text-foreground"
-                              htmlFor="uiAuthenticationCurrentPassword"
-                            >
-                              Current Password
-                            </label>
-                            <Input
-                              id="uiAuthenticationCurrentPassword"
-                              type="password"
-                              autoComplete="current-password"
-                              value={uiAuthenticationCurrentPasswordInput}
-                              disabled={isMutating || isLoading}
-                              onChange={(event) => {
-                                setUiAuthenticationCurrentPasswordInput(
-                                  event.target.value,
-                                );
-                              }}
-                            />
+                        {uiAuthenticationEnabledInput &&
+                        uiAuthenticationHasPassword &&
+                        !uiAuthenticationPasswordEditorOpen ? (
+                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/30 px-3 py-3">
                             <p className="text-xs text-muted-foreground">
-                              Required when changing authentication settings.
+                              Password is already configured. Use Change Password to rotate credentials.
                             </p>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              disabled={isMutating || isLoading}
+                              onClick={() => {
+                                setUiAuthenticationPasswordEditorOpen(true);
+                                setUiAuthenticationCurrentPasswordInput("");
+                                setUiAuthenticationPasswordInput("");
+                                setUiAuthenticationPasswordConfirmationInput("");
+                              }}
+                            >
+                              Change Password
+                            </Button>
                           </div>
                         ) : null}
 
-                        <div className="space-y-2">
-                          <label
-                            className="text-sm font-medium text-foreground"
-                            htmlFor="uiAuthenticationPassword"
-                          >
-                            {uiAuthenticationHasPassword
-                              ? "New Password (optional)"
-                              : "Password"}
-                          </label>
-                          <Input
-                            id="uiAuthenticationPassword"
-                            type="password"
-                            autoComplete="new-password"
-                            value={uiAuthenticationPasswordInput}
-                            disabled={isMutating || isLoading}
-                            onChange={(event) => {
-                              setUiAuthenticationPasswordInput(event.target.value);
-                            }}
-                          />
-                        </div>
+                        {showAuthenticationPasswordEditor ? (
+                          <div className="space-y-4">
+                            {uiAuthenticationEnabledInput &&
+                            uiAuthenticationHasPassword &&
+                            uiAuthenticationPasswordEditorOpen ? (
+                              <div className="flex items-center justify-end">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={isMutating || isLoading}
+                                  onClick={() => {
+                                    setUiAuthenticationPasswordEditorOpen(false);
+                                    setUiAuthenticationCurrentPasswordInput("");
+                                    setUiAuthenticationPasswordInput("");
+                                    setUiAuthenticationPasswordConfirmationInput("");
+                                  }}
+                                >
+                                  Cancel Password Change
+                                </Button>
+                              </div>
+                            ) : null}
 
-                        <div className="space-y-2">
-                          <label
-                            className="text-sm font-medium text-foreground"
-                            htmlFor="uiAuthenticationPasswordConfirm"
-                          >
-                            Confirm Password
-                          </label>
-                          <Input
-                            id="uiAuthenticationPasswordConfirm"
-                            type="password"
-                            autoComplete="new-password"
-                            value={uiAuthenticationPasswordConfirmationInput}
-                            disabled={isMutating || isLoading}
-                            onChange={(event) => {
-                              setUiAuthenticationPasswordConfirmationInput(
-                                event.target.value,
-                              );
-                            }}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Use at least 12 characters with uppercase, lowercase, number, and symbol.
-                          </p>
-                        </div>
+                            {showAuthenticationCurrentPasswordInput ? (
+                              <div className="space-y-2">
+                                <label
+                                  className="text-sm font-medium text-foreground"
+                                  htmlFor="uiAuthenticationCurrentPassword"
+                                >
+                                  Current Password
+                                </label>
+                                <Input
+                                  id="uiAuthenticationCurrentPassword"
+                                  type="password"
+                                  autoComplete="current-password"
+                                  value={uiAuthenticationCurrentPasswordInput}
+                                  disabled={isMutating || isLoading}
+                                  onChange={(event) => {
+                                    setUiAuthenticationCurrentPasswordInput(
+                                      event.target.value,
+                                    );
+                                  }}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                  Required when changing authentication settings.
+                                </p>
+                              </div>
+                            ) : null}
+
+                            <div className="space-y-2">
+                              <label
+                                className="text-sm font-medium text-foreground"
+                                htmlFor="uiAuthenticationPassword"
+                              >
+                                {uiAuthenticationHasPassword
+                                  ? "New Password"
+                                  : "Password"}
+                              </label>
+                              <Input
+                                id="uiAuthenticationPassword"
+                                type="password"
+                                autoComplete="new-password"
+                                value={uiAuthenticationPasswordInput}
+                                disabled={isMutating || isLoading}
+                                onChange={(event) => {
+                                  setUiAuthenticationPasswordInput(event.target.value);
+                                }}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <label
+                                className="text-sm font-medium text-foreground"
+                                htmlFor="uiAuthenticationPasswordConfirm"
+                              >
+                                Confirm Password
+                              </label>
+                              <Input
+                                id="uiAuthenticationPasswordConfirm"
+                                type="password"
+                                autoComplete="new-password"
+                                value={uiAuthenticationPasswordConfirmationInput}
+                                disabled={isMutating || isLoading}
+                                onChange={(event) => {
+                                  setUiAuthenticationPasswordConfirmationInput(
+                                    event.target.value,
+                                  );
+                                }}
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Use at least 12 characters with uppercase, lowercase, number, and symbol.
+                              </p>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     </section>
 
