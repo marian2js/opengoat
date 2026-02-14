@@ -18,9 +18,9 @@ import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import {
   renderAgentsIndex,
-  renderCeoBootstrapMarkdown,
   renderBoardIndividualSkillMarkdown,
   renderBoardManagerSkillMarkdown,
+  renderCeoBootstrapMarkdown,
   renderCeoRoleMarkdown,
   renderInternalAgentConfig,
   resolveAgentRole,
@@ -897,6 +897,10 @@ function rewriteSecondLevelSection(
 
   while (index < lines.length) {
     const line = lines[index];
+    if (line === undefined) {
+      index += 1;
+      continue;
+    }
     const trimmed = line.trim();
     if (headingPattern.test(trimmed)) {
       replaced = true;
@@ -904,7 +908,11 @@ function rewriteSecondLevelSection(
         kept.push(...replacementLines);
       }
       index += 1;
-      while (index < lines.length && !/^##\s+/.test(lines[index].trim())) {
+      while (index < lines.length) {
+        const nextLine = lines[index];
+        if (nextLine !== undefined && /^##\s+/.test(nextLine.trim())) {
+          break;
+        }
         index += 1;
       }
       continue;
