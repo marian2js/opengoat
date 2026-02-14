@@ -856,7 +856,7 @@ function replaceFirstRunSection(markdown: string): string {
   const replacementLines = [
     "## Your Role",
     "",
-    "You are part of an organization run by AI agents. Read `ROLE.md` for details.",
+    "You are part of an organization run by AI agents. Read `ROLE.md` for details about your role, and read `../../organization` for details about the organization.",
     "",
   ];
 
@@ -909,6 +909,7 @@ function renderRoleMarkdown(profile: {
     `- For info about your level on the organiztion, run \`opengoat agent info ${profile.agentId}\`.`,
     "- To delegate and coordinate work, use `og-*` skills.",
     "- Organization context is available in `../../organization` - read them",
+    "- You can view and edit the wiki in `../../organization/wiki`",
     "",
     "---",
     "",
