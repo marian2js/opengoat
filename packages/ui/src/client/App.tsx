@@ -481,6 +481,7 @@ interface SidebarItem {
   id: PageView;
   label: string;
   icon: ComponentType<{ className?: string }>;
+  hiddenInSidebar?: boolean;
 }
 
 interface MetricCard {
@@ -565,7 +566,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
   { id: "tasks", label: "Tasks", icon: Boxes },
   { id: "agents", label: "Agents", icon: UsersRound },
-  { id: "skills", label: "Skills", icon: Sparkles },
+  { id: "skills", label: "Skills", icon: Sparkles, hiddenInSidebar: true },
   { id: "wiki", label: "Wiki", icon: BookOpen },
   { id: "logs", label: "Logs", icon: TerminalSquare },
 ];
@@ -3662,7 +3663,7 @@ export function App(): ReactElement {
                 Main Menu
               </p>
             ) : null}
-            {SIDEBAR_ITEMS.map((item) => {
+            {SIDEBAR_ITEMS.filter((item) => !item.hiddenInSidebar).map((item) => {
               const Icon = item.icon;
               const active =
                 (route.kind === "page" && item.id === route.view) ||
@@ -4729,7 +4730,7 @@ export function App(): ReactElement {
 
           <div className="border-b border-border px-3 py-2 md:hidden">
             <div className="flex gap-1 overflow-x-auto">
-              {SIDEBAR_ITEMS.map((item) => {
+              {SIDEBAR_ITEMS.filter((item) => !item.hiddenInSidebar).map((item) => {
                 const Icon = item.icon;
                 const active =
                   (route.kind === "page" && item.id === route.view) ||
