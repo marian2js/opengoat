@@ -53,6 +53,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 import { resolveAgentAvatarSource } from "@/lib/agent-avatar";
 import { cn } from "@/lib/utils";
+import { SkillsPage } from "@/pages/skills/SkillsPage";
+import type { SkillsResponse } from "@/pages/skills/types";
 import dagre from "@dagrejs/dagre";
 import {
   Background,
@@ -151,13 +153,6 @@ interface Session {
   compactionCount: number;
 }
 
-interface Skill {
-  id: string;
-  name: string;
-  description: string;
-  source: "managed" | "extra" | string;
-}
-
 interface OverviewResponse {
   agents: Agent[];
   totals: {
@@ -168,12 +163,6 @@ interface OverviewResponse {
 interface SessionsResponse {
   agentId: string;
   sessions: Session[];
-}
-
-interface SkillsResponse {
-  scope: "agent" | "global";
-  skills: Skill[];
-  agentId?: string;
 }
 
 interface TaskEntry {
@@ -4995,73 +4984,10 @@ export function App(): ReactElement {
                 ) : null}
 
                 {route.kind === "page" && route.view === "skills" ? (
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Assigned Skills</CardTitle>
-                        <CardDescription>
-                          Skills currently assigned to ceo.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        {state.agentSkills.skills.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
-                            No assigned skills.
-                          </p>
-                        ) : (
-                          state.agentSkills.skills.map((skill) => (
-                            <div
-                              key={skill.id}
-                              className="rounded-md border border-border/80 bg-background/30 p-3"
-                            >
-                              <div className="mb-1 flex items-center justify-between gap-3">
-                                <p className="font-medium">{skill.name}</p>
-                                <Badge variant="secondary">
-                                  {skill.source}
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                {skill.description || "No description"}
-                              </p>
-                            </div>
-                          ))
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Global Skills</CardTitle>
-                        <CardDescription>
-                          Centralized reusable skill catalog.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        {state.globalSkills.skills.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
-                            No global skills.
-                          </p>
-                        ) : (
-                          state.globalSkills.skills.map((skill) => (
-                            <div
-                              key={skill.id}
-                              className="rounded-md border border-border/80 bg-background/30 p-3"
-                            >
-                              <div className="mb-1 flex items-center justify-between gap-3">
-                                <p className="font-medium">{skill.name}</p>
-                                <Badge variant="secondary">
-                                  {skill.source}
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                {skill.description || "No description"}
-                              </p>
-                            </div>
-                          ))
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
+                  <SkillsPage
+                    liveAssignedSkillsCount={state.agentSkills.skills.length}
+                    liveGlobalSkillsCount={state.globalSkills.skills.length}
+                  />
                 ) : null}
 
                 {route.kind === "page" && route.view === "logs" ? (
