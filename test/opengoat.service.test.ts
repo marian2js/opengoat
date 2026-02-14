@@ -1179,7 +1179,7 @@ describe("OpenGoatService", () => {
         (request) =>
           request.args[0] === "config" &&
           request.args[1] === "set" &&
-          request.args[2] === "plugins.entries.workspace.enabled" &&
+          request.args[2] === "plugins.entries.openclaw-plugin-pack.enabled" &&
           request.args[3] === "true",
       ),
     ).toBe(true);
@@ -1220,6 +1220,17 @@ describe("OpenGoatService", () => {
         if (
           request.args[0] === "config" &&
           request.args[1] === "set" &&
+          request.args[2] === "plugins.entries.openclaw-plugin-pack.enabled"
+        ) {
+          return {
+            code: 1,
+            stdout: "",
+            stderr: "plugin not found: openclaw-plugin-pack",
+          };
+        }
+        if (
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
           request.args[2] === "plugins.entries.workspace.enabled"
         ) {
           return {
@@ -1253,7 +1264,7 @@ describe("OpenGoatService", () => {
     expect(
       result?.warnings.some((warning) =>
         warning.includes(
-          "OpenClaw plugin enable failed: no matching plugin id was found (openclaw-plugin, workspace).",
+          "OpenClaw plugin enable failed: no matching plugin id was found (openclaw-plugin, openclaw-plugin-pack, workspace).",
         ),
       ),
     ).toBe(true);

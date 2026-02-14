@@ -1,5 +1,5 @@
 {
-  "id": "workspace",
+  "id": "openclaw-plugin-pack",
   "name": "OpenGoat",
   "description": "Expose OpenGoat CLI through OpenClaw as an alternative execution path.",
   "configSchema": {

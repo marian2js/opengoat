@@ -104,6 +104,7 @@ const OPENCLAW_AGENT_SANDBOX_MODE = "off";
 const OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON = "[\"*\"]";
 const OPENCLAW_OPENGOAT_PLUGIN_ID = "openclaw-plugin";
 const OPENCLAW_OPENGOAT_PLUGIN_FALLBACK_ID = "workspace";
+const OPENCLAW_OPENGOAT_PLUGIN_SECONDARY_FALLBACK_ID = "openclaw-plugin-pack";
 
 export interface RuntimeDefaultsSyncResult {
   ceoSyncCode?: number;
@@ -1829,6 +1830,7 @@ export class OpenGoatService {
 
     const pluginIds = [
       OPENCLAW_OPENGOAT_PLUGIN_ID,
+      OPENCLAW_OPENGOAT_PLUGIN_SECONDARY_FALLBACK_ID,
       OPENCLAW_OPENGOAT_PLUGIN_FALLBACK_ID,
     ];
     const enableFailures: string[] = [];

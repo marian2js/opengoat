@@ -1,5 +1,5 @@
 {
-  "name": "@opengoat/workspace",
+  "name": "@opengoat/openclaw-plugin-pack",
   "version": "0.1.0",
   "private": true,
   "description": "OpenGoat monorepo workspace",
@@ -22,6 +22,17 @@
       "./index.ts"
     ]
   },
+  "files": [
+    "index.ts",
+    "openclaw.plugin.json",
+    "packages/openclaw-plugin/index.ts",
+    "packages/openclaw-plugin/openclaw.plugin.json",
+    "packages/openclaw-plugin/src/**/*.ts",
+    "!packages/openclaw-plugin/src/**/*.test.ts",
+    "packages/core/src/**/*.ts",
+    "!packages/core/src/**/*.test.ts",
+    "packages/core/src/core/templates/assets/**/*.md"
+  ],
   "engines": {
     "node": ">=20.11.0"
   },

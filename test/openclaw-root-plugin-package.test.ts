@@ -10,10 +10,24 @@ describe("openclaw root plugin package metadata", () => {
   it("exposes openclaw.extensions from the repository root package", async () => {
     const raw = await readFile(path.join(rootDir, "package.json"), "utf-8");
     const pkg = JSON.parse(raw) as {
+      name?: unknown;
       openclaw?: { extensions?: unknown };
+      files?: unknown;
     };
 
+    expect(pkg.name).toBe("@opengoat/openclaw-plugin-pack");
     expect(pkg.openclaw?.extensions).toEqual(["./index.ts"]);
+    expect(pkg.files).toEqual([
+      "index.ts",
+      "openclaw.plugin.json",
+      "packages/openclaw-plugin/index.ts",
+      "packages/openclaw-plugin/openclaw.plugin.json",
+      "packages/openclaw-plugin/src/**/*.ts",
+      "!packages/openclaw-plugin/src/**/*.test.ts",
+      "packages/core/src/**/*.ts",
+      "!packages/core/src/**/*.test.ts",
+      "packages/core/src/core/templates/assets/**/*.md",
+    ]);
   });
 
   it("ships a valid root plugin manifest", async () => {
@@ -29,7 +43,7 @@ describe("openclaw root plugin package metadata", () => {
       uiHints?: unknown;
     };
 
-    expect(manifest.id).toBe("workspace");
+    expect(manifest.id).toBe("openclaw-plugin-pack");
     expect(typeof manifest.name).toBe("string");
     expect(typeof manifest.description).toBe("string");
     expect(manifest.configSchema).toBeTruthy();
@@ -46,7 +60,7 @@ describe("openclaw root plugin package metadata", () => {
       };
     };
 
-    expect(module.default?.id).toBe("workspace");
+    expect(module.default?.id).toBe("openclaw-plugin-pack");
     expect(typeof module.default?.register).toBe("function");
   });
 });

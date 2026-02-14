@@ -1,0 +1,10 @@
+**/*.test.ts
+coverage
+dist
+packages/*/dist
+.pnpm-store
+node_modules
+packages/*/node_modules
+.DS_Store
+*.log
+.env
