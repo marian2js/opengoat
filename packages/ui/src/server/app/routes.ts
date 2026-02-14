@@ -60,6 +60,10 @@ import {
   sanitizeRuntimeProgressChunk,
   truncateProgressLine,
 } from "./text.js";
+import {
+  readWikiPageByPath,
+  updateWikiPageByPath,
+} from "./wiki.js";
 import type {
   CreateAgentOptions,
   DeleteAgentOptions,
@@ -194,6 +198,67 @@ export function registerApiRoutes(
       };
     });
   });
+
+  app.get<{ Querystring: { path?: string } }>(
+    "/api/wiki/page",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const resolved = await readWikiPageByPath(
+          service.getHomeDir(),
+          request.query?.path,
+        );
+        if (!resolved.page) {
+          reply.code(404);
+          return {
+            error: resolved.pages.length
+              ? `Wiki page not found for path "${resolved.requestedPath || "/"}".`
+              : "No wiki markdown files were found.",
+            wikiRoot: resolved.wikiRoot,
+            pages: resolved.pages,
+            requestedPath: resolved.requestedPath,
+          };
+        }
+
+        return resolved;
+      });
+    },
+  );
+
+  app.post<{ Body: { path?: string; content?: string } }>(
+    "/api/wiki/page",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        if (typeof request.body?.content !== "string") {
+          reply.code(400);
+          return {
+            error: "content is required",
+          };
+        }
+
+        const resolved = await updateWikiPageByPath(
+          service.getHomeDir(),
+          request.body?.path,
+          request.body.content,
+        );
+        if (!resolved.page) {
+          reply.code(404);
+          return {
+            error: resolved.pages.length
+              ? `Wiki page not found for path "${resolved.requestedPath || "/"}".`
+              : "No wiki markdown files were found.",
+            wikiRoot: resolved.wikiRoot,
+            pages: resolved.pages,
+            requestedPath: resolved.requestedPath,
+          };
+        }
+
+        return {
+          ...resolved,
+          message: `Wiki page "${resolved.page.path || "/"}" updated.`,
+        };
+      });
+    },
+  );
 
   app.get("/api/settings", async (_request, reply) => {
     return safeReply(reply, async () => {

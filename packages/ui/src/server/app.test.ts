@@ -983,6 +983,116 @@ describe("OpenGoat UI server API", () => {
     expect(renameSession).toHaveBeenCalledTimes(1);
   });
 
+  it("resolves wiki pages recursively and prefers index.md overlaps", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const wikiRoot = path.resolve(uniqueHomeDir, "organization", "wiki");
+    await mkdir(path.resolve(wikiRoot, "foo"), { recursive: true });
+    await writeFile(
+      path.resolve(wikiRoot, "index.md"),
+      "# Root Wiki\n\nWelcome.",
+      "utf8",
+    );
+    await writeFile(
+      path.resolve(wikiRoot, "foo.md"),
+      "# Should Not Win\n",
+      "utf8",
+    );
+    await writeFile(
+      path.resolve(wikiRoot, "foo", "index.md"),
+      "# Nested Index\n",
+      "utf8",
+    );
+    await writeFile(
+      path.resolve(wikiRoot, "foo", "bar.md"),
+      "# Bar Page\n",
+      "utf8",
+    );
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const rootResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/wiki/page",
+    });
+    expect(rootResponse.statusCode).toBe(200);
+    expect(rootResponse.json()).toMatchObject({
+      page: {
+        path: "",
+        title: "Root Wiki",
+        sourcePath: path.resolve(wikiRoot, "index.md"),
+      },
+    });
+    const rootPayload = rootResponse.json() as {
+      pages: Array<{ path: string; sourcePath: string }>;
+    };
+    const fooPage = rootPayload.pages.find((page) => page.path === "foo");
+    expect(fooPage).toMatchObject({
+      path: "foo",
+      sourcePath: path.resolve(wikiRoot, "foo", "index.md"),
+    });
+
+    const nestedResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/wiki/page?path=foo%2Fbar",
+    });
+    expect(nestedResponse.statusCode).toBe(200);
+    expect(nestedResponse.json()).toMatchObject({
+      page: {
+        path: "foo/bar",
+        title: "Bar Page",
+        sourcePath: path.resolve(wikiRoot, "foo", "bar.md"),
+      },
+    });
+
+    const updateResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/wiki/page",
+      payload: {
+        path: "foo/bar",
+        content: "# Bar Updated\n\nBody",
+      },
+    });
+    expect(updateResponse.statusCode).toBe(200);
+    expect(updateResponse.json()).toMatchObject({
+      page: {
+        path: "foo/bar",
+        title: "Bar Updated",
+      },
+    });
+    const updated = await readFile(path.resolve(wikiRoot, "foo", "bar.md"), "utf8");
+    expect(updated).toBe("# Bar Updated\n\nBody");
+  });
+
+  it("returns 404 when a wiki page path is missing", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const wikiRoot = path.resolve(uniqueHomeDir, "organization", "wiki");
+    await mkdir(wikiRoot, { recursive: true });
+    await writeFile(path.resolve(wikiRoot, "index.md"), "# Root Wiki", "utf8");
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/wiki/page?path=missing-page",
+    });
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({
+      error: 'Wiki page not found for path "missing-page".',
+    });
+  });
+
   it("renames and removes workspace entries", async () => {
     const renameSession = vi.fn<NonNullable<OpenClawUiService["renameSession"]>>(async (): Promise<SessionSummary> => {
       return {

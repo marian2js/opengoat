@@ -69,6 +69,7 @@ import {
 } from "@xyflow/react";
 import type { ChatStatus, FileUIPart } from "ai";
 import {
+  BookOpen,
   Boxes,
   ChevronLeft,
   ChevronRight,
@@ -101,6 +102,7 @@ type PageView =
   | "tasks"
   | "agents"
   | "skills"
+  | "wiki"
   | "logs"
   | "settings";
 
@@ -108,6 +110,7 @@ type AppRoute =
   | {
       kind: "page";
       view: PageView;
+      wikiPath?: string;
     }
   | {
       kind: "agent";
@@ -461,6 +464,29 @@ interface SessionChatMessage {
   content: string;
 }
 
+interface WikiPageSummary {
+  path: string;
+  href: string;
+  title: string;
+  sourcePath: string;
+  updatedAt: number;
+}
+
+interface WikiPageContent extends WikiPageSummary {
+  content: string;
+}
+
+interface WikiPageResponse {
+  wikiRoot: string;
+  requestedPath: string;
+  page: WikiPageContent;
+  pages: WikiPageSummary[];
+}
+
+interface WikiPageUpdateResponse extends WikiPageResponse {
+  message?: string;
+}
+
 interface CreateAgentForm {
   name: string;
   role: string;
@@ -555,6 +581,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "tasks", label: "Tasks", icon: Boxes },
   { id: "agents", label: "Agents", icon: UsersRound },
   { id: "skills", label: "Skills", icon: Sparkles },
+  { id: "wiki", label: "Wiki", icon: BookOpen },
   { id: "logs", label: "Logs", icon: TerminalSquare },
 ];
 
@@ -678,6 +705,14 @@ export function App(): ReactElement {
     kind: "worklog",
     content: "",
   });
+  const [wikiPage, setWikiPage] = useState<WikiPageContent | null>(null);
+  const [wikiPages, setWikiPages] = useState<WikiPageSummary[]>([]);
+  const [wikiRootPath, setWikiRootPath] = useState("");
+  const [wikiError, setWikiError] = useState<string | null>(null);
+  const [isWikiLoading, setWikiLoading] = useState(false);
+  const [isWikiEditing, setWikiEditing] = useState(false);
+  const [wikiDraft, setWikiDraft] = useState("");
+  const [isWikiSaving, setWikiSaving] = useState(false);
   const [uiLogs, setUiLogs] = useState<UiLogEntry[]>([]);
   const [logSourceFilters, setLogSourceFilters] = useState<
     Record<UiLogSource, boolean>
@@ -724,6 +759,15 @@ export function App(): ReactElement {
         navigateToRoute({
           kind: "taskWorkspace",
           taskWorkspaceId: "tasks",
+        });
+        return;
+      }
+
+      if (nextView === "wiki") {
+        navigateToRoute({
+          kind: "page",
+          view: "wiki",
+          wikiPath: "",
         });
         return;
       }
@@ -932,6 +976,135 @@ export function App(): ReactElement {
     });
   }, []);
 
+  const activeWikiPath = useMemo(() => {
+    if (route.kind !== "page" || route.view !== "wiki") {
+      return null;
+    }
+    return normalizeWikiPath(route.wikiPath);
+  }, [route]);
+
+  const loadWikiPage = useCallback(
+    async (requestedPath: string): Promise<void> => {
+      setWikiLoading(true);
+      setWikiError(null);
+
+      const params = new URLSearchParams();
+      if (requestedPath) {
+        params.set("path", requestedPath);
+      }
+      const query = params.toString();
+      const endpoint = query ? `/api/wiki/page?${query}` : "/api/wiki/page";
+
+      try {
+        const response = await fetch(endpoint);
+        const payload = (await response.json().catch(() => {
+          return null;
+        })) as
+          | (Partial<WikiPageResponse> & {
+              error?: string;
+              code?: string;
+              pages?: WikiPageSummary[];
+              wikiRoot?: string;
+            })
+          | null;
+
+        if (!response.ok) {
+          if (response.status === 401 && payload?.code === "AUTH_REQUIRED") {
+            dispatchAuthRequiredEvent();
+            setWikiError("Authentication required. Sign in to continue.");
+            return;
+          }
+
+          setWikiPage(null);
+          setWikiPages(Array.isArray(payload?.pages) ? payload.pages : []);
+          setWikiRootPath(
+            typeof payload?.wikiRoot === "string" ? payload.wikiRoot : "",
+          );
+          setWikiError(
+            typeof payload?.error === "string"
+              ? payload.error
+              : `Request failed with ${response.status}`,
+          );
+          return;
+        }
+
+        const parsed = payload as WikiPageResponse;
+        setWikiRootPath(parsed.wikiRoot);
+        setWikiPages(parsed.pages);
+        setWikiPage(parsed.page);
+        setWikiDraft(parsed.page.content);
+        setWikiEditing(false);
+
+        const canonicalPath = normalizeWikiPath(parsed.page.path);
+        if (canonicalPath !== requestedPath) {
+          navigateToRoute({
+            kind: "page",
+            view: "wiki",
+            wikiPath: canonicalPath,
+          });
+        }
+      } catch (requestError) {
+        setWikiPage(null);
+        setWikiPages([]);
+        setWikiRootPath("");
+        setWikiError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Failed to load wiki page.",
+        );
+      } finally {
+        setWikiLoading(false);
+      }
+    },
+    [navigateToRoute],
+  );
+
+  const handleSaveWikiPage = useCallback(async (): Promise<void> => {
+    if (activeWikiPath === null || !wikiPage) {
+      return;
+    }
+
+    setWikiSaving(true);
+    setWikiError(null);
+    try {
+      const response = await fetchJson<WikiPageUpdateResponse>("/api/wiki/page", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          path: activeWikiPath,
+          content: wikiDraft,
+        }),
+      });
+      setWikiRootPath(response.wikiRoot);
+      setWikiPages(response.pages);
+      setWikiPage(response.page);
+      setWikiDraft(response.page.content);
+      setWikiEditing(false);
+
+      const canonicalPath = normalizeWikiPath(response.page.path);
+      if (canonicalPath !== activeWikiPath) {
+        navigateToRoute({
+          kind: "page",
+          view: "wiki",
+          wikiPath: canonicalPath,
+        });
+      }
+
+      toast.success(response.message ?? "Wiki page updated.");
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to update wiki page.";
+      setWikiError(message);
+      toast.error(message);
+    } finally {
+      setWikiSaving(false);
+    }
+  }, [activeWikiPath, navigateToRoute, wikiDraft, wikiPage]);
+
   const loadVersionInfo = useCallback(async () => {
     setVersionLoading(true);
     try {
@@ -1002,6 +1175,13 @@ export function App(): ReactElement {
       // Non-fatal: agent page can still render and allow new messages.
     });
   }, [route, sessionsByAgentId, refreshSessions]);
+
+  useEffect(() => {
+    if (activeWikiPath === null) {
+      return;
+    }
+    void loadWikiPage(activeWikiPath);
+  }, [activeWikiPath, loadWikiPage]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1326,6 +1506,12 @@ export function App(): ReactElement {
     }
     return resolveTaskProjectLabel(selectedSession.projectPath);
   }, [route, selectedSession, resolveTaskProjectLabel]);
+  const selectedWikiTitle = useMemo(() => {
+    if (route.kind !== "page" || route.view !== "wiki") {
+      return null;
+    }
+    return wikiPage?.title ?? deriveWikiTitle(route.wikiPath);
+  }, [route, wikiPage]);
 
   const activeChatContext = useMemo(() => {
     if (route.kind === "session" && selectedSession) {
@@ -3807,7 +3993,9 @@ export function App(): ReactElement {
                       "font-semibold tracking-tight text-xl sm:text-2xl",
                     )}
                   >
-                    {viewTitle(route, selectedSession, selectedTaskWorkspace)}
+                    {route.kind === "page" && route.view === "wiki"
+                      ? selectedWikiTitle
+                      : viewTitle(route, selectedSession, selectedTaskWorkspace)}
                   </h1>
                 </div>
               )}
@@ -3902,6 +4090,48 @@ export function App(): ReactElement {
                 >
                   Create Task
                 </Button>
+              ) : null}
+
+              {route.kind === "page" && route.view === "wiki" ? (
+                <div className="flex items-center gap-2">
+                  {isWikiEditing ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={isWikiSaving}
+                      onClick={() => {
+                        setWikiEditing(false);
+                        setWikiDraft(wikiPage?.content ?? "");
+                        setWikiError(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (isWikiEditing) {
+                        void handleSaveWikiPage();
+                        return;
+                      }
+                      setWikiDraft(wikiPage?.content ?? "");
+                      setWikiEditing(true);
+                      setWikiError(null);
+                    }}
+                    disabled={
+                      isWikiLoading ||
+                      isWikiSaving ||
+                      (!isWikiEditing && !wikiPage)
+                    }
+                  >
+                    {isWikiEditing
+                      ? isWikiSaving
+                        ? "Saving..."
+                        : "Save Update"
+                      : "Update"}
+                  </Button>
+                </div>
               ) : null}
             </div>
           </header>
@@ -4988,6 +5218,99 @@ export function App(): ReactElement {
                     liveAssignedSkillsCount={state.agentSkills.skills.length}
                     liveGlobalSkillsCount={state.globalSkills.skills.length}
                   />
+                ) : null}
+
+                {route.kind === "page" && route.view === "wiki" ? (
+                  <section className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+                    <aside className="space-y-2 rounded-xl border border-border/70 bg-card/40 p-3">
+                      <p className="px-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                        Wiki Pages
+                      </p>
+                      {wikiPages.length === 0 ? (
+                        <p className="px-1 text-sm text-muted-foreground">
+                          No wiki pages found.
+                        </p>
+                      ) : (
+                        <div className="space-y-1">
+                          {wikiPages.map((page) => {
+                            const activePath = normalizeWikiPath(page.path);
+                            const isActive = activePath === activeWikiPath;
+                            return (
+                              <button
+                                key={page.path || "wiki-root"}
+                                type="button"
+                                title={page.href}
+                                onClick={() => {
+                                  navigateToRoute({
+                                    kind: "page",
+                                    view: "wiki",
+                                    wikiPath: activePath,
+                                  });
+                                }}
+                                className={cn(
+                                  "block w-full truncate rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                                  isActive
+                                    ? "bg-accent text-foreground"
+                                    : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                                )}
+                              >
+                                {page.title}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </aside>
+
+                    <div className="space-y-3">
+                      {wikiError ? (
+                        <Card className="border-danger/40 bg-danger/5">
+                          <CardContent className="pt-5">
+                            <p className="text-sm text-danger">{wikiError}</p>
+                          </CardContent>
+                        </Card>
+                      ) : null}
+
+                      <div className="overflow-hidden rounded-xl border border-border/70 bg-card/30">
+                        {isWikiLoading ? (
+                          <div className="px-4 py-8 text-sm text-muted-foreground">
+                            Loading wiki page...
+                          </div>
+                        ) : !wikiPage ? (
+                          <div className="px-4 py-8 text-sm text-muted-foreground">
+                            Select a wiki page to continue.
+                          </div>
+                        ) : isWikiEditing ? (
+                          <div className="p-4">
+                            <textarea
+                              className="min-h-[60vh] w-full rounded-md border border-border bg-background px-3 py-2 text-sm leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                              value={wikiDraft}
+                              onChange={(event) => {
+                                setWikiDraft(event.target.value);
+                              }}
+                              placeholder="Write markdown..."
+                            />
+                          </div>
+                        ) : (
+                          <div className="p-4">
+                            <MessageResponse className="space-y-4 leading-7">
+                              {wikiPage.content || "_This page is empty._"}
+                            </MessageResponse>
+                          </div>
+                        )}
+                      </div>
+
+                      {wikiPage ? (
+                        <p className="text-xs text-muted-foreground">
+                          Source: {wikiPage.sourcePath}
+                        </p>
+                      ) : wikiRootPath ? (
+                        <p className="text-xs text-muted-foreground">
+                          Wiki root: {wikiRootPath}
+                        </p>
+                      ) : null}
+                    </div>
+                  </section>
                 ) : null}
 
                 {route.kind === "page" && route.view === "logs" ? (
@@ -6388,6 +6711,8 @@ function viewTitle(
       return "Agents";
     case "skills":
       return "Skills";
+    case "wiki":
+      return "Wiki";
     case "logs":
       return "Logs";
     case "settings":
@@ -6456,6 +6781,21 @@ function parseRoute(pathname: string): AppRoute {
     return { kind: "page", view: "skills" };
   }
 
+  if (normalized === "/wiki") {
+    return { kind: "page", view: "wiki", wikiPath: "" };
+  }
+
+  if (normalized.startsWith("/wiki/")) {
+    const wikiPath = normalizeWikiPath(
+      decodeURIComponent(normalized.slice("/wiki/".length)),
+    );
+    return {
+      kind: "page",
+      view: "wiki",
+      wikiPath,
+    };
+  }
+
   if (normalized === "/logs") {
     return { kind: "page", view: "logs" };
   }
@@ -6495,11 +6835,67 @@ function routeToPath(route: AppRoute): string {
     return `/tasks/${encodeURIComponent(route.taskWorkspaceId)}`;
   }
 
+  if (route.view === "wiki") {
+    const wikiPath = normalizeWikiPath(route.wikiPath);
+    if (!wikiPath) {
+      return "/wiki";
+    }
+    return `/wiki/${wikiPath
+      .split("/")
+      .map((segment) => encodeURIComponent(segment))
+      .join("/")}`;
+  }
+
   if (route.view === "overview") {
     return "/dashboard";
   }
 
   return `/${route.view}`;
+}
+
+function normalizeWikiPath(value: string | undefined): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed || trimmed === "/") {
+    return "";
+  }
+
+  const normalized = trimmed
+    .replace(/\\/g, "/")
+    .replace(/^\/+|\/+$/g, "");
+  if (!normalized) {
+    return "";
+  }
+
+  const segments = normalized.split("/").map((segment) => segment.trim());
+  if (
+    segments.length === 0 ||
+    segments.some(
+      (segment) => !segment || segment === "." || segment === "..",
+    )
+  ) {
+    return "";
+  }
+
+  return segments.join("/");
+}
+
+function deriveWikiTitle(wikiPath: string | undefined): string {
+  const normalized = normalizeWikiPath(wikiPath);
+  if (!normalized) {
+    return "Wiki";
+  }
+
+  const lastSegment = normalized.split("/").pop() ?? "";
+  if (!lastSegment) {
+    return "Wiki";
+  }
+
+  return lastSegment
+    .replace(/[-_]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function normalizePathForComparison(pathname: string | undefined): string {
