@@ -31,9 +31,21 @@ importers:
       '@clack/prompts':
         specifier: ^1.0.0
         version: 1.0.0
+      '@fastify/cors':
+        specifier: ^11.0.1
+        version: 11.2.0
+      '@fastify/middie':
+        specifier: ^9.0.3
+        version: 9.1.0
+      '@fastify/static':
+        specifier: ^8.3.0
+        version: 8.3.0
       '@opengoat/core':
         specifier: workspace:*
         version: link:../core
+      fastify:
+        specifier: ^5.6.1
+        version: 5.7.4
     devDependencies:
       '@types/node':
         specifier: ^22.13.4
