@@ -1,7 +1,8 @@
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
 import { InvalidProviderConfigError, ProviderService } from "../../packages/core/src/core/providers/index.js";
+import * as commandExecutor from "../../packages/core/src/core/providers/command-executor.js";
 import { ProviderRegistry } from "../../packages/core/src/core/providers/registry.js";
 import type {
   Provider,
@@ -17,6 +18,7 @@ import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 const roots: string[] = [];
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   while (roots.length > 0) {
     const root = roots.pop();
     if (root) {
@@ -134,6 +136,43 @@ describe("ProviderService (OpenClaw runtime)", () => {
 
     expect(provider.lastCreate?.agentId).toBe("developer");
     expect(provider.lastDelete?.agentId).toBe("developer");
+  });
+
+  it("restarts local gateway and retries invoke when uv_cwd failure is returned", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+    const { paths, fileSystem } = await createPaths(root);
+    await seedAgent(fileSystem, paths, "ceo");
+
+    const provider = new FlakyUvCwdProvider();
+    const service = createProviderService(fileSystem, createRegistry(provider));
+
+    const executeCommandSpy = vi
+      .spyOn(commandExecutor, "executeCommand")
+      .mockResolvedValue({
+        code: 0,
+        stdout: "{\"ok\":true}",
+        stderr: ""
+      });
+
+    const result = await service.invokeAgent(paths, "ceo", {
+      message: "hello",
+      cwd: "/tmp",
+      env: {
+        OPENCLAW_CMD: "openclaw",
+        OPENCLAW_ARGUMENTS: "--profile team-a"
+      }
+    });
+
+    expect(result.code).toBe(0);
+    expect(provider.invokeCalls).toBe(2);
+    expect(executeCommandSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "openclaw",
+        args: ["--profile", "team-a", "gateway", "restart", "--json"],
+        cwd: paths.homeDir
+      })
+    );
   });
 });
 
@@ -258,6 +297,28 @@ class FakeOpenClawProvider implements Provider {
     return {
       code: 0,
       stdout: "deleted\n",
+      stderr: ""
+    };
+  }
+}
+
+class FlakyUvCwdProvider extends FakeOpenClawProvider {
+  public invokeCalls = 0;
+
+  public override async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
+    this.lastInvoke = options;
+    this.invokeCalls += 1;
+    if (this.invokeCalls === 1) {
+      return {
+        code: 1,
+        stdout: "",
+        stderr:
+          "Gateway call failed: Error: Error: EPERM: process.cwd failed with error operation not permitted, uv_cwd"
+      };
+    }
+    return {
+      code: 0,
+      stdout: "ok\n",
       stderr: ""
     };
   }

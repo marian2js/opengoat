@@ -2,10 +2,12 @@ import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
+import { executeCommand } from "../command-executor.js";
 import {
   InvalidProviderConfigError,
   UnsupportedProviderActionError,
   type AgentProviderBinding,
+  type Provider,
   type ProviderAuthOptions,
   type ProviderCreateAgentOptions,
   type ProviderDeleteAgentOptions,
@@ -266,7 +268,8 @@ export class ProviderService {
       providerId: provider.id
     });
 
-    const result = await provider.invoke(invokeOptions);
+    let result = await provider.invoke(invokeOptions);
+    result = await this.retryGatewayInvocationOnUvCwdFailure(paths, provider, invokeOptions, result);
 
     runtimeContext.hooks?.onInvocationCompleted?.({
       runId: runtimeContext.runId,
@@ -373,6 +376,46 @@ export class ProviderService {
     };
   }
 
+  private async retryGatewayInvocationOnUvCwdFailure(
+    paths: OpenGoatPaths,
+    provider: Provider,
+    invokeOptions: ProviderInvokeOptions,
+    result: ProviderExecutionResult
+  ): Promise<ProviderExecutionResult> {
+    if (!isGatewayUvCwdFailure(result)) {
+      return result;
+    }
+
+    const gatewayConfig = await this.getOpenClawGatewayConfig(paths, invokeOptions.env);
+    if (gatewayConfig.mode !== "local") {
+      return result;
+    }
+
+    const command = gatewayConfig.command?.trim() || "openclaw";
+    const args = [
+      ...extractOpenClawGlobalArgs(invokeOptions.env?.OPENCLAW_ARGUMENTS),
+      "gateway",
+      "restart",
+      "--json"
+    ];
+    const restartResult = await executeCommand({
+      command,
+      args,
+      cwd: paths.homeDir,
+      env: invokeOptions.env
+    });
+    if (restartResult.code !== 0) {
+      this.logger.warn("OpenClaw gateway restart failed after uv_cwd error.", {
+        code: restartResult.code,
+        stderr: restartResult.stderr.trim() || undefined
+      });
+      return result;
+    }
+
+    this.logger.warn("OpenClaw gateway restarted after uv_cwd error; retrying provider invocation.");
+    return provider.invoke(invokeOptions);
+  }
+
   private getProviderRegistry(): Promise<ProviderRegistry> {
     if (!this.providerRegistryPromise) {
       this.providerRegistryPromise = this.resolveProviderRegistry(this.providerRegistryInput);
@@ -452,6 +495,41 @@ function parseOpenClawArguments(raw: string): { remoteUrl?: string; token?: stri
     remoteUrl: remoteIndex >= 0 ? parts[remoteIndex + 1] : undefined,
     token: tokenIndex >= 0 ? parts[tokenIndex + 1] : undefined
   };
+}
+
+function isGatewayUvCwdFailure(result: ProviderExecutionResult): boolean {
+  if (result.code === 0) {
+    return false;
+  }
+  const details = `${result.stderr}\n${result.stdout}`.toLowerCase();
+  return details.includes("process.cwd failed") && details.includes("uv_cwd");
+}
+
+function extractOpenClawGlobalArgs(raw: string | undefined): string[] {
+  const parts = (raw ?? "")
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const result: string[] = [];
+
+  for (let index = 0; index < parts.length; index += 1) {
+    const token = parts[index];
+    if (!token) {
+      continue;
+    }
+
+    if (token === "--remote" || token === "--token") {
+      const next = parts[index + 1];
+      if (next && !next.startsWith("--")) {
+        index += 1;
+      }
+      continue;
+    }
+
+    result.push(token);
+  }
+
+  return result;
 }
 
 function assertOpenClawProviderId(providerId: string): void {
