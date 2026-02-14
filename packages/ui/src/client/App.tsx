@@ -3249,6 +3249,30 @@ export function App(): ReactElement {
                 </Button>
               ) : null}
 
+              {route.kind === "page" && route.view === "overview" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigateToRoute({
+                      kind: "page",
+                      view: "settings",
+                    });
+                  }}
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
+                    (state?.settings.taskCronEnabled ?? taskCronEnabledInput)
+                      ? "border-success/50 bg-success/15 text-success hover:bg-success/20"
+                      : "border-danger/50 bg-danger/15 text-danger hover:bg-danger/20",
+                  )}
+                  title="Open settings"
+                  aria-label="Open settings"
+                >
+                  {(state?.settings.taskCronEnabled ?? taskCronEnabledInput)
+                    ? "Running"
+                    : "Stopped"}
+                </button>
+              ) : null}
+
               {route.kind === "agent" ? (
                 <div className="flex min-w-[220px] items-center gap-2">
                   <label
