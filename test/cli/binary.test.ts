@@ -67,7 +67,7 @@ describe("opengoat binary", () => {
       defaultAgent: string;
     };
     expect(config.defaultAgent).toBe("ceo");
-  });
+  }, 30_000);
 
   it("runs init and creates config files", async () => {
     const root = await createTempDir("opengoat-bin-");

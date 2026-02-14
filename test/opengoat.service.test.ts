@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { access, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -781,6 +781,135 @@ describe("OpenGoatService", () => {
           request.args[1] === "set" &&
           request.args[2] === "agents.list[0].tools.allow" &&
           request.args[3] === "[\"*\"]",
+      ),
+    ).toBe(true);
+  });
+
+  it("configures OpenClaw plugin source path and enables the OpenGoat plugin", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const pluginSourceDir = path.join(root, "plugin-src");
+    await mkdir(pluginSourceDir, { recursive: true });
+    await writeFile(
+      path.join(pluginSourceDir, "openclaw.plugin.json"),
+      "{}\n",
+      "utf-8",
+    );
+
+    const originalPluginPath = process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH;
+    process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH = pluginSourceDir;
+
+    const commandRunner = new FakeCommandRunner(async (request) => {
+      if (
+        request.args[0] === "skills" &&
+        request.args[1] === "list" &&
+        request.args.includes("--json")
+      ) {
+        return {
+          code: 0,
+          stdout: JSON.stringify({
+            workspaceDir: path.join(root, "openclaw-workspace"),
+            managedSkillsDir: path.join(root, "openclaw-managed-skills"),
+            skills: [],
+          }),
+          stderr: "",
+        };
+      }
+      if (
+        request.args[0] === "agents" &&
+        request.args[1] === "list" &&
+        request.args.includes("--json")
+      ) {
+        return {
+          code: 0,
+          stdout: JSON.stringify([
+            {
+              id: "ceo",
+              workspace: path.join(root, "workspaces", "ceo"),
+              agentDir: path.join(root, "agents", "ceo"),
+            },
+          ]),
+          stderr: "",
+        };
+      }
+      if (
+        request.args[0] === "config" &&
+        request.args[1] === "get" &&
+        request.args[2] === "agents.list"
+      ) {
+        return {
+          code: 0,
+          stdout: JSON.stringify([
+            {
+              id: "ceo",
+              workspace: path.join(root, "workspaces", "ceo"),
+              agentDir: path.join(root, "agents", "ceo"),
+            },
+          ]),
+          stderr: "",
+        };
+      }
+      if (
+        request.args[0] === "config" &&
+        request.args[1] === "get" &&
+        request.args[2] === "plugins.load.paths"
+      ) {
+        return {
+          code: 1,
+          stdout: "",
+          stderr: "Config path not found: plugins.load.paths",
+        };
+      }
+      if (
+        request.args[0] === "config" &&
+        request.args[1] === "set"
+      ) {
+        return {
+          code: 0,
+          stdout: "",
+          stderr: "",
+        };
+      }
+
+      return {
+        code: 0,
+        stdout: "",
+        stderr: "",
+      };
+    });
+
+    try {
+      const { service } = createService(
+        root,
+        new FakeOpenClawProvider(),
+        commandRunner,
+      );
+      await service.initialize();
+    } finally {
+      if (originalPluginPath === undefined) {
+        delete process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH;
+      } else {
+        process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH = originalPluginPath;
+      }
+    }
+
+    expect(
+      commandRunner.requests.some(
+        (request) =>
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
+          request.args[2] === "plugins.load.paths" &&
+          request.args[3] === JSON.stringify([pluginSourceDir]),
+      ),
+    ).toBe(true);
+    expect(
+      commandRunner.requests.some(
+        (request) =>
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
+          request.args[2] === "plugins.entries.openclaw-plugin.enabled" &&
+          request.args[3] === "true",
       ),
     ).toBe(true);
   });

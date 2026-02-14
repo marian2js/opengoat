@@ -1,4 +1,4 @@
-import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../../core/src/index.js";
+const DEFAULT_AGENT_ID = "ceo";
 
 export function readOptionalString(
   params: Record<string, unknown>,
@@ -94,4 +94,12 @@ export function asRecord(value: unknown): Record<string, unknown> {
     return {};
   }
   return value as Record<string, unknown>;
+}
+
+function normalizeAgentId(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }

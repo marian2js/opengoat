@@ -48,6 +48,7 @@ import {
   ProviderCommandNotFoundError,
   createDefaultProviderRegistry,
 } from "../../providers/index.js";
+import { dirname, resolve as resolvePath } from "node:path";
 import {
   SessionService,
   type AgentLastAction,
@@ -101,6 +102,7 @@ const OPENCLAW_PROVIDER_ID = "openclaw";
 const OPENCLAW_DEFAULT_AGENT_ID = "main";
 const OPENCLAW_AGENT_SANDBOX_MODE = "off";
 const OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON = "[\"*\"]";
+const OPENCLAW_OPENGOAT_PLUGIN_ID = "openclaw-plugin";
 
 export interface RuntimeDefaultsSyncResult {
   ceoSyncCode?: number;
@@ -431,6 +433,14 @@ export class OpenGoatService {
     } catch (error) {
       warnings.push(
         `OpenClaw agent policy sync failed: ${toErrorMessage(error)}`,
+      );
+    }
+
+    try {
+      warnings.push(...(await this.ensureOpenGoatPluginToolsRegistered(paths)));
+    } catch (error) {
+      warnings.push(
+        `OpenClaw plugin tool sync failed: ${toErrorMessage(error)}`,
       );
     }
 
@@ -1729,6 +1739,108 @@ export class OpenGoatService {
     return warnings;
   }
 
+  private async ensureOpenGoatPluginToolsRegistered(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+  ): Promise<string[]> {
+    if (!this.commandRunner) {
+      return [];
+    }
+
+    const warnings: string[] = [];
+    const env = await this.resolveOpenClawEnv(paths);
+    const pluginSourcePath = await this.resolveOpenGoatPluginSourcePath();
+    if (!pluginSourcePath) {
+      warnings.push(
+        "OpenClaw OpenGoat plugin source path was not found; OpenGoat tools may be unavailable to agents.",
+      );
+      return warnings;
+    }
+
+    warnings.push(
+      ...(await this.configureOpenClawPluginSourcePath(env, pluginSourcePath)),
+    );
+    return warnings;
+  }
+
+  private async resolveOpenGoatPluginSourcePath(): Promise<string | undefined> {
+    const explicit = process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH?.trim();
+    const argvEntry = process.argv[1]?.trim();
+    const argvDir = argvEntry ? dirname(resolvePath(argvEntry)) : undefined;
+    const candidates = dedupeStrings([
+      explicit,
+      resolvePath(process.cwd(), "packages", "openclaw-plugin"),
+      resolvePath(process.cwd(), "dist", "openclaw-plugin"),
+      resolvePath(process.cwd(), "node_modules", "@opengoat", "openclaw-plugin"),
+      argvDir ? resolvePath(argvDir, "..", "dist", "openclaw-plugin") : undefined,
+      argvDir
+        ? resolvePath(argvDir, "..", "node_modules", "@opengoat", "openclaw-plugin")
+        : undefined,
+      argvDir
+        ? resolvePath(argvDir, "..", "..", "@opengoat", "openclaw-plugin")
+        : undefined,
+    ]);
+
+    for (const candidate of candidates) {
+      const pluginManifestPath = this.pathPort.join(
+        candidate,
+        "openclaw.plugin.json",
+      );
+      if (await this.fileSystem.exists(pluginManifestPath)) {
+        return candidate;
+      }
+    }
+
+    return undefined;
+  }
+
+  private async configureOpenClawPluginSourcePath(
+    env: NodeJS.ProcessEnv,
+    pluginSourcePath: string,
+  ): Promise<string[]> {
+    const warnings: string[] = [];
+
+    const currentPathsResult = await this.runOpenClaw(
+      ["config", "get", "plugins.load.paths"],
+      { env },
+    );
+    const currentPaths =
+      currentPathsResult.code === 0
+        ? readStringArray(parseLooseJson(currentPathsResult.stdout))
+        : [];
+    const mergedPaths = dedupeStrings([
+      pluginSourcePath,
+      ...currentPaths,
+    ]);
+
+    if (!containsPath(currentPaths, pluginSourcePath)) {
+      const setPaths = await this.runOpenClaw(
+        ["config", "set", "plugins.load.paths", JSON.stringify(mergedPaths)],
+        { env },
+      );
+      if (setPaths.code !== 0) {
+        warnings.push(
+          `OpenClaw plugin source path update failed (code ${setPaths.code}). ${
+            setPaths.stderr.trim() || setPaths.stdout.trim() || ""
+          }`.trim(),
+        );
+      }
+    }
+
+    const enablePlugin = await this.runOpenClaw(
+      ["config", "set", `plugins.entries.${OPENCLAW_OPENGOAT_PLUGIN_ID}.enabled`, "true"],
+      { env },
+    );
+    if (enablePlugin.code !== 0) {
+      warnings.push(
+        `OpenClaw plugin enable failed (code ${enablePlugin.code}). ${
+          enablePlugin.stderr.trim() || enablePlugin.stdout.trim() || ""
+        }`.trim(),
+      );
+    }
+
+    return warnings;
+  }
+
   private async resolveOpenClawEnv(
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
   ): Promise<NodeJS.ProcessEnv> {
@@ -1848,4 +1960,69 @@ function hasAgentToolsAllowAll(entry: Record<string, unknown>): boolean {
   return allow.some(
     (value) => typeof value === "string" && value.trim() === "*",
   );
+}
+
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter((entry) => entry.length > 0);
+}
+
+function parseLooseJson(raw: string): unknown {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    // continue
+  }
+
+  const starts = dedupeNumbers([
+    trimmed.indexOf("{"),
+    trimmed.indexOf("["),
+    trimmed.lastIndexOf("{"),
+    trimmed.lastIndexOf("["),
+  ]).filter((index) => index >= 0);
+
+  for (const startIndex of starts) {
+    const candidate = trimmed.slice(startIndex).trim();
+    if (!candidate) {
+      continue;
+    }
+    try {
+      return JSON.parse(candidate) as unknown;
+    } catch {
+      // keep trying candidates
+    }
+  }
+
+  return undefined;
+}
+
+function dedupeNumbers(values: number[]): number[] {
+  return [...new Set(values)];
+}
+
+function dedupeStrings(values: Array<string | undefined>): string[] {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (!trimmed || seen.has(trimmed)) {
+      continue;
+    }
+    seen.add(trimmed);
+    deduped.push(trimmed);
+  }
+  return deduped;
+}
+
+function containsPath(paths: readonly string[], candidatePath: string): boolean {
+  return paths.some((entry) => pathMatches(entry, candidatePath));
 }
