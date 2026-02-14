@@ -1,10 +1,4 @@
-import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const CWD = process.cwd();
@@ -12,14 +6,6 @@ const CHANGESET_DIR = join(CWD, ".changeset");
 const CLI_PACKAGE_JSON_PATH = join(CWD, "packages", "cli", "package.json");
 const CORE_PACKAGE_JSON_PATH = join(CWD, "packages", "core", "package.json");
 const CHANGELOG_PATH = join(CWD, "CHANGELOG.md");
-
-function getCalVer() {
-  const date = new Date();
-  const y = date.getFullYear();
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
-  return `${y}.${m}.${d}`;
-}
 
 function run() {
   // 1. Check for changesets
@@ -40,25 +26,20 @@ function run() {
   const month = date.getMonth() + 1;
   const day = date.getDate();
   const todayVer = `${year}.${month}.${day}`;
-
   let nextVer = todayVer;
-
-  // Check if we need to bump the patch beyond today's date
-  if (cliPkg.version) {
-    const [pkgMajor, pkgMinor, pkgPatch] = cliPkg.version
-      .split(".")
-      .map(Number);
-
-    // If we are in the same Year.Month
-    if (pkgMajor === year && pkgMinor === month) {
-      if (pkgPatch >= day) {
-        // If the package is already at today's "day" or ahead (due to multiple releases),
-        // we just increment the patch.
-        nextVer = `${year}.${month}.${pkgPatch + 1}`;
-      }
-      // Else: pkgPatch < day, so we jump correctly to todayVer (e.g. 13 -> 14)
+  const parsedCurrent = parseCalVer(cliPkg.version);
+  if (parsedCurrent) {
+    const currentDateStamp = dateStamp(parsedCurrent.year, parsedCurrent.month, parsedCurrent.day);
+    const todayDateStamp = dateStamp(year, month, day);
+    if (currentDateStamp > todayDateStamp) {
+      nextVer = toCalVer(parsedCurrent, (parsedCurrent.suffix ?? 1) + 1);
+    } else if (
+      parsedCurrent.year === year &&
+      parsedCurrent.month === month &&
+      parsedCurrent.day === day
+    ) {
+      nextVer = `${todayVer}-${(parsedCurrent.suffix ?? 1) + 1}`;
     }
-    // Else: Different month/year, reset to todayVer
   }
 
   console.log(
@@ -114,6 +95,40 @@ function run() {
   }
 
   console.log(`Version ${nextVer} applied and changesets consumed.`);
+}
+
+function parseCalVer(version) {
+  if (typeof version !== "string") {
+    return undefined;
+  }
+  const match = version.trim().match(/^(\d{4})\.(\d{1,2})\.(\d{1,2})(?:-(\d+))?$/);
+  if (!match) {
+    return undefined;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const suffix = match[4] ? Number(match[4]) : undefined;
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return undefined;
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return undefined;
+  }
+  if (suffix !== undefined && (!Number.isInteger(suffix) || suffix < 2)) {
+    return undefined;
+  }
+  return { year, month, day, suffix };
+}
+
+function dateStamp(year, month, day) {
+  return year * 10000 + month * 100 + day;
+}
+
+function toCalVer(parts, suffix) {
+  const base = `${parts.year}.${parts.month}.${parts.day}`;
+  return suffix ? `${base}-${suffix}` : base;
 }
 
 run();
