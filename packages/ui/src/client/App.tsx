@@ -3360,8 +3360,8 @@ export function App(): ReactElement {
                   aria-label="Open settings"
                 >
                   {state?.settings.taskCronEnabled ?? taskCronEnabledInput
-                    ? "Automation On"
-                    : "Automation Off"}
+                    ? "Running"
+                    : "Stopped"}
                 </button>
               ) : null}
 
