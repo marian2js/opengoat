@@ -1434,7 +1434,6 @@ function registerApiRoutes(
       });
     };
 
-    writeProgress("queued", "Queued request.");
     deps.logs.append({
       timestamp: new Date().toISOString(),
       level: "info",

@@ -4316,7 +4316,7 @@ export function App(): ReactElement {
                                       <MessageContent className="w-full max-w-full bg-transparent px-0 py-0">
                                         <Reasoning
                                           autoCloseOnFinish={false}
-                                          defaultOpen
+                                          defaultOpen={false}
                                           isStreaming={
                                             sessionChatStatus === "streaming"
                                           }
@@ -4349,7 +4349,7 @@ export function App(): ReactElement {
                                   <MessageContent className="w-full max-w-full bg-transparent px-0 py-0">
                                     <Reasoning
                                       autoCloseOnFinish={false}
-                                      defaultOpen
+                                      defaultOpen={false}
                                       isStreaming={
                                         sessionChatStatus === "streaming"
                                       }
