@@ -530,6 +530,7 @@ const LOG_FLUSH_INTERVAL_MS = 100;
 const LOG_AUTOSCROLL_BOTTOM_THRESHOLD_PX = 24;
 const TASK_AUTO_REFRESH_INTERVAL_MS = 10_000;
 const TASK_AUTO_REFRESH_HIDDEN_INTERVAL_MS = 30_000;
+const MAX_VISIBLE_WORKSPACE_SESSIONS = 10;
 const TASK_STATUS_OPTIONS = [
   { value: "todo", label: "To do" },
   { value: "doing", label: "In progress" },
@@ -604,6 +605,8 @@ export function App(): ReactElement {
   const [collapsedWorkspaceIds, setCollapsedWorkspaceIds] = useState<
     Set<string>
   >(() => new Set());
+  const [expandedWorkspaceSessionIds, setExpandedWorkspaceSessionIds] =
+    useState<Set<string>>(() => new Set());
   const [sessionChatStatus, setSessionChatStatus] =
     useState<ChatStatus>("ready");
   const [sessionMessagesById, setSessionMessagesById] = useState<
@@ -1639,6 +1642,22 @@ export function App(): ReactElement {
 
   useEffect(() => {
     setCollapsedWorkspaceIds((current) => {
+      const validIds = new Set(workspaceNodes.map((workspace) => workspace.id));
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of current) {
+        if (validIds.has(id)) {
+          next.add(id);
+          continue;
+        }
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [workspaceNodes]);
+
+  useEffect(() => {
+    setExpandedWorkspaceSessionIds((current) => {
       const validIds = new Set(workspaceNodes.map((workspace) => workspace.id));
       let changed = false;
       const next = new Set<string>();
@@ -3544,6 +3563,13 @@ export function App(): ReactElement {
               const isWorkspaceCollapsed = collapsedWorkspaceIds.has(
                 workspace.id,
               );
+              const isWorkspaceSessionsExpanded =
+                expandedWorkspaceSessionIds.has(workspace.id);
+              const hasHiddenWorkspaceSessions =
+                workspace.sessions.length > MAX_VISIBLE_WORKSPACE_SESSIONS;
+              const visibleWorkspaceSessions = isWorkspaceSessionsExpanded
+                ? workspace.sessions
+                : workspace.sessions.slice(0, MAX_VISIBLE_WORKSPACE_SESSIONS);
               const canManageWorkspace = Boolean(workspace.projectSessionKey);
               const FolderIcon = isWorkspaceCollapsed ? Folder : FolderOpen;
 
@@ -3658,7 +3684,7 @@ export function App(): ReactElement {
 
                   {!isSidebarCollapsed && !isWorkspaceCollapsed ? (
                     <div className="mt-0.5 space-y-0.5">
-                      {workspace.sessions.map((session) => (
+                      {visibleWorkspaceSessions.map((session) => (
                         <div
                           key={session.sessionId}
                           className="group/session relative"
@@ -3673,7 +3699,7 @@ export function App(): ReactElement {
                               });
                               setOpenWorkspaceMenuId(null);
                             }}
-                            className="flex w-full items-center rounded-md py-1.5 pl-9 pr-8 text-left text-sm text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                            className="flex w-full items-center rounded-md py-1 pl-9 pr-8 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
                           >
                             <span
                               className="mr-2 inline-block size-2 shrink-0"
@@ -3733,6 +3759,28 @@ export function App(): ReactElement {
                           ) : null}
                         </div>
                       ))}
+                      {hasHiddenWorkspaceSessions ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setExpandedWorkspaceSessionIds((current) => {
+                              const next = new Set(current);
+                              if (next.has(workspace.id)) {
+                                next.delete(workspace.id);
+                              } else {
+                                next.add(workspace.id);
+                              }
+                              return next;
+                            });
+                            setOpenSessionMenuId(null);
+                          }}
+                          className="w-full rounded-md py-1 pl-11 pr-2 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                        >
+                          {isWorkspaceSessionsExpanded
+                            ? "Show less"
+                            : `Show more (${workspace.sessions.length - MAX_VISIBLE_WORKSPACE_SESSIONS})`}
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
