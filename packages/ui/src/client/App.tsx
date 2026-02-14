@@ -592,6 +592,12 @@ export function App(): ReactElement {
     content: "",
   });
   const [uiLogs, setUiLogs] = useState<UiLogEntry[]>([]);
+  const [logSourceFilters, setLogSourceFilters] = useState<
+    Record<UiLogSource, boolean>
+  >({
+    opengoat: true,
+    openclaw: false,
+  });
   const [logsConnectionState, setLogsConnectionState] = useState<
     "connecting" | "live" | "offline"
   >("connecting");
@@ -2760,6 +2766,10 @@ export function App(): ReactElement {
     [scheduleUiLogFlush],
   );
 
+  const filteredUiLogs = useMemo(() => {
+    return uiLogs.filter((entry) => logSourceFilters[entry.source]);
+  }, [logSourceFilters, uiLogs]);
+
   const handleLogsViewportScroll = useCallback(() => {
     const viewport = logsViewportRef.current;
     if (!viewport) {
@@ -2783,7 +2793,7 @@ export function App(): ReactElement {
       return;
     }
     viewport.scrollTop = viewport.scrollHeight;
-  }, [logsAutoScrollEnabled, uiLogs.length]);
+  }, [filteredUiLogs.length, logsAutoScrollEnabled]);
 
   useEffect(() => {
     return () => {
@@ -4429,7 +4439,38 @@ export function App(): ReactElement {
                       <p className="text-sm text-muted-foreground">
                         Real-time runtime activity from OpenGoat and OpenClaw.
                       </p>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-[#041004] px-2 py-1 text-[11px]">
+                          <span className="uppercase tracking-wide text-emerald-300/80">
+                            Sources
+                          </span>
+                          <label className="inline-flex items-center gap-1.5 text-emerald-100">
+                            <Checkbox
+                              checked={logSourceFilters.opengoat}
+                              onCheckedChange={(checked) => {
+                                setLogSourceFilters((current) => ({
+                                  ...current,
+                                  opengoat: checked === true,
+                                }));
+                              }}
+                              aria-label="Show OpenGoat logs"
+                            />
+                            <span>OpenGoat</span>
+                          </label>
+                          <label className="inline-flex items-center gap-1.5 text-emerald-100">
+                            <Checkbox
+                              checked={logSourceFilters.openclaw}
+                              onCheckedChange={(checked) => {
+                                setLogSourceFilters((current) => ({
+                                  ...current,
+                                  openclaw: checked === true,
+                                }));
+                              }}
+                              aria-label="Show OpenClaw logs"
+                            />
+                            <span>OpenClaw</span>
+                          </label>
+                        </div>
                         <span
                           className={cn(
                             "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide",
@@ -4472,7 +4513,7 @@ export function App(): ReactElement {
                     <div className="overflow-hidden rounded-xl border border-emerald-500/20 bg-[#030a03] shadow-[0_0_0_1px_rgba(16,185,129,0.08)]">
                       <div className="flex items-center justify-between border-b border-emerald-500/15 bg-[#041004] px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-emerald-300/90">
                         <span>OpenGoat Terminal</span>
-                        <span>{`${uiLogs.length} line${uiLogs.length === 1 ? "" : "s"}`}</span>
+                        <span>{`${filteredUiLogs.length} visible / ${uiLogs.length} total`}</span>
                       </div>
                       <div
                         ref={logsViewportRef}
@@ -4488,18 +4529,22 @@ export function App(): ReactElement {
                           <p className="text-emerald-200/70">
                             Waiting for runtime activity...
                           </p>
+                        ) : filteredUiLogs.length === 0 ? (
+                          <p className="text-emerald-200/70">
+                            No entries match the selected source filters.
+                          </p>
                         ) : (
-                          uiLogs.map((entry) => (
+                          filteredUiLogs.map((entry) => (
                             <div
                               key={entry.id}
-                              className="grid grid-cols-[76px_82px_1fr] items-start gap-2 py-0.5"
+                              className="grid grid-cols-[76px_124px_minmax(0,1fr)] items-start gap-x-3 py-0.5"
                             >
                               <span className="text-emerald-200/60">
                                 {formatUiLogTimestamp(entry.timestamp)}
                               </span>
                               <span
                                 className={cn(
-                                  "font-semibold uppercase",
+                                  "font-semibold uppercase whitespace-nowrap",
                                   uiLogLevelClassName(entry.level),
                                 )}
                               >
