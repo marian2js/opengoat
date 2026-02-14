@@ -83,6 +83,7 @@ import {
   Home,
   MessageSquare,
   MoreHorizontal,
+  Pin,
   Plus,
   Settings,
   Sparkles,
@@ -607,6 +608,9 @@ export function App(): ReactElement {
   >(() => new Set());
   const [expandedWorkspaceSessionIds, setExpandedWorkspaceSessionIds] =
     useState<Set<string>>(() => new Set());
+  const [pinnedSessionIds, setPinnedSessionIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [sessionChatStatus, setSessionChatStatus] =
     useState<ChatStatus>("ready");
   const [sessionMessagesById, setSessionMessagesById] = useState<
@@ -1188,6 +1192,22 @@ export function App(): ReactElement {
       })
       .sort((left, right) => right.updatedAt - left.updatedAt);
   }, [sessions]);
+  const pinnedWorkspaceSessions = useMemo<
+    Array<WorkspaceSessionItem & { workspaceId: string }>
+  >(() => {
+    if (pinnedSessionIds.size === 0) {
+      return [];
+    }
+
+    return workspaceNodes.flatMap((workspace) =>
+      workspace.sessions
+        .filter((session) => pinnedSessionIds.has(session.sessionId))
+        .map((session) => ({
+          ...session,
+          workspaceId: workspace.id,
+        })),
+    );
+  }, [workspaceNodes, pinnedSessionIds]);
 
   const taskProjectOptions = useMemo(() => {
     if (workspaceNodes.length === 0) {
@@ -1664,6 +1684,30 @@ export function App(): ReactElement {
       for (const id of current) {
         if (validIds.has(id)) {
           next.add(id);
+          continue;
+        }
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [workspaceNodes]);
+
+  useEffect(() => {
+    setPinnedSessionIds((current) => {
+      if (current.size === 0) {
+        return current;
+      }
+
+      const validSessionIds = new Set(
+        workspaceNodes.flatMap((workspace) =>
+          workspace.sessions.map((session) => session.sessionId),
+        ),
+      );
+      let changed = false;
+      const next = new Set<string>();
+      for (const sessionId of current) {
+        if (validSessionIds.has(sessionId)) {
+          next.add(sessionId);
           continue;
         }
         changed = true;
@@ -3394,6 +3438,111 @@ export function App(): ReactElement {
     (authenticationEnabledChanged ||
       authenticationUsernameChanged ||
       hasPendingAuthenticationPasswordUpdate);
+  const renderWorkspaceSessionRow = (
+    session: WorkspaceSessionItem,
+    key: string,
+  ): ReactElement => {
+    const isPinnedSession = pinnedSessionIds.has(session.sessionId);
+
+    return (
+      <div key={key} className="group/session relative">
+        <button
+          type="button"
+          title={`${session.title} (${session.sessionKey})`}
+          onClick={() => {
+            navigateToRoute({
+              kind: "session",
+              sessionId: session.sessionId,
+            });
+            setOpenWorkspaceMenuId(null);
+          }}
+          className="flex w-full items-center rounded-md px-3 py-1 pr-8 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+        >
+          <span className="inline-block size-4 shrink-0" aria-hidden="true" />
+          <span className="ml-2 truncate">{session.title}</span>
+        </button>
+        <button
+          type="button"
+          aria-label={
+            isPinnedSession
+              ? `Unpin ${session.title}`
+              : `Pin ${session.title}`
+          }
+          title={isPinnedSession ? "Unpin session" : "Pin session"}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setPinnedSessionIds((current) => {
+              const next = new Set(current);
+              if (next.has(session.sessionId)) {
+                next.delete(session.sessionId);
+              } else {
+                next.add(session.sessionId);
+              }
+              return next;
+            });
+            setOpenSessionMenuId(null);
+          }}
+          className={cn(
+            "absolute left-3 top-1/2 z-10 inline-flex size-4 -translate-y-1/2 items-center justify-center rounded-sm transition-colors hover:text-foreground",
+            isPinnedSession
+              ? "text-foreground"
+              : "text-muted-foreground opacity-0 group-hover/session:opacity-100",
+          )}
+        >
+          <Pin className="size-3 icon-stroke-1" />
+        </button>
+        <button
+          type="button"
+          aria-label={`Session menu for ${session.title}`}
+          title="Session menu"
+          disabled={isMutating}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setOpenWorkspaceMenuId(null);
+            setOpenSessionMenuId((current) =>
+              current === session.sessionId ? null : session.sessionId,
+            );
+          }}
+          className={cn(
+            "absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50",
+            openSessionMenuId === session.sessionId
+              ? "opacity-100"
+              : "opacity-0 group-hover/session:opacity-100",
+          )}
+        >
+          <MoreHorizontal className="size-3.5" />
+        </button>
+        {openSessionMenuId === session.sessionId ? (
+          <div className="absolute right-1 top-8 z-20 min-w-[120px] rounded-md border border-border bg-card p-1 shadow-lg">
+            <button
+              type="button"
+              className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent/80"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void handleRenameSession(session);
+              }}
+            >
+              Rename
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-danger hover:bg-danger/10"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void handleRemoveSession(session);
+              }}
+            >
+              Remove
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
 
   if (isAuthChecking) {
     return (
@@ -3559,17 +3708,35 @@ export function App(): ReactElement {
               ) : null}
             </button>
 
+            {!isSidebarCollapsed && pinnedWorkspaceSessions.length > 0 ? (
+              <div className="mb-1 mt-0.5 space-y-0.5">
+                {pinnedWorkspaceSessions.map((session) =>
+                  renderWorkspaceSessionRow(
+                    session,
+                    `pinned:${session.workspaceId}:${session.sessionId}`,
+                  ),
+                )}
+                <Separator className="my-2 bg-border/60" />
+              </div>
+            ) : null}
+
             {workspaceNodes.map((workspace) => {
               const isWorkspaceCollapsed = collapsedWorkspaceIds.has(
                 workspace.id,
               );
+              const visibleSessionsForWorkspace = workspace.sessions.filter(
+                (session) => !pinnedSessionIds.has(session.sessionId),
+              );
               const isWorkspaceSessionsExpanded =
                 expandedWorkspaceSessionIds.has(workspace.id);
               const hasHiddenWorkspaceSessions =
-                workspace.sessions.length > MAX_VISIBLE_WORKSPACE_SESSIONS;
+                visibleSessionsForWorkspace.length > MAX_VISIBLE_WORKSPACE_SESSIONS;
               const visibleWorkspaceSessions = isWorkspaceSessionsExpanded
-                ? workspace.sessions
-                : workspace.sessions.slice(0, MAX_VISIBLE_WORKSPACE_SESSIONS);
+                ? visibleSessionsForWorkspace
+                : visibleSessionsForWorkspace.slice(
+                    0,
+                    MAX_VISIBLE_WORKSPACE_SESSIONS,
+                  );
               const canManageWorkspace = Boolean(workspace.projectSessionKey);
               const FolderIcon = isWorkspaceCollapsed ? Folder : FolderOpen;
 
@@ -3684,81 +3851,9 @@ export function App(): ReactElement {
 
                   {!isSidebarCollapsed && !isWorkspaceCollapsed ? (
                     <div className="mt-0.5 space-y-0.5">
-                      {visibleWorkspaceSessions.map((session) => (
-                        <div
-                          key={session.sessionId}
-                          className="group/session relative"
-                        >
-                          <button
-                            type="button"
-                            title={`${session.title} (${session.sessionKey})`}
-                            onClick={() => {
-                              navigateToRoute({
-                                kind: "session",
-                                sessionId: session.sessionId,
-                              });
-                              setOpenWorkspaceMenuId(null);
-                            }}
-                            className="flex w-full items-center rounded-md py-1 pl-9 pr-8 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-                          >
-                            <span
-                              className="mr-2 inline-block size-2 shrink-0"
-                              aria-hidden="true"
-                            />
-                            <span className="truncate">{session.title}</span>
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={`Session menu for ${session.title}`}
-                            title="Session menu"
-                            disabled={isMutating}
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              setOpenWorkspaceMenuId(null);
-                              setOpenSessionMenuId((current) =>
-                                current === session.sessionId
-                                  ? null
-                                  : session.sessionId,
-                              );
-                            }}
-                            className={cn(
-                              "absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50",
-                              openSessionMenuId === session.sessionId
-                                ? "opacity-100"
-                                : "opacity-0 group-hover/session:opacity-100",
-                            )}
-                          >
-                            <MoreHorizontal className="size-3.5" />
-                          </button>
-                          {openSessionMenuId === session.sessionId ? (
-                            <div className="absolute right-1 top-8 z-20 min-w-[120px] rounded-md border border-border bg-card p-1 shadow-lg">
-                              <button
-                                type="button"
-                                className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent/80"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  void handleRenameSession(session);
-                                }}
-                              >
-                                Rename
-                              </button>
-                              <button
-                                type="button"
-                                className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-danger hover:bg-danger/10"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  void handleRemoveSession(session);
-                                }}
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      ))}
+                      {visibleWorkspaceSessions.map((session) =>
+                        renderWorkspaceSessionRow(session, session.sessionId),
+                      )}
                       {hasHiddenWorkspaceSessions ? (
                         <button
                           type="button"
@@ -3774,11 +3869,17 @@ export function App(): ReactElement {
                             });
                             setOpenSessionMenuId(null);
                           }}
-                          className="w-full rounded-md py-1 pl-11 pr-2 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                          className="flex w-full items-center rounded-md px-3 py-1 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
                         >
-                          {isWorkspaceSessionsExpanded
-                            ? "Show less"
-                            : `Show more (${workspace.sessions.length - MAX_VISIBLE_WORKSPACE_SESSIONS})`}
+                          <span
+                            className="inline-block size-4 shrink-0"
+                            aria-hidden="true"
+                          />
+                          <span className="ml-2">
+                            {isWorkspaceSessionsExpanded
+                              ? "Show less"
+                              : `Show more (${visibleSessionsForWorkspace.length - MAX_VISIBLE_WORKSPACE_SESSIONS})`}
+                          </span>
                         </button>
                       ) : null}
                     </div>
