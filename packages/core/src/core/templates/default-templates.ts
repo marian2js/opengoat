@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { DEFAULT_AGENT_ID, isDefaultAgentId } from "../domain/agent-id.js";
 import type { AgentIdentity } from "../domain/agent.js";
 import type { AgentsIndex, OpenGoatConfig } from "../domain/opengoat-paths.js";
@@ -10,6 +10,11 @@ export interface AgentTemplateOptions {
   reportsTo?: string | null;
   skills?: string[];
   role?: string;
+}
+
+export interface OrganizationMarkdownTemplate {
+  fileName: string;
+  content: string;
 }
 
 const ROLE_SKILLS: Record<"manager" | "individual", string[]> = {
@@ -51,6 +56,17 @@ export function renderBoardManagerSkillMarkdown(): string {
 
 export function renderBoardIndividualSkillMarkdown(): string {
   return readMarkdownTemplate("skills/og-board-individual/SKILL.md");
+}
+
+export function listOrganizationMarkdownTemplates(): OrganizationMarkdownTemplate[] {
+  const cached = organizationMarkdownTemplateCache;
+  if (cached) {
+    return cloneOrganizationMarkdownTemplates(cached);
+  }
+
+  const discovered = discoverOrganizationMarkdownTemplates();
+  organizationMarkdownTemplateCache = discovered;
+  return cloneOrganizationMarkdownTemplates(discovered);
 }
 
 export function renderInternalAgentConfig(
@@ -149,6 +165,7 @@ function dedupe(values: string[]): string[] {
 }
 
 const markdownTemplateCache = new Map<string, string>();
+let organizationMarkdownTemplateCache: OrganizationMarkdownTemplate[] | undefined;
 
 function readMarkdownTemplate(relativePath: string): string {
   const cached = markdownTemplateCache.get(relativePath);
@@ -164,4 +181,44 @@ function readMarkdownTemplate(relativePath: string): string {
     .trimEnd();
   markdownTemplateCache.set(relativePath, content);
   return content;
+}
+
+function discoverOrganizationMarkdownTemplates(): OrganizationMarkdownTemplate[] {
+  let fileNames: string[];
+  try {
+    fileNames = readdirSync(new URL("./assets/organization/", import.meta.url))
+      .filter((name) => isMarkdownFile(name))
+      .sort((left, right) => left.localeCompare(right));
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return [];
+    }
+    throw error;
+  }
+
+  return fileNames.map((fileName) => ({
+    fileName,
+    content: readMarkdownTemplate(`organization/${fileName}`),
+  }));
+}
+
+function isMarkdownFile(fileName: string): boolean {
+  return fileName.toLowerCase().endsWith(".md");
+}
+
+function isNotFoundError(error: unknown): error is NodeJS.ErrnoException {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  return (error as NodeJS.ErrnoException).code === "ENOENT";
+}
+
+function cloneOrganizationMarkdownTemplates(
+  templates: OrganizationMarkdownTemplate[],
+): OrganizationMarkdownTemplate[] {
+  return templates.map((template) => ({
+    fileName: template.fileName,
+    content: template.content,
+  }));
 }

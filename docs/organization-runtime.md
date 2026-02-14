@@ -9,6 +9,7 @@ This document describes the current organization-first runtime model.
 - hierarchy is explicit in agent metadata
 - manager behavior is skill-driven (`og-board-manager` skill)
 - OpenClaw owns workspace bootstrap semantics; OpenGoat pre-seeds `ceo` `AGENTS.md` + `ROLE.md` and removes `BOOTSTRAP.md`
+- OpenGoat also creates `~/.opengoat/organization` and seeds default organization `.md` files there on startup
 - task assignment is constrained to self or reportees (direct or indirect)
 - task updates are constrained to self-owned/self-assigned tasks or reportee tasks (direct or indirect)
 

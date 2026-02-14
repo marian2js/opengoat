@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  listOrganizationMarkdownTemplates,
   renderAgentsIndex,
   renderGlobalConfig,
   renderInternalAgentConfig,
@@ -45,5 +46,13 @@ describe("default templates", () => {
     expect(internalConfig.runtime.adapter).toBe("openclaw");
     expect(internalConfig.runtime.sessions.mainKey).toBe("main");
     expect(internalConfig.runtime.skills.assigned).toEqual([]);
+  });
+
+  it("discovers default organization markdown templates", () => {
+    const templates = listOrganizationMarkdownTemplates();
+    expect(templates.length).toBeGreaterThan(0);
+    expect(templates.map((template) => template.fileName)).toContain(
+      "ORGANIZATION.md",
+    );
   });
 });

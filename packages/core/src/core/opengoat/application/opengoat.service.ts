@@ -158,6 +158,7 @@ export class OpenGoatService {
     });
     this.bootstrapService = new BootstrapService({
       fileSystem: deps.fileSystem,
+      pathPort: deps.pathPort,
       pathsProvider: deps.pathsProvider,
       agentService: this.agentService,
       nowIso,

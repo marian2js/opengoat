@@ -125,6 +125,7 @@ Main structure:
 - `config.json`
 - `agents.json`
 - `workspaces/` (OpenClaw workspace paths)
+- `organization/` (organization-level markdown defaults copied from templates on startup)
 - `agents/`
 - `skills/` (optional compatibility store; created on first `opengoat skill install`)
 - `providers/` (OpenClaw runtime connectivity config)
@@ -134,6 +135,7 @@ OpenClaw owns workspace bootstrap markdown semantics.
 
 OpenGoat pre-seeds `workspaces/ceo/AGENTS.md` and `workspaces/ceo/ROLE.md` and removes `BOOTSTRAP.md`
 to avoid first-run bootstrap prompts for the default manager.
+OpenGoat also pre-seeds `organization/*.md` from `packages/core/src/core/templates/assets/organization/`.
 
 ## 10) Module Layout
 

@@ -32,6 +32,10 @@ describe("BootstrapService", () => {
     expect(result.paths.homeDir).toBe(paths.homeDir);
     expect(result.defaultAgent).toBe("ceo");
     expect(result.createdPaths.length).toBeGreaterThan(0);
+    expect(await fileSystem.exists(paths.organizationDir)).toBe(true);
+    expect(
+      await fileSystem.exists(path.join(paths.organizationDir, "ORGANIZATION.md")),
+    ).toBe(true);
 
     const config = JSON.parse(
       await readFile(paths.globalConfigJsonPath, "utf-8"),
@@ -191,6 +195,7 @@ async function createBootstrapService(): Promise<{
   const agentService = new AgentService({ fileSystem, pathPort, nowIso });
   const service = new BootstrapService({
     fileSystem,
+    pathPort,
     pathsProvider,
     agentService,
     nowIso,

@@ -6,14 +6,17 @@ import type {
   OpenGoatConfig,
 } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
+import type { PathPort } from "../../ports/path.port.js";
 import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
 import {
+  listOrganizationMarkdownTemplates,
   renderAgentsIndex,
   renderGlobalConfig,
 } from "../../templates/default-templates.js";
 
 interface BootstrapServiceDeps {
   fileSystem: FileSystemPort;
+  pathPort: PathPort;
   pathsProvider: OpenGoatPathsProvider;
   agentService: AgentService;
   nowIso: () => string;
@@ -21,12 +24,14 @@ interface BootstrapServiceDeps {
 
 export class BootstrapService {
   private readonly fileSystem: FileSystemPort;
+  private readonly pathPort: PathPort;
   private readonly pathsProvider: OpenGoatPathsProvider;
   private readonly agentService: AgentService;
   private readonly nowIso: () => string;
 
   public constructor(deps: BootstrapServiceDeps) {
     this.fileSystem = deps.fileSystem;
+    this.pathPort = deps.pathPort;
     this.pathsProvider = deps.pathsProvider;
     this.agentService = deps.agentService;
     this.nowIso = deps.nowIso;
@@ -39,9 +44,19 @@ export class BootstrapService {
 
     await this.ensureDirectory(paths.homeDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.workspacesDir, createdPaths, skippedPaths);
+    await this.ensureDirectory(
+      paths.organizationDir,
+      createdPaths,
+      skippedPaths,
+    );
     await this.ensureDirectory(paths.agentsDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.providersDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.runsDir, createdPaths, skippedPaths);
+    await this.ensureOrganizationMarkdownFiles(
+      paths.organizationDir,
+      createdPaths,
+      skippedPaths,
+    );
 
     const now = this.nowIso();
     await this.ensureGlobalConfig(
@@ -165,6 +180,27 @@ export class BootstrapService {
       return;
     }
     createdPaths.push(directoryPath);
+  }
+
+  private async ensureOrganizationMarkdownFiles(
+    organizationDir: string,
+    createdPaths: string[],
+    skippedPaths: string[],
+  ): Promise<void> {
+    const templates = listOrganizationMarkdownTemplates();
+    for (const template of templates) {
+      const filePath = this.pathPort.join(organizationDir, template.fileName);
+      const exists = await this.fileSystem.exists(filePath);
+      if (exists) {
+        skippedPaths.push(filePath);
+        continue;
+      }
+      const markdown = template.content.endsWith("\n")
+        ? template.content
+        : `${template.content}\n`;
+      await this.fileSystem.writeFile(filePath, markdown);
+      createdPaths.push(filePath);
+    }
   }
 
   private async readJsonIfPresent<T>(filePath: string): Promise<T | null> {

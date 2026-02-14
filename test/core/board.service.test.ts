@@ -482,6 +482,7 @@ async function createHarness(): Promise<{
   const paths: OpenGoatPaths = {
     homeDir: root,
     workspacesDir: path.join(root, "workspaces"),
+    organizationDir: path.join(root, "organization"),
     agentsDir: path.join(root, "agents"),
     skillsDir: path.join(root, "skills"),
     providersDir: path.join(root, "providers"),

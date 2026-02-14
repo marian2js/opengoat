@@ -16,6 +16,7 @@ export class NodeOpenGoatPathsProvider implements OpenGoatPathsProvider {
     return {
       homeDir,
       workspacesDir: path.join(homeDir, "workspaces"),
+      organizationDir: path.join(homeDir, "organization"),
       agentsDir: path.join(homeDir, "agents"),
       skillsDir: path.join(homeDir, "skills"),
       providersDir: path.join(homeDir, "providers"),

@@ -5,6 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
+  lodash-es: '>=4.17.23'
   '@trpc/client': 10.45.4
   '@trpc/server': 10.45.4
 
@@ -30,21 +31,9 @@ importers:
       '@clack/prompts':
         specifier: ^1.0.0
         version: 1.0.0
-      '@fastify/cors':
-        specifier: ^11.0.1
-        version: 11.2.0
-      '@fastify/middie':
-        specifier: ^9.0.3
-        version: 9.1.0
-      '@fastify/static':
-        specifier: ^8.3.0
-        version: 8.3.0
       '@opengoat/core':
         specifier: workspace:*
         version: link:../core
-      fastify:
-        specifier: ^5.6.1
-        version: 5.7.4
     devDependencies:
       '@types/node':
         specifier: ^22.13.4
@@ -2472,9 +2461,6 @@ packages:
     resolution: {integrity: sha512-t7hw9pI+WvuwNJXwk5zVHpyhIqzg2qTlklJOf0mVxGSbe3Fp2VieZcduNYjaLDoy6p9uGpQEGWG87WpMKlNq8g==}
     engines: {node: '>=8'}
 
-  lodash-es@4.17.21:
-    resolution: {integrity: sha512-mKnC+QJ9pWVzv+C4/U3rRsHapFfHvQFoFB92e52xeyGMcX6/OlIl78je1u8vePzYZSkkogMPJ2yjxxsb89cxyw==}
-
   lodash-es@4.17.23:
     resolution: {integrity: sha512-kVI48u3PZr38HdYz98UmfPnXl2DXrpdctLrFLCd3kOx1xUkOmpFPx7gCWWM5MPkL/fD8zb+Ph0QzjGFs4+hHWg==}
 
@@ -3921,12 +3907,12 @@ snapshots:
     dependencies:
       '@chevrotain/gast': 11.0.3
       '@chevrotain/types': 11.0.3
-      lodash-es: 4.17.21
+      lodash-es: 4.17.23
 
   '@chevrotain/gast@11.0.3':
     dependencies:
       '@chevrotain/types': 11.0.3
-      lodash-es: 4.17.21
+      lodash-es: 4.17.23
 
   '@chevrotain/regexp-to-ast@11.0.3': {}
 
@@ -5176,7 +5162,7 @@ snapshots:
       '@chevrotain/regexp-to-ast': 11.0.3
       '@chevrotain/types': 11.0.3
       '@chevrotain/utils': 11.0.3
-      lodash-es: 4.17.21
+      lodash-es: 4.17.23
 
   chokidar@3.6.0:
     dependencies:
@@ -6084,8 +6070,6 @@ snapshots:
   locate-path@5.0.0:
     dependencies:
       p-locate: 4.1.0
-
-  lodash-es@4.17.21: {}
 
   lodash-es@4.17.23: {}
 
