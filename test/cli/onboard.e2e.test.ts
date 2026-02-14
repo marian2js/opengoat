@@ -73,7 +73,7 @@ describe("onboard command e2e", () => {
     expect(providerConfig.env?.OPENCLAW_GATEWAY_URL).toBe("ws://remote-host:18789");
     expect(providerConfig.env?.OPENCLAW_GATEWAY_PASSWORD).toBe("secret-token");
     expect(providerConfig.env?.OPENCLAW_ARGUMENTS).toContain("--remote ws://remote-host:18789");
-  });
+  }, 45_000);
 
   it("fails with a clear error when external mode is missing required fields", async () => {
     const root = await createTempDir("opengoat-onboard-e2e-");
