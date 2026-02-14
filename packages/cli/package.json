@@ -1,6 +1,6 @@
 {
   "name": "opengoat",
-  "version": "2026.2.14-2",
+  "version": "2026.2.14-3",
   "description": "OpenGoat organization runtime CLI",
   "repository": {
     "type": "git",

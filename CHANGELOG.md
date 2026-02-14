@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.2.14-3
+
+- Fix organization bootstrap seeding to include nested template files such as `organization/wiki/index.md`.
+
 ## 2026.2.14-2
 
 - Release follow-up for February 14, 2026:
