@@ -912,6 +912,54 @@ describe("OpenGoatService", () => {
     await expect(access(root, constants.F_OK)).rejects.toBeTruthy();
   });
 
+  it("hard-reset deletes workspace-derived agents when OpenClaw discovery fails", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const commandRunner = new FakeCommandRunner(async (request) => {
+      if (request.args[0] === "agents" && request.args[1] === "list") {
+        return {
+          code: 1,
+          stdout: "",
+          stderr: "unsupported flag: --json",
+        };
+      }
+      if (request.args[0] === "skills" && request.args[1] === "list") {
+        return {
+          code: 0,
+          stdout: JSON.stringify({
+            workspaceDir: path.join(root, "openclaw-workspace"),
+            managedSkillsDir: path.join(root, "openclaw-managed-skills"),
+            skills: [],
+          }),
+          stderr: "",
+        };
+      }
+      return {
+        code: 0,
+        stdout: "",
+        stderr: "",
+      };
+    });
+
+    const { service, provider } = createService(
+      root,
+      new FakeOpenClawProvider(),
+      commandRunner,
+    );
+    await service.initialize();
+    await new NodeFileSystem().ensureDir(path.join(root, "workspaces", "cto"));
+
+    const result = await service.hardReset();
+
+    expect(result.homeRemoved).toBe(true);
+    expect(result.failedOpenClawAgents).toHaveLength(0);
+    expect(result.warnings.some((warning) => warning.includes("OpenClaw agent discovery failed"))).toBe(true);
+    expect(
+      provider.deletedAgents.some((entry) => entry.agentId === "cto"),
+    ).toBe(true);
+  });
+
   it("prepares a new session for a specific project path without invoking runtime", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);

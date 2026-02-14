@@ -221,6 +221,11 @@ export class OpenGoatService {
       }
       candidateOpenClawAgentIds.add(agent.id);
     }
+    await this.addWorkspaceAgentCandidates(
+      paths,
+      candidateOpenClawAgentIds,
+      warnings,
+    );
 
     try {
       const openClawAgents = await this.listOpenClawAgents(paths);
@@ -1313,6 +1318,31 @@ export class OpenGoatService {
     }
 
     return extractOpenClawAgents(parsed);
+  }
+
+  private async addWorkspaceAgentCandidates(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    candidates: Set<string>,
+    warnings: string[],
+  ): Promise<void> {
+    try {
+      const workspaceDirs = await this.fileSystem.listDirectories(
+        paths.workspacesDir,
+      );
+      for (const workspaceDir of workspaceDirs) {
+        const workspaceAgentId = normalizeAgentId(workspaceDir);
+        if (
+          workspaceAgentId &&
+          workspaceAgentId !== OPENCLAW_DEFAULT_AGENT_ID
+        ) {
+          candidates.add(workspaceAgentId);
+        }
+      }
+    } catch (error) {
+      warnings.push(
+        `Workspace fallback discovery failed: ${toErrorMessage(error)}`,
+      );
+    }
   }
 
   private async ensureOpenClawAgentLocation(
