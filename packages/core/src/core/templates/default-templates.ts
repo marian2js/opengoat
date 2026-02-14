@@ -42,10 +42,6 @@ export function renderAgentsIndex(
   };
 }
 
-export function renderCeoAgentsMarkdown(): string {
-  return readMarkdownTemplate("ceo/AGENTS.md");
-}
-
 export function renderCeoRoleMarkdown(): string {
   return readMarkdownTemplate("ceo/ROLE.md");
 }

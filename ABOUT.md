@@ -133,7 +133,7 @@ Main structure:
 
 OpenClaw owns workspace bootstrap markdown semantics.
 
-OpenGoat pre-seeds `workspaces/ceo/AGENTS.md` and `workspaces/ceo/ROLE.md` and removes `BOOTSTRAP.md`
+OpenGoat pre-seeds `workspaces/ceo/ROLE.md` and removes `BOOTSTRAP.md`
 to avoid first-run bootstrap prompts for the default manager.
 OpenGoat also pre-seeds `organization/*.md` from `packages/core/src/core/templates/assets/organization/`.
 
@@ -170,7 +170,7 @@ Optional UI extension module:
 
 If rebuilding from scratch, preserve these behaviors:
 
-1. bootstrap creates `ceo`, core OpenGoat state, and pre-seeded `ceo` workspace markdown (`AGENTS.md` + `ROLE.md`).
+1. bootstrap creates `ceo`, core OpenGoat state, and pre-seeded `ceo` workspace markdown (`ROLE.md`).
 2. `agent create` creates local state and syncs OpenClaw create.
 3. `agent delete` syncs OpenClaw delete and removes local state.
 4. `ceo` is undeletable.

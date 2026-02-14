@@ -172,7 +172,10 @@ export class AgentService {
   public async ensureCeoWorkspaceBootstrap(
     paths: OpenGoatPaths,
   ): Promise<CeoWorkspaceBootstrapResult> {
-    const displayName = await this.readAgentDisplayName(paths, DEFAULT_AGENT_ID);
+    const displayName = await this.readAgentDisplayName(
+      paths,
+      DEFAULT_AGENT_ID,
+    );
     const role = await this.readAgentRole(paths, DEFAULT_AGENT_ID);
     return this.ensureAgentWorkspaceBootstrap(paths, {
       agentId: DEFAULT_AGENT_ID,
@@ -775,7 +778,9 @@ function toAgentTemplateOptions(
     ...LEGACY_MANAGER_ROLE_SKILLS,
     ...LEGACY_INDIVIDUAL_ROLE_SKILLS,
   ]);
-  const skills = dedupe(providedSkills.filter((skillId) => !roleSkillIds.has(skillId)));
+  const skills = dedupe(
+    providedSkills.filter((skillId) => !roleSkillIds.has(skillId)),
+  );
   const role = resolveAgentRole(agentId, type, options.role);
   return {
     type,
@@ -903,6 +908,7 @@ function renderRoleMarkdown(profile: {
     `- Role: ${profile.role}`,
     `- For info about your level on the organiztion, run \`opengoat agent info ${profile.agentId}\`.`,
     "- To delegate and coordinate work, use `og-*` skills.",
+    "- Organization context is available in `../../organization` - read them",
     "",
     "---",
     "",
