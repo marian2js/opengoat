@@ -24,7 +24,6 @@ import {
 } from "@/components/ai-elements/reasoning";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -32,6 +31,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +41,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
@@ -77,8 +84,14 @@ import {
   UsersRound,
 } from "lucide-react";
 import type { ComponentType, ReactElement } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Fragment } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 type PageView =
@@ -203,7 +216,10 @@ interface TasksResponse {
 interface UiSettings {
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
+  inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
 }
+
+type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
 
 interface UiVersionInfo {
   packageName: string;
@@ -584,8 +600,14 @@ export function App(): ReactElement {
   const [maxInactivityMinutesInput, setMaxInactivityMinutesInput] = useState(
     String(DEFAULT_MAX_INACTIVITY_MINUTES),
   );
-  const [notifyManagersOfInactiveAgentsInput, setNotifyManagersOfInactiveAgentsInput] =
-    useState(true);
+  const [
+    notifyManagersOfInactiveAgentsInput,
+    setNotifyManagersOfInactiveAgentsInput,
+  ] = useState(true);
+  const [
+    inactiveAgentNotificationTargetInput,
+    setInactiveAgentNotificationTargetInput,
+  ] = useState<InactiveAgentNotificationTarget>("all-managers");
   const [isTaskDetailsDialogOpen, setTaskDetailsDialogOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskDetailsError, setTaskDetailsError] = useState<string | null>(null);
@@ -681,29 +703,37 @@ export function App(): ReactElement {
     setError(null);
 
     try {
-      const [health, overview, sessions, agentSkills, globalSkills, tasks, settings] =
-        await Promise.all([
-          fetchJson<HealthResponse>("/api/health"),
-          fetchJson<OverviewResponse>("/api/openclaw/overview"),
-          fetchJson<SessionsResponse>(
-            `/api/sessions?agentId=${encodeURIComponent(DEFAULT_AGENT_ID)}`,
-          ),
-          fetchJson<SkillsResponse>(
-            `/api/skills?agentId=${encodeURIComponent(DEFAULT_AGENT_ID)}`,
-          ),
-          fetchJson<SkillsResponse>("/api/skills?global=true"),
-          fetchJson<TasksResponse>("/api/tasks").catch(() => {
-            return { tasks: [] } satisfies TasksResponse;
+      const [
+        health,
+        overview,
+        sessions,
+        agentSkills,
+        globalSkills,
+        tasks,
+        settings,
+      ] = await Promise.all([
+        fetchJson<HealthResponse>("/api/health"),
+        fetchJson<OverviewResponse>("/api/openclaw/overview"),
+        fetchJson<SessionsResponse>(
+          `/api/sessions?agentId=${encodeURIComponent(DEFAULT_AGENT_ID)}`,
+        ),
+        fetchJson<SkillsResponse>(
+          `/api/skills?agentId=${encodeURIComponent(DEFAULT_AGENT_ID)}`,
+        ),
+        fetchJson<SkillsResponse>("/api/skills?global=true"),
+        fetchJson<TasksResponse>("/api/tasks").catch(() => {
+          return { tasks: [] } satisfies TasksResponse;
+        }),
+        fetchJson<{ settings: UiSettings }>("/api/settings")
+          .then((payload) => payload.settings)
+          .catch(() => {
+            return {
+              notifyManagersOfInactiveAgents: true,
+              maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
+              inactiveAgentNotificationTarget: "all-managers",
+            } satisfies UiSettings;
           }),
-          fetchJson<{ settings: UiSettings }>("/api/settings")
-            .then((payload) => payload.settings)
-            .catch(() => {
-              return {
-                notifyManagersOfInactiveAgents: true,
-                maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
-              } satisfies UiSettings;
-            }),
-        ]);
+      ]);
 
       setState({
         health,
@@ -714,11 +744,12 @@ export function App(): ReactElement {
         taskWorkspaces: buildTaskWorkspaceResponse(tasks),
         settings,
       });
-      setMaxInactivityMinutesInput(
-        String(settings.maxInactivityMinutes),
-      );
+      setMaxInactivityMinutesInput(String(settings.maxInactivityMinutes));
       setNotifyManagersOfInactiveAgentsInput(
         settings.notifyManagersOfInactiveAgents,
+      );
+      setInactiveAgentNotificationTargetInput(
+        settings.inactiveAgentNotificationTarget,
       );
       setSessionsByAgentId({
         [sessions.agentId]: sessions.sessions,
@@ -1023,8 +1054,7 @@ export function App(): ReactElement {
     } as const;
   }, [isVersionLoading, versionInfo]);
 
-  const installedVersionLabel =
-    versionInfo?.installedVersion?.trim() || "—";
+  const installedVersionLabel = versionInfo?.installedVersion?.trim() || "—";
   const versionSummaryLabel = `${versionStatus.label} · v${installedVersionLabel}`;
 
   const defaultTaskProjectPath = taskProjectOptions[0]?.projectPath ?? "~";
@@ -1233,11 +1263,7 @@ export function App(): ReactElement {
       sessionChatStatus !== "streaming" &&
       lastAssistantMessageIndex >= 0
     );
-  }, [
-    lastAssistantMessageIndex,
-    sessionChatStatus,
-    shouldRenderReasoning,
-  ]);
+  }, [lastAssistantMessageIndex, sessionChatStatus, shouldRenderReasoning]);
 
   useEffect(() => {
     if (!activeChatContext?.historyRef) {
@@ -1309,7 +1335,9 @@ export function App(): ReactElement {
       return null;
     }
     return (
-      selectedTaskWorkspace.tasks.find((task) => task.taskId === selectedTaskId) ?? null
+      selectedTaskWorkspace.tasks.find(
+        (task) => task.taskId === selectedTaskId,
+      ) ?? null
     );
   }, [selectedTaskWorkspace, selectedTaskId]);
   const selectedTaskIds = useMemo(() => {
@@ -1467,7 +1495,9 @@ export function App(): ReactElement {
         const allowedTaskIds = new Set(
           taskWorkspace.tasks.map((task) => task.taskId),
         );
-        const filtered = existing.filter((taskId) => allowedTaskIds.has(taskId));
+        const filtered = existing.filter((taskId) =>
+          allowedTaskIds.has(taskId),
+        );
         if (filtered.length > 0) {
           next[taskWorkspace.taskWorkspaceId] = filtered;
         }
@@ -1524,7 +1554,12 @@ export function App(): ReactElement {
       }
       return next;
     });
-  }, [taskWorkspaces, getAssignableAgents, taskActorId, defaultTaskProjectPath]);
+  }, [
+    taskWorkspaces,
+    getAssignableAgents,
+    taskActorId,
+    defaultTaskProjectPath,
+  ]);
 
   const openTaskCount = useMemo(() => {
     if (!state) {
@@ -2018,15 +2053,14 @@ export function App(): ReactElement {
       const response = await persistUiSettings({
         notifyManagersOfInactiveAgents: notifyManagersOfInactiveAgentsInput,
         maxInactivityMinutes: resolvedMaxInactivityMinutes,
+        inactiveAgentNotificationTarget:
+          inactiveAgentNotificationTargetInput,
       });
       applyUiSettingsResponse(response);
       const statusMessage = notifyManagersOfInactiveAgentsInput
         ? `Manager inactivity notifications enabled (${resolvedMaxInactivityMinutes} minutes).`
         : "Manager inactivity notifications disabled.";
-      toast.success(
-        response.message ??
-          statusMessage,
-      );
+      toast.success(response.message ?? statusMessage);
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -2053,9 +2087,7 @@ export function App(): ReactElement {
     });
   }
 
-  function applyUiSettingsResponse(response: {
-    settings: UiSettings;
-  }): void {
+  function applyUiSettingsResponse(response: { settings: UiSettings }): void {
     setState((current) => {
       if (!current) {
         return current;
@@ -2070,6 +2102,9 @@ export function App(): ReactElement {
     );
     setNotifyManagersOfInactiveAgentsInput(
       response.settings.notifyManagersOfInactiveAgents,
+    );
+    setInactiveAgentNotificationTargetInput(
+      response.settings.inactiveAgentNotificationTarget,
     );
   }
 
@@ -2225,7 +2260,9 @@ export function App(): ReactElement {
     }
 
     const confirmed = window.confirm(
-      `Delete ${taskIds.length} task${taskIds.length === 1 ? "" : "s"}? This cannot be undone.`,
+      `Delete ${taskIds.length} task${
+        taskIds.length === 1 ? "" : "s"
+      }? This cannot be undone.`,
     );
     if (!confirmed) {
       return;
@@ -2261,7 +2298,9 @@ export function App(): ReactElement {
 
       toast.success(
         response.message ??
-          `Deleted ${response.deletedCount} task${response.deletedCount === 1 ? "" : "s"}.`,
+          `Deleted ${response.deletedCount} task${
+            response.deletedCount === 1 ? "" : "s"
+          }.`,
       );
       await refreshTasks();
     } catch (requestError) {
@@ -2535,8 +2574,8 @@ export function App(): ReactElement {
               event.phase === "stderr"
                 ? "stderr"
                 : event.phase === "stdout"
-                  ? "stdout"
-                  : "info",
+                ? "stdout"
+                : "info",
             timestamp: event.timestamp,
             message: event.message,
           });
@@ -3232,13 +3271,15 @@ export function App(): ReactElement {
                   <AgentAvatar
                     agentId={defaultEntryAgent?.id ?? DEFAULT_AGENT_ID}
                     displayName={
-                      defaultEntryAgent?.displayName ?? DEFAULT_AGENT_ID.toUpperCase()
+                      defaultEntryAgent?.displayName ??
+                      DEFAULT_AGENT_ID.toUpperCase()
                     }
                     size="md"
                   />
                   <div className="flex min-w-0 items-center gap-2">
                     <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
-                      {defaultEntryAgent?.displayName ?? DEFAULT_AGENT_ID.toUpperCase()}
+                      {defaultEntryAgent?.displayName ??
+                        DEFAULT_AGENT_ID.toUpperCase()}
                     </h1>
                     <span
                       className="h-5 w-px shrink-0 bg-border/80"
@@ -3288,20 +3329,16 @@ export function App(): ReactElement {
                   }}
                   className={cn(
                     "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
-                    (
-                      state?.settings.notifyManagersOfInactiveAgents ??
+                    state?.settings.notifyManagersOfInactiveAgents ??
                       notifyManagersOfInactiveAgentsInput
-                    )
                       ? "border-success/50 bg-success/15 text-success hover:bg-success/20"
                       : "border-red-500/70 bg-red-600/25 text-red-200 hover:bg-red-600/35",
                   )}
                   title="Open settings"
                   aria-label="Open settings"
                 >
-                  {(
-                    state?.settings.notifyManagersOfInactiveAgents ??
-                    notifyManagersOfInactiveAgentsInput
-                  )
+                  {state?.settings.notifyManagersOfInactiveAgents ??
+                  notifyManagersOfInactiveAgentsInput
                     ? "Inactive Alerts On"
                     : "Inactive Alerts Off"}
                 </button>
@@ -3519,7 +3556,9 @@ export function App(): ReactElement {
                 </DialogHeader>
 
                 {(() => {
-                  const draft = taskDraftByWorkspaceId[selectedTaskWorkspace.taskWorkspaceId] ?? {
+                  const draft = taskDraftByWorkspaceId[
+                    selectedTaskWorkspace.taskWorkspaceId
+                  ] ?? {
                     title: "",
                     description: "",
                     project: defaultTaskProjectPath,
@@ -3570,9 +3609,12 @@ export function App(): ReactElement {
                             id="createTaskTitle"
                             value={draft.title}
                             onChange={(event) =>
-                              updateTaskDraft(selectedTaskWorkspace.taskWorkspaceId, {
-                                title: event.target.value,
-                              })
+                              updateTaskDraft(
+                                selectedTaskWorkspace.taskWorkspaceId,
+                                {
+                                  title: event.target.value,
+                                },
+                              )
                             }
                             placeholder="Implement feature"
                           />
@@ -3589,9 +3631,12 @@ export function App(): ReactElement {
                             className="min-h-[96px] w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             value={draft.description}
                             onChange={(event) =>
-                              updateTaskDraft(selectedTaskWorkspace.taskWorkspaceId, {
-                                description: event.target.value,
-                              })
+                              updateTaskDraft(
+                                selectedTaskWorkspace.taskWorkspaceId,
+                                {
+                                  description: event.target.value,
+                                },
+                              )
                             }
                             placeholder="Define acceptance criteria."
                           />
@@ -3608,9 +3653,12 @@ export function App(): ReactElement {
                             className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             value={projectValue}
                             onChange={(event) =>
-                              updateTaskDraft(selectedTaskWorkspace.taskWorkspaceId, {
-                                project: event.target.value,
-                              })
+                              updateTaskDraft(
+                                selectedTaskWorkspace.taskWorkspaceId,
+                                {
+                                  project: event.target.value,
+                                },
+                              )
                             }
                           >
                             {taskProjectOptions.map((projectOption) => (
@@ -3635,9 +3683,12 @@ export function App(): ReactElement {
                             className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             value={draft.assignedTo}
                             onChange={(event) =>
-                              updateTaskDraft(selectedTaskWorkspace.taskWorkspaceId, {
-                                assignedTo: event.target.value,
-                              })
+                              updateTaskDraft(
+                                selectedTaskWorkspace.taskWorkspaceId,
+                                {
+                                  assignedTo: event.target.value,
+                                },
+                              )
                             }
                           >
                             {assignableAgents.map((agent) => (
@@ -3659,10 +3710,13 @@ export function App(): ReactElement {
                             className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             value={draft.status}
                             onChange={(event) =>
-                              updateTaskDraft(selectedTaskWorkspace.taskWorkspaceId, {
-                                status: event.target
-                                  .value as TaskCreateDraft["status"],
-                              })
+                              updateTaskDraft(
+                                selectedTaskWorkspace.taskWorkspaceId,
+                                {
+                                  status: event.target
+                                    .value as TaskCreateDraft["status"],
+                                },
+                              )
                             }
                           >
                             {TASK_STATUS_OPTIONS.map((status) => (
@@ -3691,9 +3745,12 @@ export function App(): ReactElement {
                   </Button>
                   <Button
                     onClick={() => {
-                      void handleCreateTask(selectedTaskWorkspace.taskWorkspaceId, {
-                        fromDialog: true,
-                      });
+                      void handleCreateTask(
+                        selectedTaskWorkspace.taskWorkspaceId,
+                        {
+                          fromDialog: true,
+                        },
+                      );
                     }}
                     disabled={isMutating || isLoading}
                   >
@@ -3788,7 +3845,9 @@ export function App(): ReactElement {
                   <section>
                     <h3 className="text-base font-medium">Description</h3>
                     <div className="mt-2 text-base leading-relaxed text-foreground">
-                      <MessageResponse>{selectedTaskDescription}</MessageResponse>
+                      <MessageResponse>
+                        {selectedTaskDescription}
+                      </MessageResponse>
                     </div>
                   </section>
 
@@ -4153,7 +4212,8 @@ export function App(): ReactElement {
                             <div>
                               <p className="text-sm font-medium">Tasks</p>
                               <p className="text-xs text-muted-foreground">
-                                Select tasks to delete in bulk or open one for full details.
+                                Select tasks to delete in bulk or open one for
+                                full details.
                               </p>
                             </div>
 
@@ -4226,7 +4286,9 @@ export function App(): ReactElement {
                                   >
                                     <td className="px-3 py-3">
                                       <Checkbox
-                                        checked={selectedTaskIdSet.has(task.taskId)}
+                                        checked={selectedTaskIdSet.has(
+                                          task.taskId,
+                                        )}
                                         onCheckedChange={(checked) => {
                                           handleToggleTaskSelection(
                                             selectedTaskWorkspace.taskWorkspaceId,
@@ -4253,7 +4315,9 @@ export function App(): ReactElement {
                                     <td className="px-4 py-3">
                                       <p
                                         className="max-w-[240px] truncate text-sm text-muted-foreground"
-                                        title={resolveTaskProjectLabel(task.project)}
+                                        title={resolveTaskProjectLabel(
+                                          task.project,
+                                        )}
                                       >
                                         {resolveTaskProjectLabel(task.project)}
                                       </p>
@@ -4517,8 +4581,8 @@ export function App(): ReactElement {
                             logsConnectionState === "live"
                               ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
                               : logsConnectionState === "connecting"
-                                ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
-                                : "border-rose-500/40 bg-rose-500/10 text-rose-200",
+                              ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
+                              : "border-rose-500/40 bg-rose-500/10 text-rose-200",
                           )}
                         >
                           {logsConnectionState}
@@ -4619,7 +4683,7 @@ export function App(): ReactElement {
                       <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
                         <div className="space-y-1">
                           <h2 className="text-sm font-semibold text-foreground">
-                            Notify Managers Of Inactive Agents
+                            Notify Managers of Inactive Agents
                           </h2>
                           <p className="text-xs text-muted-foreground">
                             When enabled, OpenGoat continuously checks for
@@ -4683,6 +4747,46 @@ export function App(): ReactElement {
                             Managers are notified after this many minutes with
                             no assistant activity.
                           </p>
+
+                          <Separator className="bg-border/50" />
+
+                          <div className="space-y-2">
+                            <label
+                              className="text-sm font-medium text-foreground"
+                              htmlFor="inactiveAgentNotificationTarget"
+                            >
+                              Notify CEO only
+                            </label>
+                            <Select
+                              value={inactiveAgentNotificationTargetInput}
+                              onValueChange={(nextValue) => {
+                                setInactiveAgentNotificationTargetInput(
+                                  nextValue as InactiveAgentNotificationTarget,
+                                );
+                              }}
+                            >
+                              <SelectTrigger
+                                id="inactiveAgentNotificationTarget"
+                                className="max-w-sm"
+                              >
+                                <SelectValue placeholder="Select who gets inactivity notifications" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all-managers">
+                                  Notify all managers
+                                </SelectItem>
+                                <SelectItem value="ceo-only">
+                                  Notify only CEO
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              {inactiveAgentNotificationTargetInput ===
+                              "ceo-only"
+                                ? "Only the CEO receives inactivity alerts, and only for agents that report directly to the CEO."
+                                : "Every manager receives inactivity alerts for their own direct reports."}
+                            </p>
+                          </div>
                         </div>
                       ) : (
                         <p className="px-5 py-4 text-xs text-muted-foreground">
@@ -4696,7 +4800,10 @@ export function App(): ReactElement {
                         Status:{" "}
                         <span className="font-medium text-foreground">
                           {notifyManagersOfInactiveAgentsInput
-                            ? "Monitoring inactive agents"
+                            ? inactiveAgentNotificationTargetInput ===
+                              "ceo-only"
+                              ? "Monitoring direct CEO reportees only"
+                              : "Monitoring inactive agents for all managers"
                             : "Notifications paused"}
                         </span>
                       </p>
@@ -5345,7 +5452,9 @@ function uiLogMessageClassName(level: UiLogLevel): string {
   }
 }
 
-function buildTaskWorkspaceResponse(response: TasksResponse): TaskWorkspacesResponse {
+function buildTaskWorkspaceResponse(
+  response: TasksResponse,
+): TaskWorkspacesResponse {
   return {
     taskWorkspaces: [
       {
@@ -5406,7 +5515,11 @@ function parseRoute(pathname: string): AppRoute {
   const trimmed = pathname.trim() || "/";
   const normalized = trimmed.length > 1 ? trimmed.replace(/\/+$/, "") : trimmed;
 
-  if (normalized === "/" || normalized === "/dashboard" || normalized === "/overview") {
+  if (
+    normalized === "/" ||
+    normalized === "/dashboard" ||
+    normalized === "/overview"
+  ) {
     return { kind: "page", view: "overview" };
   }
 

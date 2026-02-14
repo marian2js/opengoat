@@ -222,6 +222,7 @@ describe("OpenGoat UI server API", () => {
       settings: {
         notifyManagersOfInactiveAgents: true,
         maxInactivityMinutes: 30,
+        inactiveAgentNotificationTarget: "all-managers",
       },
     });
 
@@ -231,6 +232,7 @@ describe("OpenGoat UI server API", () => {
       payload: {
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        inactiveAgentNotificationTarget: "ceo-only",
       },
     });
     expect(updateResponse.statusCode).toBe(200);
@@ -238,6 +240,7 @@ describe("OpenGoat UI server API", () => {
       settings: {
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        inactiveAgentNotificationTarget: "ceo-only",
       },
     });
 
@@ -250,6 +253,7 @@ describe("OpenGoat UI server API", () => {
       settings: {
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        inactiveAgentNotificationTarget: "ceo-only",
       },
     });
   });
@@ -287,6 +291,7 @@ describe("OpenGoat UI server API", () => {
         `${JSON.stringify({
           notifyManagersOfInactiveAgents: false,
           maxInactivityMinutes: 30,
+          inactiveAgentNotificationTarget: "ceo-only",
         }, null, 2)}\n`,
         "utf8"
       );
@@ -331,6 +336,7 @@ describe("OpenGoat UI server API", () => {
       settings: {
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 30,
+        inactiveAgentNotificationTarget: "all-managers",
       },
     });
   });

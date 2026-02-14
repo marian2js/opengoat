@@ -133,6 +133,8 @@ interface UiOpenClawGatewayConfig {
   command?: string;
 }
 
+type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
+
 export interface OpenClawUiService {
   initialize?: () => Promise<unknown>;
   getHomeDir: () => string;
@@ -175,7 +177,10 @@ export interface OpenClawUiService {
   addTaskBlocker?: (actorId: string, taskId: string, blocker: string) => Promise<TaskRecord>;
   addTaskArtifact?: (actorId: string, taskId: string, content: string) => Promise<TaskRecord>;
   addTaskWorklog?: (actorId: string, taskId: string, content: string) => Promise<TaskRecord>;
-  runTaskCronCycle?: (options?: { inactiveMinutes?: number }) => Promise<TaskCronRunResult>;
+  runTaskCronCycle?: (options?: {
+    inactiveMinutes?: number;
+    notificationTarget?: InactiveAgentNotificationTarget;
+  }) => Promise<TaskCronRunResult>;
 }
 
 interface SessionRunInfo {
@@ -263,6 +268,7 @@ interface TaskCronRunResult {
 interface UiServerSettings {
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
+  inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
 }
 
 interface UiVersionInfo {
@@ -552,6 +558,9 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
       taskCronScheduler.setMaxInactivityMinutes(
         uiSettings.maxInactivityMinutes,
       );
+      taskCronScheduler.setInactiveAgentNotificationTarget(
+        uiSettings.inactiveAgentNotificationTarget,
+      );
     },
     getVersionInfo,
     logs,
@@ -596,6 +605,7 @@ function registerApiRoutes(
     Body: {
       notifyManagersOfInactiveAgents?: boolean;
       maxInactivityMinutes?: number;
+      inactiveAgentNotificationTarget?: InactiveAgentNotificationTarget;
     };
   }>("/api/settings", async (request, reply) => {
     return safeReply(reply, async () => {
@@ -608,6 +618,11 @@ function registerApiRoutes(
         request.body ?? {},
         "maxInactivityMinutes",
       );
+      const hasNotificationTargetSetting =
+        Object.prototype.hasOwnProperty.call(
+          request.body ?? {},
+          "inactiveAgentNotificationTarget",
+        );
 
       const parsedNotifyManagers = hasNotifyManagersSetting
         ? parseNotifyManagersOfInactiveAgents(
@@ -630,17 +645,30 @@ function registerApiRoutes(
           error: `maxInactivityMinutes must be an integer between ${MIN_MAX_INACTIVITY_MINUTES} and ${MAX_MAX_INACTIVITY_MINUTES}`,
         };
       }
+      const parsedNotificationTarget = hasNotificationTargetSetting
+        ? parseInactiveAgentNotificationTarget(
+            request.body?.inactiveAgentNotificationTarget,
+          )
+        : currentSettings.inactiveAgentNotificationTarget;
+      if (!parsedNotificationTarget) {
+        reply.code(400);
+        return {
+          error:
+            "inactiveAgentNotificationTarget must be either all-managers or ceo-only",
+        };
+      }
 
       const nextSettings: UiServerSettings = {
         notifyManagersOfInactiveAgents: parsedNotifyManagers,
         maxInactivityMinutes: parsedMaxInactivityMinutes,
+        inactiveAgentNotificationTarget: parsedNotificationTarget,
       };
       await deps.updateSettings(nextSettings);
       deps.logs.append({
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `UI settings updated: notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes}`,
+        message: `UI settings updated: notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes} inactiveAgentNotificationTarget=${nextSettings.inactiveAgentNotificationTarget}`,
       });
       return {
         settings: nextSettings,
@@ -648,7 +676,7 @@ function registerApiRoutes(
           nextSettings.notifyManagersOfInactiveAgents
             ? "enabled"
             : "disabled"
-        }; threshold ${nextSettings.maxInactivityMinutes} minute(s).`,
+        }; threshold ${nextSettings.maxInactivityMinutes} minute(s); audience ${nextSettings.inactiveAgentNotificationTarget}.`,
       };
     });
   });
@@ -3267,6 +3295,7 @@ function defaultUiServerSettings(): UiServerSettings {
   return {
     notifyManagersOfInactiveAgents: true,
     maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
+    inactiveAgentNotificationTarget: "all-managers",
   };
 }
 
@@ -3288,6 +3317,22 @@ function parseBooleanSetting(value: unknown): boolean | undefined {
 
 function parseNotifyManagersOfInactiveAgents(value: unknown): boolean | undefined {
   return parseBooleanSetting(value);
+}
+
+function parseInactiveAgentNotificationTarget(
+  value: unknown,
+): InactiveAgentNotificationTarget | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "all-managers") {
+    return "all-managers";
+  }
+  if (normalized === "ceo-only") {
+    return "ceo-only";
+  }
+  return undefined;
 }
 
 function parseUiLogStreamLimit(value: unknown): number {
@@ -3355,6 +3400,7 @@ async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> 
     const parsed = JSON.parse(raw) as {
       notifyManagersOfInactiveAgents?: unknown;
       maxInactivityMinutes?: unknown;
+      inactiveAgentNotificationTarget?: unknown;
       taskCronEnabled?: unknown;
     };
     const notifyManagersOfInactiveAgents =
@@ -3364,6 +3410,10 @@ async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> 
     const maxInactivityMinutes = parseMaxInactivityMinutes(
       parsed?.maxInactivityMinutes,
     );
+    const inactiveAgentNotificationTarget =
+      parseInactiveAgentNotificationTarget(
+        parsed?.inactiveAgentNotificationTarget,
+      );
     const defaults = defaultUiServerSettings();
     return {
       notifyManagersOfInactiveAgents:
@@ -3371,6 +3421,9 @@ async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> 
         defaults.notifyManagersOfInactiveAgents,
       maxInactivityMinutes:
         maxInactivityMinutes ?? defaults.maxInactivityMinutes,
+      inactiveAgentNotificationTarget:
+        inactiveAgentNotificationTarget ??
+        defaults.inactiveAgentNotificationTarget,
     };
   } catch {
     return defaultUiServerSettings();
@@ -3386,6 +3439,9 @@ async function writeUiServerSettings(homeDir: string, settings: UiServerSettings
 interface TaskCronScheduler {
   setNotifyManagersOfInactiveAgents: (enabled: boolean) => void;
   setMaxInactivityMinutes: (maxInactivityMinutes: number) => void;
+  setInactiveAgentNotificationTarget: (
+    target: InactiveAgentNotificationTarget,
+  ) => void;
   stop: () => void;
 }
 
@@ -3403,6 +3459,9 @@ function createTaskCronScheduler(
       setMaxInactivityMinutes: () => {
         // no-op when runtime task cron is unavailable.
       },
+      setInactiveAgentNotificationTarget: () => {
+        // no-op when runtime task cron is unavailable.
+      },
       stop: () => {
         // no-op when runtime task cron is unavailable.
       }
@@ -3416,6 +3475,10 @@ function createTaskCronScheduler(
   let maxInactivityMinutes =
     parseMaxInactivityMinutes(initialSettings.maxInactivityMinutes) ??
     defaultUiServerSettings().maxInactivityMinutes;
+  let inactiveAgentNotificationTarget =
+    parseInactiveAgentNotificationTarget(
+      initialSettings.inactiveAgentNotificationTarget,
+    ) ?? defaultUiServerSettings().inactiveAgentNotificationTarget;
   let intervalHandle: NodeJS.Timeout | undefined;
   let running = false;
 
@@ -3434,22 +3497,34 @@ function createTaskCronScheduler(
     const persistedMaxInactivityMinutes =
       parseMaxInactivityMinutes(persisted.maxInactivityMinutes) ??
       maxInactivityMinutes;
+    const persistedNotificationTarget =
+      parseInactiveAgentNotificationTarget(
+        persisted.inactiveAgentNotificationTarget,
+      ) ?? inactiveAgentNotificationTarget;
 
     const hasNotifyManagersChange =
       persistedNotifyManagers !== notifyManagersOfInactiveAgents;
     const hasMaxInactivityChange =
       persistedMaxInactivityMinutes !== maxInactivityMinutes;
-    if (!hasNotifyManagersChange && !hasMaxInactivityChange) {
+    const hasNotificationTargetChange =
+      persistedNotificationTarget !== inactiveAgentNotificationTarget;
+    if (
+      !hasNotifyManagersChange &&
+      !hasMaxInactivityChange &&
+      !hasNotificationTargetChange
+    ) {
       return;
     }
 
     notifyManagersOfInactiveAgents = persistedNotifyManagers;
     maxInactivityMinutes = persistedMaxInactivityMinutes;
+    inactiveAgentNotificationTarget = persistedNotificationTarget;
     schedule();
     app.log.info(
       {
         notifyManagersOfInactiveAgents,
         maxInactivityMinutes,
+        inactiveAgentNotificationTarget,
       },
       "[task-cron] scheduler synchronized from persisted settings"
     );
@@ -3467,6 +3542,7 @@ function createTaskCronScheduler(
       }
       const cycle = await service.runTaskCronCycle?.({
         inactiveMinutes: maxInactivityMinutes,
+        notificationTarget: inactiveAgentNotificationTarget,
       });
       if (cycle) {
         app.log.info(
@@ -3565,6 +3641,27 @@ function createTaskCronScheduler(
         level: "info",
         source: "opengoat",
         message: `[task-cron] inactivity threshold updated to ${maxInactivityMinutes} minute(s).`,
+      });
+    },
+    setInactiveAgentNotificationTarget: (
+      nextTarget: InactiveAgentNotificationTarget,
+    ) => {
+      const parsed = parseInactiveAgentNotificationTarget(nextTarget);
+      if (!parsed || parsed === inactiveAgentNotificationTarget) {
+        return;
+      }
+      inactiveAgentNotificationTarget = parsed;
+      app.log.info(
+        {
+          inactiveAgentNotificationTarget,
+        },
+        "[task-cron] inactivity notification target updated"
+      );
+      logs.append({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "opengoat",
+        message: `[task-cron] inactivity notification target set to ${inactiveAgentNotificationTarget}.`,
       });
     },
     stop: () => {

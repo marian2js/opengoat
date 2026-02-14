@@ -1080,6 +1080,45 @@ describe("OpenGoatService", () => {
       ),
     ).toBe(true);
   });
+
+  it("supports notifying only ceo for inactive direct reports", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service, provider } = createService(root);
+    await service.initialize();
+    await service.createAgent("CTO", {
+      type: "manager",
+      reportsTo: "ceo",
+    });
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "cto",
+    });
+
+    const cycle = await service.runTaskCronCycle({
+      inactiveMinutes: 30,
+      notificationTarget: "ceo-only",
+    });
+
+    expect(cycle.inactiveAgents).toBe(1);
+    expect(cycle.dispatches).toHaveLength(1);
+    expect(cycle.dispatches[0]?.targetAgentId).toBe("ceo");
+    expect(cycle.dispatches[0]?.subjectAgentId).toBe("cto");
+
+    expect(
+      provider.invocations.some(
+        (entry) =>
+          entry.agent === "ceo" &&
+          entry.message.includes('Your reportee "@cto"'),
+      ),
+    ).toBe(true);
+    expect(
+      provider.invocations.some((entry) =>
+        entry.message.includes('Your reportee "@engineer"'),
+      ),
+    ).toBe(false);
+  });
 });
 
 function createService(

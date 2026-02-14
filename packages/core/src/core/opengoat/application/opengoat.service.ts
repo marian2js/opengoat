@@ -106,6 +106,8 @@ export interface TaskCronRunResult {
   dispatches: TaskCronDispatchResult[];
 }
 
+export type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
+
 export interface HardResetResult {
   homeDir: string;
   homeRemoved: boolean;
@@ -834,7 +836,10 @@ export class OpenGoatService {
   }
 
   public async runTaskCronCycle(
-    options: { inactiveMinutes?: number } = {},
+    options: {
+      inactiveMinutes?: number;
+      notificationTarget?: InactiveAgentNotificationTarget;
+    } = {},
   ): Promise<TaskCronRunResult> {
     const paths = this.pathsProvider.getPaths();
     const ranAt = this.resolveNowIso();
@@ -843,10 +848,14 @@ export class OpenGoatService {
       manifests.map((manifest) => [manifest.agentId, manifest]),
     );
     const inactiveMinutes = resolveInactiveMinutes(options.inactiveMinutes);
+    const notificationTarget = resolveInactiveAgentNotificationTarget(
+      options.notificationTarget,
+    );
     const inactiveCandidates = await this.collectInactiveAgents(
       paths,
       manifests,
       inactiveMinutes,
+      notificationTarget,
     );
     const latestCeoProjectPath = await this.resolveLatestProjectPathForAgent(
       paths,
@@ -1462,6 +1471,7 @@ export class OpenGoatService {
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
     manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
     inactiveMinutes: number,
+    notificationTarget: InactiveAgentNotificationTarget,
   ): Promise<
     Array<{
       managerAgentId: string;
@@ -1486,6 +1496,12 @@ export class OpenGoatService {
         manifest.metadata.reportsTo ?? "",
       );
       if (!managerAgentId) {
+        continue;
+      }
+      if (
+        notificationTarget === "ceo-only" &&
+        managerAgentId !== DEFAULT_AGENT_ID
+      ) {
         continue;
       }
 
@@ -1548,6 +1564,12 @@ function resolveInactiveMinutes(value: number | undefined): number {
     return 30;
   }
   return Math.floor(value);
+}
+
+function resolveInactiveAgentNotificationTarget(
+  value: InactiveAgentNotificationTarget | undefined,
+): InactiveAgentNotificationTarget {
+  return value === "ceo-only" ? "ceo-only" : "all-managers";
 }
 
 function extractManagedSkillsDir(payload: unknown): string | null {
@@ -1765,11 +1787,11 @@ function buildInactiveAgentMessage(params: {
     typeof params.lastActionTimestamp === "number" &&
     Number.isFinite(params.lastActionTimestamp)
       ? new Date(params.lastActionTimestamp).toISOString()
-      : "No recorded assistant actions yet";
+      : null;
   return [
     `Your reportee "@${params.subjectAgentId}" (${params.subjectName}) has no activity in the last ${params.inactiveMinutes} minutes.`,
     ...(params.role ? [`Role: ${params.role}`] : []),
-    ...(params.lastActionTimestamp ? [`Last action: ${lastAction}`] : []),
+    ...(lastAction ? [`Last action: ${lastAction}`] : []),
     "Please check in and unblock progress.",
   ].join("\n");
 }
