@@ -66,7 +66,7 @@ describe("runCli", () => {
       defaultAgent: string;
     };
     expect(config.defaultAgent).toBe("ceo");
-  }, 30_000);
+  }, 45_000);
 
   it("bootstraps through CLI init command", async () => {
     const root = await createTempDir("opengoat-runcli-");

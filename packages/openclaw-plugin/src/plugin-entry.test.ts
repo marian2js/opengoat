@@ -1,7 +1,7 @@
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import plugin from "../index.js";
 import type {
   OpenClawPluginApiLike,
@@ -36,6 +36,13 @@ class FakePluginApi implements OpenClawPluginApiLike {
   }
 }
 
+beforeEach(() => {
+  const stateKey = Symbol.for("opengoat.openclaw.plugin.registration-state");
+  delete (
+    globalThis as typeof globalThis & { [key: symbol]: unknown }
+  )[stateKey];
+});
+
 describe("openclaw plugin entrypoint", () => {
   it("registers CLI bridge and tool factories", () => {
     const api = new FakePluginApi();
@@ -68,5 +75,20 @@ describe("openclaw plugin entrypoint", () => {
       process.env.PATH = originalPath;
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+
+  it("registers only once when loaded under multiple plugin ids", () => {
+    const firstApi = new FakePluginApi();
+    firstApi.source = "/tmp/plugin-a/index.ts";
+    const secondApi = new FakePluginApi();
+    secondApi.source = "/tmp/plugin-b/index.ts";
+
+    plugin.register(firstApi);
+    plugin.register(secondApi);
+
+    expect(firstApi.cliRegistrars.length).toBe(1);
+    expect(firstApi.toolRegistrations.length).toBeGreaterThan(15);
+    expect(secondApi.cliRegistrars.length).toBe(0);
+    expect(secondApi.toolRegistrations.length).toBe(0);
   });
 });
