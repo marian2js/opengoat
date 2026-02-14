@@ -346,6 +346,88 @@ describe("OrchestrationService manager runtime", () => {
     );
   });
 
+  it("restarts local gateway when missing-agent retry still fails", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-manager-repair-restart-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+
+    const providerService = {
+      invokeAgent: vi
+        .fn()
+        .mockResolvedValueOnce({
+          code: 1,
+          stdout: "",
+          stderr: 'invalid agent params: unknown agent id "ceo"',
+          agentId: "ceo",
+          providerId: "openclaw"
+        })
+        .mockResolvedValueOnce({
+          code: 1,
+          stdout: "",
+          stderr: 'invalid agent params: unknown agent id "ceo"',
+          agentId: "ceo",
+          providerId: "openclaw"
+        })
+        .mockResolvedValueOnce({
+          code: 0,
+          stdout: "Recovered after gateway restart\n",
+          stderr: "",
+          agentId: "ceo",
+          providerId: "openclaw"
+        }),
+      createProviderAgent: vi.fn(async () => ({
+        code: 0,
+        stdout: "",
+        stderr: "",
+        agentId: "ceo",
+        providerId: "openclaw"
+      })),
+      restartLocalGateway: vi.fn(async () => true)
+    };
+
+    const sessionService = {
+      prepareRunSession: vi.fn(async () => ({
+        enabled: true,
+        info: {
+          agentId: "ceo",
+          sessionKey: "agent:ceo:main",
+          sessionId: "session-repair-restart",
+          transcriptPath: path.join(paths.sessionsDir, "ceo", "session-repair-restart.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "ceo"),
+          projectPath: tempDir,
+          isNewSession: true
+        },
+        compactionApplied: false
+      })),
+      recordAssistantReply: vi.fn(async () => ({
+        sessionKey: "agent:ceo:main",
+        sessionId: "session-repair-restart",
+        transcriptPath: path.join(paths.sessionsDir, "ceo", "session-repair-restart.jsonl"),
+        applied: false,
+        compactedMessages: 0
+      }))
+    };
+
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      agentManifestService: createManifestServiceStub(["ceo"], paths.workspacesDir) as unknown as AgentManifestService,
+      sessionService: sessionService as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-10T10:00:00.000Z"
+    });
+
+    const result = await service.runAgent(paths, "ceo", {
+      message: "hello"
+    });
+
+    expect(providerService.createProviderAgent).toHaveBeenCalledTimes(1);
+    expect(providerService.restartLocalGateway).toHaveBeenCalledTimes(1);
+    expect(providerService.invokeAgent).toHaveBeenCalledTimes(3);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("Recovered after gateway restart");
+  });
+
 });
 
 function createPaths(root: string): OpenGoatPaths {

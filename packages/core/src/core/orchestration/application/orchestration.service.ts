@@ -322,6 +322,25 @@ export class OrchestrationService {
       code: repair.code
     });
 
+    const retried = await this.providerService.invokeAgent(params.paths, params.agentId, params.invokeOptions, {
+      runId: params.runId,
+      step: params.step,
+      hooks: params.hooks
+    });
+
+    if (!containsMissingAgentMessage(retried.stdout, retried.stderr)) {
+      return retried;
+    }
+
+    const restarted = await this.providerService.restartLocalGateway(params.paths, params.invokeOptions.env);
+    if (!restarted) {
+      return retried;
+    }
+
+    this.logger.warn("OpenClaw missing-agent retry still failed; retried after gateway restart.", {
+      agentId: manifest.agentId
+    });
+
     return this.providerService.invokeAgent(params.paths, params.agentId, params.invokeOptions, {
       runId: params.runId,
       step: params.step,

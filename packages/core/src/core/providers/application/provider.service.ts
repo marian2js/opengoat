@@ -361,6 +361,42 @@ export class ProviderService {
     };
   }
 
+  public async restartLocalGateway(
+    paths: OpenGoatPaths,
+    inputEnv?: NodeJS.ProcessEnv
+  ): Promise<boolean> {
+    const env = await this.resolveProviderEnv(paths, inputEnv);
+    const gatewayConfig = await this.getOpenClawGatewayConfig(paths, env);
+    if (gatewayConfig.mode !== "local") {
+      return false;
+    }
+
+    const command = gatewayConfig.command?.trim() || "openclaw";
+    const args = [
+      ...extractOpenClawGlobalArgs(env.OPENCLAW_ARGUMENTS),
+      "gateway",
+      "restart",
+      "--json"
+    ];
+    const restartResult = await executeCommand({
+      command,
+      args,
+      cwd: paths.homeDir,
+      env
+    });
+    if (restartResult.code !== 0) {
+      this.logger.warn("OpenClaw gateway restart failed.", {
+        code: restartResult.code,
+        stderr: restartResult.stderr.trim() || undefined,
+        stdout: restartResult.stdout.trim() || undefined
+      });
+      return false;
+    }
+
+    this.logger.warn("OpenClaw gateway restarted.");
+    return true;
+  }
+
   private getProviderConfigPath(paths: OpenGoatPaths): string {
     return this.pathPort.join(paths.providersDir, OPENCLAW_PROVIDER_ID, "config.json");
   }
@@ -386,29 +422,8 @@ export class ProviderService {
       return result;
     }
 
-    const gatewayConfig = await this.getOpenClawGatewayConfig(paths, invokeOptions.env);
-    if (gatewayConfig.mode !== "local") {
-      return result;
-    }
-
-    const command = gatewayConfig.command?.trim() || "openclaw";
-    const args = [
-      ...extractOpenClawGlobalArgs(invokeOptions.env?.OPENCLAW_ARGUMENTS),
-      "gateway",
-      "restart",
-      "--json"
-    ];
-    const restartResult = await executeCommand({
-      command,
-      args,
-      cwd: paths.homeDir,
-      env: invokeOptions.env
-    });
-    if (restartResult.code !== 0) {
-      this.logger.warn("OpenClaw gateway restart failed after uv_cwd error.", {
-        code: restartResult.code,
-        stderr: restartResult.stderr.trim() || undefined
-      });
+    const restarted = await this.restartLocalGateway(paths, invokeOptions.env);
+    if (!restarted) {
       return result;
     }
 
