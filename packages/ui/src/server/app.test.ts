@@ -172,6 +172,35 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("returns a logs snapshot through the stream api", async () => {
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService()
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/logs/stream?follow=false&limit=20"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("application/x-ndjson");
+
+    const lines = response.body
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { type: string; entries?: unknown[] });
+
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toMatchObject({
+      type: "snapshot"
+    });
+    expect(Array.isArray(lines[0]?.entries)).toBe(true);
+    expect((lines[0]?.entries ?? []).length).toBeGreaterThan(0);
+  });
+
   it("gets and updates UI server settings through the api", async () => {
     const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     activeServer = await createOpenGoatUiServer({
@@ -722,11 +751,14 @@ describe("OpenGoat UI server API", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(runAgent).toHaveBeenCalledWith("ceo", {
-      message: "hello",
-      sessionRef: "workspace:tmp",
-      cwd: "/tmp"
-    });
+    expect(runAgent).toHaveBeenCalledWith(
+      "ceo",
+      expect.objectContaining({
+        message: "hello",
+        sessionRef: "workspace:tmp",
+        cwd: "/tmp"
+      })
+    );
     expect(response.json()).toMatchObject({
       output: "assistant response",
       result: {
@@ -789,18 +821,21 @@ describe("OpenGoat UI server API", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(runAgent).toHaveBeenCalledWith("ceo", {
-      message: "Please analyze the attached image.",
-      sessionRef: "workspace:tmp",
-      cwd: "/tmp",
-      images: [
-        {
-          name: "chart.png",
-          mediaType: "image/png",
-          dataUrl: "data:image/png;base64,Zm9v"
-        }
-      ]
-    });
+    expect(runAgent).toHaveBeenCalledWith(
+      "ceo",
+      expect.objectContaining({
+        message: "Please analyze the attached image.",
+        sessionRef: "workspace:tmp",
+        cwd: "/tmp",
+        images: [
+          {
+            name: "chart.png",
+            mediaType: "image/png",
+            dataUrl: "data:image/png;base64,Zm9v"
+          }
+        ]
+      })
+    );
   });
 
   it("streams session message progress events and final result", async () => {

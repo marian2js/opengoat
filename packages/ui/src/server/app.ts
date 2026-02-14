@@ -20,6 +20,11 @@ const UI_SETTINGS_FILENAME = "ui-settings.json";
 const OPENGOAT_PACKAGE_NAME = "opengoat";
 const VERSION_CACHE_TTL_MS = 5 * 60_000;
 const VERSION_CHECK_TIMEOUT_MS = 2_000;
+const MAX_UI_LOG_ENTRIES = 4000;
+const DEFAULT_LOG_STREAM_LIMIT = 300;
+const MAX_LOG_STREAM_LIMIT = 1000;
+const LOG_STREAM_HEARTBEAT_MS = 15_000;
+const OPENCLAW_LOG_POLL_INTERVAL_MS = 1200;
 
 interface AgentDescriptor {
   id: string;
@@ -308,6 +313,52 @@ type SessionMessageStreamEvent =
   | SessionMessageStreamResultEvent
   | SessionMessageStreamErrorEvent;
 
+type UiLogLevel = "info" | "warn" | "error";
+type UiLogSource = "opengoat" | "openclaw";
+
+interface UiLogEntry {
+  id: number;
+  timestamp: string;
+  level: UiLogLevel;
+  source: UiLogSource;
+  message: string;
+}
+
+interface UiLogSnapshotStreamEvent {
+  type: "snapshot";
+  entries: UiLogEntry[];
+}
+
+interface UiLogLineStreamEvent {
+  type: "log";
+  entry: UiLogEntry;
+}
+
+interface UiLogHeartbeatStreamEvent {
+  type: "heartbeat";
+  timestamp: string;
+}
+
+interface UiLogErrorStreamEvent {
+  type: "error";
+  timestamp: string;
+  error: string;
+}
+
+type UiLogStreamEvent =
+  | UiLogSnapshotStreamEvent
+  | UiLogLineStreamEvent
+  | UiLogHeartbeatStreamEvent
+  | UiLogErrorStreamEvent;
+
+interface UiLogBuffer {
+  append: (entry: Omit<UiLogEntry, "id">) => UiLogEntry;
+  listRecent: (limit: number) => UiLogEntry[];
+  subscribe: (listener: (entry: UiLogEntry) => void) => () => void;
+  start: () => void;
+  stop: () => void;
+}
+
 export interface OpenGoatUiServerOptions {
   logger?: boolean;
   mode?: "development" | "production";
@@ -319,6 +370,132 @@ interface RegisterApiRoutesDeps {
   getSettings: () => UiServerSettings;
   updateSettings: (settings: UiServerSettings) => Promise<void>;
   getVersionInfo: () => Promise<UiVersionInfo>;
+  logs: UiLogBuffer;
+}
+
+function createUiLogBuffer(service: OpenClawUiService): UiLogBuffer {
+  const entries: UiLogEntry[] = [];
+  const listeners = new Set<(entry: UiLogEntry) => void>();
+  let nextId = 1;
+  let poller: NodeJS.Timeout | undefined;
+  let pollInFlight = false;
+  let cursor: number | undefined;
+  let reportedPollFailure = false;
+
+  const append = (entry: Omit<UiLogEntry, "id">): UiLogEntry => {
+    const next: UiLogEntry = {
+      ...entry,
+      id: nextId,
+    };
+    nextId += 1;
+    entries.push(next);
+    if (entries.length > MAX_UI_LOG_ENTRIES) {
+      entries.splice(0, entries.length - MAX_UI_LOG_ENTRIES);
+    }
+    for (const listener of listeners) {
+      listener(next);
+    }
+    return next;
+  };
+
+  const pollOpenClawLogs = async (): Promise<void> => {
+    if (pollInFlight || typeof service.getOpenClawGatewayConfig !== "function") {
+      return;
+    }
+
+    pollInFlight = true;
+    try {
+      const tailed = await fetchOpenClawGatewayLogTail(service, {
+        cursor,
+        limit: 200,
+        maxBytes: 250000,
+      });
+      cursor = tailed.cursor;
+      for (const line of tailed.lines) {
+        const parsed = parseCommandJson(line);
+        const message = resolveUiLogMessageFromGatewayLine(parsed, line);
+        if (!message) {
+          continue;
+        }
+        append({
+          timestamp: resolveUiLogTimestamp(parsed),
+          level: resolveUiLogLevel(parsed),
+          source: "openclaw",
+          message,
+        });
+      }
+      reportedPollFailure = false;
+    } catch (error) {
+      if (!reportedPollFailure) {
+        append({
+          timestamp: new Date().toISOString(),
+          level: "warn",
+          source: "opengoat",
+          message:
+            error instanceof Error
+              ? `OpenClaw log stream unavailable: ${error.message}`
+              : "OpenClaw log stream unavailable.",
+        });
+        reportedPollFailure = true;
+      }
+    } finally {
+      pollInFlight = false;
+    }
+  };
+
+  const ensurePolling = (): void => {
+    if (
+      poller ||
+      listeners.size === 0 ||
+      typeof service.getOpenClawGatewayConfig !== "function"
+    ) {
+      return;
+    }
+    void pollOpenClawLogs();
+    poller = setInterval(() => {
+      void pollOpenClawLogs();
+    }, OPENCLAW_LOG_POLL_INTERVAL_MS);
+    poller.unref?.();
+  };
+
+  const stopPollingIfIdle = (): void => {
+    if (listeners.size > 0 || !poller) {
+      return;
+    }
+    clearInterval(poller);
+    poller = undefined;
+  };
+
+  return {
+    append,
+    listRecent: (limit: number): UiLogEntry[] => {
+      if (entries.length === 0) {
+        return [];
+      }
+      const safeLimit = Math.min(
+        Math.max(1, Math.floor(limit || DEFAULT_LOG_STREAM_LIMIT)),
+        MAX_LOG_STREAM_LIMIT,
+      );
+      return entries.slice(-safeLimit);
+    },
+    subscribe: (listener: (entry: UiLogEntry) => void): (() => void) => {
+      listeners.add(listener);
+      ensurePolling();
+      return () => {
+        listeners.delete(listener);
+        stopPollingIfIdle();
+      };
+    },
+    start: () => {
+      ensurePolling();
+    },
+    stop: () => {
+      if (poller) {
+        clearInterval(poller);
+        poller = undefined;
+      }
+    },
+  };
 }
 
 export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = {}): Promise<FastifyInstance> {
@@ -337,16 +514,27 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
     await service.initialize();
   }
 
+  const logs = createUiLogBuffer(service);
+  logs.append({
+    timestamp: new Date().toISOString(),
+    level: "info",
+    source: "opengoat",
+    message: "OpenGoat UI server started.",
+  });
+  logs.start();
+
   let uiSettings = await readUiServerSettings(service.getHomeDir());
   const getVersionInfo = createVersionInfoProvider();
   const taskCronScheduler = createTaskCronScheduler(
     app,
     service,
     uiSettings.taskCheckFrequencyMinutes,
-    uiSettings.taskCronEnabled
+    uiSettings.taskCronEnabled,
+    logs,
   );
   app.addHook("onClose", async () => {
     taskCronScheduler.stop();
+    logs.stop();
   });
 
   await app.register(cors, { origin: true });
@@ -358,7 +546,8 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
       taskCronScheduler.setEnabled(uiSettings.taskCronEnabled);
       taskCronScheduler.setTaskCheckFrequencyMinutes(uiSettings.taskCheckFrequencyMinutes);
     },
-    getVersionInfo
+    getVersionInfo,
+    logs,
   });
 
   if (attachFrontend) {
@@ -427,6 +616,12 @@ function registerApiRoutes(
         taskCheckFrequencyMinutes: parsedFrequency
       };
       await deps.updateSettings(nextSettings);
+      deps.logs.append({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "opengoat",
+        message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} taskCheckFrequencyMinutes=${nextSettings.taskCheckFrequencyMinutes}`,
+      });
       return {
         settings: nextSettings,
         message: `Task cron ${nextSettings.taskCronEnabled ? "enabled" : "disabled"}; frequency ${nextSettings.taskCheckFrequencyMinutes} minute(s).`
@@ -440,6 +635,64 @@ function registerApiRoutes(
         version: await deps.getVersionInfo()
       };
     });
+  });
+
+  app.get<{ Querystring: { limit?: string; follow?: string } }>("/api/logs/stream", async (request, reply) => {
+    const limit = parseUiLogStreamLimit(request.query?.limit);
+    const follow = parseUiLogStreamFollow(request.query?.follow);
+    const raw = reply.raw;
+
+    reply.hijack();
+    raw.statusCode = 200;
+    raw.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+    raw.setHeader("Cache-Control", "no-cache, no-transform");
+    raw.setHeader("Connection", "keep-alive");
+    raw.setHeader("X-Accel-Buffering", "no");
+    raw.flushHeaders?.();
+
+    const writeEvent = (event: UiLogStreamEvent): void => {
+      if (raw.destroyed || raw.writableEnded) {
+        return;
+      }
+      raw.write(`${JSON.stringify(event)}\n`);
+    };
+
+    writeEvent({
+      type: "snapshot",
+      entries: deps.logs.listRecent(limit),
+    });
+
+    if (!follow) {
+      if (!raw.destroyed && !raw.writableEnded) {
+        raw.end();
+      }
+      return;
+    }
+
+    const unsubscribe = deps.logs.subscribe((entry) => {
+      writeEvent({
+        type: "log",
+        entry,
+      });
+    });
+    const heartbeat = setInterval(() => {
+      writeEvent({
+        type: "heartbeat",
+        timestamp: new Date().toISOString(),
+      });
+    }, LOG_STREAM_HEARTBEAT_MS);
+    heartbeat.unref?.();
+
+    const cleanup = (): void => {
+      unsubscribe();
+      clearInterval(heartbeat);
+      if (!raw.destroyed && !raw.writableEnded) {
+        raw.end();
+      }
+    };
+
+    raw.on("close", cleanup);
+    raw.on("error", cleanup);
   });
 
   app.get("/api/openclaw/overview", async (_request, reply) => {
@@ -1042,6 +1295,13 @@ function registerApiRoutes(
         };
       }
 
+      deps.logs.append({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "opengoat",
+        message: `Session message request queued for @${agentId} (session=${sessionRef}).`,
+      });
+
       const result = await runUiSessionMessage(service, agentId, {
         sessionRef,
         projectPath,
@@ -1050,10 +1310,34 @@ function registerApiRoutes(
           (images.length === 1
             ? "Please analyze the attached image."
             : "Please analyze the attached images."),
-        images: images.length > 0 ? images : undefined
+        images: images.length > 0 ? images : undefined,
+        hooks: {
+          onEvent: (event) => {
+            deps.logs.append({
+              timestamp: event.timestamp || new Date().toISOString(),
+              level:
+                event.stage === "provider_invocation_completed" &&
+                typeof event.code === "number" &&
+                event.code !== 0
+                  ? "warn"
+                  : "info",
+              source: "opengoat",
+              message: formatRunStatusMessage(event),
+            });
+          },
+        },
       });
 
       const output = sanitizeConversationText(result.stdout.trim() || result.stderr.trim());
+      deps.logs.append({
+        timestamp: new Date().toISOString(),
+        level: result.code === 0 ? "info" : "warn",
+        source: "opengoat",
+        message:
+          result.code === 0
+            ? `Session message completed for @${agentId} (session=${sessionRef}).`
+            : `Session message completed with code ${result.code} for @${agentId} (session=${sessionRef}).`,
+      });
 
       return {
         agentId,
@@ -1148,6 +1432,12 @@ function registerApiRoutes(
     };
 
     writeProgress("queued", "Queued request.");
+    deps.logs.append({
+      timestamp: new Date().toISOString(),
+      level: "info",
+      source: "opengoat",
+      message: `Streaming session message request queued for @${agentId} (session=${sessionRef}).`,
+    });
 
     const startRuntimeLogPolling = async (runId: string): Promise<void> => {
       runtimeRunId = runId;
@@ -1202,6 +1492,14 @@ function registerApiRoutes(
                 ? "Live activity is unavailable in this environment."
                 : "Live activity stream is temporarily unavailable.",
             );
+            deps.logs.append({
+              timestamp: new Date().toISOString(),
+              level: "warn",
+              source: "opengoat",
+              message: details.includes("enoent")
+                ? "Live OpenClaw activity is unavailable in this environment."
+                : "Live OpenClaw activity stream is temporarily unavailable.",
+            });
           }
         } finally {
           inFlight = false;
@@ -1250,6 +1548,17 @@ function registerApiRoutes(
         images: images.length > 0 ? images : undefined,
         hooks: {
           onEvent: (event) => {
+            deps.logs.append({
+              timestamp: event.timestamp || new Date().toISOString(),
+              level:
+                event.stage === "provider_invocation_completed" &&
+                typeof event.code === "number" &&
+                event.code !== 0
+                  ? "warn"
+                  : "info",
+              source: "opengoat",
+              message: formatRunStatusMessage(event),
+            });
             const phase = mapRunStageToProgressPhase(event.stage);
             writeProgress(phase, formatRunStatusMessage(event));
             if (
@@ -1285,9 +1594,24 @@ function registerApiRoutes(
             ? "Message sent."
             : "Message completed with non-zero exit code.",
       });
+      deps.logs.append({
+        timestamp: new Date().toISOString(),
+        level: result.code === 0 ? "info" : "warn",
+        source: "opengoat",
+        message:
+          result.code === 0
+            ? `Streaming session message completed for @${agentId} (session=${sessionRef}).`
+            : `Streaming session message completed with code ${result.code} for @${agentId} (session=${sessionRef}).`,
+      });
     } catch (error) {
       const streamError =
         error instanceof Error ? error.message : "Unexpected server error";
+      deps.logs.append({
+        timestamp: new Date().toISOString(),
+        level: "error",
+        source: "opengoat",
+        message: `Streaming session message failed for @${agentId} (session=${sessionRef}): ${streamError}`,
+      });
       writeEvent({
         type: "error",
         timestamp: new Date().toISOString(),
@@ -1885,6 +2209,63 @@ function parseCommandJson(value: string): Record<string, unknown> | null {
   }
 
   return null;
+}
+
+function resolveUiLogMessageFromGatewayLine(
+  parsed: Record<string, unknown> | null,
+  fallbackLine: string,
+): string | null {
+  if (!parsed) {
+    const cleaned = sanitizeRuntimeProgressChunk(fallbackLine);
+    return cleaned || null;
+  }
+
+  const preferredCandidates = [
+    parsed["1"],
+    parsed.message,
+    parsed["0"],
+  ];
+  for (const candidate of preferredCandidates) {
+    if (typeof candidate !== "string") {
+      continue;
+    }
+    const cleaned = sanitizeRuntimeProgressChunk(candidate);
+    if (cleaned) {
+      return cleaned;
+    }
+  }
+
+  const serialized = sanitizeRuntimeProgressChunk(JSON.stringify(parsed));
+  return serialized || null;
+}
+
+function resolveUiLogTimestamp(parsed: Record<string, unknown> | null): string {
+  const timeRaw = parsed?.time;
+  if (
+    typeof timeRaw === "string" &&
+    Number.isFinite(Date.parse(timeRaw))
+  ) {
+    return new Date(timeRaw).toISOString();
+  }
+  return new Date().toISOString();
+}
+
+function resolveUiLogLevel(parsed: Record<string, unknown> | null): UiLogLevel {
+  const meta = parsed?._meta;
+  const level =
+    meta && typeof meta === "object" && typeof (meta as Record<string, unknown>).logLevelName === "string"
+      ? (meta as Record<string, unknown>).logLevelName
+      : typeof parsed?.level === "string"
+        ? parsed.level
+        : "";
+  const normalized = level.trim().toLowerCase();
+  if (normalized === "error" || normalized === "fatal") {
+    return "error";
+  }
+  if (normalized === "warn" || normalized === "warning") {
+    return "warn";
+  }
+  return "info";
 }
 
 export function extractRuntimeActivityFromLogLines(
@@ -2678,6 +3059,41 @@ function parseTaskCronEnabled(value: unknown): boolean | undefined {
   return undefined;
 }
 
+function parseUiLogStreamLimit(value: unknown): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return DEFAULT_LOG_STREAM_LIMIT;
+  }
+  return Math.min(parsed, MAX_LOG_STREAM_LIMIT);
+}
+
+function parseUiLogStreamFollow(value: unknown): boolean {
+  if (value === undefined || value === null || value === "") {
+    return true;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "false" || normalized === "0" || normalized === "no") {
+      return false;
+    }
+    if (normalized === "true" || normalized === "1" || normalized === "yes") {
+      return true;
+    }
+  }
+  return true;
+}
+
 function parseTaskCheckFrequencyMinutes(value: unknown): number | undefined {
   const parsed =
     typeof value === "number"
@@ -2734,7 +3150,8 @@ function createTaskCronScheduler(
   app: FastifyInstance,
   service: OpenClawUiService,
   initialTaskCheckFrequencyMinutes: number,
-  initialTaskCronEnabled: boolean
+  initialTaskCronEnabled: boolean,
+  logs: UiLogBuffer,
 ): TaskCronScheduler {
   if (typeof service.runTaskCronCycle !== "function") {
     return {
@@ -2813,6 +3230,12 @@ function createTaskCronScheduler(
           },
           "[task-cron] cycle completed"
         );
+        logs.append({
+          timestamp: new Date().toISOString(),
+          level: cycle.failed > 0 ? "warn" : "info",
+          source: "opengoat",
+          message: `[task-cron] cycle completed ran=${cycle.ranAt} scanned=${cycle.scannedTasks} todo=${cycle.todoTasks} blocked=${cycle.blockedTasks} inactive=${cycle.inactiveAgents} sent=${cycle.sent} failed=${cycle.failed}`,
+        });
       }
     } catch (error) {
       app.log.error(
@@ -2821,6 +3244,15 @@ function createTaskCronScheduler(
         },
         "[task-cron] cycle failed"
       );
+      logs.append({
+        timestamp: new Date().toISOString(),
+        level: "error",
+        source: "opengoat",
+        message:
+          error instanceof Error
+            ? `[task-cron] cycle failed: ${error.message}`
+            : "[task-cron] cycle failed.",
+      });
     } finally {
       running = false;
     }
@@ -2856,6 +3288,12 @@ function createTaskCronScheduler(
         },
         "[task-cron] scheduler interval updated"
       );
+      logs.append({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "opengoat",
+        message: `[task-cron] interval updated to ${taskCheckFrequencyMinutes} minute(s).`,
+      });
     },
     setEnabled: (nextEnabled: boolean) => {
       const parsed = parseTaskCronEnabled(nextEnabled);
@@ -2870,6 +3308,12 @@ function createTaskCronScheduler(
         },
         "[task-cron] scheduler state updated"
       );
+      logs.append({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "opengoat",
+        message: `[task-cron] scheduler ${taskCronEnabled ? "enabled" : "disabled"}.`,
+      });
     },
     stop: () => {
       if (intervalHandle) {

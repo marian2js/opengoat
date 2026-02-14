@@ -73,6 +73,7 @@ import {
   Plus,
   Settings,
   Sparkles,
+  TerminalSquare,
   UsersRound,
 } from "lucide-react";
 import type { ComponentType, ReactElement } from "react";
@@ -80,7 +81,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Fragment } from "react";
 import { toast } from "sonner";
 
-type PageView = "overview" | "tasks" | "agents" | "skills" | "settings";
+type PageView =
+  | "overview"
+  | "tasks"
+  | "agents"
+  | "skills"
+  | "logs"
+  | "settings";
 
 type AppRoute =
   | {
@@ -390,6 +397,44 @@ interface SessionMessageImageInput {
   name?: string;
 }
 
+type UiLogLevel = "info" | "warn" | "error";
+type UiLogSource = "opengoat" | "openclaw";
+
+interface UiLogEntry {
+  id: number;
+  timestamp: string;
+  level: UiLogLevel;
+  source: UiLogSource;
+  message: string;
+}
+
+interface UiLogsSnapshotEvent {
+  type: "snapshot";
+  entries: UiLogEntry[];
+}
+
+interface UiLogsLineEvent {
+  type: "log";
+  entry: UiLogEntry;
+}
+
+interface UiLogsHeartbeatEvent {
+  type: "heartbeat";
+  timestamp: string;
+}
+
+interface UiLogsErrorEvent {
+  type: "error";
+  timestamp: string;
+  error: string;
+}
+
+type UiLogsStreamEvent =
+  | UiLogsSnapshotEvent
+  | UiLogsLineEvent
+  | UiLogsHeartbeatEvent
+  | UiLogsErrorEvent;
+
 interface SessionChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -450,6 +495,10 @@ const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
 const DEFAULT_AGENT_ID = "ceo";
 const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
+const DEFAULT_LOG_STREAM_LIMIT = 300;
+const MAX_UI_LOG_ENTRIES = 1200;
+const LOG_FLUSH_INTERVAL_MS = 100;
+const LOG_AUTOSCROLL_BOTTOM_THRESHOLD_PX = 24;
 const TASK_STATUS_OPTIONS = [
   { value: "todo", label: "To do" },
   { value: "doing", label: "In progress" },
@@ -463,6 +512,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "tasks", label: "Tasks", icon: Boxes },
   { id: "agents", label: "Agents", icon: UsersRound },
   { id: "skills", label: "Skills", icon: Sparkles },
+  { id: "logs", label: "Logs", icon: TerminalSquare },
 ];
 
 const DEFAULT_FORM: CreateAgentForm = {
@@ -541,6 +591,15 @@ export function App(): ReactElement {
     kind: "worklog",
     content: "",
   });
+  const [uiLogs, setUiLogs] = useState<UiLogEntry[]>([]);
+  const [logsConnectionState, setLogsConnectionState] = useState<
+    "connecting" | "live" | "offline"
+  >("connecting");
+  const [logsError, setLogsError] = useState<string | null>(null);
+  const [logsAutoScrollEnabled, setLogsAutoScrollEnabled] = useState(true);
+  const logsViewportRef = useRef<HTMLDivElement | null>(null);
+  const pendingUiLogsRef = useRef<UiLogEntry[]>([]);
+  const logsFlushTimerRef = useRef<number | null>(null);
 
   const navigateToRoute = useCallback((nextRoute: AppRoute) => {
     const nextPath = routeToPath(nextRoute);
@@ -2668,6 +2727,141 @@ export function App(): ReactElement {
       : new Error("Unable to send session message.");
   }
 
+  const flushPendingUiLogs = useCallback(() => {
+    const queued = pendingUiLogsRef.current;
+    if (queued.length === 0) {
+      return;
+    }
+    pendingUiLogsRef.current = [];
+    setUiLogs((current) => {
+      const next = [...current, ...queued];
+      if (next.length <= MAX_UI_LOG_ENTRIES) {
+        return next;
+      }
+      return next.slice(next.length - MAX_UI_LOG_ENTRIES);
+    });
+  }, []);
+
+  const scheduleUiLogFlush = useCallback(() => {
+    if (logsFlushTimerRef.current !== null) {
+      return;
+    }
+    logsFlushTimerRef.current = window.setTimeout(() => {
+      logsFlushTimerRef.current = null;
+      flushPendingUiLogs();
+    }, LOG_FLUSH_INTERVAL_MS);
+  }, [flushPendingUiLogs]);
+
+  const queueUiLogEntry = useCallback(
+    (entry: UiLogEntry) => {
+      pendingUiLogsRef.current.push(entry);
+      scheduleUiLogFlush();
+    },
+    [scheduleUiLogFlush],
+  );
+
+  const handleLogsViewportScroll = useCallback(() => {
+    const viewport = logsViewportRef.current;
+    if (!viewport) {
+      return;
+    }
+    const distanceToBottom =
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    const nextAutoScroll =
+      distanceToBottom <= LOG_AUTOSCROLL_BOTTOM_THRESHOLD_PX;
+    setLogsAutoScrollEnabled((current) =>
+      current === nextAutoScroll ? current : nextAutoScroll,
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!logsAutoScrollEnabled) {
+      return;
+    }
+    const viewport = logsViewportRef.current;
+    if (!viewport) {
+      return;
+    }
+    viewport.scrollTop = viewport.scrollHeight;
+  }, [logsAutoScrollEnabled, uiLogs.length]);
+
+  useEffect(() => {
+    return () => {
+      if (logsFlushTimerRef.current !== null) {
+        clearTimeout(logsFlushTimerRef.current);
+        logsFlushTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (route.kind !== "page" || route.view !== "logs") {
+      return;
+    }
+
+    const abortController = new AbortController();
+    setLogsConnectionState("connecting");
+    setLogsError(null);
+    setLogsAutoScrollEnabled(true);
+
+    const run = async (): Promise<void> => {
+      try {
+        await streamUiLogs(
+          {
+            signal: abortController.signal,
+            limit: DEFAULT_LOG_STREAM_LIMIT,
+            follow: true,
+          },
+          {
+            onSnapshot: (entries) => {
+              pendingUiLogsRef.current = [];
+              setUiLogs(() => {
+                const trimmed =
+                  entries.length > MAX_UI_LOG_ENTRIES
+                    ? entries.slice(entries.length - MAX_UI_LOG_ENTRIES)
+                    : entries;
+                return [...trimmed];
+              });
+              setLogsConnectionState("live");
+            },
+            onLog: (entry) => {
+              queueUiLogEntry(entry);
+              setLogsConnectionState("live");
+            },
+          },
+        );
+
+        if (!abortController.signal.aborted) {
+          flushPendingUiLogs();
+          setLogsConnectionState("offline");
+          setLogsError("Logs stream disconnected.");
+        }
+      } catch (streamError) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+        flushPendingUiLogs();
+        setLogsConnectionState("offline");
+        setLogsError(
+          streamError instanceof Error
+            ? streamError.message
+            : "Unable to load logs.",
+        );
+      }
+    };
+
+    void run();
+
+    return () => {
+      abortController.abort();
+      if (logsFlushTimerRef.current !== null) {
+        clearTimeout(logsFlushTimerRef.current);
+        logsFlushTimerRef.current = null;
+      }
+      flushPendingUiLogs();
+    };
+  }, [flushPendingUiLogs, queueUiLogEntry, route]);
+
   return (
     <div className="h-screen bg-background text-[14px] text-foreground">
       <Toaster />
@@ -4205,6 +4399,104 @@ export function App(): ReactElement {
                   </div>
                 ) : null}
 
+                {route.kind === "page" && route.view === "logs" ? (
+                  <section className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm text-muted-foreground">
+                        Real-time runtime activity from OpenGoat and OpenClaw.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide",
+                            logsConnectionState === "live"
+                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                              : logsConnectionState === "connecting"
+                                ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
+                                : "border-rose-500/40 bg-rose-500/10 text-rose-200",
+                          )}
+                        >
+                          {logsConnectionState}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setUiLogs([]);
+                            pendingUiLogsRef.current = [];
+                          }}
+                        >
+                          Clear
+                        </Button>
+                        {!logsAutoScrollEnabled ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              const viewport = logsViewportRef.current;
+                              if (viewport) {
+                                viewport.scrollTop = viewport.scrollHeight;
+                              }
+                              setLogsAutoScrollEnabled(true);
+                            }}
+                          >
+                            Jump to Latest
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="overflow-hidden rounded-xl border border-emerald-500/20 bg-[#030a03] shadow-[0_0_0_1px_rgba(16,185,129,0.08)]">
+                      <div className="flex items-center justify-between border-b border-emerald-500/15 bg-[#041004] px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-emerald-300/90">
+                        <span>OpenGoat Terminal</span>
+                        <span>{`${uiLogs.length} line${uiLogs.length === 1 ? "" : "s"}`}</span>
+                      </div>
+                      <div
+                        ref={logsViewportRef}
+                        onScroll={handleLogsViewportScroll}
+                        className="max-h-[68vh] min-h-[340px] overflow-y-auto px-3 py-2 font-mono text-[12px] leading-5"
+                      >
+                        {logsError ? (
+                          <div className="mb-2 rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-rose-200">
+                            {logsError}
+                          </div>
+                        ) : null}
+                        {uiLogs.length === 0 ? (
+                          <p className="text-emerald-200/70">
+                            Waiting for runtime activity...
+                          </p>
+                        ) : (
+                          uiLogs.map((entry) => (
+                            <div
+                              key={entry.id}
+                              className="grid grid-cols-[76px_82px_1fr] items-start gap-2 py-0.5"
+                            >
+                              <span className="text-emerald-200/60">
+                                {formatUiLogTimestamp(entry.timestamp)}
+                              </span>
+                              <span
+                                className={cn(
+                                  "font-semibold uppercase",
+                                  uiLogLevelClassName(entry.level),
+                                )}
+                              >
+                                {`${entry.source}:${entry.level}`}
+                              </span>
+                              <span
+                                className={cn(
+                                  "whitespace-pre-wrap break-words",
+                                  uiLogMessageClassName(entry.level),
+                                )}
+                              >
+                                {entry.message}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+
                 {route.kind === "page" && route.view === "settings" ? (
                   <Card className="max-w-3xl border-border/80 bg-card/60">
                     <CardHeader>
@@ -4833,6 +5125,111 @@ async function readResponseError(response: Response): Promise<string> {
   return `Request failed with ${response.status}`;
 }
 
+async function streamUiLogs(
+  options: {
+    signal: AbortSignal;
+    limit: number;
+    follow: boolean;
+  },
+  handlers: {
+    onSnapshot: (entries: UiLogEntry[]) => void;
+    onLog: (entry: UiLogEntry) => void;
+  },
+): Promise<void> {
+  const query = new URLSearchParams({
+    limit: String(options.limit),
+    follow: options.follow ? "1" : "0",
+  });
+  const response = await fetch(`/api/logs/stream?${query.toString()}`, {
+    method: "GET",
+    signal: options.signal,
+  });
+  if (!response.ok) {
+    throw new Error(await readResponseError(response));
+  }
+
+  const body = response.body;
+  if (!body) {
+    throw new Error("Log stream response body is unavailable.");
+  }
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        continue;
+      }
+      const event = JSON.parse(trimmed) as UiLogsStreamEvent;
+      if (event.type === "error") {
+        throw new Error(event.error || "Log stream failed.");
+      }
+      if (event.type === "snapshot") {
+        handlers.onSnapshot(event.entries);
+      }
+      if (event.type === "log") {
+        handlers.onLog(event.entry);
+      }
+    }
+
+    if (done) {
+      break;
+    }
+  }
+
+  if (buffer.trim()) {
+    const event = JSON.parse(buffer.trim()) as UiLogsStreamEvent;
+    if (event.type === "error") {
+      throw new Error(event.error || "Log stream failed.");
+    }
+    if (event.type === "snapshot") {
+      handlers.onSnapshot(event.entries);
+    }
+    if (event.type === "log") {
+      handlers.onLog(event.entry);
+    }
+  }
+}
+
+function formatUiLogTimestamp(value: string): string {
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) {
+    return value;
+  }
+  return new Date(parsed).toISOString().slice(11, 19);
+}
+
+function uiLogLevelClassName(level: UiLogLevel): string {
+  switch (level) {
+    case "error":
+      return "text-rose-300";
+    case "warn":
+      return "text-amber-200";
+    default:
+      return "text-emerald-300";
+  }
+}
+
+function uiLogMessageClassName(level: UiLogLevel): string {
+  switch (level) {
+    case "error":
+      return "text-rose-100";
+    case "warn":
+      return "text-amber-50";
+    default:
+      return "text-emerald-100";
+  }
+}
+
 function buildTaskWorkspaceResponse(response: TasksResponse): TaskWorkspacesResponse {
   return {
     taskWorkspaces: [
@@ -4873,6 +5270,8 @@ function viewTitle(
       return "Agents";
     case "skills":
       return "Skills";
+    case "logs":
+      return "Logs";
     case "settings":
       return "Settings";
     default:
@@ -4933,6 +5332,10 @@ function parseRoute(pathname: string): AppRoute {
 
   if (normalized === "/skills") {
     return { kind: "page", view: "skills" };
+  }
+
+  if (normalized === "/logs") {
+    return { kind: "page", view: "logs" };
   }
 
   if (normalized === "/settings") {
