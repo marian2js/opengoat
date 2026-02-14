@@ -74,6 +74,11 @@ interface RoleAssignmentSyncResult {
   skippedPaths: string[];
 }
 
+export interface WorkspaceCommandShimSyncResult {
+  createdPaths: string[];
+  skippedPaths: string[];
+}
+
 export class AgentService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
@@ -207,11 +212,7 @@ export class AgentService {
     const removedPaths: string[] = [];
 
     await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
-    await this.writeOpenGoatWorkspaceShim(
-      workspaceDir,
-      createdPaths,
-      skippedPaths,
-    );
+    await this.writeOpenGoatWorkspaceShim(workspaceDir, createdPaths, skippedPaths);
 
     await this.rewriteAgentsMarkdown(
       agentsPath,
@@ -252,6 +253,26 @@ export class AgentService {
       createdPaths,
       skippedPaths,
       removedPaths,
+    };
+  }
+
+  public async ensureAgentWorkspaceCommandShim(
+    paths: OpenGoatPaths,
+    rawAgentId: string,
+  ): Promise<WorkspaceCommandShimSyncResult> {
+    const agentId = normalizeAgentId(rawAgentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
+    const createdPaths: string[] = [];
+    const skippedPaths: string[] = [];
+    await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
+    await this.writeOpenGoatWorkspaceShim(workspaceDir, createdPaths, skippedPaths);
+    return {
+      createdPaths,
+      skippedPaths,
     };
   }
 

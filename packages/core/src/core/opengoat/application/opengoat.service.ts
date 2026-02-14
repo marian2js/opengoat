@@ -438,6 +438,20 @@ export class OpenGoatService {
       );
     }
 
+    try {
+      const agents = await this.agentService.listAgents(paths);
+      for (const agent of agents) {
+        await this.agentService.ensureAgentWorkspaceCommandShim(
+          paths,
+          agent.id,
+        );
+      }
+    } catch (error) {
+      warnings.push(
+        `OpenGoat workspace command shim sync failed: ${toErrorMessage(error)}`,
+      );
+    }
+
     return {
       ceoSyncCode,
       ceoSynced,
