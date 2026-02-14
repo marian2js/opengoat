@@ -14,8 +14,9 @@ import { createOpenGoatRuntime } from "@opengoat/core";
 const DEFAULT_AGENT_ID = "ceo";
 const execFileAsync = promisify(execFile);
 const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
-const MIN_TASK_CHECK_FREQUENCY_MINUTES = 1;
-const MAX_TASK_CHECK_FREQUENCY_MINUTES = 1440;
+const DEFAULT_MAX_INACTIVITY_MINUTES = 30;
+const MIN_MAX_INACTIVITY_MINUTES = 1;
+const MAX_MAX_INACTIVITY_MINUTES = 10_080;
 const UI_SETTINGS_FILENAME = "ui-settings.json";
 const OPENGOAT_PACKAGE_NAME = "opengoat";
 const VERSION_CACHE_TTL_MS = 5 * 60_000;
@@ -260,8 +261,8 @@ interface TaskCronRunResult {
 }
 
 interface UiServerSettings {
-  taskCronEnabled: boolean;
-  taskCheckFrequencyMinutes: number;
+  notifyManagersOfInactiveAgents: boolean;
+  maxInactivityMinutes: number;
 }
 
 interface UiVersionInfo {
@@ -531,8 +532,7 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
   const taskCronScheduler = createTaskCronScheduler(
     app,
     service,
-    uiSettings.taskCheckFrequencyMinutes,
-    uiSettings.taskCronEnabled,
+    uiSettings,
     logs,
   );
   app.addHook("onClose", async () => {
@@ -546,8 +546,12 @@ export async function createOpenGoatUiServer(options: OpenGoatUiServerOptions = 
     updateSettings: async (nextSettings) => {
       uiSettings = nextSettings;
       await writeUiServerSettings(service.getHomeDir(), uiSettings);
-      taskCronScheduler.setEnabled(uiSettings.taskCronEnabled);
-      taskCronScheduler.setTaskCheckFrequencyMinutes(uiSettings.taskCheckFrequencyMinutes);
+      taskCronScheduler.setNotifyManagersOfInactiveAgents(
+        uiSettings.notifyManagersOfInactiveAgents,
+      );
+      taskCronScheduler.setMaxInactivityMinutes(
+        uiSettings.maxInactivityMinutes,
+      );
     },
     getVersionInfo,
     logs,
@@ -588,46 +592,63 @@ function registerApiRoutes(
     });
   });
 
-  app.post<{ Body: { taskCronEnabled?: boolean; taskCheckFrequencyMinutes?: number } }>("/api/settings", async (request, reply) => {
+  app.post<{
+    Body: {
+      notifyManagersOfInactiveAgents?: boolean;
+      maxInactivityMinutes?: number;
+    };
+  }>("/api/settings", async (request, reply) => {
     return safeReply(reply, async () => {
       const currentSettings = deps.getSettings();
-      const hasFrequency = Object.prototype.hasOwnProperty.call(request.body ?? {}, "taskCheckFrequencyMinutes");
-      const hasTaskCronEnabled = Object.prototype.hasOwnProperty.call(request.body ?? {}, "taskCronEnabled");
+      const hasNotifyManagersSetting = Object.prototype.hasOwnProperty.call(
+        request.body ?? {},
+        "notifyManagersOfInactiveAgents",
+      );
+      const hasMaxInactivitySetting = Object.prototype.hasOwnProperty.call(
+        request.body ?? {},
+        "maxInactivityMinutes",
+      );
 
-      const parsedFrequency = hasFrequency
-        ? parseTaskCheckFrequencyMinutes(request.body?.taskCheckFrequencyMinutes)
-        : currentSettings.taskCheckFrequencyMinutes;
-      if (!parsedFrequency) {
+      const parsedNotifyManagers = hasNotifyManagersSetting
+        ? parseNotifyManagersOfInactiveAgents(
+            request.body?.notifyManagersOfInactiveAgents,
+          )
+        : currentSettings.notifyManagersOfInactiveAgents;
+      if (parsedNotifyManagers === undefined) {
         reply.code(400);
         return {
-          error: `taskCheckFrequencyMinutes must be an integer between ${MIN_TASK_CHECK_FREQUENCY_MINUTES} and ${MAX_TASK_CHECK_FREQUENCY_MINUTES}`
+          error: "notifyManagersOfInactiveAgents must be true or false",
         };
       }
 
-      const parsedTaskCronEnabled = hasTaskCronEnabled
-        ? parseTaskCronEnabled(request.body?.taskCronEnabled)
-        : currentSettings.taskCronEnabled;
-      if (parsedTaskCronEnabled === undefined) {
+      const parsedMaxInactivityMinutes = hasMaxInactivitySetting
+        ? parseMaxInactivityMinutes(request.body?.maxInactivityMinutes)
+        : currentSettings.maxInactivityMinutes;
+      if (!parsedMaxInactivityMinutes) {
         reply.code(400);
         return {
-          error: "taskCronEnabled must be true or false"
+          error: `maxInactivityMinutes must be an integer between ${MIN_MAX_INACTIVITY_MINUTES} and ${MAX_MAX_INACTIVITY_MINUTES}`,
         };
       }
 
       const nextSettings: UiServerSettings = {
-        taskCronEnabled: parsedTaskCronEnabled,
-        taskCheckFrequencyMinutes: parsedFrequency
+        notifyManagersOfInactiveAgents: parsedNotifyManagers,
+        maxInactivityMinutes: parsedMaxInactivityMinutes,
       };
       await deps.updateSettings(nextSettings);
       deps.logs.append({
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} taskCheckFrequencyMinutes=${nextSettings.taskCheckFrequencyMinutes}`,
+        message: `UI settings updated: notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes}`,
       });
       return {
         settings: nextSettings,
-        message: `Task cron ${nextSettings.taskCronEnabled ? "enabled" : "disabled"}; frequency ${nextSettings.taskCheckFrequencyMinutes} minute(s).`
+        message: `Inactive-agent manager notifications ${
+          nextSettings.notifyManagersOfInactiveAgents
+            ? "enabled"
+            : "disabled"
+        }; threshold ${nextSettings.maxInactivityMinutes} minute(s).`,
       };
     });
   });
@@ -3244,12 +3265,12 @@ function normalizeRoleValue(rawRole: string | undefined): string | undefined {
 
 function defaultUiServerSettings(): UiServerSettings {
   return {
-    taskCronEnabled: true,
-    taskCheckFrequencyMinutes: DEFAULT_TASK_CHECK_FREQUENCY_MINUTES
+    notifyManagersOfInactiveAgents: true,
+    maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
   };
 }
 
-function parseTaskCronEnabled(value: unknown): boolean | undefined {
+function parseBooleanSetting(value: unknown): boolean | undefined {
   if (typeof value === "boolean") {
     return value;
   }
@@ -3263,6 +3284,10 @@ function parseTaskCronEnabled(value: unknown): boolean | undefined {
     }
   }
   return undefined;
+}
+
+function parseNotifyManagersOfInactiveAgents(value: unknown): boolean | undefined {
+  return parseBooleanSetting(value);
 }
 
 function parseUiLogStreamLimit(value: unknown): number {
@@ -3300,7 +3325,7 @@ function parseUiLogStreamFollow(value: unknown): boolean {
   return true;
 }
 
-function parseTaskCheckFrequencyMinutes(value: unknown): number | undefined {
+function parseMaxInactivityMinutes(value: unknown): number | undefined {
   const parsed =
     typeof value === "number"
       ? value
@@ -3310,7 +3335,10 @@ function parseTaskCheckFrequencyMinutes(value: unknown): number | undefined {
   if (!Number.isInteger(parsed)) {
     return undefined;
   }
-  if (parsed < MIN_TASK_CHECK_FREQUENCY_MINUTES || parsed > MAX_TASK_CHECK_FREQUENCY_MINUTES) {
+  if (
+    parsed < MIN_MAX_INACTIVITY_MINUTES ||
+    parsed > MAX_MAX_INACTIVITY_MINUTES
+  ) {
     return undefined;
   }
   return parsed;
@@ -3325,15 +3353,24 @@ async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> 
   try {
     const raw = await readFile(settingsPath, "utf8");
     const parsed = JSON.parse(raw) as {
+      notifyManagersOfInactiveAgents?: unknown;
+      maxInactivityMinutes?: unknown;
       taskCronEnabled?: unknown;
-      taskCheckFrequencyMinutes?: unknown;
     };
-    const taskCronEnabled = parseTaskCronEnabled(parsed?.taskCronEnabled);
-    const taskCheckFrequencyMinutes = parseTaskCheckFrequencyMinutes(parsed?.taskCheckFrequencyMinutes);
+    const notifyManagersOfInactiveAgents =
+      parseNotifyManagersOfInactiveAgents(
+        parsed?.notifyManagersOfInactiveAgents,
+      ) ?? parseBooleanSetting(parsed?.taskCronEnabled);
+    const maxInactivityMinutes = parseMaxInactivityMinutes(
+      parsed?.maxInactivityMinutes,
+    );
     const defaults = defaultUiServerSettings();
     return {
-      taskCronEnabled: taskCronEnabled ?? defaults.taskCronEnabled,
-      taskCheckFrequencyMinutes: taskCheckFrequencyMinutes ?? defaults.taskCheckFrequencyMinutes
+      notifyManagersOfInactiveAgents:
+        notifyManagersOfInactiveAgents ??
+        defaults.notifyManagersOfInactiveAgents,
+      maxInactivityMinutes:
+        maxInactivityMinutes ?? defaults.maxInactivityMinutes,
     };
   } catch {
     return defaultUiServerSettings();
@@ -3347,24 +3384,23 @@ async function writeUiServerSettings(homeDir: string, settings: UiServerSettings
 }
 
 interface TaskCronScheduler {
-  setTaskCheckFrequencyMinutes: (taskCheckFrequencyMinutes: number) => void;
-  setEnabled: (enabled: boolean) => void;
+  setNotifyManagersOfInactiveAgents: (enabled: boolean) => void;
+  setMaxInactivityMinutes: (maxInactivityMinutes: number) => void;
   stop: () => void;
 }
 
 function createTaskCronScheduler(
   app: FastifyInstance,
   service: OpenClawUiService,
-  initialTaskCheckFrequencyMinutes: number,
-  initialTaskCronEnabled: boolean,
+  initialSettings: UiServerSettings,
   logs: UiLogBuffer,
 ): TaskCronScheduler {
   if (typeof service.runTaskCronCycle !== "function") {
     return {
-      setTaskCheckFrequencyMinutes: () => {
+      setNotifyManagersOfInactiveAgents: () => {
         // no-op when runtime task cron is unavailable.
       },
-      setEnabled: () => {
+      setMaxInactivityMinutes: () => {
         // no-op when runtime task cron is unavailable.
       },
       stop: () => {
@@ -3373,10 +3409,13 @@ function createTaskCronScheduler(
     };
   }
 
-  let taskCheckFrequencyMinutes =
-    parseTaskCheckFrequencyMinutes(initialTaskCheckFrequencyMinutes) ??
-    DEFAULT_TASK_CHECK_FREQUENCY_MINUTES;
-  let taskCronEnabled = parseTaskCronEnabled(initialTaskCronEnabled) ?? true;
+  let notifyManagersOfInactiveAgents =
+    parseNotifyManagersOfInactiveAgents(
+      initialSettings.notifyManagersOfInactiveAgents,
+    ) ?? defaultUiServerSettings().notifyManagersOfInactiveAgents;
+  let maxInactivityMinutes =
+    parseMaxInactivityMinutes(initialSettings.maxInactivityMinutes) ??
+    defaultUiServerSettings().maxInactivityMinutes;
   let intervalHandle: NodeJS.Timeout | undefined;
   let running = false;
 
@@ -3388,25 +3427,29 @@ function createTaskCronScheduler(
       return;
     }
 
-    const persistedFrequency =
-      parseTaskCheckFrequencyMinutes(persisted.taskCheckFrequencyMinutes) ??
-      taskCheckFrequencyMinutes;
-    const persistedEnabled =
-      parseTaskCronEnabled(persisted.taskCronEnabled) ?? taskCronEnabled;
+    const persistedNotifyManagers =
+      parseNotifyManagersOfInactiveAgents(
+        persisted.notifyManagersOfInactiveAgents,
+      ) ?? notifyManagersOfInactiveAgents;
+    const persistedMaxInactivityMinutes =
+      parseMaxInactivityMinutes(persisted.maxInactivityMinutes) ??
+      maxInactivityMinutes;
 
-    const hasFrequencyChange = persistedFrequency !== taskCheckFrequencyMinutes;
-    const hasEnabledChange = persistedEnabled !== taskCronEnabled;
-    if (!hasFrequencyChange && !hasEnabledChange) {
+    const hasNotifyManagersChange =
+      persistedNotifyManagers !== notifyManagersOfInactiveAgents;
+    const hasMaxInactivityChange =
+      persistedMaxInactivityMinutes !== maxInactivityMinutes;
+    if (!hasNotifyManagersChange && !hasMaxInactivityChange) {
       return;
     }
 
-    taskCheckFrequencyMinutes = persistedFrequency;
-    taskCronEnabled = persistedEnabled;
+    notifyManagersOfInactiveAgents = persistedNotifyManagers;
+    maxInactivityMinutes = persistedMaxInactivityMinutes;
     schedule();
     app.log.info(
       {
-        taskCronEnabled,
-        taskCheckFrequencyMinutes
+        notifyManagersOfInactiveAgents,
+        maxInactivityMinutes,
       },
       "[task-cron] scheduler synchronized from persisted settings"
     );
@@ -3419,10 +3462,12 @@ function createTaskCronScheduler(
     running = true;
     try {
       await syncFromPersistedSettings();
-      if (!taskCronEnabled) {
+      if (!notifyManagersOfInactiveAgents) {
         return;
       }
-      const cycle = await service.runTaskCronCycle?.();
+      const cycle = await service.runTaskCronCycle?.({
+        inactiveMinutes: maxInactivityMinutes,
+      });
       if (cycle) {
         app.log.info(
           {
@@ -3469,48 +3514,28 @@ function createTaskCronScheduler(
       clearInterval(intervalHandle);
       intervalHandle = undefined;
     }
-    if (!taskCronEnabled) {
+    if (!notifyManagersOfInactiveAgents) {
       return;
     }
     intervalHandle = setInterval(() => {
       void runCycle();
-    }, taskCheckFrequencyMinutes * 60_000);
+    }, DEFAULT_TASK_CHECK_FREQUENCY_MINUTES * 60_000);
     intervalHandle.unref?.();
   };
 
   schedule();
 
   return {
-    setTaskCheckFrequencyMinutes: (nextTaskCheckFrequencyMinutes: number) => {
-      const parsed = parseTaskCheckFrequencyMinutes(nextTaskCheckFrequencyMinutes);
-      if (!parsed || parsed === taskCheckFrequencyMinutes) {
+    setNotifyManagersOfInactiveAgents: (nextEnabled: boolean) => {
+      const parsed = parseNotifyManagersOfInactiveAgents(nextEnabled);
+      if (parsed === undefined || parsed === notifyManagersOfInactiveAgents) {
         return;
       }
-      taskCheckFrequencyMinutes = parsed;
+      notifyManagersOfInactiveAgents = parsed;
       schedule();
       app.log.info(
         {
-          taskCheckFrequencyMinutes
-        },
-        "[task-cron] scheduler interval updated"
-      );
-      logs.append({
-        timestamp: new Date().toISOString(),
-        level: "info",
-        source: "opengoat",
-        message: `[task-cron] interval updated to ${taskCheckFrequencyMinutes} minute(s).`,
-      });
-    },
-    setEnabled: (nextEnabled: boolean) => {
-      const parsed = parseTaskCronEnabled(nextEnabled);
-      if (parsed === undefined || parsed === taskCronEnabled) {
-        return;
-      }
-      taskCronEnabled = parsed;
-      schedule();
-      app.log.info(
-        {
-          taskCronEnabled
+          notifyManagersOfInactiveAgents,
         },
         "[task-cron] scheduler state updated"
       );
@@ -3518,7 +3543,28 @@ function createTaskCronScheduler(
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `[task-cron] scheduler ${taskCronEnabled ? "enabled" : "disabled"}.`,
+        message: `[task-cron] inactive-manager notifications ${
+          notifyManagersOfInactiveAgents ? "enabled" : "disabled"
+        }.`,
+      });
+    },
+    setMaxInactivityMinutes: (nextMaxInactivityMinutes: number) => {
+      const parsed = parseMaxInactivityMinutes(nextMaxInactivityMinutes);
+      if (!parsed || parsed === maxInactivityMinutes) {
+        return;
+      }
+      maxInactivityMinutes = parsed;
+      app.log.info(
+        {
+          maxInactivityMinutes,
+        },
+        "[task-cron] inactivity threshold updated"
+      );
+      logs.append({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "opengoat",
+        message: `[task-cron] inactivity threshold updated to ${maxInactivityMinutes} minute(s).`,
       });
     },
     stop: () => {
