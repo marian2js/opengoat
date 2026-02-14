@@ -3953,7 +3953,7 @@ export function App(): ReactElement {
                     <Button
                       size="sm"
                       variant="ghost"
-                      disabled={wikiController.isSaving}
+                      disabled={wikiController.isSaving || wikiController.isDeleting}
                       onClick={wikiController.cancelEditing}
                     >
                       Cancel
@@ -3971,6 +3971,7 @@ export function App(): ReactElement {
                     disabled={
                       wikiController.isLoading ||
                       wikiController.isSaving ||
+                      wikiController.isDeleting ||
                       (!wikiController.isEditing && !wikiController.page)
                     }
                   >
@@ -3979,6 +3980,29 @@ export function App(): ReactElement {
                         ? "Saving..."
                         : "Save Update"
                       : "Update"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={
+                      wikiController.isLoading ||
+                      wikiController.isSaving ||
+                      wikiController.isDeleting ||
+                      !wikiController.page
+                    }
+                    onClick={() => {
+                      if (
+                        typeof window !== "undefined" &&
+                        !window.confirm(
+                          `Delete wiki page "${wikiController.title}"? This action cannot be undone.`,
+                        )
+                      ) {
+                        return;
+                      }
+                      void wikiController.deletePage();
+                    }}
+                  >
+                    {wikiController.isDeleting ? "Deleting..." : "Delete"}
                   </Button>
                 </div>
               ) : null}

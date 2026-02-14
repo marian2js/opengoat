@@ -61,6 +61,7 @@ import {
   truncateProgressLine,
 } from "./text.js";
 import {
+  deleteWikiPageByPath,
   readWikiPageByPath,
   updateWikiPageByPath,
 } from "./wiki.js";
@@ -255,6 +256,34 @@ export function registerApiRoutes(
         return {
           ...resolved,
           message: `Wiki page "${resolved.page.path || "/"}" updated.`,
+        };
+      });
+    },
+  );
+
+  app.delete<{ Querystring: { path?: string } }>(
+    "/api/wiki/page",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const resolved = await deleteWikiPageByPath(
+          service.getHomeDir(),
+          request.query?.path,
+        );
+        if (!resolved.deletedPath) {
+          reply.code(404);
+          return {
+            error: resolved.pages.length
+              ? `Wiki page not found for path "${resolved.requestedPath || "/"}".`
+              : "No wiki markdown files were found.",
+            wikiRoot: resolved.wikiRoot,
+            pages: resolved.pages,
+            requestedPath: resolved.requestedPath,
+          };
+        }
+
+        return {
+          ...resolved,
+          message: `Wiki page "${resolved.deletedPath || "/"}" deleted.`,
         };
       });
     },

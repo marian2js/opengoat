@@ -1,4 +1,4 @@
-import { readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export interface WikiPageSummary {
@@ -128,6 +128,43 @@ export async function updateWikiPageByPath(
 
   await writeFile(resolved.page.sourcePath, content, "utf8");
   return readWikiPageByPath(homeDir, resolved.page.path);
+}
+
+export async function deleteWikiPageByPath(
+  homeDir: string,
+  requestedPath: string | undefined,
+): Promise<{
+  wikiRoot: string;
+  pages: WikiPageSummary[];
+  requestedPath: string;
+  deletedPath: string | null;
+  deletedSourcePath: string | null;
+  nextPath: string | null;
+}> {
+  const resolved = await readWikiPageByPath(homeDir, requestedPath);
+  if (!resolved.page) {
+    return {
+      wikiRoot: resolved.wikiRoot,
+      pages: resolved.pages,
+      requestedPath: resolved.requestedPath,
+      deletedPath: null,
+      deletedSourcePath: null,
+      nextPath: null,
+    };
+  }
+
+  await unlink(resolved.page.sourcePath);
+  const snapshot = await listWikiPages(homeDir);
+  const nextPath = snapshot.pages[0]?.path ?? null;
+
+  return {
+    wikiRoot: snapshot.wikiRoot,
+    pages: snapshot.pages,
+    requestedPath: resolved.requestedPath,
+    deletedPath: resolved.page.path,
+    deletedSourcePath: resolved.page.sourcePath,
+    nextPath,
+  };
 }
 
 async function buildWikiPagesSnapshot(

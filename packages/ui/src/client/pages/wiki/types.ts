@@ -20,3 +20,13 @@ export interface WikiPageResponse {
 export interface WikiPageUpdateResponse extends WikiPageResponse {
   message?: string;
 }
+
+export interface WikiPageDeleteResponse {
+  wikiRoot: string;
+  pages: WikiPageSummary[];
+  requestedPath: string;
+  deletedPath: string | null;
+  deletedSourcePath: string | null;
+  nextPath: string | null;
+  message?: string;
+}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type {
   WikiPageContent,
+  WikiPageDeleteResponse,
   WikiPageResponse,
   WikiPageSummary,
   WikiPageUpdateResponse,
@@ -33,11 +34,13 @@ export interface WikiPageController {
   isEditing: boolean;
   draft: string;
   isSaving: boolean;
+  isDeleting: boolean;
   selectPage: (wikiPath: string) => void;
   startEditing: () => void;
   cancelEditing: () => void;
   setDraft: (value: string) => void;
   save: () => Promise<void>;
+  deletePage: () => Promise<void>;
 }
 
 export function useWikiPageController(
@@ -52,6 +55,7 @@ export function useWikiPageController(
   const [isEditing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [isSaving, setSaving] = useState(false);
+  const [isDeleting, setDeleting] = useState(false);
 
   const activePath = useMemo(() => normalizeWikiPath(wikiPath), [wikiPath]);
   const title = page?.title ?? deriveWikiTitle(activePath);
@@ -209,6 +213,67 @@ export function useWikiPageController(
     }
   }, [activePath, draft, enabled, onAuthRequired, onNavigate, page]);
 
+  const deletePage = useCallback(async (): Promise<void> => {
+    if (!enabled || !page) {
+      return;
+    }
+
+    setDeleting(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (activePath) {
+        params.set("path", activePath);
+      }
+      const endpoint = params.toString()
+        ? `/api/wiki/page?${params.toString()}`
+        : "/api/wiki/page";
+
+      const response = await fetch(endpoint, {
+        method: "DELETE",
+      });
+      const payload = (await response.json().catch(() => {
+        return null;
+      })) as (WikiPageDeleteResponse & WikiApiErrorPayload) | null;
+
+      if (!response.ok) {
+        if (response.status === 401 && payload?.code === "AUTH_REQUIRED") {
+          onAuthRequired();
+          throw new Error("Authentication required. Sign in to continue.");
+        }
+        throw new Error(
+          typeof payload?.error === "string"
+            ? payload.error
+            : `Request failed with ${response.status}`,
+        );
+      }
+
+      const parsed = payload as WikiPageDeleteResponse;
+      setWikiRootPath(parsed.wikiRoot);
+      setPages(parsed.pages);
+      setEditing(false);
+      setDraft("");
+      setPage(null);
+
+      if (parsed.nextPath !== null) {
+        onNavigate(normalizeWikiPath(parsed.nextPath));
+      } else {
+        onNavigate("");
+      }
+
+      toast.success(parsed.message ?? "Wiki page deleted.");
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to delete wiki page.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setDeleting(false);
+    }
+  }, [activePath, enabled, onAuthRequired, onNavigate, page]);
+
   return {
     activePath,
     title,
@@ -220,10 +285,12 @@ export function useWikiPageController(
     isEditing,
     draft,
     isSaving,
+    isDeleting,
     selectPage,
     startEditing,
     cancelEditing,
     setDraft,
     save,
+    deletePage,
   };
 }

@@ -1067,6 +1067,42 @@ describe("OpenGoat UI server API", () => {
     });
     const updated = await readFile(path.resolve(wikiRoot, "foo", "bar.md"), "utf8");
     expect(updated).toBe("# Bar Updated\n\nBody");
+
+    const deleteResponse = await activeServer.inject({
+      method: "DELETE",
+      url: "/api/wiki/page?path=foo%2Fbar",
+    });
+    expect(deleteResponse.statusCode).toBe(200);
+    expect(deleteResponse.json()).toMatchObject({
+      deletedPath: "foo/bar",
+      requestedPath: "foo/bar",
+    });
+    await expect(
+      readFile(path.resolve(wikiRoot, "foo", "bar.md"), "utf8"),
+    ).rejects.toThrow();
+
+    const deleteFallbackResponse = await activeServer.inject({
+      method: "DELETE",
+      url: "/api/wiki/page?path=foo",
+    });
+    expect(deleteFallbackResponse.statusCode).toBe(200);
+    expect(deleteFallbackResponse.json()).toMatchObject({
+      deletedPath: "foo",
+      requestedPath: "foo",
+    });
+
+    const afterFallbackDelete = await activeServer.inject({
+      method: "GET",
+      url: "/api/wiki/page?path=foo",
+    });
+    expect(afterFallbackDelete.statusCode).toBe(200);
+    expect(afterFallbackDelete.json()).toMatchObject({
+      page: {
+        path: "foo",
+        title: "Should Not Win",
+        sourcePath: path.resolve(wikiRoot, "foo.md"),
+      },
+    });
   });
 
   it("returns 404 when a wiki page path is missing", async () => {
@@ -1089,6 +1125,15 @@ describe("OpenGoat UI server API", () => {
     });
     expect(response.statusCode).toBe(404);
     expect(response.json()).toMatchObject({
+      error: 'Wiki page not found for path "missing-page".',
+    });
+
+    const deleteResponse = await activeServer.inject({
+      method: "DELETE",
+      url: "/api/wiki/page?path=missing-page",
+    });
+    expect(deleteResponse.statusCode).toBe(404);
+    expect(deleteResponse.json()).toMatchObject({
       error: 'Wiki page not found for path "missing-page".',
     });
   });
