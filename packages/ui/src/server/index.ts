@@ -1,4 +1,5 @@
 import { createOpenGoatUiServer } from "./app.js";
+import { listenWithPortFallback } from "./startup.js";
 
 export const DEFAULT_PORT = 19123;
 
@@ -12,15 +13,16 @@ async function main(): Promise<void> {
     logger: true
   });
 
-  await server.listen({
+  const listenResult = await listenWithPortFallback(server, {
+    host,
     port,
-    host
   });
 
   server.log.info(
     {
       host,
-      port,
+      port: listenResult.resolvedPort,
+      requestedPort: listenResult.requestedPort,
       mode
     },
     "OpenGoat UI server is running"
