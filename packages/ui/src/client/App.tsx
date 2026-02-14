@@ -752,19 +752,24 @@ export function App(): ReactElement {
     [navigateToRoute],
   );
 
-  const wikiController = useWikiPageController({
-    enabled: route.kind === "page" && route.view === "wiki",
-    wikiPath:
-      route.kind === "page" && route.view === "wiki"
-        ? route.wikiPath
-        : undefined,
-    onNavigate: (wikiPath) => {
+  const handleWikiNavigate = useCallback(
+    (wikiPath: string) => {
       navigateToRoute({
         kind: "page",
         view: "wiki",
         wikiPath,
       });
     },
+    [navigateToRoute],
+  );
+
+  const wikiController = useWikiPageController({
+    enabled: route.kind === "page" && route.view === "wiki",
+    wikiPath:
+      route.kind === "page" && route.view === "wiki"
+        ? route.wikiPath
+        : undefined,
+    onNavigate: handleWikiNavigate,
     onAuthRequired: dispatchAuthRequiredEvent,
   });
 
