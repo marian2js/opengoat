@@ -1,5 +1,5 @@
 import { createOpenGoatUiServer } from "./app.js";
-import { listenWithPortFallback } from "./startup.js";
+import { listenWithPortFallback, openUrlInBrowser } from "./startup.js";
 
 export const DEFAULT_PORT = 19123;
 
@@ -17,6 +17,7 @@ async function main(): Promise<void> {
     host,
     port,
   });
+  openUrlInBrowser(`http://127.0.0.1:${listenResult.resolvedPort}`);
 
   server.log.info(
     {
