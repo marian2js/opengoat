@@ -34,17 +34,31 @@ function run() {
   // 2. Determine target version
   const cliPkg = JSON.parse(readFileSync(CLI_PACKAGE_JSON_PATH, "utf8"));
   const corePkg = JSON.parse(readFileSync(CORE_PACKAGE_JSON_PATH, "utf8"));
-  const todayVer = getCalVer();
+
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const todayVer = `${year}.${month}.${day}`;
+
   let nextVer = todayVer;
 
-  if (cliPkg.version === todayVer) {
-    // If released today already, add patch: 2026.2.7 -> 2026.2.7.1
-    nextVer = `${todayVer}.1`;
-  } else if (cliPkg.version.startsWith(todayVer + ".")) {
-    // already has patch, increment it
-    const parts = cliPkg.version.split(".");
-    const patch = parseInt(parts[3] || "0", 10) + 1;
-    nextVer = `${todayVer}.${patch}`;
+  // Check if we need to bump the patch beyond today's date
+  if (cliPkg.version) {
+    const [pkgMajor, pkgMinor, pkgPatch] = cliPkg.version
+      .split(".")
+      .map(Number);
+
+    // If we are in the same Year.Month
+    if (pkgMajor === year && pkgMinor === month) {
+      if (pkgPatch >= day) {
+        // If the package is already at today's "day" or ahead (due to multiple releases),
+        // we just increment the patch.
+        nextVer = `${year}.${month}.${pkgPatch + 1}`;
+      }
+      // Else: pkgPatch < day, so we jump correctly to todayVer (e.g. 13 -> 14)
+    }
+    // Else: Different month/year, reset to todayVer
   }
 
   console.log(
@@ -69,7 +83,10 @@ function run() {
   cliPkg.version = nextVer;
   corePkg.version = nextVer;
   writeFileSync(CLI_PACKAGE_JSON_PATH, JSON.stringify(cliPkg, null, 2) + "\n");
-  writeFileSync(CORE_PACKAGE_JSON_PATH, JSON.stringify(corePkg, null, 2) + "\n");
+  writeFileSync(
+    CORE_PACKAGE_JSON_PATH,
+    JSON.stringify(corePkg, null, 2) + "\n",
+  );
 
   // Update CHANGELOG.md
   const currentLog = existsSync(CHANGELOG_PATH)
