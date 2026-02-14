@@ -70,6 +70,14 @@ jobs:
           pnpm -C packages/core pack --pack-destination /tmp/npm-publish
           pnpm -C packages/cli pack --pack-destination /tmp/npm-publish
 
+      - name: Smoke test packed CLI
+        if: steps.check_changesets.outputs.has_changesets == 'true'
+        run: |
+          VERSION="$(node -p "require('./packages/cli/package.json').version")"
+          CORE_TGZ="/tmp/npm-publish/opengoat-core-${VERSION}.tgz"
+          CLI_TGZ="/tmp/npm-publish/opengoat-${VERSION}.tgz"
+          ./scripts/smoke-packed-cli.sh "$CORE_TGZ" "$CLI_TGZ"
+
       - name: Publish to npm (Trusted Publishing / OIDC)
         if: steps.check_changesets.outputs.has_changesets == 'true'
         run: |
