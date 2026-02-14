@@ -1,5 +1,5 @@
-import path from "node:path";
 import { homedir } from "node:os";
+import path from "node:path";
 import { AgentManifestService } from "../../agents/application/agent-manifest.service.js";
 import { AgentService } from "../../agents/application/agent.service.js";
 import {
@@ -745,12 +745,16 @@ export class OpenGoatService {
     return this.boardService.createTask(paths, actorId, options);
   }
 
-  public async listTasks(options: ListTasksOptions = {}): Promise<TaskRecord[]> {
+  public async listTasks(
+    options: ListTasksOptions = {},
+  ): Promise<TaskRecord[]> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.listTasks(paths, options);
   }
 
-  public async listLatestTasks(options: { assignee?: string; limit?: number } = {}): Promise<TaskRecord[]> {
+  public async listLatestTasks(
+    options: { assignee?: string; limit?: number } = {},
+  ): Promise<TaskRecord[]> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.listLatestTasks(paths, options);
   }
@@ -763,7 +767,12 @@ export class OpenGoatService {
       limit?: number;
       offset?: number;
     } = {},
-  ): Promise<{ tasks: TaskRecord[]; total: number; limit: number; offset: number }> {
+  ): Promise<{
+    tasks: TaskRecord[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.listLatestTasksPage(paths, options);
   }
@@ -838,6 +847,10 @@ export class OpenGoatService {
       paths,
       manifests,
       inactiveMinutes,
+    );
+    const latestCeoProjectPath = await this.resolveLatestProjectPathForAgent(
+      paths,
+      DEFAULT_AGENT_ID,
     );
 
     const tasks = await this.boardService.listTasks(paths, { limit: 10_000 });
@@ -914,6 +927,9 @@ export class OpenGoatService {
         candidate.managerAgentId,
         sessionRef,
         message,
+        {
+          cwd: latestCeoProjectPath,
+        },
       );
       dispatches.push({
         kind: "inactive",
@@ -976,9 +992,7 @@ export class OpenGoatService {
       throw new Error("OpenClaw passthrough requires at least one argument.");
     }
 
-    const executionEnv = prepareOpenClawCommandEnv(
-      options.env ?? process.env,
-    );
+    const executionEnv = prepareOpenClawCommandEnv(options.env ?? process.env);
     const command =
       executionEnv.OPENGOAT_OPENCLAW_CMD?.trim() ||
       executionEnv.OPENCLAW_CMD?.trim() ||
@@ -1101,11 +1115,13 @@ export class OpenGoatService {
     agentId: string,
     sessionRef: string,
     message: string,
+    options: { cwd?: string } = {},
   ): Promise<{ ok: boolean; error?: string }> {
     try {
       const result = await this.orchestrationService.runAgent(paths, agentId, {
         message,
         sessionRef,
+        cwd: options.cwd,
         env: process.env,
       });
       if (result.code !== 0) {
@@ -1492,6 +1508,20 @@ export class OpenGoatService {
 
     return inactive;
   }
+
+  private async resolveLatestProjectPathForAgent(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    rawAgentId: string,
+  ): Promise<string | undefined> {
+    const agentId = normalizeAgentId(rawAgentId);
+    if (!agentId) {
+      return undefined;
+    }
+
+    const sessions = await this.sessionService.listSessions(paths, agentId);
+    const latestProjectPath = sessions[0]?.projectPath?.trim();
+    return latestProjectPath || undefined;
+  }
 }
 
 function containsAlreadyExistsMessage(stdout: string, stderr: string): boolean {
@@ -1738,9 +1768,8 @@ function buildInactiveAgentMessage(params: {
       : "No recorded assistant actions yet";
   return [
     `Your reportee "@${params.subjectAgentId}" (${params.subjectName}) has no activity in the last ${params.inactiveMinutes} minutes.`,
-    `Role: ${params.role}`,
-    `Last action: ${lastAction}`,
-    `Manager: @${params.managerAgentId}`,
+    ...(params.role ? [`Role: ${params.role}`] : []),
+    ...(params.lastActionTimestamp ? [`Last action: ${lastAction}`] : []),
     "Please check in and unblock progress.",
   ].join("\n");
 }
@@ -1803,7 +1832,9 @@ function prepareOpenClawCommandEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   };
 }
 
-function resolvePreferredOpenClawCommandPaths(env: NodeJS.ProcessEnv): string[] {
+function resolvePreferredOpenClawCommandPaths(
+  env: NodeJS.ProcessEnv,
+): string[] {
   const homeDir = homedir();
   const preferredPaths: string[] = [
     path.dirname(process.execPath),

@@ -997,6 +997,13 @@ describe("OpenGoatService", () => {
 
     const { service, provider } = createService(root);
     await service.initialize();
+    const projectPath = path.join(root, "packages", "ui");
+    await new NodeFileSystem().ensureDir(projectPath);
+    await service.prepareSession("ceo", {
+      sessionRef: "project:ui",
+      projectPath,
+      forceNew: true,
+    });
     await service.createAgent("Engineer", {
       type: "individual",
       reportsTo: "ceo",
@@ -1057,6 +1064,7 @@ describe("OpenGoatService", () => {
     expect(inactivityInvocation?.message).toContain(
       "no activity in the last 30 minutes",
     );
+    expect(inactivityInvocation?.cwd).toBe(projectPath);
 
     const engineerSessions = await service.listSessions("engineer");
     expect(
