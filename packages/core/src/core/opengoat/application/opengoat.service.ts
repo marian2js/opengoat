@@ -931,6 +931,8 @@ export class OpenGoatService {
         subjectAgentId: candidate.subjectAgentId,
         subjectName: candidate.subjectName,
         role: candidate.role,
+        directReporteesCount: candidate.directReporteesCount,
+        indirectReporteesCount: candidate.indirectReporteesCount,
         inactiveMinutes,
         lastActionTimestamp: candidate.lastActionTimestamp,
       });
@@ -1481,16 +1483,29 @@ export class OpenGoatService {
       subjectAgentId: string;
       subjectName: string;
       role: string;
+      directReporteesCount: number;
+      indirectReporteesCount: number;
       lastActionTimestamp?: number;
     }>
   > {
     const nowMs = this.resolveNowMs();
     const inactiveCutoffMs = nowMs - inactiveMinutes * 60_000;
+    const directReporteesByManager = new Map<string, number>();
+    for (const manifest of manifests) {
+      const reportsTo = normalizeAgentId(manifest.metadata.reportsTo ?? "");
+      if (!reportsTo) {
+        continue;
+      }
+      const currentCount = directReporteesByManager.get(reportsTo) ?? 0;
+      directReporteesByManager.set(reportsTo, currentCount + 1);
+    }
     const inactive: Array<{
       managerAgentId: string;
       subjectAgentId: string;
       subjectName: string;
       role: string;
+      directReporteesCount: number;
+      indirectReporteesCount: number;
       lastActionTimestamp?: number;
     }> = [];
 
@@ -1515,12 +1530,24 @@ export class OpenGoatService {
       if (lastAction && lastAction.timestamp >= inactiveCutoffMs) {
         continue;
       }
+      const directReporteesCount =
+        directReporteesByManager.get(manifest.agentId) ?? 0;
+      const totalReporteesCount = collectAllReportees(
+        manifests,
+        manifest.agentId,
+      ).length;
+      const indirectReporteesCount = Math.max(
+        0,
+        totalReporteesCount - directReporteesCount,
+      );
 
       inactive.push({
         managerAgentId,
         subjectAgentId: manifest.agentId,
         subjectName: manifest.metadata.name,
         role: manifest.metadata.description,
+        directReporteesCount,
+        indirectReporteesCount,
         lastActionTimestamp: lastAction?.timestamp,
       });
     }
@@ -1783,6 +1810,8 @@ function buildInactiveAgentMessage(params: {
   subjectAgentId: string;
   subjectName: string;
   role: string;
+  directReporteesCount: number;
+  indirectReporteesCount: number;
   inactiveMinutes: number;
   lastActionTimestamp?: number;
 }): string {
@@ -1794,6 +1823,9 @@ function buildInactiveAgentMessage(params: {
   return [
     `Your reportee "@${params.subjectAgentId}" (${params.subjectName}) has no activity in the last ${params.inactiveMinutes} minutes.`,
     ...(params.role ? [`Role: ${params.role}`] : []),
+    `${
+      params.subjectName || `@${params.subjectAgentId}`
+    } has ${params.directReporteesCount} direct and ${params.indirectReporteesCount} indirect reportees.`,
     ...(lastAction ? [`Last action: ${lastAction}`] : []),
     "Please check in and unblock progress.",
   ].join("\n");

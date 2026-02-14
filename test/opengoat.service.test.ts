@@ -1083,6 +1083,9 @@ describe("OpenGoatService", () => {
     expect(inactivityInvocation?.message).toContain(
       "no activity in the last 30 minutes",
     );
+    expect(inactivityInvocation?.message).toContain(
+      "Engineer has 0 direct and 0 indirect reportees.",
+    );
     expect(inactivityInvocation?.cwd).toBe(projectPath);
 
     const engineerSessions = await service.listSessions("engineer");
@@ -1129,7 +1132,8 @@ describe("OpenGoatService", () => {
       provider.invocations.some(
         (entry) =>
           entry.agent === "ceo" &&
-          entry.message.includes('Your reportee "@cto"'),
+          entry.message.includes('Your reportee "@cto"') &&
+          entry.message.includes("CTO has 1 direct and 0 indirect reportees."),
       ),
     ).toBe(true);
     expect(
