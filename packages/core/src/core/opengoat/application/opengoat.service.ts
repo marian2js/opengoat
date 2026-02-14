@@ -108,6 +108,22 @@ export interface TaskCronRunResult {
 
 export type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
 
+interface InactiveAgentCandidate {
+  managerAgentId: string;
+  subjectAgentId: string;
+  subjectName: string;
+  role: string;
+  directReporteesCount: number;
+  indirectReporteesCount: number;
+  lastActionTimestamp?: number;
+}
+
+interface TaskStatusDispatchSummary {
+  dispatches: TaskCronDispatchResult[];
+  todoTasks: number;
+  blockedTasks: number;
+}
+
 export interface HardResetResult {
   homeDir: string;
   homeRemoved: boolean;
@@ -626,6 +642,7 @@ export class OpenGoatService {
       this.agentService.listAgents(paths),
       this.agentManifestService.listManifests(paths),
     ]);
+    const reporteeStats = buildReporteeStats(manifests);
 
     const descriptorsById = new Map(agents.map((agent) => [agent.id, agent]));
     const agent = descriptorsById.get(agentId);
@@ -633,7 +650,7 @@ export class OpenGoatService {
       throw new Error(`Agent "${agentId}" does not exist.`);
     }
 
-    const totalReportees = collectAllReportees(manifests, agentId).length;
+    const totalReportees = reporteeStats.totalByManager.get(agentId) ?? 0;
     const directReportees: AgentReporteeSummary[] = manifests
       .filter((manifest) => manifest.metadata.reportsTo === agentId)
       .map((manifest) => {
@@ -648,8 +665,8 @@ export class OpenGoatService {
           id: manifest.agentId,
           name,
           role,
-          totalReportees: collectAllReportees(manifests, manifest.agentId)
-            .length,
+          totalReportees:
+            reporteeStats.totalByManager.get(manifest.agentId) ?? 0,
         };
       })
       .sort((left, right) => left.id.localeCompare(right.id));
@@ -845,9 +862,6 @@ export class OpenGoatService {
     const paths = this.pathsProvider.getPaths();
     const ranAt = this.resolveNowIso();
     const manifests = await this.agentManifestService.listManifests(paths);
-    const manifestsById = new Map(
-      manifests.map((manifest) => [manifest.agentId, manifest]),
-    );
     const inactiveMinutes = resolveInactiveMinutes(options.inactiveMinutes);
     const notificationTarget = resolveInactiveAgentNotificationTarget(
       options.notificationTarget,
@@ -866,8 +880,44 @@ export class OpenGoatService {
       : undefined;
 
     const tasks = await this.boardService.listTasks(paths, { limit: 10_000 });
+    const taskStatusDispatch = await this.dispatchTaskStatusAutomations(
+      paths,
+      tasks,
+      manifests,
+    );
+    const inactiveDispatches = await this.dispatchInactiveAgentAutomations(
+      paths,
+      inactiveCandidates,
+      inactiveMinutes,
+      latestCeoProjectPath,
+    );
+    const dispatches = [
+      ...taskStatusDispatch.dispatches,
+      ...inactiveDispatches,
+    ];
+
+    const failed = dispatches.filter((entry) => !entry.ok).length;
+    return {
+      ranAt,
+      scannedTasks: tasks.length,
+      todoTasks: taskStatusDispatch.todoTasks,
+      blockedTasks: taskStatusDispatch.blockedTasks,
+      inactiveAgents: inactiveCandidates.length,
+      sent: dispatches.length - failed,
+      failed,
+      dispatches,
+    };
+  }
+
+  private async dispatchTaskStatusAutomations(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    tasks: TaskRecord[],
+    manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
+  ): Promise<TaskStatusDispatchSummary> {
+    const manifestsById = new Map(
+      manifests.map((manifest) => [manifest.agentId, manifest]),
+    );
     const dispatches: TaskCronDispatchResult[] = [];
-    let scannedTasks = tasks.length;
     let todoTasks = 0;
     let blockedTasks = 0;
 
@@ -921,6 +971,20 @@ export class OpenGoatService {
       });
     }
 
+    return {
+      dispatches,
+      todoTasks,
+      blockedTasks,
+    };
+  }
+
+  private async dispatchInactiveAgentAutomations(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    inactiveCandidates: InactiveAgentCandidate[],
+    inactiveMinutes: number,
+    latestCeoProjectPath?: string,
+  ): Promise<TaskCronDispatchResult[]> {
+    const dispatches: TaskCronDispatchResult[] = [];
     for (const candidate of inactiveCandidates) {
       const sessionRef = buildInactiveSessionRef(
         candidate.managerAgentId,
@@ -954,18 +1018,7 @@ export class OpenGoatService {
         error: result.error,
       });
     }
-
-    const failed = dispatches.filter((entry) => !entry.ok).length;
-    return {
-      ranAt,
-      scannedTasks,
-      todoTasks,
-      blockedTasks,
-      inactiveAgents: inactiveCandidates.length,
-      sent: dispatches.length - failed,
-      failed,
-      dispatches,
-    };
+    return dispatches;
   }
 
   public async listSkills(
@@ -1477,37 +1530,11 @@ export class OpenGoatService {
     manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
     inactiveMinutes: number,
     notificationTarget: InactiveAgentNotificationTarget,
-  ): Promise<
-    Array<{
-      managerAgentId: string;
-      subjectAgentId: string;
-      subjectName: string;
-      role: string;
-      directReporteesCount: number;
-      indirectReporteesCount: number;
-      lastActionTimestamp?: number;
-    }>
-  > {
+  ): Promise<InactiveAgentCandidate[]> {
     const nowMs = this.resolveNowMs();
     const inactiveCutoffMs = nowMs - inactiveMinutes * 60_000;
-    const directReporteesByManager = new Map<string, number>();
-    for (const manifest of manifests) {
-      const reportsTo = normalizeAgentId(manifest.metadata.reportsTo ?? "");
-      if (!reportsTo) {
-        continue;
-      }
-      const currentCount = directReporteesByManager.get(reportsTo) ?? 0;
-      directReporteesByManager.set(reportsTo, currentCount + 1);
-    }
-    const inactive: Array<{
-      managerAgentId: string;
-      subjectAgentId: string;
-      subjectName: string;
-      role: string;
-      directReporteesCount: number;
-      indirectReporteesCount: number;
-      lastActionTimestamp?: number;
-    }> = [];
+    const reporteeStats = buildReporteeStats(manifests);
+    const inactive: InactiveAgentCandidate[] = [];
 
     for (const manifest of manifests) {
       const managerAgentId = normalizeAgentId(
@@ -1531,11 +1558,9 @@ export class OpenGoatService {
         continue;
       }
       const directReporteesCount =
-        directReporteesByManager.get(manifest.agentId) ?? 0;
-      const totalReporteesCount = collectAllReportees(
-        manifests,
-        manifest.agentId,
-      ).length;
+        reporteeStats.directByManager.get(manifest.agentId) ?? 0;
+      const totalReporteesCount =
+        reporteeStats.totalByManager.get(manifest.agentId) ?? 0;
       const indirectReporteesCount = Math.max(
         0,
         totalReporteesCount - directReporteesCount,
@@ -1838,6 +1863,84 @@ type AgentReportNode = {
   };
 };
 
+type ReporteeGraph = Map<string, string[]>;
+
+function buildReporteeStats(manifests: AgentReportNode[]): {
+  directByManager: Map<string, number>;
+  totalByManager: Map<string, number>;
+} {
+  const graph = buildReporteeGraph(manifests);
+  const directByManager = new Map<string, number>();
+  for (const [managerAgentId, directReportees] of graph.entries()) {
+    directByManager.set(managerAgentId, directReportees.length);
+  }
+  const totalByManager = buildTotalReporteeCountByManager(graph);
+  return {
+    directByManager,
+    totalByManager,
+  };
+}
+
+function buildReporteeGraph(manifests: AgentReportNode[]): ReporteeGraph {
+  const graph: ReporteeGraph = new Map();
+  for (const manifest of manifests) {
+    const reportsTo = manifest.metadata.reportsTo;
+    if (!reportsTo) {
+      continue;
+    }
+    const reportees = graph.get(reportsTo) ?? [];
+    reportees.push(manifest.agentId);
+    graph.set(reportsTo, reportees);
+  }
+
+  for (const [managerAgentId, reportees] of graph.entries()) {
+    graph.set(
+      managerAgentId,
+      [...reportees].sort((left, right) => left.localeCompare(right)),
+    );
+  }
+  return graph;
+}
+
+function buildTotalReporteeCountByManager(
+  graph: ReporteeGraph,
+): Map<string, number> {
+  const descendantsByManager = new Map<string, Set<string>>();
+  const inProgress = new Set<string>();
+
+  const resolveDescendants = (managerAgentId: string): Set<string> => {
+    const cached = descendantsByManager.get(managerAgentId);
+    if (cached) {
+      return cached;
+    }
+    if (inProgress.has(managerAgentId)) {
+      return new Set();
+    }
+
+    inProgress.add(managerAgentId);
+    const descendants = new Set<string>();
+    for (const reporteeAgentId of graph.get(managerAgentId) ?? []) {
+      descendants.add(reporteeAgentId);
+      const reporteeDescendants = resolveDescendants(reporteeAgentId);
+      for (const descendantAgentId of reporteeDescendants) {
+        descendants.add(descendantAgentId);
+      }
+    }
+    inProgress.delete(managerAgentId);
+    descendantsByManager.set(managerAgentId, descendants);
+    return descendants;
+  };
+
+  const totalByManager = new Map<string, number>();
+  for (const managerAgentId of graph.keys()) {
+    totalByManager.set(
+      managerAgentId,
+      resolveDescendants(managerAgentId).size,
+    );
+  }
+  return totalByManager;
+}
+
 function assertAgentExists(
   manifests: AgentReportNode[],
   agentId: string,
@@ -1852,26 +1955,16 @@ function collectAllReportees(
   manifests: AgentReportNode[],
   managerAgentId: string,
 ): string[] {
-  const byManager = new Map<string, string[]>();
-  for (const manifest of manifests) {
-    const reportsTo = manifest.metadata.reportsTo;
-    if (!reportsTo) {
-      continue;
-    }
-    const reportees = byManager.get(reportsTo) ?? [];
-    reportees.push(manifest.agentId);
-    byManager.set(reportsTo, reportees);
-  }
-
+  const graph = buildReporteeGraph(manifests);
   const visited = new Set<string>();
-  const queue = [...(byManager.get(managerAgentId) ?? [])];
+  const queue = [...(graph.get(managerAgentId) ?? [])];
   while (queue.length > 0) {
     const current = queue.shift();
     if (!current || current === managerAgentId || visited.has(current)) {
       continue;
     }
     visited.add(current);
-    queue.push(...(byManager.get(current) ?? []));
+    queue.push(...(graph.get(current) ?? []));
   }
 
   return [...visited].sort((left, right) => left.localeCompare(right));
