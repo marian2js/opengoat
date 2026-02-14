@@ -17,6 +17,11 @@
     "version-packages": "node scripts/release.mjs",
     "release": "node scripts/release.mjs"
   },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
   "engines": {
     "node": ">=20.11.0"
   },

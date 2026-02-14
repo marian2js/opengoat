@@ -1103,6 +1103,91 @@ describe("OpenGoatService", () => {
     ).toBe(true);
   });
 
+  it("falls back to workspace plugin id when openclaw-plugin id is not found", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const pluginSourceDir = path.join(root, "plugin-src");
+    await mkdir(pluginSourceDir, { recursive: true });
+    await writeFile(
+      path.join(pluginSourceDir, "openclaw.plugin.json"),
+      "{}\n",
+      "utf-8",
+    );
+
+    const originalPluginPath = process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH;
+    process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH = pluginSourceDir;
+
+    const commandRunner = createRuntimeDefaultsCommandRunner(
+      root,
+      async (request) => {
+        if (
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
+          request.args[2] === "plugins.entries.openclaw-plugin.enabled"
+        ) {
+          return {
+            code: 1,
+            stdout: "",
+            stderr: "plugin not found: openclaw-plugin",
+          };
+        }
+        if (
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
+          request.args[2] === "plugins.entries.workspace.enabled"
+        ) {
+          return {
+            code: 0,
+            stdout: "",
+            stderr: "",
+          };
+        }
+        return undefined;
+      },
+    );
+
+    let result:
+      | Awaited<ReturnType<OpenGoatService["syncRuntimeDefaults"]>>
+      | undefined;
+    try {
+      const { service } = createService(
+        root,
+        new FakeOpenClawProvider(),
+        commandRunner,
+      );
+      result = await service.syncRuntimeDefaults();
+    } finally {
+      if (originalPluginPath === undefined) {
+        delete process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH;
+      } else {
+        process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH = originalPluginPath;
+      }
+    }
+
+    expect(
+      commandRunner.requests.some(
+        (request) =>
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
+          request.args[2] === "plugins.entries.openclaw-plugin.enabled" &&
+          request.args[3] === "true",
+      ),
+    ).toBe(true);
+    expect(
+      commandRunner.requests.some(
+        (request) =>
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
+          request.args[2] === "plugins.entries.workspace.enabled" &&
+          request.args[3] === "true",
+      ),
+    ).toBe(true);
+    expect(
+      result?.warnings.some((warning) => warning.includes("plugin enable failed")),
+    ).toBe(false);
+  });
+
   it("adds a warning when OpenClaw plugin enable fails", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
@@ -1132,6 +1217,17 @@ describe("OpenGoatService", () => {
             stderr: "plugin not found: openclaw-plugin",
           };
         }
+        if (
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
+          request.args[2] === "plugins.entries.workspace.enabled"
+        ) {
+          return {
+            code: 1,
+            stdout: "",
+            stderr: "plugin not found: workspace",
+          };
+        }
         return undefined;
       },
     );
@@ -1156,7 +1252,9 @@ describe("OpenGoatService", () => {
 
     expect(
       result?.warnings.some((warning) =>
-        warning.includes('OpenClaw plugin enable failed (code 1). plugin not found: openclaw-plugin'),
+        warning.includes(
+          "OpenClaw plugin enable failed: no matching plugin id was found (openclaw-plugin, workspace).",
+        ),
       ),
     ).toBe(true);
   });

@@ -103,6 +103,7 @@ const OPENCLAW_DEFAULT_AGENT_ID = "main";
 const OPENCLAW_AGENT_SANDBOX_MODE = "off";
 const OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON = "[\"*\"]";
 const OPENCLAW_OPENGOAT_PLUGIN_ID = "openclaw-plugin";
+const OPENCLAW_OPENGOAT_PLUGIN_FALLBACK_ID = "workspace";
 
 export interface RuntimeDefaultsSyncResult {
   ceoSyncCode?: number;
@@ -1826,16 +1827,44 @@ export class OpenGoatService {
       }
     }
 
-    const enablePlugin = await this.runOpenClaw(
-      ["config", "set", `plugins.entries.${OPENCLAW_OPENGOAT_PLUGIN_ID}.enabled`, "true"],
-      { env },
-    );
-    if (enablePlugin.code !== 0) {
-      warnings.push(
-        `OpenClaw plugin enable failed (code ${enablePlugin.code}). ${
-          enablePlugin.stderr.trim() || enablePlugin.stdout.trim() || ""
-        }`.trim(),
+    const pluginIds = [
+      OPENCLAW_OPENGOAT_PLUGIN_ID,
+      OPENCLAW_OPENGOAT_PLUGIN_FALLBACK_ID,
+    ];
+    const enableFailures: string[] = [];
+    let pluginEnabled = false;
+
+    for (const pluginId of pluginIds) {
+      const enablePlugin = await this.runOpenClaw(
+        ["config", "set", `plugins.entries.${pluginId}.enabled`, "true"],
+        { env },
       );
+      if (enablePlugin.code === 0) {
+        pluginEnabled = true;
+        break;
+      }
+
+      const message =
+        enablePlugin.stderr.trim() || enablePlugin.stdout.trim() || "";
+      if (isPluginNotFoundMessage(message)) {
+        continue;
+      }
+
+      enableFailures.push(
+        `OpenClaw plugin enable failed for "${pluginId}" (code ${enablePlugin.code}). ${message}`.trim(),
+      );
+    }
+
+    if (!pluginEnabled) {
+      if (enableFailures.length === 0) {
+        warnings.push(
+          `OpenClaw plugin enable failed: no matching plugin id was found (${pluginIds.join(
+            ", ",
+          )}).`,
+        );
+      } else {
+        warnings.push(...enableFailures);
+      }
     }
 
     return warnings;
@@ -2025,4 +2054,8 @@ function dedupeStrings(values: Array<string | undefined>): string[] {
 
 function containsPath(paths: readonly string[], candidatePath: string): boolean {
   return paths.some((entry) => pathMatches(entry, candidatePath));
+}
+
+function isPluginNotFoundMessage(message: string): boolean {
+  return message.toLowerCase().includes("plugin not found");
 }
