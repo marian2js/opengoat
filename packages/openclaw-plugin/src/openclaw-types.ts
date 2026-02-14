@@ -5,6 +5,35 @@ export interface PluginLogger {
   debug?(message: string): void;
 }
 
+export interface OpenClawToolResultLike {
+  content: Array<{ type: "text"; text: string }>;
+  details: unknown;
+}
+
+export interface OpenClawToolLike {
+  name: string;
+  label: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  execute(
+    toolCallId: string,
+    params: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<OpenClawToolResultLike>;
+}
+
+export interface OpenClawPluginToolContextLike {
+  agentId?: string;
+  sessionKey?: string;
+  workspaceDir?: string;
+  agentDir?: string;
+  sandboxed?: boolean;
+}
+
+export type OpenClawPluginToolFactoryLike = (
+  context: OpenClawPluginToolContextLike,
+) => OpenClawToolLike | OpenClawToolLike[] | null | undefined;
+
 export interface CliCommandLike {
   description(text: string): CliCommandLike;
   allowUnknownOption(allow?: boolean): CliCommandLike;
@@ -29,4 +58,8 @@ export interface OpenClawPluginApiLike {
   pluginConfig?: Record<string, unknown>;
   logger: PluginLogger;
   registerCli(registrar: PluginCliRegistrarLike, opts?: { commands?: string[] }): void;
+  registerTool(
+    tool: OpenClawToolLike | OpenClawPluginToolFactoryLike,
+    opts?: { optional?: boolean; name?: string; names?: string[] },
+  ): void;
 }
