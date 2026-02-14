@@ -1,5 +1,8 @@
+import { basename } from "node:path";
+
 const TOOL_REGISTRATION_PATTERNS: readonly (readonly string[])[] = [
   ["gateway", "call", "agent"],
+  ["gateway"],
   ["opengoat", "start"],
 ];
 const FORCE_TOOL_REGISTRATION_ENV = "OPENGOAT_OPENCLAW_REGISTER_TOOLS";
@@ -12,6 +15,10 @@ export function shouldRegisterOpenGoatToolsForArgv(
     return true;
   }
 
+  if (isGatewayServiceProcess(rawArgv, env)) {
+    return true;
+  }
+
   const args = normalizeArgv(rawArgv.slice(2));
   if (args.length === 0) {
     return false;
@@ -20,6 +27,27 @@ export function shouldRegisterOpenGoatToolsForArgv(
   return TOOL_REGISTRATION_PATTERNS.some((pattern) =>
     containsContiguousSequence(args, pattern),
   );
+}
+
+function isGatewayServiceProcess(
+  rawArgv: readonly string[],
+  env: NodeJS.ProcessEnv,
+): boolean {
+  const executableTokens = [rawArgv[0], rawArgv[1]]
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => basename(value).trim().toLowerCase())
+    .filter((value) => value.length > 0);
+
+  if (executableTokens.some((value) => value.includes("openclaw-gateway"))) {
+    return true;
+  }
+
+  // LaunchAgent-managed gateway processes set both values.
+  if (env.OPENCLAW_GATEWAY_PORT?.trim() && env.OPENCLAW_GATEWAY_TOKEN?.trim()) {
+    return true;
+  }
+
+  return false;
 }
 
 function normalizeArgv(tokens: readonly string[]): string[] {

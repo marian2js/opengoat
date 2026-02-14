@@ -23,6 +23,29 @@ describe("shouldRegisterOpenGoatToolsForArgv", () => {
     ).toBe(true);
   });
 
+  it("returns true for gateway lifecycle invocations", () => {
+    expect(
+      shouldRegisterOpenGoatToolsForArgv([
+        "node",
+        "openclaw",
+        "gateway",
+        "restart",
+      ]),
+    ).toBe(true);
+  });
+
+  it("returns true for LaunchAgent gateway process startup", () => {
+    expect(
+      shouldRegisterOpenGoatToolsForArgv(
+        ["openclaw-gateway"],
+        {
+          OPENCLAW_GATEWAY_PORT: "18789",
+          OPENCLAW_GATEWAY_TOKEN: "token",
+        },
+      ),
+    ).toBe(true);
+  });
+
   it("returns true when gateway call agent has global flags", () => {
     expect(
       shouldRegisterOpenGoatToolsForArgv([
