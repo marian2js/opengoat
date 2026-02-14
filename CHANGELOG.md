@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.2.14
+
+- Release the latest scheduler and settings updates, including explicit cron controls, improved settings UX labels, and cron/inactivity notification decoupling.
+
 ## 2026.2.13
 
 - Release CalVer 2026.2.13
