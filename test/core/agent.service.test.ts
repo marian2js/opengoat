@@ -171,7 +171,7 @@ describe("AgentService", () => {
     ).toBe(false);
   });
 
-  it("keeps AGENTS.md content, replaces First Run section, preserves SOUL.md, and writes ROLE.md", async () => {
+  it("keeps CEO First Run section, appends Your Role section, preserves SOUL.md, and writes ROLE/BOOTSTRAP", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
 
@@ -200,17 +200,19 @@ describe("AgentService", () => {
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
     const roleMarkdown = await readFile(rolePath, "utf-8");
     const soulMarkdown = await readFile(soulPath, "utf-8");
+    const bootstrapMarkdown = await readFile(bootstrapPath, "utf-8");
     expect(agentsMarkdown).toContain("foo");
+    expect(agentsMarkdown).toContain("## First Run");
+    expect(agentsMarkdown).toContain("bar");
     expect(agentsMarkdown).toContain("## Another section");
     expect(agentsMarkdown).toContain("baz");
-    expect(agentsMarkdown).not.toContain("## First Run");
-    expect(agentsMarkdown).not.toContain("\nbar\n");
     expect(agentsMarkdown).toContain("## Your Role");
+    expect(
+      agentsMarkdown.indexOf("## First Run") <
+        agentsMarkdown.indexOf("## Your Role"),
+    ).toBe(true);
     expect(agentsMarkdown).toContain(
-      "You are part of an organization run by AI agents. Read `ROLE.md` for details.",
-    );
-    expect(agentsMarkdown).toContain(
-      "Read `ROLE.md` for details.\n\n## Another section",
+      "You are part of an organization run by AI agents. Read `ROLE.md` for details about your role, and read `../../organization` for details about the organization.",
     );
     expect(roleMarkdown).toContain(
       "# ROLE.md - Your position in the organization",
@@ -228,7 +230,11 @@ describe("AgentService", () => {
       "- To delegate and coordinate work, use `og-*` skills.",
     );
     expect(soulMarkdown).toBe(["# SOUL.md - Custom", "", "Legacy body"].join("\n"));
-    expect(await fileSystem.exists(bootstrapPath)).toBe(false);
+    expect(bootstrapMarkdown).toContain(
+      "# BOOTSTRAP.md - OpenGoat CEO workspace bootstrap",
+    );
+    expect(bootstrapMarkdown).toContain("## First Run");
+    expect(bootstrapMarkdown).not.toContain("# bootstrap");
   });
 
   it("writes ROLE.md for non-ceo agents with id/name/role details", async () => {
