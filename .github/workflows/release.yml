@@ -84,15 +84,17 @@ jobs:
           VERSION="$(node -p "require('./packages/cli/package.json').version")"
           CORE_TGZ="/tmp/npm-publish/opengoat-core-${VERSION}.tgz"
           CLI_TGZ="/tmp/npm-publish/opengoat-${VERSION}.tgz"
+          TAG="latest"
 
           echo "Publishing version: ${VERSION}"
+          echo "Publishing tag: ${TAG}"
           ls -la "$CORE_TGZ" "$CLI_TGZ"
 
           # publish @opengoat/core
-          npm publish "$CORE_TGZ" --access public
+          npm publish "$CORE_TGZ" --access public --tag "$TAG"
 
           # publish opengoat (from packages/cli, name is "opengoat")
-          npm publish "$CLI_TGZ" --access public
+          npm publish "$CLI_TGZ" --access public --tag "$TAG"
 
       - name: Push Changes + Tag
         if: steps.check_changesets.outputs.has_changesets == 'true'
