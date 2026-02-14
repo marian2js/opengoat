@@ -22,7 +22,7 @@ const openGoatPlugin = {
   register(api: OpenClawPluginApiLike): void {
     const registrationState = getGlobalPluginRegistrationState();
     if (registrationState.status !== "idle") {
-      api.logger.info(
+      api.logger.debug?.(
         `[opengoat-plugin] skipping duplicate registration for ${api.source}; already registered from ${
           registrationState.source ?? "another OpenGoat plugin instance"
         }.`,

@@ -1769,8 +1769,12 @@ export class OpenGoatService {
     const explicit = process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH?.trim();
     const argvEntry = process.argv[1]?.trim();
     const argvDir = argvEntry ? dirname(resolvePath(argvEntry)) : undefined;
+    const argvPathCandidates = argvDir
+      ? collectPluginPathCandidatesFromArgvDir(argvDir)
+      : [];
     const candidates = dedupeStrings([
       explicit,
+      ...argvPathCandidates,
       resolvePath(process.cwd(), "packages", "openclaw-plugin"),
       resolvePath(process.cwd(), "dist", "openclaw-plugin"),
       resolvePath(process.cwd(), "node_modules", "@opengoat", "openclaw-plugin"),
@@ -1837,6 +1841,7 @@ export class OpenGoatService {
     ];
     const enableFailures: string[] = [];
     let pluginEnabled = false;
+    let enabledPluginId: string | undefined;
 
     for (const pluginId of pluginIds) {
       const enablePlugin = await this.runOpenClaw(
@@ -1845,6 +1850,7 @@ export class OpenGoatService {
       );
       if (enablePlugin.code === 0) {
         pluginEnabled = true;
+        enabledPluginId = pluginId;
         break;
       }
 
@@ -1868,6 +1874,29 @@ export class OpenGoatService {
         );
       } else {
         warnings.push(...enableFailures);
+      }
+    }
+
+    if (enabledPluginId) {
+      const idsToDisable = pluginIds.filter((pluginId) => pluginId !== enabledPluginId);
+      for (const pluginId of idsToDisable) {
+        const disablePlugin = await this.runOpenClaw(
+          ["config", "set", `plugins.entries.${pluginId}.enabled`, "false"],
+          { env },
+        );
+        if (disablePlugin.code === 0) {
+          continue;
+        }
+
+        const message =
+          disablePlugin.stderr.trim() || disablePlugin.stdout.trim() || "";
+        if (isPluginNotFoundMessage(message)) {
+          continue;
+        }
+
+        warnings.push(
+          `OpenClaw plugin cleanup failed for "${pluginId}" (code ${disablePlugin.code}). ${message}`.trim(),
+        );
       }
     }
 
@@ -2040,6 +2069,25 @@ function parseLooseJson(raw: string): unknown {
 
 function dedupeNumbers(values: number[]): number[] {
   return [...new Set(values)];
+}
+
+function collectPluginPathCandidatesFromArgvDir(argvDir: string): string[] {
+  const maxDepth = 8;
+  const candidates: Array<string | undefined> = [];
+  let currentDir = argvDir;
+
+  for (let depth = 0; depth < maxDepth; depth += 1) {
+    candidates.push(resolvePath(currentDir, "packages", "openclaw-plugin"));
+    candidates.push(resolvePath(currentDir, "openclaw-plugin"));
+
+    const parentDir = dirname(currentDir);
+    if (parentDir === currentDir) {
+      break;
+    }
+    currentDir = parentDir;
+  }
+
+  return dedupeStrings(candidates);
 }
 
 function dedupeStrings(values: Array<string | undefined>): string[] {

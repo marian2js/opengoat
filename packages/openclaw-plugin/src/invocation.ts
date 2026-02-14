@@ -42,8 +42,14 @@ function isGatewayServiceProcess(
     return true;
   }
 
-  // LaunchAgent-managed gateway processes set both values.
-  if (env.OPENCLAW_GATEWAY_PORT?.trim() && env.OPENCLAW_GATEWAY_TOKEN?.trim()) {
+  // LaunchAgent-managed gateway processes set both values. Guard this path so
+  // unrelated CLI commands (for example, `openclaw plugins list`) do not
+  // trigger OpenGoat tool registration.
+  if (
+    env.OPENCLAW_GATEWAY_PORT?.trim() &&
+    env.OPENCLAW_GATEWAY_TOKEN?.trim() &&
+    containsContiguousSequence(normalizeArgv(rawArgv.slice(2)), ["gateway"])
+  ) {
     return true;
   }
 

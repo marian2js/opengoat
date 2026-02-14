@@ -46,6 +46,18 @@ describe("shouldRegisterOpenGoatToolsForArgv", () => {
     ).toBe(true);
   });
 
+  it("returns false for non-gateway invocations even with gateway env vars", () => {
+    expect(
+      shouldRegisterOpenGoatToolsForArgv(
+        ["node", "openclaw", "plugins", "list"],
+        {
+          OPENCLAW_GATEWAY_PORT: "18789",
+          OPENCLAW_GATEWAY_TOKEN: "token",
+        },
+      ),
+    ).toBe(false);
+  });
+
   it("returns true when gateway call agent has global flags", () => {
     expect(
       shouldRegisterOpenGoatToolsForArgv([
