@@ -201,8 +201,8 @@ interface TasksResponse {
 }
 
 interface UiSettings {
-  taskCronEnabled: boolean;
-  taskCheckFrequencyMinutes: number;
+  notifyManagersOfInactiveAgents: boolean;
+  maxInactivityMinutes: number;
 }
 
 interface UiVersionInfo {
@@ -494,7 +494,9 @@ interface OrgNodeData {
 const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
 const DEFAULT_AGENT_ID = "ceo";
-const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
+const DEFAULT_MAX_INACTIVITY_MINUTES = 30;
+const MIN_MAX_INACTIVITY_MINUTES = 1;
+const MAX_MAX_INACTIVITY_MINUTES = 10_080;
 const DEFAULT_LOG_STREAM_LIMIT = 300;
 const MAX_UI_LOG_ENTRIES = 1200;
 const LOG_FLUSH_INTERVAL_MS = 100;
@@ -579,9 +581,11 @@ export function App(): ReactElement {
   const [createTaskDialogError, setCreateTaskDialogError] = useState<
     string | null
   >(null);
-  const [taskCheckFrequencyMinutesInput, setTaskCheckFrequencyMinutesInput] =
-    useState(String(DEFAULT_TASK_CHECK_FREQUENCY_MINUTES));
-  const [taskCronEnabledInput, setTaskCronEnabledInput] = useState(true);
+  const [maxInactivityMinutesInput, setMaxInactivityMinutesInput] = useState(
+    String(DEFAULT_MAX_INACTIVITY_MINUTES),
+  );
+  const [notifyManagersOfInactiveAgentsInput, setNotifyManagersOfInactiveAgentsInput] =
+    useState(true);
   const [isTaskDetailsDialogOpen, setTaskDetailsDialogOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskDetailsError, setTaskDetailsError] = useState<string | null>(null);
@@ -695,8 +699,8 @@ export function App(): ReactElement {
             .then((payload) => payload.settings)
             .catch(() => {
               return {
-                taskCronEnabled: true,
-                taskCheckFrequencyMinutes: DEFAULT_TASK_CHECK_FREQUENCY_MINUTES,
+                notifyManagersOfInactiveAgents: true,
+                maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
               } satisfies UiSettings;
             }),
         ]);
@@ -710,10 +714,12 @@ export function App(): ReactElement {
         taskWorkspaces: buildTaskWorkspaceResponse(tasks),
         settings,
       });
-      setTaskCheckFrequencyMinutesInput(
-        String(settings.taskCheckFrequencyMinutes),
+      setMaxInactivityMinutesInput(
+        String(settings.maxInactivityMinutes),
       );
-      setTaskCronEnabledInput(settings.taskCronEnabled);
+      setNotifyManagersOfInactiveAgentsInput(
+        settings.notifyManagersOfInactiveAgents,
+      );
       setSessionsByAgentId({
         [sessions.agentId]: sessions.sessions,
       });
@@ -1987,24 +1993,40 @@ export function App(): ReactElement {
   }
 
   async function handleSaveSettings(): Promise<void> {
-    const parsedFrequency = Number.parseInt(taskCheckFrequencyMinutesInput.trim(), 10);
-    const isFrequencyValid =
-      Number.isFinite(parsedFrequency) && parsedFrequency >= 1 && parsedFrequency <= 1440;
-    if (taskCronEnabledInput && !isFrequencyValid) {
-      toast.error("Task Check Frequency must be an integer between 1 and 1440.");
+    const parsedMaxInactivityMinutes = Number.parseInt(
+      maxInactivityMinutesInput.trim(),
+      10,
+    );
+    const isMaxInactivityValid =
+      Number.isFinite(parsedMaxInactivityMinutes) &&
+      parsedMaxInactivityMinutes >= MIN_MAX_INACTIVITY_MINUTES &&
+      parsedMaxInactivityMinutes <= MAX_MAX_INACTIVITY_MINUTES;
+    if (notifyManagersOfInactiveAgentsInput && !isMaxInactivityValid) {
+      toast.error(
+        `Max inactivity time must be an integer between ${MIN_MAX_INACTIVITY_MINUTES} and ${MAX_MAX_INACTIVITY_MINUTES} minutes.`,
+      );
       return;
     }
-    const fallbackFrequency = state?.settings.taskCheckFrequencyMinutes ?? DEFAULT_TASK_CHECK_FREQUENCY_MINUTES;
-    const resolvedFrequency = isFrequencyValid ? parsedFrequency : fallbackFrequency;
+    const fallbackMaxInactivityMinutes =
+      state?.settings.maxInactivityMinutes ?? DEFAULT_MAX_INACTIVITY_MINUTES;
+    const resolvedMaxInactivityMinutes = isMaxInactivityValid
+      ? parsedMaxInactivityMinutes
+      : fallbackMaxInactivityMinutes;
 
     setMutating(true);
     try {
-      const response = await persistUiSettings(
-        taskCronEnabledInput,
-        resolvedFrequency,
-      );
+      const response = await persistUiSettings({
+        notifyManagersOfInactiveAgents: notifyManagersOfInactiveAgentsInput,
+        maxInactivityMinutes: resolvedMaxInactivityMinutes,
+      });
       applyUiSettingsResponse(response);
-      toast.success(response.message ?? "Settings updated.");
+      const statusMessage = notifyManagersOfInactiveAgentsInput
+        ? `Manager inactivity notifications enabled (${resolvedMaxInactivityMinutes} minutes).`
+        : "Manager inactivity notifications disabled.";
+      toast.success(
+        response.message ??
+          statusMessage,
+      );
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -2016,45 +2038,8 @@ export function App(): ReactElement {
     }
   }
 
-  async function handleToggleTaskCron(nextValue: boolean): Promise<void> {
-    const previousValue = taskCronEnabledInput;
-    const parsedFrequency = Number.parseInt(
-      taskCheckFrequencyMinutesInput.trim(),
-      10,
-    );
-    const isFrequencyValid =
-      Number.isFinite(parsedFrequency) &&
-      parsedFrequency >= 1 &&
-      parsedFrequency <= 1440;
-    const fallbackFrequency =
-      state?.settings.taskCheckFrequencyMinutes ??
-      DEFAULT_TASK_CHECK_FREQUENCY_MINUTES;
-    const resolvedFrequency = isFrequencyValid ? parsedFrequency : fallbackFrequency;
-
-    setTaskCronEnabledInput(nextValue);
-    setMutating(true);
-    try {
-      const response = await persistUiSettings(nextValue, resolvedFrequency);
-      applyUiSettingsResponse(response);
-      toast.success(
-        response.message ??
-          `Cron ${nextValue ? "enabled" : "disabled"}.`,
-      );
-    } catch (requestError) {
-      setTaskCronEnabledInput(previousValue);
-      const message =
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to update cron setting.";
-      toast.error(message);
-    } finally {
-      setMutating(false);
-    }
-  }
-
   async function persistUiSettings(
-    taskCronEnabled: boolean,
-    taskCheckFrequencyMinutes: number,
+    settings: UiSettings,
   ): Promise<{ settings: UiSettings; message?: string }> {
     return fetchJson<{
       settings: UiSettings;
@@ -2064,10 +2049,7 @@ export function App(): ReactElement {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        taskCronEnabled,
-        taskCheckFrequencyMinutes,
-      }),
+      body: JSON.stringify(settings),
     });
   }
 
@@ -2083,10 +2065,12 @@ export function App(): ReactElement {
         settings: response.settings,
       };
     });
-    setTaskCheckFrequencyMinutesInput(
-      String(response.settings.taskCheckFrequencyMinutes),
+    setMaxInactivityMinutesInput(
+      String(response.settings.maxInactivityMinutes),
     );
-    setTaskCronEnabledInput(response.settings.taskCronEnabled);
+    setNotifyManagersOfInactiveAgentsInput(
+      response.settings.notifyManagersOfInactiveAgents,
+    );
   }
 
   async function handleCreateTask(
@@ -3304,16 +3288,22 @@ export function App(): ReactElement {
                   }}
                   className={cn(
                     "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
-                    (state?.settings.taskCronEnabled ?? taskCronEnabledInput)
+                    (
+                      state?.settings.notifyManagersOfInactiveAgents ??
+                      notifyManagersOfInactiveAgentsInput
+                    )
                       ? "border-success/50 bg-success/15 text-success hover:bg-success/20"
                       : "border-red-500/70 bg-red-600/25 text-red-200 hover:bg-red-600/35",
                   )}
                   title="Open settings"
                   aria-label="Open settings"
                 >
-                  {(state?.settings.taskCronEnabled ?? taskCronEnabledInput)
-                    ? "Running"
-                    : "Stopped"}
+                  {(
+                    state?.settings.notifyManagersOfInactiveAgents ??
+                    notifyManagersOfInactiveAgentsInput
+                  )
+                    ? "Inactive Alerts On"
+                    : "Inactive Alerts Off"}
                 </button>
               ) : null}
 
@@ -4617,103 +4607,109 @@ export function App(): ReactElement {
                 ) : null}
 
                 {route.kind === "page" && route.view === "settings" ? (
-                  <Card className="max-w-3xl border-border/80 bg-card/60">
-                    <CardHeader>
-                      <CardTitle>Settings</CardTitle>
-                      <CardDescription>
-                        Configure runtime behavior for the OpenGoat UI server.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <section className="rounded-lg border border-border/70 bg-background/40 p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-medium">Cron</p>
-                            <p className="text-xs text-muted-foreground">
-                              Enable or disable background task cron execution.
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={taskCronEnabledInput}
-                              disabled={isMutating || isLoading}
-                              onCheckedChange={(checked) => {
-                                void handleToggleTaskCron(checked);
-                              }}
-                              aria-label="Toggle task cron"
-                            />
-                            <span
-                              className={cn(
-                                "text-xs font-medium",
-                                taskCronEnabledInput
-                                  ? "text-success"
-                                  : "text-muted-foreground",
-                              )}
-                            >
-                              {taskCronEnabledInput ? "Enabled" : "Disabled"}
-                            </span>
-                          </div>
-                        </div>
-                      </section>
+                  <section className="mx-auto w-full max-w-3xl space-y-6">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        Configure how managers are alerted when reportees become
+                        inactive.
+                      </p>
+                    </div>
 
-                      <section
-                        className={cn(
-                          "rounded-lg border border-border/70 p-4",
-                          taskCronEnabledInput ? "bg-background/40" : "bg-muted/20",
-                        )}
-                      >
-                        <div className="space-y-2">
-                          <label
-                            className={cn(
-                              "text-sm font-medium",
-                              taskCronEnabledInput
-                                ? "text-foreground"
-                                : "text-muted-foreground",
-                            )}
-                            htmlFor="taskCheckFrequencyMinutes"
-                          >
-                            Task Check Frequency (minutes)
-                          </label>
-                          <Input
-                            id="taskCheckFrequencyMinutes"
-                            type="number"
-                            min={1}
-                            max={1440}
-                            step={1}
-                            value={taskCheckFrequencyMinutesInput}
-                            disabled={!taskCronEnabledInput}
-                            onChange={(event) => {
-                              setTaskCheckFrequencyMinutesInput(
-                                event.target.value,
-                              );
-                            }}
-                          />
+                    <section className="overflow-hidden rounded-xl border border-border/70 bg-background/40">
+                      <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+                        <div className="space-y-1">
+                          <h2 className="text-sm font-semibold text-foreground">
+                            Notify Managers Of Inactive Agents
+                          </h2>
                           <p className="text-xs text-muted-foreground">
-                            {taskCronEnabledInput
-                              ? "How often cron runs while the UI server is active (1-1440 minutes)."
-                              : "Enable Cron to edit frequency."}
+                            When enabled, OpenGoat continuously checks for
+                            inactive reportees and prompts managers to unblock
+                            work.
                           </p>
                         </div>
-                      </section>
-
-                      <div className="flex items-center justify-between rounded-lg border border-border/70 bg-background/30 px-4 py-3">
-                        <p className="text-xs text-muted-foreground">
-                          Current status:{" "}
-                          <span className="font-medium text-foreground">
-                            {taskCronEnabledInput ? "Cron enabled" : "Cron disabled"}
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={notifyManagersOfInactiveAgentsInput}
+                            disabled={isMutating || isLoading}
+                            onCheckedChange={(checked) => {
+                              setNotifyManagersOfInactiveAgentsInput(checked);
+                            }}
+                            aria-label="Toggle inactive-agent manager notifications"
+                          />
+                          <span
+                            className={cn(
+                              "text-xs font-medium",
+                              notifyManagersOfInactiveAgentsInput
+                                ? "text-success"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            {notifyManagersOfInactiveAgentsInput
+                              ? "Enabled"
+                              : "Disabled"}
                           </span>
-                        </p>
-                        <Button
-                          onClick={() => {
-                            void handleSaveSettings();
-                          }}
-                          disabled={isMutating || isLoading}
-                        >
-                          Save Settings
-                        </Button>
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
+
+                      <Separator className="bg-border/60" />
+
+                      {notifyManagersOfInactiveAgentsInput ? (
+                        <div className="space-y-3 px-5 py-4">
+                          <label
+                            className="text-sm font-medium text-foreground"
+                            htmlFor="maxInactivityMinutes"
+                          >
+                            Max Inactivity Time
+                          </label>
+                          <div className="flex max-w-sm items-center gap-3">
+                            <Input
+                              id="maxInactivityMinutes"
+                              type="number"
+                              min={MIN_MAX_INACTIVITY_MINUTES}
+                              max={MAX_MAX_INACTIVITY_MINUTES}
+                              step={1}
+                              value={maxInactivityMinutesInput}
+                              onChange={(event) => {
+                                setMaxInactivityMinutesInput(
+                                  event.target.value,
+                                );
+                              }}
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              minutes
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Managers are notified after this many minutes with
+                            no assistant activity.
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="px-5 py-4 text-xs text-muted-foreground">
+                          Manager inactivity notifications are currently paused.
+                        </p>
+                      )}
+                    </section>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs text-muted-foreground">
+                        Status:{" "}
+                        <span className="font-medium text-foreground">
+                          {notifyManagersOfInactiveAgentsInput
+                            ? "Monitoring inactive agents"
+                            : "Notifications paused"}
+                        </span>
+                      </p>
+                      <Button
+                        onClick={() => {
+                          void handleSaveSettings();
+                        }}
+                        disabled={isMutating || isLoading}
+                      >
+                        Save Settings
+                      </Button>
+                    </div>
+                  </section>
                 ) : null}
               </div>
             ) : null}

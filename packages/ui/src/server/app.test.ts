@@ -220,25 +220,25 @@ describe("OpenGoat UI server API", () => {
     expect(defaultResponse.statusCode).toBe(200);
     expect(defaultResponse.json()).toMatchObject({
       settings: {
-        taskCronEnabled: true,
-        taskCheckFrequencyMinutes: 1
-      }
+        notifyManagersOfInactiveAgents: true,
+        maxInactivityMinutes: 30,
+      },
     });
 
     const updateResponse = await activeServer.inject({
       method: "POST",
       url: "/api/settings",
       payload: {
-        taskCronEnabled: false,
-        taskCheckFrequencyMinutes: 5
-      }
+        notifyManagersOfInactiveAgents: false,
+        maxInactivityMinutes: 45,
+      },
     });
     expect(updateResponse.statusCode).toBe(200);
     expect(updateResponse.json()).toMatchObject({
       settings: {
-        taskCronEnabled: false,
-        taskCheckFrequencyMinutes: 5
-      }
+        notifyManagersOfInactiveAgents: false,
+        maxInactivityMinutes: 45,
+      },
     });
 
     const updatedResponse = await activeServer.inject({
@@ -248,9 +248,9 @@ describe("OpenGoat UI server API", () => {
     expect(updatedResponse.statusCode).toBe(200);
     expect(updatedResponse.json()).toMatchObject({
       settings: {
-        taskCronEnabled: false,
-        taskCheckFrequencyMinutes: 5
-      }
+        notifyManagersOfInactiveAgents: false,
+        maxInactivityMinutes: 45,
+      },
     });
   });
 
@@ -285,8 +285,8 @@ describe("OpenGoat UI server API", () => {
       await writeFile(
         `${uniqueHomeDir}/ui-settings.json`,
         `${JSON.stringify({
-          taskCronEnabled: false,
-          taskCheckFrequencyMinutes: 1
+          notifyManagersOfInactiveAgents: false,
+          maxInactivityMinutes: 30,
         }, null, 2)}\n`,
         "utf8"
       );
@@ -296,6 +296,43 @@ describe("OpenGoat UI server API", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("maps legacy taskCronEnabled setting to inactivity notifications", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    await mkdir(uniqueHomeDir, { recursive: true });
+    await writeFile(
+      `${uniqueHomeDir}/ui-settings.json`,
+      `${JSON.stringify(
+        {
+          taskCronEnabled: false,
+          taskCheckFrequencyMinutes: 5,
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/settings",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      settings: {
+        notifyManagersOfInactiveAgents: false,
+        maxInactivityMinutes: 30,
+      },
+    });
   });
 
   it("returns installed and latest versions from the version api", async () => {
