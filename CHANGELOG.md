@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026.2.14-2
+
+- Release follow-up for February 14, 2026:
+
+- include UI runtime dependencies in the published `opengoat` package so `opengoat start` works in global installs
+- add packed-tarball smoke checks in CI/release to validate publish artifacts before npm publish
+
 ## 2026.2.14
 
 - Release the latest scheduler and settings updates, including explicit cron controls, improved settings UX labels, and cron/inactivity notification decoupling.
