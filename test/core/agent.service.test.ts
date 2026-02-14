@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentService } from "../../packages/core/src/core/agents/index.js";
 import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
+import { renderCeoBootstrapMarkdown } from "../../packages/core/src/core/templates/default-templates.js";
 import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
 import { NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
 import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
@@ -171,7 +172,7 @@ describe("AgentService", () => {
     ).toBe(false);
   });
 
-  it("keeps CEO First Run section, appends Your Role section, preserves SOUL.md, and writes ROLE/BOOTSTRAP", async () => {
+  it("keeps CEO First Run, replaces Every Session, preserves SOUL.md, and writes ROLE/BOOTSTRAP", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
 
@@ -183,9 +184,19 @@ describe("AgentService", () => {
     await fileSystem.ensureDir(ceoWorkspace);
     await writeFile(
       agentsPath,
-      ["foo", "", "## First Run", "bar", "", "## Another section", "baz", ""].join(
-        "\n",
-      ),
+      [
+        "foo",
+        "",
+        "## First Run",
+        "bar",
+        "",
+        "## Every Session",
+        "legacy session instructions",
+        "",
+        "## Another section",
+        "baz",
+        "",
+      ].join("\n"),
       "utf-8",
     );
     await writeFile(
@@ -204,15 +215,18 @@ describe("AgentService", () => {
     expect(agentsMarkdown).toContain("foo");
     expect(agentsMarkdown).toContain("## First Run");
     expect(agentsMarkdown).toContain("bar");
+    expect(agentsMarkdown).not.toContain("legacy session instructions");
     expect(agentsMarkdown).toContain("## Another section");
     expect(agentsMarkdown).toContain("baz");
-    expect(agentsMarkdown).toContain("## Your Role");
-    expect(
-      agentsMarkdown.indexOf("## First Run") <
-        agentsMarkdown.indexOf("## Your Role"),
-    ).toBe(true);
+    expect(agentsMarkdown).not.toContain("## Your Role");
+    expect(agentsMarkdown).toContain("## Every Session");
+    expect(agentsMarkdown).toContain("Read `SOUL.md` — this is who you are");
     expect(agentsMarkdown).toContain(
-      "You are part of an organization run by AI agents. Read `ROLE.md` for details about your role, and read `../../organization` for details about the organization.",
+      "4. **If in MAIN SESSION**: Also read `MEMORY.md`",
+    );
+    expect(agentsMarkdown).toContain("## The Organization");
+    expect(agentsMarkdown).toContain(
+      "You have access to the organization's context and wiki on `../../organization`",
     );
     expect(roleMarkdown).toContain(
       "# ROLE.md - Your position in the organization",
@@ -230,11 +244,51 @@ describe("AgentService", () => {
       "- To delegate and coordinate work, use `og-*` skills.",
     );
     expect(soulMarkdown).toBe(["# SOUL.md - Custom", "", "Legacy body"].join("\n"));
-    expect(bootstrapMarkdown).toContain(
-      "# BOOTSTRAP.md - OpenGoat CEO workspace bootstrap",
-    );
-    expect(bootstrapMarkdown).toContain("## First Run");
+    expect(bootstrapMarkdown.trimEnd()).toBe(renderCeoBootstrapMarkdown());
     expect(bootstrapMarkdown).not.toContain("# bootstrap");
+  });
+
+  it("removes First Run and replaces Every Session for non-ceo AGENTS.md", async () => {
+    const { service, paths, fileSystem } = await createAgentServiceWithPaths();
+    await service.ensureAgent(paths, { id: "engineer", displayName: "Avery" });
+
+    const workspace = path.join(paths.workspacesDir, "engineer");
+    const agentsPath = path.join(workspace, "AGENTS.md");
+    await fileSystem.ensureDir(workspace);
+    await writeFile(
+      agentsPath,
+      [
+        "foo",
+        "",
+        "## First Run",
+        "first-run-content",
+        "",
+        "## Every Session",
+        "legacy session content",
+        "",
+        "## Another section",
+        "baz",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    await service.ensureAgentWorkspaceBootstrap(paths, {
+      agentId: "engineer",
+      displayName: "Avery",
+      role: "Backend Engineer",
+    });
+
+    const agentsMarkdown = await readFile(agentsPath, "utf-8");
+    expect(agentsMarkdown).toContain("foo");
+    expect(agentsMarkdown).toContain("## Another section");
+    expect(agentsMarkdown).toContain("baz");
+    expect(agentsMarkdown).not.toContain("## First Run");
+    expect(agentsMarkdown).not.toContain("first-run-content");
+    expect(agentsMarkdown).not.toContain("legacy session content");
+    expect(agentsMarkdown).toContain("## Every Session");
+    expect(agentsMarkdown).toContain("Read `SOUL.md` — this is who you are");
+    expect(agentsMarkdown).toContain("## The Organization");
   });
 
   it("writes ROLE.md for non-ceo agents with id/name/role details", async () => {

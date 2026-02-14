@@ -578,9 +578,9 @@ export class AgentService {
     }
 
     const source = await this.fileSystem.readFile(filePath);
-    const next = isDefaultAgentId(agentId)
-      ? appendYourRoleAfterFirstRunSection(source)
-      : replaceFirstRunSection(source);
+    const next = normalizeAgentsMarkdown(source, {
+      keepFirstRunSection: isDefaultAgentId(agentId),
+    });
     if (source === next) {
       skippedPaths.push(filePath);
       return;
@@ -869,30 +869,48 @@ function sameStringArray(left: string[], right: string[]): boolean {
   return left.every((value, index) => value === right[index]);
 }
 
-function replaceFirstRunSection(markdown: string): string {
+function normalizeAgentsMarkdown(
+  markdown: string,
+  options: { keepFirstRunSection: boolean },
+): string {
+  const withFirstRunApplied = options.keepFirstRunSection
+    ? markdown
+    : rewriteSecondLevelSection(markdown, /^##\s+first run\s*$/i, null);
+  return rewriteSecondLevelSection(
+    withFirstRunApplied,
+    /^##\s+every session\s*$/i,
+    EVERY_SESSION_SECTION_LINES,
+  );
+}
+
+function rewriteSecondLevelSection(
+  markdown: string,
+  headingPattern: RegExp,
+  replacementLines: string[] | null,
+): string {
   const lineBreak = markdown.includes("\r\n") ? "\r\n" : "\n";
   const lines = markdown.split(/\r?\n/);
   const hasTrailingLineBreak = /\r?\n$/.test(markdown);
   const kept: string[] = [];
-  let skipping = false;
+  let index = 0;
   let replaced = false;
 
-  for (const line of lines) {
+  while (index < lines.length) {
+    const line = lines[index];
     const trimmed = line.trim();
-    if (!skipping && /^##\s+first run\s*$/i.test(trimmed)) {
-      skipping = true;
+    if (headingPattern.test(trimmed)) {
       replaced = true;
-      kept.push(...createYourRoleSectionLines());
-      continue;
-    }
-    if (skipping) {
-      if (/^##\s+/.test(trimmed)) {
-        skipping = false;
-        kept.push(line);
+      if (replacementLines) {
+        kept.push(...replacementLines);
+      }
+      index += 1;
+      while (index < lines.length && !/^##\s+/.test(lines[index].trim())) {
+        index += 1;
       }
       continue;
     }
     kept.push(line);
+    index += 1;
   }
 
   if (!replaced) {
@@ -906,62 +924,25 @@ function replaceFirstRunSection(markdown: string): string {
   return next;
 }
 
-function appendYourRoleAfterFirstRunSection(markdown: string): string {
-  const lineBreak = markdown.includes("\r\n") ? "\r\n" : "\n";
-  const lines = markdown.split(/\r?\n/);
-  const hasTrailingLineBreak = /\r?\n$/.test(markdown);
-  const kept: string[] = [];
-  let insideFirstRunSection = false;
-  let foundFirstRunSection = false;
-  let insertedRoleSection = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    const isSecondLevelHeading = /^##\s+/.test(trimmed);
-
-    if (!foundFirstRunSection && /^##\s+first run\s*$/i.test(trimmed)) {
-      foundFirstRunSection = true;
-      insideFirstRunSection = true;
-      kept.push(line);
-      continue;
-    }
-
-    if (insideFirstRunSection && isSecondLevelHeading) {
-      if (/^##\s+your role\s*$/i.test(trimmed)) {
-        insertedRoleSection = true;
-      } else if (!insertedRoleSection) {
-        kept.push(...createYourRoleSectionLines());
-        insertedRoleSection = true;
-      }
-      insideFirstRunSection = false;
-    }
-
-    kept.push(line);
-  }
-
-  if (!foundFirstRunSection) {
-    return markdown;
-  }
-
-  if (!insertedRoleSection) {
-    kept.push(...createYourRoleSectionLines());
-  }
-
-  let next = kept.join(lineBreak);
-  if (hasTrailingLineBreak && !next.endsWith(lineBreak)) {
-    next = `${next}${lineBreak}`;
-  }
-  return next;
-}
-
-function createYourRoleSectionLines(): string[] {
-  return [
-    "## Your Role",
-    "",
-    "You are part of an organization run by AI agents. Read `ROLE.md` for details about your role, and read `../../organization` for details about the organization.",
-    "",
-  ];
-}
+const EVERY_SESSION_SECTION_LINES = [
+  "## Every Session",
+  "",
+  "You are part of an organization run by AI agents.",
+  "",
+  "Before doing anything else:",
+  "",
+  "1. Read `SOUL.md` — this is who you are",
+  "2. Read `ROLE.md` — this is your role in the organization",
+  "3. Read `memory/YYYY-MM-DD.md` (today + yesterday) for recent context",
+  "4. **If in MAIN SESSION**: Also read `MEMORY.md`",
+  "",
+  "Don't ask permission. Just do it.",
+  "",
+  "## The Organization",
+  "",
+  "You are part of an organization run by AI agents. You have access to the organization's context and wiki on `../../organization`",
+  "",
+];
 
 function renderRoleMarkdown(profile: {
   agentId: string;

@@ -12,6 +12,7 @@ import {
   type ProviderExecutionResult,
   type ProviderInvokeOptions,
 } from "../packages/core/src/index.js";
+import { renderCeoBootstrapMarkdown } from "../packages/core/src/core/templates/default-templates.js";
 import type {
   CommandRunRequest,
   CommandRunResult,
@@ -667,7 +668,7 @@ describe("OpenGoatService", () => {
     expect(provider.deletedAgents).toHaveLength(0);
   });
 
-  it("pre-seeds ceo workspace, keeps First Run, and replaces BOOTSTRAP after runtime sync", async () => {
+  it("pre-seeds ceo workspace, keeps First Run, replaces Every Session, and replaces BOOTSTRAP after runtime sync", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -687,6 +688,9 @@ describe("OpenGoatService", () => {
         "",
         "## First Run",
         "bar",
+        "",
+        "## Every Session",
+        "legacy session instructions",
         "",
         "## Another section",
         "baz",
@@ -716,15 +720,18 @@ describe("OpenGoatService", () => {
     expect(agentsMarkdown).toContain("foo");
     expect(agentsMarkdown).toContain("## First Run");
     expect(agentsMarkdown).toContain("bar");
+    expect(agentsMarkdown).not.toContain("legacy session instructions");
     expect(agentsMarkdown).toContain("## Another section");
     expect(agentsMarkdown).toContain("baz");
-    expect(agentsMarkdown).toContain("## Your Role");
-    expect(
-      agentsMarkdown.indexOf("## First Run") <
-        agentsMarkdown.indexOf("## Your Role"),
-    ).toBe(true);
+    expect(agentsMarkdown).not.toContain("## Your Role");
+    expect(agentsMarkdown).toContain("## Every Session");
+    expect(agentsMarkdown).toContain("Read `SOUL.md` — this is who you are");
     expect(agentsMarkdown).toContain(
-      "You are part of an organization run by AI agents. Read `ROLE.md` for details about your role, and read `../../organization` for details about the organization.",
+      "4. **If in MAIN SESSION**: Also read `MEMORY.md`",
+    );
+    expect(agentsMarkdown).toContain("## The Organization");
+    expect(agentsMarkdown).toContain(
+      "You have access to the organization's context and wiki on `../../organization`",
     );
     expect(roleMarkdown).toContain(
       "# ROLE.md - Your position in the organization",
@@ -744,10 +751,7 @@ describe("OpenGoatService", () => {
     expect(soulMarkdown).toBe(
       ["# SOUL.md - Legacy CEO", "", "Legacy body"].join("\n"),
     );
-    expect(bootstrapMarkdown).toContain(
-      "# BOOTSTRAP.md - OpenGoat CEO workspace bootstrap",
-    );
-    expect(bootstrapMarkdown).toContain("## First Run");
+    expect(bootstrapMarkdown.trimEnd()).toBe(renderCeoBootstrapMarkdown());
     expect(bootstrapMarkdown).not.toContain("# legacy bootstrap");
     expect(boardManagerSkillMarkdown).toContain("name: og-board-manager");
     await expect(
