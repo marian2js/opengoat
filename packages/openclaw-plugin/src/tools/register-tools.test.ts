@@ -39,11 +39,21 @@ describe("openclaw plugin tool registration", () => {
 
     const toolNames = registerOpenGoatTools(api);
 
-    expect(toolNames.length).toBeGreaterThanOrEqual(25);
+    expect(toolNames.length).toBeGreaterThanOrEqual(15);
     expect(new Set(toolNames).size).toBe(toolNames.length);
     expect(toolNames).toContain("opengoat_agent_info");
     expect(toolNames).toContain("opengoat_task_create");
-    expect(toolNames).toContain("opengoat_session_history");
+    expect(toolNames).not.toContain("opengoat_agent_route");
+    expect(toolNames).not.toContain("opengoat_agent_run");
+    expect(toolNames).not.toContain("opengoat_task_list_latest_page");
+    expect(toolNames).not.toContain("opengoat_task_cron_run");
+    expect(toolNames).not.toContain("opengoat_session_list");
+    expect(toolNames).not.toContain("opengoat_session_prepare");
+    expect(toolNames).not.toContain("opengoat_session_history");
+    expect(toolNames).not.toContain("opengoat_session_reset");
+    expect(toolNames).not.toContain("opengoat_session_compact");
+    expect(toolNames).not.toContain("opengoat_session_rename");
+    expect(toolNames).not.toContain("opengoat_session_remove");
     expect(toolNames).not.toContain("opengoat_agent_provider_get");
     expect(toolNames).not.toContain("opengoat_agent_provider_set");
     expect(toolNames).not.toContain("opengoat_skill_list");

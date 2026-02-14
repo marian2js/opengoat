@@ -1,13 +1,11 @@
 import type { OpenGoatToolDefinition } from "./common.js";
 import {
-  BOOL_PARAM_SCHEMA,
   NUMBER_PARAM_SCHEMA,
   STRING_ARRAY_PARAM_SCHEMA,
   STRING_PARAM_SCHEMA,
   objectSchema,
 } from "./common.js";
 import {
-  readOptionalBoolean,
   readOptionalNumber,
   readOptionalString,
   readOptionalStringArray,
@@ -91,29 +89,6 @@ export function createTaskToolDefinitions(): OpenGoatToolDefinition[] {
         const limit = readOptionalNumber(args.params, "limit");
         const tasks = await service.listLatestTasks({ assignee, limit });
         return successResult({ tasks, count: tasks.length });
-      },
-    },
-    {
-      name: "opengoat_task_list_latest_page",
-      label: "OpenGoat Task List Latest Page",
-      description: "List paginated latest tasks.",
-      parameters: objectSchema({
-        assignee: STRING_PARAM_SCHEMA,
-        owner: STRING_PARAM_SCHEMA,
-        status: STRING_PARAM_SCHEMA,
-        limit: NUMBER_PARAM_SCHEMA,
-        offset: NUMBER_PARAM_SCHEMA,
-      }),
-      async execute(args, runtime) {
-        const service = await runtime.getService();
-        const page = await service.listLatestTasksPage({
-          assignee: readOptionalString(args.params, "assignee"),
-          owner: readOptionalString(args.params, "owner"),
-          status: readOptionalString(args.params, "status"),
-          limit: readOptionalNumber(args.params, "limit"),
-          offset: readOptionalNumber(args.params, "offset"),
-        });
-        return successResult({ page });
       },
     },
     {
@@ -252,48 +227,5 @@ export function createTaskToolDefinitions(): OpenGoatToolDefinition[] {
         return successResult({ task });
       },
     },
-    {
-      name: "opengoat_task_cron_run",
-      label: "OpenGoat Task Cron Run",
-      description: "Run one cycle of task automation checks.",
-      parameters: objectSchema({
-        inactiveMinutes: NUMBER_PARAM_SCHEMA,
-        notifyInactiveAgents: BOOL_PARAM_SCHEMA,
-        notificationTarget: {
-          type: "string",
-          enum: ["all-managers", "ceo-only"],
-        },
-      }),
-      async execute(args, runtime) {
-        const service = await runtime.getService();
-        const result = await service.runTaskCronCycle({
-          inactiveMinutes: readOptionalNumber(args.params, "inactiveMinutes"),
-          notifyInactiveAgents:
-            readOptionalBoolean(args.params, "notifyInactiveAgents"),
-          notificationTarget: readOptionalNotificationTarget(
-            args.params,
-            "notificationTarget",
-          ),
-        });
-
-        return successResult({ result });
-      },
-    },
   ];
-}
-
-function readOptionalNotificationTarget(
-  params: Record<string, unknown>,
-  key: string,
-): "all-managers" | "ceo-only" | undefined {
-  const value = readOptionalString(params, key);
-  if (!value) {
-    return undefined;
-  }
-
-  if (value !== "all-managers" && value !== "ceo-only") {
-    throw new Error('notificationTarget must be "all-managers" or "ceo-only".');
-  }
-
-  return value;
 }

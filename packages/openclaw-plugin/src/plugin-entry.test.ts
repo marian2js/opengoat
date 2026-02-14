@@ -43,7 +43,7 @@ describe("openclaw plugin entrypoint", () => {
     plugin.register(api);
 
     expect(api.cliRegistrars.length).toBe(1);
-    expect(api.toolRegistrations.length).toBeGreaterThan(20);
+    expect(api.toolRegistrations.length).toBeGreaterThan(15);
   });
 
   it("bootstraps PATH with local bin directory when opengoat is unavailable", () => {
