@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -1593,6 +1593,23 @@ describe("OpenGoatService", () => {
         constants.F_OK,
       ),
     ).rejects.toBeTruthy();
+  });
+
+  it("does not recreate ceo BOOTSTRAP.md when ceo create is re-run", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+
+    const bootstrapPath = path.join(root, "workspaces", "ceo", "BOOTSTRAP.md");
+    await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
+    await rm(bootstrapPath);
+    await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
+
+    const recreated = await service.createAgent("CEO");
+    expect(recreated.alreadyExisted).toBe(true);
+    await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
   });
 
   it("updates who an agent reports to", async () => {

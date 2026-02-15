@@ -41,6 +41,9 @@ export class BootstrapService {
     const paths = this.pathsProvider.getPaths();
     const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
+    const globalConfigExisted = await this.fileSystem.exists(
+      paths.globalConfigJsonPath,
+    );
 
     await this.ensureDirectory(paths.homeDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.workspacesDir, createdPaths, skippedPaths);
@@ -88,7 +91,9 @@ export class BootstrapService {
           skippedPaths: [],
           removedPaths: [],
         }
-      : await this.agentService.ensureCeoWorkspaceBootstrap(paths);
+      : await this.agentService.ensureCeoWorkspaceBootstrap(paths, {
+          syncBootstrapMarkdown: !globalConfigExisted,
+        });
 
     createdPaths.push(...agentResult.createdPaths);
     skippedPaths.push(...agentResult.skippedPaths);

@@ -1,5 +1,6 @@
+import { constants } from "node:fs";
 import { execFile } from "node:child_process";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -231,6 +232,44 @@ describe("agent create OpenClaw sync e2e", () => {
         "--non-interactive"
       ])
     );
+  });
+
+  it("does not recreate ceo BOOTSTRAP.md when ceo create is re-run", async () => {
+    const root = await createTempDir("opengoat-agent-create-e2e-");
+    roots.push(root);
+
+    const opengoatHome = path.join(root, "opengoat-home");
+    await mkdir(opengoatHome, { recursive: true });
+    const { stubPath, stubLogPath } = await createOpenClawStub(root);
+
+    const initResult = await runBinary(
+      ["init"],
+      opengoatHome,
+      {
+        OPENCLAW_CMD: stubPath,
+        OPENCLAW_STUB_LOG: stubLogPath,
+      },
+    );
+    expect(initResult.code).toBe(0);
+
+    const bootstrapPath = path.join(opengoatHome, "workspaces", "ceo", "BOOTSTRAP.md");
+    await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
+    await rm(bootstrapPath);
+    await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
+
+    const recreateCeo = await runBinary(
+      ["agent", "create", "CEO"],
+      opengoatHome,
+      {
+        OPENCLAW_CMD: stubPath,
+        OPENCLAW_STUB_LOG: stubLogPath,
+      },
+    );
+    expect(recreateCeo.code).toBe(0);
+    expect(recreateCeo.stdout).toContain(
+      "Local agent already existed; OpenClaw sync was still attempted.",
+    );
+    await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
   });
 });
 

@@ -123,6 +123,26 @@ describe("BootstrapService", () => {
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });
 
+  it("does not recreate ceo BOOTSTRAP.md when repairing ceo on an existing home", async () => {
+    const { service, paths, fileSystem } = await createBootstrapService();
+
+    await service.initialize();
+    const bootstrapPath = path.join(paths.workspacesDir, "ceo", "BOOTSTRAP.md");
+    const ceoConfigDir = path.join(paths.agentsDir, "ceo");
+    expect(await fileSystem.exists(bootstrapPath)).toBe(true);
+    expect(await fileSystem.exists(ceoConfigDir)).toBe(true);
+
+    await fileSystem.removeDir(bootstrapPath);
+    await fileSystem.removeDir(ceoConfigDir);
+    expect(await fileSystem.exists(bootstrapPath)).toBe(false);
+    expect(await fileSystem.exists(ceoConfigDir)).toBe(false);
+
+    await service.initialize();
+
+    expect(await fileSystem.exists(ceoConfigDir)).toBe(true);
+    expect(await fileSystem.exists(bootstrapPath)).toBe(false);
+  });
+
   it("forces ceo as default even when config was changed", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 

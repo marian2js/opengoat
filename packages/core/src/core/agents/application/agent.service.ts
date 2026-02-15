@@ -63,6 +63,10 @@ export interface AgentWorkspaceBootstrapInput {
   role: string;
 }
 
+export interface AgentWorkspaceBootstrapOptions {
+  syncBootstrapMarkdown?: boolean;
+}
+
 interface WorkspaceSkillSyncResult {
   createdPaths: string[];
   skippedPaths: string[];
@@ -178,6 +182,9 @@ export class AgentService {
 
   public async ensureCeoWorkspaceBootstrap(
     paths: OpenGoatPaths,
+    options: AgentWorkspaceBootstrapOptions = {
+      syncBootstrapMarkdown: true,
+    },
   ): Promise<CeoWorkspaceBootstrapResult> {
     const displayName = await this.readAgentDisplayName(
       paths,
@@ -188,12 +195,13 @@ export class AgentService {
       agentId: DEFAULT_AGENT_ID,
       displayName,
       role,
-    });
+    }, options);
   }
 
   public async ensureAgentWorkspaceBootstrap(
     paths: OpenGoatPaths,
     input: AgentWorkspaceBootstrapInput,
+    options: AgentWorkspaceBootstrapOptions = {},
   ): Promise<CeoWorkspaceBootstrapResult> {
     const normalizedAgentId = normalizeAgentId(input.agentId);
     if (!normalizedAgentId) {
@@ -238,12 +246,14 @@ export class AgentService {
     skippedPaths.push(...workspaceSkillSync.skippedPaths);
     removedPaths.push(...workspaceSkillSync.removedPaths);
 
-    if (isDefaultAgentId(normalizedAgentId)) {
+    if (isDefaultAgentId(normalizedAgentId) && options.syncBootstrapMarkdown) {
       await this.writeBootstrapMarkdown(
         bootstrapPath,
         createdPaths,
         skippedPaths,
       );
+    } else if (isDefaultAgentId(normalizedAgentId)) {
+      skippedPaths.push(bootstrapPath);
     } else {
       await this.removePathIfExists(bootstrapPath, removedPaths, skippedPaths);
     }

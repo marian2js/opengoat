@@ -554,6 +554,8 @@ export class OpenGoatService {
           role:
             options.role?.trim() ??
             (created.alreadyExisted ? created.agent.role : ""),
+        }, {
+          syncBootstrapMarkdown: false,
         });
       created.createdPaths.push(...workspaceBootstrap.createdPaths);
       created.skippedPaths.push(...workspaceBootstrap.skippedPaths);
