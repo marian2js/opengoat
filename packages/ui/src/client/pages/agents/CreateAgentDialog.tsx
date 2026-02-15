@@ -45,9 +45,18 @@ export function CreateAgentDialog({
   onCancel,
 }: CreateAgentDialogProps): ReactElement {
   const canSubmit = !isLoading && !isSubmitting && form.name.trim().length > 0;
+  const isBusy = isSubmitting;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (isBusy) {
+          return;
+        }
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create Agent</DialogTitle>
@@ -69,6 +78,7 @@ export function CreateAgentDialog({
               value={form.name}
               onChange={(event) => onNameChange(event.target.value)}
               placeholder="Developer"
+              disabled={isBusy}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && canSubmit) {
                   event.preventDefault();
@@ -90,6 +100,7 @@ export function CreateAgentDialog({
               value={form.role}
               onChange={(event) => onRoleChange(event.target.value)}
               placeholder="Software Engineer"
+              disabled={isBusy}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && canSubmit) {
                   event.preventDefault();
@@ -111,6 +122,7 @@ export function CreateAgentDialog({
               className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               value={form.reportsTo}
               onChange={(event) => onReportsToChange(event.target.value)}
+              disabled={isBusy}
             >
               {managerOptions.map((option) => (
                 <option key={option.id} value={option.id}>
@@ -127,24 +139,20 @@ export function CreateAgentDialog({
         {error ? <p className="text-sm text-danger">{error}</p> : null}
 
         <DialogFooter>
-          <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
+          <Button variant="secondary" onClick={onCancel} disabled={isBusy}>
             Cancel
           </Button>
-          <Button onClick={onSubmit} disabled={!canSubmit}>
-            Create
+          <Button onClick={onSubmit} disabled={!canSubmit} aria-busy={isBusy}>
+            {isBusy ? (
+              <>
+                <Spinner className="size-4" />
+                Creating...
+              </>
+            ) : (
+              "Create"
+            )}
           </Button>
         </DialogFooter>
-        {isSubmitting ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Spinner className="size-3.5" />
-              Creating agent...
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-              <div className="h-full w-2/5 animate-[pulse_1s_ease-in-out_infinite] rounded-full bg-primary/80" />
-            </div>
-          </div>
-        ) : null}
       </DialogContent>
     </Dialog>
   );
