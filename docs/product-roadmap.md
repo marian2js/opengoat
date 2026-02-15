@@ -59,6 +59,11 @@ OpenGoat is a platform for building and managing AI agent organizations that tra
    - Rationale: Fosters community contributions and customization.
    - Priority: Medium (Post-MVP)
 
+10. **Performance Monitoring Dashboard** (From DevRel Recommendation)
+    - Description: Dashboard for real-time metrics on agent performance and task efficiency.
+    - Rationale: Provides insights for optimization, aligning with efficient outcomes.
+    - Priority: Medium (Post-MVP)
+
 ## Priorities and Timeline
 
 - **Q1 2026 (MVP Launch)**: Agent management, task tracking, basic tool integration, SDK, interactive docs.
