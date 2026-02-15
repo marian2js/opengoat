@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Discussions
+    url: https://github.com/marian2js/opengoat/discussions
+    about: Ask questions or discuss ideas
