@@ -230,6 +230,52 @@ export function buildTodoTaskMessage(params: { task: TaskRecord }): string {
   ].join("\n");
 }
 
+export function buildPendingTaskMessage(params: {
+  task: TaskRecord;
+  pendingMinutes: number;
+}): string {
+  const blockers =
+    params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "None";
+  const artifacts =
+    params.task.artifacts.length > 0
+      ? params.task.artifacts
+          .map(
+            (entry) =>
+              `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`,
+          )
+          .join("\n")
+      : "- None";
+  const worklog =
+    params.task.worklog.length > 0
+      ? params.task.worklog
+          .map(
+            (entry) =>
+              `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`,
+          )
+          .join("\n")
+      : "- None";
+
+  return [
+    `Task #${params.task.taskId} is still in PENDING after ${params.pendingMinutes} minutes.`,
+    "Please continue working on it or update the task status if needed.",
+    "",
+    `Task ID: ${params.task.taskId}`,
+    `Title: ${params.task.title}`,
+    `Description: ${params.task.description}`,
+    `Project: ${params.task.project}`,
+    `Status: ${params.task.status}`,
+    `Owner: @${params.task.owner}`,
+    `Assigned to: @${params.task.assignedTo}`,
+    `Created at: ${params.task.createdAt}`,
+    `Reason: ${params.task.statusReason ?? "n/a"}`,
+    `Blockers: ${blockers}`,
+    "Artifacts:",
+    artifacts,
+    "Worklog:",
+    worklog,
+  ].join("\n");
+}
+
 export function buildBlockedTaskMessage(params: { task: TaskRecord }): string {
   const blockerReason =
     params.task.blockers.length > 0
