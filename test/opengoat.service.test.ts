@@ -686,6 +686,66 @@ describe("OpenGoatService", () => {
     expect(provider.deletedAgents).toHaveLength(0);
   });
 
+  it("parses OpenClaw skills list JSON even when config warnings are prefixed", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const pluginSourceDir = path.join(root, "plugin-src");
+    await mkdir(pluginSourceDir, { recursive: true });
+    await writeFile(
+      path.join(pluginSourceDir, "openclaw.plugin.json"),
+      "{}\n",
+      "utf-8",
+    );
+
+    const originalPluginPath = process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH;
+    process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH = pluginSourceDir;
+
+    const commandRunner = createRuntimeDefaultsCommandRunner(
+      root,
+      async (request) => {
+        if (
+          request.args[0] === "skills" &&
+          request.args[1] === "list" &&
+          request.args.includes("--json")
+        ) {
+          return {
+            code: 0,
+            stdout: `Config warnings:\\n- duplicate plugin id detected\\n${JSON.stringify(
+              {
+                workspaceDir: path.join(root, "openclaw-workspace"),
+                managedSkillsDir: path.join(root, "openclaw-managed-skills"),
+                skills: [],
+              },
+            )}`,
+            stderr: "",
+          };
+        }
+        return undefined;
+      },
+    );
+
+    try {
+      const { service } = createService(
+        root,
+        new FakeOpenClawProvider(),
+        commandRunner,
+      );
+      const result = await service.syncRuntimeDefaults();
+      expect(
+        result.warnings.some((warning) =>
+          warning.includes("skills list returned non-JSON output"),
+        ),
+      ).toBe(false);
+    } finally {
+      if (originalPluginPath === undefined) {
+        delete process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH;
+      } else {
+        process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH = originalPluginPath;
+      }
+    }
+  });
+
   it("does not recreate OpenClaw agent when ceo is already registered with matching paths", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
@@ -1117,6 +1177,80 @@ describe("OpenGoatService", () => {
               "/tmp/existing-a",
               "/tmp/existing-b",
             ]),
+      ),
+    ).toBe(true);
+  });
+
+  it("removes duplicate OpenGoat plugin source paths with the same plugin id", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const pluginSourceDir = path.join(root, "plugin-src");
+    const duplicatePluginDir = path.join(root, "duplicate-plugin-src");
+    const unrelatedPluginDir = path.join(root, "unrelated-plugin-src");
+    await mkdir(pluginSourceDir, { recursive: true });
+    await mkdir(duplicatePluginDir, { recursive: true });
+    await mkdir(unrelatedPluginDir, { recursive: true });
+    await writeFile(
+      path.join(pluginSourceDir, "openclaw.plugin.json"),
+      JSON.stringify({ id: "openclaw-plugin" }, null, 2) + "\n",
+      "utf-8",
+    );
+    await writeFile(
+      path.join(duplicatePluginDir, "openclaw.plugin.json"),
+      JSON.stringify({ id: "openclaw-plugin" }, null, 2) + "\n",
+      "utf-8",
+    );
+    await writeFile(
+      path.join(unrelatedPluginDir, "openclaw.plugin.json"),
+      JSON.stringify({ id: "unrelated-plugin" }, null, 2) + "\n",
+      "utf-8",
+    );
+
+    const originalPluginPath = process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH;
+    process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH = pluginSourceDir;
+
+    const commandRunner = createRuntimeDefaultsCommandRunner(
+      root,
+      async (request) => {
+        if (
+          request.args[0] === "config" &&
+          request.args[1] === "get" &&
+          request.args[2] === "plugins.load.paths"
+        ) {
+          return {
+            code: 0,
+            stdout: JSON.stringify([duplicatePluginDir, unrelatedPluginDir]),
+            stderr: "",
+          };
+        }
+        return undefined;
+      },
+    );
+
+    try {
+      const { service } = createService(
+        root,
+        new FakeOpenClawProvider(),
+        commandRunner,
+      );
+      await service.syncRuntimeDefaults();
+    } finally {
+      if (originalPluginPath === undefined) {
+        delete process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH;
+      } else {
+        process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH = originalPluginPath;
+      }
+    }
+
+    expect(
+      commandRunner.requests.some(
+        (request) =>
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
+          request.args[2] === "plugins.load.paths" &&
+          request.args[3] ===
+            JSON.stringify([pluginSourceDir, unrelatedPluginDir]),
       ),
     ).toBe(true);
   });
