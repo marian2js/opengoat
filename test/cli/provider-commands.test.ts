@@ -29,51 +29,69 @@ describe("provider CLI commands", () => {
     expect(stdout.output()).toContain("opengoat provider list");
   });
 
-  it("provider list passes through to OpenClaw CLI", async () => {
-    const runOpenClaw = vi.fn(async () => ({
-      code: 0,
-      stdout: "openclaw\tconfigured\n",
-      stderr: ""
-    }));
-    const { context, stdout } = createContext({ runOpenClaw });
+  it("provider list uses OpenGoat provider registry", async () => {
+    const listProviders = vi.fn(async () => [
+      {
+        id: "claude-code",
+        displayName: "Claude Code",
+        kind: "cli",
+        capabilities: {
+          agent: false,
+          model: true,
+          auth: true,
+          passthrough: true,
+        },
+      },
+      {
+        id: "openclaw",
+        displayName: "OpenClaw",
+        kind: "cli",
+        capabilities: {
+          agent: true,
+          model: true,
+          auth: true,
+          passthrough: true,
+        },
+      },
+    ]);
+    const { context, stdout } = createContext({ listProviders });
     const code = await providerListCommand.run([], context);
     expect(code).toBe(0);
-    expect(runOpenClaw).toHaveBeenCalledWith(["providers", "list"]);
-    expect(stdout.output()).toContain("openclaw\tconfigured");
+    expect(listProviders).toHaveBeenCalledTimes(1);
+    expect(stdout.output()).toContain("claude-code (Claude Code) [cli]");
+    expect(stdout.output()).toContain("openclaw (OpenClaw) [cli]");
   });
 
-  it("agent provider get validates and passes through", async () => {
-    const runOpenClaw = vi.fn(async () => ({
-      code: 0,
-      stdout: "ceo\topenclaw\n",
-      stderr: ""
+  it("agent provider get validates and reads binding", async () => {
+    const getAgentProvider = vi.fn(async () => ({
+      agentId: "ceo",
+      providerId: "openclaw",
     }));
-    const { context, stderr } = createContext({ runOpenClaw });
+    const { context, stderr } = createContext({ getAgentProvider });
 
     expect(await agentProviderGetCommand.run([], context)).toBe(1);
     expect(stderr.output()).toContain("Usage: opengoat agent provider get");
 
-    const ok = createContext({ runOpenClaw });
+    const ok = createContext({ getAgentProvider });
     expect(await agentProviderGetCommand.run(["ceo"], ok.context)).toBe(0);
-    expect(runOpenClaw).toHaveBeenLastCalledWith(["agents", "provider", "get", "ceo"]);
-    expect(ok.stdout.output()).toContain("ceo\topenclaw");
+    expect(getAgentProvider).toHaveBeenLastCalledWith("ceo");
+    expect(ok.stdout.output()).toContain("ceo: openclaw");
   });
 
-  it("agent provider set validates and passes through", async () => {
-    const runOpenClaw = vi.fn(async () => ({
-      code: 0,
-      stdout: "updated\n",
-      stderr: ""
+  it("agent provider set validates and updates binding", async () => {
+    const setAgentProvider = vi.fn(async () => ({
+      agentId: "ceo",
+      providerId: "openclaw",
     }));
 
-    const first = createContext({ runOpenClaw });
+    const first = createContext({ setAgentProvider });
     expect(await agentProviderSetCommand.run(["ceo"], first.context)).toBe(1);
     expect(first.stderr.output()).toContain("Usage: opengoat agent provider set");
 
-    const second = createContext({ runOpenClaw });
+    const second = createContext({ setAgentProvider });
     expect(await agentProviderSetCommand.run(["ceo", "openclaw"], second.context)).toBe(0);
-    expect(runOpenClaw).toHaveBeenLastCalledWith(["agents", "provider", "set", "ceo", "openclaw"]);
-    expect(second.stdout.output()).toContain("updated");
+    expect(setAgentProvider).toHaveBeenLastCalledWith("ceo", "openclaw");
+    expect(second.stdout.output()).toContain("ceo: openclaw");
   });
 
   it("agent run validates required flags", async () => {

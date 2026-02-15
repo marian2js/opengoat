@@ -4,7 +4,9 @@ This document describes the current organization-first runtime model.
 
 ## Runtime Premise
 
-- all OpenGoat agents are OpenClaw agents
+- `ceo` is always an OpenClaw agent
+- each agent has a provider binding (`runtime.provider.id`)
+- default provider is `openclaw` unless overridden per agent
 - `ceo` is the default manager (head/CEO)
 - hierarchy is explicit in agent metadata
 - manager behavior is skill-driven (`og-board-manager` skill)
@@ -19,7 +21,7 @@ For `opengoat agent ...`:
 
 1. resolve target agent (fallback to `ceo` if missing)
 2. prepare/resolve the agent session id
-3. invoke that OpenClaw agent through gateway RPC with session key `agent:<agent-id>:<opengoat-session-id>`
+3. invoke the bound provider for the target agent
 4. record assistant reply into session transcript
 5. persist run trace (`runs/<run-id>.json`)
 
@@ -50,7 +52,7 @@ It does not execute delegated calls.
 
 ## Skills
 
-Skills are delegated to OpenClaw.
+Skills remain delegated to OpenClaw workspaces/skill resolution.
 
 - OpenClaw loads bundled skills, managed skills (`~/.openclaw/skills`), and workspace-local `skills/`
 - OpenGoat stores per-agent skill assignment metadata

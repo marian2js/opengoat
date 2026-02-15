@@ -64,11 +64,11 @@ describe("AgentService", () => {
       ),
     ) as {
       role?: string;
-      runtime?: { adapter?: string };
+      runtime?: { provider?: { id?: string } };
       organization?: { type?: string; reportsTo?: string | null };
     };
     expect(config.role).toBe("CEO");
-    expect(config.runtime?.adapter).toBe("openclaw");
+    expect(config.runtime?.provider?.id).toBe("openclaw");
     expect(config.organization?.type).toBe("manager");
     expect(config.organization?.reportsTo).toBeNull();
     expect(result.agent.role).toBe("CEO");

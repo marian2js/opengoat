@@ -2,7 +2,7 @@ import type { CliCommand } from "../framework/command.js";
 
 export const providerCommand: CliCommand = {
   path: ["provider"],
-  description: "Provider passthrough commands delegated to OpenClaw.",
+  description: "Manage OpenGoat runtime providers.",
   async run(args, context): Promise<number> {
     if (args.length === 0 || args[0] === "--help" || args[0] === "-h" || args[0] === "help") {
       printHelp(context.stdout);
@@ -17,8 +17,5 @@ export const providerCommand: CliCommand = {
 
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
-  output.write("  opengoat provider list [-- ...]\n");
-  output.write("\n");
-  output.write("Notes:\n");
-  output.write("  - This command is a direct passthrough to OpenClaw CLI provider commands.\n");
+  output.write("  opengoat provider list\n");
 }

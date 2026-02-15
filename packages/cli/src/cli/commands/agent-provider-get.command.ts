@@ -2,7 +2,7 @@ import type { CliCommand } from "../framework/command.js";
 
 export const agentProviderGetCommand: CliCommand = {
   path: ["agent", "provider", "get"],
-  description: "Get agent provider binding via OpenClaw passthrough.",
+  description: "Get the configured provider for one agent.",
   async run(args, context): Promise<number> {
     const agentId = args[0]?.trim();
     if (!agentId) {
@@ -10,13 +10,15 @@ export const agentProviderGetCommand: CliCommand = {
       return 1;
     }
 
-    const result = await context.service.runOpenClaw(["agents", "provider", "get", agentId, ...args.slice(1)]);
-    if (result.stdout.trim()) {
-      context.stdout.write(result.stdout);
+    if (args.length > 1) {
+      const invalid = args[1];
+      context.stderr.write(`Unknown option: ${invalid}\n`);
+      context.stderr.write("Usage: opengoat agent provider get <agent-id>\n");
+      return 1;
     }
-    if (result.stderr.trim()) {
-      context.stderr.write(result.stderr);
-    }
-    return result.code;
+
+    const binding = await context.service.getAgentProvider(agentId);
+    context.stdout.write(`${binding.agentId}: ${binding.providerId}\n`);
+    return 0;
   }
 };

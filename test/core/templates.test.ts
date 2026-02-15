@@ -35,7 +35,7 @@ describe("default templates", () => {
       role: string;
       organization: { type: string; reportsTo: string | null };
       runtime: {
-        adapter: string;
+        provider: { id: string };
         sessions: { mainKey: string };
         skills: { assigned: string[] };
       };
@@ -43,7 +43,7 @@ describe("default templates", () => {
     expect(internalConfig.role).toBe("CEO");
     expect(internalConfig.organization.type).toBe("manager");
     expect(internalConfig.organization.reportsTo).toBeNull();
-    expect(internalConfig.runtime.adapter).toBe("openclaw");
+    expect(internalConfig.runtime.provider.id).toBe("openclaw");
     expect(internalConfig.runtime.sessions.mainKey).toBe("main");
     expect(internalConfig.runtime.skills.assigned).toEqual([]);
   });
