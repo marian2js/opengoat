@@ -566,6 +566,102 @@ function defaultUiSettings(): UiSettings {
   };
 }
 
+function resolveMaxInactivityMinutesValue(value: unknown): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
+    return DEFAULT_MAX_INACTIVITY_MINUTES;
+  }
+  if (parsed < MIN_MAX_INACTIVITY_MINUTES) {
+    return MIN_MAX_INACTIVITY_MINUTES;
+  }
+  if (parsed > MAX_MAX_INACTIVITY_MINUTES) {
+    return MAX_MAX_INACTIVITY_MINUTES;
+  }
+  return parsed;
+}
+
+function resolveMaxParallelFlowsValue(value: unknown): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
+    return DEFAULT_MAX_PARALLEL_FLOWS;
+  }
+  if (parsed < MIN_MAX_PARALLEL_FLOWS) {
+    return MIN_MAX_PARALLEL_FLOWS;
+  }
+  if (parsed > MAX_MAX_PARALLEL_FLOWS) {
+    return MAX_MAX_PARALLEL_FLOWS;
+  }
+  return parsed;
+}
+
+function resolveInactiveAgentNotificationTarget(
+  value: unknown,
+): InactiveAgentNotificationTarget {
+  if (value === "all-managers" || value === "ceo-only") {
+    return value;
+  }
+  return defaultUiSettings().inactiveAgentNotificationTarget;
+}
+
+function normalizeAuthenticationSettings(
+  value: unknown,
+): UiAuthenticationSettings {
+  if (!value || typeof value !== "object") {
+    return defaultAuthenticationSettings();
+  }
+
+  const raw = value as {
+    enabled?: unknown;
+    username?: unknown;
+    hasPassword?: unknown;
+  };
+  return {
+    enabled: raw.enabled === true,
+    username: typeof raw.username === "string" ? raw.username : "",
+    hasPassword: raw.hasPassword === true,
+  };
+}
+
+function normalizeUiSettings(
+  settings: Partial<UiSettings> | null | undefined,
+): UiSettings {
+  const defaults = defaultUiSettings();
+  const raw = settings ?? {};
+
+  return {
+    taskCronEnabled:
+      typeof raw.taskCronEnabled === "boolean"
+        ? raw.taskCronEnabled
+        : defaults.taskCronEnabled,
+    notifyManagersOfInactiveAgents:
+      typeof raw.notifyManagersOfInactiveAgents === "boolean"
+        ? raw.notifyManagersOfInactiveAgents
+        : defaults.notifyManagersOfInactiveAgents,
+    maxInactivityMinutes: resolveMaxInactivityMinutesValue(
+      raw.maxInactivityMinutes,
+    ),
+    maxParallelFlows: resolveMaxParallelFlowsValue(raw.maxParallelFlows),
+    inactiveAgentNotificationTarget: resolveInactiveAgentNotificationTarget(
+      raw.inactiveAgentNotificationTarget,
+    ),
+    authentication: normalizeAuthenticationSettings(raw.authentication),
+    ceoBootstrapPending:
+      typeof raw.ceoBootstrapPending === "boolean"
+        ? raw.ceoBootstrapPending
+        : defaults.ceoBootstrapPending,
+  };
+}
+
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
   { id: "tasks", label: "Tasks", icon: Boxes },
@@ -871,6 +967,8 @@ export function DashboardPage(): ReactElement {
           }),
       ]);
 
+      const normalizedSettings = normalizeUiSettings(settings);
+
       setState({
         health,
         overview,
@@ -878,20 +976,20 @@ export function DashboardPage(): ReactElement {
         agentSkills,
         globalSkills,
         taskWorkspaces: buildTaskWorkspaceResponse(tasks),
-        settings,
+        settings: normalizedSettings,
       });
-      setTaskCronEnabledInput(settings.taskCronEnabled);
-      setMaxInactivityMinutesInput(String(settings.maxInactivityMinutes));
-      setMaxParallelFlowsInput(String(settings.maxParallelFlows));
+      setTaskCronEnabledInput(normalizedSettings.taskCronEnabled);
+      setMaxInactivityMinutesInput(String(normalizedSettings.maxInactivityMinutes));
+      setMaxParallelFlowsInput(String(normalizedSettings.maxParallelFlows));
       setNotifyManagersOfInactiveAgentsInput(
-        settings.notifyManagersOfInactiveAgents,
+        normalizedSettings.notifyManagersOfInactiveAgents,
       );
       setInactiveAgentNotificationTargetInput(
-        settings.inactiveAgentNotificationTarget,
+        normalizedSettings.inactiveAgentNotificationTarget,
       );
-      setUiAuthenticationEnabledInput(settings.authentication.enabled);
-      setUiAuthenticationUsernameInput(settings.authentication.username);
-      setUiAuthenticationHasPassword(settings.authentication.hasPassword);
+      setUiAuthenticationEnabledInput(normalizedSettings.authentication.enabled);
+      setUiAuthenticationUsernameInput(normalizedSettings.authentication.username);
+      setUiAuthenticationHasPassword(normalizedSettings.authentication.hasPassword);
       setSessionsByAgentId({
         [sessions.agentId]: sessions.sessions,
       });
@@ -2551,29 +2649,31 @@ export function DashboardPage(): ReactElement {
   }
 
   function applyUiSettingsResponse(response: { settings: UiSettings }): void {
+    const normalizedSettings = normalizeUiSettings(response.settings);
+
     setState((current) => {
       if (!current) {
         return current;
       }
       return {
         ...current,
-        settings: response.settings,
+        settings: normalizedSettings,
       };
     });
-    setTaskCronEnabledInput(response.settings.taskCronEnabled);
+    setTaskCronEnabledInput(normalizedSettings.taskCronEnabled);
     setMaxInactivityMinutesInput(
-      String(response.settings.maxInactivityMinutes),
+      String(normalizedSettings.maxInactivityMinutes),
     );
-    setMaxParallelFlowsInput(String(response.settings.maxParallelFlows));
+    setMaxParallelFlowsInput(String(normalizedSettings.maxParallelFlows));
     setNotifyManagersOfInactiveAgentsInput(
-      response.settings.notifyManagersOfInactiveAgents,
+      normalizedSettings.notifyManagersOfInactiveAgents,
     );
     setInactiveAgentNotificationTargetInput(
-      response.settings.inactiveAgentNotificationTarget,
+      normalizedSettings.inactiveAgentNotificationTarget,
     );
-    setUiAuthenticationEnabledInput(response.settings.authentication.enabled);
-    setUiAuthenticationUsernameInput(response.settings.authentication.username);
-    setUiAuthenticationHasPassword(response.settings.authentication.hasPassword);
+    setUiAuthenticationEnabledInput(normalizedSettings.authentication.enabled);
+    setUiAuthenticationUsernameInput(normalizedSettings.authentication.username);
+    setUiAuthenticationHasPassword(normalizedSettings.authentication.hasPassword);
   }
 
   async function handleCreateTask(
@@ -4920,7 +5020,10 @@ export function DashboardPage(): ReactElement {
                             }
                           />
                         </PromptInputBody>
-                        <PromptInputFooter className="justify-end">
+                        <PromptInputFooter
+                          align="inline-end"
+                          className="self-end justify-end pb-2 pr-2"
+                        >
                           <PromptInputSubmit
                             status={sessionChatStatus}
                             onStop={handleStopSessionPrompt}

@@ -933,7 +933,10 @@ export const PromptInputTextarea = ({
 
   return (
     <InputGroupTextarea
-      className={cn("field-sizing-content max-h-48 min-h-16", className)}
+      className={cn(
+        "field-sizing-content min-h-20 max-h-72 overflow-y-auto",
+        className,
+      )}
       name="message"
       onCompositionEnd={handleCompositionEnd}
       onCompositionStart={handleCompositionStart}
@@ -962,17 +965,15 @@ export const PromptInputHeader = ({
   />
 );
 
-export type PromptInputFooterProps = Omit<
-  ComponentProps<typeof InputGroupAddon>,
-  "align"
->;
+export type PromptInputFooterProps = ComponentProps<typeof InputGroupAddon>;
 
 export const PromptInputFooter = ({
+  align = "block-end",
   className,
   ...props
 }: PromptInputFooterProps) => (
   <InputGroupAddon
-    align="block-end"
+    align={align}
     className={cn("justify-between gap-1", className)}
     {...props}
   />
