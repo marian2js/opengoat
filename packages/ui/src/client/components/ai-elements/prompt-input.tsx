@@ -799,7 +799,7 @@ export const PromptInput = ({
         ref={formRef}
         {...props}
       >
-        <InputGroup className="overflow-hidden">{children}</InputGroup>
+        <InputGroup className="h-auto overflow-hidden">{children}</InputGroup>
       </form>
     </>
   );
@@ -833,6 +833,7 @@ export type PromptInputTextareaProps = ComponentProps<
 
 export const PromptInputTextarea = ({
   onChange,
+  onInput,
   onKeyDown,
   className,
   placeholder = "What would you like to know?",
@@ -841,6 +842,25 @@ export const PromptInputTextarea = ({
   const controller = useOptionalPromptInputController();
   const attachments = usePromptInputAttachments();
   const [isComposing, setIsComposing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const resizeTextarea = useCallback((textarea: HTMLTextAreaElement | null) => {
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "auto";
+    const computed = window.getComputedStyle(textarea);
+    const maxHeight = Number.parseFloat(computed.maxHeight);
+    const minHeight = Number.parseFloat(computed.minHeight);
+    const cappedHeight = Number.isFinite(maxHeight)
+      ? Math.min(textarea.scrollHeight, maxHeight)
+      : textarea.scrollHeight;
+    const resolvedHeight = Number.isFinite(minHeight)
+      ? Math.max(minHeight, cappedHeight)
+      : cappedHeight;
+    textarea.style.height = `${resolvedHeight}px`;
+  }, []);
 
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = useCallback(
     (e) => {
@@ -918,18 +938,35 @@ export const PromptInputTextarea = ({
 
   const handleCompositionEnd = useCallback(() => setIsComposing(false), []);
   const handleCompositionStart = useCallback(() => setIsComposing(true), []);
+  const handleInput = useCallback<
+    NonNullable<PromptInputTextareaProps["onInput"]>
+  >(
+    (event) => {
+      resizeTextarea(event.currentTarget);
+      onInput?.(event);
+    },
+    [onInput, resizeTextarea],
+  );
 
   const controlledProps = controller
     ? {
         onChange: (e: ChangeEvent<HTMLTextAreaElement>) => {
           controller.textInput.setInput(e.currentTarget.value);
+          resizeTextarea(e.currentTarget);
           onChange?.(e);
         },
         value: controller.textInput.value,
       }
     : {
-        onChange,
+        onChange: (e: ChangeEvent<HTMLTextAreaElement>) => {
+          resizeTextarea(e.currentTarget);
+          onChange?.(e);
+        },
       };
+
+  useEffect(() => {
+    resizeTextarea(textareaRef.current);
+  }, [controller?.textInput.value, resizeTextarea]);
 
   return (
     <InputGroupTextarea
@@ -938,11 +975,14 @@ export const PromptInputTextarea = ({
         className,
       )}
       name="message"
+      onInput={handleInput}
       onCompositionEnd={handleCompositionEnd}
       onCompositionStart={handleCompositionStart}
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
       placeholder={placeholder}
+      ref={textareaRef}
+      rows={3}
       {...props}
       {...controlledProps}
     />
