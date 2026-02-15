@@ -1922,6 +1922,108 @@ describe("OpenGoatService", () => {
     ).toBe(false);
   });
 
+  it("notifies assignees when pending tasks exceed the inactivity threshold", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const provider = new FakeOpenClawProvider();
+    let nowMs = Date.parse("2026-02-06T00:00:00.000Z");
+    const { service } = createService(root, provider, undefined, {
+      nowIso: () => new Date(nowMs).toISOString(),
+    });
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    const task = await service.createTask("ceo", {
+      title: "Finish integration",
+      description: "Complete the pending integration work",
+      assignedTo: "engineer",
+      status: "doing",
+    });
+    await service.updateTaskStatus(
+      "engineer",
+      task.taskId,
+      "pending",
+      "Waiting for integration window",
+    );
+
+    nowMs += 31 * 60_000;
+    const cycle = await service.runTaskCronCycle({
+      inactiveMinutes: 30,
+      notifyInactiveAgents: false,
+    });
+
+    expect(cycle.todoTasks).toBe(0);
+    expect(cycle.blockedTasks).toBe(0);
+    expect(cycle.inactiveAgents).toBe(0);
+    expect(cycle.dispatches).toHaveLength(1);
+    expect(cycle.dispatches[0]).toMatchObject({
+      kind: "pending",
+      targetAgentId: "engineer",
+      taskId: task.taskId,
+      ok: true,
+    });
+    expect(
+      provider.invocations.some(
+        (entry) =>
+          entry.agent === "engineer" &&
+          entry.message.includes(
+            `Task #${task.taskId} is still in PENDING after 30 minutes.`,
+          ) &&
+          entry.message.includes(
+            "Please continue working on it or update the task status if needed.",
+          ),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not notify assignees for pending tasks below the inactivity threshold", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const provider = new FakeOpenClawProvider();
+    let nowMs = Date.parse("2026-02-06T00:00:00.000Z");
+    const { service } = createService(root, provider, undefined, {
+      nowIso: () => new Date(nowMs).toISOString(),
+    });
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    const task = await service.createTask("ceo", {
+      title: "Prepare QA handoff",
+      description: "Collect all QA handoff artifacts",
+      assignedTo: "engineer",
+      status: "doing",
+    });
+    await service.updateTaskStatus(
+      "engineer",
+      task.taskId,
+      "pending",
+      "Awaiting QA slot",
+    );
+
+    nowMs += 29 * 60_000;
+    const cycle = await service.runTaskCronCycle({
+      inactiveMinutes: 30,
+      notifyInactiveAgents: false,
+    });
+
+    expect(cycle.dispatches).toHaveLength(0);
+    expect(
+      provider.invocations.some(
+        (entry) =>
+          entry.agent === "engineer" &&
+          entry.message.includes(`Task #${task.taskId} is still in PENDING`),
+      ),
+    ).toBe(false);
+  });
+
   it("supports notifying only ceo for inactive direct reports", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
@@ -2190,6 +2292,9 @@ function createService(
   root: string,
   provider: FakeOpenClawProvider = new FakeOpenClawProvider(),
   commandRunner?: CommandRunnerPort,
+  options: {
+    nowIso?: () => string;
+  } = {},
 ): { service: OpenGoatService; provider: FakeOpenClawProvider } {
   const registry = new ProviderRegistry();
   registry.register("openclaw", () => provider);
@@ -2199,7 +2304,7 @@ function createService(
     pathPort: new NodePathPort(),
     pathsProvider: new TestPathsProvider(root),
     providerRegistry: registry,
-    nowIso: () => "2026-02-06T00:00:00.000Z",
+    nowIso: options.nowIso ?? (() => "2026-02-06T00:00:00.000Z"),
     commandRunner,
   });
   return {

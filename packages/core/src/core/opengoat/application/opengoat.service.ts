@@ -68,6 +68,7 @@ import {
   assertAgentExists,
   buildBlockedTaskMessage,
   buildInactiveAgentMessage,
+  buildPendingTaskMessage,
   buildInactiveSessionRef,
   buildReporteeStats,
   buildTaskSessionRef,
@@ -115,7 +116,7 @@ export interface RuntimeDefaultsSyncResult {
 }
 
 export interface TaskCronDispatchResult {
-  kind: "todo" | "blocked" | "inactive";
+  kind: "todo" | "pending" | "blocked" | "inactive";
   targetAgentId: string;
   sessionRef: string;
   taskId?: string;
@@ -150,6 +151,7 @@ interface InactiveAgentCandidate {
 interface TaskStatusDispatchSummary {
   dispatches: TaskCronDispatchResult[];
   todoTasks: number;
+  pendingTasks: number;
   blockedTasks: number;
 }
 
@@ -928,10 +930,18 @@ export class OpenGoatService {
       : undefined;
 
     const tasks = await this.boardService.listTasks(paths, { limit: 10_000 });
+    const pendingTaskIds = new Set(
+      await this.boardService.listPendingTaskIdsOlderThan(
+        paths,
+        inactiveMinutes,
+      ),
+    );
     const taskStatusDispatch = await this.dispatchTaskStatusAutomations(
       paths,
       tasks,
       manifests,
+      pendingTaskIds,
+      inactiveMinutes,
       maxParallelFlows,
     );
     const inactiveDispatches = await this.dispatchInactiveAgentAutomations(
@@ -963,26 +973,25 @@ export class OpenGoatService {
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
     tasks: TaskRecord[],
     manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
+    pendingTaskIds: Set<string>,
+    pendingMinutes: number,
     maxParallelFlows: number,
   ): Promise<TaskStatusDispatchSummary> {
     const manifestsById = new Map(
       manifests.map((manifest) => [manifest.agentId, manifest]),
     );
     const requests: Array<{
-      kind: "todo" | "blocked";
+      kind: "todo" | "pending" | "blocked";
       targetAgentId: string;
       sessionRef: string;
       taskId: string;
       message: string;
     }> = [];
     let todoTasks = 0;
+    let pendingTasks = 0;
     let blockedTasks = 0;
 
     for (const task of tasks) {
-      if (task.status !== "todo" && task.status !== "blocked") {
-        continue;
-      }
-
       if (task.status === "todo") {
         todoTasks += 1;
         const targetAgentId = task.assignedTo;
@@ -998,20 +1007,43 @@ export class OpenGoatService {
         continue;
       }
 
-      blockedTasks += 1;
-      const assigneeManifest = manifestsById.get(task.assignedTo);
-      const managerAgentId =
-        normalizeAgentId(assigneeManifest?.metadata.reportsTo ?? "") ||
-        DEFAULT_AGENT_ID;
-      const sessionRef = buildTaskSessionRef(managerAgentId, task.taskId);
-      const message = buildBlockedTaskMessage({ task });
-      requests.push({
-        kind: "blocked",
-        targetAgentId: managerAgentId,
-        sessionRef,
-        taskId: task.taskId,
-        message,
-      });
+      if (task.status === "pending") {
+        if (!pendingTaskIds.has(task.taskId)) {
+          continue;
+        }
+        pendingTasks += 1;
+        const targetAgentId = task.assignedTo;
+        const sessionRef = buildTaskSessionRef(targetAgentId, task.taskId);
+        const message = buildPendingTaskMessage({
+          task,
+          pendingMinutes,
+        });
+        requests.push({
+          kind: "pending",
+          targetAgentId,
+          sessionRef,
+          taskId: task.taskId,
+          message,
+        });
+        continue;
+      }
+
+      if (task.status === "blocked") {
+        blockedTasks += 1;
+        const assigneeManifest = manifestsById.get(task.assignedTo);
+        const managerAgentId =
+          normalizeAgentId(assigneeManifest?.metadata.reportsTo ?? "") ||
+          DEFAULT_AGENT_ID;
+        const sessionRef = buildTaskSessionRef(managerAgentId, task.taskId);
+        const message = buildBlockedTaskMessage({ task });
+        requests.push({
+          kind: "blocked",
+          targetAgentId: managerAgentId,
+          sessionRef,
+          taskId: task.taskId,
+          message,
+        });
+      }
     }
 
     const dispatches = await runWithConcurrency(
@@ -1038,6 +1070,7 @@ export class OpenGoatService {
     return {
       dispatches,
       todoTasks,
+      pendingTasks,
       blockedTasks,
     };
   }

@@ -43,6 +43,7 @@ interface TaskRow {
   task_id: string;
   board_id: string;
   created_at: string;
+  status_updated_at?: string | null;
   project: string;
   owner_agent_id: string;
   assigned_to_agent_id: string;
@@ -59,6 +60,10 @@ interface EntryRow {
 }
 
 interface TaskIdRow {
+  task_id: string;
+}
+
+interface PendingTaskIdRow {
   task_id: string;
 }
 
@@ -138,6 +143,7 @@ export class BoardService {
          task_id,
          board_id,
          created_at,
+         status_updated_at,
          project,
          owner_agent_id,
          assigned_to_agent_id,
@@ -145,10 +151,11 @@ export class BoardService {
          description,
          status,
          status_reason
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         taskId,
         INTERNAL_TASK_BUCKET_ID,
+        createdAt,
         createdAt,
         project,
         normalizedActorId,
@@ -347,11 +354,40 @@ export class BoardService {
 
     this.execute(
       db,
-      `UPDATE tasks SET status = ?, status_reason = ? WHERE task_id = ?`,
-      [nextStatus, nextStatusReason, resolvedTaskId],
+      `UPDATE tasks
+       SET status = ?, status_reason = ?, status_updated_at = ?
+       WHERE task_id = ?`,
+      [nextStatus, nextStatusReason, this.nowIso(), resolvedTaskId],
     );
     await this.persistDatabase(paths, db);
     return this.requireTask(db, resolvedTaskId);
+  }
+
+  public async listPendingTaskIdsOlderThan(
+    paths: OpenGoatPaths,
+    olderThanMinutes: number,
+  ): Promise<string[]> {
+    if (!Number.isFinite(olderThanMinutes) || olderThanMinutes <= 0) {
+      return [];
+    }
+
+    const db = await this.getDatabase(paths);
+    const nowMs = Date.parse(this.nowIso());
+    const referenceNowMs = Number.isFinite(nowMs) ? nowMs : Date.now();
+    const cutoffIso = new Date(
+      referenceNowMs - Math.floor(olderThanMinutes) * 60_000,
+    ).toISOString();
+    const rows = this.queryAll<PendingTaskIdRow>(
+      db,
+      `SELECT task_id
+       FROM tasks
+       WHERE status = 'pending'
+         AND COALESCE(status_updated_at, created_at) <= ?
+       ORDER BY COALESCE(status_updated_at, created_at) ASC, task_id ASC`,
+      [cutoffIso],
+    );
+
+    return rows.map((row) => row.task_id);
   }
 
   public async addTaskBlocker(
@@ -610,6 +646,7 @@ export class BoardService {
          task_id TEXT PRIMARY KEY,
          board_id TEXT NOT NULL,
          created_at TEXT NOT NULL,
+         status_updated_at TEXT,
          project TEXT NOT NULL DEFAULT '${DEFAULT_TASK_PROJECT}',
          owner_agent_id TEXT NOT NULL,
          assigned_to_agent_id TEXT NOT NULL,
@@ -622,6 +659,7 @@ export class BoardService {
     );
     this.ensureTaskProjectColumn(db);
     this.ensureTaskStatusReasonColumn(db);
+    this.ensureTaskStatusUpdatedAtColumn(db);
     this.execute(
       db,
       `CREATE TABLE IF NOT EXISTS task_blockers (
@@ -666,6 +704,14 @@ export class BoardService {
     this.execute(
       db,
       "CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at, task_id);",
+    );
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_tasks_status_updated_at ON tasks(status_updated_at, task_id);",
+    );
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_tasks_status_status_updated_at ON tasks(status, status_updated_at, task_id);",
     );
     this.execute(
       db,
@@ -825,6 +871,27 @@ export class BoardService {
     }
 
     this.execute(db, "ALTER TABLE tasks ADD COLUMN status_reason TEXT;");
+  }
+
+  private ensureTaskStatusUpdatedAtColumn(db: SqlJsDatabase): void {
+    const columns = this.queryAll<{ name: string }>(
+      db,
+      "PRAGMA table_info(tasks);",
+    );
+    const hasStatusUpdatedAt = columns.some(
+      (column) => column.name === "status_updated_at",
+    );
+    if (!hasStatusUpdatedAt) {
+      this.execute(db, "ALTER TABLE tasks ADD COLUMN status_updated_at TEXT;");
+    }
+
+    this.execute(
+      db,
+      `UPDATE tasks
+       SET status_updated_at = created_at
+       WHERE status_updated_at IS NULL
+          OR TRIM(status_updated_at) = '';`,
+    );
   }
 
   private ensureBoardDefaultColumn(db: SqlJsDatabase): void {
