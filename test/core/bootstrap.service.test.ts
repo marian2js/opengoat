@@ -108,6 +108,21 @@ describe("BootstrapService", () => {
     expect(second.skippedPaths.length).toBeGreaterThan(0);
   });
 
+  it("does not recreate ceo BOOTSTRAP.md after initial creation", async () => {
+    const { service, paths, fileSystem } = await createBootstrapService();
+
+    await service.initialize();
+    const bootstrapPath = path.join(paths.workspacesDir, "ceo", "BOOTSTRAP.md");
+    expect(await fileSystem.exists(bootstrapPath)).toBe(true);
+
+    await fileSystem.removeDir(bootstrapPath);
+    expect(await fileSystem.exists(bootstrapPath)).toBe(false);
+
+    await service.initialize();
+
+    expect(await fileSystem.exists(bootstrapPath)).toBe(false);
+  });
+
   it("forces ceo as default even when config was changed", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 

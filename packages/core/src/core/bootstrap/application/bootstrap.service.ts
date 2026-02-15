@@ -82,8 +82,13 @@ export class BootstrapService {
       reportsTo: null,
       role: "CEO",
     });
-    const workspaceBootstrapResult =
-      await this.agentService.ensureCeoWorkspaceBootstrap(paths);
+    const workspaceBootstrapResult = agentResult.alreadyExisted
+      ? {
+          createdPaths: [],
+          skippedPaths: [],
+          removedPaths: [],
+        }
+      : await this.agentService.ensureCeoWorkspaceBootstrap(paths);
 
     createdPaths.push(...agentResult.createdPaths);
     skippedPaths.push(...agentResult.skippedPaths);

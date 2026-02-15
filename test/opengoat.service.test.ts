@@ -12,7 +12,6 @@ import {
   type ProviderExecutionResult,
   type ProviderInvokeOptions,
 } from "../packages/core/src/index.js";
-import { renderCeoBootstrapMarkdown } from "../packages/core/src/core/templates/default-templates.js";
 import type {
   CommandRunRequest,
   CommandRunResult,
@@ -687,6 +686,25 @@ describe("OpenGoatService", () => {
     expect(provider.deletedAgents).toHaveLength(0);
   });
 
+  it("does not recreate OpenClaw agent when ceo is already registered with matching paths", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const provider = new FakeOpenClawProvider();
+    const commandRunner = createRuntimeDefaultsCommandRunner(root);
+    const { service } = createService(root, provider, commandRunner);
+    await service.initialize();
+
+    provider.createdAgents.length = 0;
+
+    const result = await service.syncRuntimeDefaults();
+
+    expect(result.ceoSynced).toBe(true);
+    expect(
+      provider.createdAgents.some((entry) => entry.agentId === "ceo"),
+    ).toBe(false);
+  });
+
   it("enforces OpenClaw agent policy: sandbox off and tools allow all", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
@@ -1281,7 +1299,7 @@ describe("OpenGoatService", () => {
     ).toBe(true);
   });
 
-  it("pre-seeds ceo workspace, keeps First Run, replaces Every Session, and replaces BOOTSTRAP after runtime sync", async () => {
+  it("does not rewrite ceo bootstrap files during runtime sync", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -1323,7 +1341,6 @@ describe("OpenGoatService", () => {
     await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
 
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
-    const roleMarkdown = await readFile(rolePath, "utf-8");
     const soulMarkdown = await readFile(soulPath, "utf-8");
     const bootstrapMarkdown = await readFile(bootstrapPath, "utf-8");
     const boardManagerSkillMarkdown = await readFile(
@@ -1333,45 +1350,13 @@ describe("OpenGoatService", () => {
     expect(agentsMarkdown).toContain("foo");
     expect(agentsMarkdown).toContain("## First Run");
     expect(agentsMarkdown).toContain("bar");
-    expect(agentsMarkdown).not.toContain("legacy session instructions");
+    expect(agentsMarkdown).toContain("legacy session instructions");
     expect(agentsMarkdown).toContain("## Another section");
     expect(agentsMarkdown).toContain("baz");
-    expect(agentsMarkdown).not.toContain("## Your Role");
-    expect(agentsMarkdown).toContain("## Every Session");
-    expect(agentsMarkdown).toContain("Read `SOUL.md` — this is who you are");
-    expect(agentsMarkdown).toContain(
-      "4. **If in MAIN SESSION**: Also read `MEMORY.md`",
-    );
-    expect(agentsMarkdown).toContain(
-      "Use OpenGoat tools directly (`opengoat_*`). Do not rely on shell CLI commands.",
-    );
-    expect(agentsMarkdown).toContain("## The Organization");
-    expect(agentsMarkdown).toContain(
-      "You have access to the organization's context and wiki on `../../organization`",
-    );
-    expect(roleMarkdown).toContain(
-      "# ROLE.md - Your position in the organization",
-    );
-    expect(roleMarkdown).toContain(
-      "You are the CEO of an organization fully run by AI agents.",
-    );
-    expect(roleMarkdown).toContain("- Your id: ceo (agent id)");
-    expect(roleMarkdown).toContain("- Your name: CEO");
-    expect(roleMarkdown).toContain("- Role: CEO");
-    expect(roleMarkdown).toContain(
-      '- For info about your reportees, call tool `opengoat_agent_info` with `{"agentId":"ceo"}`.',
-    );
-    expect(roleMarkdown).toContain(
-      "- Use OpenGoat tools directly (`opengoat_*`), not shell CLI commands.",
-    );
-    expect(roleMarkdown).toContain(
-      "- To delegate and coordinate work, use `og-*` skills.",
-    );
     expect(soulMarkdown).toBe(
       ["# SOUL.md - Legacy CEO", "", "Legacy body"].join("\n"),
     );
-    expect(bootstrapMarkdown.trimEnd()).toBe(renderCeoBootstrapMarkdown());
-    expect(bootstrapMarkdown).not.toContain("# legacy bootstrap");
+    expect(bootstrapMarkdown.trimEnd()).toBe("# legacy bootstrap");
     expect(boardManagerSkillMarkdown).toContain("name: og-board-manager");
     await expect(
       access(

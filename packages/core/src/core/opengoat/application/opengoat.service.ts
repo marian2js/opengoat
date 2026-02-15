@@ -448,16 +448,6 @@ export class OpenGoatService {
     }
 
     try {
-      await this.agentService.ensureCeoWorkspaceBootstrap(paths);
-    } catch (error) {
-      warnings.push(
-        `OpenGoat workspace bootstrap for "ceo" failed: ${toErrorMessage(
-          error,
-        )}`,
-      );
-    }
-
-    try {
       const agents = await this.agentService.listAgents(paths);
       for (const agent of agents) {
         await this.agentService.ensureAgentWorkspaceCommandShim(
@@ -1447,10 +1437,8 @@ export class OpenGoatService {
       );
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(listed.stdout);
-    } catch {
+    const parsed = parseLooseJson(listed.stdout);
+    if (parsed === undefined) {
       throw new Error(
         "OpenClaw agents list returned non-JSON output; cannot inspect agents.",
       );
@@ -1496,6 +1484,18 @@ export class OpenGoatService {
     warnings: string[];
   }> {
     const warnings: string[] = [];
+
+    if (
+      params.existingEntry &&
+      pathMatches(params.existingEntry.workspace, params.descriptor.workspaceDir) &&
+      pathMatches(params.existingEntry.agentDir, params.descriptor.internalConfigDir)
+    ) {
+      return {
+        synced: true,
+        code: 0,
+        warnings,
+      };
+    }
 
     let runtimeSync:
       | Awaited<ReturnType<ProviderService["createProviderAgent"]>>
