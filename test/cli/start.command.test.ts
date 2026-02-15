@@ -7,12 +7,19 @@ import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
 const roots: string[] = [];
 const originalUiServerEntry = process.env.OPENGOAT_UI_SERVER_ENTRY;
+const originalOpenGoatHome = process.env.OPENGOAT_HOME;
 
 afterEach(async () => {
   if (originalUiServerEntry === undefined) {
     delete process.env.OPENGOAT_UI_SERVER_ENTRY;
   } else {
     process.env.OPENGOAT_UI_SERVER_ENTRY = originalUiServerEntry;
+  }
+
+  if (originalOpenGoatHome === undefined) {
+    delete process.env.OPENGOAT_HOME;
+  } else {
+    process.env.OPENGOAT_HOME = originalOpenGoatHome;
   }
 
   while (roots.length > 0) {
@@ -58,6 +65,7 @@ describe("start command", () => {
   it("starts the configured ui entrypoint", async () => {
     const root = await createTempDir("opengoat-start-command-");
     roots.push(root);
+    process.env.OPENGOAT_HOME = root;
 
     const uiEntrypoint = path.join(root, "ui-entry.mjs");
     await writeFile(

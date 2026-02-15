@@ -153,6 +153,7 @@ export interface OpenClawUiService {
     inactiveMinutes?: number;
     notificationTarget?: InactiveAgentNotificationTarget;
     notifyInactiveAgents?: boolean;
+    maxParallelFlows?: number;
   }) => Promise<TaskCronRunResult>;
 }
 
@@ -242,6 +243,7 @@ export interface UiServerSettings {
   taskCronEnabled: boolean;
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
+  maxParallelFlows: number;
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
   authentication: UiServerAuthenticationSettings;
 }
@@ -267,8 +269,10 @@ export interface UiServerSettingsResponse {
   taskCronEnabled: boolean;
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
+  maxParallelFlows: number;
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
   authentication: UiAuthenticationSettingsResponse;
+  ceoBootstrapPending: boolean;
 }
 
 export interface UiVersionInfo {
@@ -425,6 +429,7 @@ export interface TaskCronScheduler {
   setTaskCronEnabled: (enabled: boolean) => void;
   setNotifyManagersOfInactiveAgents: (enabled: boolean) => void;
   setMaxInactivityMinutes: (maxInactivityMinutes: number) => void;
+  setMaxParallelFlows: (maxParallelFlows: number) => void;
   setInactiveAgentNotificationTarget: (
     target: InactiveAgentNotificationTarget,
   ) => void;
