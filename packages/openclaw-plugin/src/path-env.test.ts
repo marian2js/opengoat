@@ -177,6 +177,7 @@ describe("ensureOpenGoatCommandOnPath", () => {
       processExecPath: "/tmp/node",
       processArgv: ["node", "/tmp/openclaw"],
       includeProcessEnvPrefixes: false,
+      createShim: false,
     });
 
     expect(result).toEqual({
@@ -186,5 +187,36 @@ describe("ensureOpenGoatCommandOnPath", () => {
     expect(env.PATH).toBe("");
     expect(logger.info).not.toHaveBeenCalled();
     expect(logger.warn).toHaveBeenCalledOnce();
+  });
+
+  it("creates an opengoat shim in a writable PATH entry when command is missing", () => {
+    const shimDir = createTempDir("opengoat-shim-path-");
+    const env = { PATH: shimDir };
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+
+    const result = ensureOpenGoatCommandOnPath({
+      env,
+      logger,
+      cwd: createTempDir("opengoat-empty-cwd-"),
+      pluginSource: join(createTempDir("opengoat-empty-plugin-"), "index.ts"),
+      homeDir: createTempDir("opengoat-home-"),
+      processExecPath: "/tmp/node",
+      processArgv: ["node", "/tmp/openclaw"],
+      includeProcessEnvPrefixes: false,
+      openClawCommand: "openclaw",
+    });
+
+    expect(result).toMatchObject({
+      alreadyAvailable: false,
+      added: false,
+      shimCreated: true,
+    });
+    expect(env.PATH).toBe(shimDir);
+    expect(logger.info).toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 });

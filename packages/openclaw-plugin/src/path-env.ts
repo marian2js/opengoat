@@ -1,4 +1,11 @@
-import { existsSync } from "node:fs";
+import {
+  accessSync,
+  chmodSync,
+  constants as fsConstants,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import type { PluginLogger } from "./openclaw-types.js";
@@ -13,6 +20,8 @@ interface EnsureOpenGoatPathOptions {
   processExecPath?: string;
   processArgv?: readonly string[];
   includeProcessEnvPrefixes?: boolean;
+  createShim?: boolean;
+  openClawCommand?: string;
   fileExists?: (path: string) => boolean;
   logger?: PluginLogger;
 }
@@ -21,6 +30,8 @@ interface EnsureOpenGoatPathResult {
   alreadyAvailable: boolean;
   added: boolean;
   addedPath?: string;
+  shimCreated?: boolean;
+  shimPath?: string;
 }
 
 export function ensureOpenGoatCommandOnPath(
@@ -31,6 +42,8 @@ export function ensureOpenGoatCommandOnPath(
   const cwd = options.cwd ?? process.cwd();
   const platform = options.platform ?? process.platform;
   const fileExists = options.fileExists ?? existsSync;
+  const createShim = options.createShim ?? true;
+  const openClawCommand = options.openClawCommand?.trim() || "openclaw";
   const pathValue = env.PATH ?? "";
 
   if (isCommandOnPath(command, pathValue, platform, fileExists)) {
@@ -68,6 +81,22 @@ export function ensureOpenGoatCommandOnPath(
       added: true,
       addedPath: candidate,
     };
+  }
+
+  if (createShim) {
+    const shim = ensureCommandShim({
+      command,
+      env,
+      platform,
+      homeDir: options.homeDir ?? homedir(),
+      pathEntries: existingEntries,
+      openClawCommand,
+      logger: options.logger,
+    });
+
+    if (shim) {
+      return shim;
+    }
   }
 
   options.logger?.warn(
@@ -255,4 +284,114 @@ function *iterateAncestors(start: string): Generator<string> {
 
 function dedupe(entries: readonly string[]): string[] {
   return [...new Set(entries.map((entry) => entry.trim()).filter(Boolean))];
+}
+
+function ensureCommandShim(options: {
+  command: string;
+  env: NodeJS.ProcessEnv;
+  platform: NodeJS.Platform;
+  homeDir: string;
+  pathEntries: readonly string[];
+  openClawCommand: string;
+  logger?: PluginLogger;
+}): EnsureOpenGoatPathResult | undefined {
+  const shimDirectories = dedupe([
+    ...options.pathEntries,
+    join(options.homeDir, ".openclaw", "bin"),
+  ]);
+
+  for (const directory of shimDirectories) {
+    const prepared = ensureWritableDirectory(directory);
+    if (!prepared) {
+      continue;
+    }
+
+    const shimPath = writeShimFile({
+      directory: prepared,
+      command: options.command,
+      platform: options.platform,
+      openClawCommand: options.openClawCommand,
+    });
+    if (!shimPath) {
+      continue;
+    }
+
+    if (!containsPathEntry(options.pathEntries, prepared, options.platform)) {
+      options.env.PATH = [prepared, ...options.pathEntries].join(delimiter);
+      options.logger?.info(
+        `[opengoat-plugin] created ${shimPath} and added ${prepared} to PATH.`,
+      );
+      return {
+        alreadyAvailable: false,
+        added: true,
+        addedPath: prepared,
+        shimCreated: true,
+        shimPath,
+      };
+    }
+
+    options.logger?.info(`[opengoat-plugin] created ${shimPath}.`);
+    return {
+      alreadyAvailable: false,
+      added: false,
+      shimCreated: true,
+      shimPath,
+    };
+  }
+
+  return undefined;
+}
+
+function ensureWritableDirectory(directory: string): string | undefined {
+  const resolved = resolve(directory);
+  try {
+    mkdirSync(resolved, { recursive: true });
+  } catch {
+    return undefined;
+  }
+
+  try {
+    accessSync(resolved, fsConstants.W_OK);
+    return resolved;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeShimFile(options: {
+  directory: string;
+  command: string;
+  platform: NodeJS.Platform;
+  openClawCommand: string;
+}): string | undefined {
+  const path =
+    options.platform === "win32"
+      ? join(options.directory, `${options.command}.cmd`)
+      : join(options.directory, options.command);
+
+  try {
+    const content =
+      options.platform === "win32"
+        ? `@echo off\r\n${options.openClawCommand} opengoat %*\r\n`
+        : `#!/usr/bin/env sh\nexec ${shellEscapeToken(options.openClawCommand)} opengoat "$@"\n`;
+    writeFileSync(path, content, "utf8");
+    if (options.platform !== "win32") {
+      chmodSync(path, 0o755);
+    }
+    return path;
+  } catch {
+    return undefined;
+  }
+}
+
+function shellEscapeToken(token: string): string {
+  if (token === "") {
+    return "openclaw";
+  }
+
+  if (!/[\s"'$`\\]/.test(token)) {
+    return token;
+  }
+
+  return `'${token.replace(/'/g, `'\\''`)}'`;
 }

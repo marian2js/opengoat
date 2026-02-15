@@ -1669,10 +1669,8 @@ export class OpenGoatService {
       return warnings;
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(listResult.stdout);
-    } catch {
+    const parsed = parseLooseJson(listResult.stdout);
+    if (parsed === undefined) {
       warnings.push(
         "OpenClaw config read returned non-JSON for agents.list; skipping sandbox/tools policy sync.",
       );
