@@ -72,6 +72,9 @@ importers:
       sql.js:
         specifier: ^1.13.0
         version: 1.13.0
+      ws:
+        specifier: ^8.18.3
+        version: 8.19.0
     devDependencies:
       '@types/node':
         specifier: ^22.13.4
@@ -7458,8 +7461,7 @@ snapshots:
       siginfo: 2.0.0
       stackback: 0.0.2
 
-  ws@8.19.0:
-    optional: true
+  ws@8.19.0: {}
 
   xml-name-validator@5.0.0:
     optional: true
