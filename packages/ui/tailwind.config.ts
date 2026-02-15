@@ -2,7 +2,12 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: ["class"],
-  content: ["./index.html", "./src/client/**/*.{ts,tsx}"],
+  content: [
+    "./index.html",
+    "./src/client/**/*.{ts,tsx}",
+    "./node_modules/streamdown/dist/*.js",
+    "../../node_modules/streamdown/dist/*.js",
+  ],
   theme: {
     container: {
       center: true,
