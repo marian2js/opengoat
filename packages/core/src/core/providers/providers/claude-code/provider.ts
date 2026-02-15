@@ -37,7 +37,10 @@ export class ClaudeCodeProvider extends BaseCliProvider {
     return { command, args };
   }
 
-  protected buildInvocationArgs(options: ProviderInvokeOptions): string[] {
+  protected override buildInvocationArgs(
+    options: ProviderInvokeOptions,
+    _command: string,
+  ): string[] {
     const args = ["-p", options.message, "--output-format", "json"];
 
     const sessionId = options.providerSessionId?.trim();
@@ -61,6 +64,7 @@ export class ClaudeCodeProvider extends BaseCliProvider {
 
   protected override buildAuthInvocationArgs(
     options: ProviderAuthOptions,
+    _command: string,
   ): string[] {
     return ["auth", "login", ...(options.passthroughArgs ?? [])];
   }
