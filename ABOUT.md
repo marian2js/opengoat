@@ -8,7 +8,9 @@ OpenGoat is a CLI-first organization runtime.
 
 Current policy:
 
-- every OpenGoat agent is an OpenClaw agent
+- `ceo` is always bound to OpenClaw
+- every agent has a runtime provider binding (`runtime.provider.id`)
+- default provider binding is `openclaw` unless explicitly changed
 - `ceo` is the immutable default manager (head of organization)
 - organizations are hierarchical (`reportsTo`)
 - managers act through skills, not hardcoded control-flow logic
@@ -82,8 +84,8 @@ skills into OpenClaw shared managed skills.
 
 OpenGoat integrates OpenClaw for:
 
-- agent execution
-- agent create/delete sync
+- CEO/runtime execution when agent provider is `openclaw`
+- agent create/delete sync for OpenClaw-managed agents
 - onboarding/auth passthrough where needed
 
 Onboarding (`opengoat onboard`) only configures OpenClaw gateway mode:
@@ -93,13 +95,11 @@ Onboarding (`opengoat onboard`) only configures OpenClaw gateway mode:
 
 ## 7) Provider Commands
 
-`provider` commands in OpenGoat are passthrough wrappers:
+`provider` commands in OpenGoat are runtime provider controls:
 
 - `opengoat provider list`
 - `opengoat agent provider get <agent-id>`
 - `opengoat agent provider set <agent-id> <provider-id>`
-
-No custom multi-provider business logic is implemented in OpenGoat core.
 
 ## 8) Sessions
 
@@ -181,6 +181,5 @@ If rebuilding from scratch, preserve these behaviors:
 
 ## 13) Extensibility
 
-Architecture keeps adapter boundaries so non-OpenClaw runtimes can be added later.
-
-Current implementation intentionally supports only OpenClaw.
+Architecture keeps adapter boundaries so new runtimes can be added by
+registering provider modules, without changing orchestration/session flow.

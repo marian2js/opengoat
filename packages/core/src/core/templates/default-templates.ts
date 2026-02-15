@@ -94,7 +94,9 @@ export function renderInternalAgentConfig(
       priority: type === "manager" ? 100 : 50,
     },
     runtime: {
-      adapter: "openclaw",
+      provider: {
+        id: "openclaw",
+      },
       mode: "organization",
       sessions: {
         mainKey: "main",

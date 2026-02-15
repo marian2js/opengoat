@@ -215,11 +215,15 @@ describe("CLI full e2e smoke", () => {
 
     await expectOk(
       await runBinary(["provider", "list"], opengoatHome, env),
+      "claude-code",
+    );
+    await expectOk(
+      await runBinary(["provider", "list"], opengoatHome, env),
       "openclaw",
     );
     await expectOk(
       await runBinary(["agent", "provider", "get", "ceo"], opengoatHome, env),
-      "ceo\topenclaw",
+      "ceo: openclaw",
     );
     await expectOk(
       await runBinary(
@@ -227,7 +231,7 @@ describe("CLI full e2e smoke", () => {
         opengoatHome,
         env,
       ),
-      "provider-set-ok",
+      "ceo: openclaw",
     );
 
     await expectOk(
@@ -256,14 +260,6 @@ describe("CLI full e2e smoke", () => {
     expect(
       flattened.some((entry) =>
         entry.includes("agents delete developer --force"),
-      ),
-    ).toBe(true);
-    expect(
-      flattened.some((entry) => entry.includes("agents provider get ceo")),
-    ).toBe(true);
-    expect(
-      flattened.some((entry) =>
-        entry.includes("agents provider set ceo openclaw"),
       ),
     ).toBe(true);
     expect(flattened.some((entry) => entry.includes("gateway call agent"))).toBe(

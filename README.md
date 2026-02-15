@@ -1,5 +1,5 @@
 <h1 align="center">OpenGoat</h1>
-<p align="center"><strong>Build AI Autonomous Organizations of OpenClaw Agents.</strong></p>
+<p align="center"><strong>Build AI Autonomous Organizations of provider-backed agents.</strong></p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License" /></a>

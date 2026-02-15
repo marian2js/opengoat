@@ -54,8 +54,8 @@ describe("BootstrapService", () => {
 
     const ceoConfig = JSON.parse(
       await readFile(path.join(paths.agentsDir, "ceo", "config.json"), "utf-8"),
-    ) as { runtime?: { adapter?: string } };
-    expect(ceoConfig.runtime?.adapter).toBe("openclaw");
+    ) as { runtime?: { provider?: { id?: string } } };
+    expect(ceoConfig.runtime?.provider?.id).toBe("openclaw");
 
     expect(
       await fileSystem.exists(
