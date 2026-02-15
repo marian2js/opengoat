@@ -18,6 +18,7 @@ import {
   fetchOpenClawGatewayLogTail,
 } from "./runtime-logs.js";
 import {
+  isCeoBootstrapPending,
   parseBooleanSetting,
   parseInactiveAgentNotificationTarget,
   parseMaxInactivityMinutes,
@@ -291,10 +292,14 @@ export function registerApiRoutes(
 
   app.get("/api/settings", async (_request, reply) => {
     return safeReply(reply, async () => {
+      const ceoBootstrapPending = isCeoBootstrapPending(service.getHomeDir());
       return {
         settings: toPublicUiServerSettings(
           deps.getSettings(),
           deps.auth.getSettingsResponse(),
+          {
+            ceoBootstrapPending,
+          },
         ),
       };
     });
@@ -571,11 +576,17 @@ export function registerApiRoutes(
         source: "opengoat",
         message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes} inactiveAgentNotificationTarget=${nextSettings.inactiveAgentNotificationTarget} authEnabled=${nextSettings.authentication.enabled}`,
       });
+      const ceoBootstrapPending = isCeoBootstrapPending(service.getHomeDir());
+      const taskAutomationMessage = !nextSettings.taskCronEnabled
+        ? "disabled"
+        : ceoBootstrapPending
+          ? "enabled, waiting for the first CEO message before checks start"
+          : "enabled";
       return {
-        settings: toPublicUiServerSettings(nextSettings, nextAuthResponse),
-        message: `Task automation checks ${
-          nextSettings.taskCronEnabled ? "enabled" : "disabled"
-        } (runs every ${DEFAULT_TASK_CHECK_FREQUENCY_MINUTES} minute(s)). Inactive-agent manager notifications ${
+        settings: toPublicUiServerSettings(nextSettings, nextAuthResponse, {
+          ceoBootstrapPending,
+        }),
+        message: `Task automation checks ${taskAutomationMessage} (runs every ${DEFAULT_TASK_CHECK_FREQUENCY_MINUTES} minute(s)). Inactive-agent manager notifications ${
           nextSettings.notifyManagersOfInactiveAgents
             ? "enabled"
             : "disabled"

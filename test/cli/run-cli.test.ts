@@ -129,6 +129,16 @@ describe("runCli", () => {
     expect(code).toBe(0);
   });
 
+  it("supports restart --help", async () => {
+    const root = await createTempDir("opengoat-runcli-");
+    roots.push(root);
+    process.env.OPENGOAT_HOME = root;
+    applyOpenClawIsolation(root);
+
+    const code = await runCli(["restart", "--help"]);
+    expect(code).toBe(0);
+  });
+
   it("supports global log flags before command", async () => {
     const root = await createTempDir("opengoat-runcli-");
     roots.push(root);

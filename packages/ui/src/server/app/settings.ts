@@ -13,6 +13,7 @@ import {
   normalizeUiAuthenticationPasswordHash,
   normalizeUiAuthenticationUsername,
 } from "./auth.js";
+import { DEFAULT_AGENT_ID } from "./constants.js";
 import type {
   InactiveAgentNotificationTarget,
   UiAuthenticationSettingsResponse,
@@ -194,9 +195,18 @@ export async function writeUiServerSettings(
   await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }
 
+export function resolveCeoBootstrapPath(homeDir: string): string {
+  return path.resolve(homeDir, "workspaces", DEFAULT_AGENT_ID, "BOOTSTRAP.md");
+}
+
+export function isCeoBootstrapPending(homeDir: string): boolean {
+  return existsSync(resolveCeoBootstrapPath(homeDir));
+}
+
 export function toPublicUiServerSettings(
   settings: UiServerSettings,
   authentication: UiAuthenticationSettingsResponse,
+  options: { ceoBootstrapPending?: boolean } = {},
 ): UiServerSettingsResponse {
   return {
     taskCronEnabled: settings.taskCronEnabled,
@@ -204,5 +214,6 @@ export function toPublicUiServerSettings(
     maxInactivityMinutes: settings.maxInactivityMinutes,
     inactiveAgentNotificationTarget: settings.inactiveAgentNotificationTarget,
     authentication,
+    ceoBootstrapPending: options.ceoBootstrapPending ?? false,
   };
 }
