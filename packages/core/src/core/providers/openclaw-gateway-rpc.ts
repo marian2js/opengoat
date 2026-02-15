@@ -431,7 +431,10 @@ function parseFrame(raw: string): GatewayFrame | undefined {
     const record = asRecord(parsed);
     const type = record.type;
     if (type === "event" || type === "res") {
-      return record as GatewayFrame;
+      return {
+        ...record,
+        type,
+      } as unknown as GatewayFrame;
     }
   } catch {
     // Ignore malformed frames.
@@ -647,8 +650,9 @@ function loadDeviceAuthToken(params: {
     return undefined;
   }
   const entry = asRecord(store.tokens)[params.role];
-  if (typeof asRecord(entry).token === "string" && asRecord(entry).token.trim().length > 0) {
-    return String(asRecord(entry).token).trim();
+  const token = asRecord(entry).token;
+  if (typeof token === "string" && token.trim().length > 0) {
+    return token.trim();
   }
   return undefined;
 }
