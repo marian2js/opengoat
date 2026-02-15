@@ -42,6 +42,13 @@ function isGatewayServiceProcess(
     return true;
   }
 
+  if (
+    env.OPENCLAW_SERVICE_KIND?.trim().toLowerCase() === "gateway" &&
+    env.OPENCLAW_SERVICE_MARKER?.trim().toLowerCase() === "openclaw"
+  ) {
+    return true;
+  }
+
   // LaunchAgent-managed gateway processes set both values. Guard this path so
   // unrelated CLI commands (for example, `openclaw plugins list`) do not
   // trigger OpenGoat tool registration.

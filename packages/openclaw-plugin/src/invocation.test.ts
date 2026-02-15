@@ -46,6 +46,18 @@ describe("shouldRegisterOpenGoatToolsForArgv", () => {
     ).toBe(true);
   });
 
+  it("returns true for service-marked gateway daemon processes", () => {
+    expect(
+      shouldRegisterOpenGoatToolsForArgv(
+        ["node", "/path/to/openclaw/dist/index.js"],
+        {
+          OPENCLAW_SERVICE_KIND: "gateway",
+          OPENCLAW_SERVICE_MARKER: "openclaw",
+        },
+      ),
+    ).toBe(true);
+  });
+
   it("returns false for non-gateway invocations even with gateway env vars", () => {
     expect(
       shouldRegisterOpenGoatToolsForArgv(
