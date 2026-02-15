@@ -321,6 +321,12 @@ async function waitForToolAvailability(
         continue;
       }
 
+      if (isRuntimeBootstrapError(response.toolError)) {
+        lastFailure = `Tool failed to initialize OpenGoat runtime (${toolName}): ${response.toolError}`;
+        await wait(1000);
+        continue;
+      }
+
       return;
     } catch (error) {
       lastFailure = error instanceof Error ? error.message : String(error);
@@ -340,7 +346,7 @@ async function invokeGatewayTool(
     args: Record<string, unknown>;
     sessionKey: string;
   },
-): Promise<{ status: number; message: string; raw: string }> {
+): Promise<{ status: number; message: string; toolError: string; raw: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
 
@@ -361,10 +367,12 @@ async function invokeGatewayTool(
     const raw = await response.text();
     const parsed = parseLooseJson(raw);
     const message = extractErrorMessage(parsed);
+    const toolError = extractToolErrorMessage(parsed);
 
     return {
       status: response.status,
       message,
+      toolError,
       raw,
     };
   } finally {
@@ -379,6 +387,26 @@ function extractErrorMessage(payload: unknown): string {
     return error.message;
   }
   return "";
+}
+
+function extractToolErrorMessage(payload: unknown): string {
+  const record = asRecord(payload);
+  const result = asRecord(record.result);
+  const details = asRecord(result.details);
+  if (typeof details.error === "string") {
+    return details.error;
+  }
+  return "";
+}
+
+function isRuntimeBootstrapError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("createopengoatruntime is not a function") ||
+    normalized.includes("unable to load opengoat core runtime") ||
+    normalized.includes("cannot find module 'sql.js'") ||
+    normalized.includes("cannot find module \"sql.js\"")
+  );
 }
 
 function startProcess(

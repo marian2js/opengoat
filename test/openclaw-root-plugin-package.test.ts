@@ -13,6 +13,7 @@ describe("openclaw root plugin package metadata", () => {
       name?: unknown;
       openclaw?: { extensions?: unknown };
       files?: unknown;
+      dependencies?: Record<string, unknown>;
     };
 
     expect(pkg.name).toBe("@opengoat/opengoat-plugin");
@@ -28,6 +29,10 @@ describe("openclaw root plugin package metadata", () => {
       "!packages/core/src/**/*.test.ts",
       "packages/core/src/core/templates/assets/**/*.md",
     ]);
+    expect(pkg.dependencies).toMatchObject({
+      "@agentclientprotocol/sdk": expect.any(String),
+      "sql.js": expect.any(String),
+    });
   });
 
   it("ships a valid root plugin manifest", async () => {

@@ -12,6 +12,13 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      '@agentclientprotocol/sdk':
+        specifier: ^0.14.1
+        version: 0.14.1(zod@4.3.6)
+      sql.js:
+        specifier: ^1.13.0
+        version: 1.13.0
     devDependencies:
       '@changesets/cli':
         specifier: ^2.29.8
@@ -78,6 +85,8 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  packages/openclaw-plugin: {}
 
   packages/ui:
     dependencies:

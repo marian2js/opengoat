@@ -51,5 +51,9 @@
     "@types/node": "^22.13.4",
     "typescript": "^5.9.3",
     "vitest": "^4.0.5"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^0.14.1",
+    "sql.js": "^1.13.0"
   }
 }
