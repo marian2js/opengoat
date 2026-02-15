@@ -473,22 +473,28 @@ async function readUiServerState(stateFilePath: string): Promise<UiServerState |
   try {
     const raw = await readFile(stateFilePath, "utf-8");
     const parsed = JSON.parse(raw) as Partial<UiServerState>;
+    const pid = parsed.pid;
+    const port = parsed.port;
+    const host = parsed.host;
+    const command = parsed.command;
+    const startedAt = parsed.startedAt;
     if (
       !parsed ||
-      !Number.isInteger(parsed.pid) ||
-      typeof parsed.port !== "number" ||
-      typeof parsed.host !== "string" ||
-      typeof parsed.command !== "string" ||
-      typeof parsed.startedAt !== "string"
+      typeof pid !== "number" ||
+      !Number.isInteger(pid) ||
+      typeof port !== "number" ||
+      typeof host !== "string" ||
+      typeof command !== "string" ||
+      typeof startedAt !== "string"
     ) {
       return null;
     }
     return {
-      pid: parsed.pid,
-      host: parsed.host,
-      port: parsed.port,
-      command: parsed.command,
-      startedAt: parsed.startedAt,
+      pid,
+      host,
+      port,
+      command,
+      startedAt,
     };
   } catch {
     return null;
