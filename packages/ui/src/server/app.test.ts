@@ -223,6 +223,7 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: true,
         notifyManagersOfInactiveAgents: true,
         maxInactivityMinutes: 30,
+        maxParallelFlows: 3,
         inactiveAgentNotificationTarget: "all-managers",
         ceoBootstrapPending: false,
       },
@@ -235,6 +236,7 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: false,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        maxParallelFlows: 6,
         inactiveAgentNotificationTarget: "ceo-only",
       },
     });
@@ -244,6 +246,7 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: false,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        maxParallelFlows: 6,
         inactiveAgentNotificationTarget: "ceo-only",
         ceoBootstrapPending: false,
       },
@@ -256,6 +259,7 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: true,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        maxParallelFlows: 6,
         inactiveAgentNotificationTarget: "ceo-only",
       },
     });
@@ -265,6 +269,7 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: true,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        maxParallelFlows: 6,
         inactiveAgentNotificationTarget: "ceo-only",
         ceoBootstrapPending: false,
       },
@@ -280,6 +285,7 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: true,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        maxParallelFlows: 6,
         inactiveAgentNotificationTarget: "ceo-only",
         ceoBootstrapPending: false,
       },
@@ -520,6 +526,7 @@ describe("OpenGoat UI server API", () => {
           taskCronEnabled: false,
           notifyManagersOfInactiveAgents: false,
           maxInactivityMinutes: 30,
+          maxParallelFlows: 4,
           inactiveAgentNotificationTarget: "ceo-only",
         }, null, 2)}\n`,
         "utf8"
@@ -620,6 +627,7 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: false,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 30,
+        maxParallelFlows: 3,
         inactiveAgentNotificationTarget: "all-managers",
       },
     });

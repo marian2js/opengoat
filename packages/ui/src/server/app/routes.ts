@@ -6,7 +6,9 @@ import {
   DEFAULT_TASK_CHECK_FREQUENCY_MINUTES,
   LOG_STREAM_HEARTBEAT_MS,
   MAX_MAX_INACTIVITY_MINUTES,
+  MAX_MAX_PARALLEL_FLOWS,
   MIN_MAX_INACTIVITY_MINUTES,
+  MIN_MAX_PARALLEL_FLOWS,
 } from "./constants.js";
 import {
   normalizePasswordInput,
@@ -22,6 +24,7 @@ import {
   parseBooleanSetting,
   parseInactiveAgentNotificationTarget,
   parseMaxInactivityMinutes,
+  parseMaxParallelFlows,
   parseNotifyManagersOfInactiveAgents,
   parseTaskCronEnabled,
   parseUiLogStreamFollow,
@@ -310,6 +313,7 @@ export function registerApiRoutes(
       taskCronEnabled?: boolean;
       notifyManagersOfInactiveAgents?: boolean;
       maxInactivityMinutes?: number;
+      maxParallelFlows?: number;
       inactiveAgentNotificationTarget?: InactiveAgentNotificationTarget;
       authentication?: {
         enabled?: boolean;
@@ -332,6 +336,10 @@ export function registerApiRoutes(
       const hasMaxInactivitySetting = Object.prototype.hasOwnProperty.call(
         request.body ?? {},
         "maxInactivityMinutes",
+      );
+      const hasMaxParallelFlowsSetting = Object.prototype.hasOwnProperty.call(
+        request.body ?? {},
+        "maxParallelFlows",
       );
       const hasNotificationTargetSetting =
         Object.prototype.hasOwnProperty.call(
@@ -372,6 +380,15 @@ export function registerApiRoutes(
         reply.code(400);
         return {
           error: `maxInactivityMinutes must be an integer between ${MIN_MAX_INACTIVITY_MINUTES} and ${MAX_MAX_INACTIVITY_MINUTES}`,
+        };
+      }
+      const parsedMaxParallelFlows = hasMaxParallelFlowsSetting
+        ? parseMaxParallelFlows(request.body?.maxParallelFlows)
+        : currentSettings.maxParallelFlows;
+      if (!parsedMaxParallelFlows) {
+        reply.code(400);
+        return {
+          error: `maxParallelFlows must be an integer between ${MIN_MAX_PARALLEL_FLOWS} and ${MAX_MAX_PARALLEL_FLOWS}`,
         };
       }
       const parsedNotificationTarget = hasNotificationTargetSetting
@@ -511,6 +528,7 @@ export function registerApiRoutes(
         taskCronEnabled: parsedTaskCronEnabled,
         notifyManagersOfInactiveAgents: parsedNotifyManagers,
         maxInactivityMinutes: parsedMaxInactivityMinutes,
+        maxParallelFlows: parsedMaxParallelFlows,
         inactiveAgentNotificationTarget: parsedNotificationTarget,
         authentication: nextAuthentication,
       };
@@ -574,7 +592,7 @@ export function registerApiRoutes(
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes} inactiveAgentNotificationTarget=${nextSettings.inactiveAgentNotificationTarget} authEnabled=${nextSettings.authentication.enabled}`,
+        message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes} maxParallelFlows=${nextSettings.maxParallelFlows} inactiveAgentNotificationTarget=${nextSettings.inactiveAgentNotificationTarget} authEnabled=${nextSettings.authentication.enabled}`,
       });
       const ceoBootstrapPending = isCeoBootstrapPending(service.getHomeDir());
       const taskAutomationMessage = !nextSettings.taskCronEnabled
@@ -590,7 +608,7 @@ export function registerApiRoutes(
           nextSettings.notifyManagersOfInactiveAgents
             ? "enabled"
             : "disabled"
-        }; threshold ${nextSettings.maxInactivityMinutes} minute(s); audience ${nextSettings.inactiveAgentNotificationTarget}.`,
+        }; threshold ${nextSettings.maxInactivityMinutes} minute(s); max parallel flows ${nextSettings.maxParallelFlows}; audience ${nextSettings.inactiveAgentNotificationTarget}.`,
       };
     });
   });

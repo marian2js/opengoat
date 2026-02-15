@@ -50,6 +50,25 @@ export function resolveInactiveMinutes(value: number | undefined): number {
   return Math.floor(value);
 }
 
+const DEFAULT_MAX_PARALLEL_FLOWS = 3;
+const MIN_MAX_PARALLEL_FLOWS = 1;
+const MAX_MAX_PARALLEL_FLOWS = 32;
+
+export function resolveMaxParallelFlows(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_MAX_PARALLEL_FLOWS;
+  }
+
+  const normalized = Math.floor(value);
+  if (normalized < MIN_MAX_PARALLEL_FLOWS) {
+    return MIN_MAX_PARALLEL_FLOWS;
+  }
+  if (normalized > MAX_MAX_PARALLEL_FLOWS) {
+    return MAX_MAX_PARALLEL_FLOWS;
+  }
+  return normalized;
+}
+
 export function resolveInactiveAgentNotificationTarget(
   value: "all-managers" | "ceo-only" | undefined,
 ): "all-managers" | "ceo-only" {

@@ -219,6 +219,7 @@ interface UiSettings {
   taskCronEnabled: boolean;
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
+  maxParallelFlows: number;
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
   authentication: UiAuthenticationSettings;
   ceoBootstrapPending: boolean;
@@ -524,9 +525,12 @@ const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
 const DEFAULT_AGENT_ID = "ceo";
 const DEFAULT_MAX_INACTIVITY_MINUTES = 30;
+const DEFAULT_MAX_PARALLEL_FLOWS = 3;
 const TASK_CRON_INTERVAL_MINUTES = 1;
 const MIN_MAX_INACTIVITY_MINUTES = 1;
 const MAX_MAX_INACTIVITY_MINUTES = 10_080;
+const MIN_MAX_PARALLEL_FLOWS = 1;
+const MAX_MAX_PARALLEL_FLOWS = 32;
 const DEFAULT_LOG_STREAM_LIMIT = 300;
 const MAX_UI_LOG_ENTRIES = 1200;
 const LOG_FLUSH_INTERVAL_MS = 100;
@@ -555,6 +559,7 @@ function defaultUiSettings(): UiSettings {
     taskCronEnabled: true,
     notifyManagersOfInactiveAgents: true,
     maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
+    maxParallelFlows: DEFAULT_MAX_PARALLEL_FLOWS,
     inactiveAgentNotificationTarget: "all-managers",
     authentication: defaultAuthenticationSettings(),
     ceoBootstrapPending: false,
@@ -640,6 +645,9 @@ export function DashboardPage(): ReactElement {
   >(null);
   const [maxInactivityMinutesInput, setMaxInactivityMinutesInput] = useState(
     String(DEFAULT_MAX_INACTIVITY_MINUTES),
+  );
+  const [maxParallelFlowsInput, setMaxParallelFlowsInput] = useState(
+    String(DEFAULT_MAX_PARALLEL_FLOWS),
   );
   const [taskCronEnabledInput, setTaskCronEnabledInput] = useState(true);
   const [
@@ -874,6 +882,7 @@ export function DashboardPage(): ReactElement {
       });
       setTaskCronEnabledInput(settings.taskCronEnabled);
       setMaxInactivityMinutesInput(String(settings.maxInactivityMinutes));
+      setMaxParallelFlowsInput(String(settings.maxParallelFlows));
       setNotifyManagersOfInactiveAgentsInput(
         settings.notifyManagersOfInactiveAgents,
       );
@@ -2405,10 +2414,18 @@ export function DashboardPage(): ReactElement {
       maxInactivityMinutesInput.trim(),
       10,
     );
+    const parsedMaxParallelFlows = Number.parseInt(
+      maxParallelFlowsInput.trim(),
+      10,
+    );
     const isMaxInactivityValid =
       Number.isFinite(parsedMaxInactivityMinutes) &&
       parsedMaxInactivityMinutes >= MIN_MAX_INACTIVITY_MINUTES &&
       parsedMaxInactivityMinutes <= MAX_MAX_INACTIVITY_MINUTES;
+    const isMaxParallelFlowsValid =
+      Number.isFinite(parsedMaxParallelFlows) &&
+      parsedMaxParallelFlows >= MIN_MAX_PARALLEL_FLOWS &&
+      parsedMaxParallelFlows <= MAX_MAX_PARALLEL_FLOWS;
     if (
       taskCronEnabledInput &&
       notifyManagersOfInactiveAgentsInput &&
@@ -2419,11 +2436,22 @@ export function DashboardPage(): ReactElement {
       );
       return;
     }
+    if (taskCronEnabledInput && !isMaxParallelFlowsValid) {
+      toast.error(
+        `Max parallel flows must be an integer between ${MIN_MAX_PARALLEL_FLOWS} and ${MAX_MAX_PARALLEL_FLOWS}.`,
+      );
+      return;
+    }
     const fallbackMaxInactivityMinutes =
       state?.settings.maxInactivityMinutes ?? DEFAULT_MAX_INACTIVITY_MINUTES;
+    const fallbackMaxParallelFlows =
+      state?.settings.maxParallelFlows ?? DEFAULT_MAX_PARALLEL_FLOWS;
     const resolvedMaxInactivityMinutes = isMaxInactivityValid
       ? parsedMaxInactivityMinutes
       : fallbackMaxInactivityMinutes;
+    const resolvedMaxParallelFlows = isMaxParallelFlowsValid
+      ? parsedMaxParallelFlows
+      : fallbackMaxParallelFlows;
 
     setMutating(true);
     try {
@@ -2431,6 +2459,7 @@ export function DashboardPage(): ReactElement {
         taskCronEnabled: boolean;
         notifyManagersOfInactiveAgents: boolean;
         maxInactivityMinutes: number;
+        maxParallelFlows: number;
         inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
         authentication?: {
           enabled: boolean;
@@ -2442,6 +2471,7 @@ export function DashboardPage(): ReactElement {
         taskCronEnabled: taskCronEnabledInput,
         notifyManagersOfInactiveAgents: notifyManagersOfInactiveAgentsInput,
         maxInactivityMinutes: resolvedMaxInactivityMinutes,
+        maxParallelFlows: resolvedMaxParallelFlows,
         inactiveAgentNotificationTarget:
           inactiveAgentNotificationTargetInput,
       };
@@ -2478,8 +2508,8 @@ export function DashboardPage(): ReactElement {
         : response.settings.ceoBootstrapPending
           ? "Task automation checks are waiting for the first CEO message."
         : notifyManagersOfInactiveAgentsInput
-          ? `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); inactivity notifications enabled (${resolvedMaxInactivityMinutes} minutes).`
-          : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); inactivity notifications disabled.`;
+          ? `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; inactivity notifications enabled (${resolvedMaxInactivityMinutes} minutes).`
+          : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; inactivity notifications disabled.`;
       toast.success(response.message ?? statusMessage);
       await refreshAuthenticationStatus();
     } catch (requestError) {
@@ -2498,6 +2528,7 @@ export function DashboardPage(): ReactElement {
       taskCronEnabled: boolean;
       notifyManagersOfInactiveAgents: boolean;
       maxInactivityMinutes: number;
+      maxParallelFlows: number;
       inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
       authentication?: {
         enabled: boolean;
@@ -2533,6 +2564,7 @@ export function DashboardPage(): ReactElement {
     setMaxInactivityMinutesInput(
       String(response.settings.maxInactivityMinutes),
     );
+    setMaxParallelFlowsInput(String(response.settings.maxParallelFlows));
     setNotifyManagersOfInactiveAgentsInput(
       response.settings.notifyManagersOfInactiveAgents,
     );
@@ -5030,6 +5062,40 @@ export function DashboardPage(): ReactElement {
                           !taskCronEnabledInput && "opacity-60",
                         )}
                       >
+                        <div className="space-y-3">
+                          <label
+                            className="text-sm font-medium text-foreground"
+                            htmlFor="maxParallelFlows"
+                          >
+                            Max Parallel Flows
+                          </label>
+                          <div className="flex max-w-sm items-center gap-3">
+                            <Input
+                              id="maxParallelFlows"
+                              type="number"
+                              min={MIN_MAX_PARALLEL_FLOWS}
+                              max={MAX_MAX_PARALLEL_FLOWS}
+                              step={1}
+                              value={maxParallelFlowsInput}
+                              disabled={
+                                !taskCronEnabledInput || isMutating || isLoading
+                              }
+                              onChange={(event) => {
+                                setMaxParallelFlowsInput(event.target.value);
+                              }}
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              concurrent runs
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Controls how many task automation flows can run at
+                            the same time. Higher values increase throughput.
+                          </p>
+                        </div>
+
+                        <Separator className="bg-border/50" />
+
                         <div className="flex flex-wrap items-center justify-between gap-4">
                           <div className="space-y-1">
                             <h3 className="text-sm font-semibold text-foreground">
