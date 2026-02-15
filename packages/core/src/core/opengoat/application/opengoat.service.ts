@@ -1404,10 +1404,8 @@ export class OpenGoatService {
       );
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(skillsList.stdout);
-    } catch {
+    const parsed = parseLooseJson(skillsList.stdout);
+    if (parsed === undefined) {
       throw new Error(
         "OpenClaw skills list returned non-JSON output; cannot resolve managed skills directory.",
       );
@@ -1813,12 +1811,12 @@ export class OpenGoatService {
       currentPathsResult.code === 0
         ? readStringArray(parseLooseJson(currentPathsResult.stdout))
         : [];
-    const mergedPaths = dedupeStrings([
+    const mergedPaths = await this.mergePluginLoadPaths(
       pluginSourcePath,
-      ...currentPaths,
-    ]);
+      currentPaths,
+    );
 
-    if (!containsPath(currentPaths, pluginSourcePath)) {
+    if (!samePathList(currentPaths, mergedPaths)) {
       const setPaths = await this.runOpenClaw(
         ["config", "set", "plugins.load.paths", JSON.stringify(mergedPaths)],
         { env },
@@ -1900,6 +1898,55 @@ export class OpenGoatService {
     }
 
     return warnings;
+  }
+
+  private async mergePluginLoadPaths(
+    pluginSourcePath: string,
+    currentPaths: string[],
+  ): Promise<string[]> {
+    const merged = dedupeStrings([pluginSourcePath, ...currentPaths]);
+    const normalizedPluginSource = resolvePath(pluginSourcePath);
+    const filtered: string[] = [];
+
+    for (const candidate of merged) {
+      const normalizedCandidate = resolvePath(candidate);
+      if (pathMatches(normalizedCandidate, normalizedPluginSource)) {
+        filtered.push(candidate);
+        continue;
+      }
+
+      const manifestId = await this.readPluginManifestId(candidate);
+      if (
+        manifestId &&
+        isOpenGoatPluginId(manifestId)
+      ) {
+        continue;
+      }
+
+      filtered.push(candidate);
+    }
+
+    return dedupeStrings(filtered);
+  }
+
+  private async readPluginManifestId(path: string): Promise<string | undefined> {
+    const manifestPath = this.pathPort.join(path, "openclaw.plugin.json");
+    if (!(await this.fileSystem.exists(manifestPath))) {
+      return undefined;
+    }
+
+    try {
+      const raw = await this.fileSystem.readFile(manifestPath);
+      const parsed = parseLooseJson(raw);
+      const id = asRecord(parsed).id;
+      if (typeof id === "string" && id.trim().length > 0) {
+        return id.trim();
+      }
+    } catch {
+      // Ignore malformed manifests when cleaning up load paths.
+    }
+
+    return undefined;
   }
 
   private async resolveOpenClawEnv(
@@ -2103,8 +2150,29 @@ function dedupeStrings(values: Array<string | undefined>): string[] {
   return deduped;
 }
 
-function containsPath(paths: readonly string[], candidatePath: string): boolean {
-  return paths.some((entry) => pathMatches(entry, candidatePath));
+function samePathList(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftValue = left[index];
+    const rightValue = right[index];
+    if (!leftValue || !rightValue || !pathMatches(leftValue, rightValue)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isOpenGoatPluginId(pluginId: string): boolean {
+  return [
+    OPENCLAW_OPENGOAT_PLUGIN_ID,
+    OPENCLAW_OPENGOAT_PLUGIN_ROOT_ID,
+    OPENCLAW_OPENGOAT_PLUGIN_LEGACY_PACK_ID,
+    OPENCLAW_OPENGOAT_PLUGIN_FALLBACK_ID,
+  ].includes(pluginId.trim().toLowerCase());
 }
 
 function isPluginNotFoundMessage(message: string): boolean {
