@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.2.15
+
+- Make task cron automation notifications run without persisted sessions, so inactive-reportee reminders no longer create lasting chat threads in the UI.
+
 ## 2026.2.14-3
 
 - Fix organization bootstrap seeding to include nested template files such as `organization/wiki/index.md`.
