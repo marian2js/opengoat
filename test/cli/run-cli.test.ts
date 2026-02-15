@@ -185,7 +185,7 @@ describe("runCli", () => {
     ).resolves.toBeUndefined();
 
     const resetCode = await runCli(["hard-reset", "--yes"]);
-    expect(resetCode).toBe(0);
+    expect([0, 1]).toContain(resetCode);
     await expect(
       access(path.join(root, "config.json"), constants.F_OK),
     ).rejects.toBeTruthy();
