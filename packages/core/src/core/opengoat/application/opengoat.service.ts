@@ -1237,12 +1237,13 @@ export class OpenGoatService {
     agentId: string,
     sessionRef: string,
     message: string,
-    options: { cwd?: string } = {},
+    options: { cwd?: string; disableSession?: boolean } = {},
   ): Promise<{ ok: boolean; error?: string }> {
     try {
       const result = await this.orchestrationService.runAgent(paths, agentId, {
         message,
         sessionRef,
+        disableSession: options.disableSession ?? true,
         cwd: options.cwd,
         env: process.env,
       });

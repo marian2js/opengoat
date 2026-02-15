@@ -1693,14 +1693,19 @@ describe("OpenGoatService", () => {
       engineerSessions.some((entry) =>
         entry.sessionKey.includes(`agent_engineer_task_${todoTask.taskId}`),
       ),
-    ).toBe(true);
+    ).toBe(false);
 
     const ceoSessions = await service.listSessions("ceo");
     expect(
       ceoSessions.some((entry) =>
         entry.sessionKey.includes(`agent_ceo_task_${blockedTask.taskId}`),
       ),
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      ceoSessions.some((entry) =>
+        entry.sessionKey.includes("agent_ceo_inactive_engineer"),
+      ),
+    ).toBe(false);
   });
 
   it("supports notifying only ceo for inactive direct reports", async () => {
