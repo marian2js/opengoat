@@ -1370,6 +1370,13 @@ export function registerApiRoutes(
     }
 
     const raw = reply.raw;
+    const runtimeAbortController = new AbortController();
+    const abortRuntimeRun = (): void => {
+      if (!runtimeAbortController.signal.aborted) {
+        runtimeAbortController.abort();
+      }
+    };
+    raw.on("close", abortRuntimeRun);
     reply.hijack();
     raw.statusCode = 200;
     raw.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
@@ -1520,6 +1527,7 @@ export function registerApiRoutes(
             ? "Please analyze the attached image."
             : "Please analyze the attached images."),
         images: images.length > 0 ? images : undefined,
+        abortSignal: runtimeAbortController.signal,
         hooks: {
           onEvent: (event) => {
             deps.logs.append({
@@ -1592,6 +1600,7 @@ export function registerApiRoutes(
         error: streamError,
       });
     } finally {
+      raw.off("close", abortRuntimeRun);
       if (logPoller) {
         clearInterval(logPoller);
       }

@@ -92,6 +92,7 @@ export interface UiRunAgentOptions {
   sessionRef?: string;
   cwd?: string;
   images?: UiImageInput[];
+  abortSignal?: AbortSignal;
   hooks?: UiRunHooks;
   onStdout?: (chunk: string) => void;
   onStderr?: (chunk: string) => void;

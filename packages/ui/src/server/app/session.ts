@@ -332,6 +332,7 @@ export async function runUiSessionMessage(
     projectPath?: string;
     message: string;
     images?: UiImageInput[];
+    abortSignal?: AbortSignal;
     hooks?: UiRunHooks;
     onStdout?: (chunk: string) => void;
     onStderr?: (chunk: string) => void;
@@ -343,6 +344,7 @@ export async function runUiSessionMessage(
       sessionRef: options.sessionRef,
       cwd: options.projectPath,
       images: options.images,
+      ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
       ...(options.hooks ? { hooks: options.hooks } : {}),
       ...(options.onStdout ? { onStdout: options.onStdout } : {}),
       ...(options.onStderr ? { onStderr: options.onStderr } : {}),

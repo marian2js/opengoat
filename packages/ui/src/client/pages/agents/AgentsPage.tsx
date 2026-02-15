@@ -5,6 +5,7 @@ import type { ReactElement } from "react";
 interface AgentsPageAgent {
   id: string;
   displayName: string;
+  role?: string;
 }
 
 interface AgentsPageProps {
@@ -48,10 +49,19 @@ export function AgentsPage({
                 }
               }}
             >
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
                 {renderAgentAvatar(agent)}
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{agent.displayName}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <p className="min-w-0 flex-1 truncate font-medium">
+                      {agent.displayName}
+                    </p>
+                    {agent.role ? (
+                      <p className="max-w-[46%] truncate text-right text-xs text-muted-foreground">
+                        {agent.role}
+                      </p>
+                    ) : null}
+                  </div>
                   <p className="truncate text-xs text-muted-foreground">{agent.id}</p>
                 </div>
               </div>
