@@ -1,10 +1,16 @@
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
+import { normalizeAgentId } from "../../domain/agent-id.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import { executeCommand } from "../command-executor.js";
 import {
+  callOpenClawGatewayRpc,
+  resolveGatewayAgentCallTimeoutMs,
+} from "../openclaw-gateway-rpc.js";
+import {
   InvalidProviderConfigError,
+  ProviderCommandNotFoundError,
   UnsupportedProviderActionError,
   type AgentProviderBinding,
   type Provider,
@@ -49,6 +55,18 @@ export interface OpenClawGatewayConfig {
   gatewayUrl?: string;
   gatewayToken?: string;
   command?: string;
+}
+
+export interface OpenClawAgentConfigEntry {
+  id: string;
+  name?: string;
+  workspace: string;
+  agentDir: string;
+}
+
+export interface OpenClawGatewayConfigSnapshot {
+  config: Record<string, unknown>;
+  hash?: string;
 }
 
 const OPENCLAW_PROVIDER_ID = "openclaw";
@@ -246,12 +264,13 @@ export class ProviderService {
     const registry = await this.getProviderRegistry();
     const provider = registry.create(OPENCLAW_PROVIDER_ID);
     const mergedSystemPrompt = options.systemPrompt?.trim();
+    const env = await this.resolveProviderEnv(paths, options.env);
 
     const invokeOptions: ProviderInvokeOptions = {
       ...options,
       systemPrompt: mergedSystemPrompt || undefined,
       cwd: options.cwd,
-      env: await this.resolveProviderEnv(paths, options.env),
+      env,
       agent: provider.capabilities.agent ? options.agent || agentId : options.agent
     };
 
@@ -268,8 +287,22 @@ export class ProviderService {
       providerId: provider.id
     });
 
-    let result = await provider.invoke(invokeOptions);
-    result = await this.retryGatewayInvocationOnUvCwdFailure(paths, provider, invokeOptions, result);
+    let result: ProviderExecutionResult;
+    try {
+      result = await provider.invoke(invokeOptions);
+      result = await this.retryGatewayInvocationOnUvCwdFailure(
+        paths,
+        provider,
+        invokeOptions,
+        result,
+      );
+    } catch (error) {
+      if (error instanceof ProviderCommandNotFoundError) {
+        result = await this.invokeAgentViaGateway(agentId, invokeOptions, env);
+      } else {
+        throw error;
+      }
+    }
 
     runtimeContext.hooks?.onInvocationCompleted?.({
       runId: runtimeContext.runId,
@@ -301,17 +334,32 @@ export class ProviderService {
     if (!provider.capabilities.agentCreate || !provider.createAgent) {
       throw new UnsupportedProviderActionError(provider.id, "create_agent");
     }
+    const env = await this.resolveProviderEnv(paths, options.env);
 
-    const result = await provider.createAgent({
-      agentId,
-      displayName: options.displayName,
-      workspaceDir: options.workspaceDir,
-      internalConfigDir: options.internalConfigDir,
-      cwd: options.cwd,
-      env: await this.resolveProviderEnv(paths, options.env),
-      onStdout: options.onStdout,
-      onStderr: options.onStderr
-    });
+    let result: ProviderExecutionResult;
+    try {
+      result = await provider.createAgent({
+        agentId,
+        displayName: options.displayName,
+        workspaceDir: options.workspaceDir,
+        internalConfigDir: options.internalConfigDir,
+        cwd: options.cwd,
+        env,
+        onStdout: options.onStdout,
+        onStderr: options.onStderr
+      });
+    } catch (error) {
+      if (error instanceof ProviderCommandNotFoundError) {
+        result = await this.createProviderAgentViaGateway(agentId, {
+          displayName: options.displayName,
+          workspaceDir: options.workspaceDir,
+          internalConfigDir: options.internalConfigDir,
+          env,
+        });
+      } else {
+        throw error;
+      }
+    }
 
     return {
       ...result,
@@ -334,20 +382,140 @@ export class ProviderService {
     if (!provider.capabilities.agentDelete || !provider.deleteAgent) {
       throw new UnsupportedProviderActionError(provider.id, "delete_agent");
     }
+    const env = await this.resolveProviderEnv(paths, options.env);
 
-    const result = await provider.deleteAgent({
-      agentId,
-      cwd: options.cwd,
-      env: await this.resolveProviderEnv(paths, options.env),
-      onStdout: options.onStdout,
-      onStderr: options.onStderr
-    });
+    let result: ProviderExecutionResult;
+    try {
+      result = await provider.deleteAgent({
+        agentId,
+        cwd: options.cwd,
+        env,
+        onStdout: options.onStdout,
+        onStderr: options.onStderr
+      });
+    } catch (error) {
+      if (error instanceof ProviderCommandNotFoundError) {
+        result = await this.deleteProviderAgentViaGateway(agentId, env);
+      } else {
+        throw error;
+      }
+    }
 
     return {
       ...result,
       agentId,
       providerId: provider.id
     };
+  }
+
+  public async listOpenClawAgentsViaGateway(
+    paths: OpenGoatPaths,
+    inputEnv?: NodeJS.ProcessEnv,
+  ): Promise<OpenClawAgentConfigEntry[]> {
+    const env = await this.resolveProviderEnv(paths, inputEnv);
+    const payload = await this.callGatewayMethod(env, "config.get", {});
+    const parsed = parseGatewayConfigPayload(payload);
+    if (!parsed) {
+      return [];
+    }
+
+    return readGatewayAgentsList(parsed);
+  }
+
+  public async getOpenClawSkillsStatusViaGateway(
+    paths: OpenGoatPaths,
+    inputEnv?: NodeJS.ProcessEnv,
+  ): Promise<Record<string, unknown>> {
+    const env = await this.resolveProviderEnv(paths, inputEnv);
+    const payload = await this.callGatewayMethod(env, "skills.status", {});
+    return asRecord(payload);
+  }
+
+  public async syncOpenClawAgentExecutionPoliciesViaGateway(
+    paths: OpenGoatPaths,
+    rawAgentIds: string[],
+    inputEnv?: NodeJS.ProcessEnv,
+  ): Promise<string[]> {
+    const env = await this.resolveProviderEnv(paths, inputEnv);
+    const warnings: string[] = [];
+    const normalizedAgentIds = [
+      ...new Set(
+        rawAgentIds
+          .map((agentId) => normalizeAgentId(agentId))
+          .filter((agentId): agentId is string => Boolean(agentId)),
+      ),
+    ];
+    if (normalizedAgentIds.length === 0) {
+      return warnings;
+    }
+
+    const snapshot = await this.getOpenClawConfigViaGateway(paths, env);
+    const root = snapshot.config;
+    const agents = asRecord(root.agents);
+    const list = Array.isArray(agents.list) ? [...agents.list] : [];
+    const indexById = new Map<string, number>();
+    for (let index = 0; index < list.length; index += 1) {
+      const entry = asRecord(list[index]);
+      const id = normalizeAgentId(String(entry.id ?? ""));
+      if (!id || indexById.has(id)) {
+        continue;
+      }
+      indexById.set(id, index);
+    }
+
+    let changed = false;
+    for (const agentId of normalizedAgentIds) {
+      const index = indexById.get(agentId);
+      if (index === undefined) {
+        warnings.push(
+          `OpenClaw gateway policy sync skipped for "${agentId}" because no agents.list entry was found.`,
+        );
+        continue;
+      }
+
+      const current = asRecord(list[index]);
+      const next: Record<string, unknown> = {
+        ...current,
+      };
+
+      if (readAgentSandboxMode(current) !== "off") {
+        next.sandbox = {
+          ...asRecord(current.sandbox),
+          mode: "off",
+        };
+        changed = true;
+      }
+
+      if (!hasAgentToolsAllowAll(current)) {
+        next.tools = {
+          ...asRecord(current.tools),
+          allow: ["*"],
+        };
+        changed = true;
+      }
+
+      list[index] = next;
+    }
+
+    if (!changed) {
+      return warnings;
+    }
+
+    const nextRoot: Record<string, unknown> = {
+      ...root,
+      agents: {
+        ...agents,
+        list,
+      },
+    };
+
+    await this.applyOpenClawConfigViaGateway(
+      paths,
+      nextRoot,
+      snapshot.hash,
+      env,
+    );
+    return warnings;
   }
 
   public async getAgentRuntimeProfile(_paths: OpenGoatPaths, agentId: string): Promise<AgentRuntimeProfile> {
@@ -395,6 +563,215 @@ export class ProviderService {
 
     this.logger.warn("OpenClaw gateway restarted.");
     return true;
+  }
+
+  private async invokeAgentViaGateway(
+    fallbackAgentId: string,
+    invokeOptions: ProviderInvokeOptions,
+    env: NodeJS.ProcessEnv,
+  ): Promise<ProviderExecutionResult> {
+    const agentId = (invokeOptions.agent || fallbackAgentId).trim();
+    const payload = await this.callGatewayMethod(
+      env,
+      "agent",
+      buildGatewayAgentParams({
+        message: invokeOptions.message,
+        agentId,
+        model: invokeOptions.model,
+        providerSessionId: invokeOptions.providerSessionId,
+        idempotencyKey: invokeOptions.idempotencyKey,
+      }),
+      {
+        expectFinal: true,
+        timeoutMs: resolveGatewayAgentCallTimeoutMs(),
+      },
+    );
+    const normalized = normalizeGatewayAgentPayload(payload);
+    return {
+      code: 0,
+      stdout: normalized.stdout,
+      stderr: "",
+      providerSessionId: normalized.providerSessionId,
+    };
+  }
+
+  private async createProviderAgentViaGateway(
+    agentId: string,
+    options: {
+      displayName: string;
+      workspaceDir: string;
+      internalConfigDir: string;
+      env: NodeJS.ProcessEnv;
+    },
+  ): Promise<ProviderExecutionResult> {
+    const payload = await this.callGatewayMethod(options.env, "config.get", {});
+    const configPayload = asRecord(payload);
+    const rawConfig = parseGatewayConfigPayload(configPayload);
+    if (!rawConfig) {
+      throw new Error("OpenClaw gateway config.get did not return valid JSON.");
+    }
+
+    const root = asRecord(rawConfig);
+    const agents = asRecord(root.agents);
+    const list = Array.isArray(agents.list) ? [...agents.list] : [];
+    const normalizedTarget = normalizeAgentId(agentId);
+    if (!normalizedTarget) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const index = list.findIndex((entry) => {
+      const id = normalizeAgentId(asRecord(entry).id as string);
+      return id === normalizedTarget;
+    });
+    const nextEntry: Record<string, unknown> = {
+      ...(index >= 0 ? asRecord(list[index]) : {}),
+      id: normalizedTarget,
+      name: options.displayName,
+      workspace: options.workspaceDir,
+      agentDir: options.internalConfigDir,
+      sandbox: {
+        mode: "off",
+      },
+      tools: {
+        allow: ["*"],
+      },
+    };
+    if (index >= 0) {
+      list[index] = nextEntry;
+    } else {
+      list.push(nextEntry);
+    }
+
+    const nextRoot: Record<string, unknown> = {
+      ...root,
+      agents: {
+        ...agents,
+        list,
+      },
+    };
+    const applyParams: Record<string, unknown> = {
+      raw: `${JSON.stringify(nextRoot, null, 2)}\n`,
+    };
+    const hash = configPayload.hash;
+    if (typeof hash === "string" && hash.trim().length > 0) {
+      applyParams.baseHash = hash.trim();
+    }
+    await this.callGatewayMethod(options.env, "config.apply", applyParams);
+
+    return {
+      code: 0,
+      stdout: "created via OpenClaw gateway config.apply",
+      stderr: "",
+    };
+  }
+
+  private async deleteProviderAgentViaGateway(
+    agentId: string,
+    env: NodeJS.ProcessEnv,
+  ): Promise<ProviderExecutionResult> {
+    const normalizedTarget = normalizeAgentId(agentId);
+    if (!normalizedTarget) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const payload = await this.callGatewayMethod(env, "config.get", {});
+    const configPayload = asRecord(payload);
+    const rawConfig = parseGatewayConfigPayload(configPayload);
+    if (!rawConfig) {
+      throw new Error("OpenClaw gateway config.get did not return valid JSON.");
+    }
+
+    const root = asRecord(rawConfig);
+    const agents = asRecord(root.agents);
+    const list = Array.isArray(agents.list) ? [...agents.list] : [];
+    const nextList = list.filter((entry) => {
+      const id = normalizeAgentId(asRecord(entry).id as string);
+      return id !== normalizedTarget;
+    });
+
+    if (nextList.length === list.length) {
+      return {
+        code: 0,
+        stdout: "agent already absent in OpenClaw config",
+        stderr: "",
+      };
+    }
+
+    const nextRoot: Record<string, unknown> = {
+      ...root,
+      agents: {
+        ...agents,
+        list: nextList,
+      },
+    };
+    const applyParams: Record<string, unknown> = {
+      raw: `${JSON.stringify(nextRoot, null, 2)}\n`,
+    };
+    const hash = configPayload.hash;
+    if (typeof hash === "string" && hash.trim().length > 0) {
+      applyParams.baseHash = hash.trim();
+    }
+    await this.callGatewayMethod(env, "config.apply", applyParams);
+
+    return {
+      code: 0,
+      stdout: "deleted via OpenClaw gateway config.apply",
+      stderr: "",
+    };
+  }
+
+  private async callGatewayMethod(
+    env: NodeJS.ProcessEnv,
+    method: string,
+    params: unknown,
+    options: {
+      expectFinal?: boolean;
+      timeoutMs?: number;
+    } = {},
+  ): Promise<unknown> {
+    return callOpenClawGatewayRpc({
+      env,
+      method,
+      params,
+      options,
+    });
+  }
+
+  private async getOpenClawConfigViaGateway(
+    paths: OpenGoatPaths,
+    inputEnv?: NodeJS.ProcessEnv,
+  ): Promise<OpenClawGatewayConfigSnapshot> {
+    const env = await this.resolveProviderEnv(paths, inputEnv);
+    const payload = await this.callGatewayMethod(env, "config.get", {});
+    const record = asRecord(payload);
+    const config = parseGatewayConfigPayload(record);
+    if (!config) {
+      throw new Error("OpenClaw gateway config.get did not return valid JSON.");
+    }
+    const hash = record.hash;
+    return {
+      config,
+      hash:
+        typeof hash === "string" && hash.trim().length > 0
+          ? hash.trim()
+          : undefined,
+    };
+  }
+
+  private async applyOpenClawConfigViaGateway(
+    paths: OpenGoatPaths,
+    config: Record<string, unknown>,
+    baseHash?: string,
+    inputEnv?: NodeJS.ProcessEnv,
+  ): Promise<void> {
+    const env = await this.resolveProviderEnv(paths, inputEnv);
+    const params: Record<string, unknown> = {
+      raw: `${JSON.stringify(config, null, 2)}\n`,
+    };
+    if (typeof baseHash === "string" && baseHash.trim().length > 0) {
+      params.baseHash = baseHash.trim();
+    }
+    await this.callGatewayMethod(env, "config.apply", params);
   }
 
   private getProviderConfigPath(paths: OpenGoatPaths): string {
@@ -545,6 +922,187 @@ function extractOpenClawGlobalArgs(raw: string | undefined): string[] {
   }
 
   return result;
+}
+
+function buildGatewayAgentParams(options: {
+  message: string;
+  agentId: string;
+  model?: string;
+  providerSessionId?: string;
+  idempotencyKey?: string;
+}): Record<string, unknown> {
+  const idempotencyKey =
+    options.idempotencyKey?.trim() || `opengoat-${Date.now()}-${Math.random()}`;
+  const params: Record<string, unknown> = {
+    message: options.message,
+    agentId: options.agentId,
+    idempotencyKey,
+  };
+  if (options.model?.trim()) {
+    params.model = options.model.trim();
+  }
+  if (options.providerSessionId?.trim()) {
+    params.sessionId = options.providerSessionId.trim();
+    params.sessionKey = buildOpenClawSessionKey(
+      options.agentId,
+      options.providerSessionId.trim(),
+    );
+  }
+  return params;
+}
+
+function buildOpenClawSessionKey(
+  agentId: string,
+  providerSessionId: string,
+): string {
+  if (providerSessionId.includes(":")) {
+    return providerSessionId.toLowerCase();
+  }
+  return `agent:${normalizeSessionSegment(agentId) || "main"}:${normalizeSessionSegment(providerSessionId) || "main"}`;
+}
+
+function normalizeSessionSegment(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9:-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function normalizeGatewayAgentPayload(payload: unknown): {
+  stdout: string;
+  providerSessionId?: string;
+} {
+  const record = asRecord(payload);
+  const payloads = Array.isArray(record.payloads) ? record.payloads : [];
+  const chunks: string[] = [];
+
+  for (const payloadEntry of payloads) {
+    const entry = asRecord(payloadEntry);
+    const text = entry.text;
+    if (typeof text === "string" && text.trim().length > 0) {
+      chunks.push(text.trim());
+    }
+  }
+
+  const sessionId = asRecord(asRecord(record.meta).agentMeta).sessionId;
+  return {
+    stdout: chunks.join("\n\n").trim(),
+    providerSessionId:
+      typeof sessionId === "string" && sessionId.trim().length > 0
+        ? sessionId.trim()
+        : undefined,
+  };
+}
+
+function parseGatewayConfigPayload(
+  payload: unknown,
+): Record<string, unknown> | undefined {
+  const record = asRecord(payload);
+  const raw = record.raw;
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return undefined;
+  }
+
+  const parsed = parseLooseJson(raw);
+  if (!parsed) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+function readGatewayAgentsList(
+  config: Record<string, unknown>,
+): OpenClawAgentConfigEntry[] {
+  const agents = asRecord(config.agents);
+  const list = Array.isArray(agents.list) ? agents.list : [];
+  const entries: OpenClawAgentConfigEntry[] = [];
+
+  for (const entry of list) {
+    const record = asRecord(entry);
+    const id = normalizeAgentId(String(record.id ?? ""));
+    if (!id) {
+      continue;
+    }
+    entries.push({
+      id,
+      name:
+        typeof record.name === "string" && record.name.trim().length > 0
+          ? record.name.trim()
+          : undefined,
+      workspace:
+        typeof record.workspace === "string" ? record.workspace : "",
+      agentDir:
+        typeof record.agentDir === "string" ? record.agentDir : "",
+    });
+  }
+
+  return entries;
+}
+
+function readAgentSandboxMode(entry: Record<string, unknown>): string | undefined {
+  const sandbox = asRecord(entry.sandbox);
+  const mode = sandbox.mode;
+  if (typeof mode !== "string") {
+    return undefined;
+  }
+  const normalized = mode.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function hasAgentToolsAllowAll(entry: Record<string, unknown>): boolean {
+  const tools = asRecord(entry.tools);
+  const allow = tools.allow;
+  if (!Array.isArray(allow)) {
+    return false;
+  }
+
+  return allow.some(
+    (value) => typeof value === "string" && value.trim() === "*",
+  );
+}
+
+function parseLooseJson(raw: string): Record<string, unknown> | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    return asRecord(parsed);
+  } catch {
+    // continue
+  }
+
+  const starts = [
+    trimmed.indexOf("{"),
+    trimmed.lastIndexOf("{"),
+    trimmed.indexOf("["),
+    trimmed.lastIndexOf("["),
+  ].filter((value, index, arr) => value >= 0 && arr.indexOf(value) === index);
+  for (const start of starts) {
+    const candidate = trimmed.slice(start).trim();
+    if (!candidate) {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(candidate) as unknown;
+      return asRecord(parsed);
+    } catch {
+      // keep trying
+    }
+  }
+
+  return undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
 }
 
 function assertOpenClawProviderId(providerId: string): void {

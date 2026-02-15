@@ -1,8 +1,9 @@
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
-import { InvalidProviderConfigError, ProviderService } from "../../packages/core/src/core/providers/index.js";
+import { InvalidProviderConfigError, ProviderCommandNotFoundError, ProviderService } from "../../packages/core/src/core/providers/index.js";
 import * as commandExecutor from "../../packages/core/src/core/providers/command-executor.js";
+import * as gatewayRpc from "../../packages/core/src/core/providers/openclaw-gateway-rpc.js";
 import { ProviderRegistry } from "../../packages/core/src/core/providers/registry.js";
 import type {
   Provider,
@@ -174,6 +175,142 @@ describe("ProviderService (OpenClaw runtime)", () => {
       })
     );
   });
+
+  it("falls back to gateway agent call when provider command is unavailable", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+    const { paths, fileSystem } = await createPaths(root);
+    await seedAgent(fileSystem, paths, "ceo");
+
+    const provider = new MissingCommandOpenClawProvider();
+    const service = createProviderService(fileSystem, createRegistry(provider));
+
+    const gatewayCallSpy = vi
+      .spyOn(gatewayRpc, "callOpenClawGatewayRpc")
+      .mockResolvedValue({
+        payloads: [{ text: "gateway hello" }],
+        meta: { agentMeta: { sessionId: "agent:ceo:main" } }
+      });
+
+    const result = await service.invokeAgent(paths, "ceo", {
+      message: "hello from fallback",
+      providerSessionId: "main"
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe("gateway hello");
+    expect(result.providerSessionId).toBe("agent:ceo:main");
+    expect(gatewayCallSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "agent"
+      })
+    );
+  });
+
+  it("falls back to gateway config.apply when create/delete commands are unavailable", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+    const { paths, fileSystem } = await createPaths(root);
+    const provider = new MissingCommandOpenClawProvider();
+    const service = createProviderService(fileSystem, createRegistry(provider));
+
+    const gatewayCallSpy = vi
+      .spyOn(gatewayRpc, "callOpenClawGatewayRpc")
+      .mockImplementation(async (params) => {
+        if (params.method === "config.get") {
+          return {
+            raw: JSON.stringify(
+              {
+                agents: {
+                  list: [
+                    {
+                      id: "developer",
+                      workspace: "/tmp/workspaces/developer",
+                      agentDir: "/tmp/agents/developer",
+                      sandbox: { mode: "workspace" },
+                      tools: { allow: [] }
+                    }
+                  ]
+                }
+              },
+              null,
+              2
+            ),
+            hash: "hash-1"
+          };
+        }
+        return { ok: true };
+      });
+
+    const created = await service.createProviderAgent(paths, "developer", {
+      displayName: "Developer",
+      workspaceDir: "/tmp/workspaces/developer",
+      internalConfigDir: "/tmp/agents/developer"
+    });
+    const deleted = await service.deleteProviderAgent(paths, "developer", {});
+
+    expect(created.code).toBe(0);
+    expect(deleted.code).toBe(0);
+    expect(gatewayCallSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "config.apply"
+      })
+    );
+  });
+
+  it("syncs execution policies via gateway config when requested", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+    const { paths, fileSystem } = await createPaths(root);
+    const service = createProviderService(
+      fileSystem,
+      createRegistry(new FakeOpenClawProvider())
+    );
+
+    const gatewayCallSpy = vi
+      .spyOn(gatewayRpc, "callOpenClawGatewayRpc")
+      .mockImplementation(async (params) => {
+        if (params.method === "config.get") {
+          return {
+            raw: JSON.stringify(
+              {
+                agents: {
+                  list: [
+                    {
+                      id: "developer",
+                      sandbox: { mode: "workspace" },
+                      tools: { allow: [] }
+                    }
+                  ]
+                }
+              },
+              null,
+              2
+            ),
+            hash: "hash-2"
+          };
+        }
+        if (params.method === "config.apply") {
+          return { ok: true };
+        }
+        throw new Error(`unexpected method: ${params.method}`);
+      });
+
+    const warnings = await service.syncOpenClawAgentExecutionPoliciesViaGateway(
+      paths,
+      ["developer"]
+    );
+
+    expect(warnings).toEqual([]);
+    const applyCall = gatewayCallSpy.mock.calls.find(
+      (call) => call[0].method === "config.apply"
+    );
+    expect(applyCall).toBeDefined();
+    const raw = String((applyCall?.[0].params as { raw?: unknown }).raw ?? "");
+    expect(raw).toContain("\"mode\": \"off\"");
+    expect(raw).toContain("\"allow\": [");
+    expect(raw).toContain("\"*\"");
+  });
 });
 
 function createRegistry(provider: Provider): ProviderRegistry {
@@ -321,5 +458,26 @@ class FlakyUvCwdProvider extends FakeOpenClawProvider {
       stdout: "ok\n",
       stderr: ""
     };
+  }
+}
+
+class MissingCommandOpenClawProvider extends FakeOpenClawProvider {
+  public override async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
+    this.lastInvoke = options;
+    throw new ProviderCommandNotFoundError("openclaw", "openclaw");
+  }
+
+  public override async createAgent(
+    options: ProviderCreateAgentOptions
+  ): Promise<ProviderExecutionResult> {
+    this.lastCreate = options;
+    throw new ProviderCommandNotFoundError("openclaw", "openclaw");
+  }
+
+  public override async deleteAgent(
+    options: ProviderDeleteAgentOptions
+  ): Promise<ProviderExecutionResult> {
+    this.lastDelete = options;
+    throw new ProviderCommandNotFoundError("openclaw", "openclaw");
   }
 }

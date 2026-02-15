@@ -1393,25 +1393,39 @@ export class OpenGoatService {
       ...process.env,
       ...(providerConfig?.env ?? {}),
     };
-    const skillsList = await this.runOpenClaw(["skills", "list", "--json"], {
+    try {
+      const skillsList = await this.runOpenClaw(["skills", "list", "--json"], {
+        env,
+      });
+      if (skillsList.code !== 0) {
+        throw new Error(
+          `OpenClaw skills list failed (exit ${skillsList.code}). ${
+            skillsList.stderr.trim() || skillsList.stdout.trim() || ""
+          }`.trim(),
+        );
+      }
+
+      const parsed = parseLooseJson(skillsList.stdout);
+      if (parsed === undefined) {
+        throw new Error(
+          "OpenClaw skills list returned non-JSON output; cannot resolve managed skills directory.",
+        );
+      }
+
+      const managedSkillsDir = extractManagedSkillsDir(parsed);
+      this.openClawManagedSkillsDirCache = managedSkillsDir;
+      return managedSkillsDir;
+    } catch (error) {
+      if (!(error instanceof ProviderCommandNotFoundError)) {
+        throw error;
+      }
+    }
+
+    const skillsStatus = await this.providerService.getOpenClawSkillsStatusViaGateway(
+      paths,
       env,
-    });
-    if (skillsList.code !== 0) {
-      throw new Error(
-        `OpenClaw skills list failed (exit ${skillsList.code}). ${
-          skillsList.stderr.trim() || skillsList.stdout.trim() || ""
-        }`.trim(),
-      );
-    }
-
-    const parsed = parseLooseJson(skillsList.stdout);
-    if (parsed === undefined) {
-      throw new Error(
-        "OpenClaw skills list returned non-JSON output; cannot resolve managed skills directory.",
-      );
-    }
-
-    const managedSkillsDir = extractManagedSkillsDir(parsed);
+    );
+    const managedSkillsDir = extractManagedSkillsDir(skillsStatus);
     this.openClawManagedSkillsDirCache = managedSkillsDir;
     return managedSkillsDir;
   }
@@ -1424,25 +1438,41 @@ export class OpenGoatService {
     }
 
     const env = await this.resolveOpenClawEnv(paths);
-    const listed = await this.runOpenClaw(["agents", "list", "--json"], {
+    try {
+      const listed = await this.runOpenClaw(["agents", "list", "--json"], {
+        env,
+      });
+      if (listed.code !== 0) {
+        throw new Error(
+          `OpenClaw agents list failed (exit ${listed.code}). ${
+            listed.stderr.trim() || listed.stdout.trim() || ""
+          }`.trim(),
+        );
+      }
+
+      const parsed = parseLooseJson(listed.stdout);
+      if (parsed === undefined) {
+        throw new Error(
+          "OpenClaw agents list returned non-JSON output; cannot inspect agents.",
+        );
+      }
+
+      return extractOpenClawAgents(parsed);
+    } catch (error) {
+      if (!(error instanceof ProviderCommandNotFoundError)) {
+        throw error;
+      }
+    }
+
+    const entries = await this.providerService.listOpenClawAgentsViaGateway(
+      paths,
       env,
-    });
-    if (listed.code !== 0) {
-      throw new Error(
-        `OpenClaw agents list failed (exit ${listed.code}). ${
-          listed.stderr.trim() || listed.stdout.trim() || ""
-        }`.trim(),
-      );
-    }
-
-    const parsed = parseLooseJson(listed.stdout);
-    if (parsed === undefined) {
-      throw new Error(
-        "OpenClaw agents list returned non-JSON output; cannot inspect agents.",
-      );
-    }
-
-    return extractOpenClawAgents(parsed);
+    );
+    return entries.map((entry) => ({
+      id: entry.id,
+      workspace: entry.workspace,
+      agentDir: entry.agentDir,
+    }));
   }
 
   private async addWorkspaceAgentCandidates(
@@ -1655,35 +1685,51 @@ export class OpenGoatService {
 
     const warnings: string[] = [];
     const env = await this.resolveOpenClawEnv(paths);
-    const listResult = await this.runOpenClaw(["config", "get", "agents.list"], {
-      env,
-    });
-
-    if (listResult.code !== 0) {
-      warnings.push(
-        `OpenClaw config read failed (agents.list, code ${listResult.code}). ${
-          listResult.stderr.trim() || listResult.stdout.trim() || ""
-        }`.trim(),
+    let entries: unknown[];
+    try {
+      const listResult = await this.runOpenClaw(
+        ["config", "get", "agents.list"],
+        {
+          env,
+        },
       );
-      return warnings;
+
+      if (listResult.code !== 0) {
+        warnings.push(
+          `OpenClaw config read failed (agents.list, code ${listResult.code}). ${
+            listResult.stderr.trim() || listResult.stdout.trim() || ""
+          }`.trim(),
+        );
+        return warnings;
+      }
+
+      const parsed = parseLooseJson(listResult.stdout);
+      if (parsed === undefined) {
+        warnings.push(
+          "OpenClaw config read returned non-JSON for agents.list; skipping sandbox/tools policy sync.",
+        );
+        return warnings;
+      }
+
+      if (!Array.isArray(parsed)) {
+        warnings.push(
+          "OpenClaw config agents.list is not an array; skipping sandbox/tools policy sync.",
+        );
+        return warnings;
+      }
+
+      entries = parsed;
+    } catch (error) {
+      if (!(error instanceof ProviderCommandNotFoundError)) {
+        throw error;
+      }
+      return this.providerService.syncOpenClawAgentExecutionPoliciesViaGateway(
+        paths,
+        agentIds,
+        env,
+      );
     }
 
-    const parsed = parseLooseJson(listResult.stdout);
-    if (parsed === undefined) {
-      warnings.push(
-        "OpenClaw config read returned non-JSON for agents.list; skipping sandbox/tools policy sync.",
-      );
-      return warnings;
-    }
-
-    if (!Array.isArray(parsed)) {
-      warnings.push(
-        "OpenClaw config agents.list is not an array; skipping sandbox/tools policy sync.",
-      );
-      return warnings;
-    }
-
-    const entries = parsed;
     const indexById = new Map<string, number>();
     for (let index = 0; index < entries.length; index += 1) {
       const entry = entries[index];

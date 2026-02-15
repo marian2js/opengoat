@@ -2,7 +2,7 @@ import { constants } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BaseProvider,
   OpenGoatService,
@@ -485,6 +485,101 @@ describe("OpenGoatService", () => {
           request.args.includes("--json"),
       ),
     ).toBe(true);
+  });
+
+  it("creates agents via gateway fallbacks when openclaw binary is unavailable", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const commandRunner = createRuntimeDefaultsCommandRunner(
+      root,
+      async (request) => {
+        if (
+          request.args[0] === "skills" &&
+          request.args[1] === "list" &&
+          request.args.includes("--json")
+        ) {
+          const error = new Error("spawn openclaw ENOENT");
+          (error as Error & { code?: string }).code = "ENOENT";
+          throw error;
+        }
+        if (
+          request.args[0] === "agents" &&
+          request.args[1] === "list" &&
+          request.args.includes("--json")
+        ) {
+          const error = new Error("spawn openclaw ENOENT");
+          (error as Error & { code?: string }).code = "ENOENT";
+          throw error;
+        }
+        if (
+          request.args[0] === "config" &&
+          request.args[1] === "get" &&
+          request.args[2] === "agents.list"
+        ) {
+          const error = new Error("spawn openclaw ENOENT");
+          (error as Error & { code?: string }).code = "ENOENT";
+          throw error;
+        }
+        return undefined;
+      },
+    );
+
+    const { service } = createService(
+      root,
+      new FakeOpenClawProvider(),
+      commandRunner,
+    );
+    const providerService = (
+      service as unknown as {
+        providerService: {
+          getOpenClawSkillsStatusViaGateway: (
+            ...args: unknown[]
+          ) => Promise<unknown>;
+          listOpenClawAgentsViaGateway: (
+            ...args: unknown[]
+          ) => Promise<unknown>;
+          syncOpenClawAgentExecutionPoliciesViaGateway: (
+            ...args: unknown[]
+          ) => Promise<string[]>;
+        };
+      }
+    ).providerService;
+
+    const skillsFallbackSpy = vi
+      .spyOn(providerService, "getOpenClawSkillsStatusViaGateway")
+      .mockResolvedValue({
+        workspaceDir: path.join(root, "openclaw-workspace"),
+        managedSkillsDir: path.join(root, "openclaw-managed-skills"),
+        skills: [],
+      });
+    const agentsFallbackSpy = vi
+      .spyOn(providerService, "listOpenClawAgentsViaGateway")
+      .mockResolvedValue([
+        {
+          id: "ceo",
+          workspace: path.join(root, "workspaces", "ceo"),
+          agentDir: path.join(root, "agents", "ceo"),
+        },
+      ]);
+    const policiesFallbackSpy = vi
+      .spyOn(providerService, "syncOpenClawAgentExecutionPoliciesViaGateway")
+      .mockResolvedValue([]);
+
+    await service.initialize();
+    const created = await service.createAgent("Marcos", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    expect(created.agent.id).toBe("marcos");
+    expect(skillsFallbackSpy).toHaveBeenCalled();
+    expect(agentsFallbackSpy).toHaveBeenCalled();
+    expect(policiesFallbackSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining(["marcos"]),
+      expect.anything(),
+    );
   });
 
   it("repairs stale OpenClaw ceo workspace mapping to OPENGOAT_HOME", async () => {
