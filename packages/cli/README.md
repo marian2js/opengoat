@@ -70,6 +70,12 @@ Run the production UI server from the CLI:
 opengoat start
 ```
 
+Restart a running UI server:
+
+```bash
+opengoat restart
+```
+
 Use an external OpenClaw gateway:
 
 ```bash

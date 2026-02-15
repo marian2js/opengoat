@@ -269,6 +269,7 @@ export interface UiServerSettingsResponse {
   maxInactivityMinutes: number;
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
   authentication: UiAuthenticationSettingsResponse;
+  ceoBootstrapPending: boolean;
 }
 
 export interface UiVersionInfo {

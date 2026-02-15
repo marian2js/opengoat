@@ -29,7 +29,6 @@ interface TasksPageProps {
   taskActorId: string;
   agents: TasksPageAgent[];
   onTaskActorChange: (nextTaskActorId: string) => void;
-  onBackToTasks: () => void;
   hasSelectedTasks: boolean;
   selectedTaskIdsCount: number;
   onDeleteSelectedTasks: () => void;
@@ -49,7 +48,6 @@ export function TasksPage({
   taskActorId,
   agents,
   onTaskActorChange,
-  onBackToTasks,
   hasSelectedTasks,
   selectedTaskIdsCount,
   onDeleteSelectedTasks,
@@ -101,10 +99,6 @@ export function TasksPage({
                 ))}
               </select>
             </div>
-
-            <Button variant="secondary" size="sm" onClick={onBackToTasks}>
-              Back to Tasks
-            </Button>
           </div>
         </div>
       </section>

@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { DEFAULT_TASK_CHECK_FREQUENCY_MINUTES } from "./constants.js";
 import {
   defaultUiServerSettings,
+  isCeoBootstrapPending,
   parseInactiveAgentNotificationTarget,
   parseMaxInactivityMinutes,
   parseNotifyManagersOfInactiveAgents,
@@ -56,7 +57,9 @@ export function createTaskCronScheduler(
     parseInactiveAgentNotificationTarget(
       initialSettings.inactiveAgentNotificationTarget,
     ) ?? defaultUiServerSettings().inactiveAgentNotificationTarget;
+  const homeDir = service.getHomeDir();
   let intervalHandle: NodeJS.Timeout | undefined;
+  let bootstrapCheckHandle: NodeJS.Timeout | undefined;
   let running = false;
 
   const syncFromPersistedSettings = async (): Promise<void> => {
@@ -125,6 +128,10 @@ export function createTaskCronScheduler(
       if (!taskCronEnabled) {
         return;
       }
+      if (isCeoBootstrapPending(homeDir)) {
+        schedule();
+        return;
+      }
       const cycle = await service.runTaskCronCycle?.({
         inactiveMinutes: maxInactivityMinutes,
         notificationTarget: inactiveAgentNotificationTarget,
@@ -171,14 +178,53 @@ export function createTaskCronScheduler(
     }
   };
 
+  const stopBootstrapCheck = (): void => {
+    if (bootstrapCheckHandle) {
+      clearInterval(bootstrapCheckHandle);
+      bootstrapCheckHandle = undefined;
+    }
+  };
+
+  const ensureBootstrapCheck = (): void => {
+    if (bootstrapCheckHandle) {
+      return;
+    }
+    bootstrapCheckHandle = setInterval(() => {
+      if (!taskCronEnabled) {
+        stopBootstrapCheck();
+        return;
+      }
+      if (isCeoBootstrapPending(homeDir)) {
+        return;
+      }
+      stopBootstrapCheck();
+      app.log.info("[task-cron] scheduler resumed after CEO bootstrap completion");
+      logs.append({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "opengoat",
+        message:
+          "[task-cron] scheduler resumed after first CEO message completed bootstrap.",
+      });
+      schedule();
+    }, DEFAULT_TASK_CHECK_FREQUENCY_MINUTES * 60_000);
+    bootstrapCheckHandle.unref?.();
+  };
+
   const schedule = (): void => {
     if (intervalHandle) {
       clearInterval(intervalHandle);
       intervalHandle = undefined;
     }
     if (!taskCronEnabled) {
+      stopBootstrapCheck();
       return;
     }
+    if (isCeoBootstrapPending(homeDir)) {
+      ensureBootstrapCheck();
+      return;
+    }
+    stopBootstrapCheck();
     intervalHandle = setInterval(() => {
       void runCycle();
     }, DEFAULT_TASK_CHECK_FREQUENCY_MINUTES * 60_000);
@@ -272,6 +318,7 @@ export function createTaskCronScheduler(
         clearInterval(intervalHandle);
         intervalHandle = undefined;
       }
+      stopBootstrapCheck();
     },
   };
 }
