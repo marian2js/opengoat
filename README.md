@@ -1,25 +1,18 @@
-# OpenGoat
+<h1 align="center">OpenGoat</h1>
+<p align="center"><strong>Build AI Autonomous Organizations of OpenClaw Agents.</strong></p>
 
-**Build AI Autonomous Organizations of OpenClaw Agents.**
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License" /></a>
+  <a href="https://www.npmjs.com/package/opengoat"><img src="https://img.shields.io/npm/v/opengoat?style=flat-square" alt="npm version" /></a>
+  <a href="https://github.com/marian2js/opengoat/actions"><img src="https://img.shields.io/github/actions/workflow/status/marian2js/opengoat/ci.yml?branch=main&style=flat-square" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D20.11-brightgreen?style=flat-square" alt="Node >= 20.11" />
+</p>
 
-[![OpenGoat UI](./assets/org-example.png)](https://opengoat.ai)
+**OpenGoat** allows you to build herarchical organizations of AI agents that coordinate work across multiple tools.
 
-[![npm version](https://img.shields.io/npm/v/opengoat?style=flat-square)](https://www.npmjs.com/package/opengoat)
-[![CI](https://img.shields.io/github/actions/workflow/status/marian2js/opengoat/ci.yml?branch=main&style=flat-square)](https://github.com/marian2js/opengoat/actions)
-![Node >= 20.11](https://img.shields.io/badge/node-%3E%3D20.11-brightgreen?style=flat-square)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![OpenGoat UI](/assets/org-example.png)](https://opengoat.ai)
 
-OpenGoat is a platform for creating hierarchical organizations of AI agents that collaborate to achieve complex goals. Powered by OpenClaw, it enables scalable delegation, task management, and efficient AI-driven workflows.
-
-## Features
-
-- **Agent Hierarchy Management**: Organize AI agents in reporting structures for scalable delegation.
-- **Task Assignment and Tracking**: Create, assign, and monitor tasks with status updates, blockers, and artifacts.
-- **Persistent Memory**: Agents retain long-term memory for continuity across sessions.
-- **Tool and Skill Integration**: Access external tools and APIs seamlessly.
-- **Collaboration Tools**: Enable messaging and coordination between agents.
-
-For more details, see our [Initial Product Roadmap](docs/product-roadmap.md) (coming soon).
+---
 
 ## Installation
 
@@ -34,40 +27,111 @@ openclaw onboard
 opengoat start
 ```
 
-Open `http://127.0.0.1:19123` to access the UI, add a project, and interact with the CEO agent.
+That's it. Open `http://127.0.0.1:19123`, add a project, and start messaging the CEO. He will take care of the rest.
 
-### Docker
+### Alternative: Docker
 
 ```bash
 docker build -t opengoat:latest .
 docker run --rm -p 19123:19123 -v opengoat-data:/data/opengoat opengoat:latest
 ```
 
-See [Docker documentation](docs/docker.md) for more.
+Then open `http://127.0.0.1:19123`.
 
-## Quick Start
+### From Source (without global npm install)
 
 ```bash
-opengoat init
-opengoat agent --message \"Set up a CTO and two engineers for this project.\"
+pnpm install
+pnpm build
+./bin/opengoat --help
 ```
 
-Run the UI server:
+When agents execute commands from their OpenGoat workspace, use the workspace shim:
+
+```bash
+sh ./opengoat agent list
+sh ./opengoat agent info ceo
+```
+
+### CLI Quick Start (Optional)
+
+Runtime: Node `>=20.11`.
+
+```bash
+npm i -g openclaw opengoat
+openclaw onboard
+opengoat init
+opengoat agent --message "Set up a CTO and two engineers for this project."
+```
+
+Run the production UI server from the CLI:
 
 ```bash
 opengoat start
 ```
 
-## Documentation
+Restart a running UI server:
 
-- [Organization Runtime](docs/organization-runtime.md)
-- [Docker Setup](docs/docker.md)
-- [ACP Integration](docs/acp.md)
+```bash
+opengoat restart
+```
 
-## Contributing
+Use an external OpenClaw gateway:
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+```bash
+opengoat onboard --external \
+  --gateway-url ws://host:18789 \
+  --gateway-token <token> \
+  --non-interactive
+```
 
-## License
+## Typical Workflows
 
-[MIT](LICENSE)
+### Build the organization
+
+```bash
+opengoat agent create "CTO" --manager --reports-to ceo --skill og-board-manager
+opengoat agent create "Engineer" --individual --reports-to cto --skill coding
+opengoat agent create "Designer" --individual --reports-to cto
+opengoat agent list
+```
+
+### Run role-based work
+
+```bash
+opengoat agent cto --message "Plan the Q2 engineering roadmap and split it into streams."
+opengoat agent engineer --message "Implement the auth middleware for this sprint."
+```
+
+### Keep project sessions scoped
+
+```bash
+opengoat agent ceo \
+  --session saaslib-planning \
+  --project-path /Users/you/workspace/project \
+  --message "Create a release checklist for v1.2"
+
+opengoat agent ceo \
+  --session saaslib-planning \
+  --message "Now draft the changelog"
+```
+
+### Operate with tasks
+
+```bash
+opengoat task create --title "Ship auth" --description "Finish middleware + tests" --owner cto --assign engineer
+opengoat task list --as engineer
+opengoat task status <task-id> doing
+```
+
+## Skills
+
+```bash
+opengoat skill install og-board-manager --from /path/to/skill
+opengoat skill install jira-tools --from /path/to/skill
+opengoat skill list --agent ceo
+```
+
+# License
+
+MIT
