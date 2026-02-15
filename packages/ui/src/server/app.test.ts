@@ -223,7 +223,9 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: true,
         notifyManagersOfInactiveAgents: true,
         maxInactivityMinutes: 30,
+        maxParallelFlows: 3,
         inactiveAgentNotificationTarget: "all-managers",
+        ceoBootstrapPending: false,
       },
     });
 
@@ -234,6 +236,7 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: false,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        maxParallelFlows: 6,
         inactiveAgentNotificationTarget: "ceo-only",
       },
     });
@@ -243,7 +246,9 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: false,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        maxParallelFlows: 6,
         inactiveAgentNotificationTarget: "ceo-only",
+        ceoBootstrapPending: false,
       },
     });
 
@@ -254,6 +259,7 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: true,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        maxParallelFlows: 6,
         inactiveAgentNotificationTarget: "ceo-only",
       },
     });
@@ -263,7 +269,9 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: true,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        maxParallelFlows: 6,
         inactiveAgentNotificationTarget: "ceo-only",
+        ceoBootstrapPending: false,
       },
     });
 
@@ -277,7 +285,9 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: true,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 45,
+        maxParallelFlows: 6,
         inactiveAgentNotificationTarget: "ceo-only",
+        ceoBootstrapPending: false,
       },
     });
   });
@@ -516,10 +526,65 @@ describe("OpenGoat UI server API", () => {
           taskCronEnabled: false,
           notifyManagersOfInactiveAgents: false,
           maxInactivityMinutes: 30,
+          maxParallelFlows: 4,
           inactiveAgentNotificationTarget: "ceo-only",
         }, null, 2)}\n`,
         "utf8"
       );
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(runTaskCronCycle).toHaveBeenCalledTimes(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps scheduler paused while ceo bootstrap is pending", async () => {
+    vi.useFakeTimers();
+    try {
+      const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      const runTaskCronCycle = vi.fn<NonNullable<OpenClawUiService["runTaskCronCycle"]>>(async () => {
+        return {
+          ranAt: new Date().toISOString(),
+          scannedTasks: 0,
+          todoTasks: 0,
+          blockedTasks: 0,
+          inactiveAgents: 0,
+          sent: 0,
+          failed: 0,
+        };
+      });
+
+      await mkdir(path.resolve(uniqueHomeDir, "workspaces", "ceo"), {
+        recursive: true,
+      });
+      await writeFile(
+        path.resolve(uniqueHomeDir, "workspaces", "ceo", "BOOTSTRAP.md"),
+        "# BOOTSTRAP.md\n",
+        "utf8",
+      );
+
+      activeServer = await createOpenGoatUiServer({
+        logger: false,
+        attachFrontend: false,
+        service: {
+          ...createMockService({
+            homeDir: uniqueHomeDir,
+          }),
+          runTaskCronCycle,
+        },
+      });
+
+      const settingsResponse = await activeServer.inject({
+        method: "GET",
+        url: "/api/settings",
+      });
+      expect(settingsResponse.statusCode).toBe(200);
+      expect(settingsResponse.json()).toMatchObject({
+        settings: {
+          ceoBootstrapPending: true,
+        },
+      });
 
       await vi.advanceTimersByTimeAsync(60_000);
       expect(runTaskCronCycle).toHaveBeenCalledTimes(0);
@@ -562,6 +627,7 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: false,
         notifyManagersOfInactiveAgents: false,
         maxInactivityMinutes: 30,
+        maxParallelFlows: 3,
         inactiveAgentNotificationTarget: "all-managers",
       },
     });

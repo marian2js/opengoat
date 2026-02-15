@@ -84,6 +84,7 @@ import {
   prepareOpenClawCommandEnv,
   resolveInactiveAgentNotificationTarget,
   resolveInactiveMinutes,
+  resolveMaxParallelFlows,
   toErrorMessage,
   type OpenClawAgentPathEntry,
 } from "./opengoat.service.helpers.js";
@@ -902,6 +903,7 @@ export class OpenGoatService {
       inactiveMinutes?: number;
       notificationTarget?: InactiveAgentNotificationTarget;
       notifyInactiveAgents?: boolean;
+      maxParallelFlows?: number;
     } = {},
   ): Promise<TaskCronRunResult> {
     const paths = this.pathsProvider.getPaths();
@@ -912,6 +914,7 @@ export class OpenGoatService {
       options.notificationTarget,
     );
     const notifyInactiveAgents = options.notifyInactiveAgents ?? true;
+    const maxParallelFlows = resolveMaxParallelFlows(options.maxParallelFlows);
     const inactiveCandidates = notifyInactiveAgents
       ? await this.collectInactiveAgents(
           paths,
@@ -929,12 +932,14 @@ export class OpenGoatService {
       paths,
       tasks,
       manifests,
+      maxParallelFlows,
     );
     const inactiveDispatches = await this.dispatchInactiveAgentAutomations(
       paths,
       inactiveCandidates,
       inactiveMinutes,
       latestCeoProjectPath,
+      maxParallelFlows,
     );
     const dispatches = [
       ...taskStatusDispatch.dispatches,
@@ -958,11 +963,18 @@ export class OpenGoatService {
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
     tasks: TaskRecord[],
     manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
+    maxParallelFlows: number,
   ): Promise<TaskStatusDispatchSummary> {
     const manifestsById = new Map(
       manifests.map((manifest) => [manifest.agentId, manifest]),
     );
-    const dispatches: TaskCronDispatchResult[] = [];
+    const requests: Array<{
+      kind: "todo" | "blocked";
+      targetAgentId: string;
+      sessionRef: string;
+      taskId: string;
+      message: string;
+    }> = [];
     let todoTasks = 0;
     let blockedTasks = 0;
 
@@ -976,19 +988,12 @@ export class OpenGoatService {
         const targetAgentId = task.assignedTo;
         const sessionRef = buildTaskSessionRef(targetAgentId, task.taskId);
         const message = buildTodoTaskMessage({ task });
-        const result = await this.dispatchAutomationMessage(
-          paths,
-          targetAgentId,
-          sessionRef,
-          message,
-        );
-        dispatches.push({
+        requests.push({
           kind: "todo",
           targetAgentId,
           sessionRef,
           taskId: task.taskId,
-          ok: result.ok,
-          error: result.error,
+          message,
         });
         continue;
       }
@@ -1000,21 +1005,35 @@ export class OpenGoatService {
         DEFAULT_AGENT_ID;
       const sessionRef = buildTaskSessionRef(managerAgentId, task.taskId);
       const message = buildBlockedTaskMessage({ task });
-      const result = await this.dispatchAutomationMessage(
-        paths,
-        managerAgentId,
-        sessionRef,
-        message,
-      );
-      dispatches.push({
+      requests.push({
         kind: "blocked",
         targetAgentId: managerAgentId,
         sessionRef,
         taskId: task.taskId,
-        ok: result.ok,
-        error: result.error,
+        message,
       });
     }
+
+    const dispatches = await runWithConcurrency(
+      requests,
+      maxParallelFlows,
+      async (request) => {
+        const result = await this.dispatchAutomationMessage(
+          paths,
+          request.targetAgentId,
+          request.sessionRef,
+          request.message,
+        );
+        return {
+          kind: request.kind,
+          targetAgentId: request.targetAgentId,
+          sessionRef: request.sessionRef,
+          taskId: request.taskId,
+          ok: result.ok,
+          error: result.error,
+        };
+      },
+    );
 
     return {
       dispatches,
@@ -1028,42 +1047,45 @@ export class OpenGoatService {
     inactiveCandidates: InactiveAgentCandidate[],
     inactiveMinutes: number,
     latestCeoProjectPath?: string,
+    maxParallelFlows = 1,
   ): Promise<TaskCronDispatchResult[]> {
-    const dispatches: TaskCronDispatchResult[] = [];
-    for (const candidate of inactiveCandidates) {
-      const sessionRef = buildInactiveSessionRef(
-        candidate.managerAgentId,
-        candidate.subjectAgentId,
-      );
-      const message = buildInactiveAgentMessage({
-        managerAgentId: candidate.managerAgentId,
-        subjectAgentId: candidate.subjectAgentId,
-        subjectName: candidate.subjectName,
-        role: candidate.role,
-        directReporteesCount: candidate.directReporteesCount,
-        indirectReporteesCount: candidate.indirectReporteesCount,
-        inactiveMinutes,
-        lastActionTimestamp: candidate.lastActionTimestamp,
-      });
-      const result = await this.dispatchAutomationMessage(
-        paths,
-        candidate.managerAgentId,
-        sessionRef,
-        message,
-        {
-          cwd: latestCeoProjectPath,
-        },
-      );
-      dispatches.push({
-        kind: "inactive",
-        targetAgentId: candidate.managerAgentId,
-        sessionRef,
-        subjectAgentId: candidate.subjectAgentId,
-        ok: result.ok,
-        error: result.error,
-      });
-    }
-    return dispatches;
+    return runWithConcurrency(
+      inactiveCandidates,
+      maxParallelFlows,
+      async (candidate) => {
+        const sessionRef = buildInactiveSessionRef(
+          candidate.managerAgentId,
+          candidate.subjectAgentId,
+        );
+        const message = buildInactiveAgentMessage({
+          managerAgentId: candidate.managerAgentId,
+          subjectAgentId: candidate.subjectAgentId,
+          subjectName: candidate.subjectName,
+          role: candidate.role,
+          directReporteesCount: candidate.directReporteesCount,
+          indirectReporteesCount: candidate.indirectReporteesCount,
+          inactiveMinutes,
+          lastActionTimestamp: candidate.lastActionTimestamp,
+        });
+        const result = await this.dispatchAutomationMessage(
+          paths,
+          candidate.managerAgentId,
+          sessionRef,
+          message,
+          {
+            cwd: latestCeoProjectPath,
+          },
+        );
+        return {
+          kind: "inactive",
+          targetAgentId: candidate.managerAgentId,
+          sessionRef,
+          subjectAgentId: candidate.subjectAgentId,
+          ok: result.ok,
+          error: result.error,
+        };
+      },
+    );
   }
 
   public async listSkills(
@@ -2123,6 +2145,37 @@ function readStringArray(value: unknown): string[] {
   return value
     .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
     .filter((entry) => entry.length > 0);
+}
+
+async function runWithConcurrency<T, R>(
+  items: T[],
+  rawConcurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const concurrency = Math.max(1, Math.floor(rawConcurrency));
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  const runWorker = async (): Promise<void> => {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= items.length) {
+        return;
+      }
+
+      results[currentIndex] = await worker(items[currentIndex]!, currentIndex);
+    }
+  };
+
+  const workerCount = Math.min(concurrency, items.length);
+  const workers = Array.from({ length: workerCount }, () => runWorker());
+  await Promise.all(workers);
+  return results;
 }
 
 function parseLooseJson(raw: string): unknown {

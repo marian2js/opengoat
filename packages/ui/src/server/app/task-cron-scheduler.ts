@@ -2,8 +2,10 @@ import type { FastifyInstance } from "fastify";
 import { DEFAULT_TASK_CHECK_FREQUENCY_MINUTES } from "./constants.js";
 import {
   defaultUiServerSettings,
+  isCeoBootstrapPending,
   parseInactiveAgentNotificationTarget,
   parseMaxInactivityMinutes,
+  parseMaxParallelFlows,
   parseNotifyManagersOfInactiveAgents,
   parseTaskCronEnabled,
   readUiServerSettings,
@@ -33,6 +35,9 @@ export function createTaskCronScheduler(
       setMaxInactivityMinutes: () => {
         // no-op when runtime task cron is unavailable.
       },
+      setMaxParallelFlows: () => {
+        // no-op when runtime task cron is unavailable.
+      },
       setInactiveAgentNotificationTarget: () => {
         // no-op when runtime task cron is unavailable.
       },
@@ -52,11 +57,16 @@ export function createTaskCronScheduler(
   let maxInactivityMinutes =
     parseMaxInactivityMinutes(initialSettings.maxInactivityMinutes) ??
     defaultUiServerSettings().maxInactivityMinutes;
+  let maxParallelFlows =
+    parseMaxParallelFlows(initialSettings.maxParallelFlows) ??
+    defaultUiServerSettings().maxParallelFlows;
   let inactiveAgentNotificationTarget =
     parseInactiveAgentNotificationTarget(
       initialSettings.inactiveAgentNotificationTarget,
     ) ?? defaultUiServerSettings().inactiveAgentNotificationTarget;
+  const homeDir = service.getHomeDir();
   let intervalHandle: NodeJS.Timeout | undefined;
+  let bootstrapCheckHandle: NodeJS.Timeout | undefined;
   let running = false;
 
   const syncFromPersistedSettings = async (): Promise<void> => {
@@ -76,6 +86,8 @@ export function createTaskCronScheduler(
     const persistedMaxInactivityMinutes =
       parseMaxInactivityMinutes(persisted.maxInactivityMinutes) ??
       maxInactivityMinutes;
+    const persistedMaxParallelFlows =
+      parseMaxParallelFlows(persisted.maxParallelFlows) ?? maxParallelFlows;
     const persistedNotificationTarget =
       parseInactiveAgentNotificationTarget(
         persisted.inactiveAgentNotificationTarget,
@@ -86,12 +98,15 @@ export function createTaskCronScheduler(
       persistedNotifyManagers !== notifyManagersOfInactiveAgents;
     const hasMaxInactivityChange =
       persistedMaxInactivityMinutes !== maxInactivityMinutes;
+    const hasMaxParallelFlowsChange =
+      persistedMaxParallelFlows !== maxParallelFlows;
     const hasNotificationTargetChange =
       persistedNotificationTarget !== inactiveAgentNotificationTarget;
     if (
       !hasTaskCronEnabledChange &&
       !hasNotifyManagersChange &&
       !hasMaxInactivityChange &&
+      !hasMaxParallelFlowsChange &&
       !hasNotificationTargetChange
     ) {
       return;
@@ -100,6 +115,7 @@ export function createTaskCronScheduler(
     taskCronEnabled = persistedTaskCronEnabled;
     notifyManagersOfInactiveAgents = persistedNotifyManagers;
     maxInactivityMinutes = persistedMaxInactivityMinutes;
+    maxParallelFlows = persistedMaxParallelFlows;
     inactiveAgentNotificationTarget = persistedNotificationTarget;
     if (hasTaskCronEnabledChange) {
       schedule();
@@ -109,6 +125,7 @@ export function createTaskCronScheduler(
         taskCronEnabled,
         notifyManagersOfInactiveAgents,
         maxInactivityMinutes,
+        maxParallelFlows,
         inactiveAgentNotificationTarget,
       },
       "[task-cron] scheduler synchronized from persisted settings",
@@ -125,10 +142,15 @@ export function createTaskCronScheduler(
       if (!taskCronEnabled) {
         return;
       }
+      if (isCeoBootstrapPending(homeDir)) {
+        schedule();
+        return;
+      }
       const cycle = await service.runTaskCronCycle?.({
         inactiveMinutes: maxInactivityMinutes,
         notificationTarget: inactiveAgentNotificationTarget,
         notifyInactiveAgents: notifyManagersOfInactiveAgents,
+        maxParallelFlows,
       });
       if (cycle) {
         app.log.info(
@@ -138,6 +160,7 @@ export function createTaskCronScheduler(
             todo: cycle.todoTasks,
             blocked: cycle.blockedTasks,
             inactive: cycle.inactiveAgents,
+            maxParallelFlows,
             sent: cycle.sent,
             failed: cycle.failed,
           },
@@ -171,14 +194,53 @@ export function createTaskCronScheduler(
     }
   };
 
+  const stopBootstrapCheck = (): void => {
+    if (bootstrapCheckHandle) {
+      clearInterval(bootstrapCheckHandle);
+      bootstrapCheckHandle = undefined;
+    }
+  };
+
+  const ensureBootstrapCheck = (): void => {
+    if (bootstrapCheckHandle) {
+      return;
+    }
+    bootstrapCheckHandle = setInterval(() => {
+      if (!taskCronEnabled) {
+        stopBootstrapCheck();
+        return;
+      }
+      if (isCeoBootstrapPending(homeDir)) {
+        return;
+      }
+      stopBootstrapCheck();
+      app.log.info("[task-cron] scheduler resumed after CEO bootstrap completion");
+      logs.append({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "opengoat",
+        message:
+          "[task-cron] scheduler resumed after first CEO message completed bootstrap.",
+      });
+      schedule();
+    }, DEFAULT_TASK_CHECK_FREQUENCY_MINUTES * 60_000);
+    bootstrapCheckHandle.unref?.();
+  };
+
   const schedule = (): void => {
     if (intervalHandle) {
       clearInterval(intervalHandle);
       intervalHandle = undefined;
     }
     if (!taskCronEnabled) {
+      stopBootstrapCheck();
       return;
     }
+    if (isCeoBootstrapPending(homeDir)) {
+      ensureBootstrapCheck();
+      return;
+    }
+    stopBootstrapCheck();
     intervalHandle = setInterval(() => {
       void runCycle();
     }, DEFAULT_TASK_CHECK_FREQUENCY_MINUTES * 60_000);
@@ -246,6 +308,25 @@ export function createTaskCronScheduler(
         message: `[task-cron] inactivity threshold updated to ${maxInactivityMinutes} minute(s).`,
       });
     },
+    setMaxParallelFlows: (nextMaxParallelFlows: number) => {
+      const parsed = parseMaxParallelFlows(nextMaxParallelFlows);
+      if (!parsed || parsed === maxParallelFlows) {
+        return;
+      }
+      maxParallelFlows = parsed;
+      app.log.info(
+        {
+          maxParallelFlows,
+        },
+        "[task-cron] max parallel flows updated",
+      );
+      logs.append({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "opengoat",
+        message: `[task-cron] max parallel flows updated to ${maxParallelFlows}.`,
+      });
+    },
     setInactiveAgentNotificationTarget: (
       nextTarget: InactiveAgentNotificationTarget,
     ) => {
@@ -272,6 +353,7 @@ export function createTaskCronScheduler(
         clearInterval(intervalHandle);
         intervalHandle = undefined;
       }
+      stopBootstrapCheck();
     },
   };
 }

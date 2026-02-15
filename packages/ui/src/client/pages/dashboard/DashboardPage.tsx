@@ -128,6 +128,7 @@ type AppRoute =
   | {
       kind: "taskWorkspace";
       taskWorkspaceId: string;
+      taskId?: string;
     }
   | {
       kind: "session";
@@ -218,8 +219,10 @@ interface UiSettings {
   taskCronEnabled: boolean;
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
+  maxParallelFlows: number;
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
   authentication: UiAuthenticationSettings;
+  ceoBootstrapPending: boolean;
 }
 
 type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
@@ -522,9 +525,12 @@ const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
 const DEFAULT_AGENT_ID = "ceo";
 const DEFAULT_MAX_INACTIVITY_MINUTES = 30;
+const DEFAULT_MAX_PARALLEL_FLOWS = 3;
 const TASK_CRON_INTERVAL_MINUTES = 1;
 const MIN_MAX_INACTIVITY_MINUTES = 1;
 const MAX_MAX_INACTIVITY_MINUTES = 10_080;
+const MIN_MAX_PARALLEL_FLOWS = 1;
+const MAX_MAX_PARALLEL_FLOWS = 32;
 const DEFAULT_LOG_STREAM_LIMIT = 300;
 const MAX_UI_LOG_ENTRIES = 1200;
 const LOG_FLUSH_INTERVAL_MS = 100;
@@ -553,8 +559,10 @@ function defaultUiSettings(): UiSettings {
     taskCronEnabled: true,
     notifyManagersOfInactiveAgents: true,
     maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
+    maxParallelFlows: DEFAULT_MAX_PARALLEL_FLOWS,
     inactiveAgentNotificationTarget: "all-managers",
     authentication: defaultAuthenticationSettings(),
+    ceoBootstrapPending: false,
   };
 }
 
@@ -638,6 +646,9 @@ export function DashboardPage(): ReactElement {
   const [maxInactivityMinutesInput, setMaxInactivityMinutesInput] = useState(
     String(DEFAULT_MAX_INACTIVITY_MINUTES),
   );
+  const [maxParallelFlowsInput, setMaxParallelFlowsInput] = useState(
+    String(DEFAULT_MAX_PARALLEL_FLOWS),
+  );
   const [taskCronEnabledInput, setTaskCronEnabledInput] = useState(true);
   const [
     notifyManagersOfInactiveAgentsInput,
@@ -675,8 +686,6 @@ export function DashboardPage(): ReactElement {
     uiAuthenticationPasswordEditorOpen,
     setUiAuthenticationPasswordEditorOpen,
   ] = useState(false);
-  const [isTaskDetailsDialogOpen, setTaskDetailsDialogOpen] = useState(false);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskDetailsError, setTaskDetailsError] = useState<string | null>(null);
   const [versionInfo, setVersionInfo] = useState<UiVersionInfo | null>(null);
   const [isVersionLoading, setVersionLoading] = useState(true);
@@ -714,7 +723,7 @@ export function DashboardPage(): ReactElement {
     const nextPath = routeToPath(nextRoute);
     if (
       typeof window !== "undefined" &&
-      window.location.pathname !== nextPath
+      `${window.location.pathname}${window.location.search}` !== nextPath
     ) {
       window.history.pushState({}, "", nextPath);
     }
@@ -800,7 +809,7 @@ export function DashboardPage(): ReactElement {
     }
 
     const onPopState = (): void => {
-      setRoute(parseRoute(window.location.pathname));
+      setRoute(parseRoute(window.location.pathname, window.location.search));
       setHoveredWorkspaceId(null);
       setOpenWorkspaceMenuId(null);
       setOpenSessionMenuId(null);
@@ -818,7 +827,9 @@ export function DashboardPage(): ReactElement {
     }
 
     const canonicalPath = routeToPath(route);
-    if (window.location.pathname !== canonicalPath) {
+    if (
+      `${window.location.pathname}${window.location.search}` !== canonicalPath
+    ) {
       window.history.replaceState({}, "", canonicalPath);
     }
   }, [route]);
@@ -871,6 +882,7 @@ export function DashboardPage(): ReactElement {
       });
       setTaskCronEnabledInput(settings.taskCronEnabled);
       setMaxInactivityMinutesInput(String(settings.maxInactivityMinutes));
+      setMaxParallelFlowsInput(String(settings.maxParallelFlows));
       setNotifyManagersOfInactiveAgentsInput(
         settings.notifyManagersOfInactiveAgents,
       );
@@ -1080,6 +1092,10 @@ export function DashboardPage(): ReactElement {
     onCreated: refreshOverview,
   });
   const hasLoadedState = state !== null;
+  const ceoBootstrapPending = state?.settings.ceoBootstrapPending ?? false;
+  const taskCronRunning =
+    (state?.settings.taskCronEnabled ?? taskCronEnabledInput) &&
+    !ceoBootstrapPending;
   const sessions = state?.sessions.sessions ?? [];
   const selectedSession = useMemo(() => {
     if (route.kind !== "session") {
@@ -1530,6 +1546,13 @@ export function DashboardPage(): ReactElement {
       ) ?? null
     );
   }, [taskWorkspaces, route]);
+  const selectedTaskId = useMemo(() => {
+    if (route.kind !== "taskWorkspace") {
+      return null;
+    }
+    const taskId = route.taskId?.trim();
+    return taskId ? taskId : null;
+  }, [route]);
   const selectedTask = useMemo(() => {
     if (!selectedTaskWorkspace || !selectedTaskId) {
       return null;
@@ -1707,8 +1730,6 @@ export function DashboardPage(): ReactElement {
       return;
     }
 
-    setTaskDetailsDialogOpen(false);
-    setSelectedTaskId(null);
     setTaskDetailsError(null);
   }, [route]);
 
@@ -1790,15 +1811,23 @@ export function DashboardPage(): ReactElement {
   }, [route.kind, hasLoadedState, refreshTasks]);
 
   useEffect(() => {
-    if (!isTaskDetailsDialogOpen) {
+    if (route.kind !== "taskWorkspace" || !selectedTaskId) {
+      return;
+    }
+    if (!selectedTaskWorkspace || selectedTask) {
       return;
     }
 
-    if (!selectedTask) {
-      setTaskDetailsDialogOpen(false);
-      setSelectedTaskId(null);
-    }
-  }, [isTaskDetailsDialogOpen, selectedTask]);
+    navigateToRoute({
+      kind: "taskWorkspace",
+      taskWorkspaceId: route.taskWorkspaceId,
+    });
+    setTaskDetailsError(null);
+    setTaskEntryDraft({
+      kind: "worklog",
+      content: "",
+    });
+  }, [navigateToRoute, route, selectedTask, selectedTaskId, selectedTaskWorkspace]);
 
   useEffect(() => {
     setSelectedTaskIdsByWorkspaceId((current) => {
@@ -2385,10 +2414,18 @@ export function DashboardPage(): ReactElement {
       maxInactivityMinutesInput.trim(),
       10,
     );
+    const parsedMaxParallelFlows = Number.parseInt(
+      maxParallelFlowsInput.trim(),
+      10,
+    );
     const isMaxInactivityValid =
       Number.isFinite(parsedMaxInactivityMinutes) &&
       parsedMaxInactivityMinutes >= MIN_MAX_INACTIVITY_MINUTES &&
       parsedMaxInactivityMinutes <= MAX_MAX_INACTIVITY_MINUTES;
+    const isMaxParallelFlowsValid =
+      Number.isFinite(parsedMaxParallelFlows) &&
+      parsedMaxParallelFlows >= MIN_MAX_PARALLEL_FLOWS &&
+      parsedMaxParallelFlows <= MAX_MAX_PARALLEL_FLOWS;
     if (
       taskCronEnabledInput &&
       notifyManagersOfInactiveAgentsInput &&
@@ -2399,11 +2436,22 @@ export function DashboardPage(): ReactElement {
       );
       return;
     }
+    if (taskCronEnabledInput && !isMaxParallelFlowsValid) {
+      toast.error(
+        `Max parallel flows must be an integer between ${MIN_MAX_PARALLEL_FLOWS} and ${MAX_MAX_PARALLEL_FLOWS}.`,
+      );
+      return;
+    }
     const fallbackMaxInactivityMinutes =
       state?.settings.maxInactivityMinutes ?? DEFAULT_MAX_INACTIVITY_MINUTES;
+    const fallbackMaxParallelFlows =
+      state?.settings.maxParallelFlows ?? DEFAULT_MAX_PARALLEL_FLOWS;
     const resolvedMaxInactivityMinutes = isMaxInactivityValid
       ? parsedMaxInactivityMinutes
       : fallbackMaxInactivityMinutes;
+    const resolvedMaxParallelFlows = isMaxParallelFlowsValid
+      ? parsedMaxParallelFlows
+      : fallbackMaxParallelFlows;
 
     setMutating(true);
     try {
@@ -2411,6 +2459,7 @@ export function DashboardPage(): ReactElement {
         taskCronEnabled: boolean;
         notifyManagersOfInactiveAgents: boolean;
         maxInactivityMinutes: number;
+        maxParallelFlows: number;
         inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
         authentication?: {
           enabled: boolean;
@@ -2422,6 +2471,7 @@ export function DashboardPage(): ReactElement {
         taskCronEnabled: taskCronEnabledInput,
         notifyManagersOfInactiveAgents: notifyManagersOfInactiveAgentsInput,
         maxInactivityMinutes: resolvedMaxInactivityMinutes,
+        maxParallelFlows: resolvedMaxParallelFlows,
         inactiveAgentNotificationTarget:
           inactiveAgentNotificationTargetInput,
       };
@@ -2455,9 +2505,11 @@ export function DashboardPage(): ReactElement {
       setUiAuthenticationPasswordEditorOpen(false);
       const statusMessage = !taskCronEnabledInput
         ? "Task automation checks disabled."
+        : response.settings.ceoBootstrapPending
+          ? "Task automation checks are waiting for the first CEO message."
         : notifyManagersOfInactiveAgentsInput
-          ? `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); inactivity notifications enabled (${resolvedMaxInactivityMinutes} minutes).`
-          : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); inactivity notifications disabled.`;
+          ? `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; inactivity notifications enabled (${resolvedMaxInactivityMinutes} minutes).`
+          : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; inactivity notifications disabled.`;
       toast.success(response.message ?? statusMessage);
       await refreshAuthenticationStatus();
     } catch (requestError) {
@@ -2476,6 +2528,7 @@ export function DashboardPage(): ReactElement {
       taskCronEnabled: boolean;
       notifyManagersOfInactiveAgents: boolean;
       maxInactivityMinutes: number;
+      maxParallelFlows: number;
       inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
       authentication?: {
         enabled: boolean;
@@ -2511,6 +2564,7 @@ export function DashboardPage(): ReactElement {
     setMaxInactivityMinutesInput(
       String(response.settings.maxInactivityMinutes),
     );
+    setMaxParallelFlowsInput(String(response.settings.maxParallelFlows));
     setNotifyManagersOfInactiveAgentsInput(
       response.settings.notifyManagersOfInactiveAgents,
     );
@@ -2705,9 +2759,17 @@ export function DashboardPage(): ReactElement {
         return next;
       });
       if (selectedTaskId && response.deletedTaskIds.includes(selectedTaskId)) {
-        setTaskDetailsDialogOpen(false);
-        setSelectedTaskId(null);
+        if (route.kind === "taskWorkspace") {
+          navigateToRoute({
+            kind: "taskWorkspace",
+            taskWorkspaceId: route.taskWorkspaceId,
+          });
+        }
         setTaskDetailsError(null);
+        setTaskEntryDraft({
+          kind: "worklog",
+          content: "",
+        });
       }
 
       toast.success(
@@ -2729,8 +2791,14 @@ export function DashboardPage(): ReactElement {
   }
 
   function handleOpenTaskDetails(taskId: string): void {
-    setSelectedTaskId(taskId);
-    setTaskDetailsDialogOpen(true);
+    if (route.kind !== "taskWorkspace") {
+      return;
+    }
+    navigateToRoute({
+      kind: "taskWorkspace",
+      taskWorkspaceId: route.taskWorkspaceId,
+      taskId,
+    });
     setTaskDetailsError(null);
     setTaskEntryDraft({
       kind: "worklog",
@@ -3964,16 +4032,14 @@ export function DashboardPage(): ReactElement {
                   }}
                   className={cn(
                     "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
-                    state?.settings.taskCronEnabled ?? taskCronEnabledInput
+                    taskCronRunning
                       ? "border-success/50 bg-success/15 text-success hover:bg-success/20"
                       : "border-red-500/70 bg-red-600/25 text-red-200 hover:bg-red-600/35",
                   )}
                   title="Open settings"
                   aria-label="Open settings"
                 >
-                  {state?.settings.taskCronEnabled ?? taskCronEnabledInput
-                    ? "Running"
-                    : "Stopped"}
+                  {taskCronRunning ? "Running" : "Stopped"}
                 </button>
               ) : null}
 
@@ -4337,10 +4403,19 @@ export function DashboardPage(): ReactElement {
           ) : null}
 
           <Dialog
-            open={isTaskDetailsDialogOpen && Boolean(selectedTask)}
+            open={
+              route.kind === "taskWorkspace" &&
+              Boolean(route.taskId) &&
+              Boolean(selectedTask)
+            }
             onOpenChange={(open) => {
-              setTaskDetailsDialogOpen(open);
               if (!open) {
+                if (route.kind === "taskWorkspace" && route.taskId) {
+                  navigateToRoute({
+                    kind: "taskWorkspace",
+                    taskWorkspaceId: route.taskWorkspaceId,
+                  });
+                }
                 setTaskDetailsError(null);
                 setTaskEntryDraft({
                   kind: "worklog",
@@ -4439,7 +4514,9 @@ export function DashboardPage(): ReactElement {
                             key={`${selectedTask.taskId}:blocker:${index}`}
                             className="rounded-md border border-border/60 bg-background/30 px-3 py-2 text-sm"
                           >
-                            {blocker}
+                            <MessageResponse>
+                              {decodeEscapedMarkdown(blocker)}
+                            </MessageResponse>
                           </li>
                         ))}
                       </ul>
@@ -4467,9 +4544,11 @@ export function DashboardPage(): ReactElement {
                                 entry.createdBy
                               } • ${formatEntryDate(entry.createdAt)}`}</span>
                             </div>
-                            <p className="text-sm leading-relaxed">
-                              {entry.content}
-                            </p>
+                            <div className="text-sm leading-relaxed">
+                              <MessageResponse>
+                                {decodeEscapedMarkdown(entry.content)}
+                              </MessageResponse>
+                            </div>
                           </article>
                         ))}
                       </div>
@@ -4701,12 +4780,6 @@ export function DashboardPage(): ReactElement {
                     taskActorId={taskActorId}
                     agents={agents}
                     onTaskActorChange={setTaskActorId}
-                    onBackToTasks={() => {
-                      navigateToRoute({
-                        kind: "taskWorkspace",
-                        taskWorkspaceId: "tasks",
-                      });
-                    }}
                     hasSelectedTasks={hasSelectedTasks}
                     selectedTaskIdsCount={selectedTaskIds.length}
                     onDeleteSelectedTasks={() => {
@@ -4918,6 +4991,29 @@ export function DashboardPage(): ReactElement {
                       </p>
                     </div>
 
+                    {ceoBootstrapPending ? (
+                      <section className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <p className="text-sm text-amber-100">
+                            Send your first message to the CEO to finish setup
+                            and start background automation.
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              navigateToRoute({
+                                kind: "agent",
+                                agentId: DEFAULT_AGENT_ID,
+                              });
+                            }}
+                          >
+                            Open CEO chat
+                          </Button>
+                        </div>
+                      </section>
+                    ) : null}
+
                     <section className="overflow-hidden rounded-xl border border-border/70 bg-background/40">
                       <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
                         <div className="space-y-1">
@@ -4966,6 +5062,40 @@ export function DashboardPage(): ReactElement {
                           !taskCronEnabledInput && "opacity-60",
                         )}
                       >
+                        <div className="space-y-3">
+                          <label
+                            className="text-sm font-medium text-foreground"
+                            htmlFor="maxParallelFlows"
+                          >
+                            Max Parallel Flows
+                          </label>
+                          <div className="flex max-w-sm items-center gap-3">
+                            <Input
+                              id="maxParallelFlows"
+                              type="number"
+                              min={MIN_MAX_PARALLEL_FLOWS}
+                              max={MAX_MAX_PARALLEL_FLOWS}
+                              step={1}
+                              value={maxParallelFlowsInput}
+                              disabled={
+                                !taskCronEnabledInput || isMutating || isLoading
+                              }
+                              onChange={(event) => {
+                                setMaxParallelFlowsInput(event.target.value);
+                              }}
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              concurrent runs
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Controls how many task automation flows can run at
+                            the same time. Higher values increase throughput.
+                          </p>
+                        </div>
+
+                        <Separator className="bg-border/50" />
+
                         <div className="flex flex-wrap items-center justify-between gap-4">
                           <div className="space-y-1">
                             <h3 className="text-sm font-semibold text-foreground">
@@ -5086,7 +5216,12 @@ export function DashboardPage(): ReactElement {
                           </p>
                         </div>
 
-                        {!taskCronEnabledInput ? (
+                        {ceoBootstrapPending ? (
+                          <p className="text-xs text-muted-foreground">
+                            Background checks stay paused until the first CEO
+                            message removes bootstrap mode.
+                          </p>
+                        ) : !taskCronEnabledInput ? (
                           <p className="text-xs text-muted-foreground">
                             Background checks are paused. Enable task automation
                             above to resume todo, blocked, and inactivity
@@ -5289,7 +5424,9 @@ export function DashboardPage(): ReactElement {
                       <p className="text-xs text-muted-foreground">
                         Status:{" "}
                         <span className="font-medium text-foreground">
-                          {!taskCronEnabledInput
+                          {ceoBootstrapPending
+                            ? "Waiting for first CEO message to start checks"
+                            : !taskCronEnabledInput
                             ? "Background checks paused"
                             : !notifyManagersOfInactiveAgentsInput
                               ? "Background checks active (inactivity notifications paused)"
@@ -6171,12 +6308,13 @@ function getInitialRoute(): AppRoute {
     return { kind: "page", view: "overview" };
   }
 
-  return parseRoute(window.location.pathname);
+  return parseRoute(window.location.pathname, window.location.search);
 }
 
-function parseRoute(pathname: string): AppRoute {
+function parseRoute(pathname: string, search = ""): AppRoute {
   const trimmed = pathname.trim() || "/";
   const normalized = trimmed.length > 1 ? trimmed.replace(/\/+$/, "") : trimmed;
+  const taskIdFromQuery = parseTaskIdFromSearch(search);
 
   if (
     normalized === "/" ||
@@ -6206,6 +6344,7 @@ function parseRoute(pathname: string): AppRoute {
     return {
       kind: "taskWorkspace",
       taskWorkspaceId: "tasks",
+      ...(taskIdFromQuery ? { taskId: taskIdFromQuery } : {}),
     };
   }
 
@@ -6217,6 +6356,7 @@ function parseRoute(pathname: string): AppRoute {
       return {
         kind: "taskWorkspace",
         taskWorkspaceId,
+        ...(taskIdFromQuery ? { taskId: taskIdFromQuery } : {}),
       };
     }
   }
@@ -6273,10 +6413,15 @@ function routeToPath(route: AppRoute): string {
   }
 
   if (route.kind === "taskWorkspace") {
-    if (route.taskWorkspaceId === "tasks") {
-      return "/tasks";
+    const basePath =
+      route.taskWorkspaceId === "tasks"
+        ? "/tasks"
+        : `/tasks/${encodeURIComponent(route.taskWorkspaceId)}`;
+    const taskId = route.taskId?.trim();
+    if (!taskId) {
+      return basePath;
     }
-    return `/tasks/${encodeURIComponent(route.taskWorkspaceId)}`;
+    return `${basePath}?task=${encodeURIComponent(taskId)}`;
   }
 
   if (route.view === "wiki") {
@@ -6295,6 +6440,14 @@ function routeToPath(route: AppRoute): string {
   }
 
   return `/${route.view}`;
+}
+
+function parseTaskIdFromSearch(search: string): string | undefined {
+  if (!search) {
+    return undefined;
+  }
+  const taskId = new URLSearchParams(search).get("task")?.trim();
+  return taskId ? taskId : undefined;
 }
 
 function normalizePathForComparison(pathname: string | undefined): string {

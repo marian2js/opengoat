@@ -2024,6 +2024,71 @@ describe("OpenGoatService", () => {
       ),
     ).toBe(true);
   });
+
+  it("limits task automation dispatch concurrency using maxParallelFlows", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const provider = new FakeOpenClawProvider();
+    const { service } = createService(root, provider);
+    await service.initialize();
+    await service.createAgent("Engineer One", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+    await service.createAgent("Engineer Two", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+    await service.createAgent("Engineer Three", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+    await service.createAgent("Engineer Four", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    for (const assignee of [
+      "engineer-one",
+      "engineer-two",
+      "engineer-three",
+      "engineer-four",
+    ]) {
+      await service.createTask("ceo", {
+        title: `Deliver for ${assignee}`,
+        description: "Complete the assigned task",
+        assignedTo: assignee,
+        status: "todo",
+      });
+    }
+
+    let concurrentInvocations = 0;
+    let peakConcurrentInvocations = 0;
+    vi.spyOn(provider, "invoke").mockImplementation(async () => {
+      concurrentInvocations += 1;
+      peakConcurrentInvocations = Math.max(
+        peakConcurrentInvocations,
+        concurrentInvocations,
+      );
+      await delayMs(20);
+      concurrentInvocations -= 1;
+      return {
+        code: 0,
+        stdout: "ok\n",
+        stderr: "",
+      };
+    });
+
+    const cycle = await service.runTaskCronCycle({
+      notifyInactiveAgents: false,
+      maxParallelFlows: 2,
+    });
+
+    expect(cycle.todoTasks).toBe(4);
+    expect(cycle.dispatches).toHaveLength(4);
+    expect(peakConcurrentInvocations).toBe(2);
+  });
 });
 
 function createRuntimeDefaultsCommandRunner(
@@ -2247,4 +2312,10 @@ class FakeCommandRunner implements CommandRunnerPort {
     this.requests.push(request);
     return this.handler(request);
   }
+}
+
+function delayMs(durationMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
 }
