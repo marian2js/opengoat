@@ -58,6 +58,7 @@ import {
   updateUiTaskStatus,
 } from "./session.js";
 import {
+  formatUiLogQuotedPreview,
   formatRunStatusMessage,
   mapRunStageToProgressPhase,
   sanitizeConversationText,
@@ -1284,22 +1285,26 @@ export function registerApiRoutes(
         sessionRef,
         request.body?.projectPath
       );
+      const resolvedMessage =
+        message ||
+        (images.length === 1
+          ? "Please analyze the attached image."
+          : "Please analyze the attached images.");
+      const messagePreview = formatUiLogQuotedPreview(resolvedMessage);
+      const imageSuffix =
+        images.length > 0 ? ` images=${images.length}` : "";
 
       deps.logs.append({
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `Session message request queued for @${agentId} (session=${sessionRef}).`,
+        message: `Agent @${agentId} received message: "${messagePreview}" (session=${sessionRef}${imageSuffix}).`,
       });
 
       const result = await runUiSessionMessage(service, agentId, {
         sessionRef,
         projectPath,
-        message:
-          message ||
-          (images.length === 1
-            ? "Please analyze the attached image."
-            : "Please analyze the attached images."),
+        message: resolvedMessage,
         images: images.length > 0 ? images : undefined,
         hooks: {
           onEvent: (event) => {
@@ -1442,11 +1447,18 @@ export function registerApiRoutes(
       });
     };
 
+    const resolvedMessage =
+      message ||
+      (images.length === 1
+        ? "Please analyze the attached image."
+        : "Please analyze the attached images.");
+    const streamMessagePreview = formatUiLogQuotedPreview(resolvedMessage);
+    const streamImageSuffix = images.length > 0 ? ` images=${images.length}` : "";
     deps.logs.append({
       timestamp: new Date().toISOString(),
       level: "info",
       source: "opengoat",
-      message: `Streaming session message request queued for @${agentId} (session=${sessionRef}).`,
+      message: `Agent @${agentId} received message: "${streamMessagePreview}" (session=${sessionRef}${streamImageSuffix}).`,
     });
 
     const startRuntimeLogPolling = async (runId: string): Promise<void> => {
@@ -1550,11 +1562,7 @@ export function registerApiRoutes(
       const result = await runUiSessionMessage(service, agentId, {
         sessionRef,
         projectPath,
-        message:
-          message ||
-          (images.length === 1
-            ? "Please analyze the attached image."
-            : "Please analyze the attached images."),
+        message: resolvedMessage,
         images: images.length > 0 ? images : undefined,
         abortSignal: runtimeAbortController.signal,
         hooks: {

@@ -1885,6 +1885,28 @@ describe("OpenGoatService", () => {
     expect(cycle.inactiveAgents).toBe(1);
     expect(cycle.failed).toBe(0);
     expect(cycle.dispatches.length).toBe(3);
+    expect(cycle.dispatches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "todo",
+          targetAgentId: "engineer",
+          message: expect.stringContaining(`Task ID: ${todoTask.taskId}`),
+        }),
+        expect.objectContaining({
+          kind: "blocked",
+          targetAgentId: "ceo",
+          message: expect.stringContaining(`Task ID: ${blockedTask.taskId}`),
+        }),
+        expect.objectContaining({
+          kind: "inactive",
+          targetAgentId: "ceo",
+          subjectAgentId: "engineer",
+          message: expect.stringContaining(
+            'Your reportee "@engineer" (Engineer) has no activity',
+          ),
+        }),
+      ]),
+    );
 
     const todoInvocation = provider.invocations.find(
       (entry) => entry.agent === "engineer",
@@ -1981,6 +2003,9 @@ describe("OpenGoatService", () => {
       kind: "pending",
       targetAgentId: "engineer",
       taskId: task.taskId,
+      message: expect.stringContaining(
+        `Task #${task.taskId} is still in PENDING after 30 minutes.`,
+      ),
       ok: true,
     });
     expect(

@@ -55,6 +55,27 @@ export function truncateProgressLine(value: string): string {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
+export function formatUiLogMessagePreview(
+  value: string,
+  maxLength = 220,
+): string {
+  const cleaned = sanitizeConversationText(value).replace(/\s+/g, " ").trim();
+  if (!cleaned) {
+    return "";
+  }
+  if (cleaned.length <= maxLength) {
+    return cleaned;
+  }
+  return `${cleaned.slice(0, maxLength - 1)}…`;
+}
+
+export function formatUiLogQuotedPreview(
+  value: string,
+  maxLength = 220,
+): string {
+  return formatUiLogMessagePreview(value, maxLength).replace(/"/g, "'");
+}
+
 export function mapRunStageToProgressPhase(
   stage: UiRunEvent["stage"],
 ): SessionMessageProgressPhase {

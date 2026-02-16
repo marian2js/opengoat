@@ -237,6 +237,18 @@ export interface TaskCronRunResult {
   inactiveAgents: number;
   sent: number;
   failed: number;
+  dispatches?: TaskCronDispatchResult[];
+}
+
+export interface TaskCronDispatchResult {
+  kind: "todo" | "pending" | "blocked" | "inactive";
+  targetAgentId: string;
+  sessionRef: string;
+  taskId?: string;
+  subjectAgentId?: string;
+  message?: string;
+  ok: boolean;
+  error?: string;
 }
 
 export interface UiServerSettings {

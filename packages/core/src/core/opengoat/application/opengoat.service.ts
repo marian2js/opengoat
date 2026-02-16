@@ -121,6 +121,7 @@ export interface TaskCronDispatchResult {
   sessionRef: string;
   taskId?: string;
   subjectAgentId?: string;
+  message?: string;
   ok: boolean;
   error?: string;
 }
@@ -1063,6 +1064,7 @@ export class OpenGoatService {
           targetAgentId: request.targetAgentId,
           sessionRef: request.sessionRef,
           taskId: request.taskId,
+          message: request.message,
           ok: result.ok,
           error: result.error,
         };
@@ -1116,6 +1118,7 @@ export class OpenGoatService {
           targetAgentId: candidate.managerAgentId,
           sessionRef,
           subjectAgentId: candidate.subjectAgentId,
+          message,
           ok: result.ok,
           error: result.error,
         };

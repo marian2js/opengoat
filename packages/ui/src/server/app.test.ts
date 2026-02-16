@@ -539,6 +539,79 @@ describe("OpenGoat UI server API", () => {
     }
   });
 
+  it("logs per-dispatch task-cron delivery messages", async () => {
+    vi.useFakeTimers();
+    try {
+      const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      const runTaskCronCycle = vi.fn<NonNullable<OpenClawUiService["runTaskCronCycle"]>>(async () => {
+        return {
+          ranAt: new Date().toISOString(),
+          scannedTasks: 1,
+          todoTasks: 0,
+          blockedTasks: 0,
+          inactiveAgents: 1,
+          sent: 1,
+          failed: 0,
+          dispatches: [
+            {
+              kind: "inactive",
+              targetAgentId: "ceo",
+              sessionRef: "agent:ceo:agent_ceo_inactive_engineer",
+              subjectAgentId: "engineer",
+              message:
+                'Your reportee "@engineer" (Engineer) has no activity in the last 30 minutes.',
+              ok: true,
+            },
+          ],
+        };
+      });
+
+      activeServer = await createOpenGoatUiServer({
+        logger: false,
+        attachFrontend: false,
+        service: {
+          ...createMockService({
+            homeDir: uniqueHomeDir,
+          }),
+          runTaskCronCycle,
+        },
+      });
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(runTaskCronCycle).toHaveBeenCalledTimes(1);
+
+      const logsResponse = await activeServer.inject({
+        method: "GET",
+        url: "/api/logs/stream?follow=false&limit=200",
+      });
+      expect(logsResponse.statusCode).toBe(200);
+      const snapshotEvent = logsResponse.body
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as { type: string; entries?: Array<{ message?: string }> })
+        .find((event) => event.type === "snapshot");
+      const messages =
+        snapshotEvent?.entries
+          ?.map((entry) => entry.message ?? "")
+          .filter(Boolean) ?? [];
+      expect(
+        messages.some((entry) =>
+          entry.includes("[task-cron] Agent @ceo received inactive message."),
+        ),
+      ).toBe(true);
+      expect(
+        messages.some((entry) =>
+          entry.includes(
+            "message=\"Your reportee '@engineer' (Engineer) has no activity in the last 30 minutes.\"",
+          ),
+        ),
+      ).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps scheduler paused while ceo bootstrap is pending", async () => {
     vi.useFakeTimers();
     try {
@@ -1349,6 +1422,61 @@ describe("OpenGoat UI server API", () => {
       }
     });
     expect(aliasResponse.statusCode).toBe(200);
+  });
+
+  it("logs incoming session message previews to the logs stream", async () => {
+    const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(async () => {
+      return {
+        code: 0,
+        stdout: "assistant response",
+        stderr: "",
+        providerId: "openclaw",
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        runAgent,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message",
+      payload: {
+        agentId: "ceo",
+        sessionRef: "workspace:tmp",
+        projectPath: "/tmp",
+        message: 'review "alpha" release',
+      },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const logsResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/logs/stream?follow=false&limit=50",
+    });
+    expect(logsResponse.statusCode).toBe(200);
+    const snapshotEvent = logsResponse.body
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { type: string; entries?: Array<{ message?: string }> })
+      .find((event) => event.type === "snapshot");
+    const messages =
+      snapshotEvent?.entries
+        ?.map((entry) => entry.message ?? "")
+        .filter(Boolean) ?? [];
+    expect(
+      messages.some((entry) =>
+        entry.includes(
+          `Agent @ceo received message: "review 'alpha' release" (session=workspace:tmp).`,
+        ),
+      ),
+    ).toBe(true);
   });
 
   it("reuses stored session project path when projectPath is omitted", async () => {
