@@ -11,7 +11,7 @@ export class CursorProvider extends BaseCliProvider {
   public constructor() {
     super({
       id: "cursor",
-      displayName: "Cursor Agent",
+      displayName: "Cursor",
       kind: "cli",
       command: "cursor",
       commandEnvVar: "CURSOR_CMD",

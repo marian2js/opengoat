@@ -10,7 +10,7 @@ export class CodexProvider extends BaseCliProvider {
   public constructor() {
     super({
       id: "codex",
-      displayName: "Codex CLI",
+      displayName: "Codex",
       kind: "cli",
       command: "codex",
       commandEnvVar: "CODEX_CMD",
