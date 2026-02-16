@@ -512,6 +512,7 @@ interface OrgNodeData {
   [key: string]: unknown;
   agentId: string;
   displayName: string;
+  providerId: string;
   role?: string;
   directReports: number;
   totalReports: number;
@@ -5744,6 +5745,7 @@ function OrganizationChartNode({
   data,
 }: NodeProps<OrgChartNode>): ReactElement {
   const hasReportees = data.totalReports > 0;
+  const providerLabel = formatProviderLabel(data.providerId);
 
   return (
     <div className="relative w-[260px] rounded-xl border border-border/80 bg-card/95 px-3 py-3 shadow-sm">
@@ -5779,19 +5781,19 @@ function OrganizationChartNode({
               event.stopPropagation();
               data.onToggle(id);
             }}
-            className="inline-flex min-w-10 items-center justify-center rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="inline-flex size-6 items-center justify-center rounded-md border border-border bg-background text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
             aria-label={
               data.collapsed
                 ? `Expand ${data.displayName}`
                 : `Collapse ${data.displayName}`
             }
           >
-            {data.totalReports}
+            {data.collapsed ? "+" : "-"}
           </button>
         ) : null}
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-2 flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           {hasReportees
             ? `${data.directReports} direct report${
@@ -5799,6 +5801,12 @@ function OrganizationChartNode({
               }`
             : "No direct reports"}
         </p>
+        <span
+          className="inline-flex max-w-[96px] shrink-0 items-center rounded-sm border border-border/70 bg-background/60 px-1.5 py-0.5 text-[10px] leading-4 text-muted-foreground"
+          title={providerLabel}
+        >
+          <span className="truncate">{providerLabel}</span>
+        </span>
       </div>
 
       <Handle
@@ -5863,6 +5871,24 @@ function buildOrgHierarchy(agents: Agent[]): OrgHierarchy {
     childrenById,
     roots: roots.filter(Boolean),
   };
+}
+
+function formatProviderLabel(providerId: string): string {
+  const normalized = providerId.trim().toLowerCase();
+  if (normalized === "openclaw") {
+    return "OpenClaw";
+  }
+  if (normalized === "claude-code") {
+    return "Claude Code";
+  }
+
+  return normalized
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((segment) => {
+      return segment.charAt(0).toUpperCase() + segment.slice(1);
+    })
+    .join(" ");
 }
 
 function buildFlowModel(params: {
@@ -5956,6 +5982,7 @@ function buildFlowModel(params: {
       data: {
         agentId,
         displayName: agent?.displayName ?? agentId,
+        providerId: agent?.providerId ?? "openclaw",
         role: resolveAgentRoleLabel(agent),
         directReports,
         totalReports: totalReportsById.get(agentId) ?? 0,
