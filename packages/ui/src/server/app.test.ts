@@ -857,6 +857,75 @@ describe("OpenGoat UI server API", () => {
     expect(setAgentProvider).toHaveBeenCalledWith("developer", "claude-code");
   });
 
+  it("assigns providers from the runtime registry when creating agents", async () => {
+    const createAgent = vi.fn<OpenClawUiService["createAgent"]>(async (name: string): Promise<AgentCreationResult> => {
+      return {
+        agent: {
+          id: "developer",
+          displayName: name,
+          workspaceDir: "/tmp/workspace",
+          internalConfigDir: "/tmp/internal"
+        },
+        createdPaths: [],
+        skippedPaths: []
+      };
+    });
+    const setAgentProvider = vi.fn<NonNullable<OpenClawUiService["setAgentProvider"]>>(async (agentId, providerId) => {
+      return {
+        agentId,
+        providerId
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        createAgent,
+        setAgentProvider,
+        listProviders: async () => [
+          {
+            id: "openclaw",
+            displayName: "OpenClaw",
+            kind: "cli",
+            capabilities: {
+              agent: true,
+              model: false,
+              auth: false,
+              passthrough: true,
+              reportees: true
+            }
+          },
+          {
+            id: "codecs",
+            displayName: "Codecs",
+            kind: "cli",
+            capabilities: {
+              agent: true,
+              model: true,
+              auth: true,
+              passthrough: true,
+              reportees: false
+            }
+          }
+        ]
+      }
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/agents",
+      payload: {
+        name: "Developer",
+        providerId: "codecs"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(setAgentProvider).toHaveBeenCalledWith("developer", "codecs");
+  });
+
   it("rejects unsupported provider ids when creating agents through the api", async () => {
     const createAgent = vi.fn<OpenClawUiService["createAgent"]>(async (name: string): Promise<AgentCreationResult> => {
       return {
@@ -892,7 +961,7 @@ describe("OpenGoat UI server API", () => {
     expect(response.statusCode).toBe(400);
     expect(createAgent).not.toHaveBeenCalled();
     expect(response.json()).toEqual({
-      error: "providerId must be one of: openclaw, claude-code"
+      error: "providerId must be one of: openclaw, claude-code, codex"
     });
   });
 
@@ -2270,6 +2339,44 @@ function createMockService(options: { homeDir?: string } = {}): OpenClawUiServic
     ],
     listSkills: async (): Promise<ResolvedSkill[]> => [],
     listGlobalSkills: async (): Promise<ResolvedSkill[]> => [],
+    listProviders: async () => [
+      {
+        id: "openclaw",
+        displayName: "OpenClaw",
+        kind: "cli",
+        capabilities: {
+          agent: true,
+          model: false,
+          auth: false,
+          passthrough: true,
+          reportees: true
+        }
+      },
+      {
+        id: "claude-code",
+        displayName: "Claude Code",
+        kind: "cli",
+        capabilities: {
+          agent: true,
+          model: true,
+          auth: true,
+          passthrough: true,
+          reportees: false
+        }
+      },
+      {
+        id: "codex",
+        displayName: "Codex",
+        kind: "cli",
+        capabilities: {
+          agent: true,
+          model: true,
+          auth: true,
+          passthrough: true,
+          reportees: false
+        }
+      }
+    ],
     renameSession: async (_agentId, title = "Session", sessionRef = "agent:ceo:main"): Promise<SessionSummary> => {
       return {
         sessionKey: sessionRef,

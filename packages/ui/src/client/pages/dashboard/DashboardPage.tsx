@@ -174,9 +174,16 @@ interface Session {
 
 interface OverviewResponse {
   agents: Agent[];
+  providers: UiProviderOption[];
   totals: {
     agents: number;
   };
+}
+
+interface UiProviderOption {
+  id: string;
+  displayName: string;
+  supportsReportees: boolean;
 }
 
 interface SessionsResponse {
@@ -513,6 +520,7 @@ interface OrgNodeData {
   agentId: string;
   displayName: string;
   providerId: string;
+  providerLabel: string;
   role?: string;
   directReports: number;
   totalReports: number;
@@ -1172,12 +1180,13 @@ export function DashboardPage(): ReactElement {
   }, [state, taskActorId]);
 
   const agents = state?.overview.agents ?? [];
+  const providers = state?.overview.providers ?? [];
   const createAgentRequest = useCallback(
     async (payload: {
       name: string;
       reportsTo: string;
       role?: string;
-      providerId: "openclaw" | "claude-code";
+      providerId: string;
     }) => {
       return fetchJson<{ message?: string }>("/api/agents", {
         method: "POST",
@@ -1191,6 +1200,7 @@ export function DashboardPage(): ReactElement {
   );
   const createAgentDialog = useCreateAgentDialog({
     agents,
+    providers,
     setMutating,
     createAgent: createAgentRequest,
     onCreated: refreshOverview,
@@ -4212,6 +4222,7 @@ export function DashboardPage(): ReactElement {
             open={createAgentDialog.isOpen}
             form={createAgentDialog.form}
             managerOptions={createAgentDialog.managerOptions}
+            providerOptions={createAgentDialog.providerOptions}
             error={createAgentDialog.error}
             isLoading={isLoading}
             isSubmitting={createAgentDialog.isSubmitting}
@@ -4777,6 +4788,7 @@ export function DashboardPage(): ReactElement {
                     {agents.length >= 2 ? (
                       <OrganizationChartPanel
                         agents={agents}
+                        providers={providers}
                         onCreateAgentClick={createAgentDialog.openDialog}
                         isCreateAgentDisabled={isLoading || isMutating}
                       />
@@ -5591,14 +5603,20 @@ function OrganizationGetStartedPanel({
 
 function OrganizationChartPanel({
   agents,
+  providers,
   onCreateAgentClick,
   isCreateAgentDisabled,
 }: {
   agents: Agent[];
+  providers: UiProviderOption[];
   onCreateAgentClick: () => void;
   isCreateAgentDisabled: boolean;
 }): ReactElement {
   const hierarchy = useMemo(() => buildOrgHierarchy(agents), [agents]);
+  const providerLabelById = useMemo(
+    () => buildProviderLabelById(providers),
+    [providers],
+  );
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(
     new Set(),
   );
@@ -5632,9 +5650,10 @@ function OrganizationChartPanel({
     return buildFlowModel({
       hierarchy,
       collapsedNodeIds,
+      providerLabelById,
       onToggle: toggleNode,
     });
-  }, [hierarchy, collapsedNodeIds, toggleNode]);
+  }, [hierarchy, collapsedNodeIds, providerLabelById, toggleNode]);
 
   return (
     <Card className="border-border/70 bg-card/70">
@@ -5745,7 +5764,7 @@ function OrganizationChartNode({
   data,
 }: NodeProps<OrgChartNode>): ReactElement {
   const hasReportees = data.totalReports > 0;
-  const providerLabel = formatProviderLabel(data.providerId);
+  const providerLabel = data.providerLabel;
 
   return (
     <div className="relative w-[260px] rounded-xl border border-border/80 bg-card/95 px-3 py-3 shadow-sm">
@@ -5873,13 +5892,32 @@ function buildOrgHierarchy(agents: Agent[]): OrgHierarchy {
   };
 }
 
-function formatProviderLabel(providerId: string): string {
-  const normalized = providerId.trim().toLowerCase();
-  if (normalized === "openclaw") {
-    return "OpenClaw";
+function buildProviderLabelById(
+  providers: UiProviderOption[],
+): Map<string, string> {
+  const labels = new Map<string, string>();
+  for (const provider of providers) {
+    const providerId = provider.id.trim().toLowerCase();
+    const displayName = provider.displayName.trim();
+    if (!providerId || !displayName || labels.has(providerId)) {
+      continue;
+    }
+    labels.set(providerId, displayName);
   }
-  if (normalized === "claude-code") {
-    return "Claude Code";
+  return labels;
+}
+
+function resolveProviderLabel(
+  providerId: string,
+  labelsById: Map<string, string>,
+): string {
+  const normalized = providerId.trim().toLowerCase();
+  if (!normalized) {
+    return "Unknown";
+  }
+  const label = labelsById.get(normalized);
+  if (label) {
+    return label;
   }
 
   return normalized
@@ -5894,12 +5932,13 @@ function formatProviderLabel(providerId: string): string {
 function buildFlowModel(params: {
   hierarchy: OrgHierarchy;
   collapsedNodeIds: Set<string>;
+  providerLabelById: Map<string, string>;
   onToggle: (agentId: string) => void;
 }): {
   nodes: OrgChartNode[];
   edges: Edge[];
 } {
-  const { hierarchy, collapsedNodeIds, onToggle } = params;
+  const { hierarchy, collapsedNodeIds, providerLabelById, onToggle } = params;
 
   if (hierarchy.agentsById.size === 0) {
     return {
@@ -5971,6 +6010,7 @@ function buildFlowModel(params: {
     const agent = hierarchy.agentsById.get(agentId);
     const layout = graph.node(agentId) as { x: number; y: number } | undefined;
     const directReports = hierarchy.childrenById.get(agentId)?.length ?? 0;
+    const providerId = agent?.providerId ?? "openclaw";
 
     return {
       id: agentId,
@@ -5982,7 +6022,8 @@ function buildFlowModel(params: {
       data: {
         agentId,
         displayName: agent?.displayName ?? agentId,
-        providerId: agent?.providerId ?? "openclaw",
+        providerId,
+        providerLabel: resolveProviderLabel(providerId, providerLabelById),
         role: resolveAgentRoleLabel(agent),
         directReports,
         totalReports: totalReportsById.get(agentId) ?? 0,

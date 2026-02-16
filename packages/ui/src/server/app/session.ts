@@ -21,6 +21,7 @@ import type {
   TaskRecord,
   UiImageInput,
   UiLogBuffer,
+  UiProviderOption,
   UiRunHooks,
 } from "./types.js";
 
@@ -690,8 +691,9 @@ export async function resolveOrganizationAgents(
 ): Promise<OrganizationAgent[]> {
   const agents = await service.listAgents();
   const agentIds = new Set(agents.map((agent) => agent.id));
-  const providerReporteeSupportById = await resolveProviderReporteeSupportById(
-    service,
+  const providers = await resolveUiProviders(service);
+  const providerReporteeSupportById = new Map(
+    providers.map((provider) => [provider.id, provider.supportsReportees]),
   );
 
   return Promise.all(
@@ -761,28 +763,42 @@ export async function resolveOrganizationAgents(
   );
 }
 
-async function resolveProviderReporteeSupportById(
+export async function resolveUiProviders(
   service: OpenClawUiService,
-): Promise<Map<string, boolean>> {
-  const supportById = new Map<string, boolean>();
+): Promise<UiProviderOption[]> {
+  const providers: UiProviderOption[] = [];
+  const seenProviderIds = new Set<string>();
+
   if (typeof service.listProviders !== "function") {
-    supportById.set("openclaw", true);
-    return supportById;
+    return [{ id: "openclaw", displayName: "OpenClaw", supportsReportees: true }];
   }
 
-  const providers = await service.listProviders();
-  for (const provider of providers) {
+  const rawProviders = await service.listProviders();
+  for (const provider of rawProviders) {
     const providerId = normalizeProviderIdValue(provider.id);
     if (!providerId) {
       continue;
     }
-    supportById.set(providerId, provider.capabilities.reportees === true);
+    if (seenProviderIds.has(providerId)) {
+      continue;
+    }
+    seenProviderIds.add(providerId);
+    providers.push({
+      id: providerId,
+      displayName: normalizeProviderDisplayName(provider.displayName, providerId),
+      supportsReportees: provider.capabilities.reportees === true,
+    });
   }
 
-  if (!supportById.has("openclaw")) {
-    supportById.set("openclaw", true);
+  if (!seenProviderIds.has("openclaw")) {
+    providers.unshift({
+      id: "openclaw",
+      displayName: "OpenClaw",
+      supportsReportees: true,
+    });
   }
-  return supportById;
+
+  return providers;
 }
 
 function normalizeProviderIdValue(value: unknown): string | undefined {
@@ -802,6 +818,26 @@ function resolveProviderReporteeSupport(
     return supported;
   }
   return providerId === "openclaw";
+}
+
+function normalizeProviderDisplayName(
+  value: unknown,
+  providerId: string,
+): string {
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return providerId
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((segment) => {
+      return segment.charAt(0).toUpperCase() + segment.slice(1);
+    })
+    .join(" ");
 }
 
 function normalizeReportsToValue(

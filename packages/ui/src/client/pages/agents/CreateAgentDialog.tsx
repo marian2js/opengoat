@@ -12,7 +12,7 @@ import { Spinner } from "@/components/ui/spinner";
 import type {
   CreateAgentFormValue,
   CreateAgentManagerOption,
-  CreateAgentProviderId,
+  CreateAgentProviderOption,
 } from "@/pages/agents/useCreateAgentDialog";
 import type { ReactElement } from "react";
 
@@ -20,6 +20,7 @@ interface CreateAgentDialogProps {
   open: boolean;
   form: CreateAgentFormValue;
   managerOptions: CreateAgentManagerOption[];
+  providerOptions: CreateAgentProviderOption[];
   error: string | null;
   isLoading: boolean;
   isSubmitting: boolean;
@@ -27,7 +28,7 @@ interface CreateAgentDialogProps {
   onNameChange: (value: string) => void;
   onRoleChange: (value: string) => void;
   onReportsToChange: (value: string) => void;
-  onProviderIdChange: (value: CreateAgentProviderId) => void;
+  onProviderIdChange: (value: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
 }
@@ -36,6 +37,7 @@ export function CreateAgentDialog({
   open,
   form,
   managerOptions,
+  providerOptions,
   error,
   isLoading,
   isSubmitting,
@@ -49,7 +51,11 @@ export function CreateAgentDialog({
 }: CreateAgentDialogProps): ReactElement {
   const canSubmit = !isLoading && !isSubmitting && form.name.trim().length > 0;
   const isBusy = isSubmitting;
-  const providerLabel = formatAgentProviderLabel(form.providerId);
+  const defaultProviderId = resolveDefaultProviderId(providerOptions);
+  const selectedProvider = providerOptions.find(
+    (provider) => provider.id === form.providerId,
+  );
+  const providerLabel = selectedProvider?.displayName ?? form.providerId;
 
   return (
     <Dialog
@@ -150,15 +156,17 @@ export function CreateAgentDialog({
               id="createAgentProviderId"
               className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               value={form.providerId}
-              onChange={(event) =>
-                onProviderIdChange(normalizeCreateAgentProvider(event.target.value))
-              }
+              onChange={(event) => onProviderIdChange(event.target.value)}
               disabled={isBusy}
             >
-              <option value="openclaw">OpenClaw (default)</option>
-              <option value="claude-code">Claude Code</option>
+              {providerOptions.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.displayName}
+                  {provider.id === defaultProviderId ? " (default)" : ""}
+                </option>
+              ))}
             </select>
-            {form.providerId !== "openclaw" ? (
+            {selectedProvider?.supportsReportees === false ? (
               <p className="text-xs text-muted-foreground">
                 {providerLabel} agents can't have reportees.
               </p>
@@ -188,13 +196,8 @@ export function CreateAgentDialog({
   );
 }
 
-function normalizeCreateAgentProvider(value: string): CreateAgentProviderId {
-  return value === "claude-code" ? "claude-code" : "openclaw";
-}
-
-function formatAgentProviderLabel(providerId: CreateAgentProviderId): string {
-  if (providerId === "claude-code") {
-    return "Claude Code";
-  }
-  return "OpenClaw";
+function resolveDefaultProviderId(
+  providers: CreateAgentProviderOption[],
+): string | undefined {
+  return providers.find((provider) => provider.id === "openclaw")?.id ?? providers[0]?.id;
 }

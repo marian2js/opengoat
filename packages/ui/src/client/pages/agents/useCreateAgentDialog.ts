@@ -2,21 +2,24 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const DEFAULT_REPORTS_TO = "ceo";
-const DEFAULT_PROVIDER_ID = "openclaw";
-
-export type CreateAgentProviderId = "openclaw" | "claude-code";
 
 export interface CreateAgentFormValue {
   name: string;
   role: string;
   reportsTo: string;
-  providerId: CreateAgentProviderId;
+  providerId: string;
 }
 
 export interface CreateAgentDialogAgent {
   id: string;
   displayName: string;
   role?: string;
+  supportsReportees: boolean;
+}
+
+export interface CreateAgentProviderOption {
+  id: string;
+  displayName: string;
   supportsReportees: boolean;
 }
 
@@ -27,12 +30,13 @@ export interface CreateAgentManagerOption {
 
 interface UseCreateAgentDialogOptions {
   agents: CreateAgentDialogAgent[];
+  providers: CreateAgentProviderOption[];
   setMutating: (value: boolean) => void;
   createAgent: (payload: {
     name: string;
     reportsTo: string;
     role?: string;
-    providerId: CreateAgentProviderId;
+    providerId: string;
   }) => Promise<{ message?: string }>;
   onCreated: () => Promise<void>;
 }
@@ -42,6 +46,7 @@ interface UseCreateAgentDialogResult {
   isOpen: boolean;
   isSubmitting: boolean;
   error: string | null;
+  providerOptions: CreateAgentProviderOption[];
   managerOptions: CreateAgentManagerOption[];
   openDialog: () => void;
   openDialogForCeo: () => void;
@@ -49,7 +54,7 @@ interface UseCreateAgentDialogResult {
   setName: (value: string) => void;
   setRole: (value: string) => void;
   setReportsTo: (value: string) => void;
-  setProviderId: (value: CreateAgentProviderId) => void;
+  setProviderId: (value: string) => void;
   submitFromDialog: () => Promise<void>;
 }
 
@@ -57,17 +62,57 @@ const DEFAULT_FORM: CreateAgentFormValue = {
   name: "",
   role: "",
   reportsTo: DEFAULT_REPORTS_TO,
-  providerId: DEFAULT_PROVIDER_ID,
+  providerId: "openclaw",
 };
 
 export function useCreateAgentDialog(
   options: UseCreateAgentDialogOptions,
 ): UseCreateAgentDialogResult {
-  const { agents, setMutating, createAgent, onCreated } = options;
+  const { agents, providers, setMutating, createAgent, onCreated } = options;
   const [form, setForm] = useState<CreateAgentFormValue>(DEFAULT_FORM);
   const [isOpen, setOpen] = useState(false);
   const [isSubmitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const providerOptions = useMemo(() => {
+    const deduped = new Map<string, CreateAgentProviderOption>();
+    for (const provider of providers) {
+      const providerId = provider.id.trim().toLowerCase();
+      if (!providerId || deduped.has(providerId)) {
+        continue;
+      }
+      deduped.set(providerId, {
+        id: providerId,
+        displayName: provider.displayName.trim() || providerId,
+        supportsReportees: provider.supportsReportees === true,
+      });
+    }
+
+    if (!deduped.has("openclaw")) {
+      deduped.set("openclaw", {
+        id: "openclaw",
+        displayName: "OpenClaw",
+        supportsReportees: true,
+      });
+    }
+
+    return [...deduped.values()];
+  }, [providers]);
+
+  useEffect(() => {
+    setForm((current) => {
+      const allowedProviderIds = new Set(
+        providerOptions.map((provider) => provider.id),
+      );
+      if (allowedProviderIds.has(current.providerId)) {
+        return current;
+      }
+      return {
+        ...current,
+        providerId: resolveDefaultProviderId(providerOptions),
+      };
+    });
+  }, [providerOptions]);
 
   const managerOptions = useMemo(() => {
     return agents
@@ -134,7 +179,7 @@ export function useCreateAgentDialog(
     }));
   }, []);
 
-  const setProviderId = useCallback((value: CreateAgentProviderId) => {
+  const setProviderId = useCallback((value: string) => {
     setForm((current) => ({
       ...current,
       providerId: value,
@@ -167,6 +212,12 @@ export function useCreateAgentDialog(
     const submittedName = form.name;
     const submittedNameTrimmed = submittedName.trim();
     const submittedRole = form.role.trim();
+    const availableProviderIds = new Set(
+      providerOptions.map((provider) => provider.id),
+    );
+    const providerId = availableProviderIds.has(form.providerId)
+      ? form.providerId
+      : resolveDefaultProviderId(providerOptions);
 
     setSubmitting(true);
     setMutating(true);
@@ -176,7 +227,7 @@ export function useCreateAgentDialog(
       const response = await createAgent({
         name: form.name,
         reportsTo,
-        providerId: form.providerId,
+        providerId,
         ...(submittedRole ? { role: submittedRole } : {}),
       });
 
@@ -189,7 +240,7 @@ export function useCreateAgentDialog(
           ...current,
           name: "",
           role: "",
-          providerId: DEFAULT_PROVIDER_ID,
+          providerId: resolveDefaultProviderId(providerOptions),
         };
       });
       setOpen(false);
@@ -204,7 +255,7 @@ export function useCreateAgentDialog(
       setSubmitting(false);
       setMutating(false);
     }
-  }, [agents, createAgent, form, onCreated, setMutating]);
+  }, [agents, createAgent, form, onCreated, providerOptions, setMutating]);
 
   const handleSetOpen = useCallback((open: boolean) => {
     setOpen(open);
@@ -216,6 +267,7 @@ export function useCreateAgentDialog(
     isOpen,
     isSubmitting,
     error,
+    providerOptions,
     managerOptions,
     openDialog,
     openDialogForCeo,
@@ -244,4 +296,14 @@ function resolveAgentRoleLabel(role: string | undefined): string | undefined {
   }
 
   return explicitRole;
+}
+
+function resolveDefaultProviderId(
+  providers: CreateAgentProviderOption[],
+): string {
+  return (
+    providers.find((provider) => provider.id === "openclaw")?.id ??
+    providers[0]?.id ??
+    "openclaw"
+  );
 }

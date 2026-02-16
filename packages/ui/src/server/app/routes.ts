@@ -53,6 +53,7 @@ import {
   resolveDefaultWorkspaceSessionTitle,
   resolveOrganizationAgents,
   resolveProjectFolder,
+  resolveUiProviders,
   resolveSessionProjectPathForRequest,
   runUiSessionMessage,
   updateUiTaskStatus,
@@ -84,8 +85,6 @@ import type {
   UiImageInput,
   UiLogStreamEvent,
 } from "./types.js";
-
-const DEFAULT_CREATE_AGENT_PROVIDER_ID = "openclaw";
 
 export function registerApiRoutes(
   app: FastifyInstance,
@@ -684,10 +683,14 @@ export function registerApiRoutes(
 
   app.get("/api/openclaw/overview", async (_request, reply) => {
     return safeReply(reply, async () => {
-      const agents = await resolveOrganizationAgents(service);
+      const [agents, providers] = await Promise.all([
+        resolveOrganizationAgents(service),
+        resolveUiProviders(service),
+      ]);
 
       return {
         agents,
+        providers,
         totals: {
           agents: agents.length
         }
@@ -714,13 +717,16 @@ export function registerApiRoutes(
             error: "name is required"
           };
         }
+        const providers = await resolveUiProviders(service);
+        const availableProviderIds = providers.map((provider) => provider.id);
         const providerId = normalizeCreateAgentProviderId(
           request.body?.providerId,
+          availableProviderIds,
         );
         if (!providerId) {
           reply.code(400);
           return {
-            error: "providerId must be one of: openclaw, claude-code",
+            error: `providerId must be one of: ${availableProviderIds.join(", ")}`,
           };
         }
 
@@ -736,7 +742,7 @@ export function registerApiRoutes(
         }
 
         const created = await service.createAgent(name, createOptions);
-        if (providerId !== DEFAULT_CREATE_AGENT_PROVIDER_ID) {
+        if (providerId !== resolveDefaultCreateAgentProviderId(availableProviderIds)) {
           if (typeof service.setAgentProvider !== "function") {
             throw new Error(
               "Agent provider assignment is unavailable. Restart the UI server after updating dependencies.",
@@ -1691,15 +1697,26 @@ export function registerApiRoutes(
 
 function normalizeCreateAgentProviderId(
   rawProviderId: string | undefined,
-): "openclaw" | "claude-code" | null {
+  availableProviderIds: string[],
+): string | null {
+  const defaultProviderId = resolveDefaultCreateAgentProviderId(
+    availableProviderIds,
+  );
   const normalized = rawProviderId?.trim().toLowerCase();
   if (!normalized) {
-    return DEFAULT_CREATE_AGENT_PROVIDER_ID;
+    return defaultProviderId;
   }
-  if (normalized === "openclaw" || normalized === "claude-code") {
+  if (availableProviderIds.includes(normalized)) {
     return normalized;
   }
   return null;
+}
+
+function resolveDefaultCreateAgentProviderId(availableProviderIds: string[]): string {
+  if (availableProviderIds.includes("openclaw")) {
+    return "openclaw";
+  }
+  return availableProviderIds[0] ?? "openclaw";
 }
 
 

@@ -121,6 +121,12 @@ export interface UiProviderSummary {
   };
 }
 
+export interface UiProviderOption {
+  id: string;
+  displayName: string;
+  supportsReportees: boolean;
+}
+
 export type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
 
 export interface OpenClawUiService {

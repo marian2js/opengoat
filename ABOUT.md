@@ -183,3 +183,6 @@ If rebuilding from scratch, preserve these behaviors:
 
 Architecture keeps adapter boundaries so new runtimes can be added by
 registering provider modules, without changing orchestration/session flow.
+
+Built-in provider modules are registered in one place:
+`packages/core/src/core/providers/providers/registry.ts`.
