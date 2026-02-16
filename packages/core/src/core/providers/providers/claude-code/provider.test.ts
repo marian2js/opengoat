@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { ClaudeCodeProvider, parseClaudeCodeResponse } from "./provider.js";
 
 describe("claude-code provider", () => {
+  it("does not support reportees", () => {
+    const provider = new ClaudeCodeProvider();
+    expect(provider.capabilities.reportees).toBe(false);
+  });
+
   it("maps invoke options to Claude Code headless flags", () => {
     const provider = new ClaudeCodeProvider();
     const invocation = provider.buildInvocation({

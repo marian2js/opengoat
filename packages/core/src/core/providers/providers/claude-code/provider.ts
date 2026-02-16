@@ -20,6 +20,7 @@ export class ClaudeCodeProvider extends BaseCliProvider {
         model: true,
         auth: true,
         passthrough: true,
+        reportees: false,
         agentCreate: false,
         agentDelete: false,
       },

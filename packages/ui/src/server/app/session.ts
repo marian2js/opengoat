@@ -690,6 +690,9 @@ export async function resolveOrganizationAgents(
 ): Promise<OrganizationAgent[]> {
   const agents = await service.listAgents();
   const agentIds = new Set(agents.map((agent) => agent.id));
+  const providerReporteeSupportById = await resolveProviderReporteeSupportById(
+    service,
+  );
 
   return Promise.all(
     agents.map(async (agent) => {
@@ -697,6 +700,7 @@ export async function resolveOrganizationAgents(
         agent.id === DEFAULT_AGENT_ID ? null : DEFAULT_AGENT_ID;
       const fallbackType: OrganizationAgent["type"] =
         agent.id === DEFAULT_AGENT_ID ? "manager" : "individual";
+      const fallbackProviderId = "openclaw";
 
       try {
         const configPath = path.resolve(agent.internalConfigDir, "config.json");
@@ -706,6 +710,12 @@ export async function resolveOrganizationAgents(
           organization?: {
             reportsTo?: string | null;
             type?: string;
+          };
+          runtime?: {
+            provider?: {
+              id?: string;
+            };
+            adapter?: string;
           };
         };
 
@@ -717,23 +727,81 @@ export async function resolveOrganizationAgents(
         );
         const type = normalizeTypeValue(organization?.type, fallbackType);
         const role = normalizeRoleValue(parsed.role);
+        const providerId =
+          normalizeProviderIdValue(parsed.runtime?.provider?.id) ??
+          normalizeProviderIdValue(parsed.runtime?.adapter) ??
+          fallbackProviderId;
 
         return {
           ...agent,
           reportsTo,
           type,
           role,
+          providerId,
+          supportsReportees: resolveProviderReporteeSupport(
+            providerId,
+            providerReporteeSupportById,
+          ),
         };
       } catch {
+        const providerId = fallbackProviderId;
         return {
           ...agent,
           reportsTo: fallbackReportsTo,
           type: fallbackType,
           role: undefined,
+          providerId,
+          supportsReportees: resolveProviderReporteeSupport(
+            providerId,
+            providerReporteeSupportById,
+          ),
         };
       }
     }),
   );
+}
+
+async function resolveProviderReporteeSupportById(
+  service: OpenClawUiService,
+): Promise<Map<string, boolean>> {
+  const supportById = new Map<string, boolean>();
+  if (typeof service.listProviders !== "function") {
+    supportById.set("openclaw", true);
+    return supportById;
+  }
+
+  const providers = await service.listProviders();
+  for (const provider of providers) {
+    const providerId = normalizeProviderIdValue(provider.id);
+    if (!providerId) {
+      continue;
+    }
+    supportById.set(providerId, provider.capabilities.reportees === true);
+  }
+
+  if (!supportById.has("openclaw")) {
+    supportById.set("openclaw", true);
+  }
+  return supportById;
+}
+
+function normalizeProviderIdValue(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized || undefined;
+}
+
+function resolveProviderReporteeSupport(
+  providerId: string,
+  supportById: Map<string, boolean>,
+): boolean {
+  const supported = supportById.get(providerId);
+  if (supported !== undefined) {
+    return supported;
+  }
+  return providerId === "openclaw";
 }
 
 function normalizeReportsToValue(

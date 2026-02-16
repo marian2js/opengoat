@@ -7,7 +7,11 @@ import {
   type TaskRecord,
 } from "../../boards/index.js";
 import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
-import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
+import {
+  DEFAULT_AGENT_ID,
+  isDefaultAgentId,
+  normalizeAgentId,
+} from "../../domain/agent-id.js";
 import type {
   AgentCreationResult,
   AgentDeletionResult,
@@ -477,6 +481,13 @@ export class OpenGoatService {
     options: CreateAgentOptions = {},
   ): Promise<AgentCreationResult> {
     const identity = this.agentService.normalizeAgentName(rawName);
+    const managerAgentId = resolveCreateAgentManagerId(
+      identity.id,
+      options.reportsTo,
+    );
+    if (managerAgentId) {
+      await this.assertManagerSupportsReportees(managerAgentId);
+    }
     const paths = this.pathsProvider.getPaths();
     const created = await this.agentService.ensureAgent(paths, identity, {
       type: options.type,
@@ -901,6 +912,36 @@ export class OpenGoatService {
   ): Promise<TaskRecord> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.addTaskWorklog(paths, actorId, taskId, content);
+  }
+
+  private async assertManagerSupportsReportees(
+    managerAgentId: string,
+  ): Promise<void> {
+    const paths = this.pathsProvider.getPaths();
+    const agents = await this.agentService.listAgents(paths);
+    if (!agents.some((agent) => agent.id === managerAgentId)) {
+      return;
+    }
+
+    const managerBinding = await this.providerService.getAgentProvider(
+      paths,
+      managerAgentId,
+    );
+    const providers = await this.providerService.listProviders();
+    const provider = providers.find(
+      (candidate) => candidate.id === managerBinding.providerId,
+    );
+    if (!provider) {
+      throw new Error(
+        `Provider "${managerBinding.providerId}" is not available for manager "${managerAgentId}".`,
+      );
+    }
+
+    if (!provider.capabilities.reportees) {
+      throw new Error(
+        `Cannot assign "${managerAgentId}" as manager because provider "${provider.displayName}" does not support reportees.`,
+      );
+    }
   }
 
   public async runTaskCronCycle(
@@ -2288,6 +2329,27 @@ function parseLooseJson(raw: string): unknown {
 
 function dedupeNumbers(values: number[]): number[] {
   return [...new Set(values)];
+}
+
+function resolveCreateAgentManagerId(
+  agentId: string,
+  reportsTo: string | null | undefined,
+): string | null {
+  const normalizedAgentId = normalizeAgentId(agentId);
+  if (isDefaultAgentId(normalizedAgentId)) {
+    return null;
+  }
+
+  if (reportsTo === null || reportsTo === undefined) {
+    return DEFAULT_AGENT_ID;
+  }
+
+  const normalizedManagerId = normalizeAgentId(reportsTo);
+  if (!normalizedManagerId || normalizedManagerId === normalizedAgentId) {
+    return DEFAULT_AGENT_ID;
+  }
+
+  return normalizedManagerId;
 }
 
 function collectPluginPathCandidatesFromArgvDir(argvDir: string): string[] {

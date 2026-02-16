@@ -2,17 +2,22 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const DEFAULT_REPORTS_TO = "ceo";
+const DEFAULT_PROVIDER_ID = "openclaw";
+
+export type CreateAgentProviderId = "openclaw" | "claude-code";
 
 export interface CreateAgentFormValue {
   name: string;
   role: string;
   reportsTo: string;
+  providerId: CreateAgentProviderId;
 }
 
 export interface CreateAgentDialogAgent {
   id: string;
   displayName: string;
   role?: string;
+  supportsReportees: boolean;
 }
 
 export interface CreateAgentManagerOption {
@@ -27,6 +32,7 @@ interface UseCreateAgentDialogOptions {
     name: string;
     reportsTo: string;
     role?: string;
+    providerId: CreateAgentProviderId;
   }) => Promise<{ message?: string }>;
   onCreated: () => Promise<void>;
 }
@@ -43,6 +49,7 @@ interface UseCreateAgentDialogResult {
   setName: (value: string) => void;
   setRole: (value: string) => void;
   setReportsTo: (value: string) => void;
+  setProviderId: (value: CreateAgentProviderId) => void;
   submitFromDialog: () => Promise<void>;
 }
 
@@ -50,6 +57,7 @@ const DEFAULT_FORM: CreateAgentFormValue = {
   name: "",
   role: "",
   reportsTo: DEFAULT_REPORTS_TO,
+  providerId: DEFAULT_PROVIDER_ID,
 };
 
 export function useCreateAgentDialog(
@@ -62,17 +70,21 @@ export function useCreateAgentDialog(
   const [error, setError] = useState<string | null>(null);
 
   const managerOptions = useMemo(() => {
-    return agents.map((agent) => {
-      const roleLabel = resolveAgentRoleLabel(agent.role);
-      return {
-        id: agent.id,
-        label: roleLabel ? `${agent.displayName} (${roleLabel})` : agent.displayName,
-      };
-    });
+    return agents
+      .filter((agent) => agent.supportsReportees !== false)
+      .map((agent) => {
+        const roleLabel = resolveAgentRoleLabel(agent.role);
+        return {
+          id: agent.id,
+          label: roleLabel ? `${agent.displayName} (${roleLabel})` : agent.displayName,
+        };
+      });
   }, [agents]);
 
   useEffect(() => {
-    const agentIds = agents.map((agent) => agent.id);
+    const agentIds = agents
+      .filter((agent) => agent.supportsReportees !== false)
+      .map((agent) => agent.id);
     if (agentIds.length === 0) {
       return;
     }
@@ -122,21 +134,31 @@ export function useCreateAgentDialog(
     }));
   }, []);
 
+  const setProviderId = useCallback((value: CreateAgentProviderId) => {
+    setForm((current) => ({
+      ...current,
+      providerId: value,
+    }));
+  }, []);
+
   const submitFromDialog = useCallback(async () => {
     if (!form.name.trim()) {
       setError("Agent name is required.");
       return;
     }
 
-    if (agents.length === 0) {
+    const assignableManagers = agents.filter(
+      (agent) => agent.supportsReportees !== false,
+    );
+    if (assignableManagers.length === 0) {
       setError("No available manager targets found.");
       return;
     }
 
-    const allowedReportsTo = new Set(agents.map((agent) => agent.id));
+    const allowedReportsTo = new Set(assignableManagers.map((agent) => agent.id));
     const reportsTo = allowedReportsTo.has(form.reportsTo)
       ? form.reportsTo
-      : agents[0]?.id ?? "";
+      : assignableManagers[0]?.id ?? "";
     if (!reportsTo) {
       setError("Reports To is required.");
       return;
@@ -154,6 +176,7 @@ export function useCreateAgentDialog(
       const response = await createAgent({
         name: form.name,
         reportsTo,
+        providerId: form.providerId,
         ...(submittedRole ? { role: submittedRole } : {}),
       });
 
@@ -162,7 +185,12 @@ export function useCreateAgentDialog(
         if (current.name.trim() !== submittedNameTrimmed) {
           return current;
         }
-        return { ...current, name: "", role: "" };
+        return {
+          ...current,
+          name: "",
+          role: "",
+          providerId: DEFAULT_PROVIDER_ID,
+        };
       });
       setOpen(false);
       await onCreated();
@@ -195,6 +223,7 @@ export function useCreateAgentDialog(
     setName,
     setRole,
     setReportsTo,
+    setProviderId,
     submitFromDialog,
   };
 }

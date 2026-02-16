@@ -414,6 +414,7 @@ class FakeOpenClawProvider implements Provider {
     model: true,
     auth: true,
     passthrough: true,
+    reportees: true,
     agentCreate: true,
     agentDelete: true
   };

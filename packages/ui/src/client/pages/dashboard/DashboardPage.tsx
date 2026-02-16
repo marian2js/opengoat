@@ -154,6 +154,8 @@ interface Agent {
   reportsTo: string | null;
   type: "manager" | "individual" | "unknown";
   role?: string;
+  providerId: string;
+  supportsReportees: boolean;
 }
 
 interface Session {
@@ -1170,7 +1172,12 @@ export function DashboardPage(): ReactElement {
 
   const agents = state?.overview.agents ?? [];
   const createAgentRequest = useCallback(
-    async (payload: { name: string; reportsTo: string; role?: string }) => {
+    async (payload: {
+      name: string;
+      reportsTo: string;
+      role?: string;
+      providerId: "openclaw" | "claude-code";
+    }) => {
       return fetchJson<{ message?: string }>("/api/agents", {
         method: "POST",
         headers: {
@@ -4211,6 +4218,7 @@ export function DashboardPage(): ReactElement {
             onNameChange={createAgentDialog.setName}
             onRoleChange={createAgentDialog.setRole}
             onReportsToChange={createAgentDialog.setReportsTo}
+            onProviderIdChange={createAgentDialog.setProviderId}
             onSubmit={() => {
               void createAgentDialog.submitFromDialog();
             }}
@@ -4895,9 +4903,15 @@ export function DashboardPage(): ReactElement {
 
                                   <Message from={message.role}>
                                     <MessageContent>
-                                      <MessageResponse>
-                                        {message.content}
-                                      </MessageResponse>
+                                      {message.role === "user" ? (
+                                        <p className="whitespace-pre-wrap break-words">
+                                          {message.content}
+                                        </p>
+                                      ) : (
+                                        <MessageResponse>
+                                          {message.content}
+                                        </MessageResponse>
+                                      )}
                                     </MessageContent>
                                   </Message>
                                 </Fragment>

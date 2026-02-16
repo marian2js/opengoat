@@ -40,6 +40,7 @@ describe("provider CLI commands", () => {
           model: true,
           auth: true,
           passthrough: true,
+          reportees: false,
         },
       },
       {
@@ -51,6 +52,7 @@ describe("provider CLI commands", () => {
           model: true,
           auth: true,
           passthrough: true,
+          reportees: true,
         },
       },
     ]);

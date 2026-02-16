@@ -12,6 +12,7 @@ import { Spinner } from "@/components/ui/spinner";
 import type {
   CreateAgentFormValue,
   CreateAgentManagerOption,
+  CreateAgentProviderId,
 } from "@/pages/agents/useCreateAgentDialog";
 import type { ReactElement } from "react";
 
@@ -26,6 +27,7 @@ interface CreateAgentDialogProps {
   onNameChange: (value: string) => void;
   onRoleChange: (value: string) => void;
   onReportsToChange: (value: string) => void;
+  onProviderIdChange: (value: CreateAgentProviderId) => void;
   onSubmit: () => void;
   onCancel: () => void;
 }
@@ -41,11 +43,13 @@ export function CreateAgentDialog({
   onNameChange,
   onRoleChange,
   onReportsToChange,
+  onProviderIdChange,
   onSubmit,
   onCancel,
 }: CreateAgentDialogProps): ReactElement {
   const canSubmit = !isLoading && !isSubmitting && form.name.trim().length > 0;
   const isBusy = isSubmitting;
+  const providerLabel = formatAgentProviderLabel(form.providerId);
 
   return (
     <Dialog
@@ -134,6 +138,32 @@ export function CreateAgentDialog({
               You can only assign existing agents as manager.
             </p>
           </div>
+
+          <div className="space-y-1.5">
+            <label
+              className="text-xs uppercase tracking-wide text-muted-foreground"
+              htmlFor="createAgentProviderId"
+            >
+              Agent Type
+            </label>
+            <select
+              id="createAgentProviderId"
+              className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              value={form.providerId}
+              onChange={(event) =>
+                onProviderIdChange(normalizeCreateAgentProvider(event.target.value))
+              }
+              disabled={isBusy}
+            >
+              <option value="openclaw">OpenClaw (default)</option>
+              <option value="claude-code">Claude Code</option>
+            </select>
+            {form.providerId !== "openclaw" ? (
+              <p className="text-xs text-muted-foreground">
+                {providerLabel} agents can't have reportees.
+              </p>
+            ) : null}
+          </div>
         </div>
 
         {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -156,4 +186,15 @@ export function CreateAgentDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function normalizeCreateAgentProvider(value: string): CreateAgentProviderId {
+  return value === "claude-code" ? "claude-code" : "openclaw";
+}
+
+function formatAgentProviderLabel(providerId: CreateAgentProviderId): string {
+  if (providerId === "claude-code") {
+    return "Claude Code";
+  }
+  return "OpenClaw";
 }

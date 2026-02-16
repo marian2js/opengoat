@@ -11,6 +11,8 @@ export interface OrganizationAgent extends AgentDescriptor {
   reportsTo: string | null;
   type: "manager" | "individual" | "unknown";
   role?: string;
+  providerId: string;
+  supportsReportees: boolean;
 }
 
 export interface AgentCreationResult {
@@ -25,6 +27,11 @@ export interface AgentDeletionResult {
   existed: boolean;
   removedPaths: string[];
   skippedPaths: string[];
+}
+
+export interface AgentProviderBinding {
+  agentId: string;
+  providerId: string;
 }
 
 export interface CreateAgentOptions {
@@ -105,6 +112,15 @@ export interface UiOpenClawGatewayConfig {
   command?: string;
 }
 
+export interface UiProviderSummary {
+  id: string;
+  displayName: string;
+  kind: string;
+  capabilities: {
+    reportees?: boolean;
+  };
+}
+
 export type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
 
 export interface OpenClawUiService {
@@ -117,7 +133,9 @@ export interface OpenClawUiService {
   listSessions: (agentId?: string, options?: { activeMinutes?: number }) => Promise<SessionSummary[]>;
   listSkills: (agentId?: string) => Promise<ResolvedSkill[]>;
   listGlobalSkills: () => Promise<ResolvedSkill[]>;
+  listProviders?: () => Promise<UiProviderSummary[]>;
   getOpenClawGatewayConfig?: () => Promise<UiOpenClawGatewayConfig>;
+  setAgentProvider?: (agentId: string, providerId: string) => Promise<AgentProviderBinding>;
   prepareSession?: (
     agentId?: string,
     options?: { sessionRef?: string; projectPath?: string; forceNew?: boolean }

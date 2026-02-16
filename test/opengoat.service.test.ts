@@ -2447,6 +2447,7 @@ class FakeOpenClawProvider extends BaseProvider {
         model: true,
         auth: true,
         passthrough: true,
+        reportees: true,
         agentCreate: true,
         agentDelete: true,
       },

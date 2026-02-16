@@ -109,6 +109,7 @@ describe("openclaw provider", () => {
 
     expect(provider.capabilities.agentCreate).toBe(true);
     expect(provider.capabilities.agentDelete).toBe(true);
+    expect(provider.capabilities.reportees).toBe(true);
     expect(invocation.command).toBe("openclaw");
     expect(invocation.args).toEqual([
       "agents",

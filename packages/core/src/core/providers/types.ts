@@ -12,6 +12,7 @@ export interface ProviderCapabilities {
   model: boolean;
   auth: boolean;
   passthrough: boolean;
+  reportees: boolean;
   agentCreate?: boolean;
   agentDelete?: boolean;
 }

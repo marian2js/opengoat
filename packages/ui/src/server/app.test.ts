@@ -814,6 +814,88 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("assigns the provider when creating non-openclaw agents through the api", async () => {
+    const createAgent = vi.fn<OpenClawUiService["createAgent"]>(async (name: string): Promise<AgentCreationResult> => {
+      return {
+        agent: {
+          id: "developer",
+          displayName: name,
+          workspaceDir: "/tmp/workspace",
+          internalConfigDir: "/tmp/internal"
+        },
+        createdPaths: [],
+        skippedPaths: []
+      };
+    });
+    const setAgentProvider = vi.fn<NonNullable<OpenClawUiService["setAgentProvider"]>>(async (agentId, providerId) => {
+      return {
+        agentId,
+        providerId
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        createAgent,
+        setAgentProvider
+      }
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/agents",
+      payload: {
+        name: "Developer",
+        providerId: "claude-code"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(setAgentProvider).toHaveBeenCalledWith("developer", "claude-code");
+  });
+
+  it("rejects unsupported provider ids when creating agents through the api", async () => {
+    const createAgent = vi.fn<OpenClawUiService["createAgent"]>(async (name: string): Promise<AgentCreationResult> => {
+      return {
+        agent: {
+          id: "developer",
+          displayName: name,
+          workspaceDir: "/tmp/workspace",
+          internalConfigDir: "/tmp/internal"
+        },
+        createdPaths: [],
+        skippedPaths: []
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        createAgent
+      }
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/agents",
+      payload: {
+        name: "Developer",
+        providerId: "invalid-provider"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(createAgent).not.toHaveBeenCalled();
+    expect(response.json()).toEqual({
+      error: "providerId must be one of: openclaw, claude-code"
+    });
+  });
+
   it("passes optional role when creating agents through the api", async () => {
     const createAgent = vi.fn<OpenClawUiService["createAgent"]>(async (name: string): Promise<AgentCreationResult> => {
       return {

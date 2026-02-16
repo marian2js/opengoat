@@ -77,6 +77,7 @@ class ScriptedProvider extends BaseProvider {
         model: true,
         auth: false,
         passthrough: false,
+        reportees: true,
         agentCreate: true,
         agentDelete: true
       }

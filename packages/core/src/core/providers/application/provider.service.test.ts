@@ -25,6 +25,7 @@ class RecordingProvider extends BaseProvider {
       model: boolean;
       auth: boolean;
       passthrough: boolean;
+      reportees: boolean;
       agentCreate?: boolean;
       agentDelete?: boolean;
     };
@@ -161,6 +162,7 @@ async function createService(paths: OpenGoatPaths): Promise<{
       model: true,
       auth: true,
       passthrough: true,
+      reportees: true,
       agentCreate: true,
       agentDelete: true,
     },
@@ -173,6 +175,7 @@ async function createService(paths: OpenGoatPaths): Promise<{
       model: true,
       auth: true,
       passthrough: true,
+      reportees: false,
     },
     providerSessionId: "claude-session-123",
   });

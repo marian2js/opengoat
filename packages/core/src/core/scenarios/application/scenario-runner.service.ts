@@ -106,7 +106,7 @@ class ScenarioScriptedProvider extends BaseProvider {
 
   public constructor(scenario: ScenarioSpec) {
     super({
-      id: "scenario-scripted",
+      id: "openclaw",
       displayName: "Scenario Scripted Provider",
       kind: "http",
       capabilities: {
@@ -114,6 +114,7 @@ class ScenarioScriptedProvider extends BaseProvider {
         model: true,
         auth: false,
         passthrough: false,
+        reportees: true,
         agentCreate: true,
         agentDelete: true,
       },

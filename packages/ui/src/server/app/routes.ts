@@ -85,6 +85,8 @@ import type {
   UiLogStreamEvent,
 } from "./types.js";
 
+const DEFAULT_CREATE_AGENT_PROVIDER_ID = "openclaw";
+
 export function registerApiRoutes(
   app: FastifyInstance,
   service: OpenClawUiService,
@@ -701,7 +703,7 @@ export function registerApiRoutes(
     });
   });
 
-  app.post<{ Body: { name?: string; type?: "manager" | "individual"; reportsTo?: string | null; skills?: string[] | string; role?: string } }>(
+  app.post<{ Body: { name?: string; type?: "manager" | "individual"; reportsTo?: string | null; skills?: string[] | string; role?: string; providerId?: string } }>(
     "/api/agents",
     async (request, reply) => {
       return safeReply(reply, async () => {
@@ -710,6 +712,15 @@ export function registerApiRoutes(
           reply.code(400);
           return {
             error: "name is required"
+          };
+        }
+        const providerId = normalizeCreateAgentProviderId(
+          request.body?.providerId,
+        );
+        if (!providerId) {
+          reply.code(400);
+          return {
+            error: "providerId must be one of: openclaw, claude-code",
           };
         }
 
@@ -725,10 +736,19 @@ export function registerApiRoutes(
         }
 
         const created = await service.createAgent(name, createOptions);
+        if (providerId !== DEFAULT_CREATE_AGENT_PROVIDER_ID) {
+          if (typeof service.setAgentProvider !== "function") {
+            throw new Error(
+              "Agent provider assignment is unavailable. Restart the UI server after updating dependencies.",
+            );
+          }
+          await service.setAgentProvider(created.agent.id, providerId);
+        }
 
         return {
           agent: created.agent,
           created,
+          providerId,
           message: created.alreadyExisted
             ? `Agent \"${created.agent.id}\" already exists.`
             : `Agent \"${created.agent.id}\" created.`
@@ -1667,6 +1687,19 @@ export function registerApiRoutes(
     handleSessionMessageStream
   );
 
+}
+
+function normalizeCreateAgentProviderId(
+  rawProviderId: string | undefined,
+): "openclaw" | "claude-code" | null {
+  const normalized = rawProviderId?.trim().toLowerCase();
+  if (!normalized) {
+    return DEFAULT_CREATE_AGENT_PROVIDER_ID;
+  }
+  if (normalized === "openclaw" || normalized === "claude-code") {
+    return normalized;
+  }
+  return null;
 }
 
 
