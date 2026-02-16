@@ -174,65 +174,25 @@ function normalizePathForCompare(value: string): string {
   return resolved;
 }
 
-export function buildTaskSessionRef(agentId: string, taskId: string): string {
-  const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
-  const normalizedTaskId = normalizeAgentId(taskId) || "task";
-  return `agent:${normalizedAgentId}:agent_${normalizedAgentId}_task_${normalizedTaskId}`;
+export function buildTaskSessionRef(agentId: string, _taskId: string): string {
+  return buildNotificationSessionRef(agentId);
 }
 
 export function buildInactiveSessionRef(
   managerAgentId: string,
-  subjectAgentId: string,
+  _subjectAgentId: string,
 ): string {
-  const manager = normalizeAgentId(managerAgentId) || DEFAULT_AGENT_ID;
-  const subject = normalizeAgentId(subjectAgentId) || "agent";
-  return `agent:${manager}:agent_${manager}_inactive_${subject}`;
+  return buildNotificationSessionRef(managerAgentId);
 }
 
-export function buildTodoTaskMessage(params: { task: TaskRecord }): string {
-  const blockers =
-    params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "None";
-  const artifacts =
-    params.task.artifacts.length > 0
-      ? params.task.artifacts
-          .map(
-            (entry) =>
-              `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`,
-          )
-          .join("\n")
-      : "- None";
-  const worklog =
-    params.task.worklog.length > 0
-      ? params.task.worklog
-          .map(
-            (entry) =>
-              `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`,
-          )
-          .join("\n")
-      : "- None";
-
-  return [
-    `Task #${params.task.taskId} is assigned to you and currently in TODO. Please work on it now.`,
-    "",
-    `Task ID: ${params.task.taskId}`,
-    `Title: ${params.task.title}`,
-    `Description: ${params.task.description}`,
-    `Project: ${params.task.project}`,
-    `Status: ${params.task.status}`,
-    `Owner: @${params.task.owner}`,
-    `Assigned to: @${params.task.assignedTo}`,
-    `Created at: ${params.task.createdAt}`,
-    `Blockers: ${blockers}`,
-    "Artifacts:",
-    artifacts,
-    "Worklog:",
-    worklog,
-  ].join("\n");
+export function buildNotificationSessionRef(agentId: string): string {
+  const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
+  return `agent:${normalizedAgentId}:agent_${normalizedAgentId}_notifications`;
 }
 
-export function buildPendingTaskMessage(params: {
+export function buildTodoTaskMessage(params: {
   task: TaskRecord;
-  pendingMinutes: number;
+  notificationTimestamp?: string;
 }): string {
   const blockers =
     params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "None";
@@ -254,9 +214,66 @@ export function buildPendingTaskMessage(params: {
           )
           .join("\n")
       : "- None";
+  const notificationTimestamp = resolveNotificationTimestamp(
+    params.notificationTimestamp,
+  );
+
+  return [
+    `Task #${params.task.taskId} is assigned to you and currently in TODO. Please work on it now.`,
+    ...(notificationTimestamp
+      ? [`Notification timestamp: ${notificationTimestamp}`]
+      : []),
+    "",
+    `Task ID: ${params.task.taskId}`,
+    `Title: ${params.task.title}`,
+    `Description: ${params.task.description}`,
+    `Project: ${params.task.project}`,
+    `Status: ${params.task.status}`,
+    `Owner: @${params.task.owner}`,
+    `Assigned to: @${params.task.assignedTo}`,
+    `Created at: ${params.task.createdAt}`,
+    `Blockers: ${blockers}`,
+    "Artifacts:",
+    artifacts,
+    "Worklog:",
+    worklog,
+  ].join("\n");
+}
+
+export function buildPendingTaskMessage(params: {
+  task: TaskRecord;
+  pendingMinutes: number;
+  notificationTimestamp?: string;
+}): string {
+  const blockers =
+    params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "None";
+  const artifacts =
+    params.task.artifacts.length > 0
+      ? params.task.artifacts
+          .map(
+            (entry) =>
+              `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`,
+          )
+          .join("\n")
+      : "- None";
+  const worklog =
+    params.task.worklog.length > 0
+      ? params.task.worklog
+          .map(
+            (entry) =>
+              `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`,
+          )
+          .join("\n")
+      : "- None";
+  const notificationTimestamp = resolveNotificationTimestamp(
+    params.notificationTimestamp,
+  );
 
   return [
     `Task #${params.task.taskId} is still in PENDING after ${params.pendingMinutes} minutes.`,
+    ...(notificationTimestamp
+      ? [`Notification timestamp: ${notificationTimestamp}`]
+      : []),
     "Please continue working on it or update the task status if needed.",
     "",
     `Task ID: ${params.task.taskId}`,
@@ -276,7 +293,10 @@ export function buildPendingTaskMessage(params: {
   ].join("\n");
 }
 
-export function buildBlockedTaskMessage(params: { task: TaskRecord }): string {
+export function buildBlockedTaskMessage(params: {
+  task: TaskRecord;
+  notificationTimestamp?: string;
+}): string {
   const blockerReason =
     params.task.blockers.length > 0
       ? params.task.blockers.join("; ")
@@ -299,9 +319,15 @@ export function buildBlockedTaskMessage(params: { task: TaskRecord }): string {
           )
           .join("\n")
       : "- None";
+  const notificationTimestamp = resolveNotificationTimestamp(
+    params.notificationTimestamp,
+  );
 
   return [
     `Task #${params.task.taskId}, assigned to your reportee "@${params.task.assignedTo}" is blocked because of ${blockerReason}. Help unblocking it.`,
+    ...(notificationTimestamp
+      ? [`Notification timestamp: ${notificationTimestamp}`]
+      : []),
     "",
     `Task ID: ${params.task.taskId}`,
     `Title: ${params.task.title}`,
@@ -326,8 +352,12 @@ export function buildInactiveAgentMessage(params: {
   directReporteesCount: number;
   indirectReporteesCount: number;
   inactiveMinutes: number;
+  notificationTimestamp?: string;
   lastActionTimestamp?: number;
 }): string {
+  const notificationTimestamp = resolveNotificationTimestamp(
+    params.notificationTimestamp,
+  );
   const lastAction =
     typeof params.lastActionTimestamp === "number" &&
     Number.isFinite(params.lastActionTimestamp)
@@ -335,6 +365,9 @@ export function buildInactiveAgentMessage(params: {
       : null;
   return [
     `Your reportee "@${params.subjectAgentId}" (${params.subjectName}) has no activity in the last ${params.inactiveMinutes} minutes.`,
+    ...(notificationTimestamp
+      ? [`Notification timestamp: ${notificationTimestamp}`]
+      : []),
     ...(params.role ? [`Role: ${params.role}`] : []),
     `${
       params.subjectName || `@${params.subjectAgentId}`
@@ -418,6 +451,26 @@ function buildTotalReporteeCountByManager(
     );
   }
   return totalByManager;
+}
+
+function resolveNotificationTimestamp(
+  value: string | undefined,
+): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+
+  return parsed.toISOString();
 }
 
 export function assertAgentExists(

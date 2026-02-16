@@ -1914,6 +1914,9 @@ describe("OpenGoatService", () => {
     expect(todoInvocation?.message).toContain(`Task ID: ${todoTask.taskId}`);
     expect(todoInvocation?.message).toContain("Project: ~");
     expect(todoInvocation?.message).toContain("Status: todo");
+    expect(todoInvocation?.message).toContain(
+      `Notification timestamp: ${cycle.ranAt}`,
+    );
 
     const blockedInvocation = provider.invocations.find(
       (entry) =>
@@ -1927,6 +1930,9 @@ describe("OpenGoatService", () => {
     expect(blockedInvocation?.message).toContain(
       "Waiting for production credentials",
     );
+    expect(blockedInvocation?.message).toContain(
+      `Notification timestamp: ${cycle.ranAt}`,
+    );
 
     const inactivityInvocation = provider.invocations.find(
       (entry) =>
@@ -1939,26 +1945,48 @@ describe("OpenGoatService", () => {
     expect(inactivityInvocation?.message).toContain(
       "Engineer has 0 direct and 0 indirect reportees.",
     );
+    expect(inactivityInvocation?.message).toContain(
+      `Notification timestamp: ${cycle.ranAt}`,
+    );
     expect(inactivityInvocation?.cwd).toBe(projectPath);
 
     const engineerSessions = await service.listSessions("engineer");
+    const engineerNotificationSessionKey =
+      "agent:engineer:agent_engineer_notifications";
+    expect(
+      engineerSessions.some(
+        (entry) => entry.sessionKey === engineerNotificationSessionKey,
+      ),
+    ).toBe(true);
+    expect(
+      engineerSessions.filter(
+        (entry) => entry.sessionKey === engineerNotificationSessionKey,
+      ),
+    ).toHaveLength(1);
     expect(
       engineerSessions.some((entry) =>
-        entry.sessionKey.includes(`agent_engineer_task_${todoTask.taskId}`),
+        entry.sessionKey.includes("agent_engineer_task_"),
       ),
-    ).toBe(true);
+    ).toBe(false);
 
     const ceoSessions = await service.listSessions("ceo");
+    const ceoNotificationSessionKey = "agent:ceo:agent_ceo_notifications";
     expect(
-      ceoSessions.some((entry) =>
-        entry.sessionKey.includes(`agent_ceo_task_${blockedTask.taskId}`),
-      ),
+      ceoSessions.some((entry) => entry.sessionKey === ceoNotificationSessionKey),
     ).toBe(true);
     expect(
-      ceoSessions.some((entry) =>
-        entry.sessionKey.includes("agent_ceo_inactive_engineer"),
+      ceoSessions.filter(
+        (entry) => entry.sessionKey === ceoNotificationSessionKey,
       ),
-    ).toBe(true);
+    ).toHaveLength(1);
+    expect(
+      ceoSessions.some((entry) => entry.sessionKey.includes("agent_ceo_task_")),
+    ).toBe(false);
+    expect(
+      ceoSessions.some((entry) =>
+        entry.sessionKey.includes("agent_ceo_inactive_"),
+      ),
+    ).toBe(false);
   });
 
   it("notifies assignees when pending tasks exceed the inactivity threshold", async () => {

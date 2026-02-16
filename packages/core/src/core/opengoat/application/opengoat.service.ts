@@ -72,10 +72,9 @@ import {
   assertAgentExists,
   buildBlockedTaskMessage,
   buildInactiveAgentMessage,
+  buildNotificationSessionRef,
   buildPendingTaskMessage,
-  buildInactiveSessionRef,
   buildReporteeStats,
-  buildTaskSessionRef,
   buildTodoTaskMessage,
   collectAllReportees,
   containsAgentNotFoundMessage,
@@ -992,12 +991,14 @@ export class OpenGoatService {
       manifests,
       pendingTaskIds,
       inactiveMinutes,
+      ranAt,
       maxParallelFlows,
     );
     const inactiveDispatches = await this.dispatchInactiveAgentAutomations(
       paths,
       inactiveCandidates,
       inactiveMinutes,
+      ranAt,
       latestCeoProjectPath,
       maxParallelFlows,
     );
@@ -1025,6 +1026,7 @@ export class OpenGoatService {
     manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
     pendingTaskIds: Set<string>,
     pendingMinutes: number,
+    notificationTimestamp: string,
     maxParallelFlows: number,
   ): Promise<TaskStatusDispatchSummary> {
     const manifestsById = new Map(
@@ -1045,8 +1047,11 @@ export class OpenGoatService {
       if (task.status === "todo") {
         todoTasks += 1;
         const targetAgentId = task.assignedTo;
-        const sessionRef = buildTaskSessionRef(targetAgentId, task.taskId);
-        const message = buildTodoTaskMessage({ task });
+        const sessionRef = buildNotificationSessionRef(targetAgentId);
+        const message = buildTodoTaskMessage({
+          task,
+          notificationTimestamp,
+        });
         requests.push({
           kind: "todo",
           targetAgentId,
@@ -1063,10 +1068,11 @@ export class OpenGoatService {
         }
         pendingTasks += 1;
         const targetAgentId = task.assignedTo;
-        const sessionRef = buildTaskSessionRef(targetAgentId, task.taskId);
+        const sessionRef = buildNotificationSessionRef(targetAgentId);
         const message = buildPendingTaskMessage({
           task,
           pendingMinutes,
+          notificationTimestamp,
         });
         requests.push({
           kind: "pending",
@@ -1084,8 +1090,11 @@ export class OpenGoatService {
         const managerAgentId =
           normalizeAgentId(assigneeManifest?.metadata.reportsTo ?? "") ||
           DEFAULT_AGENT_ID;
-        const sessionRef = buildTaskSessionRef(managerAgentId, task.taskId);
-        const message = buildBlockedTaskMessage({ task });
+        const sessionRef = buildNotificationSessionRef(managerAgentId);
+        const message = buildBlockedTaskMessage({
+          task,
+          notificationTimestamp,
+        });
         requests.push({
           kind: "blocked",
           targetAgentId: managerAgentId,
@@ -1131,6 +1140,7 @@ export class OpenGoatService {
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
     inactiveCandidates: InactiveAgentCandidate[],
     inactiveMinutes: number,
+    notificationTimestamp: string,
     latestCeoProjectPath?: string,
     maxParallelFlows = 1,
   ): Promise<TaskCronDispatchResult[]> {
@@ -1140,9 +1150,8 @@ export class OpenGoatService {
       (candidate) =>
         normalizeAgentId(candidate.managerAgentId) || DEFAULT_AGENT_ID,
       async (candidate) => {
-        const sessionRef = buildInactiveSessionRef(
+        const sessionRef = buildNotificationSessionRef(
           candidate.managerAgentId,
-          candidate.subjectAgentId,
         );
         const message = buildInactiveAgentMessage({
           managerAgentId: candidate.managerAgentId,
@@ -1152,6 +1161,7 @@ export class OpenGoatService {
           directReporteesCount: candidate.directReporteesCount,
           indirectReporteesCount: candidate.indirectReporteesCount,
           inactiveMinutes,
+          notificationTimestamp,
           lastActionTimestamp: candidate.lastActionTimestamp,
         });
         const result = await this.dispatchAutomationMessage(
