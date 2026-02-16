@@ -12,6 +12,7 @@ describe("provider loader", () => {
       "codex",
       "cursor",
       "openclaw",
+      "opencode",
     ]);
   });
 });

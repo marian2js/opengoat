@@ -2,6 +2,7 @@ import type { ProviderModule } from "../provider-module.js";
 import { providerModule as claudeCodeProviderModule } from "./claude-code/index.js";
 import { providerModule as codexProviderModule } from "./codex/index.js";
 import { providerModule as cursorProviderModule } from "./cursor/index.js";
+import { providerModule as opencodeProviderModule } from "./opencode/index.js";
 import { providerModule as openclawProviderModule } from "./openclaw/index.js";
 
 // Central registry for built-in providers.
@@ -11,4 +12,5 @@ export const BUILTIN_PROVIDER_MODULES: ProviderModule[] = [
   codexProviderModule,
   cursorProviderModule,
   openclawProviderModule,
+  opencodeProviderModule,
 ];
