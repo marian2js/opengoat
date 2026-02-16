@@ -91,7 +91,7 @@ opengoat onboard --external \
 ### Build the organization
 
 ```bash
-opengoat agent create "CTO" --manager --reports-to ceo --skill og-board-manager
+opengoat agent create "CTO" --manager --reports-to ceo --skill og-boards
 opengoat agent create "Engineer" --individual --reports-to cto --skill coding
 opengoat agent create "Designer" --individual --reports-to cto
 opengoat agent list
@@ -128,7 +128,7 @@ opengoat task status <task-id> doing
 ## Skills
 
 ```bash
-opengoat skill install og-board-manager --from /path/to/skill
+opengoat skill install og-boards --from /path/to/skill
 opengoat skill install jira-tools --from /path/to/skill
 opengoat skill list --agent ceo
 ```

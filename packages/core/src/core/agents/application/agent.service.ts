@@ -19,8 +19,7 @@ import type { PathPort } from "../../ports/path.port.js";
 import { basename, isAbsolute, resolve as resolvePath } from "node:path";
 import {
   renderAgentsIndex,
-  renderBoardIndividualSkillMarkdown,
-  renderBoardManagerSkillMarkdown,
+  renderBoardsSkillMarkdown,
   renderCeoBootstrapMarkdown,
   renderCeoRoleMarkdown,
   renderInternalAgentConfig,
@@ -342,7 +341,7 @@ export class AgentService {
         await this.ensureDirectory(skillDir, createdPaths, skippedPaths);
         await this.writeMarkdown(
           skillFile,
-          this.renderWorkspaceSkill(skillId),
+          this.renderWorkspaceSkill(skillId, normalizedAgentId),
           createdPaths,
           skippedPaths,
           { overwrite: true },
@@ -784,12 +783,13 @@ export class AgentService {
     return hasDirectReportees ? "manager" : "individual";
   }
 
-  private renderWorkspaceSkill(skillId: string): string {
-    if (skillId === "og-board-manager") {
-      return renderBoardManagerSkillMarkdown();
-    }
-    if (skillId === "og-board-individual") {
-      return renderBoardIndividualSkillMarkdown();
+  private renderWorkspaceSkill(skillId: string, agentId: string): string {
+    if (
+      skillId === "og-boards" ||
+      skillId === "og-board-manager" ||
+      skillId === "og-board-individual"
+    ) {
+      return renderBoardsSkillMarkdown(agentId);
     }
     throw new Error(`Unsupported workspace skill id: ${skillId}`);
   }
@@ -876,10 +876,10 @@ export class AgentService {
   }
 }
 
-const MANAGER_ROLE_SKILLS = ["og-board-manager"];
-const INDIVIDUAL_ROLE_SKILLS = ["og-board-individual"];
-const LEGACY_MANAGER_ROLE_SKILLS = ["board-manager"];
-const LEGACY_INDIVIDUAL_ROLE_SKILLS = ["board-individual"];
+const MANAGER_ROLE_SKILLS = ["og-boards"];
+const INDIVIDUAL_ROLE_SKILLS = ["og-boards"];
+const LEGACY_MANAGER_ROLE_SKILLS = ["og-board-manager", "board-manager"];
+const LEGACY_INDIVIDUAL_ROLE_SKILLS = ["og-board-individual", "board-individual"];
 const DEFAULT_WORKSPACE_SKILL_DIRECTORY = "skills";
 
 function toAgentTemplateOptions(

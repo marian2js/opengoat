@@ -1,4 +1,4 @@
-import { access, mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -46,18 +46,24 @@ describe("AgentService workspace role skills", () => {
         path.join(
           paths.workspacesDir,
           "cto",
-          ".cursor/skills/og-board-manager/SKILL.md",
+          ".cursor/skills/og-boards/SKILL.md",
         ),
       ),
     ).toBe(true);
     expect(
       await pathExists(
-        path.join(paths.workspacesDir, "cto", "skills", "og-board-manager"),
+        path.join(paths.workspacesDir, "cto", "skills", "og-boards"),
       ),
     ).toBe(false);
     expect(sync.removedPaths).toContain(
-      path.join(paths.workspacesDir, "cto", "skills", "og-board-manager"),
+      path.join(paths.workspacesDir, "cto", "skills", "og-boards"),
     );
+    const skillMarkdown = await readFile(
+      path.join(paths.workspacesDir, "cto", ".cursor/skills/og-boards/SKILL.md"),
+      "utf-8",
+    );
+    expect(skillMarkdown).toContain("Your agent id is `cto`.");
+    expect(skillMarkdown).not.toContain("<me>");
   });
 
   it("supports nested provider skill directories like .agents/skills", async () => {
@@ -82,7 +88,7 @@ describe("AgentService workspace role skills", () => {
         path.join(
           paths.workspacesDir,
           "engineer",
-          ".agents/skills/og-board-individual/SKILL.md",
+          ".agents/skills/og-boards/SKILL.md",
         ),
       ),
     ).toBe(true);
@@ -91,7 +97,7 @@ describe("AgentService workspace role skills", () => {
         path.join(
           paths.workspacesDir,
           "engineer",
-          "skills/og-board-individual/SKILL.md",
+          "skills/og-boards/SKILL.md",
         ),
       ),
     ).toBe(false);

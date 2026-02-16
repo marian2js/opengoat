@@ -79,7 +79,7 @@ describe("BootstrapService", () => {
           paths.workspacesDir,
           "ceo",
           "skills",
-          "og-board-manager",
+          "og-boards",
           "SKILL.md",
         ),
       ),

@@ -479,7 +479,10 @@ export class SkillService {
       normalizedSkill === LEGACY_BOARD_MANAGER_SKILL_ID
     ) {
       organizationRecord.type = "manager";
-    } else {
+    } else if (
+      normalizedSkill === BOARD_INDIVIDUAL_SKILL_ID ||
+      normalizedSkill === LEGACY_BOARD_INDIVIDUAL_SKILL_ID
+    ) {
       organizationRecord.type = "individual";
     }
 
@@ -498,9 +501,11 @@ export class SkillService {
 }
 
 const BOARD_INDIVIDUAL_SKILL_ID = "og-board-individual";
+const BOARDS_SKILL_ID = "og-boards";
 const LEGACY_BOARD_MANAGER_SKILL_ID = "board-manager";
 const LEGACY_BOARD_INDIVIDUAL_SKILL_ID = "board-individual";
 const ROLE_SKILL_IDS = new Set([
+  BOARDS_SKILL_ID,
   BOARD_MANAGER_SKILL_ID,
   BOARD_INDIVIDUAL_SKILL_ID,
   LEGACY_BOARD_MANAGER_SKILL_ID,

@@ -88,7 +88,7 @@ describe("OpenGoatService", () => {
           "workspaces",
           "research-analyst",
           "skills",
-          "og-board-individual",
+          "og-boards",
           "SKILL.md",
         ),
         constants.F_OK,
@@ -366,7 +366,7 @@ describe("OpenGoatService", () => {
           "workspaces",
           "engineer",
           "skills",
-          "og-board-individual",
+          "og-boards",
           "SKILL.md",
         ),
         constants.F_OK,
@@ -379,7 +379,7 @@ describe("OpenGoatService", () => {
           "workspaces",
           "cto",
           "skills",
-          "og-board-manager",
+          "og-boards",
           "SKILL.md",
         ),
         constants.F_OK,
@@ -396,17 +396,24 @@ describe("OpenGoatService", () => {
 
     const managedSkillsDir = path.join(root, "openclaw-managed-skills");
     const staleBoardManagerSkillDir = path.join(managedSkillsDir, "og-board-manager");
+    const staleBoardsSkillDir = path.join(managedSkillsDir, "og-boards");
     const staleBoardIndividualSkillDir = path.join(
       managedSkillsDir,
       "og-board-individual",
     );
     const staleManagedSkillDir = path.join(managedSkillsDir, "manager");
     await new NodeFileSystem().ensureDir(staleBoardManagerSkillDir);
+    await new NodeFileSystem().ensureDir(staleBoardsSkillDir);
     await new NodeFileSystem().ensureDir(staleBoardIndividualSkillDir);
     await new NodeFileSystem().ensureDir(staleManagedSkillDir);
     await writeFile(
       path.join(staleBoardManagerSkillDir, "SKILL.md"),
       "# stale manager board skill\n",
+      "utf-8",
+    );
+    await writeFile(
+      path.join(staleBoardsSkillDir, "SKILL.md"),
+      "# stale boards skill\n",
       "utf-8",
     );
     await writeFile(
@@ -465,6 +472,12 @@ describe("OpenGoatService", () => {
     await expect(
       access(
         path.join(managedSkillsDir, "og-board-manager"),
+        constants.F_OK,
+      ),
+    ).rejects.toBeTruthy();
+    await expect(
+      access(
+        path.join(managedSkillsDir, "og-boards"),
         constants.F_OK,
       ),
     ).rejects.toBeTruthy();
@@ -1572,8 +1585,8 @@ describe("OpenGoatService", () => {
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
     const soulMarkdown = await readFile(soulPath, "utf-8");
     const bootstrapMarkdown = await readFile(bootstrapPath, "utf-8");
-    const boardManagerSkillMarkdown = await readFile(
-      path.join(ceoWorkspace, "skills", "og-board-manager", "SKILL.md"),
+    const boardSkillMarkdown = await readFile(
+      path.join(ceoWorkspace, "skills", "og-boards", "SKILL.md"),
       "utf-8",
     );
     expect(agentsMarkdown).toContain("foo");
@@ -1586,7 +1599,8 @@ describe("OpenGoatService", () => {
       ["# SOUL.md - Legacy CEO", "", "Legacy body"].join("\n"),
     );
     expect(bootstrapMarkdown.trimEnd()).toBe("# legacy bootstrap");
-    expect(boardManagerSkillMarkdown).toContain("name: og-board-manager");
+    expect(boardSkillMarkdown).toContain("name: og-boards");
+    expect(boardSkillMarkdown).toContain("Your agent id is `ceo`.");
     await expect(
       access(
         path.join(ceoWorkspace, "skills", "manager", "SKILL.md"),
@@ -1734,10 +1748,16 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("CTO", { type: "manager", reportsTo: "ceo" });
     await new NodeFileSystem().ensureDir(path.join(managedSkillsDir, "og-board-manager"));
+    await new NodeFileSystem().ensureDir(path.join(managedSkillsDir, "og-boards"));
     await new NodeFileSystem().ensureDir(path.join(managedSkillsDir, "manager"));
     await writeFile(
       path.join(managedSkillsDir, "og-board-manager", "SKILL.md"),
       "# stale og-board-manager\n",
+      "utf-8",
+    );
+    await writeFile(
+      path.join(managedSkillsDir, "og-boards", "SKILL.md"),
+      "# stale og-boards\n",
       "utf-8",
     );
     await writeFile(
@@ -1753,6 +1773,7 @@ describe("OpenGoatService", () => {
     expect(result.failedOpenClawAgents).toHaveLength(0);
     expect(result.deletedOpenClawAgents).toEqual(["ceo", "cto", "orphan"]);
     expect(result.removedOpenClawManagedSkillDirs).toEqual([
+      path.join(managedSkillsDir, "og-boards"),
       path.join(managedSkillsDir, "og-board-manager"),
       path.join(managedSkillsDir, "manager"),
     ]);

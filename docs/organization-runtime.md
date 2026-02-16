@@ -9,7 +9,7 @@ This document describes the current organization-first runtime model.
 - default provider is `openclaw` unless overridden per agent
 - `ceo` is the default manager (head/CEO)
 - hierarchy is explicit in agent metadata
-- manager behavior is skill-driven (`og-board-manager` skill)
+- manager behavior is skill-driven (`og-boards` skill)
 - OpenClaw owns workspace bootstrap semantics; OpenGoat pre-seeds `ceo` `ROLE.md` and replaces `BOOTSTRAP.md` after OpenClaw bootstrap
 - OpenGoat also creates `~/.opengoat/organization` and seeds default organization `.md` files there on startup
 - task assignment is constrained to self or reportees (direct or indirect)
@@ -55,10 +55,10 @@ It does not execute delegated calls.
 Role skill materialization is provider-aware.
 
 - OpenGoat stores per-agent skill assignment metadata
-- manager capability is represented by assigned `og-board-manager` skill
+- manager capability is represented by assigned `og-boards` skill
 - role skills are workspace-installed and assignment-synced:
-  - managers: `og-board-manager`
-  - individuals: `og-board-individual`
+  - managers: `og-boards`
+  - individuals: `og-boards`
 - provider-specific workspace directories:
   - `openclaw`: `skills/`
   - `claude-code`: `.claude/skills/`

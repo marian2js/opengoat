@@ -45,7 +45,7 @@ Canonical fields:
 
 Defaults:
 
-- `ceo`: `type=manager`, `reportsTo=null`, assigned `og-board-manager` skill
+- `ceo`: `type=manager`, `reportsTo=null`, assigned `og-boards` skill
 - other agents: `type=individual`, `reportsTo=ceo`
 
 ## 4) Manager Runtime Model
@@ -78,8 +78,8 @@ Agent runtime config stores assignment under `runtime.skills.assigned`.
 
 Role skills remain mutually exclusive per agent:
 
-- managers: `og-board-manager`
-- individuals: `og-board-individual`
+- managers: `og-boards`
+- individuals: `og-boards`
 
 ## 6) OpenClaw Integration
 

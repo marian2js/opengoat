@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { DEFAULT_AGENT_ID, isDefaultAgentId } from "../domain/agent-id.js";
+import { DEFAULT_AGENT_ID, isDefaultAgentId, normalizeAgentId } from "../domain/agent-id.js";
 import type { AgentIdentity } from "../domain/agent.js";
 import type { AgentsIndex, OpenGoatConfig } from "../domain/opengoat-paths.js";
 
@@ -50,12 +50,12 @@ export function renderCeoBootstrapMarkdown(): string {
   return readMarkdownTemplate("ceo/BOOTSTRAP.md");
 }
 
-export function renderBoardManagerSkillMarkdown(): string {
-  return readMarkdownTemplate("skills/og-board-manager/SKILL.md");
-}
-
-export function renderBoardIndividualSkillMarkdown(): string {
-  return readMarkdownTemplate("skills/og-board-individual/SKILL.md");
+export function renderBoardsSkillMarkdown(agentId: string): string {
+  const resolvedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
+  return readMarkdownTemplate("skills/og-boards/SKILL.md").replaceAll(
+    "<me>",
+    resolvedAgentId,
+  );
 }
 
 export function listOrganizationMarkdownTemplates(): OrganizationMarkdownTemplate[] {
