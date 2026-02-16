@@ -4,6 +4,15 @@ import { GeminiCliProvider } from "./provider.js";
 export const providerModule: ProviderModule = {
   id: "gemini-cli",
   create: () => new GeminiCliProvider(),
+  runtime: {
+    invocation: {
+      cwd: "agent-workspace",
+      includeProjectContextPrompt: false,
+    },
+    skills: {
+      directories: [".gemini/skills"],
+    },
+  },
   onboarding: {
     env: [
       {

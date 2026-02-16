@@ -1,5 +1,10 @@
 import { ProviderNotFoundError } from "./errors.js";
-import type { ProviderModule, ProviderOnboardingSpec } from "./provider-module.js";
+import {
+  DEFAULT_PROVIDER_RUNTIME_POLICY,
+  type ProviderModule,
+  type ProviderOnboardingSpec,
+  type ProviderRuntimePolicy
+} from "./provider-module.js";
 import type { Provider } from "./types.js";
 
 export type ProviderFactory = () => Provider;
@@ -46,4 +51,54 @@ export class ProviderRegistry {
   public getProviderOnboarding(providerId: string): ProviderOnboardingSpec | undefined {
     return this.getProviderModule(providerId)?.onboarding;
   }
+
+  public getProviderRuntimePolicy(providerId: string): ProviderRuntimePolicy {
+    const runtime = this.getProviderModule(providerId)?.runtime;
+    const normalizedDirectories = normalizeSkillDirectories(
+      runtime?.skills.directories ?? DEFAULT_PROVIDER_RUNTIME_POLICY.skills.directories,
+    );
+    return {
+      invocation: {
+        cwd: runtime?.invocation.cwd ?? DEFAULT_PROVIDER_RUNTIME_POLICY.invocation.cwd,
+        includeProjectContextPrompt:
+          runtime?.invocation.includeProjectContextPrompt ??
+          DEFAULT_PROVIDER_RUNTIME_POLICY.invocation.includeProjectContextPrompt,
+      },
+      skills: {
+        directories:
+          normalizedDirectories.length > 0
+            ? normalizedDirectories
+            : [...DEFAULT_PROVIDER_RUNTIME_POLICY.skills.directories],
+      },
+    };
+  }
+}
+
+function normalizeSkillDirectories(input: string[]): string[] {
+  const normalized: string[] = [];
+  for (const rawDirectory of input) {
+    const directory = normalizeSkillDirectory(rawDirectory);
+    if (!directory || normalized.includes(directory)) {
+      continue;
+    }
+    normalized.push(directory);
+  }
+  return normalized;
+}
+
+function normalizeSkillDirectory(rawDirectory: string): string | null {
+  const trimmed = rawDirectory.trim().replace(/\\/g, "/");
+  if (!trimmed) {
+    return null;
+  }
+
+  const parts = trimmed
+    .split("/")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0 && part !== ".");
+  if (parts.length === 0 || parts.includes("..")) {
+    return null;
+  }
+
+  return parts.join("/");
 }

@@ -4,6 +4,15 @@ import { OpenCodeProvider } from "./provider.js";
 export const providerModule: ProviderModule = {
   id: "opencode",
   create: () => new OpenCodeProvider(),
+  runtime: {
+    invocation: {
+      cwd: "agent-workspace",
+      includeProjectContextPrompt: false,
+    },
+    skills: {
+      directories: [".opencode/skills"],
+    },
+  },
   onboarding: {
     env: [
       {

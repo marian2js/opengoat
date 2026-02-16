@@ -42,7 +42,9 @@ export interface AgentRuntimeProfile {
   agentId: string;
   providerId: string;
   providerKind: "cli" | "http";
-  workspaceAccess: "internal";
+  workspaceAccess: "session-project" | "agent-workspace";
+  includeProjectContextPrompt: boolean;
+  roleSkillDirectories: string[];
 }
 
 export interface ProviderStoredConfig {
@@ -606,12 +608,31 @@ export class ProviderService {
     const providerId = await this.resolveAgentProviderId(paths, normalizedAgentId);
     const registry = await this.getProviderRegistry();
     const provider = registry.create(providerId);
+    const runtimePolicy = registry.getProviderRuntimePolicy(provider.id);
     return {
       agentId: normalizedAgentId,
       providerId: provider.id,
       providerKind: provider.kind,
-      workspaceAccess: "internal"
+      workspaceAccess: runtimePolicy.invocation.cwd,
+      includeProjectContextPrompt: runtimePolicy.invocation.includeProjectContextPrompt,
+      roleSkillDirectories: [...runtimePolicy.skills.directories]
     };
+  }
+
+  public async listProviderRoleSkillDirectories(): Promise<string[]> {
+    const registry = await this.getProviderRegistry();
+    const directories = new Set<string>();
+    for (const providerId of registry.listProviderIds()) {
+      const runtimePolicy = registry.getProviderRuntimePolicy(providerId);
+      for (const directory of runtimePolicy.skills.directories) {
+        const normalized = directory.trim();
+        if (!normalized) {
+          continue;
+        }
+        directories.add(normalized);
+      }
+    }
+    return [...directories].sort((left, right) => left.localeCompare(right));
   }
 
   public async restartLocalGateway(

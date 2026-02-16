@@ -65,12 +65,19 @@ export interface AgentWorkspaceBootstrapInput {
 
 export interface AgentWorkspaceBootstrapOptions {
   syncBootstrapMarkdown?: boolean;
+  roleSkillDirectories?: string[];
+  managedRoleSkillDirectories?: string[];
 }
 
 interface WorkspaceSkillSyncResult {
   createdPaths: string[];
   skippedPaths: string[];
   removedPaths: string[];
+}
+
+export interface WorkspaceRoleSkillSyncOptions {
+  requiredSkillDirectories?: string[];
+  managedSkillDirectories?: string[];
 }
 
 interface RoleAssignmentSyncResult {
@@ -241,6 +248,10 @@ export class AgentService {
     const workspaceSkillSync = await this.ensureAgentWorkspaceRoleSkills(
       paths,
       normalizedAgentId,
+      {
+        requiredSkillDirectories: options.roleSkillDirectories,
+        managedSkillDirectories: options.managedRoleSkillDirectories,
+      },
     );
     createdPaths.push(...workspaceSkillSync.createdPaths);
     skippedPaths.push(...workspaceSkillSync.skippedPaths);
@@ -289,6 +300,7 @@ export class AgentService {
   public async ensureAgentWorkspaceRoleSkills(
     paths: OpenGoatPaths,
     agentId: string,
+    options: WorkspaceRoleSkillSyncOptions = {},
   ): Promise<WorkspaceSkillSyncResult> {
     const normalizedAgentId = normalizeAgentId(agentId);
     if (!normalizedAgentId) {
@@ -305,41 +317,58 @@ export class AgentService {
         ...LEGACY_INDIVIDUAL_ROLE_SKILLS,
       ]),
     ];
-    const workspaceDir = this.pathPort.join(
-      paths.workspacesDir,
-      normalizedAgentId,
+    const requiredSkillDirectories = resolveRoleSkillDirectories(
+      options.requiredSkillDirectories,
     );
-    const skillsDir = this.pathPort.join(workspaceDir, "skills");
+    const managedSkillDirectories = resolveRoleSkillDirectories([
+      ...(options.managedSkillDirectories ?? []),
+      ...requiredSkillDirectories,
+    ]);
+    const requiredSkillDirectorySet = new Set(requiredSkillDirectories);
+    const workspaceDir = this.pathPort.join(paths.workspacesDir, normalizedAgentId);
     const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
     const removedPaths: string[] = [];
 
     await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
-    await this.ensureDirectory(skillsDir, createdPaths, skippedPaths);
 
-    for (const skillId of requiredSkillIds) {
-      const skillDir = this.pathPort.join(skillsDir, skillId);
-      const skillFile = this.pathPort.join(skillDir, "SKILL.md");
-      await this.ensureDirectory(skillDir, createdPaths, skippedPaths);
-      await this.writeMarkdown(
-        skillFile,
-        this.renderWorkspaceSkill(skillId),
-        createdPaths,
-        skippedPaths,
-        { overwrite: true },
-      );
+    for (const relativeSkillsDir of requiredSkillDirectories) {
+      const skillsDir = this.pathPort.join(workspaceDir, relativeSkillsDir);
+      await this.ensureDirectory(skillsDir, createdPaths, skippedPaths);
+
+      for (const skillId of requiredSkillIds) {
+        const skillDir = this.pathPort.join(skillsDir, skillId);
+        const skillFile = this.pathPort.join(skillDir, "SKILL.md");
+        await this.ensureDirectory(skillDir, createdPaths, skippedPaths);
+        await this.writeMarkdown(
+          skillFile,
+          this.renderWorkspaceSkill(skillId),
+          createdPaths,
+          skippedPaths,
+          { overwrite: true },
+        );
+      }
     }
 
-    for (const skillId of managedRoleSkillIds) {
-      if (requiredSkillIds.includes(skillId)) {
-        continue;
-      }
-      const staleSkillDir = this.pathPort.join(skillsDir, skillId);
-      if (await this.fileSystem.exists(staleSkillDir)) {
-        await this.fileSystem.removeDir(staleSkillDir);
-        removedPaths.push(staleSkillDir);
-      } else {
-        skippedPaths.push(staleSkillDir);
+    for (const relativeSkillsDir of managedSkillDirectories) {
+      const skillsDir = this.pathPort.join(workspaceDir, relativeSkillsDir);
+      const shouldKeepRoleSkillsInDirectory =
+        requiredSkillDirectorySet.has(relativeSkillsDir);
+
+      for (const skillId of managedRoleSkillIds) {
+        const shouldExist =
+          shouldKeepRoleSkillsInDirectory && requiredSkillIds.includes(skillId);
+        if (shouldExist) {
+          continue;
+        }
+
+        const staleSkillDir = this.pathPort.join(skillsDir, skillId);
+        if (await this.fileSystem.exists(staleSkillDir)) {
+          await this.fileSystem.removeDir(staleSkillDir);
+          removedPaths.push(staleSkillDir);
+        } else {
+          skippedPaths.push(staleSkillDir);
+        }
       }
     }
 
@@ -851,6 +880,7 @@ const MANAGER_ROLE_SKILLS = ["og-board-manager"];
 const INDIVIDUAL_ROLE_SKILLS = ["og-board-individual"];
 const LEGACY_MANAGER_ROLE_SKILLS = ["board-manager"];
 const LEGACY_INDIVIDUAL_ROLE_SKILLS = ["board-individual"];
+const DEFAULT_WORKSPACE_SKILL_DIRECTORY = "skills";
 
 function toAgentTemplateOptions(
   agentId: string,
@@ -914,6 +944,37 @@ function normalizeReportsToValue(value: unknown): string | null | undefined {
 
 function dedupe(values: string[]): string[] {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+function resolveRoleSkillDirectories(input?: string[]): string[] {
+  const candidates =
+    input && input.length > 0 ? input : [DEFAULT_WORKSPACE_SKILL_DIRECTORY];
+  const directories: string[] = [];
+  for (const candidate of candidates) {
+    const normalized = normalizeRoleSkillDirectory(candidate);
+    if (!normalized || directories.includes(normalized)) {
+      continue;
+    }
+    directories.push(normalized);
+  }
+  return directories.length > 0
+    ? directories
+    : [DEFAULT_WORKSPACE_SKILL_DIRECTORY];
+}
+
+function normalizeRoleSkillDirectory(rawDirectory: string): string | null {
+  const trimmed = rawDirectory.trim().replace(/\\/g, "/");
+  if (!trimmed) {
+    return null;
+  }
+  const parts = trimmed
+    .split("/")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0 && part !== ".");
+  if (parts.length === 0 || parts.includes("..")) {
+    return null;
+  }
+  return parts.join("/");
 }
 
 function toJson(payload: unknown): string {

@@ -15,8 +15,31 @@ export interface ProviderOnboardingSpec {
   };
 }
 
+export type ProviderInvocationCwdMode = "session-project" | "agent-workspace";
+
+export interface ProviderRuntimePolicy {
+  invocation: {
+    cwd: ProviderInvocationCwdMode;
+    includeProjectContextPrompt: boolean;
+  };
+  skills: {
+    directories: string[];
+  };
+}
+
+export const DEFAULT_PROVIDER_RUNTIME_POLICY: ProviderRuntimePolicy = {
+  invocation: {
+    cwd: "session-project",
+    includeProjectContextPrompt: true,
+  },
+  skills: {
+    directories: ["skills"],
+  },
+};
+
 export interface ProviderModule {
   id: string;
   create: () => Provider;
   onboarding?: ProviderOnboardingSpec;
+  runtime?: ProviderRuntimePolicy;
 }

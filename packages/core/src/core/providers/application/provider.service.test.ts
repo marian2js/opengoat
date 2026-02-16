@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { BaseProvider } from "../base-provider.js";
+import type { ProviderModule } from "../provider-module.js";
 import { ProviderRegistry } from "../registry.js";
 import type {
   ProviderExecutionResult,
@@ -147,6 +148,44 @@ describe("ProviderService", () => {
       "claude-session-123",
     );
   });
+
+  it("returns provider runtime profile with provider-specific workspace policy", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-provider-service-runtime-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+
+    const { service } = await createService(paths);
+    await writeAgentConfig(paths, "developer", {
+      id: "developer",
+      displayName: "Developer",
+      runtime: {
+        provider: {
+          id: "claude-code",
+        },
+      },
+    });
+
+    const profile = await service.getAgentRuntimeProfile(paths, "developer");
+    expect(profile).toEqual({
+      agentId: "developer",
+      providerId: "claude-code",
+      providerKind: "cli",
+      workspaceAccess: "agent-workspace",
+      includeProjectContextPrompt: false,
+      roleSkillDirectories: [".claude/skills"],
+    });
+  });
+
+  it("lists managed role skill directories from registered provider runtime policies", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-provider-service-skill-dirs-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+
+    const { service } = await createService(paths);
+    const directories = await service.listProviderRoleSkillDirectories();
+
+    expect(directories).toEqual([".claude/skills", "skills"]);
+  });
 });
 
 async function createService(paths: OpenGoatPaths): Promise<{
@@ -180,8 +219,35 @@ async function createService(paths: OpenGoatPaths): Promise<{
     providerSessionId: "claude-session-123",
   });
 
-  registry.register("openclaw", () => openClawProvider);
-  registry.register("claude-code", () => claudeProvider);
+  const openClawModule: ProviderModule = {
+    id: "openclaw",
+    create: () => openClawProvider,
+    runtime: {
+      invocation: {
+        cwd: "session-project",
+        includeProjectContextPrompt: true,
+      },
+      skills: {
+        directories: ["skills"],
+      },
+    },
+  };
+  const claudeModule: ProviderModule = {
+    id: "claude-code",
+    create: () => claudeProvider,
+    runtime: {
+      invocation: {
+        cwd: "agent-workspace",
+        includeProjectContextPrompt: false,
+      },
+      skills: {
+        directories: [".claude/skills"],
+      },
+    },
+  };
+
+  registry.register("openclaw", () => openClawProvider, openClawModule);
+  registry.register("claude-code", () => claudeProvider, claudeModule);
 
   const fileSystem = new NodeFileSystem();
   await Promise.all([

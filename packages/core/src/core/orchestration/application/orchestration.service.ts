@@ -4,6 +4,7 @@ import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type {
+  AgentRuntimeProfile,
   AgentProviderBinding,
   ProviderExecutionResult,
   ProviderInvokeOptions,
@@ -37,6 +38,16 @@ interface AgentInvocationResult {
     postRunCompaction: SessionCompactionResult;
   };
 }
+
+const OPENCLAW_PROVIDER_ID = "openclaw";
+const DEFAULT_RUNTIME_PROFILE: AgentRuntimeProfile = {
+  agentId: DEFAULT_AGENT_ID,
+  providerId: OPENCLAW_PROVIDER_ID,
+  providerKind: "cli",
+  workspaceAccess: "session-project",
+  includeProjectContextPrompt: true,
+  roleSkillDirectories: ["skills"]
+};
 
 export class OrchestrationService {
   private readonly providerService: ProviderService;
@@ -142,6 +153,7 @@ export class OrchestrationService {
     behavior: { sessionAgentId?: string; runId?: string; step?: number } = {}
   ): Promise<AgentInvocationResult> {
     const sessionAgentId = normalizeAgentId(behavior.sessionAgentId ?? agentId) || DEFAULT_AGENT_ID;
+    const runtimeProfile = await this.resolveAgentRuntimeProfile(paths, agentId);
     const preparedSession = await this.sessionService.prepareRunSession(paths, sessionAgentId, {
       sessionRef: options.sessionRef,
       forceNew: options.forceNewSession,
@@ -156,8 +168,16 @@ export class OrchestrationService {
     }
     if (preparedSession.enabled) {
       invokeOptions.providerSessionId = preparedSession.info.sessionId;
-      invokeOptions.cwd = resolveInvocationCwd(invokeOptions.cwd, preparedSession.info.projectPath);
-      const projectContextPrompt = buildProjectContextSystemPrompt(preparedSession.info);
+      invokeOptions.cwd = resolveInvocationCwd({
+        requestedCwd: invokeOptions.cwd,
+        sessionProjectPath: preparedSession.info.projectPath,
+        workspacePath: preparedSession.info.workspacePath,
+        workspaceAccess: runtimeProfile.workspaceAccess
+      });
+      const projectContextPrompt = buildProjectContextSystemPrompt(
+        preparedSession.info,
+        runtimeProfile,
+      );
       if (projectContextPrompt) {
         invokeOptions.systemPrompt = mergeSystemPrompts(invokeOptions.systemPrompt, projectContextPrompt);
       }
@@ -269,6 +289,10 @@ export class OrchestrationService {
       }) => void;
     };
   }): Promise<ProviderExecutionResult & AgentProviderBinding> {
+    if (params.execution.providerId !== OPENCLAW_PROVIDER_ID) {
+      return params.execution;
+    }
+
     if (!containsMissingAgentMessage(params.execution.stdout, params.execution.stderr)) {
       return params.execution;
     }
@@ -348,6 +372,22 @@ export class OrchestrationService {
     });
   }
 
+  private async resolveAgentRuntimeProfile(
+    paths: OpenGoatPaths,
+    agentId: string
+  ): Promise<AgentRuntimeProfile> {
+    const runtimeProvider = this.providerService as ProviderService & {
+      getAgentRuntimeProfile?: (paths: OpenGoatPaths, agentId: string) => Promise<AgentRuntimeProfile>;
+    };
+    if (typeof runtimeProvider.getAgentRuntimeProfile !== "function") {
+      return {
+        ...DEFAULT_RUNTIME_PROFILE,
+        agentId: normalizeAgentId(agentId) || DEFAULT_AGENT_ID
+      };
+    }
+    return runtimeProvider.getAgentRuntimeProfile(paths, agentId);
+  }
+
   private async buildAndWriteTrace(params: {
     paths: OpenGoatPaths;
     runId: string;
@@ -423,15 +463,38 @@ function sanitizeProviderInvokeOptions(options: OrchestrationRunOptions): Provid
   return sanitized;
 }
 
-function resolveInvocationCwd(requestedCwd: string | undefined, sessionProjectPath: string): string {
-  const normalizedRequested = requestedCwd?.trim();
+function resolveInvocationCwd(params: {
+  requestedCwd: string | undefined;
+  sessionProjectPath: string;
+  workspacePath: string;
+  workspaceAccess: AgentRuntimeProfile["workspaceAccess"];
+}): string {
+  if (params.workspaceAccess === "agent-workspace") {
+    const workspacePath = params.workspacePath.trim();
+    if (workspacePath) {
+      return workspacePath;
+    }
+    return params.sessionProjectPath;
+  }
+
+  const normalizedRequested = params.requestedCwd?.trim();
   if (normalizedRequested) {
     return normalizedRequested;
   }
-  return sessionProjectPath;
+  return params.sessionProjectPath;
 }
 
-function buildProjectContextSystemPrompt(session: SessionRunInfo): string | undefined {
+function buildProjectContextSystemPrompt(
+  session: SessionRunInfo,
+  runtimeProfile: AgentRuntimeProfile
+): string | undefined {
+  if (
+    runtimeProfile.workspaceAccess !== "session-project" ||
+    !runtimeProfile.includeProjectContextPrompt
+  ) {
+    return undefined;
+  }
+
   const projectPath = session.projectPath.trim();
   const workspacePath = session.workspacePath.trim();
   if (!projectPath || projectPath === workspacePath) {

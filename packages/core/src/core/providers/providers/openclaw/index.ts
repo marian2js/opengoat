@@ -4,6 +4,15 @@ import { OpenClawProvider } from "./provider.js";
 export const providerModule: ProviderModule = {
   id: "openclaw",
   create: () => new OpenClawProvider(),
+  runtime: {
+    invocation: {
+      cwd: "session-project",
+      includeProjectContextPrompt: true,
+    },
+    skills: {
+      directories: ["skills"],
+    },
+  },
   onboarding: {
     env: [
       {

@@ -18,7 +18,12 @@ export type {
 } from "./application/provider.service.js";
 export { loadProviderModules } from "./loader.js";
 export type { ProviderModule } from "./provider-module.js";
-export type { ProviderOnboardingEnvField, ProviderOnboardingSpec } from "./provider-module.js";
+export type {
+  ProviderInvocationCwdMode,
+  ProviderOnboardingEnvField,
+  ProviderOnboardingSpec,
+  ProviderRuntimePolicy
+} from "./provider-module.js";
 export type {
   Provider,
   ProviderAuthOptions,

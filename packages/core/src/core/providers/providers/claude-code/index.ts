@@ -4,6 +4,15 @@ import { ClaudeCodeProvider } from "./provider.js";
 export const providerModule: ProviderModule = {
   id: "claude-code",
   create: () => new ClaudeCodeProvider(),
+  runtime: {
+    invocation: {
+      cwd: "agent-workspace",
+      includeProjectContextPrompt: false,
+    },
+    skills: {
+      directories: [".claude/skills"],
+    },
+  },
   onboarding: {
     env: [
       {

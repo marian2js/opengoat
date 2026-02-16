@@ -787,7 +787,13 @@ export class OpenGoatService {
     providerId: string,
   ): Promise<AgentProviderBinding> {
     const paths = this.pathsProvider.getPaths();
-    return this.providerService.setAgentProvider(paths, agentId, providerId);
+    const binding = await this.providerService.setAgentProvider(
+      paths,
+      agentId,
+      providerId,
+    );
+    await this.ensureAgentProviderRoleSkills(paths, binding.agentId);
+    return binding;
   }
 
   public async getOpenClawGatewayConfig(): Promise<OpenClawGatewayConfig> {
@@ -1405,7 +1411,7 @@ export class OpenGoatService {
         return;
       }
       syncedAgents.add(targetAgentId);
-      const sync = await this.agentService.ensureAgentWorkspaceRoleSkills(
+      const sync = await this.ensureAgentProviderRoleSkills(
         paths,
         targetAgentId,
       );
@@ -1480,6 +1486,30 @@ export class OpenGoatService {
       skippedPaths,
       removedPaths,
     };
+  }
+
+  private async ensureAgentProviderRoleSkills(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    rawAgentId: string,
+  ): Promise<{
+    createdPaths: string[];
+    skippedPaths: string[];
+    removedPaths: string[];
+  }> {
+    const agentId = normalizeAgentId(rawAgentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+    const runtimeProfile = await this.providerService.getAgentRuntimeProfile(
+      paths,
+      agentId,
+    );
+    const managedRoleSkillDirectories =
+      await this.providerService.listProviderRoleSkillDirectories();
+    return this.agentService.ensureAgentWorkspaceRoleSkills(paths, agentId, {
+      requiredSkillDirectories: runtimeProfile.roleSkillDirectories,
+      managedSkillDirectories: managedRoleSkillDirectories,
+    });
   }
 
   private async resolveOpenClawManagedSkillsDir(

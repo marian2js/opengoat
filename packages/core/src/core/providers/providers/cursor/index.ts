@@ -4,6 +4,15 @@ import { CursorProvider } from "./provider.js";
 export const providerModule: ProviderModule = {
   id: "cursor",
   create: () => new CursorProvider(),
+  runtime: {
+    invocation: {
+      cwd: "agent-workspace",
+      includeProjectContextPrompt: false,
+    },
+    skills: {
+      directories: [".cursor/skills"],
+    },
+  },
   onboarding: {
     env: [
       {

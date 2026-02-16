@@ -52,15 +52,21 @@ It does not execute delegated calls.
 
 ## Skills
 
-Skills remain delegated to OpenClaw workspaces/skill resolution.
+Role skill materialization is provider-aware.
 
-- OpenClaw loads bundled skills, managed skills (`~/.openclaw/skills`), and workspace-local `skills/`
 - OpenGoat stores per-agent skill assignment metadata
 - manager capability is represented by assigned `og-board-manager` skill
 - role skills are workspace-installed and assignment-synced:
   - managers: `og-board-manager`
   - individuals: `og-board-individual`
-- role skills are mutually exclusive per agent and are not installed into OpenClaw shared managed skills
+- provider-specific workspace directories:
+  - `openclaw`: `skills/`
+  - `claude-code`: `.claude/skills/`
+  - `codex`: `.agents/skills/`
+  - `cursor`: `.cursor/skills/`
+  - `opencode`: `.opencode/skills/`
+  - `gemini-cli`: `.gemini/skills/`
+- role skills are mutually exclusive per agent
 
 ## Sessions
 
@@ -71,7 +77,9 @@ Session behavior:
 - same key + different path rotates to a new session id
 - OpenGoat session id maps to OpenClaw session key `agent:<agent-id>:<session-id>` (1:1 mapping)
 - if project path is omitted on later runs, OpenGoat reuses the stored path for that session key
-- OpenGoat injects project-path runtime context so project sessions stay anchored to the selected repo path
+- provider runtime policy controls cwd + project context:
+  - `openclaw`: uses session project path and project-context prompt injection
+  - non-`openclaw` providers: use agent workspace path and skip project-context prompt injection
 
 Storage:
 

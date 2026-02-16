@@ -4,6 +4,15 @@ import { CodexProvider } from "./provider.js";
 export const providerModule: ProviderModule = {
   id: "codex",
   create: () => new CodexProvider(),
+  runtime: {
+    invocation: {
+      cwd: "agent-workspace",
+      includeProjectContextPrompt: false,
+    },
+    skills: {
+      directories: [".agents/skills"],
+    },
+  },
   onboarding: {
     env: [
       {
