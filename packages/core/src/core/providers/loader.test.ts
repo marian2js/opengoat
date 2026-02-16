@@ -7,6 +7,11 @@ describe("provider loader", () => {
     const registry = new ProviderRegistry();
     await loadProviderModules(registry);
 
-    expect(registry.listProviderIds()).toEqual(["claude-code", "codex", "openclaw"]);
+    expect(registry.listProviderIds()).toEqual([
+      "claude-code",
+      "codex",
+      "cursor",
+      "openclaw",
+    ]);
   });
 });

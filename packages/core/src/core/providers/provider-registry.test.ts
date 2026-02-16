@@ -6,7 +6,12 @@ describe("provider registry", () => {
     const registry = await createDefaultProviderRegistry();
 
     const providerIds = registry.listProviderIds();
-    expect(providerIds).toEqual(["claude-code", "codex", "openclaw"]);
+    expect(providerIds).toEqual([
+      "claude-code",
+      "codex",
+      "cursor",
+      "openclaw",
+    ]);
 
     expect(registry.getProviderOnboarding("openclaw")?.env?.some((field) => field.key === "OPENCLAW_CMD")).toBe(
       true
@@ -16,6 +21,9 @@ describe("provider registry", () => {
     ).toBe(true);
     expect(
       registry.getProviderOnboarding("codex")?.env?.some((field) => field.key === "CODEX_CMD"),
+    ).toBe(true);
+    expect(
+      registry.getProviderOnboarding("cursor")?.env?.some((field) => field.key === "CURSOR_CMD"),
     ).toBe(true);
   });
 });
