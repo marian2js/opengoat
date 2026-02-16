@@ -6,9 +6,10 @@
   <a href="https://www.npmjs.com/package/opengoat"><img src="https://img.shields.io/npm/v/opengoat?style=flat-square" alt="npm version" /></a>
   <a href="https://github.com/marian2js/opengoat/actions"><img src="https://img.shields.io/github/actions/workflow/status/marian2js/opengoat/ci.yml?branch=main&style=flat-square" alt="CI" /></a>
   <img src="https://img.shields.io/badge/node-%3E%3D20.11-brightgreen?style=flat-square" alt="Node >= 20.11" />
+  <a href="https://discord.gg/JWGqXJMwYE"><img src="https://img.shields.io/badge/discord-7289DA?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
 </p>
 
-**OpenGoat** allows you to build herarchical organizations of AI agents that coordinate work across multiple tools.
+**OpenGoat** allows you to build herarchical organizations of AI agents that coordinate work across multiple tools, including Claude Code, Codex, Cursor, Lovable, and more.
 
 [![OpenGoat UI](/assets/org-example.png)](https://opengoat.ai)
 
