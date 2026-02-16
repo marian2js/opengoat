@@ -11,6 +11,7 @@ describe("provider registry", () => {
       "codex",
       "cursor",
       "openclaw",
+      "opencode",
     ]);
 
     expect(registry.getProviderOnboarding("openclaw")?.env?.some((field) => field.key === "OPENCLAW_CMD")).toBe(
@@ -24,6 +25,9 @@ describe("provider registry", () => {
     ).toBe(true);
     expect(
       registry.getProviderOnboarding("cursor")?.env?.some((field) => field.key === "CURSOR_CMD"),
+    ).toBe(true);
+    expect(
+      registry.getProviderOnboarding("opencode")?.env?.some((field) => field.key === "OPENCODE_CMD"),
     ).toBe(true);
   });
 });
