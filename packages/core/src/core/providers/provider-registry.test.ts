@@ -10,6 +10,7 @@ describe("provider registry", () => {
       "claude-code",
       "codex",
       "cursor",
+      "gemini-cli",
       "openclaw",
       "opencode",
     ]);
@@ -25,6 +26,9 @@ describe("provider registry", () => {
     ).toBe(true);
     expect(
       registry.getProviderOnboarding("cursor")?.env?.some((field) => field.key === "CURSOR_CMD"),
+    ).toBe(true);
+    expect(
+      registry.getProviderOnboarding("gemini-cli")?.env?.some((field) => field.key === "GEMINI_CMD"),
     ).toBe(true);
     expect(
       registry.getProviderOnboarding("opencode")?.env?.some((field) => field.key === "OPENCODE_CMD"),

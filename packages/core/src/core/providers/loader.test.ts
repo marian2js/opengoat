@@ -11,6 +11,7 @@ describe("provider loader", () => {
       "claude-code",
       "codex",
       "cursor",
+      "gemini-cli",
       "openclaw",
       "opencode",
     ]);
