@@ -275,13 +275,22 @@ export interface UiServerSettingsResponse {
   ceoBootstrapPending: boolean;
 }
 
+export type UiVersionSource = "npm" | "github-release" | "github-tag";
+
 export interface UiVersionInfo {
   packageName: string;
   installedVersion: string | null;
   latestVersion: string | null;
   updateAvailable: boolean | null;
-  status: "latest" | "update-available" | "unpublished" | "unknown";
+  status:
+    | "latest"
+    | "update-available"
+    | "ahead"
+    | "unpublished"
+    | "unknown";
   checkedAt: string;
+  latestSource: UiVersionSource | null;
+  checkedSources: UiVersionSource[];
   error?: string;
 }
 

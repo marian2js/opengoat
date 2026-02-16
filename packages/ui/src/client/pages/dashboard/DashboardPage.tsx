@@ -55,6 +55,10 @@ import { cn } from "@/lib/utils";
 import { CreateAgentDialog } from "@/pages/agents/CreateAgentDialog";
 import { AgentsPage } from "@/pages/agents/AgentsPage";
 import { useCreateAgentDialog } from "@/pages/agents/useCreateAgentDialog";
+import {
+  SidebarVersionStatus,
+  type SidebarVersionInfo,
+} from "@/pages/dashboard/components/SidebarVersionStatus";
 import { LogsPage } from "@/pages/logs/LogsPage";
 import { SkillsPage } from "@/pages/skills/SkillsPage";
 import type { SkillsResponse } from "@/pages/skills/types";
@@ -240,15 +244,7 @@ interface UiAuthenticationStatusResponse {
   };
 }
 
-interface UiVersionInfo {
-  packageName: string;
-  installedVersion: string | null;
-  latestVersion: string | null;
-  updateAvailable: boolean | null;
-  status: "latest" | "update-available" | "unpublished" | "unknown";
-  checkedAt: string;
-  error?: string;
-}
+type UiVersionInfo = SidebarVersionInfo;
 
 interface DashboardState {
   health: HealthResponse;
@@ -1087,6 +1083,8 @@ export function DashboardPage(): ReactElement {
           latestVersion: null,
           updateAvailable: null,
           status: "unknown",
+          latestSource: null,
+          checkedSources: [],
           checkedAt: new Date().toISOString(),
           error: message,
         };
@@ -1324,48 +1322,6 @@ export function DashboardPage(): ReactElement {
       projectPath: workspace.projectPath,
     }));
   }, [workspaceNodes]);
-
-  const versionStatus = useMemo(() => {
-    if (isVersionLoading && !versionInfo) {
-      return {
-        label: "Checking updates",
-        toneClassName: "text-muted-foreground",
-      } as const;
-    }
-
-    if (versionInfo?.status === "update-available") {
-      return {
-        label: versionInfo.latestVersion
-          ? `Update ${versionInfo.latestVersion}`
-          : "Update available",
-        toneClassName: "text-amber-300",
-      } as const;
-    }
-
-    if (versionInfo?.status === "latest") {
-      return {
-        label: "Latest",
-        toneClassName: "text-emerald-300",
-      } as const;
-    }
-
-    if (versionInfo?.status === "unpublished") {
-      return {
-        label: "Release pending",
-        toneClassName: "text-sky-300",
-      } as const;
-    }
-
-    return {
-      label: versionInfo?.installedVersion
-        ? "Status unavailable"
-        : "Version unavailable",
-      toneClassName: "text-muted-foreground",
-    } as const;
-  }, [isVersionLoading, versionInfo]);
-
-  const installedVersionLabel = versionInfo?.installedVersion?.trim() || "—";
-  const versionSummaryLabel = `${versionStatus.label} · v${installedVersionLabel}`;
 
   const defaultTaskProjectPath = taskProjectOptions[0]?.projectPath ?? "~";
   const workspaceProjectNameByPath = useMemo(() => {
@@ -3997,33 +3953,11 @@ export function DashboardPage(): ReactElement {
           </nav>
 
           <div className="border-t border-border p-3">
-            {!isSidebarCollapsed ? (
-              <p
-                className="mb-2 truncate px-1 text-[11px]"
-                title={`OpenGoat v${installedVersionLabel} · ${versionStatus.label}`}
-              >
-                <span className="text-muted-foreground">OpenGoat </span>
-                <span className="font-semibold text-foreground">
-                  v{installedVersionLabel}
-                </span>
-                <span className="text-muted-foreground"> · </span>
-                <span className={versionStatus.toneClassName}>
-                  {versionStatus.label}
-                </span>
-              </p>
-            ) : (
-              <div className="mb-2 flex justify-center">
-                <div
-                  className={cn(
-                    "inline-flex size-8 items-center justify-center rounded-md border border-border/70 bg-accent/40 text-[10px] text-muted-foreground",
-                  )}
-                  title={versionSummaryLabel}
-                  aria-label={versionSummaryLabel}
-                >
-                  v
-                </div>
-              </div>
-            )}
+            <SidebarVersionStatus
+              versionInfo={versionInfo}
+              isVersionLoading={isVersionLoading}
+              isSidebarCollapsed={isSidebarCollapsed}
+            />
 
             <div
               className={cn(

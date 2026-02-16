@@ -8,6 +8,7 @@ export const MIN_MAX_PARALLEL_FLOWS = 1;
 export const MAX_MAX_PARALLEL_FLOWS = 32;
 export const UI_SETTINGS_FILENAME = "ui-settings.json";
 export const OPENGOAT_PACKAGE_NAME = "opengoat";
+export const OPENGOAT_GITHUB_REPOSITORY = "marian2js/opengoat";
 export const VERSION_CACHE_TTL_MS = 5 * 60_000;
 export const VERSION_CHECK_TIMEOUT_MS = 2_000;
 export const MAX_UI_LOG_ENTRIES = 4000;
