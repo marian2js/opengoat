@@ -1946,19 +1946,19 @@ describe("OpenGoatService", () => {
       engineerSessions.some((entry) =>
         entry.sessionKey.includes(`agent_engineer_task_${todoTask.taskId}`),
       ),
-    ).toBe(false);
+    ).toBe(true);
 
     const ceoSessions = await service.listSessions("ceo");
     expect(
       ceoSessions.some((entry) =>
         entry.sessionKey.includes(`agent_ceo_task_${blockedTask.taskId}`),
       ),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       ceoSessions.some((entry) =>
         entry.sessionKey.includes("agent_ceo_inactive_engineer"),
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("notifies assignees when pending tasks exceed the inactivity threshold", async () => {
@@ -2232,6 +2232,78 @@ describe("OpenGoatService", () => {
     expect(cycle.todoTasks).toBe(4);
     expect(cycle.dispatches).toHaveLength(4);
     expect(peakConcurrentInvocations).toBe(2);
+  });
+
+  it("serializes cron dispatches per target agent while keeping cross-agent parallelism", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const provider = new FakeOpenClawProvider();
+    const { service } = createService(root, provider);
+    await service.initialize();
+    await service.createAgent("Engineer One", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+    await service.createAgent("Engineer Two", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    for (let index = 0; index < 3; index += 1) {
+      await service.createTask("ceo", {
+        title: `Engineer one task ${index + 1}`,
+        description: "Complete the assigned task",
+        assignedTo: "engineer-one",
+        status: "todo",
+      });
+      await service.createTask("ceo", {
+        title: `Engineer two task ${index + 1}`,
+        description: "Complete the assigned task",
+        assignedTo: "engineer-two",
+        status: "todo",
+      });
+    }
+
+    let globalConcurrentInvocations = 0;
+    let globalPeakConcurrentInvocations = 0;
+    const concurrentByAgent = new Map<string, number>();
+    const peakByAgent = new Map<string, number>();
+    vi.spyOn(provider, "invoke").mockImplementation(async (options) => {
+      const targetAgentId = (options.agent ?? "").trim() || "unknown";
+      const currentAgentConcurrency = (concurrentByAgent.get(targetAgentId) ?? 0) + 1;
+      concurrentByAgent.set(targetAgentId, currentAgentConcurrency);
+      peakByAgent.set(
+        targetAgentId,
+        Math.max(peakByAgent.get(targetAgentId) ?? 0, currentAgentConcurrency),
+      );
+
+      globalConcurrentInvocations += 1;
+      globalPeakConcurrentInvocations = Math.max(
+        globalPeakConcurrentInvocations,
+        globalConcurrentInvocations,
+      );
+      await delayMs(20);
+      globalConcurrentInvocations -= 1;
+      concurrentByAgent.set(targetAgentId, currentAgentConcurrency - 1);
+
+      return {
+        code: 0,
+        stdout: "ok\n",
+        stderr: "",
+      };
+    });
+
+    const cycle = await service.runTaskCronCycle({
+      notifyInactiveAgents: false,
+      maxParallelFlows: 4,
+    });
+
+    expect(cycle.todoTasks).toBe(6);
+    expect(cycle.dispatches).toHaveLength(6);
+    expect(globalPeakConcurrentInvocations).toBe(2);
+    expect(peakByAgent.get("engineer-one")).toBe(1);
+    expect(peakByAgent.get("engineer-two")).toBe(1);
   });
 });
 

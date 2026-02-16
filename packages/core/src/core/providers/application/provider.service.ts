@@ -74,6 +74,9 @@ export interface OpenClawGatewayConfigSnapshot {
 const OPENCLAW_PROVIDER_ID = "openclaw";
 const AGENT_CONFIG_FILE_NAME = "config.json";
 const PROVIDER_SESSION_BINDINGS_SCHEMA_VERSION = 1;
+const OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS = 4;
+const OPENCLAW_RETRY_BACKOFF_BASE_MS = 100;
+const OPENCLAW_RETRY_BACKOFF_MAX_MS = 1_500;
 
 interface ProviderSessionBindingsShape {
   schemaVersion: number;
@@ -351,14 +354,14 @@ export class ProviderService {
 
     let result: ProviderExecutionResult;
     try {
-      result = await provider.invoke(invokeOptions);
       if (provider.id === OPENCLAW_PROVIDER_ID) {
-        result = await this.retryGatewayInvocationOnUvCwdFailure(
+        result = await this.invokeOpenClawProviderWithRecovery(
           paths,
           provider,
           invokeOptions,
-          result,
         );
+      } else {
+        result = await provider.invoke(invokeOptions);
       }
     } catch (error) {
       if (
@@ -1033,6 +1036,57 @@ export class ProviderService {
     await this.fileSystem.writeFile(bindingsPath, `${JSON.stringify(bindings, null, 2)}\n`);
   }
 
+  private async invokeOpenClawProviderWithRecovery(
+    paths: OpenGoatPaths,
+    provider: Provider,
+    invokeOptions: ProviderInvokeOptions
+  ): Promise<ProviderExecutionResult> {
+    let attempt = 0;
+    while (attempt < OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS) {
+      attempt += 1;
+      let result: ProviderExecutionResult;
+      try {
+        result = await provider.invoke(invokeOptions);
+        result = await this.retryGatewayInvocationOnUvCwdFailure(
+          paths,
+          provider,
+          invokeOptions,
+          result
+        );
+      } catch (error) {
+        if (!isGatewayRetryableLockFailureError(error) || attempt >= OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS) {
+          throw error;
+        }
+        const delayMs = resolveOpenClawRetryDelayMs(attempt);
+        this.logger.warn("OpenClaw invocation failed in locked/in-flight state; retrying.", {
+          attempt,
+          maxAttempts: OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS,
+          delayMs,
+          error: summarizeRetryFailureOutput(error instanceof Error ? error.message : String(error))
+        });
+        await sleep(delayMs);
+        continue;
+      }
+
+      if (!isGatewayRetryableLockFailureResult(result) || attempt >= OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS) {
+        return result;
+      }
+
+      const delayMs = resolveOpenClawRetryDelayMs(attempt);
+      this.logger.warn("OpenClaw invocation returned locked/in-flight result; retrying.", {
+        attempt,
+        maxAttempts: OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS,
+        delayMs,
+        code: result.code,
+        stderr: summarizeRetryFailureOutput(result.stderr),
+        stdout: summarizeRetryFailureOutput(result.stdout)
+      });
+      await sleep(delayMs);
+    }
+
+    return provider.invoke(invokeOptions);
+  }
+
   private getProviderSessionBindingsPath(
     paths: OpenGoatPaths,
     providerId: string,
@@ -1147,6 +1201,55 @@ function isGatewayUvCwdFailure(result: ProviderExecutionResult): boolean {
   }
   const details = `${result.stderr}\n${result.stdout}`.toLowerCase();
   return details.includes("process.cwd failed") && details.includes("uv_cwd");
+}
+
+function isGatewayRetryableLockFailureResult(result: ProviderExecutionResult): boolean {
+  if (result.code === 0) {
+    return false;
+  }
+  return isGatewayRetryableLockFailureText(`${result.stderr}\n${result.stdout}`);
+}
+
+function isGatewayRetryableLockFailureError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return isGatewayRetryableLockFailureText(error.message);
+}
+
+function isGatewayRetryableLockFailureText(value: string): boolean {
+  const details = value.trim().toLowerCase();
+  if (!details) {
+    return false;
+  }
+  return (
+    details.includes("session file locked") ||
+    details.includes("timeout waiting for session store lock") ||
+    details.includes("in_flight") ||
+    details.includes("already in flight") ||
+    details.includes("run is already active")
+  );
+}
+
+function resolveOpenClawRetryDelayMs(attempt: number): number {
+  const exponent = Math.max(0, attempt - 1);
+  const next = OPENCLAW_RETRY_BACKOFF_BASE_MS * (2 ** exponent);
+  return Math.min(OPENCLAW_RETRY_BACKOFF_MAX_MS, next);
+}
+
+function summarizeRetryFailureOutput(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (trimmed.length <= 240) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, 237)}...`;
+}
+
+async function sleep(durationMs: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, Math.max(0, durationMs)));
 }
 
 function extractOpenClawGlobalArgs(raw: string | undefined): string[] {

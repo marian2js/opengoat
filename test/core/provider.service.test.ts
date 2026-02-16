@@ -176,6 +176,25 @@ describe("ProviderService (OpenClaw runtime)", () => {
     );
   });
 
+  it("retries invoke when OpenClaw reports session lock contention", async () => {
+    const root = await createTempDir("opengoat-provider-service-");
+    roots.push(root);
+    const { paths, fileSystem } = await createPaths(root);
+    await seedAgent(fileSystem, paths, "ceo");
+
+    const provider = new FlakySessionLockProvider();
+    const service = createProviderService(fileSystem, createRegistry(provider));
+
+    const executeCommandSpy = vi.spyOn(commandExecutor, "executeCommand");
+    const result = await service.invokeAgent(paths, "ceo", {
+      message: "hello after lock"
+    });
+
+    expect(result.code).toBe(0);
+    expect(provider.invokeCalls).toBe(2);
+    expect(executeCommandSpy).not.toHaveBeenCalled();
+  });
+
   it("falls back to gateway agent call when provider command is unavailable", async () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
@@ -451,6 +470,27 @@ class FlakyUvCwdProvider extends FakeOpenClawProvider {
         stdout: "",
         stderr:
           "Gateway call failed: Error: Error: EPERM: process.cwd failed with error operation not permitted, uv_cwd"
+      };
+    }
+    return {
+      code: 0,
+      stdout: "ok\n",
+      stderr: ""
+    };
+  }
+}
+
+class FlakySessionLockProvider extends FakeOpenClawProvider {
+  public invokeCalls = 0;
+
+  public override async invoke(options: ProviderInvokeOptions): Promise<ProviderExecutionResult> {
+    this.lastInvoke = options;
+    this.invokeCalls += 1;
+    if (this.invokeCalls === 1) {
+      return {
+        code: 1,
+        stdout: "",
+        stderr: "session file locked (timeout 10000ms): pid=77 /tmp/openclaw-session.lock"
       };
     }
     return {

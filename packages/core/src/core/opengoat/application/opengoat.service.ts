@@ -1049,9 +1049,10 @@ export class OpenGoatService {
       }
     }
 
-    const dispatches = await runWithConcurrency(
+    const dispatches = await runWithConcurrencyByKey(
       requests,
       maxParallelFlows,
+      (request) => normalizeAgentId(request.targetAgentId) || DEFAULT_AGENT_ID,
       async (request) => {
         const result = await this.dispatchAutomationMessage(
           paths,
@@ -1086,9 +1087,11 @@ export class OpenGoatService {
     latestCeoProjectPath?: string,
     maxParallelFlows = 1,
   ): Promise<TaskCronDispatchResult[]> {
-    return runWithConcurrency(
+    return runWithConcurrencyByKey(
       inactiveCandidates,
       maxParallelFlows,
+      (candidate) =>
+        normalizeAgentId(candidate.managerAgentId) || DEFAULT_AGENT_ID,
       async (candidate) => {
         const sessionRef = buildInactiveSessionRef(
           candidate.managerAgentId,
@@ -1293,7 +1296,7 @@ export class OpenGoatService {
       const result = await this.orchestrationService.runAgent(paths, agentId, {
         message,
         sessionRef,
-        disableSession: options.disableSession ?? true,
+        disableSession: options.disableSession ?? false,
         cwd: options.cwd,
         env: process.env,
       });
@@ -2213,6 +2216,39 @@ async function runWithConcurrency<T, R>(
   const workerCount = Math.min(concurrency, items.length);
   const workers = Array.from({ length: workerCount }, () => runWorker());
   await Promise.all(workers);
+  return results;
+}
+
+async function runWithConcurrencyByKey<T, R>(
+  items: T[],
+  rawConcurrency: number,
+  resolveKey: (item: T, index: number) => string,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const grouped = new Map<string, Array<{ item: T; index: number }>>();
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index]!;
+    const key = resolveKey(item, index).trim().toLowerCase() || "default";
+    const bucket = grouped.get(key) ?? [];
+    bucket.push({ item, index });
+    grouped.set(key, bucket);
+  }
+
+  const results = new Array<R>(items.length);
+  await runWithConcurrency(
+    [...grouped.values()],
+    rawConcurrency,
+    async (entries): Promise<void> => {
+      for (const entry of entries) {
+        results[entry.index] = await worker(entry.item, entry.index);
+      }
+    },
+  );
+
   return results;
 }
 
