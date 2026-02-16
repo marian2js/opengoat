@@ -91,6 +91,7 @@ import {
   FolderPlus,
   Home,
   MessageSquare,
+  MessageSquarePlus,
   MoreHorizontal,
   Pin,
   Plus,
@@ -2148,6 +2149,50 @@ export function DashboardPage(): ReactElement {
     }
   }
 
+  async function handleCreateAgentWorkspaceSession(): Promise<void> {
+    if (route.kind !== "agent" || !selectedAgentProject) {
+      return;
+    }
+
+    const targetAgentId = selectedAgent?.id ?? route.agentId;
+    setMutating(true);
+    setOpenWorkspaceMenuId(null);
+    setOpenSessionMenuId(null);
+
+    try {
+      const response = await fetchJson<WorkspaceSessionResponse>(
+        "/api/workspaces/session",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            agentId: targetAgentId,
+            projectPath: selectedAgentProject.projectPath,
+            workspaceName: selectedAgentProject.name,
+          }),
+        },
+      );
+
+      toast.success(
+        response.message ??
+          `Session created for \"${
+            selectedAgent?.displayName ?? route.agentId
+          }\".`,
+      );
+      await refreshSessions(targetAgentId);
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to create agent session.";
+      toast.error(message);
+    } finally {
+      setMutating(false);
+    }
+  }
+
   async function handleRenameWorkspace(
     workspace: WorkspaceNode,
   ): Promise<void> {
@@ -4018,9 +4063,32 @@ export function DashboardPage(): ReactElement {
                       size="md"
                     />
                   ) : null}
-                  <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
-                    {selectedAgent?.displayName ?? route.agentId}
-                  </h1>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
+                      {selectedAgent?.displayName ?? route.agentId}
+                    </h1>
+                    <button
+                      type="button"
+                      title={`New session with ${
+                        selectedAgent?.displayName ?? route.agentId
+                      }`}
+                      aria-label={`New session with ${
+                        selectedAgent?.displayName ?? route.agentId
+                      }`}
+                      onClick={() => {
+                        void handleCreateAgentWorkspaceSession();
+                      }}
+                      disabled={
+                        isMutating ||
+                        isLoading ||
+                        !selectedAgentProject ||
+                        !selectedAgent
+                      }
+                      className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors hover:border-border/60 hover:bg-accent/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <MessageSquarePlus className="size-4 icon-stroke-1_2" />
+                    </button>
+                  </div>
                 </div>
               ) : route.kind === "session" ? (
                 <div className="flex min-w-0 items-center gap-3">
