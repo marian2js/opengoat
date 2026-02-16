@@ -1,5 +1,6 @@
 import type { ProviderRegistry } from "./registry.js";
 import { providerModule as claudeCodeProviderModule } from "./providers/claude-code/index.js";
+import { providerModule as codexProviderModule } from "./providers/codex/index.js";
 import { providerModule as openclawProviderModule } from "./providers/openclaw/index.js";
 
 export async function loadProviderModules(registry: ProviderRegistry): Promise<void> {
@@ -7,6 +8,11 @@ export async function loadProviderModules(registry: ProviderRegistry): Promise<v
     claudeCodeProviderModule.id,
     claudeCodeProviderModule.create,
     claudeCodeProviderModule,
+  );
+  registry.register(
+    codexProviderModule.id,
+    codexProviderModule.create,
+    codexProviderModule,
   );
   registry.register(openclawProviderModule.id, openclawProviderModule.create, openclawProviderModule);
 }

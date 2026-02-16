@@ -6,13 +6,16 @@ describe("provider registry", () => {
     const registry = await createDefaultProviderRegistry();
 
     const providerIds = registry.listProviderIds();
-    expect(providerIds).toEqual(["claude-code", "openclaw"]);
+    expect(providerIds).toEqual(["claude-code", "codex", "openclaw"]);
 
     expect(registry.getProviderOnboarding("openclaw")?.env?.some((field) => field.key === "OPENCLAW_CMD")).toBe(
       true
     );
     expect(
       registry.getProviderOnboarding("claude-code")?.env?.some((field) => field.key === "CLAUDE_CODE_CMD"),
+    ).toBe(true);
+    expect(
+      registry.getProviderOnboarding("codex")?.env?.some((field) => field.key === "CODEX_CMD"),
     ).toBe(true);
   });
 });
