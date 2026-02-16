@@ -1,5 +1,5 @@
 <h1 align="center">OpenGoat</h1>
-<p align="center"><strong>Build AI Autonomous Organizations of provider-backed agents.</strong></p>
+<p align="center"><strong>Build AI Autonomous Organizations of OpenClaw Agents.</strong></p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License" /></a>
@@ -9,7 +9,7 @@
   <a href="https://discord.gg/JWGqXJMwYE"><img src="https://img.shields.io/badge/discord-7289DA?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
 </p>
 
-**OpenGoat** allows you to build herarchical organizations of AI agents that coordinate work across multiple tools.
+**OpenGoat** allows you to build herarchical organizations of AI agents that coordinate work across multiple tools, including Claude Code, Codex, Cursor, Lovable, and more.
 
 [![OpenGoat UI](/assets/org-example.png)](https://opengoat.ai)
 
