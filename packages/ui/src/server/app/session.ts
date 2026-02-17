@@ -67,12 +67,11 @@ export function normalizeRole(value: string | undefined): string | undefined {
   return normalized || undefined;
 }
 
-export async function prepareProjectSession(
+export async function prepareUiSession(
   service: OpenClawUiService,
   agentId: string,
   options: {
     sessionRef: string;
-    projectPath: string;
     forceNew: boolean;
   },
 ): Promise<SessionRunInfo> {
@@ -88,7 +87,6 @@ export async function prepareProjectSession(
         request: {
           sessionRef?: string;
           forceNew?: boolean;
-          projectPath?: string;
           userMessage: string;
         },
       ) => Promise<LegacyPreparedSessionRun>;
@@ -116,7 +114,6 @@ export async function prepareProjectSession(
       {
         sessionRef: options.sessionRef,
         forceNew: options.forceNew,
-        projectPath: options.projectPath,
         userMessage: "",
       },
     );
@@ -128,7 +125,7 @@ export async function prepareProjectSession(
   }
 
   throw new Error(
-    "Project session preparation is unavailable. Restart the UI server after updating dependencies.",
+    "Session preparation is unavailable. Restart the UI server after updating dependencies.",
   );
 }
 
@@ -144,57 +141,17 @@ export async function ensureDefaultOrganizationWorkspace(
     await mkdir(organizationPath, { recursive: true });
 
     const sessions = await service.listSessions(DEFAULT_AGENT_ID);
-    const normalizedOrganizationPath = normalizeComparableProjectPath(organizationPath);
-    const existingProjectSession = sessions.find((session) => {
-      return (
-        session.sessionKey.startsWith("project:") &&
-        normalizeComparableProjectPath(session.projectPath) === normalizedOrganizationPath
-      );
-    });
-    const hasOrganizationWorkspaceSession = sessions.some((session) => {
-      return (
-        session.sessionKey.startsWith("workspace:") &&
-        normalizeComparableProjectPath(session.projectPath) === normalizedOrganizationPath
-      );
-    });
-
-    if (existingProjectSession) {
-      const hasExpectedProjectName =
-        existingProjectSession.title.trim() === DEFAULT_ORGANIZATION_PROJECT_NAME;
-      if (!hasExpectedProjectName) {
-        await renameUiSession(
-          service,
-          DEFAULT_AGENT_ID,
-          DEFAULT_ORGANIZATION_PROJECT_NAME,
-          existingProjectSession.sessionKey,
-        );
-      }
-    } else {
-      const projectSessionRef = buildProjectSessionRef(
-        DEFAULT_ORGANIZATION_PROJECT_NAME,
-        organizationPath,
-      );
-      await prepareProjectSession(service, DEFAULT_AGENT_ID, {
-        sessionRef: projectSessionRef,
-        projectPath: organizationPath,
-        forceNew: false,
-      });
-      await renameUiSession(
-        service,
-        DEFAULT_AGENT_ID,
-        DEFAULT_ORGANIZATION_PROJECT_NAME,
-        projectSessionRef,
-      );
-    }
+    const hasOrganizationWorkspaceSession = sessions.some((session) =>
+      session.sessionKey.startsWith("workspace:"),
+    );
 
     if (!hasOrganizationWorkspaceSession) {
       const workspaceSessionRef = buildWorkspaceSessionRef(
         DEFAULT_ORGANIZATION_PROJECT_NAME,
         organizationPath,
       );
-      await prepareProjectSession(service, DEFAULT_AGENT_ID, {
+      await prepareUiSession(service, DEFAULT_AGENT_ID, {
         sessionRef: workspaceSessionRef,
-        projectPath: organizationPath,
         forceNew: true,
       });
       await renameUiSession(
@@ -330,7 +287,6 @@ export async function runUiSessionMessage(
   agentId: string,
   options: {
     sessionRef: string;
-    projectPath?: string;
     message: string;
     images?: UiImageInput[];
     abortSignal?: AbortSignal;
@@ -343,7 +299,6 @@ export async function runUiSessionMessage(
     return service.runAgent(agentId, {
       message: options.message,
       sessionRef: options.sessionRef,
-      cwd: options.projectPath,
       images: options.images,
       ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
       ...(options.hooks ? { hooks: options.hooks } : {}),
@@ -353,71 +308,6 @@ export async function runUiSessionMessage(
   }
 
   throw new Error("Session messaging is unavailable on this runtime.");
-}
-
-export async function resolveSessionProjectPathForRequest(
-  service: OpenClawUiService,
-  agentId: string,
-  sessionRef: string,
-  requestedProjectPath: string | undefined,
-): Promise<string | undefined> {
-  const explicitPath = normalizeOptionalAbsolutePath(requestedProjectPath);
-  if (explicitPath) {
-    return explicitPath;
-  }
-
-  const storedProjectPath = await resolveStoredSessionProjectPath(
-    service,
-    agentId,
-    sessionRef,
-  );
-  if (storedProjectPath) {
-    return storedProjectPath;
-  }
-
-  const organizationPath = resolveAbsolutePath(
-    path.join(service.getHomeDir(), DEFAULT_ORGANIZATION_PROJECT_DIRNAME),
-  );
-  const organizationStats = await stat(organizationPath).catch(() => {
-    return null;
-  });
-  if (organizationStats?.isDirectory()) {
-    return organizationPath;
-  }
-
-  const homePath = resolveAbsolutePath(service.getHomeDir());
-  const homeStats = await stat(homePath).catch(() => {
-    return null;
-  });
-  if (homeStats?.isDirectory()) {
-    return homePath;
-  }
-
-  return undefined;
-}
-
-async function resolveStoredSessionProjectPath(
-  service: OpenClawUiService,
-  agentId: string,
-  sessionRef: string,
-): Promise<string | undefined> {
-  const normalizedSessionRef = sessionRef.trim();
-  if (!normalizedSessionRef) {
-    return undefined;
-  }
-
-  try {
-    const sessions = await service.listSessions(agentId);
-    const matchingSession = sessions.find((session) => {
-      return (
-        session.sessionKey === normalizedSessionRef ||
-        session.sessionId === normalizedSessionRef
-      );
-    });
-    return normalizeOptionalAbsolutePath(matchingSession?.projectPath);
-  } catch {
-    return undefined;
-  }
 }
 
 export async function createUiTask(
@@ -617,15 +507,6 @@ export function resolveDefaultWorkspaceSessionTitle(): string {
   return "New Session";
 }
 
-export function normalizeComparableProjectPath(value: string | undefined): string {
-  const trimmed = value?.trim();
-  if (!trimmed) {
-    return "";
-  }
-  const resolved = resolveAbsolutePath(trimmed);
-  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
-}
-
 export function resolveAbsolutePath(value: string): string {
   const trimmed = value.trim();
   if (trimmed === "~") {
@@ -635,16 +516,6 @@ export function resolveAbsolutePath(value: string): string {
     return path.resolve(homedir(), trimmed.slice(2));
   }
   return path.resolve(trimmed);
-}
-
-export function normalizeOptionalAbsolutePath(
-  value: string | undefined,
-): string | undefined {
-  const trimmed = value?.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-  return resolveAbsolutePath(trimmed);
 }
 
 function normalizeProjectSegment(value: string): string {

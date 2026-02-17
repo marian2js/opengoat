@@ -35,7 +35,6 @@ export interface SessionEntry {
   title?: string;
   transcriptFile?: string;
   workspacePath?: string;
-  projectPath?: string;
   inputChars?: number;
   outputChars?: number;
   totalChars?: number;
@@ -54,7 +53,6 @@ export interface SessionRunInfo {
   sessionId: string;
   transcriptPath: string;
   workspacePath: string;
-  projectPath: string;
   isNewSession: boolean;
 }
 
@@ -65,7 +63,6 @@ export interface SessionSummary {
   updatedAt: number;
   transcriptPath: string;
   workspacePath: string;
-  projectPath?: string;
   inputChars: number;
   outputChars: number;
   totalChars: number;

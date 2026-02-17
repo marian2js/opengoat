@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -19,13 +19,10 @@ describe("SessionService", () => {
     }
   });
 
-  it("reuses the stored project path when a follow-up run omits projectPath", async () => {
+  it("anchors sessions to the agent workspace and reuses session ids for the same session key", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "opengoat-session-path-"));
     tempDirs.push(root);
 
-    const projectPath = path.join(root, "saaslib");
-    await mkdir(projectPath, { recursive: true });
-
     const service = new SessionService({
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
@@ -35,7 +32,6 @@ describe("SessionService", () => {
 
     const first = await service.prepareRunSession(paths, "ceo", {
       sessionRef: "workspace:saaslib",
-      projectPath,
       userMessage: "first turn"
     });
     expect(first.enabled).toBe(true);
@@ -52,20 +48,13 @@ describe("SessionService", () => {
       return;
     }
 
-    expect(second.info.projectPath).toBe(projectPath);
+    expect(second.info.workspacePath).toBe(path.join(root, "workspaces", "ceo"));
     expect(second.info.sessionId).toBe(first.info.sessionId);
   });
 
-  it("rotates the session id when the project path explicitly changes", async () => {
+  it("rotates the session id when forceNew is requested", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "opengoat-session-rotate-"));
     tempDirs.push(root);
-
-    const projectA = path.join(root, "saaslib");
-    const projectB = path.join(root, "opengoat");
-    await Promise.all([
-      mkdir(projectA, { recursive: true }),
-      mkdir(projectB, { recursive: true })
-    ]);
 
     const service = new SessionService({
       fileSystem: new NodeFileSystem(),
@@ -76,7 +65,6 @@ describe("SessionService", () => {
 
     const first = await service.prepareRunSession(paths, "ceo", {
       sessionRef: "workspace:shared",
-      projectPath: projectA,
       userMessage: "first turn"
     });
     expect(first.enabled).toBe(true);
@@ -86,7 +74,7 @@ describe("SessionService", () => {
 
     const second = await service.prepareRunSession(paths, "ceo", {
       sessionRef: "workspace:shared",
-      projectPath: projectB,
+      forceNew: true,
       userMessage: "second turn"
     });
     expect(second.enabled).toBe(true);
@@ -94,7 +82,6 @@ describe("SessionService", () => {
       return;
     }
 
-    expect(second.info.projectPath).toBe(projectB);
     expect(second.info.sessionId).not.toBe(first.info.sessionId);
   });
 });

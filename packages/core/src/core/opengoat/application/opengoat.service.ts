@@ -974,9 +974,6 @@ export class OpenGoatService {
           notificationTarget,
         )
       : [];
-    const latestCeoProjectPath = notifyInactiveAgents
-      ? await this.resolveLatestProjectPathForAgent(paths, DEFAULT_AGENT_ID)
-      : undefined;
 
     const tasks = await this.boardService.listTasks(paths, { limit: 10_000 });
     const pendingTaskIds = new Set(
@@ -999,7 +996,6 @@ export class OpenGoatService {
       inactiveCandidates,
       inactiveMinutes,
       ranAt,
-      latestCeoProjectPath,
       maxParallelFlows,
     );
     const dispatches = [
@@ -1141,7 +1137,6 @@ export class OpenGoatService {
     inactiveCandidates: InactiveAgentCandidate[],
     inactiveMinutes: number,
     notificationTimestamp: string,
-    latestCeoProjectPath?: string,
     maxParallelFlows = 1,
   ): Promise<TaskCronDispatchResult[]> {
     return runWithConcurrencyByKey(
@@ -1169,9 +1164,6 @@ export class OpenGoatService {
           candidate.managerAgentId,
           sessionRef,
           message,
-          {
-            cwd: latestCeoProjectPath,
-          },
         );
         return {
           kind: "inactive",
@@ -1259,7 +1251,6 @@ export class OpenGoatService {
     agentId = DEFAULT_AGENT_ID,
     options: {
       sessionRef?: string;
-      projectPath?: string;
       forceNew?: boolean;
     } = {},
   ): Promise<SessionRunInfo> {
@@ -1269,7 +1260,6 @@ export class OpenGoatService {
       agentId,
       {
         sessionRef: options.sessionRef,
-        projectPath: options.projectPath,
         forceNew: options.forceNew,
         userMessage: "",
       },
@@ -2208,19 +2198,6 @@ export class OpenGoatService {
     return inactive;
   }
 
-  private async resolveLatestProjectPathForAgent(
-    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
-    rawAgentId: string,
-  ): Promise<string | undefined> {
-    const agentId = normalizeAgentId(rawAgentId);
-    if (!agentId) {
-      return undefined;
-    }
-
-    const sessions = await this.sessionService.listSessions(paths, agentId);
-    const latestProjectPath = sessions[0]?.projectPath?.trim();
-    return latestProjectPath || undefined;
-  }
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

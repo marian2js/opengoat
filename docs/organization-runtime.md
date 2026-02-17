@@ -73,13 +73,10 @@ Role skill materialization is provider-aware.
 Session behavior:
 
 - continuity per agent/session key
-- tied to project path
-- same key + different path rotates to a new session id
 - OpenGoat session id maps to OpenClaw session key `agent:<agent-id>:<session-id>` (1:1 mapping)
-- if project path is omitted on later runs, OpenGoat reuses the stored path for that session key
-- provider runtime policy controls cwd + project context:
-  - `openclaw`: uses session project path and project-context prompt injection
-  - non-`openclaw` providers: use agent workspace path and skip project-context prompt injection
+- provider runtime policy controls cwd:
+  - `openclaw`: provider-default invocation (OpenGoat does not override cwd/path)
+  - non-`openclaw` providers: use agent workspace path
 
 Storage:
 

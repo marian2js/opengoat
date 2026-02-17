@@ -171,7 +171,6 @@ describe("ProviderService", () => {
       providerId: "claude-code",
       providerKind: "cli",
       workspaceAccess: "agent-workspace",
-      includeProjectContextPrompt: false,
       roleSkillDirectories: [".claude/skills"],
     });
   });
@@ -224,8 +223,7 @@ async function createService(paths: OpenGoatPaths): Promise<{
     create: () => openClawProvider,
     runtime: {
       invocation: {
-        cwd: "session-project",
-        includeProjectContextPrompt: true,
+        cwd: "provider-default",
       },
       skills: {
         directories: ["skills"],
@@ -238,7 +236,6 @@ async function createService(paths: OpenGoatPaths): Promise<{
     runtime: {
       invocation: {
         cwd: "agent-workspace",
-        includeProjectContextPrompt: false,
       },
       skills: {
         directories: [".claude/skills"],

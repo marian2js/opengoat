@@ -42,8 +42,7 @@ export interface AgentRuntimeProfile {
   agentId: string;
   providerId: string;
   providerKind: "cli" | "http";
-  workspaceAccess: "session-project" | "agent-workspace";
-  includeProjectContextPrompt: boolean;
+  workspaceAccess: "provider-default" | "agent-workspace";
   roleSkillDirectories: string[];
 }
 
@@ -614,7 +613,6 @@ export class ProviderService {
       providerId: provider.id,
       providerKind: provider.kind,
       workspaceAccess: runtimePolicy.invocation.cwd,
-      includeProjectContextPrompt: runtimePolicy.invocation.includeProjectContextPrompt,
       roleSkillDirectories: [...runtimePolicy.skills.directories]
     };
   }

@@ -6,8 +6,7 @@ export const providerModule: ProviderModule = {
   create: () => new OpenClawProvider(),
   runtime: {
     invocation: {
-      cwd: "session-project",
-      includeProjectContextPrompt: true,
+      cwd: "provider-default",
     },
     skills: {
       directories: ["skills"],

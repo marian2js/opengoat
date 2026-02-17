@@ -28,7 +28,7 @@ openclaw onboard
 opengoat start
 ```
 
-That's it. Open `http://127.0.0.1:19123`, add a project, and start messaging the CEO. He will take care of the rest.
+That's it. Open `http://127.0.0.1:19123` and start messaging the CEO. He will take care of the rest.
 
 ### Alternative: Docker
 
@@ -104,12 +104,11 @@ opengoat agent cto --message "Plan the Q2 engineering roadmap and split it into 
 opengoat agent engineer --message "Implement the auth middleware for this sprint."
 ```
 
-### Keep project sessions scoped
+### Keep session continuity
 
 ```bash
 opengoat agent ceo \
   --session saaslib-planning \
-  --project-path /Users/you/workspace/project \
   --message "Create a release checklist for v1.2"
 
 opengoat agent ceo \
