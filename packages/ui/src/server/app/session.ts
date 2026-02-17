@@ -612,14 +612,14 @@ export async function resolveUiProviders(
   }
 
   if (!seenProviderIds.has("openclaw")) {
-    providers.unshift({
+    providers.push({
       id: "openclaw",
       displayName: "OpenClaw",
       supportsReportees: true,
     });
   }
 
-  return providers;
+  return sortUiProviders(providers);
 }
 
 function normalizeProviderIdValue(value: unknown): string | undefined {
@@ -659,6 +659,25 @@ function normalizeProviderDisplayName(
       return segment.charAt(0).toUpperCase() + segment.slice(1);
     })
     .join(" ");
+}
+
+function sortUiProviders(providers: UiProviderOption[]): UiProviderOption[] {
+  const sorted = [...providers];
+  sorted.sort((left, right) => {
+    const leftIsOpenClaw = left.id === "openclaw";
+    const rightIsOpenClaw = right.id === "openclaw";
+    if (leftIsOpenClaw && !rightIsOpenClaw) {
+      return -1;
+    }
+    if (!leftIsOpenClaw && rightIsOpenClaw) {
+      return 1;
+    }
+
+    return left.displayName.localeCompare(right.displayName, undefined, {
+      sensitivity: "base",
+    });
+  });
+  return sorted;
 }
 
 function normalizeReportsToValue(

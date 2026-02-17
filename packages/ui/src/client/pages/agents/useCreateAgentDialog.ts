@@ -96,7 +96,7 @@ export function useCreateAgentDialog(
       });
     }
 
-    return [...deduped.values()];
+    return sortProviderOptions([...deduped.values()]);
   }, [providers]);
 
   useEffect(() => {
@@ -306,4 +306,25 @@ function resolveDefaultProviderId(
     providers[0]?.id ??
     "openclaw"
   );
+}
+
+function sortProviderOptions(
+  providers: CreateAgentProviderOption[],
+): CreateAgentProviderOption[] {
+  const sorted = [...providers];
+  sorted.sort((left, right) => {
+    const leftIsOpenClaw = left.id === "openclaw";
+    const rightIsOpenClaw = right.id === "openclaw";
+    if (leftIsOpenClaw && !rightIsOpenClaw) {
+      return -1;
+    }
+    if (!leftIsOpenClaw && rightIsOpenClaw) {
+      return 1;
+    }
+
+    return left.displayName.localeCompare(right.displayName, undefined, {
+      sensitivity: "base",
+    });
+  });
+  return sorted;
 }
