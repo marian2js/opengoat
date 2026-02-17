@@ -462,7 +462,6 @@ interface OrgNodeData {
   providerLabel: string;
   role?: string;
   directReports: number;
-  indirectReports: number;
   totalReports: number;
   collapsed: boolean;
   onToggle: (agentId: string) => void;
@@ -5451,6 +5450,7 @@ function OrganizationChartNode({
 }: NodeProps<OrgChartNode>): ReactElement {
   const isManager = data.agentType === "manager";
   const hasReportees = data.totalReports > 0;
+  const managerReportees = data.totalReports;
   const providerLabel = data.providerLabel;
 
   return (
@@ -5488,24 +5488,24 @@ function OrganizationChartNode({
                 event.stopPropagation();
                 data.onToggle(id);
               }}
-              className="inline-flex min-w-6 items-center justify-center rounded-md border border-border bg-background px-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="inline-flex min-w-6 items-center justify-center rounded-md border border-border bg-background px-1.5 text-[10px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
               aria-label={
                 data.collapsed
                   ? `Expand ${data.displayName}`
                   : `Collapse ${data.displayName}`
               }
-              title={`${data.indirectReports} indirect report${
-                data.indirectReports === 1 ? "" : "s"
+              title={`${managerReportees} reportee${
+                managerReportees === 1 ? "" : "s"
               }`}
             >
-              {data.indirectReports}
+              {managerReportees}
             </button>
           ) : (
             <span
-              className="inline-flex min-w-6 items-center justify-center rounded-md border border-border bg-background px-1.5 text-xs font-medium text-muted-foreground"
-              title="0 indirect reports"
+              className="inline-flex min-w-6 items-center justify-center rounded-md border border-border bg-background px-1.5 text-[10px] font-medium text-muted-foreground"
+              title="0 reportees"
             >
-              {data.indirectReports}
+              {managerReportees}
             </span>
           )
         ) : null}
@@ -5711,7 +5711,6 @@ function buildFlowModel(params: {
     const directReports = hierarchy.childrenById.get(agentId)?.length ?? 0;
     const providerId = agent?.providerId ?? "openclaw";
     const totalReports = totalReportsById.get(agentId) ?? 0;
-    const indirectReports = Math.max(0, totalReports - directReports);
 
     return {
       id: agentId,
@@ -5728,7 +5727,6 @@ function buildFlowModel(params: {
         providerLabel: resolveProviderLabel(providerId, providerLabelById),
         role: resolveAgentRoleLabel(agent),
         directReports,
-        indirectReports,
         totalReports,
         collapsed: collapsedNodeIds.has(agentId),
         onToggle,
