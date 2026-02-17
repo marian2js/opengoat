@@ -457,10 +457,12 @@ interface OrgNodeData {
   [key: string]: unknown;
   agentId: string;
   displayName: string;
+  agentType: Agent["type"];
   providerId: string;
   providerLabel: string;
   role?: string;
   directReports: number;
+  indirectReports: number;
   totalReports: number;
   collapsed: boolean;
   onToggle: (agentId: string) => void;
@@ -5447,6 +5449,7 @@ function OrganizationChartNode({
   id,
   data,
 }: NodeProps<OrgChartNode>): ReactElement {
+  const isManager = data.agentType === "manager";
   const hasReportees = data.totalReports > 0;
   const providerLabel = data.providerLabel;
 
@@ -5476,23 +5479,35 @@ function OrganizationChartNode({
           </div>
         </div>
 
-        {hasReportees ? (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              data.onToggle(id);
-            }}
-            className="inline-flex size-6 items-center justify-center rounded-md border border-border bg-background text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
-            aria-label={
-              data.collapsed
-                ? `Expand ${data.displayName}`
-                : `Collapse ${data.displayName}`
-            }
-          >
-            {data.collapsed ? "+" : "-"}
-          </button>
+        {isManager ? (
+          hasReportees ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                data.onToggle(id);
+              }}
+              className="inline-flex min-w-6 items-center justify-center rounded-md border border-border bg-background px-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+              aria-label={
+                data.collapsed
+                  ? `Expand ${data.displayName}`
+                  : `Collapse ${data.displayName}`
+              }
+              title={`${data.indirectReports} indirect report${
+                data.indirectReports === 1 ? "" : "s"
+              }`}
+            >
+              {data.indirectReports}
+            </button>
+          ) : (
+            <span
+              className="inline-flex min-w-6 items-center justify-center rounded-md border border-border bg-background px-1.5 text-xs font-medium text-muted-foreground"
+              title="0 indirect reports"
+            >
+              {data.indirectReports}
+            </span>
+          )
         ) : null}
       </div>
 
@@ -5695,6 +5710,8 @@ function buildFlowModel(params: {
     const layout = graph.node(agentId) as { x: number; y: number } | undefined;
     const directReports = hierarchy.childrenById.get(agentId)?.length ?? 0;
     const providerId = agent?.providerId ?? "openclaw";
+    const totalReports = totalReportsById.get(agentId) ?? 0;
+    const indirectReports = Math.max(0, totalReports - directReports);
 
     return {
       id: agentId,
@@ -5706,11 +5723,13 @@ function buildFlowModel(params: {
       data: {
         agentId,
         displayName: agent?.displayName ?? agentId,
+        agentType: agent?.type ?? "unknown",
         providerId,
         providerLabel: resolveProviderLabel(providerId, providerLabelById),
         role: resolveAgentRoleLabel(agent),
         directReports,
-        totalReports: totalReportsById.get(agentId) ?? 0,
+        indirectReports,
+        totalReports,
         collapsed: collapsedNodeIds.has(agentId),
         onToggle,
       },
