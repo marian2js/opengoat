@@ -4007,18 +4007,20 @@ export function DashboardPage(): ReactElement {
           </nav>
 
           <div className="border-t border-border p-3">
-            <SidebarVersionStatus
-              versionInfo={versionInfo}
-              isVersionLoading={isVersionLoading}
-              isSidebarCollapsed={isSidebarCollapsed}
-            />
-
             <div
               className={cn(
-                "flex items-center",
-                isSidebarCollapsed ? "justify-center" : "justify-end",
+                "flex items-center gap-2",
+                isSidebarCollapsed
+                  ? "flex-col justify-center"
+                  : "justify-between",
               )}
             >
+              <SidebarVersionStatus
+                versionInfo={versionInfo}
+                isVersionLoading={isVersionLoading}
+                isSidebarCollapsed={isSidebarCollapsed}
+              />
+
               <button
                 type="button"
                 title="Settings"

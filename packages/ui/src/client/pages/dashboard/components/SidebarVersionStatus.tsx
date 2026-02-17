@@ -100,7 +100,7 @@ export function SidebarVersionStatus({
 
   if (isSidebarCollapsed) {
     return (
-      <div className="mb-2 flex justify-center">
+      <div className="flex justify-center">
         <div
           className={cn(
             "inline-flex size-8 items-center justify-center rounded-md border border-border/70 bg-accent/40 text-[10px] text-muted-foreground",
@@ -115,7 +115,7 @@ export function SidebarVersionStatus({
   }
 
   return (
-    <p className="mb-2 truncate px-1 text-[11px]" title={summaryTitle}>
+    <p className="truncate px-1 text-[11px]" title={summaryTitle}>
       <span className="text-muted-foreground">OpenGoat </span>
       <span className="font-semibold text-foreground">v{installedVersionLabel}</span>
       <span className="text-muted-foreground"> · </span>
