@@ -5517,7 +5517,7 @@ function OrganizationChartPanel({
   );
   const fitViewOptions = useMemo(() => {
     return {
-      padding: 0.2,
+      padding: 0.06,
       minZoom: 0.2,
       maxZoom: 1.8,
     };
@@ -5581,16 +5581,13 @@ function OrganizationChartPanel({
       });
 
       const minY = Math.min(...flowModel.nodes.map((node) => node.position.y));
-      const maxY = Math.max(
-        ...flowModel.nodes.map((node) => node.position.y + NODE_HEIGHT),
-      );
-      if (!Number.isFinite(minY) || !Number.isFinite(maxY)) {
+      if (!Number.isFinite(minY)) {
         return;
       }
 
       const currentViewport = instance.getViewport();
       const currentTop = minY * currentViewport.zoom + currentViewport.y;
-      const targetTop = Math.max(12, viewport.clientHeight * 0.05);
+      const targetTop = Math.max(8, viewport.clientHeight * 0.02);
       const offset = currentTop - targetTop;
       if (offset <= 1) {
         return;
@@ -5661,7 +5658,6 @@ function OrganizationChartPanel({
               nodes={flowModel.nodes}
               edges={flowModel.edges}
               nodeTypes={orgChartNodeTypes}
-              fitView
               fitViewOptions={fitViewOptions}
               minZoom={0.2}
               maxZoom={1.8}
