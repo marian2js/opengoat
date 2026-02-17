@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.2.17-2
+
+- Ship the agent profile release and sidebar organization UX hardening: add `/agents/<id>` profile routing + API-backed editing for identity and organization metadata; enforce provider/assigned-skills as read-only in the profile UI to match runtime constraints; fix case-insensitive profile resolution and org chart initial framing; improve sidebar drag-and-drop accuracy with reliable drop-line targeting, gap-friendly container drop zones, and reduced visual drag noise; persist custom sidebar organization across refresh; and align OpenClaw role-skill assignment to role-specific board skills.
+
 ## 2026.2.17
 
 - Release the latest runtime and dashboard updates, including provider runtime registry/policies with new CLI providers (Codex, Cursor, OpenCode, Gemini), organization workspace/session behavior improvements, and major dashboard/sidebar UX updates (session routing, org chart totals, persistent drag-and-drop ordering, and clearer working-state labels).
