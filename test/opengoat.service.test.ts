@@ -7,6 +7,7 @@ import {
   BaseProvider,
   OpenGoatService,
   ProviderRegistry,
+  type ProviderModule,
   type ProviderCreateAgentOptions,
   type ProviderDeleteAgentOptions,
   type ProviderExecutionResult,
@@ -88,7 +89,7 @@ describe("OpenGoatService", () => {
           "workspaces",
           "research-analyst",
           "skills",
-          "og-boards",
+          "og-board-individual",
           "SKILL.md",
         ),
         constants.F_OK,
@@ -366,7 +367,7 @@ describe("OpenGoatService", () => {
           "workspaces",
           "engineer",
           "skills",
-          "og-boards",
+          "og-board-individual",
           "SKILL.md",
         ),
         constants.F_OK,
@@ -379,7 +380,7 @@ describe("OpenGoatService", () => {
           "workspaces",
           "cto",
           "skills",
-          "og-boards",
+          "og-board-manager",
           "SKILL.md",
         ),
         constants.F_OK,
@@ -1586,7 +1587,7 @@ describe("OpenGoatService", () => {
     const soulMarkdown = await readFile(soulPath, "utf-8");
     const bootstrapMarkdown = await readFile(bootstrapPath, "utf-8");
     const boardSkillMarkdown = await readFile(
-      path.join(ceoWorkspace, "skills", "og-boards", "SKILL.md"),
+      path.join(ceoWorkspace, "skills", "og-board-manager", "SKILL.md"),
       "utf-8",
     );
     expect(agentsMarkdown).toContain("foo");
@@ -1599,8 +1600,11 @@ describe("OpenGoatService", () => {
       ["# SOUL.md - Legacy CEO", "", "Legacy body"].join("\n"),
     );
     expect(bootstrapMarkdown.trimEnd()).toBe("# legacy bootstrap");
-    expect(boardSkillMarkdown).toContain("name: og-boards");
-    expect(boardSkillMarkdown).toContain("Your agent id is `ceo`.");
+    expect(boardSkillMarkdown).toContain("name: og-board-manager");
+    expect(boardSkillMarkdown).toContain(
+      'opengoat_agent_info({ "agentId": "ceo" })',
+    );
+    expect(boardSkillMarkdown).not.toContain("<me>");
     await expect(
       access(
         path.join(ceoWorkspace, "skills", "manager", "SKILL.md"),
@@ -1638,6 +1642,90 @@ describe("OpenGoatService", () => {
     const updated = await service.setAgentManager("engineer", "cto");
     expect(updated.previousReportsTo).toBe("ceo");
     expect(updated.reportsTo).toBe("cto");
+  });
+
+  it("switches OpenClaw role skill when an individual becomes manager and back", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("Lead", { type: "individual", reportsTo: "ceo" });
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    await service.setAgentManager("engineer", "lead");
+    await expect(
+      access(
+        path.join(root, "workspaces", "lead", "skills", "og-board-manager"),
+        constants.F_OK,
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      access(
+        path.join(root, "workspaces", "lead", "skills", "og-board-individual"),
+        constants.F_OK,
+      ),
+    ).rejects.toBeTruthy();
+
+    await service.setAgentManager("engineer", "ceo");
+    await expect(
+      access(
+        path.join(root, "workspaces", "lead", "skills", "og-board-individual"),
+        constants.F_OK,
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      access(
+        path.join(root, "workspaces", "lead", "skills", "og-board-manager"),
+        constants.F_OK,
+      ),
+    ).rejects.toBeTruthy();
+  });
+
+  it("uses og-boards for non-openclaw provider role skills", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    await service.setAgentProvider("engineer", "codex");
+
+    await expect(
+      access(
+        path.join(
+          root,
+          "workspaces",
+          "engineer",
+          ".agents/skills/og-boards/SKILL.md",
+        ),
+        constants.F_OK,
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      access(
+        path.join(
+          root,
+          "workspaces",
+          "engineer",
+          ".agents/skills/og-board-individual",
+        ),
+        constants.F_OK,
+      ),
+    ).rejects.toBeTruthy();
+    await expect(
+      access(
+        path.join(root, "workspaces", "engineer", "skills", "og-board-individual"),
+        constants.F_OK,
+      ),
+    ).rejects.toBeTruthy();
   });
 
   it("enforces assignment restrictions through the service facade", async () => {
@@ -2447,7 +2535,41 @@ function createService(
   } = {},
 ): { service: OpenGoatService; provider: FakeOpenClawProvider } {
   const registry = new ProviderRegistry();
-  registry.register("openclaw", () => provider);
+  const openclawModule: ProviderModule = {
+    id: "openclaw",
+    create: () => provider,
+    runtime: {
+      invocation: {
+        cwd: "provider-default",
+      },
+      skills: {
+        directories: ["skills"],
+        roleSkillIds: {
+          manager: ["og-board-manager"],
+          individual: ["og-board-individual"],
+        },
+      },
+    },
+  };
+  const codexProvider = new FakeCodexProvider();
+  const codexModule: ProviderModule = {
+    id: "codex",
+    create: () => codexProvider,
+    runtime: {
+      invocation: {
+        cwd: "agent-workspace",
+      },
+      skills: {
+        directories: [".agents/skills"],
+        roleSkillIds: {
+          manager: ["og-boards"],
+          individual: ["og-boards"],
+        },
+      },
+    },
+  };
+  registry.register("openclaw", () => provider, openclawModule);
+  registry.register("codex", () => codexProvider, codexModule);
 
   const service = new OpenGoatService({
     fileSystem: new NodeFileSystem(),
@@ -2547,6 +2669,33 @@ class FakeOpenClawProvider extends BaseProvider {
     return {
       code: 0,
       stdout: "deleted\n",
+      stderr: "",
+    };
+  }
+}
+
+class FakeCodexProvider extends BaseProvider {
+  public constructor() {
+    super({
+      id: "codex",
+      displayName: "Codex",
+      kind: "cli",
+      capabilities: {
+        agent: false,
+        model: true,
+        auth: true,
+        passthrough: true,
+        reportees: false,
+      },
+    });
+  }
+
+  public async invoke(
+    _options: ProviderInvokeOptions,
+  ): Promise<ProviderExecutionResult> {
+    return {
+      code: 0,
+      stdout: "ok\n",
       stderr: "",
     };
   }

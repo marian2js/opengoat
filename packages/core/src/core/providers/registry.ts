@@ -57,6 +57,10 @@ export class ProviderRegistry {
     const normalizedDirectories = normalizeSkillDirectories(
       runtime?.skills.directories ?? DEFAULT_PROVIDER_RUNTIME_POLICY.skills.directories,
     );
+    const normalizedRoleSkillIds = normalizeRoleSkillIdsByType(
+      runtime?.skills.roleSkillIds ??
+        DEFAULT_PROVIDER_RUNTIME_POLICY.skills.roleSkillIds,
+    );
     return {
       invocation: {
         cwd: runtime?.invocation.cwd ?? DEFAULT_PROVIDER_RUNTIME_POLICY.invocation.cwd,
@@ -66,6 +70,7 @@ export class ProviderRegistry {
           normalizedDirectories.length > 0
             ? normalizedDirectories
             : [...DEFAULT_PROVIDER_RUNTIME_POLICY.skills.directories],
+        roleSkillIds: normalizedRoleSkillIds,
       },
     };
   }
@@ -98,4 +103,34 @@ function normalizeSkillDirectory(rawDirectory: string): string | null {
   }
 
   return parts.join("/");
+}
+
+function normalizeRoleSkillIdsByType(input: {
+  manager: string[];
+  individual: string[];
+}): { manager: string[]; individual: string[] } {
+  const manager = normalizeRoleSkillIds(input.manager);
+  const individual = normalizeRoleSkillIds(input.individual);
+  return {
+    manager:
+      manager.length > 0
+        ? manager
+        : [...DEFAULT_PROVIDER_RUNTIME_POLICY.skills.roleSkillIds.manager],
+    individual:
+      individual.length > 0
+        ? individual
+        : [...DEFAULT_PROVIDER_RUNTIME_POLICY.skills.roleSkillIds.individual],
+  };
+}
+
+function normalizeRoleSkillIds(input: string[]): string[] {
+  const normalized: string[] = [];
+  for (const rawSkillId of input) {
+    const skillId = rawSkillId.trim().toLowerCase();
+    if (!skillId || normalized.includes(skillId)) {
+      continue;
+    }
+    normalized.push(skillId);
+  }
+  return normalized;
 }

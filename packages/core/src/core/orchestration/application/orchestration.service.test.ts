@@ -233,7 +233,11 @@ describe("OrchestrationService manager runtime", () => {
         providerId: "cursor",
         providerKind: "cli",
         workspaceAccess: "agent-workspace",
-        roleSkillDirectories: [".cursor/skills"]
+        roleSkillDirectories: [".cursor/skills"],
+        roleSkillIds: {
+          manager: ["og-boards"],
+          individual: ["og-boards"],
+        },
       }))
     };
 

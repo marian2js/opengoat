@@ -23,6 +23,10 @@ export interface ProviderRuntimePolicy {
   };
   skills: {
     directories: string[];
+    roleSkillIds: {
+      manager: string[];
+      individual: string[];
+    };
   };
 }
 
@@ -32,6 +36,10 @@ export const DEFAULT_PROVIDER_RUNTIME_POLICY: ProviderRuntimePolicy = {
   },
   skills: {
     directories: ["skills"],
+    roleSkillIds: {
+      manager: ["og-boards"],
+      individual: ["og-boards"],
+    },
   },
 };
 

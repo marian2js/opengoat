@@ -172,6 +172,10 @@ describe("ProviderService", () => {
       providerKind: "cli",
       workspaceAccess: "agent-workspace",
       roleSkillDirectories: [".claude/skills"],
+      roleSkillIds: {
+        manager: ["og-boards"],
+        individual: ["og-boards"],
+      },
     });
   });
 
@@ -184,6 +188,21 @@ describe("ProviderService", () => {
     const directories = await service.listProviderRoleSkillDirectories();
 
     expect(directories).toEqual([".claude/skills", "skills"]);
+  });
+
+  it("lists managed role skill ids from registered provider runtime policies", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-provider-service-skill-ids-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+
+    const { service } = await createService(paths);
+    const roleSkillIds = await service.listProviderRoleSkillIds();
+
+    expect(roleSkillIds).toEqual([
+      "og-board-individual",
+      "og-board-manager",
+      "og-boards",
+    ]);
   });
 });
 
@@ -227,6 +246,10 @@ async function createService(paths: OpenGoatPaths): Promise<{
       },
       skills: {
         directories: ["skills"],
+        roleSkillIds: {
+          manager: ["og-board-manager"],
+          individual: ["og-board-individual"],
+        },
       },
     },
   };
@@ -239,6 +262,10 @@ async function createService(paths: OpenGoatPaths): Promise<{
       },
       skills: {
         directories: [".claude/skills"],
+        roleSkillIds: {
+          manager: ["og-boards"],
+          individual: ["og-boards"],
+        },
       },
     },
   };

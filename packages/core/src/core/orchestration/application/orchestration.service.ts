@@ -45,7 +45,11 @@ const DEFAULT_RUNTIME_PROFILE: AgentRuntimeProfile = {
   providerId: OPENCLAW_PROVIDER_ID,
   providerKind: "cli",
   workspaceAccess: "provider-default",
-  roleSkillDirectories: ["skills"]
+  roleSkillDirectories: ["skills"],
+  roleSkillIds: {
+    manager: ["og-board-manager"],
+    individual: ["og-board-individual"],
+  },
 };
 
 export class OrchestrationService {

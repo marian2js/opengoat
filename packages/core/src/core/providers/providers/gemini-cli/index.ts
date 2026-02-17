@@ -10,6 +10,10 @@ export const providerModule: ProviderModule = {
     },
     skills: {
       directories: [".gemini/skills"],
+      roleSkillIds: {
+        manager: ["og-boards"],
+        individual: ["og-boards"],
+      },
     },
   },
   onboarding: {

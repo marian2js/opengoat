@@ -10,6 +10,10 @@ export const providerModule: ProviderModule = {
     },
     skills: {
       directories: [".claude/skills"],
+      roleSkillIds: {
+        manager: ["og-boards"],
+        individual: ["og-boards"],
+      },
     },
   },
   onboarding: {

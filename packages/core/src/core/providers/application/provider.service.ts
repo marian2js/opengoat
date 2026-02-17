@@ -44,6 +44,10 @@ export interface AgentRuntimeProfile {
   providerKind: "cli" | "http";
   workspaceAccess: "provider-default" | "agent-workspace";
   roleSkillDirectories: string[];
+  roleSkillIds: {
+    manager: string[];
+    individual: string[];
+  };
 }
 
 export interface ProviderStoredConfig {
@@ -613,7 +617,11 @@ export class ProviderService {
       providerId: provider.id,
       providerKind: provider.kind,
       workspaceAccess: runtimePolicy.invocation.cwd,
-      roleSkillDirectories: [...runtimePolicy.skills.directories]
+      roleSkillDirectories: [...runtimePolicy.skills.directories],
+      roleSkillIds: {
+        manager: [...runtimePolicy.skills.roleSkillIds.manager],
+        individual: [...runtimePolicy.skills.roleSkillIds.individual],
+      },
     };
   }
 
@@ -631,6 +639,25 @@ export class ProviderService {
       }
     }
     return [...directories].sort((left, right) => left.localeCompare(right));
+  }
+
+  public async listProviderRoleSkillIds(): Promise<string[]> {
+    const registry = await this.getProviderRegistry();
+    const roleSkillIds = new Set<string>();
+    for (const providerId of registry.listProviderIds()) {
+      const runtimePolicy = registry.getProviderRuntimePolicy(providerId);
+      for (const skillId of [
+        ...runtimePolicy.skills.roleSkillIds.manager,
+        ...runtimePolicy.skills.roleSkillIds.individual,
+      ]) {
+        const normalized = skillId.trim().toLowerCase();
+        if (!normalized) {
+          continue;
+        }
+        roleSkillIds.add(normalized);
+      }
+    }
+    return [...roleSkillIds].sort((left, right) => left.localeCompare(right));
   }
 
   public async restartLocalGateway(

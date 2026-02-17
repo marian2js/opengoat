@@ -66,6 +66,8 @@ export interface AgentWorkspaceBootstrapOptions {
   syncBootstrapMarkdown?: boolean;
   roleSkillDirectories?: string[];
   managedRoleSkillDirectories?: string[];
+  roleSkillIdsByType?: RoleSkillIdsByType;
+  managedRoleSkillIds?: string[];
 }
 
 interface WorkspaceSkillSyncResult {
@@ -77,6 +79,13 @@ interface WorkspaceSkillSyncResult {
 export interface WorkspaceRoleSkillSyncOptions {
   requiredSkillDirectories?: string[];
   managedSkillDirectories?: string[];
+  roleSkillIdsByType?: RoleSkillIdsByType;
+  managedRoleSkillIds?: string[];
+}
+
+export interface RoleSkillIdsByType {
+  manager: string[];
+  individual: string[];
 }
 
 interface RoleAssignmentSyncResult {
@@ -258,6 +267,8 @@ export class AgentService {
       {
         requiredSkillDirectories: options.roleSkillDirectories,
         managedSkillDirectories: options.managedRoleSkillDirectories,
+        roleSkillIdsByType: options.roleSkillIdsByType,
+        managedRoleSkillIds: options.managedRoleSkillIds,
       },
     );
     createdPaths.push(...workspaceSkillSync.createdPaths);
@@ -318,16 +329,19 @@ export class AgentService {
       throw new Error("Agent id cannot be empty.");
     }
     const type = await this.readAgentType(paths, normalizedAgentId);
+    const roleSkillIdsByType = resolveRoleSkillIdsByType(
+      options.roleSkillIdsByType,
+    );
     const requiredSkillIds =
-      type === "manager" ? MANAGER_ROLE_SKILLS : INDIVIDUAL_ROLE_SKILLS;
-    const managedRoleSkillIds = [
-      ...new Set([
-        ...MANAGER_ROLE_SKILLS,
-        ...INDIVIDUAL_ROLE_SKILLS,
-        ...LEGACY_MANAGER_ROLE_SKILLS,
-        ...LEGACY_INDIVIDUAL_ROLE_SKILLS,
-      ]),
-    ];
+      type === "manager"
+        ? roleSkillIdsByType.manager
+        : roleSkillIdsByType.individual;
+    const managedRoleSkillIds = dedupeRoleSkillIds([
+      ...roleSkillIdsByType.manager,
+      ...roleSkillIdsByType.individual,
+      ...(options.managedRoleSkillIds ?? []),
+      ...STATIC_ROLE_SKILL_IDS,
+    ]);
     const requiredSkillDirectories = resolveRoleSkillDirectories(
       options.requiredSkillDirectories,
     );
@@ -417,13 +431,15 @@ export class AgentService {
     }
 
     const type = await this.readAgentType(paths, normalizedAgentId);
+    const roleSkillIdsByType = resolveRoleSkillIdsByType();
     const requiredSkillIds =
-      type === "manager" ? MANAGER_ROLE_SKILLS : INDIVIDUAL_ROLE_SKILLS;
+      type === "manager"
+        ? roleSkillIdsByType.manager
+        : roleSkillIdsByType.individual;
     const roleSkillIds = new Set<string>([
-      ...MANAGER_ROLE_SKILLS,
-      ...INDIVIDUAL_ROLE_SKILLS,
-      ...LEGACY_MANAGER_ROLE_SKILLS,
-      ...LEGACY_INDIVIDUAL_ROLE_SKILLS,
+      ...roleSkillIdsByType.manager,
+      ...roleSkillIdsByType.individual,
+      ...STATIC_ROLE_SKILL_IDS,
     ]);
     const runtimeRecord = toObject(config.runtime);
     const skillsRecord = toObject(runtimeRecord.skills);
@@ -804,7 +820,7 @@ export class AgentService {
       skillId === "og-board-manager" ||
       skillId === "og-board-individual"
     ) {
-      return renderBoardsSkillMarkdown(agentId);
+      return renderBoardsSkillMarkdown(skillId, agentId);
     }
     throw new Error(`Unsupported workspace skill id: ${skillId}`);
   }
@@ -891,12 +907,19 @@ export class AgentService {
   }
 }
 
-const MANAGER_ROLE_SKILLS = ["og-boards"];
-const INDIVIDUAL_ROLE_SKILLS = ["og-boards"];
-const LEGACY_MANAGER_ROLE_SKILLS = ["og-board-manager", "board-manager"];
+const MANAGER_ROLE_SKILLS = ["og-board-manager"];
+const INDIVIDUAL_ROLE_SKILLS = ["og-board-individual"];
+const SHARED_ROLE_SKILLS = ["og-boards"];
+const LEGACY_MANAGER_ROLE_SKILLS = ["board-manager"];
 const LEGACY_INDIVIDUAL_ROLE_SKILLS = [
-  "og-board-individual",
   "board-individual",
+];
+const STATIC_ROLE_SKILL_IDS = [
+  ...MANAGER_ROLE_SKILLS,
+  ...INDIVIDUAL_ROLE_SKILLS,
+  ...SHARED_ROLE_SKILLS,
+  ...LEGACY_MANAGER_ROLE_SKILLS,
+  ...LEGACY_INDIVIDUAL_ROLE_SKILLS,
 ];
 const DEFAULT_WORKSPACE_SKILL_DIRECTORY = "skills";
 
@@ -909,10 +932,7 @@ function toAgentTemplateOptions(
   const reportsTo = resolveReportsTo(agentId, options.reportsTo);
   const providedSkills = options.skills ?? [];
   const roleSkillIds = new Set([
-    ...MANAGER_ROLE_SKILLS,
-    ...INDIVIDUAL_ROLE_SKILLS,
-    ...LEGACY_MANAGER_ROLE_SKILLS,
-    ...LEGACY_INDIVIDUAL_ROLE_SKILLS,
+    ...STATIC_ROLE_SKILL_IDS,
   ]);
   const skills = dedupe(
     providedSkills.filter((skillId) => !roleSkillIds.has(skillId)),
@@ -962,6 +982,32 @@ function normalizeReportsToValue(value: unknown): string | null | undefined {
 
 function dedupe(values: string[]): string[] {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right));
+}
+
+function resolveRoleSkillIdsByType(
+  input?: RoleSkillIdsByType,
+): RoleSkillIdsByType {
+  const manager = dedupeRoleSkillIds(input?.manager ?? MANAGER_ROLE_SKILLS);
+  const individual = dedupeRoleSkillIds(
+    input?.individual ?? INDIVIDUAL_ROLE_SKILLS,
+  );
+  return {
+    manager: manager.length > 0 ? manager : [...MANAGER_ROLE_SKILLS],
+    individual:
+      individual.length > 0 ? individual : [...INDIVIDUAL_ROLE_SKILLS],
+  };
+}
+
+function dedupeRoleSkillIds(values: string[]): string[] {
+  const deduped: string[] = [];
+  for (const value of values) {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized || deduped.includes(normalized)) {
+      continue;
+    }
+    deduped.push(normalized);
+  }
+  return deduped;
 }
 
 function resolveRoleSkillDirectories(input?: string[]): string[] {

@@ -1507,9 +1507,13 @@ export class OpenGoatService {
     );
     const managedRoleSkillDirectories =
       await this.providerService.listProviderRoleSkillDirectories();
+    const managedRoleSkillIds =
+      await this.providerService.listProviderRoleSkillIds();
     return this.agentService.ensureAgentWorkspaceRoleSkills(paths, agentId, {
       requiredSkillDirectories: runtimeProfile.roleSkillDirectories,
       managedSkillDirectories: managedRoleSkillDirectories,
+      roleSkillIdsByType: runtimeProfile.roleSkillIds,
+      managedRoleSkillIds,
     });
   }
 

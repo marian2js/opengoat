@@ -50,12 +50,19 @@ export function renderCeoBootstrapMarkdown(): string {
   return readMarkdownTemplate("ceo/BOOTSTRAP.md");
 }
 
-export function renderBoardsSkillMarkdown(agentId: string): string {
+export function renderBoardsSkillMarkdown(
+  skillId: string,
+  agentId: string,
+): string {
   const resolvedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
-  return readMarkdownTemplate("skills/og-boards/SKILL.md").replaceAll(
-    "<me>",
-    resolvedAgentId,
-  );
+  const normalizedSkillId = skillId.trim().toLowerCase();
+  const templatePath =
+    normalizedSkillId === "og-board-manager"
+      ? "skills/og-board-manager/SKILL.md"
+      : normalizedSkillId === "og-board-individual"
+        ? "skills/og-board-individual/SKILL.md"
+        : "skills/og-boards/SKILL.md";
+  return readMarkdownTemplate(templatePath).replaceAll("<me>", resolvedAgentId);
 }
 
 export function listOrganizationMarkdownTemplates(): OrganizationMarkdownTemplate[] {

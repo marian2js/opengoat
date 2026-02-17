@@ -10,6 +10,10 @@ export const providerModule: ProviderModule = {
     },
     skills: {
       directories: [".opencode/skills"],
+      roleSkillIds: {
+        manager: ["og-boards"],
+        individual: ["og-boards"],
+      },
     },
   },
   onboarding: {

@@ -91,7 +91,7 @@ opengoat onboard --external \
 ### Build the organization
 
 ```bash
-opengoat agent create "CTO" --manager --reports-to ceo --skill og-boards
+opengoat agent create "CTO" --manager --reports-to ceo
 opengoat agent create "Engineer" --individual --reports-to cto --skill coding
 opengoat agent create "Designer" --individual --reports-to cto
 opengoat agent list
@@ -131,6 +131,13 @@ opengoat skill install og-boards --from /path/to/skill
 opengoat skill install jira-tools --from /path/to/skill
 opengoat skill list --agent ceo
 ```
+
+Role skill behavior:
+
+- OpenClaw agents use role-specific board skills:
+  - managers: `og-board-manager`
+  - individuals: `og-board-individual`
+- Non-OpenClaw agents use one board skill: `og-boards`
 
 # License
 

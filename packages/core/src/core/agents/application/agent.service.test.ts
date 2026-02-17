@@ -34,11 +34,19 @@ describe("AgentService workspace role skills", () => {
     await service.ensureAgentWorkspaceRoleSkills(paths, "cto", {
       requiredSkillDirectories: ["skills"],
       managedSkillDirectories: ["skills", ".cursor/skills"],
+      roleSkillIdsByType: {
+        manager: ["og-boards"],
+        individual: ["og-boards"],
+      },
     });
 
     const sync = await service.ensureAgentWorkspaceRoleSkills(paths, "cto", {
       requiredSkillDirectories: [".cursor/skills"],
       managedSkillDirectories: ["skills", ".cursor/skills"],
+      roleSkillIdsByType: {
+        manager: ["og-boards"],
+        individual: ["og-boards"],
+      },
     });
 
     expect(
@@ -81,6 +89,10 @@ describe("AgentService workspace role skills", () => {
     await service.ensureAgentWorkspaceRoleSkills(paths, "engineer", {
       requiredSkillDirectories: [".agents/skills"],
       managedSkillDirectories: [".agents/skills", "skills"],
+      roleSkillIdsByType: {
+        manager: ["og-boards"],
+        individual: ["og-boards"],
+      },
     });
 
     expect(
