@@ -161,7 +161,7 @@ export interface ReasoningTriggerProps
 
 const defaultThinkingMessage = (isStreaming: boolean, duration?: number) => {
   if (isStreaming || duration === 0) {
-    return <Shimmer duration={1}>Thinking...</Shimmer>;
+    return <Shimmer duration={1}>Working...</Shimmer>;
   }
   if (duration === undefined) {
     return <p>Thought for a few seconds</p>;
