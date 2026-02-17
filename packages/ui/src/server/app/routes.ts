@@ -183,7 +183,6 @@ export function registerApiRoutes(
   app.post("/api/auth/logout", async (request, reply) => {
     return safeReply(reply, async () => {
       deps.auth.clearSessionCookie(reply, request);
-      deps.auth.clearFailedAttempts(request);
       const status = deps.auth.getStatusForRequest(request);
       return {
         authentication: {

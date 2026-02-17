@@ -223,7 +223,7 @@ export function createUiAuthController(
       );
     },
     checkAttemptStatus: (request) => {
-      const key = resolveLoginAttemptKey(request.ip);
+      const key = resolveLoginAttemptKey(request);
       const now = Date.now();
       const state = loginAttemptsByKey.get(key);
       if (!state) {
@@ -244,7 +244,7 @@ export function createUiAuthController(
       return { blocked: false };
     },
     registerFailedAttempt: (request) => {
-      const key = resolveLoginAttemptKey(request.ip);
+      const key = resolveLoginAttemptKey(request);
       const now = Date.now();
       const state = loginAttemptsByKey.get(key) ?? {
         failures: [],
@@ -279,7 +279,7 @@ export function createUiAuthController(
       return { blocked: false };
     },
     clearFailedAttempts: (request) => {
-      const key = resolveLoginAttemptKey(request.ip);
+      const key = resolveLoginAttemptKey(request);
       loginAttemptsByKey.delete(key);
     },
     validatePasswordStrength: (password) => {
@@ -395,20 +395,79 @@ function resolveUiAuthenticationCookieSecurity(request: {
   raw?: {
     socket?: {
       encrypted?: boolean;
+      remoteAddress?: string;
     };
   };
 }): { isHttps: boolean; requiresHttps: boolean; useSecureCookie: boolean } {
   const host = normalizeRequestHost(request.headers.host);
-  const forwardedProto = normalizeForwardedProto(request.headers["x-forwarded-proto"]);
+  const remoteAddress = normalizeRemoteAddress(request.raw?.socket?.remoteAddress);
+  const forwardedProto = isPrivateOrLoopbackAddress(remoteAddress)
+    ? normalizeForwardedProto(request.headers["x-forwarded-proto"])
+    : undefined;
   const isHttps = request.raw?.socket?.encrypted === true || forwardedProto === "https";
   const isLocalHost =
     host === "" || host === "localhost" || host === "127.0.0.1" || host === "::1";
-  const requiresHttps = !isLocalHost;
+  const isLoopbackConnection =
+    remoteAddress === undefined ? true : isLoopbackAddress(remoteAddress);
+  const allowInsecureLocalHttp = isLocalHost && isLoopbackConnection;
+  const requiresHttps = !allowInsecureLocalHttp;
   return {
     isHttps,
     requiresHttps,
     useSecureCookie: requiresHttps || isHttps,
   };
+}
+
+function normalizeRemoteAddress(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return undefined;
+  }
+  const withoutZone = trimmed.split("%")[0] ?? trimmed;
+  if (withoutZone.startsWith("::ffff:")) {
+    return withoutZone.slice("::ffff:".length);
+  }
+  return withoutZone;
+}
+
+function isLoopbackAddress(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  if (value === "::1" || value === "0:0:0:0:0:0:0:1") {
+    return true;
+  }
+  return /^127\./.test(value);
+}
+
+function isPrivateOrLoopbackAddress(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+  if (isLoopbackAddress(value)) {
+    return true;
+  }
+  if (
+    value.startsWith("10.") ||
+    value.startsWith("192.168.") ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(value) ||
+    value.startsWith("169.254.")
+  ) {
+    return true;
+  }
+  if (value.startsWith("fc") || value.startsWith("fd")) {
+    return true;
+  }
+  if (value.startsWith("fe8") || value.startsWith("fe9")) {
+    return true;
+  }
+  if (value.startsWith("fea") || value.startsWith("feb")) {
+    return true;
+  }
+  return false;
 }
 
 function normalizeForwardedProto(value: unknown): string | undefined {
@@ -657,9 +716,61 @@ export function validateUiAuthenticationPasswordStrength(
   return undefined;
 }
 
-function resolveLoginAttemptKey(ipAddress: string | undefined): string {
-  const normalized = ipAddress?.trim();
-  return normalized || "unknown";
+function resolveLoginAttemptKey(request: {
+  ip?: string;
+  headers?: Record<string, unknown>;
+  raw?: {
+    socket?: {
+      remoteAddress?: string;
+    };
+  };
+}): string {
+  const remoteAddress = normalizeRemoteAddress(request.raw?.socket?.remoteAddress);
+  const normalizedIp = normalizeRemoteAddress(request.ip);
+  const forwardedFor = isPrivateOrLoopbackAddress(remoteAddress)
+    ? parseForwardedForAddress(request.headers?.["x-forwarded-for"])
+    : undefined;
+  return forwardedFor ?? normalizedIp ?? "unknown";
+}
+
+function parseForwardedForAddress(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    return parseForwardedForAddress(value[0]);
+  }
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const candidates = value
+    .split(",")
+    .map((entry) => parseForwardedForCandidate(entry.trim()))
+    .filter((entry): entry is string => Boolean(entry));
+  if (candidates.length === 0) {
+    return undefined;
+  }
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const candidate = candidates[index];
+    if (!isPrivateOrLoopbackAddress(candidate)) {
+      return candidate;
+    }
+  }
+  return candidates[candidates.length - 1];
+}
+
+function parseForwardedForCandidate(candidate: string): string | undefined {
+  if (!candidate) {
+    return undefined;
+  }
+  if (candidate.startsWith("[")) {
+    const endBracket = candidate.indexOf("]");
+    if (endBracket > 1) {
+      return normalizeRemoteAddress(candidate.slice(1, endBracket));
+    }
+  }
+  if (/^\d{1,3}(?:\.\d{1,3}){3}:\d+$/.test(candidate)) {
+    const [host] = candidate.split(":", 1);
+    return normalizeRemoteAddress(host);
+  }
+  return normalizeRemoteAddress(candidate);
 }
 
 function pruneLoginAttemptFailures(state: UiLoginAttemptState, now: number): void {

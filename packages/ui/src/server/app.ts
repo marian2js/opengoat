@@ -55,7 +55,15 @@ export async function createOpenGoatUiServer(
     logs.stop();
   });
 
-  await app.register(cors, { origin: true });
+  await app.register(cors, {
+    origin: (origin, callback) => {
+      if (!origin || !auth.isAuthenticationRequired()) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
+  });
   app.addHook("onRequest", async (request, reply) => {
     if (!auth.isAuthenticationRequired()) {
       return;

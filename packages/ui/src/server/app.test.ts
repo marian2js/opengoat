@@ -402,6 +402,210 @@ describe("OpenGoat UI server API", () => {
     expect(lastStatusCode).toBe(429);
   });
 
+  it("isolates failed sign-in rate limits per forwarded client ip behind trusted proxies", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const enableAuthResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/settings",
+      payload: {
+        authentication: {
+          enabled: true,
+          username: "security",
+          password: "StrongPassphrase#2026",
+        },
+      },
+    });
+    expect(enableAuthResponse.statusCode).toBe(200);
+
+    for (let index = 0; index < 5; index += 1) {
+      await activeServer.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        remoteAddress: "127.0.0.1",
+        headers: {
+          "x-forwarded-for": "198.51.100.70",
+        },
+        payload: {
+          username: "security",
+          password: "wrong-password",
+        },
+      });
+    }
+
+    const blockedResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      remoteAddress: "127.0.0.1",
+      headers: {
+        "x-forwarded-for": "198.51.100.70",
+      },
+      payload: {
+        username: "security",
+        password: "wrong-password",
+      },
+    });
+    expect(blockedResponse.statusCode).toBe(429);
+
+    const independentClientResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      remoteAddress: "127.0.0.1",
+      headers: {
+        "x-forwarded-for": "198.51.100.71",
+      },
+      payload: {
+        username: "security",
+        password: "wrong-password",
+      },
+    });
+    expect(independentClientResponse.statusCode).toBe(401);
+  });
+
+  it("does not reset failed sign-in attempts when logout is called unauthenticated", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const enableAuthResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/settings",
+      payload: {
+        authentication: {
+          enabled: true,
+          username: "security",
+          password: "StrongPassphrase#2026",
+        },
+      },
+    });
+    expect(enableAuthResponse.statusCode).toBe(200);
+
+    for (let index = 0; index < 4; index += 1) {
+      const loginResponse = await activeServer.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        remoteAddress: "198.51.100.23",
+        payload: {
+          username: "security",
+          password: "not-correct",
+        },
+      });
+      expect(loginResponse.statusCode).toBe(401);
+    }
+
+    const logoutResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/auth/logout",
+      remoteAddress: "198.51.100.23",
+    });
+    expect(logoutResponse.statusCode).toBe(200);
+
+    const limitedResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      remoteAddress: "198.51.100.23",
+      payload: {
+        username: "security",
+        password: "not-correct",
+      },
+    });
+    expect(limitedResponse.statusCode).toBe(429);
+  });
+
+  it("rejects spoofed forwarded-proto headers from untrusted clients", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const enableAuthResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/settings",
+      payload: {
+        authentication: {
+          enabled: true,
+          username: "admin.user",
+          password: "StrongPassphrase#2026",
+        },
+      },
+    });
+    expect(enableAuthResponse.statusCode).toBe(200);
+
+    const loginResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      remoteAddress: "198.51.100.24",
+      headers: {
+        host: "opengoat.example.com",
+        "x-forwarded-proto": "https",
+      },
+      payload: {
+        username: "admin.user",
+        password: "StrongPassphrase#2026",
+      },
+    });
+    expect(loginResponse.statusCode).toBe(400);
+    expect(loginResponse.json()).toMatchObject({
+      code: "AUTH_SESSION_ISSUE_FAILED",
+    });
+  });
+
+  it("accepts forwarded-proto from loopback proxies for HTTPS deployment setups", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const enableAuthResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/settings",
+      payload: {
+        authentication: {
+          enabled: true,
+          username: "admin.user",
+          password: "StrongPassphrase#2026",
+        },
+      },
+    });
+    expect(enableAuthResponse.statusCode).toBe(200);
+
+    const loginResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      remoteAddress: "127.0.0.1",
+      headers: {
+        host: "opengoat.example.com",
+        "x-forwarded-proto": "https",
+      },
+      payload: {
+        username: "admin.user",
+        password: "StrongPassphrase#2026",
+      },
+    });
+    expect(loginResponse.statusCode).toBe(200);
+    expect(extractCookieHeader(loginResponse)).toContain("opengoat_ui_session=");
+  });
+
   it("requires current password before changing existing authentication settings", async () => {
     const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     activeServer = await createOpenGoatUiServer({

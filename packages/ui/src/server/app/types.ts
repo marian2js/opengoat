@@ -477,9 +477,21 @@ export interface UiAuthController {
   getStatusForRequest: (request: { headers: Record<string, unknown> }) => UiAuthenticationStatus;
   verifyCredentials: (username: string, password: string) => Promise<boolean>;
   verifyCurrentPassword: (password: string) => Promise<boolean>;
-  checkAttemptStatus: (request: { ip?: string }) => { blocked: boolean; retryAfterSeconds?: number };
-  registerFailedAttempt: (request: { ip?: string }) => { blocked: boolean; retryAfterSeconds?: number };
-  clearFailedAttempts: (request: { ip?: string }) => void;
+  checkAttemptStatus: (request: {
+    ip?: string;
+    headers?: Record<string, unknown>;
+    raw?: { socket?: { remoteAddress?: string } };
+  }) => { blocked: boolean; retryAfterSeconds?: number };
+  registerFailedAttempt: (request: {
+    ip?: string;
+    headers?: Record<string, unknown>;
+    raw?: { socket?: { remoteAddress?: string } };
+  }) => { blocked: boolean; retryAfterSeconds?: number };
+  clearFailedAttempts: (request: {
+    ip?: string;
+    headers?: Record<string, unknown>;
+    raw?: { socket?: { remoteAddress?: string } };
+  }) => void;
   validatePasswordStrength: (password: string) => string | undefined;
   hashPassword: (password: string) => Promise<string>;
   getSettingsResponse: () => UiAuthenticationSettingsResponse;
