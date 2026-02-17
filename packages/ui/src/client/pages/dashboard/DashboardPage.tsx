@@ -5301,6 +5301,7 @@ function OrganizationChartPanel({
   const orgChartRef = useRef<ReactFlowInstance<OrgChartNode, Edge> | null>(
     null,
   );
+  const orgChartViewportRef = useRef<HTMLDivElement | null>(null);
   const hierarchy = useMemo(() => buildOrgHierarchy(agents), [agents]);
   const providerLabelById = useMemo(
     () => buildProviderLabelById(providers),
@@ -5359,22 +5360,60 @@ function OrganizationChartPanel({
     });
   }, [hierarchy, collapsedNodeIds, providerLabelById, toggleNode]);
 
+  const fitOrgChartViewport = useCallback(
+    (duration = 0) => {
+      const instance = orgChartRef.current;
+      const viewport = orgChartViewportRef.current;
+      if (!instance || !viewport || flowModel.nodes.length === 0) {
+        return;
+      }
+
+      instance.fitView({
+        ...fitViewOptions,
+      });
+
+      const minY = Math.min(...flowModel.nodes.map((node) => node.position.y));
+      const maxY = Math.max(
+        ...flowModel.nodes.map((node) => node.position.y + NODE_HEIGHT),
+      );
+      if (!Number.isFinite(minY) || !Number.isFinite(maxY)) {
+        return;
+      }
+
+      const currentViewport = instance.getViewport();
+      const currentTop = minY * currentViewport.zoom + currentViewport.y;
+      const targetTop = Math.max(12, viewport.clientHeight * 0.05);
+      const offset = currentTop - targetTop;
+      if (offset <= 1) {
+        return;
+      }
+
+      instance.setViewport(
+        {
+          ...currentViewport,
+          y: currentViewport.y - offset,
+        },
+        {
+          duration,
+        },
+      );
+    },
+    [fitViewOptions, flowModel.nodes],
+  );
+
   useEffect(() => {
     if (!orgChartRef.current || flowModel.nodes.length === 0) {
       return;
     }
 
     const frame = window.requestAnimationFrame(() => {
-      orgChartRef.current?.fitView({
-        ...fitViewOptions,
-        duration: 250,
-      });
+      fitOrgChartViewport(250);
     });
 
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [topologySignature, flowModel.nodes.length, fitViewOptions]);
+  }, [topologySignature, flowModel.nodes.length, fitOrgChartViewport]);
 
   return (
     <Card className="border-border/70 bg-card/70">
@@ -5406,7 +5445,10 @@ function OrganizationChartPanel({
             No organization nodes found.
           </p>
         ) : (
-          <div className="h-[640px] rounded-xl border border-border/70 bg-background/45">
+          <div
+            ref={orgChartViewportRef}
+            className="h-[640px] rounded-xl border border-border/70 bg-background/45"
+          >
             <ReactFlow
               nodes={flowModel.nodes}
               edges={flowModel.edges}
@@ -5423,7 +5465,9 @@ function OrganizationChartPanel({
               proOptions={{ hideAttribution: true }}
               onInit={(instance) => {
                 orgChartRef.current = instance;
-                instance.fitView(fitViewOptions);
+                window.requestAnimationFrame(() => {
+                  fitOrgChartViewport();
+                });
               }}
             >
               <Background color="hsl(var(--border))" gap={20} size={1} />
