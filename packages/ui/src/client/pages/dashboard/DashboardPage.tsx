@@ -1057,6 +1057,9 @@ export function DashboardPage(): ReactElement {
     loadVersionInfo,
   ]);
 
+  const agents = state?.overview.agents ?? [];
+  const providers = state?.overview.providers ?? [];
+
   useEffect(() => {
     if (agents.length === 0) {
       return;
@@ -1109,9 +1112,6 @@ export function DashboardPage(): ReactElement {
       setTaskActorId(agentIds[0] ?? "ceo");
     }
   }, [state, taskActorId]);
-
-  const agents = state?.overview.agents ?? [];
-  const providers = state?.overview.providers ?? [];
   const createAgentRequest = useCallback(
     async (payload: {
       name: string;
