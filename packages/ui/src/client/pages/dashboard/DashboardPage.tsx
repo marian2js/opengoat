@@ -1354,6 +1354,7 @@ export function DashboardPage(): ReactElement {
   const handleSidebarAgentDragOver = useCallback(
     (targetAgentId: string, event: DragEvent<HTMLElement>) => {
       event.preventDefault();
+      event.stopPropagation();
       event.dataTransfer.dropEffect = "move";
 
       const sourceAgentId =
@@ -1384,14 +1385,16 @@ export function DashboardPage(): ReactElement {
   const handleSidebarAgentDrop = useCallback(
     (targetAgentId: string, event: DragEvent<HTMLElement>) => {
       event.preventDefault();
+      event.stopPropagation();
       const sourceAgentId =
         draggingSidebarAgentId ??
         event.dataTransfer.getData("text/plain").trim();
-      const position =
-        sidebarDropTarget?.agentId === targetAgentId
-          ? sidebarDropTarget.position
-          : resolveSidebarDropPosition(event);
-      moveSidebarAgent(sourceAgentId, targetAgentId, position);
+      const target =
+        sidebarDropTarget ?? {
+          agentId: targetAgentId,
+          position: resolveSidebarDropPosition(event),
+        };
+      moveSidebarAgent(sourceAgentId, target.agentId, target.position);
       setDraggingSidebarAgentId(null);
       setSidebarDropTarget(null);
     },
@@ -1401,6 +1404,87 @@ export function DashboardPage(): ReactElement {
       resolveSidebarDropPosition,
       sidebarDropTarget,
     ],
+  );
+
+  const handleSidebarListDragOver = useCallback(
+    (event: DragEvent<HTMLElement>) => {
+      const sourceAgentId =
+        draggingSidebarAgentId ??
+        event.dataTransfer.getData("text/plain").trim();
+      if (!sourceAgentId) {
+        return;
+      }
+
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+
+      const agentRows = Array.from(
+        event.currentTarget.querySelectorAll<HTMLElement>(
+          "[data-sidebar-agent-id]",
+        ),
+      );
+
+      let nextTarget: { agentId: string; position: "before" | "after" } | null =
+        null;
+      for (const row of agentRows) {
+        const targetAgentId = row.dataset.sidebarAgentId?.trim();
+        if (!targetAgentId || targetAgentId === sourceAgentId) {
+          continue;
+        }
+
+        const rect = row.getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        if (event.clientY < midpoint) {
+          nextTarget = {
+            agentId: targetAgentId,
+            position: "before",
+          };
+          break;
+        }
+
+        nextTarget = {
+          agentId: targetAgentId,
+          position: "after",
+        };
+      }
+
+      setSidebarDropTarget((current) => {
+        if (!nextTarget) {
+          return null;
+        }
+        if (
+          current?.agentId === nextTarget.agentId &&
+          current.position === nextTarget.position
+        ) {
+          return current;
+        }
+        return nextTarget;
+      });
+    },
+    [draggingSidebarAgentId],
+  );
+
+  const handleSidebarListDrop = useCallback(
+    (event: DragEvent<HTMLElement>) => {
+      event.preventDefault();
+      const sourceAgentId =
+        draggingSidebarAgentId ??
+        event.dataTransfer.getData("text/plain").trim();
+      if (!sourceAgentId || !sidebarDropTarget) {
+        setDraggingSidebarAgentId(null);
+        setSidebarDropTarget(null);
+        return;
+      }
+
+      moveSidebarAgent(
+        sourceAgentId,
+        sidebarDropTarget.agentId,
+        sidebarDropTarget.position,
+      );
+      setDraggingSidebarAgentId(null);
+      setSidebarDropTarget(null);
+    },
+    [draggingSidebarAgentId, moveSidebarAgent, sidebarDropTarget],
   );
 
   const handleSidebarAgentDragEnd = useCallback(() => {
@@ -3696,7 +3780,11 @@ export function DashboardPage(): ReactElement {
                 <p className="px-3 pb-2 text-[11px] font-medium tracking-wide text-muted-foreground">
                   Agents & Sessions
                 </p>
-                <div className="space-y-1">
+                <div
+                  className="space-y-1"
+                  onDragOver={handleSidebarListDragOver}
+                  onDrop={handleSidebarListDrop}
+                >
                   {sidebarSessionsByAgent.map(({ agent, sessions, visibleLimit }) => {
                     const isAgentActive = activeSidebarAgentId === agent.id;
                     const isExpanded = expandedAgentSessionIds.has(agent.id);
@@ -3714,6 +3802,7 @@ export function DashboardPage(): ReactElement {
                     return (
                       <div
                         key={agent.id}
+                        data-sidebar-agent-id={agent.id}
                         draggable
                         onDragStart={(event) => {
                           handleSidebarAgentDragStart(agent.id, event);
@@ -3729,7 +3818,9 @@ export function DashboardPage(): ReactElement {
                           "relative rounded-lg border px-1 py-1 transition-colors cursor-grab active:cursor-grabbing",
                           isAgentActive
                             ? "border-border/80 bg-accent/35"
-                            : "border-transparent hover:border-border/50 hover:bg-accent/20",
+                            : draggingSidebarAgentId
+                              ? "border-transparent"
+                              : "border-transparent hover:border-border/50 hover:bg-accent/20",
                           draggingSidebarAgentId === agent.id && "opacity-60",
                           dropIndicatorPosition !== null && "border-primary/60",
                         )}
@@ -3829,7 +3920,11 @@ export function DashboardPage(): ReactElement {
                 </div>
               </>
             ) : (
-              <div className="space-y-1">
+              <div
+                className="space-y-1"
+                onDragOver={handleSidebarListDragOver}
+                onDrop={handleSidebarListDrop}
+              >
                 {sidebarSessionsByAgent.map(({ agent }) => {
                   const isAgentActive = activeSidebarAgentId === agent.id;
                   const dropIndicatorPosition =
@@ -3843,6 +3938,7 @@ export function DashboardPage(): ReactElement {
                     <button
                       key={agent.id}
                       type="button"
+                      data-sidebar-agent-id={agent.id}
                       draggable
                       onDragStart={(event) => {
                         handleSidebarAgentDragStart(agent.id, event);
@@ -3862,7 +3958,9 @@ export function DashboardPage(): ReactElement {
                         "relative flex w-full items-center justify-center rounded-lg border py-2 transition-colors",
                         isAgentActive
                           ? "border-border bg-accent/90"
-                          : "border-transparent hover:border-border/60 hover:bg-accent/60",
+                          : draggingSidebarAgentId
+                            ? "border-transparent"
+                            : "border-transparent hover:border-border/60 hover:bg-accent/60",
                         draggingSidebarAgentId === agent.id && "opacity-60",
                         dropIndicatorPosition !== null && "border-primary/60",
                       )}
