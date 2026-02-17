@@ -73,11 +73,9 @@ interface AgentProfileDraft {
   description: string;
   type: "manager" | "individual";
   reportsTo: string;
-  providerId: string;
   discoverable: boolean;
   tags: string;
   priority: string;
-  skills: string;
 }
 
 interface AgentProfilePageProps {
@@ -188,8 +186,9 @@ export function AgentProfilePage({
     });
   }, [agentId, agents]);
 
-  const selectedProvider =
-    draft?.providerId ? providerById.get(draft.providerId) : undefined;
+  const selectedProvider = profile
+    ? providerById.get(profile.providerId)
+    : undefined;
   const providerCanHaveReportees = selectedProvider?.supportsReportees !== false;
 
   const dirty = useMemo(() => {
@@ -199,7 +198,6 @@ export function AgentProfilePage({
 
     const normalizedPriority = Number.parseInt(draft.priority, 10);
     const parsedTags = parseCommaList(draft.tags);
-    const parsedSkills = parseCommaList(draft.skills);
 
     return (
       draft.displayName.trim() !== profile.displayName ||
@@ -207,11 +205,9 @@ export function AgentProfilePage({
       draft.description.trim() !== profile.description ||
       draft.type !== resolveProfileType(profile.type) ||
       normalizeReportTarget(draft.reportsTo, profile.id) !== profile.reportsTo ||
-      draft.providerId !== profile.providerId ||
       draft.discoverable !== profile.discoverable ||
       !areStringListsEqual(parsedTags, profile.tags) ||
-      Number.isNaN(normalizedPriority) || normalizedPriority !== profile.priority ||
-      !areStringListsEqual(parsedSkills, profile.skills)
+      Number.isNaN(normalizedPriority) || normalizedPriority !== profile.priority
     );
   }, [draft, profile]);
 
@@ -263,7 +259,7 @@ export function AgentProfilePage({
                 {draft.type}
               </Badge>
               <Badge variant="outline">
-                {selectedProvider?.displayName ?? draft.providerId}
+                {selectedProvider?.displayName ?? profile.providerId}
               </Badge>
               <Badge
                 variant={draft.discoverable ? "secondary" : "outline"}
@@ -532,19 +528,8 @@ export function AgentProfilePage({
                 Provider
               </label>
               <Select
-                value={draft.providerId}
-                onValueChange={(value) => {
-                  setDraft((current) => {
-                    if (!current) {
-                      return current;
-                    }
-                    return {
-                      ...current,
-                      providerId: value,
-                    };
-                  });
-                }}
-                disabled={isBusy || isSaving}
+                value={profile.providerId}
+                disabled
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider" />
@@ -560,26 +545,22 @@ export function AgentProfilePage({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs uppercase tracking-wide text-muted-foreground" htmlFor="agent-profile-skills">
+              <label className="text-xs uppercase tracking-wide text-muted-foreground">
                 Assigned Skills
               </label>
-              <Input
-                id="agent-profile-skills"
-                value={draft.skills}
-                disabled={isBusy || isSaving}
-                onChange={(event) => {
-                  setDraft((current) => {
-                    if (!current) {
-                      return current;
-                    }
-                    return {
-                      ...current,
-                      skills: event.target.value,
-                    };
-                  });
-                }}
-                placeholder="og-boards, coding"
-              />
+              {profile.skills.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {profile.skills.map((skillId) => (
+                    <Badge key={skillId} variant="secondary" className="font-mono text-[11px]">
+                      {skillId}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-md border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+                  No assigned skills.
+                </p>
+              )}
             </div>
 
             {!providerCanHaveReportees && directReportCount > 0 ? (
@@ -676,11 +657,9 @@ function toDraft(profile: AgentProfile): AgentProfileDraft {
     description: profile.description,
     type: resolveProfileType(profile.type),
     reportsTo: profile.reportsTo ?? DEFAULT_AGENT_ID,
-    providerId: profile.providerId,
     discoverable: profile.discoverable,
     tags: profile.tags.join(", "),
     priority: String(profile.priority),
-    skills: profile.skills.join(", "),
   };
 }
 
@@ -757,7 +736,6 @@ async function saveAgentProfile(options: {
   const description = draft.description.trim();
   const reportsTo = normalizeReportTarget(draft.reportsTo, profile.id);
   const tags = parseCommaList(draft.tags);
-  const skills = parseCommaList(draft.skills);
 
   if (displayName !== profile.displayName) {
     payload.displayName = displayName;
@@ -774,9 +752,6 @@ async function saveAgentProfile(options: {
   if (reportsTo !== profile.reportsTo) {
     payload.reportsTo = reportsTo;
   }
-  if (draft.providerId !== profile.providerId) {
-    payload.providerId = draft.providerId;
-  }
   if (draft.discoverable !== profile.discoverable) {
     payload.discoverable = draft.discoverable;
   }
@@ -786,10 +761,6 @@ async function saveAgentProfile(options: {
   if (priority !== profile.priority) {
     payload.priority = priority;
   }
-  if (!areStringListsEqual(skills, profile.skills)) {
-    payload.skills = skills;
-  }
-
   if (Object.keys(payload).length === 0) {
     toast.message("No changes to save.");
     return;
