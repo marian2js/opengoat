@@ -86,14 +86,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Folder,
-  FolderOpen,
-  FolderPlus,
   Home,
   MessageSquare,
   MessageSquarePlus,
   MoreHorizontal,
-  Pin,
   Plus,
   Settings,
   Sparkles,
@@ -166,7 +162,6 @@ interface Session {
   updatedAt: number;
   transcriptPath: string;
   workspacePath: string;
-  projectPath?: string;
   inputChars: number;
   outputChars: number;
   totalChars: number;
@@ -266,55 +261,12 @@ interface DashboardState {
   settings: UiSettings;
 }
 
-interface Project {
-  sessionKey: string;
-  sessionId: string;
-  name: string;
-  projectPath: string;
-  updatedAt: number;
-}
-
-interface WorkspaceSessionItem {
+interface SidebarAgentSessionItem {
+  agentId: string;
   sessionId: string;
   sessionKey: string;
   title: string;
   updatedAt: number;
-}
-
-interface WorkspaceNode {
-  id: string;
-  name: string;
-  projectSessionKey?: string;
-  projectPath: string;
-  sessions: WorkspaceSessionItem[];
-  updatedAt: number;
-}
-
-interface AgentProjectOption {
-  id: string;
-  name: string;
-  projectPath: string;
-}
-
-interface CreateProjectResponse {
-  agentId: string;
-  project: {
-    name: string;
-    path: string;
-    sessionRef: string;
-  };
-  session: {
-    sessionKey: string;
-    sessionId: string;
-  };
-  message?: string;
-}
-
-interface PickProjectResponse {
-  project: {
-    name: string;
-    path: string;
-  };
 }
 
 interface WorkspaceSessionResponse {
@@ -325,21 +277,6 @@ interface WorkspaceSessionResponse {
   };
   summary?: {
     title: string;
-  };
-  message?: string;
-}
-
-interface WorkspaceRenameResponse {
-  workspace: {
-    name: string;
-    sessionRef: string;
-  };
-  message?: string;
-}
-
-interface WorkspaceDeleteResponse {
-  removedWorkspace?: {
-    sessionRef: string;
   };
   message?: string;
 }
@@ -545,7 +482,8 @@ const LOG_FLUSH_INTERVAL_MS = 100;
 const LOG_AUTOSCROLL_BOTTOM_THRESHOLD_PX = 24;
 const TASK_AUTO_REFRESH_INTERVAL_MS = 10_000;
 const TASK_AUTO_REFRESH_HIDDEN_INTERVAL_MS = 30_000;
-const MAX_VISIBLE_WORKSPACE_SESSIONS = 10;
+const MAX_VISIBLE_CEO_AGENT_SESSIONS = 5;
+const MAX_VISIBLE_NON_CEO_AGENT_SESSIONS = 2;
 const TASK_STATUS_OPTIONS = [
   { value: "todo", label: "To do" },
   { value: "doing", label: "In progress" },
@@ -699,23 +637,18 @@ export function DashboardPage(): ReactElement {
   const [isLoading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMutating, setMutating] = useState(false);
-  const [hoveredWorkspaceId, setHoveredWorkspaceId] = useState<string | null>(
-    null,
-  );
-  const [openWorkspaceMenuId, setOpenWorkspaceMenuId] = useState<string | null>(
-    null,
-  );
   const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(
     null,
   );
-  const [collapsedWorkspaceIds, setCollapsedWorkspaceIds] = useState<
-    Set<string>
-  >(() => new Set());
-  const [expandedWorkspaceSessionIds, setExpandedWorkspaceSessionIds] =
+  const [expandedAgentSessionIds, setExpandedAgentSessionIds] =
     useState<Set<string>>(() => new Set());
-  const [pinnedSessionIds, setPinnedSessionIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [selectedSessionRefByAgentId, setSelectedSessionRefByAgentId] =
+    useState<Record<string, string>>(
+      {},
+    );
+  const [sessionsByAgentId, setSessionsByAgentId] = useState<
+    Record<string, Session[]>
+  >({});
   const [sessionChatStatus, setSessionChatStatus] =
     useState<ChatStatus>("ready");
   const [sessionMessagesById, setSessionMessagesById] = useState<
@@ -724,13 +657,8 @@ export function DashboardPage(): ReactElement {
   const [sessionReasoningById, setSessionReasoningById] = useState<
     Record<string, SessionReasoningEvent[]>
   >({});
-  const [sessionsByAgentId, setSessionsByAgentId] = useState<
-    Record<string, Session[]>
-  >({});
-  const [selectedProjectIdByAgentId, setSelectedProjectIdByAgentId] = useState<
-    Record<string, string>
-  >({});
   const hydratedSessionIdsRef = useRef<Set<string>>(new Set());
+  const attemptedSessionFetchAgentIdsRef = useRef<Set<string>>(new Set());
   const activeSessionRunAbortControllerRef = useRef<AbortController | null>(
     null,
   );
@@ -832,8 +760,6 @@ export function DashboardPage(): ReactElement {
       window.history.pushState({}, "", nextPath);
     }
     setRoute(nextRoute);
-    setHoveredWorkspaceId(null);
-    setOpenWorkspaceMenuId(null);
     setOpenSessionMenuId(null);
   }, []);
 
@@ -914,8 +840,6 @@ export function DashboardPage(): ReactElement {
 
     const onPopState = (): void => {
       setRoute(parseRoute(window.location.pathname, window.location.search));
-      setHoveredWorkspaceId(null);
-      setOpenWorkspaceMenuId(null);
       setOpenSessionMenuId(null);
     };
 
@@ -998,6 +922,7 @@ export function DashboardPage(): ReactElement {
       setUiAuthenticationEnabledInput(normalizedSettings.authentication.enabled);
       setUiAuthenticationUsernameInput(normalizedSettings.authentication.username);
       setUiAuthenticationHasPassword(normalizedSettings.authentication.hasPassword);
+      attemptedSessionFetchAgentIdsRef.current = new Set([sessions.agentId]);
       setSessionsByAgentId({
         [sessions.agentId]: sessions.sessions,
       });
@@ -1133,18 +1058,23 @@ export function DashboardPage(): ReactElement {
   ]);
 
   useEffect(() => {
-    if (route.kind !== "agent") {
+    if (agents.length === 0) {
       return;
     }
 
-    if (sessionsByAgentId[route.agentId]) {
-      return;
+    for (const agent of agents) {
+      if (sessionsByAgentId[agent.id]) {
+        continue;
+      }
+      if (attemptedSessionFetchAgentIdsRef.current.has(agent.id)) {
+        continue;
+      }
+      attemptedSessionFetchAgentIdsRef.current.add(agent.id);
+      void refreshSessions(agent.id).catch(() => {
+        // Non-fatal: sidebar can still render and start new sessions.
+      });
     }
-
-    void refreshSessions(route.agentId).catch(() => {
-      // Non-fatal: agent page can still render and allow new messages.
-    });
-  }, [route, sessionsByAgentId, refreshSessions]);
+  }, [agents, sessionsByAgentId, refreshSessions]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1212,148 +1142,133 @@ export function DashboardPage(): ReactElement {
     (state?.settings.taskCronEnabled ?? taskCronEnabledInput) &&
     !ceoBootstrapPending;
   const sessions = state?.sessions.sessions ?? [];
-  const selectedSession = useMemo(() => {
+  const sessionsById = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        agentId: string;
+        session: Session;
+      }
+    >();
+
+    for (const [agentId, agentSessions] of Object.entries(sessionsByAgentId)) {
+      for (const session of agentSessions) {
+        map.set(session.sessionId, {
+          agentId,
+          session,
+        });
+      }
+    }
+
+    return map;
+  }, [sessionsByAgentId]);
+  const selectedSessionRouteEntry = useMemo(() => {
     if (route.kind !== "session") {
       return null;
     }
-    return (
-      sessions.find((session) => session.sessionId === route.sessionId) ?? null
-    );
-  }, [route, sessions]);
+    return sessionsById.get(route.sessionId) ?? null;
+  }, [route, sessionsById]);
+  const selectedSession = selectedSessionRouteEntry?.session ?? null;
+  const selectedSessionAgentId = selectedSessionRouteEntry?.agentId ?? null;
   const selectedAgent = useMemo(() => {
     if (route.kind !== "agent") {
       return null;
     }
     return agents.find((agent) => agent.id === route.agentId) ?? null;
   }, [route, agents]);
-  const defaultEntryAgent = useMemo(() => {
-    return agents.find((agent) => agent.id === DEFAULT_AGENT_ID) ?? null;
-  }, [agents]);
-
-  const workspaceNodes = useMemo<WorkspaceNode[]>(() => {
-    const sessionsByPath = new Map<
-      string,
-      {
-        projectPath: string;
-        sessions: WorkspaceSessionItem[];
-        project?: Project;
-        latestUpdatedAt: number;
-      }
-    >();
-
-    for (const session of sessions) {
-      const projectPath = session.projectPath?.trim();
-      if (!projectPath) {
-        continue;
-      }
-
-      const pathKey = normalizePathForComparison(projectPath);
-      if (!pathKey) {
-        continue;
-      }
-
-      const existing = sessionsByPath.get(pathKey) ?? {
-        projectPath,
-        sessions: [],
-        latestUpdatedAt: 0,
-      };
-      if (!existing.projectPath) {
-        existing.projectPath = projectPath;
-      }
-      existing.latestUpdatedAt = Math.max(
-        existing.latestUpdatedAt,
-        session.updatedAt,
-      );
-
-      if (session.sessionKey.startsWith("project:")) {
-        const currentProject = existing.project;
-        if (!currentProject || session.updatedAt >= currentProject.updatedAt) {
-          existing.project = {
-            sessionKey: session.sessionKey,
-            sessionId: session.sessionId,
-            name: session.title,
-            projectPath,
-            updatedAt: session.updatedAt,
-          };
-        }
-      } else {
-        existing.sessions.push({
-          sessionId: session.sessionId,
-          sessionKey: session.sessionKey,
-          title: session.title,
-          updatedAt: session.updatedAt,
-        });
-      }
-
-      sessionsByPath.set(pathKey, existing);
-    }
-
-    for (const entry of sessionsByPath.values()) {
-      entry.sessions.sort((left, right) => right.updatedAt - left.updatedAt);
-    }
-
-    return [...sessionsByPath.values()]
-      .map((entry) => {
-        const project = entry.project;
-        const projectPath = entry.projectPath;
-        return {
-          id:
-            project?.sessionId ??
-            `workspace:${normalizeProjectSegment(projectPath)}`,
-          name: project?.name?.trim() || deriveWorkspaceName(projectPath),
-          projectSessionKey: project?.sessionKey,
-          projectPath,
-          sessions: entry.sessions,
-          updatedAt: project?.updatedAt ?? entry.latestUpdatedAt,
-        };
-      })
-      .sort((left, right) => right.updatedAt - left.updatedAt);
-  }, [sessions]);
-  const pinnedWorkspaceSessions = useMemo<
-    Array<WorkspaceSessionItem & { workspaceId: string }>
-  >(() => {
-    if (pinnedSessionIds.size === 0) {
+  const sortedSidebarAgents = useMemo(() => {
+    if (agents.length === 0) {
       return [];
     }
 
-    return workspaceNodes.flatMap((workspace) =>
-      workspace.sessions
-        .filter((session) => pinnedSessionIds.has(session.sessionId))
-        .map((session) => ({
-          ...session,
-          workspaceId: workspace.id,
-        })),
-    );
-  }, [workspaceNodes, pinnedSessionIds]);
+    const ceo = agents.find((agent) => agent.id === DEFAULT_AGENT_ID) ?? null;
+    const others = agents
+      .filter((agent) => agent.id !== DEFAULT_AGENT_ID)
+      .sort((left, right) =>
+        left.displayName.localeCompare(right.displayName, undefined, {
+          sensitivity: "base",
+        }),
+      );
+
+    return ceo ? [ceo, ...others] : others;
+  }, [agents]);
+  const sidebarSessionsByAgent = useMemo(() => {
+    return sortedSidebarAgents.map((agent) => {
+      const sortedSessions = sortSessionsByUpdatedAt(
+        sessionsByAgentId[agent.id] ?? [],
+      );
+      const sessions = sortedSessions.map((session) => ({
+        agentId: agent.id,
+        sessionId: session.sessionId,
+        sessionKey: session.sessionKey,
+        title: session.title,
+        updatedAt: session.updatedAt,
+      }));
+      return {
+        agent,
+        sessions,
+        visibleLimit:
+          agent.id === DEFAULT_AGENT_ID
+            ? MAX_VISIBLE_CEO_AGENT_SESSIONS
+            : MAX_VISIBLE_NON_CEO_AGENT_SESSIONS,
+      };
+    });
+  }, [sortedSidebarAgents, sessionsByAgentId]);
 
   const taskProjectOptions = useMemo(() => {
-    if (workspaceNodes.length === 0) {
+    const projectsByPath = new Map<
+      string,
+      {
+        label: string;
+        projectPath: string;
+      }
+    >();
+
+    for (const agentSessions of Object.values(sessionsByAgentId)) {
+      for (const session of agentSessions) {
+        const workspacePath = session.workspacePath?.trim();
+        if (!workspacePath) {
+          continue;
+        }
+        const pathKey = normalizePathForComparison(workspacePath);
+        if (!pathKey || projectsByPath.has(pathKey)) {
+          continue;
+        }
+        projectsByPath.set(pathKey, {
+          label: deriveWorkspaceName(workspacePath),
+          projectPath: workspacePath,
+        });
+      }
+    }
+
+    if (projectsByPath.size === 0) {
       return [
         {
-          label: "~",
+          label: "Home",
           projectPath: "~",
         },
       ];
     }
 
-    return workspaceNodes.map((workspace) => ({
-      label: workspace.name,
-      projectPath: workspace.projectPath,
-    }));
-  }, [workspaceNodes]);
+    return [...projectsByPath.values()].sort((left, right) =>
+      left.label.localeCompare(right.label, undefined, {
+        sensitivity: "base",
+      }),
+    );
+  }, [sessionsByAgentId]);
 
   const defaultTaskProjectPath = taskProjectOptions[0]?.projectPath ?? "~";
   const workspaceProjectNameByPath = useMemo(() => {
     const next = new Map<string, string>();
-    for (const workspace of workspaceNodes) {
-      const key = normalizePathForComparison(workspace.projectPath);
+    for (const project of taskProjectOptions) {
+      const key = normalizePathForComparison(project.projectPath);
       if (!key) {
         continue;
       }
-      next.set(key, workspace.name);
+      next.set(key, project.label);
     }
     return next;
-  }, [workspaceNodes]);
+  }, [taskProjectOptions]);
   const resolveTaskProjectLabel = useCallback(
     (projectPath: string | undefined): string => {
       const cleanedPath = projectPath?.trim() ?? "";
@@ -1374,122 +1289,89 @@ export function DashboardPage(): ReactElement {
     [workspaceProjectNameByPath],
   );
 
-  const agentProjectOptions = useMemo<AgentProjectOption[]>(() => {
-    if (workspaceNodes.length > 0) {
-      return workspaceNodes.map((workspace) => ({
-        id: workspace.id,
-        name: workspace.name,
-        projectPath: workspace.projectPath,
-      }));
+  const selectedAgentSessions = useMemo(() => {
+    if (route.kind !== "agent") {
+      return [];
     }
 
-    const homeDir = state?.health.homeDir?.trim() || "~";
-    return [
-      {
-        id: "home",
-        name: "Home",
-        projectPath: homeDir,
-      },
-    ];
-  }, [workspaceNodes, state?.health.homeDir]);
-
-  const selectedAgentProject = useMemo(() => {
+    return sortSessionsByUpdatedAt(sessionsByAgentId[route.agentId] ?? []);
+  }, [route, sessionsByAgentId]);
+  const selectedAgentSession = useMemo(() => {
     if (route.kind !== "agent") {
       return null;
     }
 
-    const selectedProjectId = selectedProjectIdByAgentId[route.agentId];
-    if (selectedProjectId) {
-      const match = agentProjectOptions.find(
-        (project) => project.id === selectedProjectId,
+    const selectedSessionRef = selectedSessionRefByAgentId[route.agentId];
+    if (selectedSessionRef) {
+      const selected = selectedAgentSessions.find(
+        (session) => session.sessionKey === selectedSessionRef,
       );
-      if (match) {
-        return match;
+      if (selected) {
+        return selected;
       }
     }
 
-    return agentProjectOptions[0] ?? null;
-  }, [route, selectedProjectIdByAgentId, agentProjectOptions]);
+    return selectedAgentSessions[0] ?? null;
+  }, [route, selectedAgentSessions, selectedSessionRefByAgentId]);
+  const selectedSessionAgent = useMemo(() => {
+    if (!selectedSessionAgentId) {
+      return null;
+    }
+    return agents.find((agent) => agent.id === selectedSessionAgentId) ?? null;
+  }, [agents, selectedSessionAgentId]);
 
   useEffect(() => {
     if (route.kind !== "agent") {
       return;
     }
 
-    if (!selectedAgentProject) {
+    if (selectedAgentSessions.length === 0) {
       return;
     }
 
-    const currentProjectId = selectedProjectIdByAgentId[route.agentId];
-    if (currentProjectId === selectedAgentProject.id) {
+    const currentSessionRef = selectedSessionRefByAgentId[route.agentId];
+    if (
+      currentSessionRef &&
+      selectedAgentSessions.some(
+        (session) => session.sessionKey === currentSessionRef,
+      )
+    ) {
       return;
     }
 
-    setSelectedProjectIdByAgentId((current) => ({
+    const latestSessionRef = selectedAgentSessions[0]?.sessionKey;
+    if (!latestSessionRef) {
+      return;
+    }
+
+    setSelectedSessionRefByAgentId((current) => ({
       ...current,
-      [route.agentId]: selectedAgentProject.id,
+      [route.agentId]: latestSessionRef,
     }));
-  }, [route, selectedAgentProject, selectedProjectIdByAgentId]);
+  }, [route, selectedAgentSessions, selectedSessionRefByAgentId]);
 
-  const selectedAgentSessions = useMemo(() => {
-    if (route.kind !== "agent") {
-      return [];
-    }
-
-    return sessionsByAgentId[route.agentId] ?? [];
-  }, [route, sessionsByAgentId]);
-
-  const selectedAgentWorkspaceSession = useMemo(() => {
-    if (route.kind !== "agent" || !selectedAgentProject) {
-      return null;
-    }
-
-    const targetPath = normalizePathForComparison(
-      selectedAgentProject.projectPath,
-    );
-    const candidates = selectedAgentSessions
-      .filter((session) => {
-        return normalizePathForComparison(session.projectPath) === targetPath;
-      })
-      .sort((left, right) => right.updatedAt - left.updatedAt);
-
-    return candidates[0] ?? null;
-  }, [route, selectedAgentProject, selectedAgentSessions]);
-  const selectedSessionProjectName = useMemo(() => {
-    if (route.kind !== "session" || !selectedSession) {
-      return null;
-    }
-    return resolveTaskProjectLabel(selectedSession.projectPath);
-  }, [route, selectedSession, resolveTaskProjectLabel]);
   const selectedWikiTitle =
     route.kind === "page" && route.view === "wiki"
       ? wikiController.title
       : null;
 
   const activeChatContext = useMemo(() => {
-    if (route.kind === "session" && selectedSession) {
+    if (route.kind === "session" && selectedSession && selectedSessionAgentId) {
       return {
-        agentId: DEFAULT_AGENT_ID,
+        agentId: selectedSessionAgentId,
         sessionRef: selectedSession.sessionKey,
-        projectPath: selectedSession.projectPath,
-        chatKey: `session:${selectedSession.sessionId}`,
+        chatKey: `session:${selectedSessionAgentId}:${selectedSession.sessionId}`,
         historyRef: selectedSession.sessionKey,
       };
     }
 
-    if (route.kind === "agent" && selectedAgentProject) {
-      const sessionRef =
-        selectedAgentWorkspaceSession?.sessionKey ??
-        buildFrontendAgentProjectSessionRef(
-          route.agentId,
-          selectedAgentProject.projectPath,
-        );
+    if (route.kind === "agent" && selectedAgentSession) {
+      const sessionRef = selectedAgentSession.sessionKey;
       return {
         agentId: route.agentId,
         sessionRef,
-        projectPath: selectedAgentProject.projectPath,
         chatKey: `agent:${route.agentId}:${sessionRef}`,
-        historyRef: selectedAgentWorkspaceSession?.sessionKey ?? null,
+        historyRef: selectedAgentSession.sessionKey,
       };
     }
 
@@ -1497,8 +1379,8 @@ export function DashboardPage(): ReactElement {
   }, [
     route,
     selectedSession,
-    selectedAgentProject,
-    selectedAgentWorkspaceSession,
+    selectedSessionAgentId,
+    selectedAgentSession,
   ]);
 
   const sessionMessages = useMemo(() => {
@@ -1743,60 +1625,54 @@ export function DashboardPage(): ReactElement {
   );
 
   useEffect(() => {
-    setCollapsedWorkspaceIds((current) => {
-      const validIds = new Set(workspaceNodes.map((workspace) => workspace.id));
-      let changed = false;
-      const next = new Set<string>();
-      for (const id of current) {
-        if (validIds.has(id)) {
-          next.add(id);
-          continue;
-        }
-        changed = true;
-      }
-      return changed ? next : current;
-    });
-  }, [workspaceNodes]);
-
-  useEffect(() => {
-    setExpandedWorkspaceSessionIds((current) => {
-      const validIds = new Set(workspaceNodes.map((workspace) => workspace.id));
-      let changed = false;
-      const next = new Set<string>();
-      for (const id of current) {
-        if (validIds.has(id)) {
-          next.add(id);
-          continue;
-        }
-        changed = true;
-      }
-      return changed ? next : current;
-    });
-  }, [workspaceNodes]);
-
-  useEffect(() => {
-    setPinnedSessionIds((current) => {
+    setExpandedAgentSessionIds((current) => {
       if (current.size === 0) {
         return current;
       }
-
-      const validSessionIds = new Set(
-        workspaceNodes.flatMap((workspace) =>
-          workspace.sessions.map((session) => session.sessionId),
-        ),
-      );
+      const validAgentIds = new Set(agents.map((agent) => agent.id));
       let changed = false;
       const next = new Set<string>();
-      for (const sessionId of current) {
-        if (validSessionIds.has(sessionId)) {
-          next.add(sessionId);
+      for (const agentId of current) {
+        if (validAgentIds.has(agentId)) {
+          next.add(agentId);
           continue;
         }
         changed = true;
       }
       return changed ? next : current;
     });
-  }, [workspaceNodes]);
+  }, [agents]);
+
+  useEffect(() => {
+    setSelectedSessionRefByAgentId((current) => {
+      const validAgentIds = new Set(agents.map((agent) => agent.id));
+      const next: Record<string, string> = {};
+      let changed = false;
+
+      for (const [agentId, sessionRef] of Object.entries(current)) {
+        if (!validAgentIds.has(agentId)) {
+          changed = true;
+          continue;
+        }
+
+        const sessionsForAgent = sessionsByAgentId[agentId] ?? [];
+        const exists = sessionsForAgent.some(
+          (session) => session.sessionKey === sessionRef,
+        );
+        if (exists) {
+          next[agentId] = sessionRef;
+          continue;
+        }
+        changed = true;
+      }
+
+      if (!changed && Object.keys(next).length === Object.keys(current).length) {
+        return current;
+      }
+
+      return next;
+    });
+  }, [agents, sessionsByAgentId]);
 
   useEffect(() => {
     if (route.kind === "taskWorkspace") {
@@ -2065,53 +1941,16 @@ export function DashboardPage(): ReactElement {
     }
   }
 
-  async function handleAddProject(): Promise<void> {
-    setMutating(true);
-
-    try {
-      const picked = await fetchJson<PickProjectResponse>(
-        "/api/projects/pick",
-        {
-          method: "POST",
-        },
-      );
-
-      const response = await fetchJson<CreateProjectResponse>("/api/projects", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          agentId: "ceo",
-          folderName: picked.project.name,
-          folderPath: picked.project.path,
-        }),
-      });
-
-      toast.success(
-        response.message ?? `Project \"${response.project.name}\" added.`,
-      );
-      await refreshSessions();
-      navigateToRoute({
-        kind: "session",
-        sessionId: response.session.sessionId,
-      });
-    } catch (requestError) {
-      const message =
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to add project.";
-      toast.error(message);
-    } finally {
-      setMutating(false);
-    }
-  }
-
-  async function handleCreateWorkspaceSession(
-    workspace: WorkspaceNode,
+  async function handleCreateAgentSession(
+    agentId: string,
+    options?: {
+      navigate?: boolean;
+      toastOnSuccess?: boolean;
+    },
   ): Promise<void> {
+    const agent = agents.find((candidate) => candidate.id === agentId) ?? null;
+    const workspaceName = agent?.displayName?.trim() || agentId;
     setMutating(true);
-    setOpenWorkspaceMenuId(null);
     setOpenSessionMenuId(null);
 
     try {
@@ -2123,65 +1962,31 @@ export function DashboardPage(): ReactElement {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            agentId: "ceo",
-            projectPath: workspace.projectPath,
-            workspaceName: workspace.name,
+            agentId,
+            workspaceName,
           }),
         },
       );
 
-      toast.success(
-        response.message ?? `Session created in \"${workspace.name}\".`,
-      );
-      await refreshSessions();
-      navigateToRoute({
-        kind: "session",
-        sessionId: response.session.sessionId,
-      });
-    } catch (requestError) {
-      const message =
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to create workspace session.";
-      toast.error(message);
-    } finally {
-      setMutating(false);
-    }
-  }
+      if (options?.toastOnSuccess ?? true) {
+        toast.success(
+          response.message ??
+            `Session created for \"${agent?.displayName ?? agentId}\".`,
+        );
+      }
 
-  async function handleCreateAgentWorkspaceSession(): Promise<void> {
-    if (route.kind !== "agent" || !selectedAgentProject) {
-      return;
-    }
+      setSelectedSessionRefByAgentId((current) => ({
+        ...current,
+        [agentId]: response.session.sessionKey,
+      }));
+      await refreshSessions(agentId);
 
-    const targetAgentId = selectedAgent?.id ?? route.agentId;
-    setMutating(true);
-    setOpenWorkspaceMenuId(null);
-    setOpenSessionMenuId(null);
-
-    try {
-      const response = await fetchJson<WorkspaceSessionResponse>(
-        "/api/workspaces/session",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            agentId: targetAgentId,
-            projectPath: selectedAgentProject.projectPath,
-            workspaceName: selectedAgentProject.name,
-          }),
-        },
-      );
-
-      toast.success(
-        response.message ??
-          `Session created for \"${
-            selectedAgent?.displayName ?? route.agentId
-          }\".`,
-      );
-      await refreshSessions(targetAgentId);
+      if (options?.navigate ?? true) {
+        navigateToRoute({
+          kind: "agent",
+          agentId,
+        });
+      }
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -2193,107 +1998,51 @@ export function DashboardPage(): ReactElement {
     }
   }
 
-  async function handleRenameWorkspace(
-    workspace: WorkspaceNode,
-  ): Promise<void> {
-    if (!workspace.projectSessionKey) {
-      toast.error("Workspace metadata is unavailable for rename.");
+  async function handleSelectSidebarAgent(agentId: string): Promise<void> {
+    const sessions = sortSessionsByUpdatedAt(sessionsByAgentId[agentId] ?? []);
+    if (sessions.length === 0) {
+      await handleCreateAgentSession(agentId, {
+        navigate: true,
+        toastOnSuccess: false,
+      });
       return;
     }
 
-    const nextName = window
-      .prompt(`Rename workspace \"${workspace.name}\"`, workspace.name)
-      ?.trim();
-    if (!nextName || nextName === workspace.name) {
-      return;
+    const selectedSessionRef = selectedSessionRefByAgentId[agentId];
+    const nextSessionRef =
+      selectedSessionRef &&
+      sessions.some((session) => session.sessionKey === selectedSessionRef)
+        ? selectedSessionRef
+        : sessions[0]?.sessionKey;
+
+    if (nextSessionRef) {
+      setSelectedSessionRefByAgentId((current) => ({
+        ...current,
+        [agentId]: nextSessionRef,
+      }));
     }
 
-    setMutating(true);
-    setOpenWorkspaceMenuId(null);
+    navigateToRoute({
+      kind: "agent",
+      agentId,
+    });
     setOpenSessionMenuId(null);
-
-    try {
-      const response = await fetchJson<WorkspaceRenameResponse>(
-        "/api/workspaces/rename",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            agentId: "ceo",
-            sessionRef: workspace.projectSessionKey,
-            name: nextName,
-          }),
-        },
-      );
-
-      toast.success(
-        response.message ?? `Workspace renamed to \"${nextName}\".`,
-      );
-      await refreshSessions();
-    } catch (requestError) {
-      const message =
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to rename workspace.";
-      toast.error(message);
-    } finally {
-      setMutating(false);
-    }
   }
 
-  async function handleDeleteWorkspace(
-    workspace: WorkspaceNode,
-  ): Promise<void> {
-    if (!workspace.projectSessionKey) {
-      toast.error("Workspace metadata is unavailable for removal.");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Remove workspace \"${workspace.name}\" from sidebar? Sessions will be kept.`,
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    setMutating(true);
-    setOpenWorkspaceMenuId(null);
+  function handleSelectAgentSession(session: SidebarAgentSessionItem): void {
+    setSelectedSessionRefByAgentId((current) => ({
+      ...current,
+      [session.agentId]: session.sessionKey,
+    }));
+    navigateToRoute({
+      kind: "agent",
+      agentId: session.agentId,
+    });
     setOpenSessionMenuId(null);
-
-    try {
-      const response = await fetchJson<WorkspaceDeleteResponse>(
-        "/api/workspaces/delete",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            agentId: "ceo",
-            sessionRef: workspace.projectSessionKey,
-          }),
-        },
-      );
-
-      toast.success(
-        response.message ?? `Workspace \"${workspace.name}\" removed.`,
-      );
-      await refreshSessions();
-    } catch (requestError) {
-      const message =
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to remove workspace.";
-      toast.error(message);
-    } finally {
-      setMutating(false);
-    }
   }
 
   async function handleRemoveSession(
-    session: WorkspaceSessionItem,
+    session: SidebarAgentSessionItem,
   ): Promise<void> {
     const confirmed = window.confirm(`Remove session \"${session.title}\"?`);
     if (!confirmed) {
@@ -2302,7 +2051,6 @@ export function DashboardPage(): ReactElement {
 
     setMutating(true);
     setOpenSessionMenuId(null);
-    setOpenWorkspaceMenuId(null);
 
     try {
       const response = await fetchJson<SessionRemoveResponse>(
@@ -2313,7 +2061,7 @@ export function DashboardPage(): ReactElement {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            agentId: "ceo",
+            agentId: session.agentId,
             sessionRef: session.sessionKey,
           }),
         },
@@ -2322,7 +2070,15 @@ export function DashboardPage(): ReactElement {
       toast.success(
         response.message ?? `Session \"${session.title}\" removed.`,
       );
-      await refreshSessions();
+      await refreshSessions(session.agentId);
+      setSelectedSessionRefByAgentId((current) => {
+        if (current[session.agentId] !== session.sessionKey) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[session.agentId];
+        return next;
+      });
       if (route.kind === "session" && route.sessionId === session.sessionId) {
         navigateToRoute({
           kind: "page",
@@ -2341,7 +2097,7 @@ export function DashboardPage(): ReactElement {
   }
 
   async function handleRenameSession(
-    session: WorkspaceSessionItem,
+    session: SidebarAgentSessionItem,
   ): Promise<void> {
     const nextName = window
       .prompt(`Rename session \"${session.title}\"`, session.title)
@@ -2352,7 +2108,6 @@ export function DashboardPage(): ReactElement {
 
     setMutating(true);
     setOpenSessionMenuId(null);
-    setOpenWorkspaceMenuId(null);
 
     try {
       const response = await fetchJson<SessionRenameResponse>(
@@ -2363,7 +2118,7 @@ export function DashboardPage(): ReactElement {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            agentId: "ceo",
+            agentId: session.agentId,
             sessionRef: session.sessionKey,
             name: nextName,
           }),
@@ -2371,7 +2126,7 @@ export function DashboardPage(): ReactElement {
       );
 
       toast.success(response.message ?? `Session renamed to \"${nextName}\".`);
-      await refreshSessions();
+      await refreshSessions(session.agentId);
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -3161,7 +2916,6 @@ export function DashboardPage(): ReactElement {
       const payload = {
         agentId: activeChatContext.agentId,
         sessionRef: activeChatContext.sessionRef,
-        projectPath: activeChatContext.projectPath,
         message,
         images,
       };
@@ -3264,7 +3018,6 @@ export function DashboardPage(): ReactElement {
     payload: {
       agentId: string;
       sessionRef: string;
-      projectPath?: string;
       message: string;
       images?: SessionMessageImageInput[];
     },
@@ -3374,7 +3127,6 @@ export function DashboardPage(): ReactElement {
   async function sendSessionMessage(payload: {
     agentId: string;
     sessionRef: string;
-    projectPath?: string;
     message: string;
     images?: SessionMessageImageInput[];
   }, signal?: AbortSignal): Promise<SessionSendMessageResponse> {
@@ -3564,11 +3316,15 @@ export function DashboardPage(): ReactElement {
     (authenticationEnabledChanged ||
       authenticationUsernameChanged ||
       hasPendingAuthenticationPasswordUpdate);
-  const renderWorkspaceSessionRow = (
-    session: WorkspaceSessionItem,
+  const renderAgentSessionRow = (
+    session: SidebarAgentSessionItem,
     key: string,
   ): ReactElement => {
-    const isPinnedSession = pinnedSessionIds.has(session.sessionId);
+    const sessionMenuId = `${session.agentId}:${session.sessionId}`;
+    const isActiveSession =
+      route.kind === "agent" &&
+      route.agentId === session.agentId &&
+      selectedAgentSession?.sessionKey === session.sessionKey;
 
     return (
       <div key={key} className="group/session relative">
@@ -3576,47 +3332,17 @@ export function DashboardPage(): ReactElement {
           type="button"
           title={`${session.title} (${session.sessionKey})`}
           onClick={() => {
-            navigateToRoute({
-              kind: "session",
-              sessionId: session.sessionId,
-            });
-            setOpenWorkspaceMenuId(null);
+            handleSelectAgentSession(session);
           }}
-          className="flex w-full items-center rounded-md px-3 py-1 pr-8 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+          className={cn(
+            "flex w-full items-center rounded-md px-3 py-1.5 pr-8 text-left text-[13px] transition-colors",
+            isActiveSession
+              ? "bg-accent/75 text-foreground"
+              : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+          )}
         >
           <span className="inline-block size-4 shrink-0" aria-hidden="true" />
           <span className="ml-2 truncate">{session.title}</span>
-        </button>
-        <button
-          type="button"
-          aria-label={
-            isPinnedSession
-              ? `Unpin ${session.title}`
-              : `Pin ${session.title}`
-          }
-          title={isPinnedSession ? "Unpin session" : "Pin session"}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            setPinnedSessionIds((current) => {
-              const next = new Set(current);
-              if (next.has(session.sessionId)) {
-                next.delete(session.sessionId);
-              } else {
-                next.add(session.sessionId);
-              }
-              return next;
-            });
-            setOpenSessionMenuId(null);
-          }}
-          className={cn(
-            "absolute left-3 top-1/2 z-10 inline-flex size-4 -translate-y-1/2 items-center justify-center rounded-sm transition-colors hover:text-foreground",
-            isPinnedSession
-              ? "text-foreground"
-              : "text-muted-foreground opacity-0 group-hover/session:opacity-100",
-          )}
-        >
-          <Pin className="size-3 icon-stroke-1" />
         </button>
         <button
           type="button"
@@ -3626,21 +3352,20 @@ export function DashboardPage(): ReactElement {
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            setOpenWorkspaceMenuId(null);
             setOpenSessionMenuId((current) =>
-              current === session.sessionId ? null : session.sessionId,
+              current === sessionMenuId ? null : sessionMenuId,
             );
           }}
           className={cn(
             "absolute right-1 top-1 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50",
-            openSessionMenuId === session.sessionId
+            openSessionMenuId === sessionMenuId
               ? "opacity-100"
               : "opacity-0 group-hover/session:opacity-100",
           )}
         >
           <MoreHorizontal className="size-3.5" />
         </button>
-        {openSessionMenuId === session.sessionId ? (
+        {openSessionMenuId === sessionMenuId ? (
           <div className="absolute right-1 top-8 z-20 min-w-[120px] rounded-md border border-border bg-card p-1 shadow-lg">
             <button
               type="button"
@@ -3815,204 +3540,143 @@ export function DashboardPage(): ReactElement {
             })}
 
             <Separator className="my-2 bg-border/70" />
+            {!isSidebarCollapsed ? (
+              <>
+                <p className="px-3 pb-2 text-[11px] font-medium tracking-wide text-muted-foreground">
+                  Agents & Sessions
+                </p>
+                <div className="space-y-1">
+                  {sidebarSessionsByAgent.map(({ agent, sessions, visibleLimit }) => {
+                    const isAgentActive =
+                      route.kind === "agent" && route.agentId === agent.id;
+                    const isExpanded = expandedAgentSessionIds.has(agent.id);
+                    const hasHiddenSessions = sessions.length > visibleLimit;
+                    const visibleSessions = isExpanded
+                      ? sessions
+                      : sessions.slice(0, visibleLimit);
 
-            {!isSidebarCollapsed && pinnedWorkspaceSessions.length > 0 ? (
-              <div className="mb-1 mt-0.5 space-y-0.5">
-                {pinnedWorkspaceSessions.map((session) =>
-                  renderWorkspaceSessionRow(
-                    session,
-                    `pinned:${session.workspaceId}:${session.sessionId}`,
-                  ),
-                )}
-                <Separator className="my-2 bg-border/60" />
-              </div>
-            ) : null}
-
-            <button
-              type="button"
-              title="Add Project"
-              onClick={() => {
-                void handleAddProject();
-              }}
-              className={cn(
-                "mb-1 flex w-full items-center rounded-lg border border-transparent px-3 py-2.5 text-[14px] text-muted-foreground transition-colors hover:border-border/60 hover:bg-accent/60 hover:text-foreground",
-                isSidebarCollapsed && "justify-center px-2",
-              )}
-              disabled={isMutating || isLoading}
-            >
-              <FolderPlus className="size-4 shrink-0" />
-              {!isSidebarCollapsed ? (
-                <span className="ml-2">Add Project</span>
-              ) : null}
-            </button>
-
-            {workspaceNodes.map((workspace) => {
-              const isWorkspaceCollapsed = collapsedWorkspaceIds.has(
-                workspace.id,
-              );
-              const visibleSessionsForWorkspace = workspace.sessions.filter(
-                (session) => !pinnedSessionIds.has(session.sessionId),
-              );
-              const isWorkspaceSessionsExpanded =
-                expandedWorkspaceSessionIds.has(workspace.id);
-              const hasHiddenWorkspaceSessions =
-                visibleSessionsForWorkspace.length > MAX_VISIBLE_WORKSPACE_SESSIONS;
-              const visibleWorkspaceSessions = isWorkspaceSessionsExpanded
-                ? visibleSessionsForWorkspace
-                : visibleSessionsForWorkspace.slice(
-                    0,
-                    MAX_VISIBLE_WORKSPACE_SESSIONS,
-                  );
-              const canManageWorkspace = Boolean(workspace.projectSessionKey);
-              const FolderIcon = isWorkspaceCollapsed ? Folder : FolderOpen;
-
-              return (
-                <div key={workspace.id} className="relative mb-1">
-                  <div
-                    className="relative"
-                    onMouseEnter={() => setHoveredWorkspaceId(workspace.id)}
-                    onMouseLeave={() => {
-                      setHoveredWorkspaceId((current) =>
-                        current === workspace.id ? null : current,
-                      );
-                    }}
-                  >
-                    <button
-                      type="button"
-                      title={`${workspace.name} (${workspace.projectPath})`}
-                      onClick={() => {
-                        setCollapsedWorkspaceIds((current) => {
-                          const next = new Set(current);
-                          if (next.has(workspace.id)) {
-                            next.delete(workspace.id);
-                          } else {
-                            next.add(workspace.id);
-                          }
-                          return next;
-                        });
-                        setOpenWorkspaceMenuId(null);
-                        setOpenSessionMenuId(null);
-                      }}
-                      className={cn(
-                        "flex w-full items-center rounded-lg border border-transparent px-3 py-2.5 pr-16 text-[14px] text-muted-foreground transition-colors hover:border-border/60 hover:bg-accent/60 hover:text-foreground",
-                        isSidebarCollapsed && "justify-center px-2 pr-2",
-                      )}
-                    >
-                      <FolderIcon className="size-4 shrink-0" />
-                      {!isSidebarCollapsed ? (
-                        <span className="ml-2 truncate">{workspace.name}</span>
-                      ) : null}
-                    </button>
-
-                    {!isSidebarCollapsed &&
-                    (hoveredWorkspaceId === workspace.id ||
-                      openWorkspaceMenuId === workspace.id) ? (
-                      <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
-                        <button
-                          type="button"
-                          aria-label={`New session in ${workspace.name}`}
-                          title="New Session"
-                          disabled={isMutating}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            setOpenSessionMenuId(null);
-                            void handleCreateWorkspaceSession(workspace);
-                          }}
-                          className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-                        >
-                          <Plus className="size-3.5 icon-stroke-1" />
-                        </button>
-                        {canManageWorkspace ? (
+                    return (
+                      <div
+                        key={agent.id}
+                        className={cn(
+                          "rounded-lg border px-1 py-1 transition-colors",
+                          isAgentActive
+                            ? "border-border/80 bg-accent/35"
+                            : "border-transparent hover:border-border/50 hover:bg-accent/20",
+                        )}
+                      >
+                        <div className="group/agent flex items-center">
                           <button
                             type="button"
-                            aria-label={`Workspace menu for ${workspace.name}`}
-                            title="More"
-                            disabled={isMutating}
+                            title={`Open ${agent.displayName}`}
+                            onClick={() => {
+                              void handleSelectSidebarAgent(agent.id);
+                            }}
+                            className="flex min-w-0 flex-1 items-center rounded-md px-2 py-1.5 text-left"
+                          >
+                            <AgentAvatar
+                              agentId={agent.id}
+                              displayName={agent.displayName}
+                            />
+                            <span
+                              className={cn(
+                                "ml-2 truncate text-[13px] font-medium",
+                                isAgentActive
+                                  ? "text-foreground"
+                                  : "text-muted-foreground",
+                              )}
+                            >
+                              {agent.displayName}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`New session with ${agent.displayName}`}
+                            title="New session"
+                            disabled={isMutating || isLoading}
                             onClick={(event) => {
                               event.preventDefault();
                               event.stopPropagation();
-                              setOpenSessionMenuId(null);
-                              setOpenWorkspaceMenuId((current) =>
-                                current === workspace.id ? null : workspace.id,
-                              );
+                              void handleCreateAgentSession(agent.id, {
+                                navigate: true,
+                              });
                             }}
-                            className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+                            className="mr-1 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/agent:opacity-100 disabled:opacity-40"
                           >
-                            <MoreHorizontal className="size-3.5 icon-stroke-1" />
+                            <Plus className="size-3.5 icon-stroke-1" />
                           </button>
+                        </div>
+
+                        {visibleSessions.length > 0 ? (
+                          <div className="space-y-0.5 pb-1">
+                            {visibleSessions.map((session) =>
+                              renderAgentSessionRow(
+                                session,
+                                `${agent.id}:${session.sessionId}`,
+                              ),
+                            )}
+                            {hasHiddenSessions ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExpandedAgentSessionIds((current) => {
+                                    const next = new Set(current);
+                                    if (next.has(agent.id)) {
+                                      next.delete(agent.id);
+                                    } else {
+                                      next.add(agent.id);
+                                    }
+                                    return next;
+                                  });
+                                  setOpenSessionMenuId(null);
+                                }}
+                                className="flex w-full items-center rounded-md px-3 py-1 text-left text-[12px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                              >
+                                <span className="inline-block size-4 shrink-0" aria-hidden="true" />
+                                <span className="ml-2">
+                                  {isExpanded
+                                    ? "Show less"
+                                    : `Show more (${sessions.length - visibleLimit})`}
+                                </span>
+                              </button>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
-                    ) : null}
-
-                    {!isSidebarCollapsed &&
-                    canManageWorkspace &&
-                    openWorkspaceMenuId === workspace.id ? (
-                      <div className="absolute right-2 top-9 z-20 min-w-[140px] rounded-md border border-border bg-card p-1 shadow-lg">
-                        <button
-                          type="button"
-                          className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent/80"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            void handleRenameWorkspace(workspace);
-                          }}
-                        >
-                          Rename
-                        </button>
-                        <button
-                          type="button"
-                          className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-danger hover:bg-danger/10"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            void handleDeleteWorkspace(workspace);
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {!isSidebarCollapsed && !isWorkspaceCollapsed ? (
-                    <div className="mt-0.5 space-y-0.5">
-                      {visibleWorkspaceSessions.map((session) =>
-                        renderWorkspaceSessionRow(session, session.sessionId),
-                      )}
-                      {hasHiddenWorkspaceSessions ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setExpandedWorkspaceSessionIds((current) => {
-                              const next = new Set(current);
-                              if (next.has(workspace.id)) {
-                                next.delete(workspace.id);
-                              } else {
-                                next.add(workspace.id);
-                              }
-                              return next;
-                            });
-                            setOpenSessionMenuId(null);
-                          }}
-                          className="flex w-full items-center rounded-md px-3 py-1 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-                        >
-                          <span
-                            className="inline-block size-4 shrink-0"
-                            aria-hidden="true"
-                          />
-                          <span className="ml-2">
-                            {isWorkspaceSessionsExpanded
-                              ? "Show less"
-                              : `Show more (${visibleSessionsForWorkspace.length - MAX_VISIBLE_WORKSPACE_SESSIONS})`}
-                          </span>
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </>
+            ) : (
+              <div className="space-y-1">
+                {sidebarSessionsByAgent.map(({ agent }) => {
+                  const isAgentActive =
+                    route.kind === "agent" && route.agentId === agent.id;
+
+                  return (
+                    <button
+                      key={agent.id}
+                      type="button"
+                      title={agent.displayName}
+                      onClick={() => {
+                        void handleSelectSidebarAgent(agent.id);
+                      }}
+                      className={cn(
+                        "flex w-full items-center justify-center rounded-lg border py-2 transition-colors",
+                        isAgentActive
+                          ? "border-border bg-accent/90"
+                          : "border-transparent hover:border-border/60 hover:bg-accent/60",
+                      )}
+                    >
+                      <AgentAvatar
+                        agentId={agent.id}
+                        displayName={agent.displayName}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </nav>
 
           <div className="border-t border-border p-3">
@@ -4076,14 +3740,11 @@ export function DashboardPage(): ReactElement {
                         selectedAgent?.displayName ?? route.agentId
                       }`}
                       onClick={() => {
-                        void handleCreateAgentWorkspaceSession();
+                        void handleCreateAgentSession(route.agentId, {
+                          navigate: true,
+                        });
                       }}
-                      disabled={
-                        isMutating ||
-                        isLoading ||
-                        !selectedAgentProject ||
-                        !selectedAgent
-                      }
+                      disabled={isMutating || isLoading || !selectedAgent}
                       className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors hover:border-border/60 hover:bg-accent/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <MessageSquarePlus className="size-4 icon-stroke-1_2" />
@@ -4093,16 +3754,16 @@ export function DashboardPage(): ReactElement {
               ) : route.kind === "session" ? (
                 <div className="flex min-w-0 items-center gap-3">
                   <AgentAvatar
-                    agentId={defaultEntryAgent?.id ?? DEFAULT_AGENT_ID}
+                    agentId={selectedSessionAgent?.id ?? DEFAULT_AGENT_ID}
                     displayName={
-                      defaultEntryAgent?.displayName ??
+                      selectedSessionAgent?.displayName ??
                       DEFAULT_AGENT_ID.toUpperCase()
                     }
                     size="md"
                   />
                   <div className="flex min-w-0 items-center gap-2">
                     <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">
-                      {defaultEntryAgent?.displayName ??
+                      {selectedSessionAgent?.displayName ??
                         DEFAULT_AGENT_ID.toUpperCase()}
                     </h1>
                     <span
@@ -4161,51 +3822,6 @@ export function DashboardPage(): ReactElement {
                 >
                   {taskCronRunning ? "Running" : "Stopped"}
                 </button>
-              ) : null}
-
-              {route.kind === "agent" ? (
-                <div className="flex min-w-[220px] items-center gap-2">
-                  <label
-                    className="text-xs uppercase tracking-wide text-muted-foreground"
-                    htmlFor="agentProjectSelector"
-                  >
-                    Project
-                  </label>
-                  <select
-                    id="agentProjectSelector"
-                    className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    value={selectedAgentProject?.id ?? ""}
-                    onChange={(event) => {
-                      const nextProjectId = event.target.value;
-                      setSelectedProjectIdByAgentId((current) => ({
-                        ...current,
-                        [route.agentId]: nextProjectId,
-                      }));
-                    }}
-                  >
-                    {agentProjectOptions.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
-
-              {route.kind === "session" ? (
-                <div className="flex min-w-[220px] items-center gap-2">
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Project
-                  </span>
-                  <span
-                    className="inline-flex h-9 min-w-0 flex-1 items-center rounded-md border border-border bg-background px-3 text-sm text-foreground"
-                    title={selectedSessionProjectName ?? "Home"}
-                  >
-                    <span className="truncate">
-                      {selectedSessionProjectName ?? "Home"}
-                    </span>
-                  </span>
-                </div>
               ) : null}
 
               {route.kind === "taskWorkspace" ? (
@@ -4769,17 +4385,6 @@ export function DashboardPage(): ReactElement {
                 );
               })}
 
-              <button
-                type="button"
-                onClick={() => {
-                  void handleAddProject();
-                }}
-                className="inline-flex items-center gap-2 rounded-md border border-transparent px-3 py-1.5 text-sm whitespace-nowrap text-muted-foreground hover:bg-accent/70 hover:text-foreground"
-                disabled={isMutating || isLoading}
-              >
-                <FolderPlus className="size-4" />
-                Add Project
-              </button>
             </div>
           </div>
 
@@ -4879,10 +4484,7 @@ export function DashboardPage(): ReactElement {
                     agents={agents}
                     isMutating={isMutating}
                     onSelectAgent={(agentId) => {
-                      navigateToRoute({
-                        kind: "agent",
-                        agentId,
-                      });
+                      void handleSelectSidebarAgent(agentId);
                     }}
                     onDeleteAgent={(agentId) => {
                       void handleDeleteAgent(agentId);
@@ -5065,11 +4667,26 @@ export function DashboardPage(): ReactElement {
                       </PromptInput>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {route.kind === "session"
-                        ? `No saved session was found for id ${route.sessionId}.`
-                        : `No chat workspace is available for agent ${route.agentId}.`}
-                    </p>
+                    <div className="flex h-full min-h-[260px] flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-background/40 px-6 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        {route.kind === "session"
+                          ? `No saved session was found for id ${route.sessionId}.`
+                          : `No sessions yet for ${selectedAgent?.displayName ?? route.agentId}.`}
+                      </p>
+                      {route.kind === "agent" ? (
+                        <Button
+                          size="sm"
+                          disabled={isMutating || isLoading}
+                          onClick={() => {
+                            void handleCreateAgentSession(route.agentId, {
+                              navigate: true,
+                            });
+                          }}
+                        >
+                          Start New Session
+                        </Button>
+                      ) : null}
+                    </div>
                   )
                 ) : null}
 
@@ -6646,6 +6263,10 @@ function normalizePathForComparison(pathname: string | undefined): string {
   );
 }
 
+function sortSessionsByUpdatedAt(sessions: Session[]): Session[] {
+  return [...sessions].sort((left, right) => right.updatedAt - left.updatedAt);
+}
+
 function deriveWorkspaceName(projectPath: string): string {
   const normalizedPath = projectPath.trim().replace(/[\\/]+$/, "");
   if (!normalizedPath) {
@@ -6654,25 +6275,6 @@ function deriveWorkspaceName(projectPath: string): string {
 
   const segments = normalizedPath.split(/[\\/]/).filter(Boolean);
   return segments[segments.length - 1] || normalizedPath || "Project";
-}
-
-function buildFrontendAgentProjectSessionRef(
-  agentId: string,
-  projectPath: string,
-): string {
-  const normalizedAgent = normalizeProjectSegment(agentId);
-  const normalizedPath = normalizeProjectSegment(projectPath);
-  const suffix = normalizedPath.slice(-24) || "workspace";
-  return `ui-agent:${normalizedAgent}-${suffix}`;
-}
-
-function normalizeProjectSegment(value: string): string {
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return normalized || "project";
 }
 
 function toSessionMessageImages(
