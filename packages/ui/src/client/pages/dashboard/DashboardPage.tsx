@@ -77,6 +77,7 @@ import {
   type Edge,
   type Node,
   type NodeProps,
+  type ReactFlowInstance,
   type NodeTypes,
 } from "@xyflow/react";
 import type { ChatStatus, FileUIPart } from "ai";
@@ -5297,11 +5298,29 @@ function OrganizationChartPanel({
   onCreateAgentClick: () => void;
   isCreateAgentDisabled: boolean;
 }): ReactElement {
+  const orgChartRef = useRef<ReactFlowInstance<OrgChartNode, Edge> | null>(
+    null,
+  );
   const hierarchy = useMemo(() => buildOrgHierarchy(agents), [agents]);
   const providerLabelById = useMemo(
     () => buildProviderLabelById(providers),
     [providers],
   );
+  const fitViewOptions = useMemo(() => {
+    return {
+      padding: 0.2,
+      minZoom: 0.2,
+      maxZoom: 1.8,
+    };
+  }, []);
+  const topologySignature = useMemo(() => {
+    return [...agents]
+      .map((agent) => {
+        return `${agent.id}:${normalizeReportsTo(agent.reportsTo) ?? "root"}`;
+      })
+      .sort((left, right) => left.localeCompare(right))
+      .join("|");
+  }, [agents]);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<Set<string>>(
     new Set(),
   );
@@ -5340,6 +5359,23 @@ function OrganizationChartPanel({
     });
   }, [hierarchy, collapsedNodeIds, providerLabelById, toggleNode]);
 
+  useEffect(() => {
+    if (!orgChartRef.current || flowModel.nodes.length === 0) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      orgChartRef.current?.fitView({
+        ...fitViewOptions,
+        duration: 250,
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [topologySignature, flowModel.nodes.length, fitViewOptions]);
+
   return (
     <Card className="border-border/70 bg-card/70">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 pb-3">
@@ -5376,7 +5412,7 @@ function OrganizationChartPanel({
               edges={flowModel.edges}
               nodeTypes={orgChartNodeTypes}
               fitView
-              fitViewOptions={{ padding: 0.2 }}
+              fitViewOptions={fitViewOptions}
               minZoom={0.2}
               maxZoom={1.8}
               nodesDraggable={false}
@@ -5385,6 +5421,10 @@ function OrganizationChartPanel({
               panOnDrag
               zoomOnScroll
               proOptions={{ hideAttribution: true }}
+              onInit={(instance) => {
+                orgChartRef.current = instance;
+                instance.fitView(fitViewOptions);
+              }}
             >
               <Background color="hsl(var(--border))" gap={20} size={1} />
               <Controls showInteractive={false} position="bottom-left" />
