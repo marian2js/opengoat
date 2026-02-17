@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { OpenCodeProvider, parseOpenCodeRunResponse } from "./provider.js";
 
 describe("opencode provider", () => {
+  class TestableOpenCodeProvider extends OpenCodeProvider {
+    public exposePrepareExecutionEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+      return this.prepareExecutionEnv(env);
+    }
+  }
+
   it("maps standard invocation to opencode run json mode", () => {
     const provider = new OpenCodeProvider();
     const invocation = provider.buildInvocation({
@@ -88,5 +94,24 @@ describe("opencode provider", () => {
       assistantText: undefined,
       providerSessionId: "ses_3998c0cbaffeWHx78ckcgrEeHK",
     });
+  });
+
+  it("forces OPENCODE_PERMISSION to allow all tools", () => {
+    const provider = new TestableOpenCodeProvider();
+    const prepared = provider.exposePrepareExecutionEnv({
+      OPENCODE_PERMISSION: JSON.stringify({ bash: "ask" }),
+      EXISTING_ENV: "value",
+    });
+
+    expect(prepared.EXISTING_ENV).toBe("value");
+    expect(prepared.OPENCODE_PERMISSION).toBe(
+      JSON.stringify({
+        bash: "allow",
+        edit: "allow",
+        webfetch: "allow",
+        read: "allow",
+        write: "allow",
+      }),
+    );
   });
 });

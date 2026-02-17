@@ -31,6 +31,7 @@ describe("claude-code provider", () => {
       "Follow policy",
       "--max-turns",
       "4",
+      "--dangerously-skip-permissions",
     ]);
   });
 

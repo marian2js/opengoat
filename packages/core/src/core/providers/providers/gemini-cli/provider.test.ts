@@ -12,7 +12,7 @@ describe("gemini-cli provider", () => {
     const invocation = provider.buildInvocation({
       message: "ship",
       model: "gemini-2.5-pro",
-      passthroughArgs: ["--sandbox", "false"],
+      passthroughArgs: ["--debug"],
     });
 
     expect(invocation.command).toBe("gemini");
@@ -21,9 +21,12 @@ describe("gemini-cli provider", () => {
       "ship",
       "--output-format",
       "json",
-      "--yolo",
       "--model",
       "gemini-2.5-pro",
+      "--debug",
+      "--yolo",
+      "--approval-mode",
+      "yolo",
       "--sandbox",
       "false",
     ]);
@@ -42,11 +45,15 @@ describe("gemini-cli provider", () => {
       "continue",
       "--output-format",
       "json",
-      "--yolo",
       "--resume",
       "f0363b08-ec9b-4d66-be43-d9730994616c",
       "--model",
       "gemini-2.5-flash",
+      "--yolo",
+      "--approval-mode",
+      "yolo",
+      "--sandbox",
+      "false",
     ]);
   });
 

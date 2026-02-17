@@ -16,11 +16,14 @@ describe("cursor provider", () => {
       "--print",
       "--output-format",
       "json",
-      "--force",
       "--model",
       "gpt-5",
       "--sandbox",
       "enabled",
+      "--force",
+      "--sandbox",
+      "disabled",
+      "--trust",
       "ship",
     ]);
   });
@@ -38,11 +41,14 @@ describe("cursor provider", () => {
       "--print",
       "--output-format",
       "json",
-      "--force",
       "--resume",
       "ebc4fe56-cd8c-453e-a894-f3cf2ebf51ae",
       "--model",
       "gpt-5",
+      "--force",
+      "--sandbox",
+      "disabled",
+      "--trust",
       "continue",
     ]);
   });
@@ -64,6 +70,9 @@ describe("cursor provider", () => {
       "--output-format",
       "json",
       "--force",
+      "--sandbox",
+      "disabled",
+      "--trust",
       "ship",
     ]);
   });

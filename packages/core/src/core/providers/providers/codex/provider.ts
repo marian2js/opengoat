@@ -6,6 +6,13 @@ import type {
   ProviderInvokeOptions,
 } from "../../types.js";
 
+const CODEX_AUTONOMY_FLAGS = [
+  "--ask-for-approval",
+  "never",
+  "--sandbox",
+  "danger-full-access",
+] as const;
+
 export class CodexProvider extends BaseCliProvider {
   public constructor() {
     super({
@@ -41,6 +48,7 @@ export class CodexProvider extends BaseCliProvider {
         args.push("--model", model);
       }
       args.push(...passthrough);
+      args.push(...CODEX_AUTONOMY_FLAGS);
       args.push(providerSessionId, message);
       return args;
     }
@@ -50,6 +58,7 @@ export class CodexProvider extends BaseCliProvider {
       args.push("--model", model);
     }
     args.push(...passthrough);
+    args.push(...CODEX_AUTONOMY_FLAGS);
     args.push(message);
     return args;
   }

@@ -60,6 +60,7 @@ export class ClaudeCodeProvider extends BaseCliProvider {
     }
 
     args.push(...(options.passthroughArgs ?? []));
+    args.push("--dangerously-skip-permissions");
     return args;
   }
 

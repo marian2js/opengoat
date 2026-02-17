@@ -6,6 +6,14 @@ import type {
   ProviderInvokeOptions,
 } from "../../types.js";
 
+const OPENCODE_PERMISSION_ALLOW_ALL = JSON.stringify({
+  bash: "allow",
+  edit: "allow",
+  webfetch: "allow",
+  read: "allow",
+  write: "allow",
+});
+
 export class OpenCodeProvider extends BaseCliProvider {
   public constructor() {
     super({
@@ -24,6 +32,13 @@ export class OpenCodeProvider extends BaseCliProvider {
         agentDelete: false,
       },
     });
+  }
+
+  protected override prepareExecutionEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    return {
+      ...env,
+      OPENCODE_PERMISSION: OPENCODE_PERMISSION_ALLOW_ALL,
+    };
   }
 
   protected override buildInvocationArgs(

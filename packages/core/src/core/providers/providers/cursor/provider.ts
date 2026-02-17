@@ -7,6 +7,8 @@ import type {
   ProviderInvokeOptions,
 } from "../../types.js";
 
+const CURSOR_AUTONOMY_FLAGS = ["--force", "--sandbox", "disabled", "--trust"] as const;
+
 export class CursorProvider extends BaseCliProvider {
   public constructor() {
     super({
@@ -41,7 +43,6 @@ export class CursorProvider extends BaseCliProvider {
       "--print",
       "--output-format",
       "json",
-      "--force",
     ];
 
     if (providerSessionId) {
@@ -53,6 +54,7 @@ export class CursorProvider extends BaseCliProvider {
     }
 
     args.push(...passthrough);
+    args.push(...CURSOR_AUTONOMY_FLAGS);
     args.push(message);
     return args;
   }

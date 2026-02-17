@@ -5,6 +5,14 @@ import type {
   ProviderInvokeOptions,
 } from "../../types.js";
 
+const GEMINI_AUTONOMY_FLAGS = [
+  "--yolo",
+  "--approval-mode",
+  "yolo",
+  "--sandbox",
+  "false",
+] as const;
+
 export class GeminiCliProvider extends BaseCliProvider {
   public constructor() {
     super({
@@ -34,7 +42,7 @@ export class GeminiCliProvider extends BaseCliProvider {
     const providerSessionId = options.providerSessionId?.trim();
     const passthrough = options.passthroughArgs ?? [];
 
-    const args = ["-p", message, "--output-format", "json", "--yolo"];
+    const args = ["-p", message, "--output-format", "json"];
 
     if (providerSessionId) {
       args.push("--resume", providerSessionId);
@@ -45,6 +53,7 @@ export class GeminiCliProvider extends BaseCliProvider {
     }
 
     args.push(...passthrough);
+    args.push(...GEMINI_AUTONOMY_FLAGS);
     return args;
   }
 

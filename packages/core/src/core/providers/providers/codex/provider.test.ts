@@ -18,6 +18,10 @@ describe("codex provider", () => {
       "--model",
       "gpt-5-codex",
       "--full-auto",
+      "--ask-for-approval",
+      "never",
+      "--sandbox",
+      "danger-full-access",
       "ship",
     ]);
   });
@@ -37,6 +41,10 @@ describe("codex provider", () => {
       "--skip-git-repo-check",
       "--model",
       "gpt-5-codex",
+      "--ask-for-approval",
+      "never",
+      "--sandbox",
+      "danger-full-access",
       "019c663e-3112-7b81-8658-71f7f1bfbb06",
       "continue",
     ]);
