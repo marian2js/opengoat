@@ -231,7 +231,7 @@ describe("AgentService", () => {
     );
     expect(agentsMarkdown).toContain("## The Organization");
     expect(agentsMarkdown).toContain(
-      "You have access to the organization's context and wiki on `../../organization`",
+      "You have access to the organization's context and wiki on `~/.opengoat/organization`",
     );
     expect(roleMarkdown).toContain(
       "# ROLE.md - Your position in the organization",
@@ -251,7 +251,9 @@ describe("AgentService", () => {
     expect(roleMarkdown).toContain(
       "- To delegate and coordinate work, use `og-*` skills.",
     );
-    expect(soulMarkdown).toBe(["# SOUL.md - Custom", "", "Legacy body"].join("\n"));
+    expect(soulMarkdown).toBe(
+      ["# SOUL.md - Custom", "", "Legacy body"].join("\n"),
+    );
     expect(bootstrapMarkdown.trimEnd()).toBe(renderCeoBootstrapMarkdown());
     expect(bootstrapMarkdown).not.toContain("# bootstrap");
     expect(await fileSystem.exists(userPath)).toBe(false);

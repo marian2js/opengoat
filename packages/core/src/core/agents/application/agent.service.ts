@@ -1,3 +1,4 @@
+import { basename, isAbsolute, resolve as resolvePath } from "node:path";
 import {
   DEFAULT_AGENT_ID,
   isDefaultAgentId,
@@ -16,7 +17,6 @@ import type {
 } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
-import { basename, isAbsolute, resolve as resolvePath } from "node:path";
 import {
   renderAgentsIndex,
   renderBoardsSkillMarkdown,
@@ -197,11 +197,15 @@ export class AgentService {
       DEFAULT_AGENT_ID,
     );
     const role = await this.readAgentRole(paths, DEFAULT_AGENT_ID);
-    return this.ensureAgentWorkspaceBootstrap(paths, {
-      agentId: DEFAULT_AGENT_ID,
-      displayName,
-      role,
-    }, options);
+    return this.ensureAgentWorkspaceBootstrap(
+      paths,
+      {
+        agentId: DEFAULT_AGENT_ID,
+        displayName,
+        role,
+      },
+      options,
+    );
   }
 
   public async ensureAgentWorkspaceBootstrap(
@@ -226,7 +230,11 @@ export class AgentService {
     const removedPaths: string[] = [];
 
     await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
-    await this.writeOpenGoatWorkspaceShim(workspaceDir, createdPaths, skippedPaths);
+    await this.writeOpenGoatWorkspaceShim(
+      workspaceDir,
+      createdPaths,
+      skippedPaths,
+    );
 
     await this.rewriteAgentsMarkdown(
       agentsPath,
@@ -289,7 +297,11 @@ export class AgentService {
     const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
     await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
-    await this.writeOpenGoatWorkspaceShim(workspaceDir, createdPaths, skippedPaths);
+    await this.writeOpenGoatWorkspaceShim(
+      workspaceDir,
+      createdPaths,
+      skippedPaths,
+    );
     return {
       createdPaths,
       skippedPaths,
@@ -324,7 +336,10 @@ export class AgentService {
       ...requiredSkillDirectories,
     ]);
     const requiredSkillDirectorySet = new Set(requiredSkillDirectories);
-    const workspaceDir = this.pathPort.join(paths.workspacesDir, normalizedAgentId);
+    const workspaceDir = this.pathPort.join(
+      paths.workspacesDir,
+      normalizedAgentId,
+    );
     const createdPaths: string[] = [];
     const skippedPaths: string[] = [];
     const removedPaths: string[] = [];
@@ -879,7 +894,10 @@ export class AgentService {
 const MANAGER_ROLE_SKILLS = ["og-boards"];
 const INDIVIDUAL_ROLE_SKILLS = ["og-boards"];
 const LEGACY_MANAGER_ROLE_SKILLS = ["og-board-manager", "board-manager"];
-const LEGACY_INDIVIDUAL_ROLE_SKILLS = ["og-board-individual", "board-individual"];
+const LEGACY_INDIVIDUAL_ROLE_SKILLS = [
+  "og-board-individual",
+  "board-individual",
+];
 const DEFAULT_WORKSPACE_SKILL_DIRECTORY = "skills";
 
 function toAgentTemplateOptions(
@@ -1074,7 +1092,7 @@ const EVERY_SESSION_SECTION_LINES = [
   "",
   "## The Organization",
   "",
-  "You are part of an organization run by AI agents. You have access to the organization's context and wiki on `../../organization`",
+  "You are part of an organization run by AI agents. You have access to the organization's context and wiki on `~/.opengoat/organization`",
   "",
 ];
 
@@ -1098,8 +1116,9 @@ function renderRoleMarkdown(profile: {
     `- For info about your level on the organization, call tool \`opengoat_agent_info\` with \`{"agentId":"${profile.agentId}"}\`.`,
     "- Use OpenGoat tools directly (`opengoat_*`), not shell CLI commands.",
     "- To delegate and coordinate work, use `og-*` skills.",
-    "- Organization context is available in `../../organization` - read them",
-    "- You can view and edit the wiki in `../../organization/wiki`",
+    "- Organization context is available in `~/.opengoat/organization` - read them",
+    "- You can view and edit the wiki in `~/.opengoat/organization/wiki`",
+    "- Repos are available in `~/.opengoat/organization/workspace/<project>` - each agent must use its own worktree named `worktree/<agent-id>`.",
     "",
     "---",
     "",
@@ -1110,19 +1129,18 @@ function renderRoleMarkdown(profile: {
 function renderOpenGoatWorkspaceShim(): string {
   const cliEntrypoint = resolveOpenGoatCliEntrypoint();
   if (!cliEntrypoint) {
-    return [
-      "#!/usr/bin/env sh",
-      "set -eu",
-      "",
-      'exec opengoat "$@"',
-    ].join("\n");
+    return ["#!/usr/bin/env sh", "set -eu", "", 'exec opengoat "$@"'].join(
+      "\n",
+    );
   }
 
   return [
     "#!/usr/bin/env sh",
     "set -eu",
     "",
-    `exec ${quoteForShell(process.execPath)} ${quoteForShell(cliEntrypoint)} "$@"`,
+    `exec ${quoteForShell(process.execPath)} ${quoteForShell(
+      cliEntrypoint,
+    )} "$@"`,
   ].join("\n");
 }
 
@@ -1154,9 +1172,7 @@ function normalizeEntrypointPath(value: string): string {
 
 function isLikelyOpenGoatEntrypointName(value: string): boolean {
   return (
-    value === "opengoat" ||
-    value === "opengoat.js" ||
-    value === "opengoat.mjs"
+    value === "opengoat" || value === "opengoat.js" || value === "opengoat.mjs"
   );
 }
 
