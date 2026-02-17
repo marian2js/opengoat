@@ -1266,6 +1266,10 @@ export function DashboardPage(): ReactElement {
   }, [agents, sidebarAgentOrderIds, defaultSidebarAgentIds]);
 
   useEffect(() => {
+    if (agents.length === 0) {
+      return;
+    }
+
     setSidebarAgentOrderIds((current) => {
       const knownIds = new Set(agents.map((agent) => agent.id));
       const next: string[] = [];
