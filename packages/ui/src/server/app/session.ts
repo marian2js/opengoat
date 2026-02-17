@@ -538,7 +538,7 @@ export async function resolveOrganizationAgents(
   service: OpenClawUiService,
 ): Promise<OrganizationAgent[]> {
   const agents = await service.listAgents();
-  const agentIds = new Set(agents.map((agent) => agent.id));
+  const agentIds = buildKnownAgentIdSet(agents);
   const providers = await resolveUiProviders(service);
   const providerReporteeSupportById = new Map(
     providers.map((provider) => [provider.id, provider.supportsReportees]),
@@ -615,18 +615,18 @@ export async function resolveOrganizationAgentProfile(
   service: OpenClawUiService,
   rawAgentId: string,
 ): Promise<OrganizationAgentProfile | null> {
-  const requestedAgentId = normalizeAgentIdValue(rawAgentId);
+  const requestedAgentId = normalizeOptionalStringValue(rawAgentId);
   if (!requestedAgentId) {
     return null;
   }
 
   const agents = await resolveOrganizationAgents(service);
-  const agent = agents.find((entry) => entry.id === requestedAgentId);
+  const agent = findOrganizationAgentById(agents, requestedAgentId);
   if (!agent) {
     return null;
   }
 
-  const knownAgentIds = new Set(agents.map((entry) => entry.id));
+  const knownAgentIds = buildKnownAgentIdSet(agents);
   const configPath = path.resolve(agent.internalConfigDir, "config.json");
   const parsed = await readAgentConfig(configPath);
 
@@ -893,6 +893,42 @@ async function readAgentConfig(
   } catch {
     return {};
   }
+}
+
+function buildKnownAgentIdSet(
+  agents: Array<{ id: string }>,
+): Set<string> {
+  const knownAgentIds = new Set<string>();
+  for (const agent of agents) {
+    const raw = agent.id.trim();
+    if (raw) {
+      knownAgentIds.add(raw);
+    }
+    const normalized = normalizeAgentIdValue(agent.id);
+    if (normalized) {
+      knownAgentIds.add(normalized);
+    }
+  }
+  return knownAgentIds;
+}
+
+function findOrganizationAgentById(
+  agents: OrganizationAgent[],
+  requestedAgentId: string,
+): OrganizationAgent | undefined {
+  const exact = agents.find((entry) => entry.id === requestedAgentId);
+  if (exact) {
+    return exact;
+  }
+
+  const normalizedRequested = normalizeAgentIdValue(requestedAgentId);
+  if (!normalizedRequested) {
+    return undefined;
+  }
+
+  return agents.find((entry) => {
+    return normalizeAgentIdValue(entry.id) === normalizedRequested;
+  });
 }
 
 function hasOwnField<T extends object>(

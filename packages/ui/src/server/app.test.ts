@@ -1080,6 +1080,67 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("loads agent profiles even when route casing differs from stored agent id", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const ceoConfigDir = path.resolve(uniqueHomeDir, "agents", "CEO");
+    await mkdir(ceoConfigDir, { recursive: true });
+    await writeFile(
+      path.resolve(ceoConfigDir, "config.json"),
+      JSON.stringify(
+        {
+          id: "CEO",
+          displayName: "CEO",
+          role: "Chief Executive Officer",
+          description: "Leads the organization.",
+          organization: {
+            type: "manager",
+            reportsTo: null,
+            discoverable: true,
+            tags: ["leadership"],
+            priority: 100,
+          },
+          runtime: {
+            provider: { id: "openclaw" },
+            skills: { assigned: ["og-boards"] },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService({ homeDir: uniqueHomeDir }),
+        listAgents: async (): Promise<AgentDescriptor[]> => [
+          {
+            id: "CEO",
+            displayName: "CEO",
+            workspaceDir: "/tmp/workspaces/CEO",
+            internalConfigDir: ceoConfigDir,
+          },
+        ],
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/agents/ceo",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      agent: {
+        id: "CEO",
+        displayName: "CEO",
+        type: "manager",
+      },
+    });
+  });
+
   it("updates agent profile configuration through the api", async () => {
     const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const developerConfigDir = path.resolve(uniqueHomeDir, "agents", "developer");
