@@ -53,6 +53,11 @@ import { Switch } from "@/components/ui/switch";
 import { resolveAgentAvatarSource } from "@/lib/agent-avatar";
 import { cn } from "@/lib/utils";
 import { CreateAgentDialog } from "@/pages/agents/CreateAgentDialog";
+import {
+  AgentProfilePage,
+  type AgentProfile,
+  type AgentProfileUpdateInput,
+} from "@/pages/agents/AgentProfilePage";
 import { AgentsPage } from "@/pages/agents/AgentsPage";
 import { useCreateAgentDialog } from "@/pages/agents/useCreateAgentDialog";
 import {
@@ -89,7 +94,6 @@ import {
   Clock3,
   Home,
   MessageSquare,
-  MessageSquarePlus,
   MoreHorizontal,
   Plus,
   Settings,
@@ -965,6 +969,29 @@ export function DashboardPage(): ReactElement {
     });
   }, []);
 
+  const loadAgentProfile = useCallback(async (agentId: string) => {
+    const response = await fetchJson<{ agent: AgentProfile }>(
+      `/api/agents/${encodeURIComponent(agentId)}`,
+    );
+    return response.agent;
+  }, []);
+
+  const saveAgentProfile = useCallback(
+    async (agentId: string, payload: AgentProfileUpdateInput) => {
+      return fetchJson<{ agent: AgentProfile; message?: string }>(
+        `/api/agents/${encodeURIComponent(agentId)}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+    },
+    [],
+  );
+
   const refreshSessions = useCallback(
     async (agentId: string = DEFAULT_AGENT_ID) => {
       const response = await fetchJson<SessionsResponse>(
@@ -1478,66 +1505,12 @@ export function DashboardPage(): ReactElement {
     [workspaceProjectNameByPath],
   );
 
-  const selectedAgentSessions = useMemo(() => {
-    if (route.kind !== "agent") {
-      return [];
-    }
-
-    return sortSessionsByUpdatedAt(sessionsByAgentId[route.agentId] ?? []);
-  }, [route, sessionsByAgentId]);
-  const selectedAgentSession = useMemo(() => {
-    if (route.kind !== "agent") {
-      return null;
-    }
-
-    const selectedSessionRef = selectedSessionRefByAgentId[route.agentId];
-    if (selectedSessionRef) {
-      const selected = selectedAgentSessions.find(
-        (session) => session.sessionKey === selectedSessionRef,
-      );
-      if (selected) {
-        return selected;
-      }
-    }
-
-    return selectedAgentSessions[0] ?? null;
-  }, [route, selectedAgentSessions, selectedSessionRefByAgentId]);
   const selectedSessionAgent = useMemo(() => {
     if (!selectedSessionAgentId) {
       return null;
     }
     return agents.find((agent) => agent.id === selectedSessionAgentId) ?? null;
   }, [agents, selectedSessionAgentId]);
-
-  useEffect(() => {
-    if (route.kind !== "agent") {
-      return;
-    }
-
-    if (selectedAgentSessions.length === 0) {
-      return;
-    }
-
-    const currentSessionRef = selectedSessionRefByAgentId[route.agentId];
-    if (
-      currentSessionRef &&
-      selectedAgentSessions.some(
-        (session) => session.sessionKey === currentSessionRef,
-      )
-    ) {
-      return;
-    }
-
-    const latestSessionRef = selectedAgentSessions[0]?.sessionKey;
-    if (!latestSessionRef) {
-      return;
-    }
-
-    setSelectedSessionRefByAgentId((current) => ({
-      ...current,
-      [route.agentId]: latestSessionRef,
-    }));
-  }, [route, selectedAgentSessions, selectedSessionRefByAgentId]);
 
   const selectedWikiTitle =
     route.kind === "page" && route.view === "wiki"
@@ -1554,23 +1527,8 @@ export function DashboardPage(): ReactElement {
       };
     }
 
-    if (route.kind === "agent" && selectedAgentSession) {
-      const sessionRef = selectedAgentSession.sessionKey;
-      return {
-        agentId: route.agentId,
-        sessionRef,
-        chatKey: `agent:${route.agentId}:${sessionRef}`,
-        historyRef: selectedAgentSession.sessionKey,
-      };
-    }
-
     return null;
-  }, [
-    route,
-    selectedSession,
-    selectedSessionAgentId,
-    selectedAgentSession,
-  ]);
+  }, [route, selectedSession, selectedSessionAgentId]);
 
   const sessionMessages = useMemo(() => {
     if (!activeChatContext) {
@@ -3985,21 +3943,19 @@ export function DashboardPage(): ReactElement {
                     </h1>
                     <button
                       type="button"
-                      title={`New session with ${
+                      title={`Open chat with ${
                         selectedAgent?.displayName ?? route.agentId
                       }`}
-                      aria-label={`New session with ${
+                      aria-label={`Open chat with ${
                         selectedAgent?.displayName ?? route.agentId
                       }`}
                       onClick={() => {
-                        void handleCreateAgentSession(route.agentId, {
-                          navigate: true,
-                        });
+                        void handleSelectSidebarAgent(route.agentId);
                       }}
                       disabled={isMutating || isLoading || !selectedAgent}
                       className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors hover:border-border/60 hover:bg-accent/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <MessageSquarePlus className="size-4 icon-stroke-1_2" />
+                      <MessageSquare className="size-4 icon-stroke-1_2" />
                     </button>
                   </div>
                 </div>
@@ -4643,7 +4599,7 @@ export function DashboardPage(): ReactElement {
           <main
             className={cn(
               "flex min-h-0 flex-1 flex-col gap-4 p-4 sm:p-6",
-              route.kind === "session" || route.kind === "agent"
+              route.kind === "session"
                 ? "overflow-hidden"
                 : "overflow-y-auto",
             )}
@@ -4665,7 +4621,7 @@ export function DashboardPage(): ReactElement {
             {state ? (
               <div
                 className={cn(
-                  route.kind === "session" || route.kind === "agent"
+                  route.kind === "session"
                     ? "flex min-h-0 flex-1 flex-col"
                     : "space-y-4",
                 )}
@@ -4736,7 +4692,10 @@ export function DashboardPage(): ReactElement {
                     agents={agents}
                     isMutating={isMutating}
                     onSelectAgent={(agentId) => {
-                      void handleSelectSidebarAgent(agentId);
+                      navigateToRoute({
+                        kind: "agent",
+                        agentId,
+                      });
                     }}
                     onDeleteAgent={(agentId) => {
                       void handleDeleteAgent(agentId);
@@ -4797,7 +4756,29 @@ export function DashboardPage(): ReactElement {
                   />
                 ) : null}
 
-                {route.kind === "session" || route.kind === "agent" ? (
+                {route.kind === "agent" ? (
+                  <AgentProfilePage
+                    agentId={route.agentId}
+                    selectedAgent={selectedAgent}
+                    agents={agents}
+                    providers={providers}
+                    isBusy={isLoading || isMutating}
+                    onLoadProfile={loadAgentProfile}
+                    onSaveProfile={saveAgentProfile}
+                    onRefreshOverview={refreshOverview}
+                    onOpenChat={(agentId) => {
+                      void handleSelectSidebarAgent(agentId);
+                    }}
+                    onBackToAgents={() => {
+                      navigateToRoute({
+                        kind: "page",
+                        view: "agents",
+                      });
+                    }}
+                  />
+                ) : null}
+
+                {route.kind === "session" ? (
                   activeChatContext ? (
                     <div className="flex min-h-0 flex-1 flex-col">
                       <Conversation className="min-h-0 flex-1">
@@ -4889,13 +4870,7 @@ export function DashboardPage(): ReactElement {
                       >
                         <PromptInputBody>
                           <PromptInputTextarea
-                            placeholder={
-                              route.kind === "agent"
-                                ? `Message ${
-                                    selectedAgent?.displayName ?? route.agentId
-                                  }...`
-                                : "Message this session..."
-                            }
+                            placeholder="Message this session..."
                             disabled={
                               sessionChatStatus === "streaming" ||
                               isLoading ||
@@ -4921,23 +4896,8 @@ export function DashboardPage(): ReactElement {
                   ) : (
                     <div className="flex h-full min-h-[260px] flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-background/40 px-6 text-center">
                       <p className="text-sm text-muted-foreground">
-                        {route.kind === "session"
-                          ? `No saved session was found for id ${route.sessionId}.`
-                          : `No sessions yet for ${selectedAgent?.displayName ?? route.agentId}.`}
+                        {`No saved session was found for id ${route.sessionId}.`}
                       </p>
-                      {route.kind === "agent" ? (
-                        <Button
-                          size="sm"
-                          disabled={isMutating || isLoading}
-                          onClick={() => {
-                            void handleCreateAgentSession(route.agentId, {
-                              navigate: true,
-                            });
-                          }}
-                        >
-                          Start New Session
-                        </Button>
-                      ) : null}
                     </div>
                   )
                 ) : null}

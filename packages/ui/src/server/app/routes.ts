@@ -49,10 +49,12 @@ import {
   removeUiSession,
   renameUiSession,
   resolveDefaultWorkspaceSessionTitle,
+  resolveOrganizationAgentProfile,
   resolveOrganizationAgents,
   resolveProjectFolder,
   resolveUiProviders,
   runUiSessionMessage,
+  updateOrganizationAgentProfile,
   updateUiTaskStatus,
 } from "./session.js";
 import {
@@ -73,6 +75,7 @@ import type {
   DeleteAgentOptions,
   InactiveAgentNotificationTarget,
   OpenClawUiService,
+  OrganizationAgentProfileUpdateInput,
   RegisterApiRoutesDeps,
   UiServerAuthenticationSettings,
   UiServerSettings,
@@ -699,6 +702,63 @@ export function registerApiRoutes(
     return safeReply(reply, async () => {
       return {
         agents: await resolveOrganizationAgents(service)
+      };
+    });
+  });
+
+  app.get<{ Params: { agentId: string } }>(
+    "/api/agents/:agentId",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const agent = await resolveOrganizationAgentProfile(
+          service,
+          request.params.agentId,
+        );
+        if (!agent) {
+          reply.code(404);
+          return {
+            error: `Agent "${request.params.agentId}" not found.`,
+          };
+        }
+        return {
+          agent,
+        };
+      });
+    },
+  );
+
+  app.put<{
+    Params: { agentId: string };
+    Body: {
+      displayName?: unknown;
+      role?: unknown;
+      description?: unknown;
+      type?: unknown;
+      reportsTo?: unknown;
+      providerId?: unknown;
+      discoverable?: unknown;
+      tags?: unknown;
+      priority?: unknown;
+      skills?: unknown;
+    };
+  }>("/api/agents/:agentId", async (request, reply) => {
+    return safeReply(reply, async () => {
+      const parsed = parseOrganizationAgentProfileUpdate(request.body ?? {});
+      if (!parsed.ok) {
+        reply.code(400);
+        return {
+          error: parsed.error,
+        };
+      }
+
+      const updated = await updateOrganizationAgentProfile(
+        service,
+        request.params.agentId,
+        parsed.value,
+      );
+      return {
+        agent: updated,
+        message: `Agent "${updated.id}" updated.`,
       };
     });
   });
@@ -1646,6 +1706,183 @@ export function registerApiRoutes(
     handleSessionMessageStream
   );
 
+}
+
+function parseOrganizationAgentProfileUpdate(
+  payload: Record<string, unknown>,
+):
+  | { ok: true; value: OrganizationAgentProfileUpdateInput }
+  | { ok: false; error: string } {
+  const next: OrganizationAgentProfileUpdateInput = {};
+
+  if (hasOwnField(payload, "displayName")) {
+    if (typeof payload.displayName !== "string") {
+      return {
+        ok: false,
+        error: "displayName must be a string.",
+      };
+    }
+    const normalized = payload.displayName.trim();
+    if (!normalized) {
+      return {
+        ok: false,
+        error: "displayName cannot be empty.",
+      };
+    }
+    next.displayName = normalized;
+  }
+
+  if (hasOwnField(payload, "role")) {
+    if (typeof payload.role !== "string") {
+      return {
+        ok: false,
+        error: "role must be a string.",
+      };
+    }
+    next.role = payload.role.trim();
+  }
+
+  if (hasOwnField(payload, "description")) {
+    if (typeof payload.description !== "string") {
+      return {
+        ok: false,
+        error: "description must be a string.",
+      };
+    }
+    next.description = payload.description.trim();
+  }
+
+  if (hasOwnField(payload, "type")) {
+    if (payload.type !== "manager" && payload.type !== "individual") {
+      return {
+        ok: false,
+        error: 'type must be either "manager" or "individual".',
+      };
+    }
+    next.type = payload.type;
+  }
+
+  if (hasOwnField(payload, "reportsTo")) {
+    if (payload.reportsTo === null) {
+      next.reportsTo = null;
+    } else if (typeof payload.reportsTo === "string") {
+      next.reportsTo = normalizeReportsTo(payload.reportsTo) ?? null;
+    } else {
+      return {
+        ok: false,
+        error: "reportsTo must be a string or null.",
+      };
+    }
+  }
+
+  if (hasOwnField(payload, "providerId")) {
+    if (typeof payload.providerId !== "string") {
+      return {
+        ok: false,
+        error: "providerId must be a string.",
+      };
+    }
+    const normalized = payload.providerId.trim().toLowerCase();
+    if (!normalized) {
+      return {
+        ok: false,
+        error: "providerId cannot be empty.",
+      };
+    }
+    next.providerId = normalized;
+  }
+
+  if (hasOwnField(payload, "discoverable")) {
+    if (typeof payload.discoverable !== "boolean") {
+      return {
+        ok: false,
+        error: "discoverable must be a boolean.",
+      };
+    }
+    next.discoverable = payload.discoverable;
+  }
+
+  if (hasOwnField(payload, "priority")) {
+    const parsed =
+      typeof payload.priority === "number"
+        ? payload.priority
+        : typeof payload.priority === "string"
+          ? Number.parseInt(payload.priority, 10)
+          : Number.NaN;
+    if (!Number.isFinite(parsed)) {
+      return {
+        ok: false,
+        error: "priority must be a number.",
+      };
+    }
+    next.priority = Math.trunc(parsed);
+  }
+
+  if (hasOwnField(payload, "tags")) {
+    const parsedTags = parseStringListField(payload.tags);
+    if (!parsedTags.ok) {
+      return {
+        ok: false,
+        error: "tags must be a string or string array.",
+      };
+    }
+    next.tags = parsedTags.value;
+  }
+
+  if (hasOwnField(payload, "skills")) {
+    const parsedSkills = parseStringListField(payload.skills);
+    if (!parsedSkills.ok) {
+      return {
+        ok: false,
+        error: "skills must be a string or string array.",
+      };
+    }
+    next.skills = parsedSkills.value;
+  }
+
+  return {
+    ok: true,
+    value: next,
+  };
+}
+
+function parseStringListField(
+  value: unknown,
+): { ok: true; value: string[] } | { ok: false } {
+  if (typeof value === "string") {
+    return {
+      ok: true,
+      value:
+        value
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean) ?? [],
+    };
+  }
+
+  if (Array.isArray(value)) {
+    const normalized: string[] = [];
+    for (const entry of value) {
+      if (typeof entry !== "string") {
+        return { ok: false };
+      }
+      const cleaned = entry.trim();
+      if (!cleaned) {
+        continue;
+      }
+      normalized.push(cleaned);
+    }
+    return {
+      ok: true,
+      value: normalized,
+    };
+  }
+
+  return { ok: false };
+}
+
+function hasOwnField(target: object, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(target, key);
 }
 
 function normalizeCreateAgentProviderId(

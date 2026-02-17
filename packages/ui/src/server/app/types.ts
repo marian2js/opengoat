@@ -34,6 +34,13 @@ export interface AgentProviderBinding {
   providerId: string;
 }
 
+export interface AgentManagerUpdateResult {
+  agentId: string;
+  previousReportsTo: string | null;
+  reportsTo: string | null;
+  updatedPaths: string[];
+}
+
 export interface CreateAgentOptions {
   type?: "manager" | "individual";
   reportsTo?: string | null;
@@ -126,6 +133,27 @@ export interface UiProviderOption {
   supportsReportees: boolean;
 }
 
+export interface OrganizationAgentProfile extends OrganizationAgent {
+  description: string;
+  discoverable: boolean;
+  tags: string[];
+  priority: number;
+  skills: string[];
+}
+
+export interface OrganizationAgentProfileUpdateInput {
+  displayName?: string;
+  role?: string;
+  description?: string;
+  type?: "manager" | "individual";
+  reportsTo?: string | null;
+  providerId?: string;
+  discoverable?: boolean;
+  tags?: string[];
+  priority?: number;
+  skills?: string[];
+}
+
 export type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
 
 export interface OpenClawUiService {
@@ -141,6 +169,10 @@ export interface OpenClawUiService {
   listProviders?: () => Promise<UiProviderSummary[]>;
   getOpenClawGatewayConfig?: () => Promise<UiOpenClawGatewayConfig>;
   setAgentProvider?: (agentId: string, providerId: string) => Promise<AgentProviderBinding>;
+  setAgentManager?: (
+    agentId: string,
+    reportsTo: string | null,
+  ) => Promise<AgentManagerUpdateResult>;
   prepareSession?: (
     agentId?: string,
     options?: { sessionRef?: string; forceNew?: boolean }

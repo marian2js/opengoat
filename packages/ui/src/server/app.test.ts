@@ -1003,6 +1003,226 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("returns a normalized agent profile through the api", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const developerConfigDir = path.resolve(uniqueHomeDir, "agents", "developer");
+    await mkdir(developerConfigDir, { recursive: true });
+    await writeFile(
+      path.resolve(developerConfigDir, "config.json"),
+      JSON.stringify(
+        {
+          id: "developer",
+          displayName: "Developer",
+          role: "Software Engineer",
+          description: "Builds features.",
+          organization: {
+            type: "individual",
+            reportsTo: "ceo",
+            discoverable: false,
+            tags: ["frontend", "ux"],
+            priority: 65,
+          },
+          runtime: {
+            provider: { id: "codex" },
+            skills: {
+              assigned: ["react", "typescript"],
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService({ homeDir: uniqueHomeDir }),
+        listAgents: async (): Promise<AgentDescriptor[]> => [
+          {
+            id: "ceo",
+            displayName: "CEO",
+            workspaceDir: "/tmp/workspaces/ceo",
+            internalConfigDir: path.resolve(uniqueHomeDir, "agents", "ceo"),
+          },
+          {
+            id: "developer",
+            displayName: "Developer",
+            workspaceDir: "/tmp/workspaces/developer",
+            internalConfigDir: developerConfigDir,
+          },
+        ],
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/agents/developer",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      agent: {
+        id: "developer",
+        displayName: "Developer",
+        type: "individual",
+        reportsTo: "ceo",
+        role: "Software Engineer",
+        description: "Builds features.",
+        discoverable: false,
+        tags: ["frontend", "ux"],
+        priority: 65,
+        providerId: "codex",
+        skills: ["react", "typescript"],
+      },
+    });
+  });
+
+  it("updates agent profile configuration through the api", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const developerConfigDir = path.resolve(uniqueHomeDir, "agents", "developer");
+    await mkdir(developerConfigDir, { recursive: true });
+    const configPath = path.resolve(developerConfigDir, "config.json");
+    await writeFile(
+      configPath,
+      JSON.stringify(
+        {
+          id: "developer",
+          displayName: "Developer",
+          role: "Engineer",
+          description: "Engineer OpenClaw agent for Developer.",
+          organization: {
+            type: "individual",
+            reportsTo: "ceo",
+            discoverable: true,
+            tags: ["specialized"],
+            priority: 50,
+          },
+          runtime: {
+            provider: { id: "openclaw" },
+            skills: { assigned: ["typescript"] },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const setAgentProvider = vi.fn<
+      NonNullable<OpenClawUiService["setAgentProvider"]>
+    >(async (agentId, providerId) => {
+      return { agentId, providerId };
+    });
+    const setAgentManager = vi.fn<
+      NonNullable<OpenClawUiService["setAgentManager"]>
+    >(async (agentId, reportsTo) => {
+      return {
+        agentId,
+        previousReportsTo: "ceo",
+        reportsTo,
+        updatedPaths: [configPath],
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService({ homeDir: uniqueHomeDir }),
+        setAgentProvider,
+        setAgentManager,
+        listAgents: async (): Promise<AgentDescriptor[]> => [
+          {
+            id: "ceo",
+            displayName: "CEO",
+            workspaceDir: "/tmp/workspaces/ceo",
+            internalConfigDir: path.resolve(uniqueHomeDir, "agents", "ceo"),
+          },
+          {
+            id: "developer",
+            displayName: "Developer",
+            workspaceDir: "/tmp/workspaces/developer",
+            internalConfigDir: developerConfigDir,
+          },
+        ],
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "PUT",
+      url: "/api/agents/developer",
+      payload: {
+        displayName: "Frontend Engineer",
+        role: "Frontend Engineer",
+        description: "Owns UI architecture.",
+        type: "individual",
+        reportsTo: "ceo",
+        providerId: "codex",
+        discoverable: false,
+        tags: "frontend, ui",
+        priority: 72,
+        skills: ["react", "testing"],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(setAgentProvider).toHaveBeenCalledWith("developer", "codex");
+    expect(setAgentManager).toHaveBeenCalledWith("developer", "ceo");
+
+    const saved = JSON.parse(await readFile(configPath, "utf8")) as {
+      displayName: string;
+      role: string;
+      description: string;
+      organization: {
+        type: string;
+        reportsTo: string | null;
+        discoverable: boolean;
+        tags: string[];
+        priority: number;
+      };
+      runtime: {
+        provider: { id: string };
+        skills: { assigned: string[] };
+      };
+    };
+    expect(saved.displayName).toBe("Frontend Engineer");
+    expect(saved.role).toBe("Frontend Engineer");
+    expect(saved.description).toBe("Owns UI architecture.");
+    expect(saved.organization).toMatchObject({
+      type: "individual",
+      reportsTo: "ceo",
+      discoverable: false,
+      tags: ["frontend", "ui"],
+      priority: 72,
+    });
+    expect(saved.runtime.provider.id).toBe("codex");
+    expect(saved.runtime.skills.assigned).toEqual(["react", "testing"]);
+  });
+
+  it("validates payload when updating agent profiles", async () => {
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService(),
+    });
+
+    const response = await activeServer.inject({
+      method: "PUT",
+      url: "/api/agents/developer",
+      payload: {
+        type: "executive",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: 'type must be either "manager" or "individual".',
+    });
+  });
+
   it("creates project session through the api", async () => {
     const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(async (_agentId, options): Promise<SessionRunInfo> => {
       const sessionKey = options?.sessionRef ?? "agent:ceo:main";

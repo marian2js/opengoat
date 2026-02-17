@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -10,6 +10,8 @@ import type {
   LegacyPreparedSessionRun,
   OpenClawUiService,
   OrganizationAgent,
+  OrganizationAgentProfile,
+  OrganizationAgentProfileUpdateInput,
   SessionHistoryResult,
   SessionRemoveResult,
   SessionRunInfo,
@@ -21,6 +23,31 @@ import type {
 } from "./types.js";
 
 const execFileAsync = promisify(execFile);
+const DEFAULT_MANAGER_TAGS = ["manager", "leadership"];
+const DEFAULT_INDIVIDUAL_TAGS = ["specialized"];
+
+interface OrganizationAgentConfigShape {
+  id?: unknown;
+  displayName?: unknown;
+  role?: unknown;
+  description?: unknown;
+  organization?: {
+    type?: unknown;
+    reportsTo?: unknown;
+    discoverable?: unknown;
+    tags?: unknown;
+    priority?: unknown;
+  };
+  runtime?: {
+    provider?: {
+      id?: unknown;
+    };
+    adapter?: unknown;
+    skills?: {
+      assigned?: unknown;
+    };
+  };
+}
 
 export function normalizeReportsTo(
   value: string | null | undefined,
@@ -584,6 +611,237 @@ export async function resolveOrganizationAgents(
   );
 }
 
+export async function resolveOrganizationAgentProfile(
+  service: OpenClawUiService,
+  rawAgentId: string,
+): Promise<OrganizationAgentProfile | null> {
+  const requestedAgentId = normalizeAgentIdValue(rawAgentId);
+  if (!requestedAgentId) {
+    return null;
+  }
+
+  const agents = await resolveOrganizationAgents(service);
+  const agent = agents.find((entry) => entry.id === requestedAgentId);
+  if (!agent) {
+    return null;
+  }
+
+  const knownAgentIds = new Set(agents.map((entry) => entry.id));
+  const configPath = path.resolve(agent.internalConfigDir, "config.json");
+  const parsed = await readAgentConfig(configPath);
+
+  const fallbackType = resolveKnownAgentType(agent);
+  const resolvedType = normalizeTypeValue(parsed.organization?.type, fallbackType);
+  const type: "manager" | "individual" =
+    resolvedType === "manager" ? "manager" : "individual";
+  const reportsTo = normalizeReportsToValue(
+    parsed.organization?.reportsTo as string | null | undefined,
+    agent.reportsTo,
+    knownAgentIds,
+  );
+  const displayName =
+    normalizeOptionalStringValue(parsed.displayName) ?? agent.displayName;
+  const role =
+    normalizeOptionalStringValue(parsed.role) ??
+    resolveDefaultAgentRole(agent.id, type);
+  const description =
+    normalizeOptionalStringValue(parsed.description) ??
+    resolveDefaultAgentDescription(role, type, displayName);
+  const discoverable = normalizeBooleanValue(
+    parsed.organization?.discoverable,
+    true,
+  );
+  const tags = normalizeStringListValue(parsed.organization?.tags) ?? [
+    ...resolveDefaultTags(type),
+  ];
+  const priority = normalizePriorityValue(
+    parsed.organization?.priority,
+    resolveDefaultPriority(type),
+  );
+  const providerId =
+    normalizeProviderIdValue(parsed.runtime?.provider?.id) ??
+    normalizeProviderIdValue(parsed.runtime?.adapter) ??
+    agent.providerId;
+  const skills = normalizeStringListValue(parsed.runtime?.skills?.assigned) ?? [];
+
+  return {
+    ...agent,
+    displayName,
+    reportsTo,
+    type,
+    role,
+    description,
+    discoverable,
+    tags,
+    priority,
+    providerId,
+    skills,
+  };
+}
+
+export async function updateOrganizationAgentProfile(
+  service: OpenClawUiService,
+  rawAgentId: string,
+  input: OrganizationAgentProfileUpdateInput,
+): Promise<OrganizationAgentProfile> {
+  const profile = await resolveOrganizationAgentProfile(service, rawAgentId);
+  if (!profile) {
+    throw new Error(`Agent "${rawAgentId}" does not exist.`);
+  }
+
+  const providers = await resolveUiProviders(service);
+  const availableProviderIds = new Set(providers.map((provider) => provider.id));
+  const agents = await resolveOrganizationAgents(service);
+  const agentsById = new Map(agents.map((agent) => [agent.id, agent]));
+
+  const requestedType = input.type
+    ? normalizeTypeValue(input.type, profile.type)
+    : profile.type;
+  const nextType: "manager" | "individual" =
+    requestedType === "manager" ? "manager" : "individual";
+
+  const hasReportsToChange = hasOwnField(input, "reportsTo");
+  const normalizedReportsToInput = hasReportsToChange
+    ? normalizeReportTargetInput(input.reportsTo)
+    : undefined;
+  if (
+    normalizedReportsToInput &&
+    agentsById.get(normalizedReportsToInput)?.supportsReportees === false
+  ) {
+    const managerAgent = agentsById.get(normalizedReportsToInput);
+    throw new Error(
+      `Cannot assign "${normalizedReportsToInput}" as manager because provider "${managerAgent?.providerId ?? "unknown"}" does not support reportees.`,
+    );
+  }
+
+  let nextReportsTo = profile.reportsTo;
+  if (hasReportsToChange && normalizedReportsToInput !== undefined) {
+    if (typeof service.setAgentManager !== "function") {
+      throw new Error(
+        "Agent manager assignment is unavailable. Restart the UI server after updating dependencies.",
+      );
+    }
+    const updated = await service.setAgentManager(
+      profile.id,
+      normalizedReportsToInput,
+    );
+    nextReportsTo = updated.reportsTo;
+  }
+
+  const hasProviderChange = hasOwnField(input, "providerId");
+  const normalizedProviderId = hasProviderChange
+    ? normalizeProviderIdValue(input.providerId)
+    : undefined;
+  if (hasProviderChange) {
+    if (!normalizedProviderId || !availableProviderIds.has(normalizedProviderId)) {
+      throw new Error(
+        `providerId must be one of: ${[...availableProviderIds].join(", ")}`,
+      );
+    }
+    if (typeof service.setAgentProvider !== "function") {
+      throw new Error(
+        "Agent provider assignment is unavailable. Restart the UI server after updating dependencies.",
+      );
+    }
+    if (normalizedProviderId !== profile.providerId) {
+      await service.setAgentProvider(profile.id, normalizedProviderId);
+    }
+  }
+
+  const refreshed = await resolveOrganizationAgentProfile(service, profile.id);
+  if (!refreshed) {
+    throw new Error(`Agent "${profile.id}" does not exist.`);
+  }
+
+  const configPath = path.resolve(refreshed.internalConfigDir, "config.json");
+  const parsed = await readAgentConfig(configPath);
+  const config = toObjectRecord(parsed as unknown);
+  const organization = toObjectRecord(config.organization);
+  const runtime = toObjectRecord(config.runtime);
+  const runtimeProvider = toObjectRecord(runtime.provider);
+  const runtimeSkills = toObjectRecord(runtime.skills);
+
+  const displayName = normalizeDisplayNameInput(input.displayName, refreshed.displayName);
+  const role = normalizeRoleInput(
+    input.role,
+    resolveDefaultAgentRole(refreshed.id, nextType),
+  );
+  const previousDefaultDescription = resolveDefaultAgentDescription(
+    refreshed.role ??
+      resolveDefaultAgentRole(
+        refreshed.id,
+        refreshed.type === "manager" ? "manager" : "individual",
+      ),
+    refreshed.type === "manager" ? "manager" : "individual",
+    refreshed.displayName,
+  );
+  const description = normalizeDescriptionInput(
+    input.description,
+    refreshed.description,
+    {
+      previousDefaultDescription,
+      nextDefaultDescription: resolveDefaultAgentDescription(
+        role,
+        nextType,
+        displayName,
+      ),
+      roleChanged: role !== refreshed.role,
+      typeChanged: nextType !== refreshed.type,
+      displayNameChanged: displayName !== refreshed.displayName,
+    },
+  );
+  const discoverable = normalizeBooleanValue(
+    input.discoverable,
+    refreshed.discoverable,
+  );
+  const tags =
+    normalizeStringListValue(input.tags) ?? (hasOwnField(input, "tags")
+      ? []
+      : refreshed.tags);
+  const priority = normalizePriorityValue(input.priority, refreshed.priority);
+  const skills =
+    normalizeStringListValue(input.skills) ?? (hasOwnField(input, "skills")
+      ? []
+      : refreshed.skills);
+  const providerId = normalizedProviderId ?? refreshed.providerId;
+  const reportsTo = nextReportsTo;
+
+  const nextConfig = {
+    ...config,
+    id: refreshed.id,
+    displayName,
+    role,
+    description,
+    organization: {
+      ...organization,
+      type: nextType,
+      reportsTo,
+      discoverable,
+      tags,
+      priority,
+    },
+    runtime: {
+      ...runtime,
+      provider: {
+        ...runtimeProvider,
+        id: providerId,
+      },
+      skills: {
+        ...runtimeSkills,
+        assigned: skills,
+      },
+    },
+  };
+
+  await writeFile(configPath, `${JSON.stringify(nextConfig, null, 2)}\n`, "utf8");
+
+  const updatedProfile = await resolveOrganizationAgentProfile(service, refreshed.id);
+  if (!updatedProfile) {
+    throw new Error(`Agent "${refreshed.id}" does not exist.`);
+  }
+  return updatedProfile;
+}
+
 export async function resolveUiProviders(
   service: OpenClawUiService,
 ): Promise<UiProviderOption[]> {
@@ -620,6 +878,43 @@ export async function resolveUiProviders(
   }
 
   return sortUiProviders(providers);
+}
+
+async function readAgentConfig(
+  configPath: string,
+): Promise<OrganizationAgentConfigShape> {
+  try {
+    const raw = await readFile(configPath, "utf8");
+    const parsed = JSON.parse(raw) as OrganizationAgentConfigShape;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function hasOwnField<T extends object>(
+  target: T,
+  key: PropertyKey,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(target, key);
+}
+
+function toObjectRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function normalizeAgentIdValue(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized || undefined;
 }
 
 function normalizeProviderIdValue(value: unknown): string | undefined {
@@ -697,11 +992,40 @@ function normalizeReportsToValue(
   return knownAgentIds.has(normalized) ? normalized : fallback;
 }
 
+function normalizeReportTargetInput(
+  value: string | null | undefined,
+): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+
+  const normalized = normalizeAgentIdValue(value);
+  if (!normalized || normalized === "none" || normalized === "null") {
+    return null;
+  }
+  return normalized;
+}
+
+function resolveKnownAgentType(
+  agent: OrganizationAgent,
+): "manager" | "individual" {
+  if (agent.type === "manager" || agent.type === "individual") {
+    return agent.type;
+  }
+  return agent.id === DEFAULT_AGENT_ID ? "manager" : "individual";
+}
+
 function normalizeTypeValue(
-  rawType: string | undefined,
+  rawType: unknown,
   fallback: OrganizationAgent["type"],
 ): OrganizationAgent["type"] {
-  const normalized = rawType?.trim().toLowerCase();
+  if (typeof rawType !== "string") {
+    return fallback;
+  }
+  const normalized = rawType.trim().toLowerCase();
   if (normalized === "manager" || normalized === "individual") {
     return normalized;
   }
@@ -722,6 +1046,136 @@ function normalizeRoleValue(rawRole: string | undefined): string | undefined {
     return normalized;
   }
   return undefined;
+}
+
+function normalizeOptionalStringValue(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim();
+  return normalized || undefined;
+}
+
+function normalizeDisplayNameInput(
+  value: string | undefined,
+  fallback: string,
+): string {
+  const normalized = normalizeOptionalStringValue(value);
+  return normalized ?? fallback;
+}
+
+function normalizeRoleInput(value: string | undefined, fallback: string): string {
+  const normalized = normalizeOptionalStringValue(value);
+  return normalized ?? fallback;
+}
+
+function normalizeDescriptionInput(
+  value: string | undefined,
+  previous: string,
+  options: {
+    previousDefaultDescription: string;
+    nextDefaultDescription: string;
+    roleChanged: boolean;
+    typeChanged: boolean;
+    displayNameChanged: boolean;
+  },
+): string {
+  const normalized = normalizeOptionalStringValue(value);
+  if (normalized) {
+    return normalized;
+  }
+
+  if (value !== undefined) {
+    return options.nextDefaultDescription;
+  }
+
+  const shouldAutoRegenerate =
+    (options.roleChanged || options.typeChanged || options.displayNameChanged) &&
+    previous.trim() === options.previousDefaultDescription.trim();
+  if (shouldAutoRegenerate) {
+    return options.nextDefaultDescription;
+  }
+  return previous;
+}
+
+function normalizeStringListValue(value: unknown): string[] | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const rawItems = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(",")
+      : [];
+  if (rawItems.length === 0) {
+    return undefined;
+  }
+
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const item of rawItems) {
+    if (typeof item !== "string") {
+      continue;
+    }
+    const cleaned = item.trim();
+    if (!cleaned || seen.has(cleaned)) {
+      continue;
+    }
+    seen.add(cleaned);
+    normalized.push(cleaned);
+  }
+
+  return normalized;
+}
+
+function normalizeBooleanValue(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  return fallback;
+}
+
+function normalizePriorityValue(value: unknown, fallback: number): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.trunc(parsed);
+}
+
+function resolveDefaultTags(type: "manager" | "individual"): string[] {
+  return type === "manager" ? DEFAULT_MANAGER_TAGS : DEFAULT_INDIVIDUAL_TAGS;
+}
+
+function resolveDefaultPriority(type: "manager" | "individual"): number {
+  return type === "manager" ? 100 : 50;
+}
+
+function resolveDefaultAgentRole(
+  agentId: string,
+  type: "manager" | "individual",
+): string {
+  if (agentId === DEFAULT_AGENT_ID) {
+    return "CEO";
+  }
+  return type === "manager" ? "Manager" : "Team Member";
+}
+
+function resolveDefaultAgentDescription(
+  role: string,
+  type: "manager" | "individual",
+  displayName: string,
+): string {
+  if (type === "manager") {
+    return `${role} coordinating direct reports.`;
+  }
+  return `${role} OpenClaw agent for ${displayName}.`;
 }
 
 export function toCreateAgentOptions(
