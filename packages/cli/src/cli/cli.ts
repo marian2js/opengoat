@@ -1,6 +1,9 @@
 import { createOpenGoatRuntime } from "@opengoat/core";
 import type { OpenGoatService } from "@opengoat/core";
 import type { LogLevel } from "@opengoat/core";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { acpCommand } from "./commands/acp.command.js";
 import { agentCommand } from "./commands/agent.command.js";
 import { agentCreateCommand } from "./commands/agent-create.command.js";
@@ -39,6 +42,12 @@ import { CommandRouter } from "./framework/router.js";
 
 export async function runCli(argv: string[]): Promise<number> {
   const globalOptions = parseGlobalCliOptions(argv);
+  if (globalOptions.versionRequested && globalOptions.passthroughArgv.length === 0) {
+    const version = resolveCliVersion();
+    process.stdout.write(`${version ?? "unknown"}\n`);
+    return 0;
+  }
+
   const runtime = createOpenGoatRuntime({
     logLevel: globalOptions.logLevel,
     logFormat: globalOptions.logFormat
@@ -98,12 +107,14 @@ export async function runCli(argv: string[]): Promise<number> {
 
 interface GlobalCliOptions {
   passthroughArgv: string[];
+  versionRequested: boolean;
   logLevel?: LogLevel;
   logFormat?: "pretty" | "json";
 }
 
 function parseGlobalCliOptions(argv: string[]): GlobalCliOptions {
   const passthrough: string[] = [];
+  let versionRequested = false;
   let logLevel: LogLevel | undefined;
   let logFormat: "pretty" | "json" | undefined;
   for (let index = 0; index < argv.length; index += 1) {
@@ -115,6 +126,11 @@ function parseGlobalCliOptions(argv: string[]): GlobalCliOptions {
     if (token === "--") {
       passthrough.push(...argv.slice(index));
       break;
+    }
+
+    if (token === "--version" || token === "-v") {
+      versionRequested = true;
+      continue;
     }
 
     if (token === "--log-level") {
@@ -152,6 +168,7 @@ function parseGlobalCliOptions(argv: string[]): GlobalCliOptions {
 
   return {
     passthroughArgv: passthrough,
+    versionRequested,
     logLevel,
     logFormat
   };
@@ -192,4 +209,52 @@ function createLazyService(factory: () => OpenGoatService): OpenGoatService {
       return value;
     }
   });
+}
+
+function resolveCliVersion(): string | undefined {
+  const envVersion = process.env.OPENGOAT_VERSION?.trim();
+  if (envVersion) {
+    return envVersion;
+  }
+
+  const cliPackageRoot = resolveCliPackageRoot(path.dirname(fileURLToPath(import.meta.url)));
+  if (!cliPackageRoot) {
+    return undefined;
+  }
+
+  try {
+    const raw = readFileSync(path.join(cliPackageRoot, "package.json"), "utf-8");
+    const parsed = JSON.parse(raw) as {
+      version?: string;
+    };
+    const version = parsed.version?.trim();
+    return version || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveCliPackageRoot(startDir: string): string | undefined {
+  let currentDir = startDir;
+  while (true) {
+    const packageJsonPath = path.join(currentDir, "package.json");
+    if (existsSync(packageJsonPath)) {
+      try {
+        const parsed = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as {
+          name?: string;
+        };
+        if (parsed.name === "opengoat") {
+          return currentDir;
+        }
+      } catch {
+        // Ignore malformed package.json files and continue walking up.
+      }
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      return undefined;
+    }
+    currentDir = parentDir;
+  }
 }
