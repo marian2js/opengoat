@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.2.17
+
+- Release the latest runtime and dashboard updates, including provider runtime registry/policies with new CLI providers (Codex, Cursor, OpenCode, Gemini), organization workspace/session behavior improvements, and major dashboard/sidebar UX updates (session routing, org chart totals, persistent drag-and-drop ordering, and clearer working-state labels).
+
 ## 2026.2.15
 
 - Make task cron automation notifications run without persisted sessions, so inactive-reportee reminders no longer create lasting chat threads in the UI.
