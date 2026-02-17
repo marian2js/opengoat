@@ -3582,6 +3582,7 @@ export function DashboardPage(): ReactElement {
                             <AgentAvatar
                               agentId={agent.id}
                               displayName={agent.displayName}
+                              size="xs"
                             />
                             <span
                               className={cn(
@@ -5488,7 +5489,7 @@ function AgentAvatar({
 }: {
   agentId: string;
   displayName: string;
-  size?: "sm" | "md";
+  size?: "xs" | "sm" | "md";
   className?: string;
 }): ReactElement {
   const avatarSource = useMemo(() => {
@@ -5504,7 +5505,7 @@ function AgentAvatar({
     <span
       className={cn(
         "inline-flex shrink-0 overflow-hidden rounded-full border border-border/80 bg-background/80",
-        size === "md" ? "size-9" : "size-8",
+        size === "md" ? "size-9" : size === "sm" ? "size-8" : "size-7",
         className,
       )}
     >
