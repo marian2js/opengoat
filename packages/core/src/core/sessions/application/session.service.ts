@@ -122,9 +122,6 @@ export class SessionService {
     const existingEntry = store.sessions[sessionKey];
     const existingProjectPath = resolveStoredProjectPath(existingEntry?.projectPath);
     const projectPath = resolveProjectPath(request.projectPath, existingProjectPath);
-    if (!existingEntry || existingProjectPath !== projectPath) {
-      await this.ensureProjectPathGitRepository(projectPath);
-    }
     const fresh = existingEntry ? isSessionFresh(existingEntry.updatedAt, config.reset, this.nowMs()) : false;
     const projectPathChanged = Boolean(existingProjectPath && existingProjectPath !== projectPath);
     const isNewSession = request.forceNew || !existingEntry || !fresh || projectPathChanged;
@@ -784,32 +781,6 @@ export class SessionService {
     return mergeSessionConfig(DEFAULT_SESSION_CONFIG, sessionConfigRaw);
   }
 
-  private async ensureProjectPathGitRepository(projectPath: string): Promise<void> {
-    if (!this.commandRunner) {
-      return;
-    }
-    if (!(await this.fileSystem.exists(projectPath))) {
-      return;
-    }
-    try {
-      const probe = await this.commandRunner.run({
-        command: "git",
-        args: ["rev-parse", "--is-inside-work-tree"],
-        cwd: projectPath
-      });
-      if (probe.code === 0) {
-        return;
-      }
-
-      await this.commandRunner.run({
-        command: "git",
-        args: ["init", "--quiet"],
-        cwd: projectPath
-      });
-    } catch {
-      // Git tooling might not be installed; session setup remains functional without VCS bootstrap.
-    }
-  }
 }
 
 function normalizeTranscriptRecord(value: unknown): SessionTranscriptRecord | null {

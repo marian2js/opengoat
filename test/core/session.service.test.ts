@@ -258,7 +258,7 @@ describe("SessionService", () => {
     expect(remaining).toHaveLength(0);
   });
 
-  it("initializes git in project path during session setup when needed", async () => {
+  it("does not run git commands during session setup", async () => {
     const root = await createTempDir("opengoat-session-");
     roots.push(root);
 
@@ -275,12 +275,6 @@ describe("SessionService", () => {
           args: request.args,
           cwd: request.cwd
         });
-        if (request.args[0] === "rev-parse") {
-          return { code: 1, stdout: "", stderr: "not a git repository" };
-        }
-        if (request.args[0] === "init") {
-          return { code: 0, stdout: "", stderr: "" };
-        }
         return { code: 0, stdout: "", stderr: "" };
       }
     };
@@ -293,8 +287,7 @@ describe("SessionService", () => {
       userMessage: "hello"
     });
     expect(prepared.enabled).toBe(true);
-    expect(commandCalls.some((call) => call.args.join(" ") === "rev-parse --is-inside-work-tree")).toBe(true);
-    expect(commandCalls.some((call) => call.args.join(" ") === "init --quiet")).toBe(true);
+    expect(commandCalls).toHaveLength(0);
   });
 });
 
