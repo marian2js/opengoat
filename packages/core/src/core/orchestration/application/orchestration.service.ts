@@ -44,8 +44,7 @@ const DEFAULT_RUNTIME_PROFILE: AgentRuntimeProfile = {
   agentId: DEFAULT_AGENT_ID,
   providerId: OPENCLAW_PROVIDER_ID,
   providerKind: "cli",
-  workspaceAccess: "session-project",
-  includeProjectContextPrompt: true,
+  workspaceAccess: "provider-default",
   roleSkillDirectories: ["skills"]
 };
 
@@ -158,7 +157,6 @@ export class OrchestrationService {
       sessionRef: options.sessionRef,
       forceNew: options.forceNewSession,
       disableSession: options.disableSession,
-      projectPath: options.cwd,
       userMessage: options.message
     });
 
@@ -168,18 +166,15 @@ export class OrchestrationService {
     }
     if (preparedSession.enabled) {
       invokeOptions.providerSessionId = preparedSession.info.sessionId;
-      invokeOptions.cwd = resolveInvocationCwd({
+      const resolvedCwd = resolveInvocationCwd({
         requestedCwd: invokeOptions.cwd,
-        sessionProjectPath: preparedSession.info.projectPath,
         workspacePath: preparedSession.info.workspacePath,
         workspaceAccess: runtimeProfile.workspaceAccess
       });
-      const projectContextPrompt = buildProjectContextSystemPrompt(
-        preparedSession.info,
-        runtimeProfile,
-      );
-      if (projectContextPrompt) {
-        invokeOptions.systemPrompt = mergeSystemPrompts(invokeOptions.systemPrompt, projectContextPrompt);
+      if (resolvedCwd) {
+        invokeOptions.cwd = resolvedCwd;
+      } else {
+        delete invokeOptions.cwd;
       }
     }
 
@@ -465,57 +460,23 @@ function sanitizeProviderInvokeOptions(options: OrchestrationRunOptions): Provid
 
 function resolveInvocationCwd(params: {
   requestedCwd: string | undefined;
-  sessionProjectPath: string;
   workspacePath: string;
   workspaceAccess: AgentRuntimeProfile["workspaceAccess"];
-}): string {
+}): string | undefined {
+  if (params.workspaceAccess === "provider-default") {
+    return undefined;
+  }
+
   if (params.workspaceAccess === "agent-workspace") {
     const workspacePath = params.workspacePath.trim();
     if (workspacePath) {
       return workspacePath;
     }
-    return params.sessionProjectPath;
+    const normalizedRequested = params.requestedCwd?.trim();
+    return normalizedRequested || undefined;
   }
 
-  const normalizedRequested = params.requestedCwd?.trim();
-  if (normalizedRequested) {
-    return normalizedRequested;
-  }
-  return params.sessionProjectPath;
-}
-
-function buildProjectContextSystemPrompt(
-  session: SessionRunInfo,
-  runtimeProfile: AgentRuntimeProfile
-): string | undefined {
-  if (
-    runtimeProfile.workspaceAccess !== "session-project" ||
-    !runtimeProfile.includeProjectContextPrompt
-  ) {
-    return undefined;
-  }
-
-  const projectPath = session.projectPath.trim();
-  const workspacePath = session.workspacePath.trim();
-  if (!projectPath || projectPath === workspacePath) {
-    return undefined;
-  }
-
-  return [
-    "OpenGoat session context:",
-    `Session project path: ${projectPath}`,
-    `Agent workspace path: ${workspacePath}`,
-    "Use the session project path for project files. Prefer absolute paths under that directory or `cd` into it before running commands.",
-    "Avoid creating task files in the agent workspace unless the user explicitly asks for it."
-  ].join("\n");
-}
-
-function mergeSystemPrompts(current: string | undefined, extra: string): string {
-  const normalizedCurrent = current?.trim();
-  if (!normalizedCurrent) {
-    return extra;
-  }
-  return `${normalizedCurrent}\n\n${extra}`;
+  return params.requestedCwd?.trim() || undefined;
 }
 
 function containsMissingAgentMessage(stdout: string, stderr: string): boolean {

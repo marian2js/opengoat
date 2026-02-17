@@ -46,7 +46,6 @@ describe("OrchestrationService manager runtime", () => {
           sessionId: "session-1",
           transcriptPath: path.join(paths.sessionsDir, "ceo", "session-1.jsonl"),
           workspacePath: path.join(paths.workspacesDir, "ceo"),
-          projectPath: tempDir,
           isNewSession: true
         },
         compactionApplied: false
@@ -94,11 +93,10 @@ describe("OrchestrationService manager runtime", () => {
     expect(trace.execution?.stdout).toContain("hello from ceo");
   });
 
-  it("uses prepared session project path as cwd when no cwd is provided", async () => {
+  it("does not pass cwd for provider-default runtimes when no cwd is provided", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-manager-runtime-cwd-"));
     tempDirs.push(tempDir);
     const paths = createPaths(tempDir);
-    const projectPath = path.join(tempDir, "saaslib");
 
     const providerService = {
       invokeAgent: vi.fn(async () => ({
@@ -119,7 +117,6 @@ describe("OrchestrationService manager runtime", () => {
           sessionId: "session-2",
           transcriptPath: path.join(paths.sessionsDir, "ceo", "session-2.jsonl"),
           workspacePath: path.join(paths.workspacesDir, "ceo"),
-          projectPath,
           isNewSession: false
         },
         compactionApplied: false
@@ -150,18 +147,17 @@ describe("OrchestrationService manager runtime", () => {
       paths,
       "ceo",
       expect.objectContaining({
-        providerSessionId: "session-2",
-        cwd: projectPath
+        providerSessionId: "session-2"
       }),
       expect.any(Object)
     );
+    expect(providerService.invokeAgent.mock.calls[0]?.[2]).not.toHaveProperty("cwd");
   });
 
-  it("adds project context instructions when project path differs from workspace", async () => {
+  it("does not inject project-context prompts for provider-default runtimes", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-manager-runtime-prompt-"));
     tempDirs.push(tempDir);
     const paths = createPaths(tempDir);
-    const projectPath = path.join(tempDir, "saaslib");
 
     const providerService = {
       invokeAgent: vi.fn(async () => ({
@@ -182,7 +178,6 @@ describe("OrchestrationService manager runtime", () => {
           sessionId: "session-3",
           transcriptPath: path.join(paths.sessionsDir, "ceo", "session-3.jsonl"),
           workspacePath: path.join(paths.workspacesDir, "ceo"),
-          projectPath,
           isNewSession: false
         },
         compactionApplied: false
@@ -212,14 +207,13 @@ describe("OrchestrationService manager runtime", () => {
     expect(providerService.invokeAgent).toHaveBeenCalledWith(
       paths,
       "ceo",
-      expect.objectContaining({
-        systemPrompt: expect.stringContaining(`Session project path: ${projectPath}`)
-      }),
+      expect.objectContaining({}),
       expect.any(Object)
     );
+    expect(providerService.invokeAgent.mock.calls[0]?.[2]).not.toHaveProperty("systemPrompt");
   });
 
-  it("uses agent workspace cwd for non-openclaw providers and skips project-context prompt injection", async () => {
+  it("uses agent workspace cwd for non-openclaw providers", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-manager-runtime-non-openclaw-"));
     tempDirs.push(tempDir);
     const paths = createPaths(tempDir);
@@ -239,7 +233,6 @@ describe("OrchestrationService manager runtime", () => {
         providerId: "cursor",
         providerKind: "cli",
         workspaceAccess: "agent-workspace",
-        includeProjectContextPrompt: false,
         roleSkillDirectories: [".cursor/skills"]
       }))
     };
@@ -253,7 +246,6 @@ describe("OrchestrationService manager runtime", () => {
           sessionId: "session-4",
           transcriptPath: path.join(paths.sessionsDir, "developer", "session-4.jsonl"),
           workspacePath,
-          projectPath,
           isNewSession: false
         },
         compactionApplied: false
@@ -372,7 +364,6 @@ describe("OrchestrationService manager runtime", () => {
           sessionId: "session-repair",
           transcriptPath: path.join(paths.sessionsDir, "ceo", "session-repair.jsonl"),
           workspacePath: path.join(paths.workspacesDir, "ceo"),
-          projectPath: tempDir,
           isNewSession: true
         },
         compactionApplied: false
@@ -468,7 +459,6 @@ describe("OrchestrationService manager runtime", () => {
           sessionId: "session-repair-restart",
           transcriptPath: path.join(paths.sessionsDir, "ceo", "session-repair-restart.jsonl"),
           workspacePath: path.join(paths.workspacesDir, "ceo"),
-          projectPath: tempDir,
           isNewSession: true
         },
         compactionApplied: false

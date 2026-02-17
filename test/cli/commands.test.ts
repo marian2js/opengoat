@@ -336,7 +336,7 @@ describe("CLI commands", () => {
       providerId: "openclaw",
     }));
 
-    const { context } = createContext({ runAgent });
+    const { context, stderr } = createContext({ runAgent });
     const code = await agentCommand.run(["--message", "hello"], context);
 
     expect(code).toBe(0);
@@ -381,7 +381,7 @@ describe("CLI commands", () => {
     expect(second.stdout.output()).toContain("agent all-reportees");
   });
 
-  it("agent command passes --project-path to service run options", async () => {
+  it("agent command rejects removed --project-path option", async () => {
     const runAgent = vi.fn(async () => ({
       code: 0,
       stdout: "",
@@ -390,19 +390,15 @@ describe("CLI commands", () => {
       providerId: "openclaw",
     }));
 
-    const { context } = createContext({ runAgent });
+    const { context, stderr } = createContext({ runAgent });
     const code = await agentCommand.run(
       ["--message", "check", "--project-path", "/tmp/project"],
       context,
     );
 
-    expect(code).toBe(0);
-    expect(runAgent).toHaveBeenCalledWith(
-      "ceo",
-      expect.objectContaining({
-        cwd: "/tmp/project",
-      }),
-    );
+    expect(code).toBe(1);
+    expect(runAgent).not.toHaveBeenCalled();
+    expect(stderr.output()).toContain("Unknown option: --project-path");
   });
 
   it("agent last-action validates args and prints results", async () => {

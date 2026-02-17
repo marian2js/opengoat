@@ -7,7 +7,6 @@ export const providerModule: ProviderModule = {
   runtime: {
     invocation: {
       cwd: "agent-workspace",
-      includeProjectContextPrompt: false,
     },
     skills: {
       directories: [".agents/skills"],

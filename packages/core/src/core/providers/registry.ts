@@ -60,9 +60,6 @@ export class ProviderRegistry {
     return {
       invocation: {
         cwd: runtime?.invocation.cwd ?? DEFAULT_PROVIDER_RUNTIME_POLICY.invocation.cwd,
-        includeProjectContextPrompt:
-          runtime?.invocation.includeProjectContextPrompt ??
-          DEFAULT_PROVIDER_RUNTIME_POLICY.invocation.includeProjectContextPrompt,
       },
       skills: {
         directories:

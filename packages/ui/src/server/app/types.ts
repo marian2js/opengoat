@@ -52,7 +52,6 @@ export interface SessionSummary {
   updatedAt: number;
   transcriptPath: string;
   workspacePath: string;
-  projectPath?: string;
   inputChars: number;
   outputChars: number;
   totalChars: number;
@@ -144,7 +143,7 @@ export interface OpenClawUiService {
   setAgentProvider?: (agentId: string, providerId: string) => Promise<AgentProviderBinding>;
   prepareSession?: (
     agentId?: string,
-    options?: { sessionRef?: string; projectPath?: string; forceNew?: boolean }
+    options?: { sessionRef?: string; forceNew?: boolean }
   ) => Promise<SessionRunInfo>;
   runAgent?: (agentId: string, options: UiRunAgentOptions) => Promise<AgentRunResult>;
   getSessionHistory?: (
@@ -187,7 +186,6 @@ export interface SessionRunInfo {
   sessionId: string;
   transcriptPath: string;
   workspacePath: string;
-  projectPath: string;
   isNewSession: boolean;
 }
 

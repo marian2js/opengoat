@@ -121,7 +121,7 @@ describe("provider CLI commands", () => {
 
     const first = createContext({ runAgent });
     const code = await agentRunCommand.run(
-      ["ceo", "--message", "hi", "--model", "o3", "--project-path", "/tmp/project", "--", "--foo", "bar"],
+      ["ceo", "--message", "hi", "--model", "o3", "--", "--foo", "bar"],
       first.context
     );
 
@@ -131,7 +131,6 @@ describe("provider CLI commands", () => {
       expect.objectContaining({
         message: "hi",
         model: "o3",
-        cwd: "/tmp/project",
         passthroughArgs: ["--foo", "bar"]
       })
     );
@@ -149,6 +148,20 @@ describe("provider CLI commands", () => {
 
     expect(failCode).toBe(2);
     expect(second.stderr.output()).toContain("Runtime run failed");
+  });
+
+  it("agent run rejects removed --project-path option", async () => {
+    const runAgent = vi.fn();
+    const context = createContext({ runAgent });
+
+    const code = await agentRunCommand.run(
+      ["ceo", "--message", "hi", "--project-path", "/tmp/project"],
+      context.context
+    );
+
+    expect(code).toBe(1);
+    expect(runAgent).not.toHaveBeenCalled();
+    expect(context.stderr.output()).toContain("Unknown option: --project-path");
   });
 
   it("agent run prints provider stderr in stream mode when provider returns final output only", async () => {

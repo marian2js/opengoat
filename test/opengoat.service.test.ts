@@ -1831,33 +1831,27 @@ describe("OpenGoatService", () => {
     ).toBe(true);
   });
 
-  it("prepares a new session for a specific project path without invoking runtime", async () => {
+  it("prepares a new named session without invoking runtime", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
     const { service, provider } = createService(root);
     await service.initialize();
 
-    const projectPath = path.join(root, "desktop-project");
-    const fileSystem = new NodeFileSystem();
-    await fileSystem.ensureDir(projectPath);
-
     const prepared = await service.prepareSession("ceo", {
-      sessionRef: "project:desktop-project",
-      projectPath: projectPath,
+      sessionRef: "workspace:desktop-project",
       forceNew: true,
     });
 
     expect(prepared.agentId).toBe("ceo");
-    expect(prepared.sessionKey).toBe("project:desktop-project");
-    expect(prepared.projectPath).toBe(projectPath);
+    expect(prepared.sessionKey).toBe("workspace:desktop-project");
     expect(prepared.isNewSession).toBe(true);
     expect(provider.invocations).toHaveLength(0);
 
     const sessions = await service.listSessions("ceo");
     expect(
       sessions.some(
-        (session) => session.sessionKey === "project:desktop-project",
+        (session) => session.sessionKey === "workspace:desktop-project",
       ),
     ).toBe(true);
   });
@@ -1868,13 +1862,6 @@ describe("OpenGoatService", () => {
 
     const { service, provider } = createService(root);
     await service.initialize();
-    const projectPath = path.join(root, "packages", "ui");
-    await new NodeFileSystem().ensureDir(projectPath);
-    await service.prepareSession("ceo", {
-      sessionRef: "project:ui",
-      projectPath,
-      forceNew: true,
-    });
     await service.createAgent("Engineer", {
       type: "individual",
       reportsTo: "ceo",
@@ -1969,7 +1956,7 @@ describe("OpenGoatService", () => {
     expect(inactivityInvocation?.message).toContain(
       `Notification timestamp: ${cycle.ranAt}`,
     );
-    expect(inactivityInvocation?.cwd).toBe(projectPath);
+    expect(inactivityInvocation?.cwd).toBeUndefined();
 
     const engineerSessions = await service.listSessions("engineer");
     const engineerNotificationSessionKey =

@@ -137,7 +137,7 @@ describe("SessionService", () => {
     expect(lastAction?.timestamp).toBe(expectedTimestamp);
   });
 
-  it("enforces one project path per session by rotating session id when project path changes", async () => {
+  it("keeps session continuity for the same session key and only rotates on forceNew", async () => {
     const root = await createTempDir("opengoat-session-");
     roots.push(root);
 
@@ -148,7 +148,6 @@ describe("SessionService", () => {
     const service = createService(now);
 
     const first = await service.prepareRunSession(paths, "ceo", {
-      projectPath: "/tmp/project-a",
       userMessage: "first"
     });
     expect(first.enabled).toBe(true);
@@ -156,12 +155,10 @@ describe("SessionService", () => {
       throw new Error("Expected session-enabled run.");
     }
     const firstSessionId = first.info.sessionId;
-    expect(first.info.projectPath).toBe(path.resolve("/tmp/project-a"));
     expect(first.info.workspacePath).toBe(path.join(paths.workspacesDir, "ceo"));
 
     now.value += 1_000;
     const second = await service.prepareRunSession(paths, "ceo", {
-      projectPath: "/tmp/project-a",
       userMessage: "second"
     });
     expect(second.enabled).toBe(true);
@@ -172,7 +169,7 @@ describe("SessionService", () => {
 
     now.value += 1_000;
     const third = await service.prepareRunSession(paths, "ceo", {
-      projectPath: "/tmp/project-b",
+      forceNew: true,
       userMessage: "third"
     });
     expect(third.enabled).toBe(true);
@@ -181,7 +178,6 @@ describe("SessionService", () => {
     }
     expect(third.info.isNewSession).toBe(true);
     expect(third.info.sessionId).not.toBe(firstSessionId);
-    expect(third.info.projectPath).toBe(path.resolve("/tmp/project-b"));
   });
 
   it("compacts transcript history and keeps recent messages", async () => {
@@ -264,9 +260,6 @@ describe("SessionService", () => {
 
     const { fileSystem, paths } = await createPaths(root);
     await seedAgentConfig(fileSystem, paths, "ceo", {});
-    const projectDir = path.join(root, "project");
-    await fileSystem.ensureDir(projectDir);
-
     const commandCalls: Array<{ command: string; args: string[]; cwd?: string }> = [];
     const commandRunner: CommandRunnerPort = {
       async run(request) {
@@ -283,7 +276,6 @@ describe("SessionService", () => {
     const service = createService(now, commandRunner);
 
     const prepared = await service.prepareRunSession(paths, "ceo", {
-      projectPath: projectDir,
       userMessage: "hello"
     });
     expect(prepared.enabled).toBe(true);

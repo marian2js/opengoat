@@ -1,4 +1,3 @@
-import { stat } from "node:fs/promises";
 import path from "node:path";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import {
@@ -46,15 +45,13 @@ import {
   normalizeSkills,
   normalizeUiImages,
   pickProjectFolderFromSystem,
-  prepareProjectSession,
+  prepareUiSession,
   removeUiSession,
   renameUiSession,
-  resolveAbsolutePath,
   resolveDefaultWorkspaceSessionTitle,
   resolveOrganizationAgents,
   resolveProjectFolder,
   resolveUiProviders,
-  resolveSessionProjectPathForRequest,
   runUiSessionMessage,
   updateUiTaskStatus,
 } from "./session.js";
@@ -1090,17 +1087,15 @@ export function registerApiRoutes(
       const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
       const project = await resolveProjectFolder(request.body?.folderName, request.body?.folderPath);
       const projectSessionRef = buildProjectSessionRef(project.name, project.path);
-      await prepareProjectSession(service, agentId, {
+      await prepareUiSession(service, agentId, {
         sessionRef: projectSessionRef,
-        projectPath: project.path,
         forceNew: false
       });
       await renameUiSession(service, agentId, project.name, projectSessionRef);
 
       const workspaceSessionRef = buildWorkspaceSessionRef(project.name, project.path);
-      const prepared = await prepareProjectSession(service, agentId, {
+      const prepared = await prepareUiSession(service, agentId, {
         sessionRef: workspaceSessionRef,
-        projectPath: project.path,
         forceNew: true
       });
       await renameUiSession(service, agentId, resolveDefaultWorkspaceSessionTitle(), workspaceSessionRef);
@@ -1127,32 +1122,15 @@ export function registerApiRoutes(
     });
   });
 
-  app.post<{ Body: { agentId?: string; projectPath?: string; workspaceName?: string } }>(
+  app.post<{ Body: { agentId?: string; workspaceName?: string } }>(
     "/api/workspaces/session",
     async (request, reply) => {
       return safeReply(reply, async () => {
         const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
-        const projectPath = request.body?.projectPath?.trim();
-        if (!projectPath) {
-          reply.code(400);
-          return {
-            error: "projectPath is required"
-          };
-        }
-
-        const resolvedProjectPath = resolveAbsolutePath(projectPath);
-        const stats = await stat(resolvedProjectPath).catch(() => {
-          return null;
-        });
-        if (!stats || !stats.isDirectory()) {
-          throw new Error(`Workspace path is not a directory: ${resolvedProjectPath}`);
-        }
-
-        const workspaceName = request.body?.workspaceName?.trim() || path.basename(resolvedProjectPath);
-        const sessionRef = buildWorkspaceSessionRef(workspaceName, resolvedProjectPath);
-        const prepared = await prepareProjectSession(service, agentId, {
+        const workspaceName = request.body?.workspaceName?.trim() || "Workspace";
+        const sessionRef = buildWorkspaceSessionRef(workspaceName, workspaceName);
+        const prepared = await prepareUiSession(service, agentId, {
           sessionRef,
-          projectPath: resolvedProjectPath,
           forceNew: true
         });
 
@@ -1278,7 +1256,6 @@ export function registerApiRoutes(
       body?: {
         agentId?: string;
         sessionRef?: string;
-        projectPath?: string;
         message?: string;
         images?: UiImageInput[];
       };
@@ -1305,12 +1282,6 @@ export function registerApiRoutes(
         };
       }
 
-      const projectPath = await resolveSessionProjectPathForRequest(
-        service,
-        agentId,
-        sessionRef,
-        request.body?.projectPath
-      );
       const resolvedMessage =
         message ||
         (images.length === 1
@@ -1329,7 +1300,6 @@ export function registerApiRoutes(
 
       const result = await runUiSessionMessage(service, agentId, {
         sessionRef,
-        projectPath,
         message: resolvedMessage,
         images: images.length > 0 ? images : undefined,
         hooks: {
@@ -1375,13 +1345,13 @@ export function registerApiRoutes(
   };
 
   app.post<{
-    Body: { agentId?: string; sessionRef?: string; projectPath?: string; message?: string; images?: UiImageInput[] };
+    Body: { agentId?: string; sessionRef?: string; message?: string; images?: UiImageInput[] };
   }>(
     "/api/sessions/message",
     handleSessionMessage
   );
   app.post<{
-    Body: { agentId?: string; sessionRef?: string; projectPath?: string; message?: string; images?: UiImageInput[] };
+    Body: { agentId?: string; sessionRef?: string; message?: string; images?: UiImageInput[] };
   }>(
     "/api/session/message",
     handleSessionMessage
@@ -1392,7 +1362,6 @@ export function registerApiRoutes(
       body?: {
         agentId?: string;
         sessionRef?: string;
-        projectPath?: string;
         message?: string;
         images?: UiImageInput[];
       };
@@ -1411,21 +1380,6 @@ export function registerApiRoutes(
 
     if (!message && images.length === 0) {
       reply.code(400).send({ error: "message or image is required" });
-      return;
-    }
-
-    let projectPath: string | undefined;
-    try {
-      projectPath = await resolveSessionProjectPathForRequest(
-        service,
-        agentId,
-        sessionRef,
-        request.body?.projectPath
-      );
-    } catch (error) {
-      const streamError =
-        error instanceof Error ? error.message : "Unexpected server error";
-      reply.code(500).send({ error: streamError });
       return;
     }
 
@@ -1587,7 +1541,6 @@ export function registerApiRoutes(
     try {
       const result = await runUiSessionMessage(service, agentId, {
         sessionRef,
-        projectPath,
         message: resolvedMessage,
         images: images.length > 0 ? images : undefined,
         abortSignal: runtimeAbortController.signal,
@@ -1681,13 +1634,13 @@ export function registerApiRoutes(
   };
 
   app.post<{
-    Body: { agentId?: string; sessionRef?: string; projectPath?: string; message?: string; images?: UiImageInput[] };
+    Body: { agentId?: string; sessionRef?: string; message?: string; images?: UiImageInput[] };
   }>(
     "/api/sessions/message/stream",
     handleSessionMessageStream
   );
   app.post<{
-    Body: { agentId?: string; sessionRef?: string; projectPath?: string; message?: string; images?: UiImageInput[] };
+    Body: { agentId?: string; sessionRef?: string; message?: string; images?: UiImageInput[] };
   }>(
     "/api/session/message/stream",
     handleSessionMessageStream
