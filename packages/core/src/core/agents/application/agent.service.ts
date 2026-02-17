@@ -1094,6 +1094,10 @@ const EVERY_SESSION_SECTION_LINES = [
   "",
   "You are part of an organization run by AI agents. You have access to the organization's context and wiki on `~/.opengoat/organization`",
   "",
+  "## Repositories",
+  "",
+  "If you need to use a repo, clone it or copy it into your own workspace.",
+  "",
 ];
 
 function renderRoleMarkdown(profile: {
@@ -1118,7 +1122,7 @@ function renderRoleMarkdown(profile: {
     "- To delegate and coordinate work, use `og-*` skills.",
     "- Organization context is available in `~/.opengoat/organization` - read them",
     "- You can view and edit the wiki in `~/.opengoat/organization/wiki`",
-    "- Repos are available in `~/.opengoat/organization/workspace/<project>` - each agent must use its own worktree named `worktree/<agent-id>`.",
+    "- If you need to use a repo, clone it or copy it into your own workspace.",
     "",
     "---",
     "",

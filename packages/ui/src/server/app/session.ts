@@ -1,13 +1,9 @@
 import { execFile } from "node:child_process";
-import { mkdir, readFile, stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import {
-  DEFAULT_AGENT_ID,
-  DEFAULT_ORGANIZATION_PROJECT_DIRNAME,
-  DEFAULT_ORGANIZATION_PROJECT_NAME,
-} from "./constants.js";
+import { DEFAULT_AGENT_ID } from "./constants.js";
 import type {
   AgentRunResult,
   CreateAgentOptions,
@@ -20,7 +16,6 @@ import type {
   SessionSummary,
   TaskRecord,
   UiImageInput,
-  UiLogBuffer,
   UiProviderOption,
   UiRunHooks,
 } from "./types.js";
@@ -127,51 +122,6 @@ export async function prepareUiSession(
   throw new Error(
     "Session preparation is unavailable. Restart the UI server after updating dependencies.",
   );
-}
-
-export async function ensureDefaultOrganizationWorkspace(
-  service: OpenClawUiService,
-  logs: UiLogBuffer,
-): Promise<void> {
-  try {
-    const organizationPath = path.resolve(
-      service.getHomeDir(),
-      DEFAULT_ORGANIZATION_PROJECT_DIRNAME,
-    );
-    await mkdir(organizationPath, { recursive: true });
-
-    const sessions = await service.listSessions(DEFAULT_AGENT_ID);
-    const hasOrganizationWorkspaceSession = sessions.some((session) =>
-      session.sessionKey.startsWith("workspace:"),
-    );
-
-    if (!hasOrganizationWorkspaceSession) {
-      const workspaceSessionRef = buildWorkspaceSessionRef(
-        DEFAULT_ORGANIZATION_PROJECT_NAME,
-        organizationPath,
-      );
-      await prepareUiSession(service, DEFAULT_AGENT_ID, {
-        sessionRef: workspaceSessionRef,
-        forceNew: true,
-      });
-      await renameUiSession(
-        service,
-        DEFAULT_AGENT_ID,
-        resolveDefaultWorkspaceSessionTitle(),
-        workspaceSessionRef,
-      );
-    }
-  } catch (error) {
-    logs.append({
-      timestamp: new Date().toISOString(),
-      level: "warn",
-      source: "opengoat",
-      message:
-        error instanceof Error
-          ? `Default Organization workspace setup skipped: ${error.message}`
-          : "Default Organization workspace setup skipped.",
-    });
-  }
 }
 
 export async function renameUiSession(

@@ -1064,7 +1064,7 @@ describe("OpenGoat UI server API", () => {
     expect(payload.session.sessionKey.startsWith("workspace:")).toBe(true);
   });
 
-  it("bootstraps default Organization project and New Session on startup", async () => {
+  it("does not auto-create organization workspace sessions on startup", async () => {
     const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const listSessions = vi.fn<OpenClawUiService["listSessions"]>(async (): Promise<SessionSummary[]> => []);
     const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(async (_agentId, options): Promise<SessionRunInfo> => {
@@ -1106,23 +1106,9 @@ describe("OpenGoat UI server API", () => {
       }
     });
 
-    expect(listSessions).toHaveBeenCalledWith("ceo");
-    expect(prepareSession).toHaveBeenCalledTimes(1);
-    expect(renameSession).toHaveBeenCalledTimes(1);
-    expect(prepareSession).toHaveBeenNthCalledWith(
-      1,
-      "ceo",
-      expect.objectContaining({
-        sessionRef: expect.stringMatching(/^workspace:/),
-        forceNew: true
-      })
-    );
-    expect(renameSession).toHaveBeenNthCalledWith(
-      1,
-      "ceo",
-      "New Session",
-      expect.stringMatching(/^workspace:/)
-    );
+    expect(listSessions).not.toHaveBeenCalled();
+    expect(prepareSession).not.toHaveBeenCalled();
+    expect(renameSession).not.toHaveBeenCalled();
   });
 
   it("creates project session through legacy core fallback when prepareSession is unavailable", async () => {

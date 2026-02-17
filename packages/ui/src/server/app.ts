@@ -7,7 +7,6 @@ import { createUiLogBuffer } from "./app/log-buffer.js";
 import { registerApiRoutes } from "./app/routes.js";
 import { extractRuntimeActivityFromLogLines } from "./app/runtime-logs.js";
 import { readUiServerSettings, writeUiServerSettings } from "./app/settings.js";
-import { ensureDefaultOrganizationWorkspace } from "./app/session.js";
 import { createTaskCronScheduler } from "./app/task-cron-scheduler.js";
 import { stripQueryStringFromUrl } from "./app/text.js";
 import { createVersionInfoProvider, resolveMode, resolvePackageRoot } from "./app/version.js";
@@ -45,7 +44,6 @@ export async function createOpenGoatUiServer(
     message: "OpenGoat UI server started.",
   });
   logs.start();
-  await ensureDefaultOrganizationWorkspace(service, logs);
 
   let uiSettings = await readUiServerSettings(service.getHomeDir());
   const auth = createUiAuthController(app, () => uiSettings.authentication);
