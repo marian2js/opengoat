@@ -97,7 +97,12 @@ import {
   TerminalSquare,
   UsersRound,
 } from "lucide-react";
-import type { ComponentType, DragEvent, ReactElement } from "react";
+import type {
+  ComponentType,
+  DragEvent,
+  KeyboardEvent,
+  ReactElement,
+} from "react";
 import {
   Fragment,
   useCallback,
@@ -3551,6 +3556,22 @@ export function DashboardPage(): ReactElement {
       : route.kind === "session"
         ? selectedSessionAgentId
         : null;
+  const handleSessionPromptTextareaKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (sessionChatStatus !== "streaming") {
+        return;
+      }
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey &&
+        !event.nativeEvent.isComposing
+      ) {
+        // Keep typing enabled while streaming, but prevent accidental submit.
+        event.preventDefault();
+      }
+    },
+    [sessionChatStatus],
+  );
   const renderAgentSessionRow = (
     session: SidebarAgentSessionItem,
     key: string,
@@ -4967,8 +4988,8 @@ export function DashboardPage(): ReactElement {
                         <PromptInputBody>
                           <PromptInputTextarea
                             placeholder="Message this session..."
+                            onKeyDown={handleSessionPromptTextareaKeyDown}
                             disabled={
-                              sessionChatStatus === "streaming" ||
                               isLoading ||
                               isMutating
                             }
