@@ -94,6 +94,27 @@ describe("opengoat binary", () => {
     };
     expect(config.defaultAgent).toBe("ceo");
   }, INIT_TIMEOUT_MS);
+
+  it("prints version without bootstrapping when --version is provided", async () => {
+    const root = await createTempDir("opengoat-bin-");
+    roots.push(root);
+
+    const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const binaryPath = path.join(projectRoot, "bin", "opengoat");
+    const expectedVersion = await readCliPackageVersion(projectRoot);
+
+    const { stdout } = await execFileAsync(binaryPath, ["--version"], {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        OPENGOAT_HOME: root,
+        ...buildOpenClawIsolatedEnv(root),
+      }
+    });
+
+    expect(stdout.trim()).toBe(expectedVersion);
+    await expect(access(path.join(root, "config.json"), constants.F_OK)).rejects.toBeTruthy();
+  });
 });
 
 function buildOpenClawIsolatedEnv(root: string): NodeJS.ProcessEnv {
@@ -102,4 +123,13 @@ function buildOpenClawIsolatedEnv(root: string): NodeJS.ProcessEnv {
     OPENCLAW_STATE_DIR: stateDir,
     OPENCLAW_CONFIG_PATH: path.join(stateDir, "openclaw.json"),
   };
+}
+
+async function readCliPackageVersion(projectRoot: string): Promise<string> {
+  const parsed = JSON.parse(
+    await readFile(path.join(projectRoot, "packages", "cli", "package.json"), "utf-8"),
+  ) as {
+    version: string;
+  };
+  return parsed.version;
 }

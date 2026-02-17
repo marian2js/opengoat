@@ -1,7 +1,8 @@
 import { constants } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { fileURLToPath } from "node:url";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCli } from "../../packages/cli/src/cli/cli.js";
 import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
 
@@ -48,6 +49,34 @@ describe("runCli", () => {
     const code = await runCli([]);
 
     expect(code).toBe(0);
+    await expect(
+      access(path.join(root, "config.json"), constants.F_OK),
+    ).rejects.toBeTruthy();
+  });
+
+  it("prints version and does not bootstrap when --version is provided", async () => {
+    const root = await createTempDir("opengoat-runcli-");
+    roots.push(root);
+    process.env.OPENGOAT_HOME = root;
+    applyOpenClawIsolation(root);
+
+    const expectedVersion = await readCliPackageVersion();
+    const writes: string[] = [];
+    const writeSpy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation(((chunk: string | Uint8Array) => {
+        writes.push(typeof chunk === "string" ? chunk : chunk.toString("utf-8"));
+        return true;
+      }) as typeof process.stdout.write);
+
+    try {
+      const code = await runCli(["--version"]);
+      expect(code).toBe(0);
+    } finally {
+      writeSpy.mockRestore();
+    }
+
+    expect(writes.join("")).toContain(`${expectedVersion}\n`);
     await expect(
       access(path.join(root, "config.json"), constants.F_OK),
     ).rejects.toBeTruthy();
@@ -196,4 +225,19 @@ function applyOpenClawIsolation(root: string): void {
   const stateDir = path.join(root, ".openclaw");
   process.env.OPENCLAW_STATE_DIR = stateDir;
   process.env.OPENCLAW_CONFIG_PATH = path.join(stateDir, "openclaw.json");
+}
+
+async function readCliPackageVersion(): Promise<string> {
+  const packageJsonPath = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "..",
+    "packages",
+    "cli",
+    "package.json",
+  );
+  const parsed = JSON.parse(await readFile(packageJsonPath, "utf-8")) as {
+    version: string;
+  };
+  return parsed.version;
 }
