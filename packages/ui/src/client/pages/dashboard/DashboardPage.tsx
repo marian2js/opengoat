@@ -1983,8 +1983,8 @@ export function DashboardPage(): ReactElement {
 
       if (options?.navigate ?? true) {
         navigateToRoute({
-          kind: "agent",
-          agentId,
+          kind: "session",
+          sessionId: response.session.sessionId,
         });
       }
     } catch (requestError) {
@@ -2009,23 +2009,23 @@ export function DashboardPage(): ReactElement {
     }
 
     const selectedSessionRef = selectedSessionRefByAgentId[agentId];
-    const nextSessionRef =
+    const nextSession =
       selectedSessionRef &&
       sessions.some((session) => session.sessionKey === selectedSessionRef)
-        ? selectedSessionRef
-        : sessions[0]?.sessionKey;
+        ? sessions.find((session) => session.sessionKey === selectedSessionRef) ??
+          sessions[0]
+        : sessions[0];
 
-    if (nextSessionRef) {
+    if (nextSession) {
       setSelectedSessionRefByAgentId((current) => ({
         ...current,
-        [agentId]: nextSessionRef,
+        [agentId]: nextSession.sessionKey,
       }));
+      navigateToRoute({
+        kind: "session",
+        sessionId: nextSession.sessionId,
+      });
     }
-
-    navigateToRoute({
-      kind: "agent",
-      agentId,
-    });
     setOpenSessionMenuId(null);
   }
 
@@ -2035,8 +2035,8 @@ export function DashboardPage(): ReactElement {
       [session.agentId]: session.sessionKey,
     }));
     navigateToRoute({
-      kind: "agent",
-      agentId: session.agentId,
+      kind: "session",
+      sessionId: session.sessionId,
     });
     setOpenSessionMenuId(null);
   }
@@ -3316,15 +3316,19 @@ export function DashboardPage(): ReactElement {
     (authenticationEnabledChanged ||
       authenticationUsernameChanged ||
       hasPendingAuthenticationPasswordUpdate);
+  const activeSidebarAgentId =
+    route.kind === "agent"
+      ? route.agentId
+      : route.kind === "session"
+        ? selectedSessionAgentId
+        : null;
   const renderAgentSessionRow = (
     session: SidebarAgentSessionItem,
     key: string,
   ): ReactElement => {
     const sessionMenuId = `${session.agentId}:${session.sessionId}`;
     const isActiveSession =
-      route.kind === "agent" &&
-      route.agentId === session.agentId &&
-      selectedAgentSession?.sessionKey === session.sessionKey;
+      route.kind === "session" && route.sessionId === session.sessionId;
 
     return (
       <div key={key} className="group/session relative">
@@ -3547,8 +3551,7 @@ export function DashboardPage(): ReactElement {
                 </p>
                 <div className="space-y-1">
                   {sidebarSessionsByAgent.map(({ agent, sessions, visibleLimit }) => {
-                    const isAgentActive =
-                      route.kind === "agent" && route.agentId === agent.id;
+                    const isAgentActive = activeSidebarAgentId === agent.id;
                     const isExpanded = expandedAgentSessionIds.has(agent.id);
                     const hasHiddenSessions = sessions.length > visibleLimit;
                     const visibleSessions = isExpanded
@@ -3650,8 +3653,7 @@ export function DashboardPage(): ReactElement {
             ) : (
               <div className="space-y-1">
                 {sidebarSessionsByAgent.map(({ agent }) => {
-                  const isAgentActive =
-                    route.kind === "agent" && route.agentId === agent.id;
+                  const isAgentActive = activeSidebarAgentId === agent.id;
 
                   return (
                     <button
@@ -4751,10 +4753,7 @@ export function DashboardPage(): ReactElement {
                             size="sm"
                             variant="secondary"
                             onClick={() => {
-                              navigateToRoute({
-                                kind: "agent",
-                                agentId: DEFAULT_AGENT_ID,
-                              });
+                              void handleSelectSidebarAgent(DEFAULT_AGENT_ID);
                             }}
                           >
                             Open CEO chat
@@ -6192,6 +6191,18 @@ function parseRoute(pathname: string, search = ""): AppRoute {
     return { kind: "page", view: "settings" };
   }
 
+  if (normalized.startsWith("/session/")) {
+    const sessionId = decodeURIComponent(
+      normalized.slice("/session/".length),
+    ).trim();
+    if (sessionId) {
+      return {
+        kind: "session",
+        sessionId,
+      };
+    }
+  }
+
   if (normalized.startsWith("/sessions/")) {
     const sessionId = decodeURIComponent(
       normalized.slice("/sessions/".length),
@@ -6209,7 +6220,7 @@ function parseRoute(pathname: string, search = ""): AppRoute {
 
 function routeToPath(route: AppRoute): string {
   if (route.kind === "session") {
-    return `/sessions/${encodeURIComponent(route.sessionId)}`;
+    return `/session/${encodeURIComponent(route.sessionId)}`;
   }
 
   if (route.kind === "agent") {
