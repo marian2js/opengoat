@@ -7,10 +7,7 @@ import type {
 } from "../../types.js";
 
 const CODEX_AUTONOMY_FLAGS = [
-  "--ask-for-approval",
-  "never",
-  "--sandbox",
-  "danger-full-access",
+  "--dangerously-bypass-approvals-and-sandbox",
 ] as const;
 
 export class CodexProvider extends BaseCliProvider {

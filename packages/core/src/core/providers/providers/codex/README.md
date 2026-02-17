@@ -4,7 +4,7 @@
 - Command: `codex`
 - Env override: `CODEX_CMD`
 - Auth command: `codex login`
-- Invocation mode: non-interactive exec (`codex exec --json --ask-for-approval never --sandbox danger-full-access`)
-- Session resume: supported (`codex exec resume <session-id> <prompt> --json --ask-for-approval never --sandbox danger-full-access`)
+- Invocation mode: non-interactive exec (`codex exec --json --dangerously-bypass-approvals-and-sandbox`)
+- Session resume: supported (`codex exec resume <session-id> <prompt> --json --dangerously-bypass-approvals-and-sandbox`)
 - External agent creation: not supported
 - External agent deletion: not supported
