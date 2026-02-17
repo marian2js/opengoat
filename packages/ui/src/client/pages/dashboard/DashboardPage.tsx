@@ -97,7 +97,7 @@ import {
   TerminalSquare,
   UsersRound,
 } from "lucide-react";
-import type { ComponentType, ReactElement } from "react";
+import type { ComponentType, DragEvent, ReactElement } from "react";
 import {
   Fragment,
   useCallback,
@@ -486,6 +486,7 @@ const TASK_AUTO_REFRESH_INTERVAL_MS = 10_000;
 const TASK_AUTO_REFRESH_HIDDEN_INTERVAL_MS = 30_000;
 const MAX_VISIBLE_CEO_AGENT_SESSIONS = 5;
 const MAX_VISIBLE_NON_CEO_AGENT_SESSIONS = 2;
+const SIDEBAR_AGENT_ORDER_STORAGE_KEY = "opengoat:dashboard:sidebar-agent-order";
 const TASK_STATUS_OPTIONS = [
   { value: "todo", label: "To do" },
   { value: "doing", label: "In progress" },
@@ -644,6 +645,12 @@ export function DashboardPage(): ReactElement {
   );
   const [expandedAgentSessionIds, setExpandedAgentSessionIds] =
     useState<Set<string>>(() => new Set());
+  const [sidebarAgentOrderIds, setSidebarAgentOrderIds] = useState<string[]>(
+    () => loadSidebarAgentOrder(),
+  );
+  const [draggingSidebarAgentId, setDraggingSidebarAgentId] = useState<
+    string | null
+  >(null);
   const [selectedSessionRefByAgentId, setSelectedSessionRefByAgentId] =
     useState<Record<string, string>>(
       {},
@@ -1178,7 +1185,7 @@ export function DashboardPage(): ReactElement {
     }
     return agents.find((agent) => agent.id === route.agentId) ?? null;
   }, [route, agents]);
-  const sortedSidebarAgents = useMemo(() => {
+  const defaultSidebarAgentIds = useMemo(() => {
     if (agents.length === 0) {
       return [];
     }
@@ -1192,8 +1199,125 @@ export function DashboardPage(): ReactElement {
         }),
       );
 
-    return ceo ? [ceo, ...others] : others;
+    return (ceo ? [ceo, ...others] : others).map((agent) => agent.id);
   }, [agents]);
+  const sortedSidebarAgents = useMemo(() => {
+    if (agents.length === 0) {
+      return [];
+    }
+
+    const agentsById = new Map(agents.map((agent) => [agent.id, agent]));
+    const ordered: Agent[] = [];
+    const seen = new Set<string>();
+
+    for (const agentId of sidebarAgentOrderIds) {
+      const agent = agentsById.get(agentId);
+      if (!agent || seen.has(agentId)) {
+        continue;
+      }
+      ordered.push(agent);
+      seen.add(agentId);
+    }
+
+    for (const agentId of defaultSidebarAgentIds) {
+      if (seen.has(agentId)) {
+        continue;
+      }
+      const agent = agentsById.get(agentId);
+      if (!agent) {
+        continue;
+      }
+      ordered.push(agent);
+      seen.add(agentId);
+    }
+
+    return ordered;
+  }, [agents, sidebarAgentOrderIds, defaultSidebarAgentIds]);
+
+  useEffect(() => {
+    setSidebarAgentOrderIds((current) => {
+      const knownIds = new Set(agents.map((agent) => agent.id));
+      const next: string[] = [];
+
+      for (const agentId of current) {
+        if (!knownIds.has(agentId) || next.includes(agentId)) {
+          continue;
+        }
+        next.push(agentId);
+      }
+
+      for (const agentId of defaultSidebarAgentIds) {
+        if (!next.includes(agentId)) {
+          next.push(agentId);
+        }
+      }
+
+      return areStringArraysEqual(current, next) ? current : next;
+    });
+  }, [agents, defaultSidebarAgentIds]);
+
+  useEffect(() => {
+    persistSidebarAgentOrder(sidebarAgentOrderIds);
+  }, [sidebarAgentOrderIds]);
+
+  const moveSidebarAgent = useCallback(
+    (sourceAgentId: string, targetAgentId: string) => {
+      if (
+        !sourceAgentId ||
+        !targetAgentId ||
+        sourceAgentId === targetAgentId
+      ) {
+        return;
+      }
+
+      setSidebarAgentOrderIds((current) => {
+        const sourceIndex = current.indexOf(sourceAgentId);
+        const targetIndex = current.indexOf(targetAgentId);
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+          return current;
+        }
+        const next = [...current];
+        const [movedAgentId] = next.splice(sourceIndex, 1);
+        next.splice(targetIndex, 0, movedAgentId);
+        return next;
+      });
+    },
+    [],
+  );
+
+  const handleSidebarAgentDragStart = useCallback(
+    (agentId: string, event: DragEvent<HTMLElement>) => {
+      setDraggingSidebarAgentId(agentId);
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", agentId);
+    },
+    [],
+  );
+
+  const handleSidebarAgentDragOver = useCallback(
+    (event: DragEvent<HTMLElement>) => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    },
+    [],
+  );
+
+  const handleSidebarAgentDrop = useCallback(
+    (targetAgentId: string, event: DragEvent<HTMLElement>) => {
+      event.preventDefault();
+      const sourceAgentId =
+        draggingSidebarAgentId ??
+        event.dataTransfer.getData("text/plain").trim();
+      moveSidebarAgent(sourceAgentId, targetAgentId);
+      setDraggingSidebarAgentId(null);
+    },
+    [draggingSidebarAgentId, moveSidebarAgent],
+  );
+
+  const handleSidebarAgentDragEnd = useCallback(() => {
+    setDraggingSidebarAgentId(null);
+  }, []);
+
   const sidebarSessionsByAgent = useMemo(() => {
     return sortedSidebarAgents.map((agent) => {
       const sortedSessions = sortSessionsByUpdatedAt(
@@ -3563,11 +3687,21 @@ export function DashboardPage(): ReactElement {
                     return (
                       <div
                         key={agent.id}
+                        draggable
+                        onDragStart={(event) => {
+                          handleSidebarAgentDragStart(agent.id, event);
+                        }}
+                        onDragOver={handleSidebarAgentDragOver}
+                        onDrop={(event) => {
+                          handleSidebarAgentDrop(agent.id, event);
+                        }}
+                        onDragEnd={handleSidebarAgentDragEnd}
                         className={cn(
-                          "rounded-lg border px-1 py-1 transition-colors",
+                          "rounded-lg border px-1 py-1 transition-colors cursor-grab active:cursor-grabbing",
                           isAgentActive
                             ? "border-border/80 bg-accent/35"
                             : "border-transparent hover:border-border/50 hover:bg-accent/20",
+                          draggingSidebarAgentId === agent.id && "opacity-60",
                         )}
                       >
                         <div className="group/agent flex items-center">
@@ -3662,6 +3796,15 @@ export function DashboardPage(): ReactElement {
                     <button
                       key={agent.id}
                       type="button"
+                      draggable
+                      onDragStart={(event) => {
+                        handleSidebarAgentDragStart(agent.id, event);
+                      }}
+                      onDragOver={handleSidebarAgentDragOver}
+                      onDrop={(event) => {
+                        handleSidebarAgentDrop(agent.id, event);
+                      }}
+                      onDragEnd={handleSidebarAgentDragEnd}
                       title={agent.displayName}
                       onClick={() => {
                         void handleSelectSidebarAgent(agent.id);
@@ -3671,6 +3814,7 @@ export function DashboardPage(): ReactElement {
                         isAgentActive
                           ? "border-border bg-accent/90"
                           : "border-transparent hover:border-border/60 hover:bg-accent/60",
+                        draggingSidebarAgentId === agent.id && "opacity-60",
                       )}
                     >
                       <AgentAvatar
@@ -6378,6 +6522,47 @@ function normalizePathForComparison(pathname: string | undefined): string {
 
 function sortSessionsByUpdatedAt(sessions: Session[]): Session[] {
   return [...sessions].sort((left, right) => right.updatedAt - left.updatedAt);
+}
+
+function loadSidebarAgentOrder(): string[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_AGENT_ORDER_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter((entry): entry is string => {
+      return typeof entry === "string" && entry.trim().length > 0;
+    });
+  } catch {
+    return [];
+  }
+}
+
+function persistSidebarAgentOrder(agentIds: string[]): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    if (agentIds.length === 0) {
+      window.localStorage.removeItem(SIDEBAR_AGENT_ORDER_STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(
+      SIDEBAR_AGENT_ORDER_STORAGE_KEY,
+      JSON.stringify(agentIds),
+    );
+  } catch {
+    // Non-fatal: sidebar order will fall back to default sorting.
+  }
 }
 
 function deriveWorkspaceName(projectPath: string): string {
