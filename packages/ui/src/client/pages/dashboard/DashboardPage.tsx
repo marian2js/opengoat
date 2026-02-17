@@ -5336,148 +5336,150 @@ export function DashboardPage(): ReactElement {
                         </div>
                       </div>
 
-                      <Separator className="bg-border/60" />
+                      {uiAuthenticationEnabledInput ? (
+                        <>
+                          <Separator className="bg-border/60" />
 
-                      <div className="space-y-4 px-5 py-4">
-                        <div className="space-y-2">
-                          <label
-                            className="text-sm font-medium text-foreground"
-                            htmlFor="uiAuthenticationUsername"
-                          >
-                            Username
-                          </label>
-                          <Input
-                            id="uiAuthenticationUsername"
-                            autoComplete="username"
-                            value={uiAuthenticationUsernameInput}
-                            disabled={isMutating || isLoading}
-                            onChange={(event) => {
-                              setUiAuthenticationUsernameInput(event.target.value);
-                            }}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            3-64 characters: lowercase letters, numbers, dots, dashes, or underscores.
-                          </p>
-                        </div>
+                          <div className="space-y-4 px-5 py-4">
+                            <div className="space-y-2">
+                              <label
+                                className="text-sm font-medium text-foreground"
+                                htmlFor="uiAuthenticationUsername"
+                              >
+                                Username
+                              </label>
+                              <Input
+                                id="uiAuthenticationUsername"
+                                autoComplete="username"
+                                value={uiAuthenticationUsernameInput}
+                                disabled={isMutating || isLoading}
+                                onChange={(event) => {
+                                  setUiAuthenticationUsernameInput(event.target.value);
+                                }}
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                3-64 characters: lowercase letters, numbers, dots, dashes, or underscores.
+                              </p>
+                            </div>
 
-                        {uiAuthenticationEnabledInput &&
-                        uiAuthenticationHasPassword &&
-                        !uiAuthenticationPasswordEditorOpen ? (
-                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/30 px-3 py-3">
-                            <p className="text-xs text-muted-foreground">
-                              Password is already configured. Use Change Password to rotate credentials.
-                            </p>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              disabled={isMutating || isLoading}
-                              onClick={() => {
-                                setUiAuthenticationPasswordEditorOpen(true);
-                                setUiAuthenticationCurrentPasswordInput("");
-                                setUiAuthenticationPasswordInput("");
-                                setUiAuthenticationPasswordConfirmationInput("");
-                              }}
-                            >
-                              Change Password
-                            </Button>
-                          </div>
-                        ) : null}
-
-                        {showAuthenticationPasswordEditor ? (
-                          <div className="space-y-4">
-                            {uiAuthenticationEnabledInput &&
-                            uiAuthenticationHasPassword &&
-                            uiAuthenticationPasswordEditorOpen ? (
-                              <div className="flex items-center justify-end">
+                            {uiAuthenticationHasPassword &&
+                            !uiAuthenticationPasswordEditorOpen ? (
+                              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/30 px-3 py-3">
+                                <p className="text-xs text-muted-foreground">
+                                  Password is already configured. Use Change Password to rotate credentials.
+                                </p>
                                 <Button
-                                  variant="ghost"
+                                  variant="secondary"
                                   size="sm"
                                   disabled={isMutating || isLoading}
                                   onClick={() => {
-                                    setUiAuthenticationPasswordEditorOpen(false);
+                                    setUiAuthenticationPasswordEditorOpen(true);
                                     setUiAuthenticationCurrentPasswordInput("");
                                     setUiAuthenticationPasswordInput("");
                                     setUiAuthenticationPasswordConfirmationInput("");
                                   }}
                                 >
-                                  Cancel Password Change
+                                  Change Password
                                 </Button>
                               </div>
                             ) : null}
 
-                            {showAuthenticationCurrentPasswordInput ? (
-                              <div className="space-y-2">
-                                <label
-                                  className="text-sm font-medium text-foreground"
-                                  htmlFor="uiAuthenticationCurrentPassword"
-                                >
-                                  Current Password
-                                </label>
-                                <Input
-                                  id="uiAuthenticationCurrentPassword"
-                                  type="password"
-                                  autoComplete="current-password"
-                                  value={uiAuthenticationCurrentPasswordInput}
-                                  disabled={isMutating || isLoading}
-                                  onChange={(event) => {
-                                    setUiAuthenticationCurrentPasswordInput(
-                                      event.target.value,
-                                    );
-                                  }}
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                  Required when changing authentication settings.
-                                </p>
+                            {showAuthenticationPasswordEditor ? (
+                              <div className="space-y-4">
+                                {uiAuthenticationHasPassword &&
+                                uiAuthenticationPasswordEditorOpen ? (
+                                  <div className="flex items-center justify-end">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={isMutating || isLoading}
+                                      onClick={() => {
+                                        setUiAuthenticationPasswordEditorOpen(false);
+                                        setUiAuthenticationCurrentPasswordInput("");
+                                        setUiAuthenticationPasswordInput("");
+                                        setUiAuthenticationPasswordConfirmationInput("");
+                                      }}
+                                    >
+                                      Cancel Password Change
+                                    </Button>
+                                  </div>
+                                ) : null}
+
+                                {showAuthenticationCurrentPasswordInput ? (
+                                  <div className="space-y-2">
+                                    <label
+                                      className="text-sm font-medium text-foreground"
+                                      htmlFor="uiAuthenticationCurrentPassword"
+                                    >
+                                      Current Password
+                                    </label>
+                                    <Input
+                                      id="uiAuthenticationCurrentPassword"
+                                      type="password"
+                                      autoComplete="current-password"
+                                      value={uiAuthenticationCurrentPasswordInput}
+                                      disabled={isMutating || isLoading}
+                                      onChange={(event) => {
+                                        setUiAuthenticationCurrentPasswordInput(
+                                          event.target.value,
+                                        );
+                                      }}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                      Required when changing authentication settings.
+                                    </p>
+                                  </div>
+                                ) : null}
+
+                                <div className="space-y-2">
+                                  <label
+                                    className="text-sm font-medium text-foreground"
+                                    htmlFor="uiAuthenticationPassword"
+                                  >
+                                    {uiAuthenticationHasPassword
+                                      ? "New Password"
+                                      : "Password"}
+                                  </label>
+                                  <Input
+                                    id="uiAuthenticationPassword"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    value={uiAuthenticationPasswordInput}
+                                    disabled={isMutating || isLoading}
+                                    onChange={(event) => {
+                                      setUiAuthenticationPasswordInput(event.target.value);
+                                    }}
+                                  />
+                                </div>
+
+                                <div className="space-y-2">
+                                  <label
+                                    className="text-sm font-medium text-foreground"
+                                    htmlFor="uiAuthenticationPasswordConfirm"
+                                  >
+                                    Confirm Password
+                                  </label>
+                                  <Input
+                                    id="uiAuthenticationPasswordConfirm"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    value={uiAuthenticationPasswordConfirmationInput}
+                                    disabled={isMutating || isLoading}
+                                    onChange={(event) => {
+                                      setUiAuthenticationPasswordConfirmationInput(
+                                        event.target.value,
+                                      );
+                                    }}
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    Use at least 12 characters with uppercase, lowercase, number, and symbol.
+                                  </p>
+                                </div>
                               </div>
                             ) : null}
-
-                            <div className="space-y-2">
-                              <label
-                                className="text-sm font-medium text-foreground"
-                                htmlFor="uiAuthenticationPassword"
-                              >
-                                {uiAuthenticationHasPassword
-                                  ? "New Password"
-                                  : "Password"}
-                              </label>
-                              <Input
-                                id="uiAuthenticationPassword"
-                                type="password"
-                                autoComplete="new-password"
-                                value={uiAuthenticationPasswordInput}
-                                disabled={isMutating || isLoading}
-                                onChange={(event) => {
-                                  setUiAuthenticationPasswordInput(event.target.value);
-                                }}
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <label
-                                className="text-sm font-medium text-foreground"
-                                htmlFor="uiAuthenticationPasswordConfirm"
-                              >
-                                Confirm Password
-                              </label>
-                              <Input
-                                id="uiAuthenticationPasswordConfirm"
-                                type="password"
-                                autoComplete="new-password"
-                                value={uiAuthenticationPasswordConfirmationInput}
-                                disabled={isMutating || isLoading}
-                                onChange={(event) => {
-                                  setUiAuthenticationPasswordConfirmationInput(
-                                    event.target.value,
-                                  );
-                                }}
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Use at least 12 characters with uppercase, lowercase, number, and symbol.
-                              </p>
-                            </div>
                           </div>
-                        ) : null}
-                      </div>
+                        </>
+                      ) : null}
                     </section>
 
                     <div className="flex flex-wrap items-center justify-between gap-3">
