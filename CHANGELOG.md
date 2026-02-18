@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026.2.18
+
+- Ship a cross-cutting runtime hardening release across core, CLI, providers, and UI.
+- Enforce manager governance rules: only OpenClaw-backed agents can be assigned as `reportsTo` managers (service + UI/API validation), and inactive-agent cron alerts are now aggregated into one message per manager per run.
+- Improve provider runtime behavior: OpenClaw slash commands now execute through gateway `chat.send` with programmatic response polling; non-OpenClaw providers now enforce no-approval/full-access autonomy defaults; Codex uses resume-compatible autonomy flags.
+- Improve session and onboarding ergonomics: new sessions auto-title from the first user message, `onboard --non-interactive --external` now fails fast when missing gateway credentials, and `init` skips runtime-default sync for faster startup.
+- Strengthen internet-facing UI security controls: login attempt limits are isolated by forwarded client IP behind trusted proxies, logout no longer resets unauthenticated failed-attempt counters, forwarded-proto spoofing is rejected for untrusted clients, and authenticated CORS policy is tightened.
+- Upgrade UI behavior and clarity: settings moved to a dedicated page, authentication credential fields hide when auth is disabled, chat input remains editable while streaming, sidebar version/settings layout is aligned, provider-specific run-status messages are surfaced, OpenClaw live telemetry polling only runs for OpenClaw invocations, and markdown code block contrast is improved on dark backgrounds.
+- Improve operational guidance and Docker defaults: role guidance now points agents to repo paths under `~/.opengoat/workspaces/<agent-id>/<repo>`, and Docker compose/runtime settings were updated for Codex reliability and home-directory resolution.
+
 ## 2026.2.17-2
 
 - Ship the agent profile release and sidebar organization UX hardening: add `/agents/<id>` profile routing + API-backed editing for identity and organization metadata; enforce provider/assigned-skills as read-only in the profile UI to match runtime constraints; fix case-insensitive profile resolution and org chart initial framing; improve sidebar drag-and-drop accuracy with reliable drop-line targeting, gap-friendly container drop zones, and reduced visual drag noise; persist custom sidebar organization across refresh; and align OpenClaw role-skill assignment to role-specific board skills.
