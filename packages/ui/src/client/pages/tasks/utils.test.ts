@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatRelativeTime, taskStatusLabel, taskStatusPillClasses } from "./utils";
+import {
+  formatAbsoluteTime,
+  formatRelativeTime,
+  resolveTaskUpdatedAt,
+  taskStatusLabel,
+  taskStatusPillClasses,
+} from "./utils";
 
 describe("taskStatusLabel", () => {
   it("maps known statuses to user-friendly labels", () => {
@@ -73,5 +79,41 @@ describe("formatRelativeTime", () => {
 
   it("returns unknown for invalid timestamps", () => {
     expect(formatRelativeTime("not-a-date", reference)).toBe("unknown");
+  });
+});
+
+describe("formatAbsoluteTime", () => {
+  it("returns locale date strings for valid timestamps", () => {
+    const timestamp = "2026-02-18T12:00:00.000Z";
+    expect(formatAbsoluteTime(timestamp)).toBe(
+      new Date(timestamp).toLocaleString(),
+    );
+  });
+
+  it("returns raw input for invalid timestamps", () => {
+    expect(formatAbsoluteTime("invalid")).toBe("invalid");
+  });
+});
+
+describe("resolveTaskUpdatedAt", () => {
+  it("returns updatedAt when present and valid", () => {
+    expect(
+      resolveTaskUpdatedAt(
+        "2026-02-18T13:00:00.000Z",
+        "2026-02-18T12:00:00.000Z",
+      ),
+    ).toBe("2026-02-18T13:00:00.000Z");
+  });
+
+  it("falls back to createdAt when updatedAt is missing", () => {
+    expect(
+      resolveTaskUpdatedAt(undefined, "2026-02-18T12:00:00.000Z"),
+    ).toBe("2026-02-18T12:00:00.000Z");
+  });
+
+  it("falls back to createdAt when updatedAt is invalid", () => {
+    expect(resolveTaskUpdatedAt("not-a-date", "2026-02-18T12:00:00.000Z")).toBe(
+      "2026-02-18T12:00:00.000Z",
+    );
   });
 });

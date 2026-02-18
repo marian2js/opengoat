@@ -64,7 +64,13 @@ import {
 import { SkillsPage } from "@/pages/skills/SkillsPage";
 import type { SkillsResponse } from "@/pages/skills/types";
 import { TasksPage } from "@/pages/tasks/TasksPage";
-import { taskStatusLabel, taskStatusPillClasses } from "@/pages/tasks/utils";
+import {
+  formatAbsoluteTime,
+  formatRelativeTime,
+  resolveTaskUpdatedAt,
+  taskStatusLabel,
+  taskStatusPillClasses,
+} from "@/pages/tasks/utils";
 import { WikiPage } from "@/pages/wiki/WikiPage";
 import { useWikiPageController } from "@/pages/wiki/useWikiPageController";
 import { normalizeWikiPath } from "@/pages/wiki/utils";
@@ -1735,6 +1741,12 @@ export function DashboardPage(): ReactElement {
       return "";
     }
     return decodeEscapedMarkdown(selectedTask.description);
+  }, [selectedTask]);
+  const selectedTaskUpdatedAt = useMemo(() => {
+    if (!selectedTask) {
+      return "";
+    }
+    return resolveTaskUpdatedAt(selectedTask.updatedAt, selectedTask.createdAt);
   }, [selectedTask]);
   const agentById = useMemo(() => {
     const map = new Map<string, Agent>();
@@ -4386,6 +4398,18 @@ export function DashboardPage(): ReactElement {
                           )}
                         >
                           {taskStatusLabel(selectedTask.status)}
+                        </span>
+                        <span
+                          className="rounded-full border border-border/60 bg-background/50 px-2.5 py-1 text-xs text-muted-foreground"
+                          title={formatAbsoluteTime(selectedTask.createdAt)}
+                        >
+                          {`Created ${formatRelativeTime(selectedTask.createdAt)}`}
+                        </span>
+                        <span
+                          className="rounded-full border border-border/60 bg-background/50 px-2.5 py-1 text-xs text-muted-foreground"
+                          title={formatAbsoluteTime(selectedTaskUpdatedAt)}
+                        >
+                          {`Updated ${formatRelativeTime(selectedTaskUpdatedAt)}`}
                         </span>
                       </div>
                     </div>

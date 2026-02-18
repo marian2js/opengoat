@@ -75,3 +75,25 @@ export function formatRelativeTime(
   const years = diffMs / (365 * 24 * 60 * 60_000);
   return RELATIVE_TIME_FORMATTER.format(Math.round(years), "year");
 }
+
+export function formatAbsoluteTime(timestampIso: string): string {
+  const parsedTimestamp = Date.parse(timestampIso);
+  if (!Number.isFinite(parsedTimestamp)) {
+    return timestampIso;
+  }
+  return new Date(parsedTimestamp).toLocaleString();
+}
+
+export function resolveTaskUpdatedAt(
+  updatedAt: string | null | undefined,
+  createdAt: string,
+): string {
+  const normalizedUpdatedAt = updatedAt?.trim();
+  if (
+    normalizedUpdatedAt &&
+    Number.isFinite(Date.parse(normalizedUpdatedAt))
+  ) {
+    return normalizedUpdatedAt;
+  }
+  return createdAt;
+}

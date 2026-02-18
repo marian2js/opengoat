@@ -2,7 +2,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useEffect, useState, type ReactElement } from "react";
-import { formatRelativeTime, taskStatusLabel, taskStatusPillClasses } from "./utils";
+import {
+  formatAbsoluteTime,
+  formatRelativeTime,
+  resolveTaskUpdatedAt,
+  taskStatusLabel,
+  taskStatusPillClasses,
+} from "./utils";
 
 interface TasksPageAgent {
   id: string;
@@ -160,71 +166,65 @@ export function TasksPage({
                   <th className="px-4 py-2 font-medium">Task</th>
                   <th className="px-4 py-2 font-medium">Assignee</th>
                   <th className="px-4 py-2 font-medium">Status</th>
-                  <th className="px-4 py-2 font-medium">Created</th>
                   <th className="px-4 py-2 font-medium">Updated</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {selectedTaskWorkspace.tasks.map((task) => (
-                  <tr
-                    key={task.taskId}
-                    className={cn(
-                      "transition-colors hover:bg-accent/20",
-                      selectedTaskIdSet.has(task.taskId) && "bg-accent/10",
-                    )}
-                  >
-                    <td className="px-3 py-3">
-                      <Checkbox
-                        checked={selectedTaskIdSet.has(task.taskId)}
-                        onCheckedChange={(checked) => {
-                          onToggleTaskSelection(task.taskId, checked === true);
-                        }}
-                        aria-label={`Select task ${task.title}`}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        className="group text-left"
-                        onClick={() => {
-                          onOpenTaskDetails(task.taskId);
-                        }}
-                      >
-                        <span className="block font-medium text-foreground group-hover:underline">
-                          {task.title}
+                {selectedTaskWorkspace.tasks.map((task) => {
+                  const updatedAt = resolveTaskUpdatedAt(
+                    task.updatedAt,
+                    task.createdAt,
+                  );
+                  return (
+                    <tr
+                      key={task.taskId}
+                      className={cn(
+                        "transition-colors hover:bg-accent/20",
+                        selectedTaskIdSet.has(task.taskId) && "bg-accent/10",
+                      )}
+                    >
+                      <td className="px-3 py-3">
+                        <Checkbox
+                          checked={selectedTaskIdSet.has(task.taskId)}
+                          onCheckedChange={(checked) => {
+                            onToggleTaskSelection(task.taskId, checked === true);
+                          }}
+                          aria-label={`Select task ${task.title}`}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          className="group text-left"
+                          onClick={() => {
+                            onOpenTaskDetails(task.taskId);
+                          }}
+                        >
+                          <span className="block font-medium text-foreground group-hover:underline">
+                            {task.title}
+                          </span>
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{`@${task.assignedTo}`}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={cn(
+                            "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+                            taskStatusPillClasses(task.status),
+                          )}
+                        >
+                          {taskStatusLabel(task.status)}
                         </span>
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{`@${task.assignedTo}`}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={cn(
-                          "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
-                          taskStatusPillClasses(task.status),
-                        )}
+                      </td>
+                      <td
+                        className="px-4 py-3 text-sm text-muted-foreground"
+                        title={formatAbsoluteTime(updatedAt)}
                       >
-                        {taskStatusLabel(task.status)}
-                      </span>
-                    </td>
-                    <td
-                      className="px-4 py-3 text-sm text-muted-foreground"
-                      title={formatAbsoluteTime(task.createdAt)}
-                    >
-                      {formatRelativeTime(task.createdAt, referenceTimestampMs)}
-                    </td>
-                    <td
-                      className="px-4 py-3 text-sm text-muted-foreground"
-                      title={formatAbsoluteTime(
-                        resolveTaskUpdatedAt(task),
-                      )}
-                    >
-                      {formatRelativeTime(
-                        resolveTaskUpdatedAt(task),
-                        referenceTimestampMs,
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                        {formatRelativeTime(updatedAt, referenceTimestampMs)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -232,20 +232,4 @@ export function TasksPage({
       </section>
     </div>
   );
-}
-
-function formatAbsoluteTime(timestampIso: string): string {
-  const parsed = Date.parse(timestampIso);
-  if (!Number.isFinite(parsed)) {
-    return timestampIso;
-  }
-  return new Date(parsed).toLocaleString();
-}
-
-function resolveTaskUpdatedAt(task: TasksPageTask): string {
-  const updatedAt = task.updatedAt?.trim();
-  if (updatedAt) {
-    return updatedAt;
-  }
-  return task.createdAt;
 }
