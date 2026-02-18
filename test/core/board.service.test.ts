@@ -242,16 +242,18 @@ describe("BoardService (tasks-only)", () => {
          task_id,
          board_id,
          created_at,
+         updated_at,
          owner_agent_id,
          assigned_to_agent_id,
          title,
          description,
          status,
          status_reason
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         legacyTaskId,
         INTERNAL_TASK_BUCKET_ID,
+        "2026-02-10T00:00:00.000Z",
         "2026-02-10T00:00:00.000Z",
         "ceo",
         "cto",
@@ -348,6 +350,7 @@ describe("BoardService (tasks-only)", () => {
       limit: 10,
     });
     expect(tasks.map((task) => task.taskId)).toEqual(["legacy-task-1"]);
+    expect(tasks[0]?.updatedAt).toBe("2026-02-10T00:00:00.000Z");
 
     const migratedDb = new SQL.Database(
       new Uint8Array(await readFileBuffer(dbPath)),
@@ -357,6 +360,7 @@ describe("BoardService (tasks-only)", () => {
       (row) => row[1] as string,
     );
     expect(columnNames).not.toContain("project");
+    expect(columnNames).toContain("updated_at");
     migratedDb.close();
   });
 
@@ -428,16 +432,18 @@ describe("BoardService (tasks-only)", () => {
            task_id,
            board_id,
            created_at,
+           updated_at,
            owner_agent_id,
            assigned_to_agent_id,
            title,
            description,
            status,
            status_reason
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           row.taskId,
           INTERNAL_TASK_BUCKET_ID,
+          row.createdAt,
           row.createdAt,
           row.owner,
           row.assignedTo,
@@ -479,16 +485,18 @@ describe("BoardService (tasks-only)", () => {
            task_id,
            board_id,
            created_at,
+           updated_at,
            owner_agent_id,
            assigned_to_agent_id,
            title,
            description,
            status,
            status_reason
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           `task-${sequence}`,
           INTERNAL_TASK_BUCKET_ID,
+          `2026-02-10T00:00:00.${sequence}Z`,
           `2026-02-10T00:00:00.${sequence}Z`,
           "ceo",
           "ceo",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { taskStatusLabel, taskStatusPillClasses } from "./utils";
+import { formatRelativeTime, taskStatusLabel, taskStatusPillClasses } from "./utils";
 
 describe("taskStatusLabel", () => {
   it("maps known statuses to user-friendly labels", () => {
@@ -41,5 +41,37 @@ describe("taskStatusPillClasses", () => {
     expect(taskStatusPillClasses(" unknown ")).toBe(
       "bg-accent text-foreground",
     );
+  });
+});
+
+describe("formatRelativeTime", () => {
+  const reference = Date.parse("2026-02-18T12:00:00.000Z");
+
+  it("formats recent timestamps as just now", () => {
+    expect(
+      formatRelativeTime("2026-02-18T11:59:45.000Z", reference),
+    ).toBe("just now");
+  });
+
+  it("formats minutes and hours ago", () => {
+    expect(
+      formatRelativeTime("2026-02-18T11:58:00.000Z", reference),
+    ).toContain("minute");
+    expect(
+      formatRelativeTime("2026-02-18T10:00:00.000Z", reference),
+    ).toContain("hour");
+  });
+
+  it("formats days and months ago", () => {
+    expect(
+      formatRelativeTime("2026-02-15T12:00:00.000Z", reference),
+    ).toContain("day");
+    expect(
+      formatRelativeTime("2025-12-18T12:00:00.000Z", reference),
+    ).toContain("month");
+  });
+
+  it("returns unknown for invalid timestamps", () => {
+    expect(formatRelativeTime("not-a-date", reference)).toBe("unknown");
   });
 });

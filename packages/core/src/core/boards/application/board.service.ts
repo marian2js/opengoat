@@ -43,6 +43,7 @@ interface TaskRow {
   task_id: string;
   board_id: string;
   created_at: string;
+  updated_at?: string | null;
   status_updated_at?: string | null;
   owner_agent_id: string;
   assigned_to_agent_id: string;
@@ -140,6 +141,7 @@ export class BoardService {
          task_id,
          board_id,
          created_at,
+         updated_at,
          status_updated_at,
          owner_agent_id,
          assigned_to_agent_id,
@@ -147,10 +149,11 @@ export class BoardService {
          description,
          status,
          status_reason
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         taskId,
         INTERNAL_TASK_BUCKET_ID,
+        createdAt,
         createdAt,
         createdAt,
         normalizedActorId,
@@ -177,7 +180,7 @@ export class BoardService {
     const rows = assignee
       ? this.queryAll<TaskRow>(
           db,
-          `SELECT task_id, board_id, created_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+          `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
            FROM tasks
            WHERE assigned_to_agent_id = ?
            ORDER BY created_at DESC, task_id DESC
@@ -186,7 +189,7 @@ export class BoardService {
         )
       : this.queryAll<TaskRow>(
           db,
-          `SELECT task_id, board_id, created_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+          `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
            FROM tasks
            ORDER BY created_at DESC, task_id DESC
            LIMIT ?`,
@@ -255,7 +258,7 @@ export class BoardService {
 
     const rows = this.queryAll<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+      `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
        FROM tasks
        ${whereClause}
        ORDER BY created_at DESC, task_id DESC
@@ -346,13 +349,14 @@ export class BoardService {
 
     const nextStatus = normalizeTaskStatus(status, true);
     const nextStatusReason = normalizeTaskStatusReason(nextStatus, reason);
+    const updatedAt = this.nowIso();
 
     this.execute(
       db,
       `UPDATE tasks
-       SET status = ?, status_reason = ?, status_updated_at = ?
+       SET status = ?, status_reason = ?, updated_at = ?, status_updated_at = ?
        WHERE task_id = ?`,
-      [nextStatus, nextStatusReason, this.nowIso(), resolvedTaskId],
+      [nextStatus, nextStatusReason, updatedAt, updatedAt, resolvedTaskId],
     );
     await this.persistDatabase(paths, db);
     return this.requireTask(db, resolvedTaskId);
@@ -409,6 +413,7 @@ export class BoardService {
        VALUES (?, ?, ?, ?)`,
       [resolvedTaskId, this.nowIso(), normalizedActorId, content],
     );
+    this.touchTaskUpdatedAt(db, resolvedTaskId);
     await this.persistDatabase(paths, db);
 
     return this.requireTask(db, resolvedTaskId);
@@ -438,6 +443,7 @@ export class BoardService {
        VALUES (?, ?, ?, ?)`,
       [resolvedTaskId, this.nowIso(), normalizedActorId, cleaned],
     );
+    this.touchTaskUpdatedAt(db, resolvedTaskId);
     await this.persistDatabase(paths, db);
 
     return this.requireTask(db, resolvedTaskId);
@@ -467,6 +473,7 @@ export class BoardService {
        VALUES (?, ?, ?, ?)`,
       [resolvedTaskId, this.nowIso(), normalizedActorId, cleaned],
     );
+    this.touchTaskUpdatedAt(db, resolvedTaskId);
     await this.persistDatabase(paths, db);
 
     return this.requireTask(db, resolvedTaskId);
@@ -503,7 +510,7 @@ export class BoardService {
   private requireTask(db: SqlJsDatabase, taskId: string): TaskRecord {
     const row = this.queryOne<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+      `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
        FROM tasks
        WHERE task_id = ?`,
       [taskId],
@@ -580,6 +587,10 @@ export class BoardService {
     return {
       taskId: row.task_id,
       createdAt: row.created_at,
+      updatedAt:
+        row.updated_at?.trim() ||
+        row.status_updated_at?.trim() ||
+        row.created_at,
       owner: row.owner_agent_id,
       assignedTo: row.assigned_to_agent_id,
       title: row.title,
@@ -640,6 +651,7 @@ export class BoardService {
          task_id TEXT PRIMARY KEY,
          board_id TEXT NOT NULL,
          created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL,
          status_updated_at TEXT,
          owner_agent_id TEXT NOT NULL,
          assigned_to_agent_id TEXT NOT NULL,
@@ -653,6 +665,7 @@ export class BoardService {
     this.ensureTaskStatusReasonColumn(db);
     this.ensureTaskStatusUpdatedAtColumn(db);
     this.ensureTaskProjectColumnRemoved(db);
+    this.ensureTaskUpdatedAtColumn(db);
     this.execute(
       db,
       `CREATE TABLE IF NOT EXISTS task_blockers (
@@ -840,6 +853,9 @@ export class BoardService {
     const hasStatusReason = columns.some(
       (column) => column.name === "status_reason",
     );
+    const hasUpdatedAt = columns.some(
+      (column) => column.name === "updated_at",
+    );
 
     this.execute(db, "PRAGMA foreign_keys = OFF;");
     try {
@@ -849,6 +865,7 @@ export class BoardService {
            task_id TEXT PRIMARY KEY,
            board_id TEXT NOT NULL,
            created_at TEXT NOT NULL,
+           updated_at TEXT NOT NULL,
            status_updated_at TEXT,
            owner_agent_id TEXT NOT NULL,
            assigned_to_agent_id TEXT NOT NULL,
@@ -865,6 +882,7 @@ export class BoardService {
            task_id,
            board_id,
            created_at,
+           updated_at,
            status_updated_at,
            owner_agent_id,
            assigned_to_agent_id,
@@ -877,6 +895,11 @@ export class BoardService {
            task_id,
            board_id,
            created_at,
+           ${
+             hasUpdatedAt
+               ? "COALESCE(updated_at, status_updated_at, created_at)"
+               : "COALESCE(status_updated_at, created_at)"
+           },
            ${hasStatusUpdatedAt ? "status_updated_at" : "created_at"},
            owner_agent_id,
            assigned_to_agent_id,
@@ -929,6 +952,30 @@ export class BoardService {
     );
   }
 
+  private ensureTaskUpdatedAtColumn(db: SqlJsDatabase): void {
+    const columns = this.queryAll<{ name: string }>(
+      db,
+      "PRAGMA table_info(tasks);",
+    );
+    const hasUpdatedAt = columns.some(
+      (column) => column.name === "updated_at",
+    );
+    if (!hasUpdatedAt) {
+      this.execute(
+        db,
+        "ALTER TABLE tasks ADD COLUMN updated_at TEXT;",
+      );
+    }
+
+    this.execute(
+      db,
+      `UPDATE tasks
+       SET updated_at = COALESCE(status_updated_at, created_at)
+       WHERE updated_at IS NULL
+          OR TRIM(updated_at) = '';`,
+    );
+  }
+
   private ensureBoardDefaultColumn(db: SqlJsDatabase): void {
     const columns = this.queryAll<{ name: string }>(
       db,
@@ -944,6 +991,16 @@ export class BoardService {
     this.execute(
       db,
       "ALTER TABLE boards ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0;",
+    );
+  }
+
+  private touchTaskUpdatedAt(db: SqlJsDatabase, taskId: string): void {
+    this.execute(
+      db,
+      `UPDATE tasks
+       SET updated_at = ?
+       WHERE task_id = ?`,
+      [this.nowIso(), taskId],
     );
   }
 }

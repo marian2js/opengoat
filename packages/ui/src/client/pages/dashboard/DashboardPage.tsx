@@ -202,6 +202,7 @@ interface TaskEntry {
 interface TaskRecord {
   taskId: string;
   createdAt: string;
+  updatedAt: string;
   owner: string;
   assignedTo: string;
   title: string;
@@ -5912,6 +5913,7 @@ function areTaskRecordListsEqual(left: TaskRecord[], right: TaskRecord[]): boole
     if (
       leftTask.taskId !== rightTask.taskId ||
       leftTask.createdAt !== rightTask.createdAt ||
+      leftTask.updatedAt !== rightTask.updatedAt ||
       leftTask.owner !== rightTask.owner ||
       leftTask.assignedTo !== rightTask.assignedTo ||
       leftTask.title !== rightTask.title ||

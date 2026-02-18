@@ -255,6 +255,7 @@ export interface TaskEntry {
 export interface TaskRecord {
   taskId: string;
   createdAt: string;
+  updatedAt: string;
   owner: string;
   assignedTo: string;
   title: string;

@@ -1,8 +1,8 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { ReactElement } from "react";
-import { taskStatusLabel, taskStatusPillClasses } from "./utils";
+import { useEffect, useState, type ReactElement } from "react";
+import { formatRelativeTime, taskStatusLabel, taskStatusPillClasses } from "./utils";
 
 interface TasksPageAgent {
   id: string;
@@ -12,6 +12,8 @@ interface TasksPageAgent {
 interface TasksPageTask {
   taskId: string;
   title: string;
+  createdAt: string;
+  updatedAt: string;
   assignedTo: string;
   status: string;
 }
@@ -57,6 +59,17 @@ export function TasksPage({
   onToggleTaskSelection,
   onOpenTaskDetails,
 }: TasksPageProps): ReactElement {
+  const [referenceTimestampMs, setReferenceTimestampMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setReferenceTimestampMs(Date.now());
+    }, 60_000);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
   if (!selectedTaskWorkspace) {
     return (
       <p className="text-sm text-muted-foreground">{`No task workspace was found for id ${missingTaskWorkspaceId}.`}</p>
@@ -147,6 +160,8 @@ export function TasksPage({
                   <th className="px-4 py-2 font-medium">Task</th>
                   <th className="px-4 py-2 font-medium">Assignee</th>
                   <th className="px-4 py-2 font-medium">Status</th>
+                  <th className="px-4 py-2 font-medium">Created</th>
+                  <th className="px-4 py-2 font-medium">Updated</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
@@ -191,6 +206,18 @@ export function TasksPage({
                         {taskStatusLabel(task.status)}
                       </span>
                     </td>
+                    <td
+                      className="px-4 py-3 text-sm text-muted-foreground"
+                      title={formatAbsoluteTime(task.createdAt)}
+                    >
+                      {formatRelativeTime(task.createdAt, referenceTimestampMs)}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-sm text-muted-foreground"
+                      title={formatAbsoluteTime(task.updatedAt)}
+                    >
+                      {formatRelativeTime(task.updatedAt, referenceTimestampMs)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -200,4 +227,12 @@ export function TasksPage({
       </section>
     </div>
   );
+}
+
+function formatAbsoluteTime(timestampIso: string): string {
+  const parsed = Date.parse(timestampIso);
+  if (!Number.isFinite(parsed)) {
+    return timestampIso;
+  }
+  return new Date(parsed).toLocaleString();
 }

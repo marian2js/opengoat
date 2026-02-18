@@ -65,6 +65,7 @@ interface TaskEntry {
 interface TaskRecord {
   taskId: string;
   createdAt: string;
+  updatedAt: string;
   owner: string;
   assignedTo: string;
   title: string;
@@ -2571,6 +2572,7 @@ describe("OpenGoat UI server API", () => {
     const baseTask: TaskRecord = {
       taskId: "task-plan",
       createdAt: "2026-02-11T08:00:00.000Z",
+      updatedAt: "2026-02-11T08:00:00.000Z",
       owner: "ceo",
       assignedTo: "developer",
       title: "Plan roadmap",
