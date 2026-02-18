@@ -28,13 +28,11 @@ export const taskCommand: CliCommand = {
         const task = await context.service.createTask(parsed.actorId, {
           title: parsed.title,
           description: parsed.description,
-          project: parsed.project,
           assignedTo: parsed.assignedTo,
           status: parsed.status
         });
 
         context.stdout.write(`Task created: ${task.title} (${task.taskId})\n`);
-        context.stdout.write(`Project: ${task.project}\n`);
         context.stdout.write(`Assigned to: ${task.assignedTo}\n`);
         context.stdout.write(`Status: ${task.status}\n`);
         return 0;
@@ -124,7 +122,6 @@ export const taskCommand: CliCommand = {
         }
 
         context.stdout.write(`Task: ${task.title} (${task.taskId})\n`);
-        context.stdout.write(`Project: ${task.project}\n`);
         context.stdout.write(`Owner: ${task.owner}\n`);
         context.stdout.write(`Assigned to: ${task.assignedTo}\n`);
         context.stdout.write(`Status: ${task.status}\n`);
@@ -205,7 +202,6 @@ interface TaskCreateArgsOk {
   actorId: string;
   title: string;
   description: string;
-  project?: string;
   assignedTo?: string;
   status?: string;
 }
@@ -248,7 +244,6 @@ function parseCreateArgs(args: string[]): ParseCreateResult {
   let actorId = DEFAULT_AGENT_ID;
   let title: string | undefined;
   let description: string | undefined;
-  let project: string | undefined;
   let assignedTo: string | undefined;
   let status: string | undefined;
 
@@ -295,16 +290,6 @@ function parseCreateArgs(args: string[]): ParseCreateResult {
       continue;
     }
 
-    if (token === "--project") {
-      const value = args[index + 1]?.trim();
-      if (!value) {
-        return { ok: false, error: "Missing value for --project." };
-      }
-      project = value;
-      index += 1;
-      continue;
-    }
-
     if (token === "--status") {
       const value = args[index + 1]?.trim();
       if (!value) {
@@ -330,7 +315,6 @@ function parseCreateArgs(args: string[]): ParseCreateResult {
     actorId,
     title,
     description,
-    project,
     assignedTo,
     status
   };
@@ -528,7 +512,7 @@ function parseListArgs(args: string[]): ParseListResult {
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write(
-    "  opengoat task create --title <title> --description <text> [--project <path|~>] [--owner <agent-id>] [--assign <agent-id>] [--status <todo|doing|pending|blocked|done>]\n"
+    "  opengoat task create --title <title> --description <text> [--owner <agent-id>] [--assign <agent-id>] [--status <todo|doing|pending|blocked|done>]\n"
   );
   output.write("  opengoat task list [--as <agent-id>] [--json]\n");
   output.write("  opengoat task show <task-id> [--json]\n");

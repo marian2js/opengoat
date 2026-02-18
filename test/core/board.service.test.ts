@@ -1,4 +1,4 @@
-import { readFile as readFileBuffer } from "node:fs/promises";
+import { readFile as readFileBuffer, writeFile as writeFileBuffer } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import initSqlJs from "sql.js";
@@ -79,14 +79,12 @@ describe("BoardService (tasks-only)", () => {
 
     expect(ownTask.assignedTo).toBe("engineer");
     expect(ownTask.owner).toBe("engineer");
-    expect(ownTask.project).toBe("~");
 
-    const customProjectTask = await harness.boardService.createTask(harness.paths, "engineer", {
+    const secondTask = await harness.boardService.createTask(harness.paths, "engineer", {
       title: "Implement worker",
-      description: "Add worker in custom path",
-      project: "/workspace/project",
+      description: "Add worker and retry logic",
     });
-    expect(customProjectTask.project).toBe("/workspace/project");
+    expect(secondTask.assignedTo).toBe("engineer");
   });
 
   it("allows updating own tasks and tasks of reportees", async () => {
@@ -244,19 +242,17 @@ describe("BoardService (tasks-only)", () => {
          task_id,
          board_id,
          created_at,
-         project,
          owner_agent_id,
          assigned_to_agent_id,
          title,
          description,
          status,
          status_reason
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         legacyTaskId,
         INTERNAL_TASK_BUCKET_ID,
         "2026-02-10T00:00:00.000Z",
-        "~",
         "ceo",
         "cto",
         "Write: Changelog",
@@ -284,6 +280,84 @@ describe("BoardService (tasks-only)", () => {
     );
     expect(updated.taskId).toBe(legacyTaskId);
     expect(updated.status).toBe("doing");
+  });
+
+  it("migrates legacy task schema by removing the project column", async () => {
+    const harness = await createHarness();
+    const SQL = await initSqlJs({
+      locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm"),
+    });
+    const legacyDb = new SQL.Database();
+    legacyDb.exec(`
+      CREATE TABLE boards (
+        board_id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        owner_agent_id TEXT NOT NULL,
+        is_default INTEGER NOT NULL DEFAULT 0
+      );
+      INSERT INTO boards (board_id, title, created_at, owner_agent_id, is_default)
+      VALUES ('tasks', 'Tasks', '2026-02-10T00:00:00.000Z', 'ceo', 0);
+
+      CREATE TABLE tasks (
+        task_id TEXT PRIMARY KEY,
+        board_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        status_updated_at TEXT,
+        project TEXT NOT NULL DEFAULT '~',
+        owner_agent_id TEXT NOT NULL,
+        assigned_to_agent_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        status TEXT NOT NULL,
+        status_reason TEXT,
+        FOREIGN KEY(board_id) REFERENCES boards(board_id) ON DELETE CASCADE
+      );
+      INSERT INTO tasks (
+        task_id,
+        board_id,
+        created_at,
+        status_updated_at,
+        project,
+        owner_agent_id,
+        assigned_to_agent_id,
+        title,
+        description,
+        status,
+        status_reason
+      ) VALUES (
+        'legacy-task-1',
+        'tasks',
+        '2026-02-10T00:00:00.000Z',
+        '2026-02-10T00:00:00.000Z',
+        '/workspace/legacy',
+        'ceo',
+        'cto',
+        'Legacy task',
+        'Migrate me',
+        'todo',
+        NULL
+      );
+    `);
+
+    const dbPath = path.join(harness.paths.homeDir, "boards.sqlite");
+    await writeFileBuffer(dbPath, legacyDb.export());
+    legacyDb.close();
+
+    const tasks = await harness.boardService.listTasks(harness.paths, {
+      limit: 10,
+    });
+    expect(tasks.map((task) => task.taskId)).toEqual(["legacy-task-1"]);
+
+    const migratedDb = new SQL.Database(
+      new Uint8Array(await readFileBuffer(dbPath)),
+    );
+    const columnRows = migratedDb.exec("PRAGMA table_info(tasks);");
+    const columnNames = (columnRows[0]?.values ?? []).map(
+      (row) => row[1] as string,
+    );
+    expect(columnNames).not.toContain("project");
+    migratedDb.close();
   });
 
   it("reloads database state when another process updates boards.sqlite", async () => {
@@ -354,19 +428,17 @@ describe("BoardService (tasks-only)", () => {
            task_id,
            board_id,
            created_at,
-           project,
            owner_agent_id,
            assigned_to_agent_id,
            title,
            description,
            status,
            status_reason
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           row.taskId,
           INTERNAL_TASK_BUCKET_ID,
           row.createdAt,
-          "~",
           row.owner,
           row.assignedTo,
           row.title,
@@ -407,19 +479,17 @@ describe("BoardService (tasks-only)", () => {
            task_id,
            board_id,
            created_at,
-           project,
            owner_agent_id,
            assigned_to_agent_id,
            title,
            description,
            status,
            status_reason
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           `task-${sequence}`,
           INTERNAL_TASK_BUCKET_ID,
           `2026-02-10T00:00:00.${sequence}Z`,
-          "~",
           "ceo",
           "ceo",
           `Task ${sequence}`,

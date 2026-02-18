@@ -294,7 +294,6 @@ export async function createUiTask(
   options: {
     title: string;
     description: string;
-    project?: string;
     assignedTo?: string;
     status?: string;
   },

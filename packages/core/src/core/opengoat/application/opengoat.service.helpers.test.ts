@@ -107,7 +107,6 @@ function buildTask(): TaskRecord {
   return {
     taskId: "task-123",
     createdAt: "2026-02-16T15:00:00.000Z",
-    project: "opengoat",
     owner: "ceo",
     assignedTo: "engineer",
     title: "Ship notification updates",

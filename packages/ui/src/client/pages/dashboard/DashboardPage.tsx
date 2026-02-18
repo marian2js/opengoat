@@ -202,7 +202,6 @@ interface TaskEntry {
 interface TaskRecord {
   taskId: string;
   createdAt: string;
-  project: string;
   owner: string;
   assignedTo: string;
   title: string;
@@ -441,7 +440,6 @@ interface MetricCard {
 interface TaskCreateDraft {
   title: string;
   description: string;
-  project: string;
   assignedTo: string;
   status: "todo" | "doing" | "pending" | "blocked" | "done";
 }
@@ -1518,80 +1516,6 @@ export function DashboardPage(): ReactElement {
     });
   }, [sortedSidebarAgents, sessionsByAgentId]);
 
-  const taskProjectOptions = useMemo(() => {
-    const projectsByPath = new Map<
-      string,
-      {
-        label: string;
-        projectPath: string;
-      }
-    >();
-
-    for (const agentSessions of Object.values(sessionsByAgentId)) {
-      for (const session of agentSessions) {
-        const workspacePath = session.workspacePath?.trim();
-        if (!workspacePath) {
-          continue;
-        }
-        const pathKey = normalizePathForComparison(workspacePath);
-        if (!pathKey || projectsByPath.has(pathKey)) {
-          continue;
-        }
-        projectsByPath.set(pathKey, {
-          label: deriveWorkspaceName(workspacePath),
-          projectPath: workspacePath,
-        });
-      }
-    }
-
-    if (projectsByPath.size === 0) {
-      return [
-        {
-          label: "Home",
-          projectPath: "~",
-        },
-      ];
-    }
-
-    return [...projectsByPath.values()].sort((left, right) =>
-      left.label.localeCompare(right.label, undefined, {
-        sensitivity: "base",
-      }),
-    );
-  }, [sessionsByAgentId]);
-
-  const defaultTaskProjectPath = taskProjectOptions[0]?.projectPath ?? "~";
-  const workspaceProjectNameByPath = useMemo(() => {
-    const next = new Map<string, string>();
-    for (const project of taskProjectOptions) {
-      const key = normalizePathForComparison(project.projectPath);
-      if (!key) {
-        continue;
-      }
-      next.set(key, project.label);
-    }
-    return next;
-  }, [taskProjectOptions]);
-  const resolveTaskProjectLabel = useCallback(
-    (projectPath: string | undefined): string => {
-      const cleanedPath = projectPath?.trim() ?? "";
-      if (!cleanedPath || cleanedPath === "~") {
-        return "Home";
-      }
-
-      const normalizedPath = normalizePathForComparison(cleanedPath);
-      if (normalizedPath) {
-        const workspaceName = workspaceProjectNameByPath.get(normalizedPath);
-        if (workspaceName) {
-          return workspaceName;
-        }
-      }
-
-      return deriveWorkspaceName(cleanedPath);
-    },
-    [workspaceProjectNameByPath],
-  );
-
   const selectedSessionAgent = useMemo(() => {
     if (!selectedSessionAgentId) {
       return null;
@@ -2061,7 +1985,6 @@ export function DashboardPage(): ReactElement {
           : {
               title: "",
               description: "",
-              project: defaultTaskProjectPath,
               assignedTo,
               status: "todo",
             };
@@ -2087,7 +2010,6 @@ export function DashboardPage(): ReactElement {
     taskWorkspaces,
     getAssignableAgents,
     taskActorId,
-    defaultTaskProjectPath,
   ]);
 
   const openTaskCount = useMemo(() => {
@@ -2447,7 +2369,6 @@ export function DashboardPage(): ReactElement {
       const existing = current[taskWorkspaceId] ?? {
         title: "",
         description: "",
-        project: defaultTaskProjectPath,
         assignedTo: taskActorId,
         status: "todo",
       };
@@ -2689,16 +2610,8 @@ export function DashboardPage(): ReactElement {
     options?: { fromDialog?: boolean },
   ): Promise<void> {
     const draft = taskDraftByWorkspaceId[taskWorkspaceId];
-    const validTaskProjects = new Set(
-      taskProjectOptions.map((option) => option.projectPath),
-    );
-    const rawProject = draft?.project.trim() ?? "";
     const title = draft?.title.trim() ?? "";
     const description = draft?.description.trim() ?? "";
-    const project =
-      validTaskProjects.size > 0 && !validTaskProjects.has(rawProject)
-        ? defaultTaskProjectPath
-        : rawProject || defaultTaskProjectPath;
     const assignedTo = draft?.assignedTo?.trim();
     const status = draft?.status ?? "todo";
 
@@ -2741,7 +2654,6 @@ export function DashboardPage(): ReactElement {
           actorId: taskActorId,
           title,
           description,
-          project,
           assignedTo,
           status,
         }),
@@ -2754,7 +2666,6 @@ export function DashboardPage(): ReactElement {
             ...(current[taskWorkspaceId] ?? {
               title: "",
               description: "",
-              project: defaultTaskProjectPath,
               assignedTo,
               status: "todo",
             }),
@@ -4267,16 +4178,10 @@ export function DashboardPage(): ReactElement {
                   ] ?? {
                     title: "",
                     description: "",
-                    project: defaultTaskProjectPath,
                     assignedTo: taskActorId,
                     status: "todo" as const,
                   };
                   const assignableAgents = getAssignableAgents(taskActorId);
-                  const projectValue = taskProjectOptions.some(
-                    (option) => option.projectPath === draft.project,
-                  )
-                    ? draft.project
-                    : defaultTaskProjectPath;
 
                   return (
                     <div className="space-y-3">
@@ -4346,36 +4251,6 @@ export function DashboardPage(): ReactElement {
                             }
                             placeholder="Define acceptance criteria."
                           />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label
-                            className="text-xs uppercase tracking-wide text-muted-foreground"
-                            htmlFor="createTaskProject"
-                          >
-                            Project
-                          </label>
-                          <select
-                            id="createTaskProject"
-                            className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                            value={projectValue}
-                            onChange={(event) =>
-                              updateTaskDraft(
-                                selectedTaskWorkspace.taskWorkspaceId,
-                                {
-                                  project: event.target.value,
-                                },
-                              )
-                            }
-                          >
-                            {taskProjectOptions.map((projectOption) => (
-                              <option
-                                key={projectOption.projectPath}
-                                value={projectOption.projectPath}
-                              >
-                                {projectOption.label}
-                              </option>
-                            ))}
-                          </select>
                         </div>
                         <div className="space-y-1.5">
                           <label
@@ -4871,7 +4746,6 @@ export function DashboardPage(): ReactElement {
                       );
                     }}
                     onOpenTaskDetails={handleOpenTaskDetails}
-                    resolveTaskProjectLabel={resolveTaskProjectLabel}
                   />
                 ) : null}
 
@@ -6038,7 +5912,6 @@ function areTaskRecordListsEqual(left: TaskRecord[], right: TaskRecord[]): boole
     if (
       leftTask.taskId !== rightTask.taskId ||
       leftTask.createdAt !== rightTask.createdAt ||
-      leftTask.project !== rightTask.project ||
       leftTask.owner !== rightTask.owner ||
       leftTask.assignedTo !== rightTask.assignedTo ||
       leftTask.title !== rightTask.title ||
@@ -6365,16 +6238,6 @@ function persistSidebarAgentOrder(agentIds: string[]): void {
   } catch {
     // Non-fatal: sidebar order will fall back to default sorting.
   }
-}
-
-function deriveWorkspaceName(projectPath: string): string {
-  const normalizedPath = projectPath.trim().replace(/[\\/]+$/, "");
-  if (!normalizedPath) {
-    return "Project";
-  }
-
-  const segments = normalizedPath.split(/[\\/]/).filter(Boolean);
-  return segments[segments.length - 1] || normalizedPath || "Project";
 }
 
 function toSessionMessageImages(

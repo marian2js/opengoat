@@ -30,7 +30,6 @@ export function createTaskToolDefinitions(): OpenGoatToolDefinition[] {
           actorId: STRING_PARAM_SCHEMA,
           title: STRING_PARAM_SCHEMA,
           description: STRING_PARAM_SCHEMA,
-          project: STRING_PARAM_SCHEMA,
           assignedTo: STRING_PARAM_SCHEMA,
           status: TASK_STATUS_SCHEMA,
         },
@@ -44,14 +43,12 @@ export function createTaskToolDefinitions(): OpenGoatToolDefinition[] {
         );
         const title = readRequiredString(args.params, "title");
         const description = readRequiredString(args.params, "description");
-        const project = readOptionalString(args.params, "project");
         const assignedTo = readOptionalString(args.params, "assignedTo");
         const status = readOptionalString(args.params, "status");
 
         const task = await service.createTask(actorId, {
           title,
           description,
-          project,
           assignedTo,
           status,
         });

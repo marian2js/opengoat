@@ -934,7 +934,6 @@ export function registerApiRoutes(
       actorId?: string;
       title?: string;
       description?: string;
-      project?: string;
       assignedTo?: string;
       status?: string;
     };
@@ -943,7 +942,6 @@ export function registerApiRoutes(
       const actorId = request.body?.actorId?.trim() || DEFAULT_AGENT_ID;
       const title = request.body?.title?.trim();
       const description = request.body?.description?.trim();
-      const project = request.body?.project?.trim();
       const assignedTo = request.body?.assignedTo?.trim();
       const status = request.body?.status?.trim();
 
@@ -963,7 +961,6 @@ export function registerApiRoutes(
       const task = await createUiTask(service, actorId, {
         title,
         description,
-        project,
         assignedTo,
         status
       });

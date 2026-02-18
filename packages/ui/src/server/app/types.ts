@@ -189,7 +189,6 @@ export interface OpenClawUiService {
     options: {
       title: string;
       description: string;
-      project?: string;
       assignedTo?: string;
       status?: string;
     }
@@ -256,7 +255,6 @@ export interface TaskEntry {
 export interface TaskRecord {
   taskId: string;
   createdAt: string;
-  project: string;
   owner: string;
   assignedTo: string;
   title: string;

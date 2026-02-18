@@ -33,8 +33,7 @@ opengoat_task_create({
   "actorId": "<me>",
   "title": "...",
   "description": "...",
-  "assignedTo": "<agent-id>",
-  "project": "<path>"
+  "assignedTo": "<agent-id>"
 })
 opengoat_task_update_status({
   "actorId": "<me>",
@@ -76,8 +75,7 @@ opengoat_task_create({
   "actorId": "<me>",
   "title": "<verb>: <deliverable>",
   "description": "<context + deliverable + acceptance criteria>",
-  "assignedTo": "<agent-id>",
-  "project": "<path>"
+  "assignedTo": "<agent-id>"
 })
 ```
 
@@ -98,8 +96,7 @@ opengoat_task_create({
   "actorId": "<me>",
   "title": "Fix: <short description>",
   "description": "Context:\n- ...\n\nDeliverable:\n- ...\n\nAcceptance criteria:\n- ...",
-  "assignedTo": "<me>",
-  "project": "<path>"
+  "assignedTo": "<me>"
 })
 ```
 

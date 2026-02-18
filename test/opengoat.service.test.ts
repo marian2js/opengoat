@@ -1979,7 +1979,6 @@ describe("OpenGoatService", () => {
     const blockedTask = await service.createTask("ceo", {
       title: "Prepare release",
       description: "Finalize release notes",
-      project: "/workspace/release",
       assignedTo: "engineer",
       status: "blocked",
     });
@@ -2023,7 +2022,6 @@ describe("OpenGoatService", () => {
       (entry) => entry.agent === "engineer",
     );
     expect(todoInvocation?.message).toContain(`Task ID: ${todoTask.taskId}`);
-    expect(todoInvocation?.message).toContain("Project: ~");
     expect(todoInvocation?.message).toContain("Status: todo");
     expect(todoInvocation?.message).toContain(
       `Notification timestamp: ${cycle.ranAt}`,
@@ -2037,7 +2035,6 @@ describe("OpenGoatService", () => {
     expect(blockedInvocation?.message).toContain(
       'assigned to your reportee "@engineer" is blocked because of',
     );
-    expect(blockedInvocation?.message).toContain("Project: /workspace/release");
     expect(blockedInvocation?.message).toContain(
       "Waiting for production credentials",
     );

@@ -23,7 +23,6 @@ describe("task CLI command", () => {
     const createTask = vi.fn(async () => ({
       taskId: "task-1234abcd",
       createdAt: "2026-02-10T00:00:00.000Z",
-      project: "~",
       owner: "ceo",
       assignedTo: "cto",
       title: "Define API",
@@ -57,12 +56,10 @@ describe("task CLI command", () => {
     expect(createTask).toHaveBeenCalledWith("ceo", {
       title: "Define API",
       description: "Draft API contract",
-      project: undefined,
       assignedTo: "cto",
       status: "doing",
     });
     expect(stdout.output()).toContain("Task created: Define API (task-1234abcd)");
-    expect(stdout.output()).toContain("Project: ~");
   });
 
   it("task status forwards actor and new status", async () => {
@@ -70,7 +67,6 @@ describe("task CLI command", () => {
     const updateTaskStatus = vi.fn(async () => ({
       taskId: "task-1234abcd",
       createdAt: "2026-02-10T00:00:00.000Z",
-      project: "~",
       owner: "ceo",
       assignedTo: "cto",
       title: "Define API",
@@ -98,7 +94,6 @@ describe("task CLI command", () => {
     const updateTaskStatus = vi.fn(async () => ({
       taskId: "task-1234abcd",
       createdAt: "2026-02-10T00:00:00.000Z",
-      project: "~",
       owner: "ceo",
       assignedTo: "cto",
       title: "Define API",
@@ -154,7 +149,6 @@ describe("task CLI command", () => {
     const addTaskBlocker = vi.fn(async () => ({
       taskId: "task-1234abcd",
       createdAt: "2026-02-10T00:00:00.000Z",
-      project: "~",
       owner: "ceo",
       assignedTo: "cto",
       title: "Define API",
@@ -207,7 +201,6 @@ describe("task CLI command", () => {
       {
         taskId: "task-a",
         createdAt: "2026-02-10T00:00:00.000Z",
-        project: "~",
         owner: "ceo",
         assignedTo: "ceo",
         title: "CEO task",
@@ -234,7 +227,6 @@ describe("task CLI command", () => {
       {
         taskId: "task-old",
         createdAt: "2026-02-09T00:00:00.000Z",
-        project: "~",
         owner: "ceo",
         assignedTo: "ceo",
         title: "Old task",
@@ -247,7 +239,6 @@ describe("task CLI command", () => {
       {
         taskId: "task-new",
         createdAt: "2026-02-10T00:00:00.000Z",
-        project: "~",
         owner: "cto",
         assignedTo: "cto",
         title: "New task",

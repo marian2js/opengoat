@@ -12,7 +12,6 @@ interface TasksPageAgent {
 interface TasksPageTask {
   taskId: string;
   title: string;
-  project: string;
   assignedTo: string;
   status: string;
 }
@@ -39,7 +38,6 @@ interface TasksPageProps {
   selectedTaskIdSet: Set<string>;
   onToggleTaskSelection: (taskId: string, checked: boolean) => void;
   onOpenTaskDetails: (taskId: string) => void;
-  resolveTaskProjectLabel: (projectPath: string) => string;
 }
 
 export function TasksPage({
@@ -58,7 +56,6 @@ export function TasksPage({
   selectedTaskIdSet,
   onToggleTaskSelection,
   onOpenTaskDetails,
-  resolveTaskProjectLabel,
 }: TasksPageProps): ReactElement {
   if (!selectedTaskWorkspace) {
     return (
@@ -148,7 +145,6 @@ export function TasksPage({
                     />
                   </th>
                   <th className="px-4 py-2 font-medium">Task</th>
-                  <th className="px-4 py-2 font-medium">Project</th>
                   <th className="px-4 py-2 font-medium">Assignee</th>
                   <th className="px-4 py-2 font-medium">Status</th>
                 </tr>
@@ -183,14 +179,6 @@ export function TasksPage({
                           {task.title}
                         </span>
                       </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p
-                        className="max-w-[240px] truncate text-sm text-muted-foreground"
-                        title={resolveTaskProjectLabel(task.project)}
-                      >
-                        {resolveTaskProjectLabel(task.project)}
-                      </p>
                     </td>
                     <td className="px-4 py-3 text-sm text-muted-foreground">{`@${task.assignedTo}`}</td>
                     <td className="px-4 py-3">

@@ -65,7 +65,6 @@ interface TaskEntry {
 interface TaskRecord {
   taskId: string;
   createdAt: string;
-  project: string;
   owner: string;
   assignedTo: string;
   title: string;
@@ -2572,7 +2571,6 @@ describe("OpenGoat UI server API", () => {
     const baseTask: TaskRecord = {
       taskId: "task-plan",
       createdAt: "2026-02-11T08:00:00.000Z",
-      project: "~",
       owner: "ceo",
       assignedTo: "developer",
       title: "Plan roadmap",
@@ -2590,7 +2588,6 @@ describe("OpenGoat UI server API", () => {
         description: options.description,
         assignedTo: options.assignedTo ?? "ceo",
         status: options.status ?? "todo",
-        project: options.project ?? "~"
       };
     });
     const deleteTasks = vi.fn<NonNullable<OpenClawUiService["deleteTasks"]>>(async (_actorId, taskIds) => {
@@ -2672,8 +2669,7 @@ describe("OpenGoat UI server API", () => {
         title: "Design API",
         description: "Document API contracts",
         assignedTo: "developer",
-        status: "todo",
-        project: "~"
+        status: "todo"
       }
     });
     expect(createTaskResponse.statusCode).toBe(200);
@@ -2681,8 +2677,7 @@ describe("OpenGoat UI server API", () => {
       title: "Design API",
       description: "Document API contracts",
       assignedTo: "developer",
-      status: "todo",
-      project: "~"
+      status: "todo"
     });
 
     const deleteTaskResponse = await activeServer.inject({

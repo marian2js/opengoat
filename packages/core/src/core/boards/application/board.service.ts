@@ -44,7 +44,6 @@ interface TaskRow {
   board_id: string;
   created_at: string;
   status_updated_at?: string | null;
-  project: string;
   owner_agent_id: string;
   assigned_to_agent_id: string;
   title: string;
@@ -68,7 +67,6 @@ interface PendingTaskIdRow {
 }
 
 const TASK_STATUSES = ["todo", "doing", "pending", "blocked", "done"] as const;
-const DEFAULT_TASK_PROJECT = "~";
 const MAX_TASK_LIST_LIMIT = 100;
 const INTERNAL_TASK_BUCKET_ID = "tasks";
 const INTERNAL_TASK_BUCKET_TITLE = "Tasks";
@@ -133,7 +131,6 @@ export class BoardService {
     }
 
     const status = normalizeTaskStatus(options.status);
-    const project = normalizeTaskProject(options.project);
     const taskId = createEntityId(`task-${title}`);
     const createdAt = this.nowIso();
 
@@ -144,20 +141,18 @@ export class BoardService {
          board_id,
          created_at,
          status_updated_at,
-         project,
          owner_agent_id,
          assigned_to_agent_id,
          title,
          description,
          status,
          status_reason
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         taskId,
         INTERNAL_TASK_BUCKET_ID,
         createdAt,
         createdAt,
-        project,
         normalizedActorId,
         assignedTo,
         title,
@@ -182,7 +177,7 @@ export class BoardService {
     const rows = assignee
       ? this.queryAll<TaskRow>(
           db,
-          `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+          `SELECT task_id, board_id, created_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
            FROM tasks
            WHERE assigned_to_agent_id = ?
            ORDER BY created_at DESC, task_id DESC
@@ -191,7 +186,7 @@ export class BoardService {
         )
       : this.queryAll<TaskRow>(
           db,
-          `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+          `SELECT task_id, board_id, created_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
            FROM tasks
            ORDER BY created_at DESC, task_id DESC
            LIMIT ?`,
@@ -260,7 +255,7 @@ export class BoardService {
 
     const rows = this.queryAll<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+      `SELECT task_id, board_id, created_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
        FROM tasks
        ${whereClause}
        ORDER BY created_at DESC, task_id DESC
@@ -508,7 +503,7 @@ export class BoardService {
   private requireTask(db: SqlJsDatabase, taskId: string): TaskRecord {
     const row = this.queryOne<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, project, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+      `SELECT task_id, board_id, created_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
        FROM tasks
        WHERE task_id = ?`,
       [taskId],
@@ -585,7 +580,6 @@ export class BoardService {
     return {
       taskId: row.task_id,
       createdAt: row.created_at,
-      project: row.project || DEFAULT_TASK_PROJECT,
       owner: row.owner_agent_id,
       assignedTo: row.assigned_to_agent_id,
       title: row.title,
@@ -647,7 +641,6 @@ export class BoardService {
          board_id TEXT NOT NULL,
          created_at TEXT NOT NULL,
          status_updated_at TEXT,
-         project TEXT NOT NULL DEFAULT '${DEFAULT_TASK_PROJECT}',
          owner_agent_id TEXT NOT NULL,
          assigned_to_agent_id TEXT NOT NULL,
          title TEXT NOT NULL,
@@ -657,9 +650,9 @@ export class BoardService {
          FOREIGN KEY(board_id) REFERENCES boards(board_id) ON DELETE CASCADE
        );`,
     );
-    this.ensureTaskProjectColumn(db);
     this.ensureTaskStatusReasonColumn(db);
     this.ensureTaskStatusUpdatedAtColumn(db);
+    this.ensureTaskProjectColumnRemoved(db);
     this.execute(
       db,
       `CREATE TABLE IF NOT EXISTS task_blockers (
@@ -831,30 +824,72 @@ export class BoardService {
     return all[0];
   }
 
-  private ensureTaskProjectColumn(db: SqlJsDatabase): void {
+  private ensureTaskProjectColumnRemoved(db: SqlJsDatabase): void {
     const columns = this.queryAll<{ name: string }>(
       db,
       "PRAGMA table_info(tasks);",
     );
     const hasProject = columns.some((column) => column.name === "project");
-    if (hasProject) {
+    if (!hasProject) {
       return;
     }
 
-    this.execute(
-      db,
-      `ALTER TABLE tasks ADD COLUMN project TEXT NOT NULL DEFAULT '${DEFAULT_TASK_PROJECT}';`,
+    const hasStatusUpdatedAt = columns.some(
+      (column) => column.name === "status_updated_at",
+    );
+    const hasStatusReason = columns.some(
+      (column) => column.name === "status_reason",
     );
 
-    const hasWorkspace = columns.some((column) => column.name === "workspace");
-    if (hasWorkspace) {
+    this.execute(db, "PRAGMA foreign_keys = OFF;");
+    try {
       this.execute(
         db,
-        `UPDATE tasks
-         SET project = workspace
-         WHERE workspace IS NOT NULL
-           AND TRIM(workspace) <> '';`,
+        `CREATE TABLE tasks_without_project (
+           task_id TEXT PRIMARY KEY,
+           board_id TEXT NOT NULL,
+           created_at TEXT NOT NULL,
+           status_updated_at TEXT,
+           owner_agent_id TEXT NOT NULL,
+           assigned_to_agent_id TEXT NOT NULL,
+           title TEXT NOT NULL,
+           description TEXT NOT NULL,
+           status TEXT NOT NULL,
+           status_reason TEXT,
+           FOREIGN KEY(board_id) REFERENCES boards(board_id) ON DELETE CASCADE
+         );`,
       );
+      this.execute(
+        db,
+        `INSERT INTO tasks_without_project (
+           task_id,
+           board_id,
+           created_at,
+           status_updated_at,
+           owner_agent_id,
+           assigned_to_agent_id,
+           title,
+           description,
+           status,
+           status_reason
+         )
+         SELECT
+           task_id,
+           board_id,
+           created_at,
+           ${hasStatusUpdatedAt ? "status_updated_at" : "created_at"},
+           owner_agent_id,
+           assigned_to_agent_id,
+           title,
+           description,
+           status,
+           ${hasStatusReason ? "status_reason" : "NULL"}
+         FROM tasks;`,
+      );
+      this.execute(db, "DROP TABLE tasks;");
+      this.execute(db, "ALTER TABLE tasks_without_project RENAME TO tasks;");
+    } finally {
+      this.execute(db, "PRAGMA foreign_keys = ON;");
     }
   }
 
@@ -946,14 +981,6 @@ function normalizeTaskStatusReason(
     throw new Error(`Reason is required when task status is \"${status}\".`);
   }
   return reason || null;
-}
-
-function normalizeTaskProject(rawProject: string | undefined): string {
-  const normalized = rawProject?.trim();
-  if (!normalized) {
-    return DEFAULT_TASK_PROJECT;
-  }
-  return normalized;
 }
 
 function toTaskEntry(row: EntryRow): TaskEntry {
