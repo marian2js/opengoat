@@ -1630,6 +1630,47 @@ describe("OpenGoatService", () => {
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
   });
 
+  it("removes recreated ceo bootstrap artifacts after the first ceo session", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.runAgent("ceo", {
+      message: "First CEO message",
+    });
+
+    const ceoWorkspace = path.join(root, "workspaces", "ceo");
+    const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
+    const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
+    await writeFile(bootstrapPath, "# BOOTSTRAP.md\n", "utf-8");
+    await writeFile(
+      agentsPath,
+      [
+        "foo",
+        "",
+        "## First Run",
+        "first-run-content",
+        "",
+        "## Every Session",
+        "legacy session instructions",
+        "",
+        "## Another section",
+        "baz",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    await service.syncRuntimeDefaults();
+
+    await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
+    const agentsMarkdown = await readFile(agentsPath, "utf-8");
+    expect(agentsMarkdown).not.toContain("## First Run");
+    expect(agentsMarkdown).not.toContain("first-run-content");
+    expect(agentsMarkdown).toContain("## Every Session");
+  });
+
   it("updates who an agent reports to", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);

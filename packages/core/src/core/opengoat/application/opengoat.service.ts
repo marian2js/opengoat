@@ -471,6 +471,13 @@ export class OpenGoatService {
         `OpenGoat workspace command shim sync failed: ${toErrorMessage(error)}`,
       );
     }
+    try {
+      await this.ensureCeoBootstrapSingleUse(paths);
+    } catch (error) {
+      warnings.push(
+        `CEO bootstrap lifecycle sync failed: ${toErrorMessage(error)}`,
+      );
+    }
 
     return {
       ceoSyncCode,
@@ -584,6 +591,13 @@ export class OpenGoatService {
           created.agent.id
         }". ${toErrorMessage(error)}`,
       );
+    }
+    if (created.agent.id === DEFAULT_AGENT_ID) {
+      try {
+        await this.ensureCeoBootstrapSingleUse(paths);
+      } catch {
+        // Keep agent creation non-blocking even if bootstrap lifecycle cleanup fails.
+      }
     }
     return {
       ...created,
@@ -828,7 +842,17 @@ export class OpenGoatService {
     options: OrchestrationRunOptions,
   ): Promise<OrchestrationRunResult> {
     const paths = this.pathsProvider.getPaths();
-    return this.orchestrationService.runAgent(paths, agentId, options);
+    const result = await this.orchestrationService.runAgent(
+      paths,
+      agentId,
+      options,
+    );
+    try {
+      await this.ensureCeoBootstrapSingleUse(paths);
+    } catch {
+      // Best-effort cleanup; invocation result should still be returned.
+    }
+    return result;
   }
 
   public async createTask(
@@ -1365,14 +1389,14 @@ export class OpenGoatService {
   }
 
   private async dispatchAutomationMessage(
-    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    _paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
     agentId: string,
     sessionRef: string,
     message: string,
     options: { cwd?: string; disableSession?: boolean } = {},
   ): Promise<{ ok: boolean; error?: string }> {
     try {
-      const result = await this.orchestrationService.runAgent(paths, agentId, {
+      const result = await this.runAgent(agentId, {
         message,
         sessionRef,
         disableSession: options.disableSession ?? false,
@@ -1396,6 +1420,39 @@ export class OpenGoatService {
         error: toErrorMessage(error),
       };
     }
+  }
+
+  private async ensureCeoBootstrapSingleUse(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+  ): Promise<void> {
+    const ceoSessions = await this.sessionService.listSessions(
+      paths,
+      DEFAULT_AGENT_ID,
+    );
+    if (ceoSessions.length === 0) {
+      return;
+    }
+
+    const ceoDescriptor = (await this.agentService.listAgents(paths)).find(
+      (agent) => agent.id === DEFAULT_AGENT_ID,
+    );
+    if (!ceoDescriptor) {
+      return;
+    }
+
+    await this.agentService.ensureAgentWorkspaceBootstrap(
+      paths,
+      {
+        agentId: ceoDescriptor.id,
+        displayName: ceoDescriptor.displayName,
+        role: ceoDescriptor.role,
+      },
+      {
+        syncBootstrapMarkdown: false,
+        keepFirstRunSection: false,
+        removeBootstrapMarkdownWhenDisabled: true,
+      },
+    );
   }
 
   private resolveNowIso(): string {

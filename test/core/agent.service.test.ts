@@ -259,6 +259,50 @@ describe("AgentService", () => {
     expect(await fileSystem.exists(userPath)).toBe(false);
   });
 
+  it("removes CEO First Run and BOOTSTRAP.md once bootstrap mode is finalized", async () => {
+    const { service, paths, fileSystem } = await createAgentServiceWithPaths();
+    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+
+    const ceoWorkspace = path.join(paths.workspacesDir, "ceo");
+    const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
+    const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
+    await fileSystem.ensureDir(ceoWorkspace);
+    await writeFile(
+      agentsPath,
+      [
+        "foo",
+        "",
+        "## First Run",
+        "first-run-content",
+        "",
+        "## Every Session",
+        "legacy session instructions",
+        "",
+        "## Another section",
+        "baz",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+    await writeFile(bootstrapPath, "# bootstrap\n", "utf-8");
+
+    await service.ensureCeoWorkspaceBootstrap(paths, {
+      syncBootstrapMarkdown: false,
+      keepFirstRunSection: false,
+      removeBootstrapMarkdownWhenDisabled: true,
+    });
+
+    const agentsMarkdown = await readFile(agentsPath, "utf-8");
+    expect(agentsMarkdown).toContain("foo");
+    expect(agentsMarkdown).toContain("## Another section");
+    expect(agentsMarkdown).toContain("baz");
+    expect(agentsMarkdown).not.toContain("## First Run");
+    expect(agentsMarkdown).not.toContain("first-run-content");
+    expect(agentsMarkdown).not.toContain("legacy session instructions");
+    expect(agentsMarkdown).toContain("## Every Session");
+    expect(await fileSystem.exists(bootstrapPath)).toBe(false);
+  });
+
   it("removes First Run and replaces Every Session for non-ceo AGENTS.md", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "engineer", displayName: "Avery" });

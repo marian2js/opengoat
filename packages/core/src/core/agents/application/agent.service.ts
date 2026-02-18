@@ -64,6 +64,8 @@ export interface AgentWorkspaceBootstrapInput {
 
 export interface AgentWorkspaceBootstrapOptions {
   syncBootstrapMarkdown?: boolean;
+  keepFirstRunSection?: boolean;
+  removeBootstrapMarkdownWhenDisabled?: boolean;
   roleSkillDirectories?: string[];
   managedRoleSkillDirectories?: string[];
   roleSkillIdsByType?: RoleSkillIdsByType;
@@ -247,7 +249,10 @@ export class AgentService {
 
     await this.rewriteAgentsMarkdown(
       agentsPath,
-      normalizedAgentId,
+      {
+        keepFirstRunSection:
+          options.keepFirstRunSection ?? isDefaultAgentId(normalizedAgentId),
+      },
       createdPaths,
       skippedPaths,
     );
@@ -282,7 +287,11 @@ export class AgentService {
         skippedPaths,
       );
     } else if (isDefaultAgentId(normalizedAgentId)) {
-      skippedPaths.push(bootstrapPath);
+      if (options.removeBootstrapMarkdownWhenDisabled) {
+        await this.removePathIfExists(bootstrapPath, removedPaths, skippedPaths);
+      } else {
+        skippedPaths.push(bootstrapPath);
+      }
     } else {
       await this.removePathIfExists(bootstrapPath, removedPaths, skippedPaths);
     }
@@ -676,7 +685,7 @@ export class AgentService {
 
   private async rewriteAgentsMarkdown(
     filePath: string,
-    agentId: string,
+    options: { keepFirstRunSection: boolean },
     createdPaths: string[],
     skippedPaths: string[],
   ): Promise<void> {
@@ -687,9 +696,7 @@ export class AgentService {
     }
 
     const source = await this.fileSystem.readFile(filePath);
-    const next = normalizeAgentsMarkdown(source, {
-      keepFirstRunSection: isDefaultAgentId(agentId),
-    });
+    const next = normalizeAgentsMarkdown(source, options);
     if (source === next) {
       skippedPaths.push(filePath);
       return;
