@@ -234,79 +234,75 @@ export function SettingsPage({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <label
-              className="text-sm font-medium text-foreground"
-              htmlFor="maxInactivityMinutes"
-            >
-              Max Inactivity Time
-            </label>
-            <div className="flex max-w-sm items-center gap-3">
-              <Input
-                id="maxInactivityMinutes"
-                type="number"
-                min={minMaxInactivityMinutes}
-                max={maxMaxInactivityMinutes}
-                step={1}
-                value={maxInactivityMinutesInput}
-                disabled={
-                  !taskCronEnabledInput ||
-                  !notifyManagersOfInactiveAgentsInput ||
-                  isMutating ||
-                  isLoading
-                }
-                onChange={(event) => {
-                  onMaxInactivityMinutesInputChange(event.target.value);
-                }}
-              />
-              <span className="text-sm text-muted-foreground">minutes</span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Managers are notified after this many minutes with no assistant
-              activity.
-            </p>
-          </div>
+          {notifyManagersOfInactiveAgentsInput ? (
+            <>
+              <div className="space-y-3">
+                <label
+                  className="text-sm font-medium text-foreground"
+                  htmlFor="maxInactivityMinutes"
+                >
+                  Max Inactivity Time
+                </label>
+                <div className="flex max-w-sm items-center gap-3">
+                  <Input
+                    id="maxInactivityMinutes"
+                    type="number"
+                    min={minMaxInactivityMinutes}
+                    max={maxMaxInactivityMinutes}
+                    step={1}
+                    value={maxInactivityMinutesInput}
+                    disabled={!taskCronEnabledInput || isMutating || isLoading}
+                    onChange={(event) => {
+                      onMaxInactivityMinutesInputChange(event.target.value);
+                    }}
+                  />
+                  <span className="text-sm text-muted-foreground">minutes</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Managers are notified after this many minutes with no
+                  assistant activity.
+                </p>
+              </div>
 
-          <Separator className="bg-border/50" />
+              <Separator className="bg-border/50" />
 
-          <div className="space-y-2">
-            <label
-              className="text-sm font-medium text-foreground"
-              htmlFor="inactiveAgentNotificationTarget"
-            >
-              Notify CEO only
-            </label>
-            <Select
-              value={inactiveAgentNotificationTargetInput}
-              onValueChange={(nextValue) => {
-                onInactiveAgentNotificationTargetInputChange(
-                  nextValue as InactiveAgentNotificationTarget,
-                );
-              }}
-              disabled={
-                !taskCronEnabledInput ||
-                !notifyManagersOfInactiveAgentsInput ||
-                isMutating ||
-                isLoading
-              }
-            >
-              <SelectTrigger
-                id="inactiveAgentNotificationTarget"
-                className="max-w-sm"
-              >
-                <SelectValue placeholder="Select who gets inactivity notifications" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all-managers">Notify all managers</SelectItem>
-                <SelectItem value="ceo-only">Notify only CEO</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {inactiveAgentNotificationTargetInput === "ceo-only"
-                ? "Only the CEO receives inactivity alerts, and only for agents that report directly to the CEO."
-                : "Every manager receives inactivity alerts for their own direct reports."}
-            </p>
-          </div>
+              <div className="space-y-2">
+                <label
+                  className="text-sm font-medium text-foreground"
+                  htmlFor="inactiveAgentNotificationTarget"
+                >
+                  Notify CEO only
+                </label>
+                <Select
+                  value={inactiveAgentNotificationTargetInput}
+                  onValueChange={(nextValue) => {
+                    onInactiveAgentNotificationTargetInputChange(
+                      nextValue as InactiveAgentNotificationTarget,
+                    );
+                  }}
+                  disabled={!taskCronEnabledInput || isMutating || isLoading}
+                >
+                  <SelectTrigger
+                    id="inactiveAgentNotificationTarget"
+                    className="max-w-sm"
+                  >
+                    <SelectValue placeholder="Select who gets inactivity notifications" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all-managers">
+                      Notify all managers
+                    </SelectItem>
+                    <SelectItem value="ceo-only">Notify only CEO</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {inactiveAgentNotificationTargetInput === "ceo-only"
+                    ? "Only the CEO receives inactivity alerts, and only for agents that report directly to the CEO."
+                    : "Every manager receives inactivity alerts for their own direct reports."}
+                </p>
+              </div>
+            </>
+          ) : null}
 
           {ceoBootstrapPending ? (
             <p className="text-xs text-muted-foreground">
