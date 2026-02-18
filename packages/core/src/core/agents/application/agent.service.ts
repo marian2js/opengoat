@@ -911,9 +911,7 @@ const MANAGER_ROLE_SKILLS = ["og-board-manager"];
 const INDIVIDUAL_ROLE_SKILLS = ["og-board-individual"];
 const SHARED_ROLE_SKILLS = ["og-boards"];
 const LEGACY_MANAGER_ROLE_SKILLS = ["board-manager"];
-const LEGACY_INDIVIDUAL_ROLE_SKILLS = [
-  "board-individual",
-];
+const LEGACY_INDIVIDUAL_ROLE_SKILLS = ["board-individual"];
 const STATIC_ROLE_SKILL_IDS = [
   ...MANAGER_ROLE_SKILLS,
   ...INDIVIDUAL_ROLE_SKILLS,
@@ -931,9 +929,7 @@ function toAgentTemplateOptions(
     options.type ?? (isDefaultAgentId(agentId) ? "manager" : "individual");
   const reportsTo = resolveReportsTo(agentId, options.reportsTo);
   const providedSkills = options.skills ?? [];
-  const roleSkillIds = new Set([
-    ...STATIC_ROLE_SKILL_IDS,
-  ]);
+  const roleSkillIds = new Set([...STATIC_ROLE_SKILL_IDS]);
   const skills = dedupe(
     providedSkills.filter((skillId) => !roleSkillIds.has(skillId)),
   );
@@ -1142,7 +1138,7 @@ const EVERY_SESSION_SECTION_LINES = [
   "",
   "## Repositories",
   "",
-  "If you need to use a repo, clone it or copy it into your own workspace.",
+  "If you need to use a repo, clone it or copy it into your own workspace at `~/.opengoat/workspaces/<agent-id>/<repo>`.",
   "",
 ];
 
@@ -1168,7 +1164,7 @@ function renderRoleMarkdown(profile: {
     "- To delegate and coordinate work, use `og-*` skills.",
     "- Organization context is available in `~/.opengoat/organization` - read them",
     "- You can view and edit the wiki in `~/.opengoat/organization/wiki`",
-    "- If you need to use a repo, clone it or copy it into your own workspace.",
+    "- If you need to use a repo, clone it or copy it into your own workspace at `~/.opengoat/workspaces/<agent-id>/<repo>`.",
     "",
     "---",
     "",
