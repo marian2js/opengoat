@@ -42,6 +42,9 @@ interface AgentConfigShape {
   };
 }
 
+const NEW_SESSION_PLACEHOLDER_TITLE = "New Session";
+const AUTO_SESSION_TITLE_MAX_CHARS = 20;
+
 export interface PrepareSessionRunRequest {
   sessionRef?: string;
   forceNew?: boolean;
@@ -628,8 +631,15 @@ export class SessionService {
     const inputChars = params.role === "user" ? (entry.inputChars ?? 0) + normalizedContent.length : entry.inputChars ?? 0;
     const outputChars =
       params.role === "assistant" ? (entry.outputChars ?? 0) + normalizedContent.length : entry.outputChars ?? 0;
+    const nextTitle =
+      params.role === "user" &&
+      isNewSessionPlaceholderTitle(entry.title) &&
+      (entry.inputChars ?? 0) === 0
+        ? buildAutoSessionTitleFromUserMessage(normalizedContent)
+        : entry.title;
     store.sessions[params.sessionKey] = {
       ...entry,
+      title: nextTitle,
       transcriptFile: transcriptPath,
       updatedAt: this.nowMs(),
       inputChars,
@@ -1063,6 +1073,17 @@ function normalizeSessionTitle(input: string): string {
     return value;
   }
   return `${value.slice(0, 117)}...`;
+}
+
+function isNewSessionPlaceholderTitle(title: string | undefined): boolean {
+  return title?.trim() === NEW_SESSION_PLACEHOLDER_TITLE;
+}
+
+function buildAutoSessionTitleFromUserMessage(message: string): string {
+  if (message.length <= AUTO_SESSION_TITLE_MAX_CHARS) {
+    return message;
+  }
+  return `${message.slice(0, AUTO_SESSION_TITLE_MAX_CHARS)}...`;
 }
 
 function resolveSessionTitle(sessionKey: string, title?: string): string {

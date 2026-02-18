@@ -84,6 +84,64 @@ describe("SessionService", () => {
 
     expect(second.info.sessionId).not.toBe(first.info.sessionId);
   });
+
+  it("auto-renames placeholder session titles from the first user message", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "opengoat-session-auto-title-"));
+    tempDirs.push(root);
+
+    const service = new SessionService({
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowMs: createNowMs()
+    });
+    const paths = createPaths(root);
+    const sessionRef = "workspace:autotitle";
+
+    await service.prepareRunSession(paths, "ceo", {
+      sessionRef,
+      userMessage: ""
+    });
+
+    await service.renameSession(paths, "ceo", "New Session", sessionRef);
+
+    await service.prepareRunSession(paths, "ceo", {
+      sessionRef,
+      userMessage: "Plan the migration and document each step."
+    });
+
+    const sessions = await service.listSessions(paths, "ceo");
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.title).toBe("Plan the migration a...");
+  });
+
+  it("does not auto-rename placeholder titles after the first user message", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "opengoat-session-no-retitle-"));
+    tempDirs.push(root);
+
+    const service = new SessionService({
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowMs: createNowMs()
+    });
+    const paths = createPaths(root);
+    const sessionRef = "workspace:no-retitle";
+
+    await service.prepareRunSession(paths, "ceo", {
+      sessionRef,
+      userMessage: "Initial kickoff"
+    });
+
+    await service.renameSession(paths, "ceo", "New Session", sessionRef);
+
+    await service.prepareRunSession(paths, "ceo", {
+      sessionRef,
+      userMessage: "This should not overwrite a post-first-message manual title."
+    });
+
+    const sessions = await service.listSessions(paths, "ceo");
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]?.title).toBe("New Session");
+  });
 });
 
 function createNowMs(): () => number {
