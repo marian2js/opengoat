@@ -141,7 +141,7 @@ export function CreateAgentDialog({
               ))}
             </select>
             <p className="text-xs text-muted-foreground">
-              You can only assign existing agents as manager.
+              You can only assign existing OpenClaw agents as manager.
             </p>
           </div>
 

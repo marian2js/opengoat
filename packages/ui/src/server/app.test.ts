@@ -1467,6 +1467,116 @@ describe("OpenGoat UI server API", () => {
     expect(saved.runtime.skills.assigned).toEqual(["react", "testing"]);
   });
 
+  it("rejects assigning reports-to managers that are not OpenClaw agents", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const ceoConfigDir = path.resolve(uniqueHomeDir, "agents", "ceo");
+    const ctoConfigDir = path.resolve(uniqueHomeDir, "agents", "cto");
+    const developerConfigDir = path.resolve(uniqueHomeDir, "agents", "developer");
+    await mkdir(ceoConfigDir, { recursive: true });
+    await mkdir(ctoConfigDir, { recursive: true });
+    await mkdir(developerConfigDir, { recursive: true });
+
+    await writeFile(
+      path.resolve(ctoConfigDir, "config.json"),
+      JSON.stringify(
+        {
+          id: "cto",
+          displayName: "CTO",
+          organization: {
+            type: "individual",
+            reportsTo: "ceo",
+            discoverable: true,
+            tags: ["specialized"],
+            priority: 50,
+          },
+          runtime: {
+            provider: { id: "codex" },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await writeFile(
+      path.resolve(developerConfigDir, "config.json"),
+      JSON.stringify(
+        {
+          id: "developer",
+          displayName: "Developer",
+          organization: {
+            type: "individual",
+            reportsTo: "ceo",
+            discoverable: true,
+            tags: ["specialized"],
+            priority: 50,
+          },
+          runtime: {
+            provider: { id: "openclaw" },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const setAgentManager = vi.fn<
+      NonNullable<OpenClawUiService["setAgentManager"]>
+    >(async (agentId, reportsTo) => {
+      return {
+        agentId,
+        previousReportsTo: "ceo",
+        reportsTo,
+        updatedPaths: [path.resolve(developerConfigDir, "config.json")],
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService({ homeDir: uniqueHomeDir }),
+        setAgentManager,
+        listAgents: async (): Promise<AgentDescriptor[]> => [
+          {
+            id: "ceo",
+            displayName: "CEO",
+            workspaceDir: "/tmp/workspaces/ceo",
+            internalConfigDir: ceoConfigDir,
+          },
+          {
+            id: "cto",
+            displayName: "CTO",
+            workspaceDir: "/tmp/workspaces/cto",
+            internalConfigDir: ctoConfigDir,
+          },
+          {
+            id: "developer",
+            displayName: "Developer",
+            workspaceDir: "/tmp/workspaces/developer",
+            internalConfigDir: developerConfigDir,
+          },
+        ],
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "PUT",
+      url: "/api/agents/developer",
+      payload: {
+        reportsTo: "cto",
+      },
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({
+      error:
+        'Cannot assign "cto" as manager because only OpenClaw agents can be managers (found provider "codex").',
+    });
+    expect(setAgentManager).not.toHaveBeenCalled();
+  });
+
   it("validates payload when updating agent profiles", async () => {
     activeServer = await createOpenGoatUiServer({
       logger: false,

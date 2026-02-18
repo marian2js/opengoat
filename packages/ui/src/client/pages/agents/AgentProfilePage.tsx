@@ -23,6 +23,7 @@ import { type ReactElement, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const DEFAULT_AGENT_ID = "ceo";
+const OPENCLAW_PROVIDER_ID = "openclaw";
 
 export interface AgentProfile {
   id: string;
@@ -58,6 +59,7 @@ interface AgentProfilePageAgent {
   id: string;
   displayName: string;
   reportsTo: string | null;
+  providerId: string;
   supportsReportees: boolean;
 }
 
@@ -161,7 +163,11 @@ export function AgentProfilePage({
 
   const managerOptions = useMemo(() => {
     const options = agents.filter((agent) => {
-      return agent.id !== agentId && agent.supportsReportees;
+      return (
+        agent.id !== agentId &&
+        agent.providerId === OPENCLAW_PROVIDER_ID &&
+        agent.supportsReportees
+      );
     });
 
     if (!options.some((agent) => agent.id === DEFAULT_AGENT_ID)) {
@@ -169,6 +175,7 @@ export function AgentProfilePage({
         id: DEFAULT_AGENT_ID,
         displayName: "CEO",
         reportsTo: null,
+        providerId: OPENCLAW_PROVIDER_ID,
         supportsReportees: true,
       });
     }
@@ -438,6 +445,9 @@ export function AgentProfilePage({
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Only OpenClaw agents can be selected as manager.
+                </p>
               </div>
             </div>
 

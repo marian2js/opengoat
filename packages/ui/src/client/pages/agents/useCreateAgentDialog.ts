@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const DEFAULT_REPORTS_TO = "ceo";
+const OPENCLAW_PROVIDER_ID = "openclaw";
 
 export interface CreateAgentFormValue {
   name: string;
@@ -14,6 +15,7 @@ export interface CreateAgentDialogAgent {
   id: string;
   displayName: string;
   role?: string;
+  providerId: string;
   supportsReportees: boolean;
 }
 
@@ -116,7 +118,12 @@ export function useCreateAgentDialog(
 
   const managerOptions = useMemo(() => {
     return agents
-      .filter((agent) => agent.supportsReportees !== false)
+      .filter((agent) => {
+        return (
+          agent.providerId === OPENCLAW_PROVIDER_ID &&
+          agent.supportsReportees !== false
+        );
+      })
       .map((agent) => {
         const roleLabel = resolveAgentRoleLabel(agent.role);
         return {
@@ -128,7 +135,12 @@ export function useCreateAgentDialog(
 
   useEffect(() => {
     const agentIds = agents
-      .filter((agent) => agent.supportsReportees !== false)
+      .filter((agent) => {
+        return (
+          agent.providerId === OPENCLAW_PROVIDER_ID &&
+          agent.supportsReportees !== false
+        );
+      })
       .map((agent) => agent.id);
     if (agentIds.length === 0) {
       return;
@@ -193,7 +205,12 @@ export function useCreateAgentDialog(
     }
 
     const assignableManagers = agents.filter(
-      (agent) => agent.supportsReportees !== false,
+      (agent) => {
+        return (
+          agent.providerId === OPENCLAW_PROVIDER_ID &&
+          agent.supportsReportees !== false
+        );
+      },
     );
     if (assignableManagers.length === 0) {
       setError("No available manager targets found.");

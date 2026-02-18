@@ -646,6 +646,10 @@ export class OpenGoatService {
     rawAgentId: string,
     rawReportsTo: string | null,
   ): Promise<AgentManagerUpdateResult> {
+    const managerAgentId = resolveCreateAgentManagerId(rawAgentId, rawReportsTo);
+    if (managerAgentId) {
+      await this.assertManagerSupportsReportees(managerAgentId);
+    }
     const paths = this.pathsProvider.getPaths();
     const updated = await this.agentService.setAgentManager(
       paths,
@@ -943,6 +947,12 @@ export class OpenGoatService {
     if (!provider) {
       throw new Error(
         `Provider "${managerBinding.providerId}" is not available for manager "${managerAgentId}".`,
+      );
+    }
+
+    if (provider.id !== OPENCLAW_PROVIDER_ID) {
+      throw new Error(
+        `Cannot assign "${managerAgentId}" as manager because only OpenClaw agents can be managers (found provider "${provider.displayName}").`,
       );
     }
 
