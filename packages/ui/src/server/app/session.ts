@@ -25,6 +25,7 @@ import type {
 const execFileAsync = promisify(execFile);
 const DEFAULT_MANAGER_TAGS = ["manager", "leadership"];
 const DEFAULT_INDIVIDUAL_TAGS = ["specialized"];
+const OPENCLAW_PROVIDER_ID = "openclaw";
 
 interface OrganizationAgentConfigShape {
   id?: unknown;
@@ -704,14 +705,21 @@ export async function updateOrganizationAgentProfile(
   const normalizedReportsToInput = hasReportsToChange
     ? normalizeReportTargetInput(input.reportsTo)
     : undefined;
-  if (
-    normalizedReportsToInput &&
-    agentsById.get(normalizedReportsToInput)?.supportsReportees === false
-  ) {
+  if (normalizedReportsToInput) {
     const managerAgent = agentsById.get(normalizedReportsToInput);
-    throw new Error(
-      `Cannot assign "${normalizedReportsToInput}" as manager because provider "${managerAgent?.providerId ?? "unknown"}" does not support reportees.`,
-    );
+    if (!managerAgent) {
+      throw new Error(`Manager "${normalizedReportsToInput}" does not exist.`);
+    }
+    if (managerAgent.providerId !== OPENCLAW_PROVIDER_ID) {
+      throw new Error(
+        `Cannot assign "${normalizedReportsToInput}" as manager because only OpenClaw agents can be managers (found provider "${managerAgent.providerId}").`,
+      );
+    }
+    if (managerAgent.supportsReportees === false) {
+      throw new Error(
+        `Cannot assign "${normalizedReportsToInput}" as manager because provider "${managerAgent.providerId}" does not support reportees.`,
+      );
+    }
   }
 
   let nextReportsTo = profile.reportsTo;

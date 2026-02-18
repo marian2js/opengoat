@@ -1644,6 +1644,21 @@ describe("OpenGoatService", () => {
     expect(updated.reportsTo).toBe("cto");
   });
 
+  it("rejects assigning reportees to non-openclaw managers", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("Lead", { type: "individual", reportsTo: "ceo" });
+    await service.createAgent("Engineer");
+    await service.setAgentProvider("lead", "codex");
+
+    await expect(service.setAgentManager("engineer", "lead")).rejects.toThrow(
+      'Cannot assign "lead" as manager because only OpenClaw agents can be managers (found provider "Codex").',
+    );
+  });
+
   it("switches OpenClaw role skill when an individual becomes manager and back", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
