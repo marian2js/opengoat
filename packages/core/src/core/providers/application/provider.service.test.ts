@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { BaseProvider } from "../base-provider.js";
 import type { ProviderModule } from "../provider-module.js";
@@ -13,6 +13,15 @@ import type {
 import { ProviderService } from "./provider.service.js";
 import { NodeFileSystem } from "../../../platform/node/node-file-system.js";
 import { NodePathPort } from "../../../platform/node/node-path.port.js";
+
+const { callOpenClawGatewayRpcMock } = vi.hoisted(() => ({
+  callOpenClawGatewayRpcMock: vi.fn(),
+}));
+
+vi.mock("../openclaw-gateway-rpc.js", () => ({
+  callOpenClawGatewayRpc: callOpenClawGatewayRpcMock,
+  resolveGatewayAgentCallTimeoutMs: (timeoutMs?: number) => timeoutMs ?? 630_000,
+}));
 
 class RecordingProvider extends BaseProvider {
   public readonly invocations: ProviderInvokeOptions[] = [];
@@ -56,6 +65,10 @@ class RecordingProvider extends BaseProvider {
 
 describe("ProviderService", () => {
   const tempDirs: string[] = [];
+
+  beforeEach(() => {
+    callOpenClawGatewayRpcMock.mockReset();
+  });
 
   afterEach(async () => {
     while (tempDirs.length > 0) {
@@ -149,6 +162,100 @@ describe("ProviderService", () => {
     );
   });
 
+  it("routes OpenClaw slash commands to chat.send and returns programmatic output", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-provider-service-openclaw-command-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const { service, openClawProvider } = await createService(paths);
+    const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const sessionKey = "agent:ceo:session-7";
+
+    callOpenClawGatewayRpcMock.mockImplementation(async (input: {
+      method: string;
+      params?: unknown;
+    }) => {
+      const params = (input.params as Record<string, unknown> | undefined) ?? {};
+      calls.push({ method: input.method, params });
+      if (input.method === "chat.history" && calls.filter((call) => call.method === "chat.history").length === 1) {
+        return {
+          messages: [
+            {
+              role: "assistant",
+              content: [{ type: "text", text: "Older message" }],
+              timestamp: 100,
+              provider: "openclaw",
+              model: "gateway-injected",
+              usage: { totalTokens: 0 },
+            },
+          ],
+        };
+      }
+      if (input.method === "chat.send") {
+        return {
+          runId: "run-1",
+          status: "started",
+        };
+      }
+      if (input.method === "chat.history") {
+        return {
+          messages: [
+            {
+              role: "assistant",
+              content: [{ type: "text", text: "Older message" }],
+              timestamp: 100,
+              provider: "openclaw",
+              model: "gateway-injected",
+              usage: { totalTokens: 0 },
+            },
+            {
+              role: "assistant",
+              content: [{ type: "text", text: "Current: google/gemini-3-flash-preview" }],
+              timestamp: 200,
+              provider: "openclaw",
+              model: "gateway-injected",
+              usage: { totalTokens: 0 },
+            },
+          ],
+        };
+      }
+      throw new Error(`Unexpected method: ${input.method}`);
+    });
+
+    const result = await service.invokeAgent(paths, "ceo", {
+      message: "/model",
+      providerSessionId: "session-7",
+    });
+
+    expect(result.providerId).toBe("openclaw");
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe("Current: google/gemini-3-flash-preview");
+    expect(result.providerSessionId).toBe("session-7");
+    expect(openClawProvider.invocations).toHaveLength(0);
+    expect(calls.map((call) => call.method)).toEqual(["chat.history", "chat.send", "chat.history"]);
+    expect(calls[1]?.params).toMatchObject({
+      sessionKey,
+      message: "/model",
+      deliver: false,
+    });
+  });
+
+  it("keeps regular OpenClaw messages on the provider invoke path", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-provider-service-openclaw-regular-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const { service, openClawProvider } = await createService(paths);
+
+    const result = await service.invokeAgent(paths, "ceo", {
+      message: "hello",
+      providerSessionId: "session-9",
+    });
+
+    expect(result.providerId).toBe("openclaw");
+    expect(result.stdout).toBe("handled-by:openclaw");
+    expect(openClawProvider.invocations).toHaveLength(1);
+    expect(callOpenClawGatewayRpcMock).not.toHaveBeenCalled();
+  });
+
   it("returns provider runtime profile with provider-specific workspace policy", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-provider-service-runtime-"));
     tempDirs.push(tempDir);
@@ -209,6 +316,7 @@ describe("ProviderService", () => {
 async function createService(paths: OpenGoatPaths): Promise<{
   service: ProviderService;
   claudeProvider: RecordingProvider;
+  openClawProvider: RecordingProvider;
 }> {
   const registry = new ProviderRegistry();
   const openClawProvider = new RecordingProvider({
@@ -288,6 +396,7 @@ async function createService(paths: OpenGoatPaths): Promise<{
       nowIso: () => "2026-02-15T12:00:00.000Z",
     }),
     claudeProvider,
+    openClawProvider,
   };
 }
 
