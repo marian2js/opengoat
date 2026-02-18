@@ -82,6 +82,9 @@ const PROVIDER_SESSION_BINDINGS_SCHEMA_VERSION = 1;
 const OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS = 4;
 const OPENCLAW_RETRY_BACKOFF_BASE_MS = 100;
 const OPENCLAW_RETRY_BACKOFF_MAX_MS = 1_500;
+const OPENCLAW_COMMAND_RESPONSE_TIMEOUT_MS = 30_000;
+const OPENCLAW_COMMAND_RESPONSE_POLL_MS = 250;
+const OPENCLAW_COMMAND_HISTORY_LIMIT = 250;
 
 interface ProviderSessionBindingsShape {
   schemaVersion: number;
@@ -359,7 +362,16 @@ export class ProviderService {
 
     let result: ProviderExecutionResult;
     try {
-      if (provider.id === OPENCLAW_PROVIDER_ID) {
+      if (
+        provider.id === OPENCLAW_PROVIDER_ID &&
+        isOpenClawCommandMessage(invokeOptions.message)
+      ) {
+        result = await this.invokeOpenClawCommandViaGateway(
+          normalizedAgentId,
+          invokeOptions,
+          env,
+        );
+      } else if (provider.id === OPENCLAW_PROVIDER_ID) {
         result = await this.invokeOpenClawProviderWithRecovery(
           paths,
           provider,
@@ -724,6 +736,119 @@ export class ProviderService {
       stderr: "",
       providerSessionId: normalized.providerSessionId,
     };
+  }
+
+  private async invokeOpenClawCommandViaGateway(
+    fallbackAgentId: string,
+    invokeOptions: ProviderInvokeOptions,
+    env: NodeJS.ProcessEnv,
+  ): Promise<ProviderExecutionResult> {
+    const agentId = (invokeOptions.agent || fallbackAgentId).trim();
+    const idempotencyKey =
+      invokeOptions.idempotencyKey?.trim() || `opengoat-${Date.now()}-${Math.random()}`;
+    const providerSessionId =
+      invokeOptions.providerSessionId?.trim() || idempotencyKey;
+    const sessionKey = buildOpenClawSessionKey(agentId, providerSessionId);
+    const knownSignatures = await this.captureKnownGatewayAssistantSignatures(
+      env,
+      sessionKey,
+    );
+
+    await this.callGatewayMethod(
+      env,
+      "chat.send",
+      {
+        sessionKey,
+        message: invokeOptions.message,
+        idempotencyKey,
+        deliver: false,
+      },
+      {
+        timeoutMs: resolveGatewayAgentCallTimeoutMs(
+          OPENCLAW_COMMAND_RESPONSE_TIMEOUT_MS,
+        ),
+      },
+    );
+
+    const commandResponse = await this.awaitOpenClawProgrammaticCommandResponse({
+      env,
+      sessionKey,
+      knownSignatures,
+      timeoutMs: OPENCLAW_COMMAND_RESPONSE_TIMEOUT_MS,
+      pollIntervalMs: OPENCLAW_COMMAND_RESPONSE_POLL_MS,
+    });
+
+    return {
+      code: 0,
+      stdout: commandResponse,
+      stderr: "",
+      providerSessionId,
+    };
+  }
+
+  private async captureKnownGatewayAssistantSignatures(
+    env: NodeJS.ProcessEnv,
+    sessionKey: string,
+  ): Promise<Set<string>> {
+    const messages = await this.readOpenClawChatHistoryMessages(env, sessionKey);
+    const signatures = new Set<string>();
+    for (const message of messages) {
+      const signature = buildGatewayChatMessageSignature(message);
+      if (signature) {
+        signatures.add(signature);
+      }
+    }
+    return signatures;
+  }
+
+  private async readOpenClawChatHistoryMessages(
+    env: NodeJS.ProcessEnv,
+    sessionKey: string,
+  ): Promise<Array<Record<string, unknown>>> {
+    const payload = await this.callGatewayMethod(
+      env,
+      "chat.history",
+      {
+        sessionKey,
+        limit: OPENCLAW_COMMAND_HISTORY_LIMIT,
+      },
+      {
+        timeoutMs: resolveGatewayAgentCallTimeoutMs(10_000),
+      },
+    );
+    const messages = asRecord(payload).messages;
+    if (!Array.isArray(messages)) {
+      return [];
+    }
+    return messages.map((message) => asRecord(message));
+  }
+
+  private async awaitOpenClawProgrammaticCommandResponse(params: {
+    env: NodeJS.ProcessEnv;
+    sessionKey: string;
+    knownSignatures: Set<string>;
+    timeoutMs: number;
+    pollIntervalMs: number;
+  }): Promise<string> {
+    const deadlineMs = Date.now() + Math.max(0, params.timeoutMs);
+    while (Date.now() <= deadlineMs) {
+      const messages = await this.readOpenClawChatHistoryMessages(
+        params.env,
+        params.sessionKey,
+      );
+      const nextText = findNewProgrammaticAssistantText(messages, params.knownSignatures);
+      if (nextText) {
+        return nextText;
+      }
+      if (Date.now() >= deadlineMs) {
+        break;
+      }
+      await sleep(params.pollIntervalMs);
+    }
+
+    throw new Error(
+      `OpenClaw command timed out waiting for programmatic response for session "${params.sessionKey}".`,
+    );
   }
 
   private async createProviderAgentViaGateway(
@@ -1370,6 +1495,10 @@ function normalizeSessionSegment(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+function isOpenClawCommandMessage(message: string): boolean {
+  return message.trim().startsWith("/");
+}
+
 function normalizeGatewayAgentPayload(payload: unknown): {
   stdout: string;
   providerSessionId?: string;
@@ -1394,6 +1523,74 @@ function normalizeGatewayAgentPayload(payload: unknown): {
         ? sessionId.trim()
         : undefined,
   };
+}
+
+function buildGatewayChatMessageSignature(message: Record<string, unknown>): string | undefined {
+  const role = readOptionalString(message.role);
+  const timestamp = typeof message.timestamp === "number" ? String(message.timestamp) : "";
+  const text = extractGatewayChatText(message);
+  if (!role || !timestamp || !text) {
+    return undefined;
+  }
+  return `${role}|${timestamp}|${text}`;
+}
+
+function findNewProgrammaticAssistantText(
+  messages: Array<Record<string, unknown>>,
+  knownSignatures: Set<string>,
+): string | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || !isProgrammaticGatewayAssistantMessage(message)) {
+      continue;
+    }
+    const signature = buildGatewayChatMessageSignature(message);
+    if (!signature || knownSignatures.has(signature)) {
+      continue;
+    }
+    const text = extractGatewayChatText(message);
+    if (!text) {
+      continue;
+    }
+    knownSignatures.add(signature);
+    return text;
+  }
+  return undefined;
+}
+
+function isProgrammaticGatewayAssistantMessage(message: Record<string, unknown>): boolean {
+  if (readOptionalString(message.role) !== "assistant") {
+    return false;
+  }
+
+  const provider = readOptionalString(message.provider);
+  const model = readOptionalString(message.model);
+  if (provider === "openclaw" && model === "gateway-injected") {
+    return true;
+  }
+
+  const usage = asRecord(message.usage);
+  const totalTokens = usage.totalTokens;
+  return typeof totalTokens === "number" && totalTokens === 0;
+}
+
+function extractGatewayChatText(message: Record<string, unknown>): string {
+  const content = message.content;
+  if (!Array.isArray(content)) {
+    return "";
+  }
+  const lines: string[] = [];
+  for (const chunk of content) {
+    const record = asRecord(chunk);
+    if (readOptionalString(record.type) !== "text") {
+      continue;
+    }
+    const text = readOptionalString(record.text);
+    if (text) {
+      lines.push(text);
+    }
+  }
+  return lines.join("\n\n").trim();
 }
 
 function parseGatewayConfigPayload(
