@@ -58,6 +58,26 @@ describe("opengoat task cron notification helpers", () => {
     ).toContain(`Notification timestamp: ${normalizedTimestamp}`);
   });
 
+  it("adds status update reminder to todo and pending task notifications", () => {
+    const task = buildTask();
+
+    const todoMessage = buildTodoTaskMessage({ task });
+    const pendingMessage = buildPendingTaskMessage({
+      task: {
+        ...task,
+        status: "pending",
+      },
+      pendingMinutes: 45,
+    });
+
+    expect(todoMessage.endsWith("Make sure the task status is updated")).toBe(
+      true,
+    );
+    expect(
+      pendingMessage.endsWith("Make sure the task status is updated"),
+    ).toBe(true);
+  });
+
   it("skips notification timestamp line when timestamp input is invalid", () => {
     const task = buildTask();
     const message = buildTodoTaskMessage({

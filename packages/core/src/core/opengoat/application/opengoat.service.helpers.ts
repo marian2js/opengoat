@@ -194,6 +194,7 @@ export function buildTodoTaskMessage(params: {
   task: TaskRecord;
   notificationTimestamp?: string;
 }): string {
+  const statusUpdateReminder = "Make sure the task status is updated";
   const blockers =
     params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "None";
   const artifacts =
@@ -236,6 +237,8 @@ export function buildTodoTaskMessage(params: {
     artifacts,
     "Worklog:",
     worklog,
+    "",
+    statusUpdateReminder,
   ].join("\n");
 }
 
@@ -244,6 +247,7 @@ export function buildPendingTaskMessage(params: {
   pendingMinutes: number;
   notificationTimestamp?: string;
 }): string {
+  const statusUpdateReminder = "Make sure the task status is updated";
   const blockers =
     params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "None";
   const artifacts =
@@ -288,6 +292,8 @@ export function buildPendingTaskMessage(params: {
     artifacts,
     "Worklog:",
     worklog,
+    "",
+    statusUpdateReminder,
   ].join("\n");
 }
 
