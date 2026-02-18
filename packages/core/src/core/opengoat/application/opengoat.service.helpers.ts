@@ -355,26 +355,92 @@ export function buildInactiveAgentMessage(params: {
   notificationTimestamp?: string;
   lastActionTimestamp?: number;
 }): string {
+  return buildInactiveAgentsMessage({
+    inactiveMinutes: params.inactiveMinutes,
+    notificationTimestamp: params.notificationTimestamp,
+    candidates: [
+      {
+        subjectAgentId: params.subjectAgentId,
+        subjectName: params.subjectName,
+        role: params.role,
+        directReporteesCount: params.directReporteesCount,
+        indirectReporteesCount: params.indirectReporteesCount,
+        lastActionTimestamp: params.lastActionTimestamp,
+      },
+    ],
+  });
+}
+
+export function buildInactiveAgentsMessage(params: {
+  inactiveMinutes: number;
+  notificationTimestamp?: string;
+  candidates: Array<{
+    subjectAgentId: string;
+    subjectName: string;
+    role: string;
+    directReporteesCount: number;
+    indirectReporteesCount: number;
+    lastActionTimestamp?: number;
+  }>;
+}): string {
   const notificationTimestamp = resolveNotificationTimestamp(
     params.notificationTimestamp,
   );
-  const lastAction =
-    typeof params.lastActionTimestamp === "number" &&
-    Number.isFinite(params.lastActionTimestamp)
-      ? new Date(params.lastActionTimestamp).toISOString()
-      : null;
-  return [
-    `Your reportee "@${params.subjectAgentId}" (${params.subjectName}) has no activity in the last ${params.inactiveMinutes} minutes.`,
+  const candidates = [...params.candidates].sort((left, right) =>
+    left.subjectAgentId.localeCompare(right.subjectAgentId),
+  );
+  if (candidates.length === 0) {
+    return [
+      `No inactive reportees were found in the last ${params.inactiveMinutes} minutes.`,
+      ...(notificationTimestamp
+        ? [`Notification timestamp: ${notificationTimestamp}`]
+        : []),
+    ].join("\n");
+  }
+
+  if (candidates.length === 1) {
+    const candidate = candidates[0]!;
+    const subjectName = candidate.subjectName || `@${candidate.subjectAgentId}`;
+    const lastAction =
+      typeof candidate.lastActionTimestamp === "number" &&
+      Number.isFinite(candidate.lastActionTimestamp)
+        ? new Date(candidate.lastActionTimestamp).toISOString()
+        : null;
+
+    return [
+      `Your reportee "@${candidate.subjectAgentId}" (${candidate.subjectName}) has no activity in the last ${params.inactiveMinutes} minutes.`,
+      ...(notificationTimestamp
+        ? [`Notification timestamp: ${notificationTimestamp}`]
+        : []),
+      ...(candidate.role ? [`Role: ${candidate.role}`] : []),
+      `${subjectName} has ${candidate.directReporteesCount} direct and ${candidate.indirectReporteesCount} indirect reportees.`,
+      ...(lastAction ? [`Last action: ${lastAction}`] : []),
+      "Please check in and unblock progress.",
+    ].join("\n");
+  }
+
+  const lines = [
+    `You have ${candidates.length} reportees with no activity in the last ${params.inactiveMinutes} minutes.`,
     ...(notificationTimestamp
       ? [`Notification timestamp: ${notificationTimestamp}`]
       : []),
-    ...(params.role ? [`Role: ${params.role}`] : []),
-    `${
-      params.subjectName || `@${params.subjectAgentId}`
-    } has ${params.directReporteesCount} direct and ${params.indirectReporteesCount} indirect reportees.`,
-    ...(lastAction ? [`Last action: ${lastAction}`] : []),
-    "Please check in and unblock progress.",
-  ].join("\n");
+    "Inactive reportees:",
+  ];
+  for (const candidate of candidates) {
+    const lastAction =
+      typeof candidate.lastActionTimestamp === "number" &&
+      Number.isFinite(candidate.lastActionTimestamp)
+        ? new Date(candidate.lastActionTimestamp).toISOString()
+        : "none recorded";
+    const role = candidate.role?.trim()
+      ? candidate.role.trim()
+      : "unspecified";
+    lines.push(
+      `- "@${candidate.subjectAgentId}" (${candidate.subjectName || "Unnamed"}) | Role: ${role} | Reportees: ${candidate.directReporteesCount} direct, ${candidate.indirectReporteesCount} indirect | Last action: ${lastAction}`,
+    );
+  }
+  lines.push("Please check in and unblock progress.");
+  return lines.join("\n");
 }
 
 export function buildReporteeStats(manifests: AgentReportNode[]): {

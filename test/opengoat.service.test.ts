@@ -2100,6 +2100,58 @@ describe("OpenGoatService", () => {
     ).toBe(false);
   });
 
+  it("sends one inactive notification per manager when multiple reportees are inactive", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service, provider } = createService(root);
+    await service.initialize();
+    await service.createAgent("Engineer One", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+    await service.createAgent("Engineer Two", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    const cycle = await service.runTaskCronCycle({ inactiveMinutes: 30 });
+    const inactiveDispatches = cycle.dispatches.filter(
+      (dispatch) => dispatch.kind === "inactive",
+    );
+
+    expect(cycle.inactiveAgents).toBe(2);
+    expect(inactiveDispatches).toHaveLength(1);
+    expect(inactiveDispatches[0]).toMatchObject({
+      kind: "inactive",
+      targetAgentId: "ceo",
+      sessionRef: "agent:ceo:agent_ceo_notifications",
+      ok: true,
+    });
+    expect(inactiveDispatches[0]?.subjectAgentId).toBeUndefined();
+    expect(inactiveDispatches[0]?.message).toContain(
+      "You have 2 reportees with no activity in the last 30 minutes.",
+    );
+    expect(inactiveDispatches[0]?.message).toContain(
+      '"@engineer-one" (Engineer One)',
+    );
+    expect(inactiveDispatches[0]?.message).toContain(
+      '"@engineer-two" (Engineer Two)',
+    );
+
+    const ceoInactivityInvocations = provider.invocations.filter(
+      (entry) =>
+        entry.agent === "ceo" && entry.message.includes("Inactive reportees:"),
+    );
+    expect(ceoInactivityInvocations).toHaveLength(1);
+    expect(ceoInactivityInvocations[0]?.message).toContain(
+      '"@engineer-one" (Engineer One)',
+    );
+    expect(ceoInactivityInvocations[0]?.message).toContain(
+      '"@engineer-two" (Engineer Two)',
+    );
+  });
+
   it("notifies assignees when pending tasks exceed the inactivity threshold", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);

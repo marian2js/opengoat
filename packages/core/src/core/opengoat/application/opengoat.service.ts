@@ -71,7 +71,7 @@ import {
 import {
   assertAgentExists,
   buildBlockedTaskMessage,
-  buildInactiveAgentMessage,
+  buildInactiveAgentsMessage,
   buildNotificationSessionRef,
   buildPendingTaskMessage,
   buildReporteeStats,
@@ -1153,38 +1153,56 @@ export class OpenGoatService {
     notificationTimestamp: string,
     maxParallelFlows = 1,
   ): Promise<TaskCronDispatchResult[]> {
-    return runWithConcurrencyByKey(
-      inactiveCandidates,
-      maxParallelFlows,
-      (candidate) =>
-        normalizeAgentId(candidate.managerAgentId) || DEFAULT_AGENT_ID,
-      async (candidate) => {
-        const sessionRef = buildNotificationSessionRef(
-          candidate.managerAgentId,
+    const groupedCandidatesByManager = new Map<string, InactiveAgentCandidate[]>();
+    for (const candidate of inactiveCandidates) {
+      const managerAgentId =
+        normalizeAgentId(candidate.managerAgentId) || DEFAULT_AGENT_ID;
+      const bucket = groupedCandidatesByManager.get(managerAgentId) ?? [];
+      bucket.push(candidate);
+      groupedCandidatesByManager.set(managerAgentId, bucket);
+    }
+
+    const requests = [...groupedCandidatesByManager.entries()]
+      .sort(([leftManagerId], [rightManagerId]) =>
+        leftManagerId.localeCompare(rightManagerId),
+      )
+      .map(([managerAgentId, candidates]) => {
+        const orderedCandidates = [...candidates].sort((left, right) =>
+          left.subjectAgentId.localeCompare(right.subjectAgentId),
         );
-        const message = buildInactiveAgentMessage({
-          managerAgentId: candidate.managerAgentId,
-          subjectAgentId: candidate.subjectAgentId,
-          subjectName: candidate.subjectName,
-          role: candidate.role,
-          directReporteesCount: candidate.directReporteesCount,
-          indirectReporteesCount: candidate.indirectReporteesCount,
-          inactiveMinutes,
-          notificationTimestamp,
-          lastActionTimestamp: candidate.lastActionTimestamp,
-        });
+        return {
+          managerAgentId,
+          candidates: orderedCandidates,
+          sessionRef: buildNotificationSessionRef(managerAgentId),
+          message: buildInactiveAgentsMessage({
+            inactiveMinutes,
+            notificationTimestamp,
+            candidates: orderedCandidates,
+          }),
+          subjectAgentId:
+            orderedCandidates.length === 1
+              ? orderedCandidates[0]?.subjectAgentId
+              : undefined,
+        };
+      });
+
+    return runWithConcurrencyByKey(
+      requests,
+      maxParallelFlows,
+      (request) => request.managerAgentId,
+      async (request) => {
         const result = await this.dispatchAutomationMessage(
           paths,
-          candidate.managerAgentId,
-          sessionRef,
-          message,
+          request.managerAgentId,
+          request.sessionRef,
+          request.message,
         );
         return {
           kind: "inactive",
-          targetAgentId: candidate.managerAgentId,
-          sessionRef,
-          subjectAgentId: candidate.subjectAgentId,
-          message,
+          targetAgentId: request.managerAgentId,
+          sessionRef: request.sessionRef,
+          subjectAgentId: request.subjectAgentId,
+          message: request.message,
           ok: result.ok,
           error: result.error,
         };

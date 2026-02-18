@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TaskRecord } from "../../boards/index.js";
 import {
   buildBlockedTaskMessage,
+  buildInactiveAgentsMessage,
   buildInactiveAgentMessage,
   buildInactiveSessionRef,
   buildNotificationSessionRef,
@@ -65,6 +66,40 @@ describe("opengoat task cron notification helpers", () => {
     });
 
     expect(message).not.toContain("Notification timestamp:");
+  });
+
+  it("builds a single combined message for multiple inactive reportees", () => {
+    const message = buildInactiveAgentsMessage({
+      inactiveMinutes: 30,
+      notificationTimestamp: "2026-02-16T11:30:00-05:00",
+      candidates: [
+        {
+          subjectAgentId: "engineer",
+          subjectName: "Engineer",
+          role: "Backend Engineer",
+          directReporteesCount: 1,
+          indirectReporteesCount: 2,
+        },
+        {
+          subjectAgentId: "designer",
+          subjectName: "Designer",
+          role: "Product Designer",
+          directReporteesCount: 0,
+          indirectReporteesCount: 0,
+          lastActionTimestamp: Date.parse("2026-02-16T15:45:00.000Z"),
+        },
+      ],
+    });
+
+    expect(message).toContain(
+      "You have 2 reportees with no activity in the last 30 minutes.",
+    );
+    expect(message).toContain("Inactive reportees:");
+    expect(message).toContain('"@designer" (Designer)');
+    expect(message).toContain('"@engineer" (Engineer)');
+    expect(message).toContain("Last action: 2026-02-16T15:45:00.000Z");
+    expect(message).toContain("Last action: none recorded");
+    expect(message).toContain("Notification timestamp: 2026-02-16T16:30:00.000Z");
   });
 });
 
