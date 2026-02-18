@@ -104,6 +104,7 @@ export class ProviderService {
   private providerRegistryPromise?: Promise<ProviderRegistry>;
   private readonly nowIso: () => string;
   private readonly logger: Logger;
+  private readonly warmedOpenClawGatewayAuthStateKeys = new Set<string>();
 
   public constructor(deps: ProviderServiceDeps) {
     this.fileSystem = deps.fileSystem;
@@ -1212,6 +1213,8 @@ export class ProviderService {
     provider: Provider,
     invokeOptions: ProviderInvokeOptions
   ): Promise<ProviderExecutionResult> {
+    const invocationEnv = invokeOptions.env ?? process.env;
+
     let attempt = 0;
     while (attempt < OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS) {
       attempt += 1;
@@ -1225,6 +1228,29 @@ export class ProviderService {
           result
         );
       } catch (error) {
+        if (
+          isGatewayRetryableDeviceTokenMismatchError(error) &&
+          attempt < OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS
+        ) {
+          this.clearOpenClawGatewayAuthWarmState(invocationEnv);
+          await this.ensureOpenClawGatewayAuthWarm(invocationEnv, {
+            force: true,
+          });
+          const delayMs = resolveOpenClawRetryDelayMs(attempt);
+          this.logger.warn(
+            "OpenClaw invocation failed with device token mismatch; retrying after auth refresh.",
+            {
+              attempt,
+              maxAttempts: OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS,
+              delayMs,
+              error: summarizeRetryFailureOutput(
+                error instanceof Error ? error.message : String(error),
+              ),
+            },
+          );
+          await sleep(delayMs);
+          continue;
+        }
         if (!isGatewayRetryableLockFailureError(error) || attempt >= OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS) {
           throw error;
         }
@@ -1235,6 +1261,30 @@ export class ProviderService {
           delayMs,
           error: summarizeRetryFailureOutput(error instanceof Error ? error.message : String(error))
         });
+        await sleep(delayMs);
+        continue;
+      }
+
+      if (
+        isGatewayRetryableDeviceTokenMismatchResult(result) &&
+        attempt < OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS
+      ) {
+        this.clearOpenClawGatewayAuthWarmState(invocationEnv);
+        await this.ensureOpenClawGatewayAuthWarm(invocationEnv, {
+          force: true,
+        });
+        const delayMs = resolveOpenClawRetryDelayMs(attempt);
+        this.logger.warn(
+          "OpenClaw invocation returned device token mismatch; retrying after auth refresh.",
+          {
+            attempt,
+            maxAttempts: OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS,
+            delayMs,
+            code: result.code,
+            stderr: summarizeRetryFailureOutput(result.stderr),
+            stdout: summarizeRetryFailureOutput(result.stdout),
+          },
+        );
         await sleep(delayMs);
         continue;
       }
@@ -1256,6 +1306,61 @@ export class ProviderService {
     }
 
     return provider.invoke(invokeOptions);
+  }
+
+  private async ensureOpenClawGatewayAuthWarm(
+    env: NodeJS.ProcessEnv,
+    options: {
+      force?: boolean;
+    } = {},
+  ): Promise<void> {
+    const key = buildOpenClawGatewayAuthWarmStateKey(env);
+    if (!options.force && this.warmedOpenClawGatewayAuthStateKeys.has(key)) {
+      return;
+    }
+
+    if (!isLikelyLocalGatewayEnvironment(env)) {
+      this.warmedOpenClawGatewayAuthStateKeys.add(key);
+      return;
+    }
+
+    try {
+      await this.callGatewayMethod(
+        env,
+        "config.get",
+        {},
+        {
+          timeoutMs: 3_000,
+        },
+      );
+      this.warmedOpenClawGatewayAuthStateKeys.add(key);
+    } catch (error) {
+      if (isGatewayRetryableDeviceTokenMismatchError(error)) {
+        this.logger.warn(
+          "OpenClaw local gateway auth warm-up hit a device token mismatch; invocation path will retry with refreshed auth.",
+          {
+            error: summarizeRetryFailureOutput(
+              error instanceof Error ? error.message : String(error),
+            ),
+          },
+        );
+        return;
+      }
+
+      this.logger.warn(
+        "OpenClaw local gateway auth warm-up failed; continuing with direct provider invocation.",
+        {
+          error: summarizeRetryFailureOutput(
+            error instanceof Error ? error.message : String(error),
+          ),
+        },
+      );
+    }
+  }
+
+  private clearOpenClawGatewayAuthWarmState(env: NodeJS.ProcessEnv): void {
+    const key = buildOpenClawGatewayAuthWarmStateKey(env);
+    this.warmedOpenClawGatewayAuthStateKeys.delete(key);
   }
 
   private getProviderSessionBindingsPath(
@@ -1364,6 +1469,79 @@ function parseOpenClawArguments(raw: string): { remoteUrl?: string; token?: stri
     remoteUrl: remoteIndex >= 0 ? parts[remoteIndex + 1] : undefined,
     token: tokenIndex >= 0 ? parts[tokenIndex + 1] : undefined
   };
+}
+
+function buildOpenClawGatewayAuthWarmStateKey(env: NodeJS.ProcessEnv): string {
+  const parsedArgs = parseOpenClawArguments(env.OPENCLAW_ARGUMENTS ?? "");
+  const stateDir =
+    env.OPENCLAW_STATE_DIR?.trim() ||
+    env.CLAWDBOT_STATE_DIR?.trim() ||
+    "__default_state_dir__";
+  const gatewayUrl =
+    env.OPENCLAW_GATEWAY_URL?.trim() ||
+    parsedArgs.remoteUrl?.trim() ||
+    "__default_gateway_url__";
+  return `${stateDir}|${gatewayUrl}`;
+}
+
+function isLikelyLocalGatewayEnvironment(env: NodeJS.ProcessEnv): boolean {
+  const parsedArgs = parseOpenClawArguments(env.OPENCLAW_ARGUMENTS ?? "");
+  const rawGatewayUrl =
+    env.OPENCLAW_GATEWAY_URL?.trim() || parsedArgs.remoteUrl?.trim() || "";
+  if (!rawGatewayUrl) {
+    return true;
+  }
+
+  try {
+    const normalizedUrl = normalizeGatewayWsUrl(rawGatewayUrl);
+    const parsed = new URL(normalizedUrl);
+    return isLoopbackHost(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function normalizeGatewayWsUrl(rawGatewayUrl: string): string {
+  const trimmed = rawGatewayUrl.trim();
+  if (trimmed.startsWith("http://")) {
+    return `ws://${trimmed.slice("http://".length)}`;
+  }
+  if (trimmed.startsWith("https://")) {
+    return `wss://${trimmed.slice("https://".length)}`;
+  }
+  return trimmed;
+}
+
+function isLoopbackHost(hostname: string): boolean {
+  const normalized = hostname.trim().toLowerCase();
+  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
+}
+
+function isGatewayRetryableDeviceTokenMismatchResult(
+  result: ProviderExecutionResult,
+): boolean {
+  if (hasDeviceTokenMismatchText(result.stderr)) {
+    return true;
+  }
+  if (result.code === 0) {
+    return false;
+  }
+  return hasDeviceTokenMismatchText(`${result.stderr}\n${result.stdout}`);
+}
+
+function isGatewayRetryableDeviceTokenMismatchError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return hasDeviceTokenMismatchText(error.message);
+}
+
+function hasDeviceTokenMismatchText(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("device token mismatch") ||
+    normalized.includes("invalid device token")
+  );
 }
 
 function isGatewayUvCwdFailure(result: ProviderExecutionResult): boolean {

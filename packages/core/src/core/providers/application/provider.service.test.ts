@@ -256,6 +256,41 @@ describe("ProviderService", () => {
     expect(callOpenClawGatewayRpcMock).not.toHaveBeenCalled();
   });
 
+  it("refreshes gateway auth and retries when OpenClaw invocation returns device token mismatch", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-provider-service-openclaw-device-token-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+    const { service, openClawProvider } = await createService(paths);
+    callOpenClawGatewayRpcMock.mockResolvedValue({});
+
+    const invokeSpy = vi.spyOn(openClawProvider, "invoke");
+    invokeSpy
+      .mockResolvedValueOnce({
+        code: 1,
+        stdout: "",
+        stderr:
+          "gateway closed (1008): unauthorized: device token mismatch (rotate/reissue device token)",
+      })
+      .mockResolvedValueOnce({
+        code: 0,
+        stdout: "recovered",
+        stderr: "",
+        providerSessionId: "session-recovered",
+      });
+
+    const result = await service.invokeAgent(paths, "ceo", {
+      message: "hello",
+      providerSessionId: "session-recovered",
+    });
+
+    expect(result.providerId).toBe("openclaw");
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe("recovered");
+    expect(result.providerSessionId).toBe("session-recovered");
+    expect(invokeSpy).toHaveBeenCalledTimes(2);
+    expect(callOpenClawGatewayRpcMock).toHaveBeenCalledTimes(1);
+  });
+
   it("returns provider runtime profile with provider-specific workspace policy", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-provider-service-runtime-"));
     tempDirs.push(tempDir);
