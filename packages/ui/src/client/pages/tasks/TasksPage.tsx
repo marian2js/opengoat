@@ -13,7 +13,7 @@ interface TasksPageTask {
   taskId: string;
   title: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   assignedTo: string;
   status: string;
 }
@@ -214,9 +214,14 @@ export function TasksPage({
                     </td>
                     <td
                       className="px-4 py-3 text-sm text-muted-foreground"
-                      title={formatAbsoluteTime(task.updatedAt)}
+                      title={formatAbsoluteTime(
+                        resolveTaskUpdatedAt(task),
+                      )}
                     >
-                      {formatRelativeTime(task.updatedAt, referenceTimestampMs)}
+                      {formatRelativeTime(
+                        resolveTaskUpdatedAt(task),
+                        referenceTimestampMs,
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -235,4 +240,12 @@ function formatAbsoluteTime(timestampIso: string): string {
     return timestampIso;
   }
   return new Date(parsed).toLocaleString();
+}
+
+function resolveTaskUpdatedAt(task: TasksPageTask): string {
+  const updatedAt = task.updatedAt?.trim();
+  if (updatedAt) {
+    return updatedAt;
+  }
+  return task.createdAt;
 }
