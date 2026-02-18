@@ -22,6 +22,21 @@ export const onboardCommand: CliCommand = {
       return 0;
     }
 
+    let mode = parsed.mode;
+    let gatewayUrl = parsed.gatewayUrl;
+    let gatewayToken = parsed.gatewayToken;
+    const hasCompleteExternalConfig = Boolean(gatewayUrl && gatewayToken);
+    if (
+      parsed.nonInteractive &&
+      mode === "external" &&
+      !hasCompleteExternalConfig
+    ) {
+      context.stderr.write(
+        "External mode requires --gateway-url and --gateway-token.\n",
+      );
+      return 1;
+    }
+
     await context.service.initialize();
 
     const prompter = createCliPrompter({
@@ -31,10 +46,6 @@ export const onboardCommand: CliCommand = {
     });
 
     try {
-      let mode = parsed.mode;
-      let gatewayUrl = parsed.gatewayUrl;
-      let gatewayToken = parsed.gatewayToken;
-
       if (!parsed.nonInteractive) {
         await prompter.intro("OpenGoat Onboarding");
         await prompter.note("All OpenGoat agents run as OpenClaw agents.", "Runtime");

@@ -96,6 +96,7 @@ describe("onboard command", () => {
 
     expect(code).toBe(1);
     expect(stderr.output()).toContain("External mode requires --gateway-url and --gateway-token.");
+    expect(service.initialize).not.toHaveBeenCalled();
     expect(service.setOpenClawGatewayConfig).not.toHaveBeenCalled();
   });
 

@@ -40,6 +40,7 @@ describe("CLI commands", () => {
 
     expect(code).toBe(0);
     expect(initialize).toHaveBeenCalledOnce();
+    expect(initialize).toHaveBeenCalledWith({ syncRuntimeDefaults: false });
     expect(stdout.output()).toContain("OpenGoat home: /tmp/opengoat");
     expect(stdout.output()).toContain("Default agent: ceo");
   });

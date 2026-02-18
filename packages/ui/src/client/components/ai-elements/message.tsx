@@ -14,11 +14,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  streamdownPlugins,
+  streamdownShikiTheme,
+} from "@/components/ai-elements/streamdown-config";
 import { cn } from "@/lib/utils";
-import { cjk } from "@streamdown/cjk";
-import { code } from "@streamdown/code";
-import { math } from "@streamdown/math";
-import { mermaid } from "@streamdown/mermaid";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import {
   createContext,
@@ -322,8 +322,6 @@ export const MessageBranchPage = ({
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
-const streamdownPlugins = { cjk, code, math, mermaid };
-
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
     <Streamdown
@@ -332,6 +330,7 @@ export const MessageResponse = memo(
         className
       )}
       plugins={streamdownPlugins}
+      shikiTheme={streamdownShikiTheme}
       {...props}
     />
   ),

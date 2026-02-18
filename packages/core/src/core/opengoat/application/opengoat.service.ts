@@ -252,8 +252,12 @@ export class OpenGoatService {
     });
   }
 
-  public initialize(): Promise<InitializationResult> {
-    return this.initializeRuntimeDefaults();
+  public initialize(
+    options: { syncRuntimeDefaults?: boolean } = {},
+  ): Promise<InitializationResult> {
+    return this.initializeRuntimeDefaults({
+      syncRuntimeDefaults: options.syncRuntimeDefaults ?? true,
+    });
   }
 
   public async hardReset(): Promise<HardResetResult> {
@@ -1370,12 +1374,16 @@ export class OpenGoatService {
     return this.nowIso();
   }
 
-  private async initializeRuntimeDefaults(): Promise<InitializationResult> {
+  private async initializeRuntimeDefaults(options: {
+    syncRuntimeDefaults: boolean;
+  }): Promise<InitializationResult> {
     const initialization = await this.bootstrapService.initialize();
-    try {
-      await this.syncRuntimeDefaults();
-    } catch {
-      // Startup remains functional even if OpenClaw CLI/runtime is unavailable.
+    if (options.syncRuntimeDefaults) {
+      try {
+        await this.syncRuntimeDefaults();
+      } catch {
+        // Startup remains functional even if OpenClaw CLI/runtime is unavailable.
+      }
     }
     return initialization;
   }

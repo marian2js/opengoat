@@ -4,7 +4,9 @@ export const initCommand: CliCommand = {
   path: ["init"],
   description: "Initialize ~/.opengoat (usually auto-run by `opengoat onboard`).",
   async run(_args, context): Promise<number> {
-    const result = await context.service.initialize();
+    const result = await context.service.initialize({
+      syncRuntimeDefaults: false,
+    });
 
     context.stdout.write(`OpenGoat home: ${result.paths.homeDir}\n`);
     context.stdout.write(`Default agent: ${result.defaultAgent}\n`);
