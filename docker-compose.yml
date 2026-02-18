@@ -8,12 +8,12 @@ services:
     environment:
       OPENGOAT_UI_HOST: "0.0.0.0"
       OPENGOAT_UI_PORT: "19123"
-      OPENGOAT_HOME: "/data/opengoat"
+      OPENCLAW_GATEWAY_TOKEN: "opengoat"
       OPENGOAT_USE_DIST: "1"
+      OPENGOAT_HOME: "/root/.opengoat"
+      HOME: "/root"
     ports:
       - "19123:19123"
-    volumes:
-      - opengoat-data:/data/opengoat
     privileged: true
     mem_limit: 4g
     security_opt:
