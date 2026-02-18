@@ -1619,8 +1619,8 @@ export function registerApiRoutes(
             const phase = mapRunStageToProgressPhase(event.stage);
             writeProgress(phase, formatRunStatusMessage(event));
             if (
-              (event.stage === "run_started" ||
-                event.stage === "provider_invocation_started") &&
+              event.stage === "provider_invocation_started" &&
+              event.providerId?.trim().toLowerCase() === "openclaw" &&
               event.runId &&
               !logPoller
             ) {

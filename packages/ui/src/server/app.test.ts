@@ -2135,6 +2135,13 @@ describe("OpenGoat UI server API", () => {
         runId: "run-1",
         agentId: "ceo",
       });
+      options.hooks?.onEvent?.({
+        stage: "provider_invocation_started",
+        timestamp: "2026-02-13T00:00:00.200Z",
+        runId: "run-1",
+        agentId: "ceo",
+        providerId: "codex",
+      });
       options.onStdout?.("first stdout line");
       options.onStderr?.("first stderr line");
       options.hooks?.onEvent?.({
@@ -2142,7 +2149,7 @@ describe("OpenGoat UI server API", () => {
         timestamp: "2026-02-13T00:00:01.000Z",
         runId: "run-1",
         agentId: "ceo",
-        providerId: "openclaw",
+        providerId: "codex",
         code: 0,
       });
 
@@ -2150,7 +2157,7 @@ describe("OpenGoat UI server API", () => {
         code: 0,
         stdout: "assistant response",
         stderr: "",
-        providerId: "openclaw",
+        providerId: "codex",
       };
     });
 
@@ -2184,6 +2191,14 @@ describe("OpenGoat UI server API", () => {
 
     expect(lines.some((line) => line.type === "progress" && line.phase === "run_started")).toBe(true);
     expect(lines.some((line) => line.type === "progress" && line.phase === "stderr")).toBe(true);
+    expect(
+      lines.some(
+        (line) =>
+          line.type === "progress" &&
+          line.phase === "provider_invocation_started" &&
+          line.message === "Sending request to Codex.",
+      ),
+    ).toBe(true);
     expect(lines.some((line) => line.type === "result")).toBe(true);
     expect(runAgent).toHaveBeenCalledWith(
       "ceo",
@@ -2194,6 +2209,90 @@ describe("OpenGoat UI server API", () => {
         onStderr: expect.any(Function),
       }),
     );
+  });
+
+  it("does not poll OpenClaw runtime logs for non-OpenClaw providers", async () => {
+    const getOpenClawGatewayConfig = vi.fn(async () => {
+      return {
+        mode: "local" as const,
+        command: "node",
+      };
+    });
+    const runAgent = vi.fn<
+      NonNullable<OpenClawUiService["runAgent"]>
+    >(async (_agentId, options) => {
+      options.hooks?.onEvent?.({
+        stage: "run_started",
+        timestamp: "2026-02-13T00:00:00.000Z",
+        runId: "run-2",
+        agentId: "developer-1",
+      });
+      options.hooks?.onEvent?.({
+        stage: "provider_invocation_started",
+        timestamp: "2026-02-13T00:00:00.100Z",
+        runId: "run-2",
+        agentId: "developer-1",
+        providerId: "codex",
+      });
+      options.hooks?.onEvent?.({
+        stage: "provider_invocation_completed",
+        timestamp: "2026-02-13T00:00:00.400Z",
+        runId: "run-2",
+        agentId: "developer-1",
+        providerId: "codex",
+        code: 0,
+      });
+
+      return {
+        code: 0,
+        stdout: "done",
+        stderr: "",
+        providerId: "codex",
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        getOpenClawGatewayConfig,
+        runAgent,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message/stream",
+      payload: {
+        agentId: "developer-1",
+        sessionRef: "workspace:tmp",
+        message: "hello",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const lines = response.body
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { type: string; message?: string });
+    const progressMessages = lines
+      .filter((line) => line.type === "progress")
+      .map((line) => line.message ?? "");
+
+    expect(getOpenClawGatewayConfig).not.toHaveBeenCalled();
+    expect(
+      progressMessages.some((message) =>
+        message.includes("Live activity"),
+      ),
+    ).toBe(false);
+    expect(
+      progressMessages.some((message) =>
+        message.includes("Run accepted by OpenClaw"),
+      ),
+    ).toBe(false);
   });
 
   it("sanitizes runtime prefixes and ansi sequences in session message output", async () => {

@@ -98,7 +98,7 @@ export function formatRunStatusMessage(event: UiRunEvent): string {
     case "run_started":
       return `Starting @${event.agentId ?? DEFAULT_AGENT_ID}.`;
     case "provider_invocation_started":
-      return "Sending request to OpenClaw.";
+      return `Sending request to ${formatProviderDisplayName(event.providerId)}.`;
     case "provider_invocation_completed":
       return typeof event.code === "number" && event.code !== 0
         ? `Provider finished with code ${event.code}.`
@@ -109,3 +109,32 @@ export function formatRunStatusMessage(event: UiRunEvent): string {
       return "Runtime update.";
   }
 }
+
+function formatProviderDisplayName(providerId: string | undefined): string {
+  const normalizedProviderId = providerId?.trim().toLowerCase();
+  if (!normalizedProviderId) {
+    return "provider";
+  }
+
+  const knownDisplayName = KNOWN_PROVIDER_DISPLAY_NAMES[normalizedProviderId];
+  if (knownDisplayName) {
+    return knownDisplayName;
+  }
+
+  return normalizedProviderId
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((segment) => {
+      return segment.charAt(0).toUpperCase() + segment.slice(1);
+    })
+    .join(" ");
+}
+
+const KNOWN_PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+  "claude-code": "Claude Code",
+  codex: "Codex",
+  cursor: "Cursor",
+  "gemini-cli": "Gemini CLI",
+  opencode: "OpenCode",
+  openclaw: "OpenClaw",
+};
