@@ -49,6 +49,16 @@ interface GatewayEventFrame {
 
 type GatewayFrame = GatewayResponseFrame | GatewayEventFrame;
 
+class GatewayDeviceTokenMismatchError extends Error {
+  public readonly retryable: boolean;
+
+  public constructor(message: string, retryable: boolean) {
+    super(message);
+    this.name = "GatewayDeviceTokenMismatchError";
+    this.retryable = retryable;
+  }
+}
+
 export async function callOpenClawGatewayRpc(
   params: GatewayCallParams,
 ): Promise<unknown> {
@@ -61,8 +71,41 @@ export async function callOpenClawGatewayRpc(
   const timeoutMs = sanitizeTimeout(params.options?.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   const expectFinal = params.options?.expectFinal === true;
 
+  try {
+    return await callOpenClawGatewayRpcOnce({
+      connection,
+      method,
+      params: params.params,
+      timeoutMs,
+      expectFinal,
+      preferStoredDeviceToken: true,
+    });
+  } catch (error) {
+    if (!isRetryableDeviceTokenMismatchError(error)) {
+      throw error;
+    }
+
+    return callOpenClawGatewayRpcOnce({
+      connection,
+      method,
+      params: params.params,
+      timeoutMs,
+      expectFinal,
+      preferStoredDeviceToken: false,
+    });
+  }
+}
+
+async function callOpenClawGatewayRpcOnce(options: {
+  connection: GatewayConnectionDetails;
+  method: string;
+  params: unknown;
+  timeoutMs: number;
+  expectFinal: boolean;
+  preferStoredDeviceToken: boolean;
+}): Promise<unknown> {
   return new Promise<unknown>((resolve, reject) => {
-    const socket = new WebSocket(connection.url, {
+    const socket = new WebSocket(options.connection.url, {
       maxPayload: 25 * 1024 * 1024,
     });
     let settled = false;
@@ -71,19 +114,22 @@ export async function callOpenClawGatewayRpc(
     let requestId: string | undefined;
     let connectSent = false;
     let connectChallengeNonce: string | undefined;
-    const identity = loadOrCreateDeviceIdentity(connection.stateDir);
+    const identity = loadOrCreateDeviceIdentity(options.connection.stateDir);
     const role = "operator";
     const scopes = ["operator.admin", "operator.approvals", "operator.pairing"];
-    const storedDeviceToken = loadDeviceAuthToken({
-      stateDir: connection.stateDir,
-      deviceId: identity.deviceId,
-      role,
-    });
-    const authToken = connection.token ?? storedDeviceToken;
+    const storedDeviceToken = options.preferStoredDeviceToken
+      ? loadDeviceAuthToken({
+          stateDir: options.connection.stateDir,
+          deviceId: identity.deviceId,
+          role,
+        })
+      : undefined;
+    const usingStoredDeviceToken = !options.connection.token && Boolean(storedDeviceToken);
+    const authToken = options.connection.token ?? storedDeviceToken;
 
     const timer = setTimeout(() => {
-      stop(new Error(`OpenClaw gateway timeout after ${timeoutMs}ms.`));
-    }, timeoutMs);
+      stop(new Error(`OpenClaw gateway timeout after ${options.timeoutMs}ms.`));
+    }, options.timeoutMs);
 
     const stop = (error?: Error, payload?: unknown): void => {
       if (settled) {
@@ -133,7 +179,7 @@ export async function callOpenClawGatewayRpc(
         id: connectRequestId,
         method: "connect",
         params: buildConnectParams({
-          connection,
+          connection: options.connection,
           authToken,
           role,
           scopes,
@@ -155,8 +201,8 @@ export async function callOpenClawGatewayRpc(
       const methodFrame: Record<string, unknown> = {
         type: "req",
         id: requestId,
-        method,
-        params: params.params ?? {},
+        method: options.method,
+        params: options.params ?? {},
       };
       sendFrame(methodFrame);
     };
@@ -196,10 +242,17 @@ export async function callOpenClawGatewayRpc(
         if (frame.ok !== true) {
           if (isUnauthorizedDeviceToken(frame.error)) {
             clearDeviceAuthToken({
-              stateDir: connection.stateDir,
+              stateDir: options.connection.stateDir,
               deviceId: identity.deviceId,
               role,
             });
+            stop(
+              new GatewayDeviceTokenMismatchError(
+                resolveGatewayError(frame, "OpenClaw gateway connect failed."),
+                usingStoredDeviceToken,
+              ),
+            );
+            return;
           }
           stop(new Error(resolveGatewayError(frame, "OpenClaw gateway connect failed.")));
           return;
@@ -207,7 +260,7 @@ export async function callOpenClawGatewayRpc(
         const auth = asRecord(asRecord(frame.payload).auth);
         if (typeof auth.deviceToken === "string" && auth.deviceToken.trim().length > 0) {
           storeDeviceAuthToken({
-            stateDir: connection.stateDir,
+            stateDir: options.connection.stateDir,
             deviceId: identity.deviceId,
             role: typeof auth.role === "string" && auth.role.trim().length > 0 ? auth.role : role,
             token: auth.deviceToken.trim(),
@@ -220,12 +273,12 @@ export async function callOpenClawGatewayRpc(
 
       if (requestId && frameId === requestId) {
         if (frame.ok !== true) {
-          stop(new Error(resolveGatewayError(frame, `OpenClaw gateway "${method}" failed.`)));
+          stop(new Error(resolveGatewayError(frame, `OpenClaw gateway "${options.method}" failed.`)));
           return;
         }
 
         if (
-          expectFinal &&
+          options.expectFinal &&
           typeof asRecord(frame.payload).status === "string" &&
           asRecord(frame.payload).status === "accepted"
         ) {
@@ -243,6 +296,20 @@ export async function callOpenClawGatewayRpc(
     socket.on("close", (_code, reason) => {
       if (!settled) {
         const text = reason.toString().trim();
+        if (isUnauthorizedDeviceTokenText(text)) {
+          clearDeviceAuthToken({
+            stateDir: options.connection.stateDir,
+            deviceId: identity.deviceId,
+            role,
+          });
+          stop(
+            new GatewayDeviceTokenMismatchError(
+              `OpenClaw gateway connection closed${text ? `: ${text}` : "."}`,
+              usingStoredDeviceToken,
+            ),
+          );
+          return;
+        }
         stop(new Error(`OpenClaw gateway connection closed${text ? `: ${text}` : "."}`));
         return;
       }
@@ -421,8 +488,16 @@ function isUnauthorizedDeviceToken(errorPayload: unknown): boolean {
   if (typeof message !== "string") {
     return false;
   }
+  return isUnauthorizedDeviceTokenText(message);
+}
+
+function isUnauthorizedDeviceTokenText(message: string): boolean {
   const normalized = message.toLowerCase();
   return normalized.includes("invalid device token") || normalized.includes("device token mismatch");
+}
+
+function isRetryableDeviceTokenMismatchError(error: unknown): error is GatewayDeviceTokenMismatchError {
+  return error instanceof GatewayDeviceTokenMismatchError && error.retryable;
 }
 
 function parseFrame(raw: string): GatewayFrame | undefined {
