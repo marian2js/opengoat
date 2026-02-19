@@ -2295,6 +2295,117 @@ describe("OpenGoatService", () => {
     ).toBe(false);
   });
 
+  it("notifies assignees when doing tasks exceed the in-progress timeout and resets countdown", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const provider = new FakeOpenClawProvider();
+    let nowMs = Date.parse("2026-02-06T00:00:00.000Z");
+    const { service } = createService(root, provider, undefined, {
+      nowIso: () => new Date(nowMs).toISOString(),
+    });
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    const task = await service.createTask("ceo", {
+      title: "Implement streaming retries",
+      description: "Finish reliability work for streaming retries",
+      assignedTo: "engineer",
+      status: "doing",
+    });
+
+    nowMs += 241 * 60_000;
+    const firstCycle = await service.runTaskCronCycle({
+      inProgressMinutes: 240,
+      notifyInactiveAgents: false,
+    });
+    expect(firstCycle.doingTasks).toBe(1);
+    expect(firstCycle.dispatches).toHaveLength(1);
+    expect(firstCycle.dispatches[0]).toMatchObject({
+      kind: "doing",
+      targetAgentId: "engineer",
+      taskId: task.taskId,
+      message: expect.stringContaining(
+        `Task #${task.taskId} is still in progress after 240 minutes.`,
+      ),
+      ok: true,
+    });
+    expect(
+      provider.invocations.some(
+        (entry) =>
+          entry.agent === "engineer" &&
+          entry.message.includes(
+            `Task #${task.taskId} is still in progress after 240 minutes.`,
+          ) &&
+          entry.message.includes("Make sure the task status is updated"),
+      ),
+    ).toBe(true);
+
+    const secondCycle = await service.runTaskCronCycle({
+      inProgressMinutes: 240,
+      notifyInactiveAgents: false,
+    });
+    expect(secondCycle.doingTasks).toBe(0);
+    expect(secondCycle.dispatches).toHaveLength(0);
+
+    nowMs += 241 * 60_000;
+    const thirdCycle = await service.runTaskCronCycle({
+      inProgressMinutes: 240,
+      notifyInactiveAgents: false,
+    });
+    expect(thirdCycle.doingTasks).toBe(1);
+    expect(thirdCycle.dispatches).toHaveLength(1);
+    expect(thirdCycle.dispatches[0]?.kind).toBe("doing");
+  });
+
+  it("does not reset doing timeout when reminder delivery fails", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const provider = new FakeOpenClawProvider();
+    const invokeSpy = vi
+      .spyOn(provider, "invoke")
+      .mockImplementation(async () => ({
+        code: 1,
+        stdout: "",
+        stderr: "delivery failed",
+      }));
+    let nowMs = Date.parse("2026-02-06T00:00:00.000Z");
+    const { service } = createService(root, provider, undefined, {
+      nowIso: () => new Date(nowMs).toISOString(),
+    });
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+    await service.createTask("ceo", {
+      title: "Stabilize parser",
+      description: "Harden parser edge cases",
+      assignedTo: "engineer",
+      status: "doing",
+    });
+
+    nowMs += 241 * 60_000;
+    const firstCycle = await service.runTaskCronCycle({
+      inProgressMinutes: 240,
+      notifyInactiveAgents: false,
+    });
+    expect(firstCycle.doingTasks).toBe(1);
+    expect(firstCycle.failed).toBe(1);
+
+    const secondCycle = await service.runTaskCronCycle({
+      inProgressMinutes: 240,
+      notifyInactiveAgents: false,
+    });
+    expect(secondCycle.doingTasks).toBe(1);
+    expect(secondCycle.failed).toBe(1);
+    expect(invokeSpy).toHaveBeenCalledTimes(2);
+  });
+
   it("supports notifying only ceo for inactive direct reports", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);

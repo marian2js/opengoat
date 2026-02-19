@@ -546,9 +546,50 @@ describe("BoardService (tasks-only)", () => {
     );
     db.close();
   });
+
+  it("tracks doing-task timeout using status_updated_at and can reset the countdown", async () => {
+    let nowMs = Date.parse("2026-02-10T00:00:00.000Z");
+    const harness = await createHarness({
+      nowIso: () => new Date(nowMs).toISOString(),
+    });
+
+    const task = await harness.boardService.createTask(harness.paths, "ceo", {
+      title: "Long running implementation",
+      description: "Build and validate long running flow",
+      assignedTo: "engineer",
+      status: "doing",
+    });
+
+    nowMs += 4 * 60_000;
+    const dueAtFourMinutes = await harness.boardService.listDoingTaskIdsOlderThan(
+      harness.paths,
+      4,
+    );
+    expect(dueAtFourMinutes).toContain(task.taskId);
+
+    const resetApplied = await harness.boardService.resetTaskStatusTimeout(
+      harness.paths,
+      task.taskId,
+      "doing",
+    );
+    expect(resetApplied).toBe(true);
+
+    const dueImmediatelyAfterReset =
+      await harness.boardService.listDoingTaskIdsOlderThan(harness.paths, 4);
+    expect(dueImmediatelyAfterReset).not.toContain(task.taskId);
+
+    nowMs += 4 * 60_000;
+    const dueAfterResetWindow = await harness.boardService.listDoingTaskIdsOlderThan(
+      harness.paths,
+      4,
+    );
+    expect(dueAfterResetWindow).toContain(task.taskId);
+  });
 });
 
-async function createHarness(): Promise<{
+async function createHarness(options?: {
+  nowIso?: () => string;
+}): Promise<{
   boardService: BoardService;
   paths: OpenGoatPaths;
 }> {
@@ -609,7 +650,7 @@ async function createHarness(): Promise<{
   const boardService = new BoardService({
     fileSystem,
     pathPort,
-    nowIso: () => new Date().toISOString(),
+    nowIso: options?.nowIso ?? (() => new Date().toISOString()),
     agentManifestService: new AgentManifestService({ fileSystem, pathPort }),
   });
 
