@@ -8,6 +8,7 @@ import {
   parseMaxInactivityMinutes,
   parseMaxInProgressMinutes,
   parseMaxParallelFlows,
+  parseTopDownOpenTasksThreshold,
   parseTaskCronEnabled,
   readUiServerSettings,
 } from "./settings.js";
@@ -50,9 +51,9 @@ export function createTaskCronScheduler(
   let taskCronEnabled =
     parseTaskCronEnabled(initialSettings.taskCronEnabled) ??
     defaultUiServerSettings().taskCronEnabled;
-  let bottomUpTaskDelegation = normalizeBottomUpTaskDelegationSettings(
-    initialSettings.taskDelegationStrategies?.bottomUp,
-    defaultUiServerSettings().taskDelegationStrategies.bottomUp,
+  let taskDelegationStrategies = normalizeTaskDelegationStrategies(
+    initialSettings.taskDelegationStrategies,
+    defaultUiServerSettings().taskDelegationStrategies,
   );
   let maxInProgressMinutes =
     parseMaxInProgressMinutes(initialSettings.maxInProgressMinutes) ??
@@ -75,9 +76,9 @@ export function createTaskCronScheduler(
 
     const persistedTaskCronEnabled =
       parseTaskCronEnabled(persisted.taskCronEnabled) ?? taskCronEnabled;
-    const persistedBottomUpTaskDelegation = normalizeBottomUpTaskDelegationSettings(
-      persisted.taskDelegationStrategies?.bottomUp,
-      bottomUpTaskDelegation,
+    const persistedTaskDelegationStrategies = normalizeTaskDelegationStrategies(
+      persisted.taskDelegationStrategies,
+      taskDelegationStrategies,
     );
     const persistedMaxInProgressMinutes =
       parseMaxInProgressMinutes(persisted.maxInProgressMinutes) ??
@@ -86,9 +87,9 @@ export function createTaskCronScheduler(
       parseMaxParallelFlows(persisted.maxParallelFlows) ?? maxParallelFlows;
 
     const hasTaskCronEnabledChange = persistedTaskCronEnabled !== taskCronEnabled;
-    const hasBottomUpChange = !isSameBottomUpTaskDelegationSettings(
-      persistedBottomUpTaskDelegation,
-      bottomUpTaskDelegation,
+    const hasTaskDelegationStrategiesChange = !isSameTaskDelegationStrategies(
+      persistedTaskDelegationStrategies,
+      taskDelegationStrategies,
     );
     const hasMaxInProgressChange =
       persistedMaxInProgressMinutes !== maxInProgressMinutes;
@@ -96,7 +97,7 @@ export function createTaskCronScheduler(
       persistedMaxParallelFlows !== maxParallelFlows;
     if (
       !hasTaskCronEnabledChange &&
-      !hasBottomUpChange &&
+      !hasTaskDelegationStrategiesChange &&
       !hasMaxInProgressChange &&
       !hasMaxParallelFlowsChange
     ) {
@@ -104,7 +105,7 @@ export function createTaskCronScheduler(
     }
 
     taskCronEnabled = persistedTaskCronEnabled;
-    bottomUpTaskDelegation = persistedBottomUpTaskDelegation;
+    taskDelegationStrategies = persistedTaskDelegationStrategies;
     maxInProgressMinutes = persistedMaxInProgressMinutes;
     maxParallelFlows = persistedMaxParallelFlows;
     if (hasTaskCronEnabledChange) {
@@ -113,9 +114,7 @@ export function createTaskCronScheduler(
     app.log.info(
       {
         taskCronEnabled,
-        taskDelegationStrategies: {
-          bottomUp: bottomUpTaskDelegation,
-        },
+        taskDelegationStrategies,
         maxInProgressMinutes,
         maxParallelFlows,
       },
@@ -137,12 +136,18 @@ export function createTaskCronScheduler(
         schedule();
         return;
       }
+      const topDownTaskDelegation = taskDelegationStrategies.topDown;
+      const bottomUpTaskDelegation = taskDelegationStrategies.bottomUp;
       const cycle = await service.runTaskCronCycle?.({
         inactiveMinutes: bottomUpTaskDelegation.maxInactivityMinutes,
         inProgressMinutes: maxInProgressMinutes,
         notificationTarget: bottomUpTaskDelegation.inactiveAgentNotificationTarget,
         notifyInactiveAgents: bottomUpTaskDelegation.enabled,
         delegationStrategies: {
+          topDown: {
+            enabled: topDownTaskDelegation.enabled,
+            openTasksThreshold: topDownTaskDelegation.openTasksThreshold,
+          },
           bottomUp: {
             enabled: bottomUpTaskDelegation.enabled,
             inactiveMinutes: bottomUpTaskDelegation.maxInactivityMinutes,
@@ -281,27 +286,34 @@ export function createTaskCronScheduler(
       });
     },
     setTaskDelegationStrategies: (nextStrategies: UiTaskDelegationStrategiesSettings) => {
-      const nextBottomUp = normalizeBottomUpTaskDelegationSettings(
-        nextStrategies?.bottomUp,
-        bottomUpTaskDelegation,
+      const nextTaskDelegationStrategies = normalizeTaskDelegationStrategies(
+        nextStrategies,
+        taskDelegationStrategies,
       );
-      if (isSameBottomUpTaskDelegationSettings(nextBottomUp, bottomUpTaskDelegation)) {
+      if (
+        isSameTaskDelegationStrategies(
+          nextTaskDelegationStrategies,
+          taskDelegationStrategies,
+        )
+      ) {
         return;
       }
-      bottomUpTaskDelegation = nextBottomUp;
+      taskDelegationStrategies = nextTaskDelegationStrategies;
       app.log.info(
         {
-          taskDelegationStrategies: {
-            bottomUp: bottomUpTaskDelegation,
-          },
+          taskDelegationStrategies,
         },
         "[task-cron] task delegation strategies updated",
       );
+      const topDownTaskDelegation = taskDelegationStrategies.topDown;
+      const bottomUpTaskDelegation = taskDelegationStrategies.bottomUp;
       logs.append({
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `[task-cron] bottom-up task delegation ${
+        message: `[task-cron] top-down task delegation ${
+          topDownTaskDelegation.enabled ? "enabled" : "disabled"
+        } (open task threshold ${topDownTaskDelegation.openTasksThreshold}); bottom-up task delegation ${
           bottomUpTaskDelegation.enabled ? "enabled" : "disabled"
         } (max inactivity ${bottomUpTaskDelegation.maxInactivityMinutes}m, audience ${bottomUpTaskDelegation.inactiveAgentNotificationTarget}).`,
       });
@@ -373,36 +385,43 @@ function formatTaskCronDispatchLogMessage(
   return `[task-cron] Agent ${target} received ${dispatch.kind} message.${taskSuffix}${subjectSuffix}${sessionSuffix}${previewSuffix}`;
 }
 
-function normalizeBottomUpTaskDelegationSettings(
-  value:
-    | Partial<UiTaskDelegationStrategiesSettings["bottomUp"]>
-    | UiTaskDelegationStrategiesSettings["bottomUp"]
-    | undefined,
-  fallback: UiTaskDelegationStrategiesSettings["bottomUp"],
-): UiTaskDelegationStrategiesSettings["bottomUp"] {
-  const enabled = parseBooleanSetting(value?.enabled) ?? fallback.enabled;
-  const maxInactivityMinutes =
-    parseMaxInactivityMinutes(value?.maxInactivityMinutes) ??
-    fallback.maxInactivityMinutes;
-  const inactiveAgentNotificationTarget =
-    parseInactiveAgentNotificationTarget(value?.inactiveAgentNotificationTarget) ??
-    fallback.inactiveAgentNotificationTarget;
+function normalizeTaskDelegationStrategies(
+  value: Partial<UiTaskDelegationStrategiesSettings> | undefined,
+  fallback: UiTaskDelegationStrategiesSettings,
+): UiTaskDelegationStrategiesSettings {
+  const topDown = value?.topDown;
+  const bottomUp = value?.bottomUp;
 
   return {
-    enabled,
-    maxInactivityMinutes,
-    inactiveAgentNotificationTarget,
+    topDown: {
+      enabled: parseBooleanSetting(topDown?.enabled) ?? fallback.topDown.enabled,
+      openTasksThreshold:
+        parseTopDownOpenTasksThreshold(topDown?.openTasksThreshold) ??
+        fallback.topDown.openTasksThreshold,
+    },
+    bottomUp: {
+      enabled: parseBooleanSetting(bottomUp?.enabled) ?? fallback.bottomUp.enabled,
+      maxInactivityMinutes:
+        parseMaxInactivityMinutes(bottomUp?.maxInactivityMinutes) ??
+        fallback.bottomUp.maxInactivityMinutes,
+      inactiveAgentNotificationTarget:
+        parseInactiveAgentNotificationTarget(
+          bottomUp?.inactiveAgentNotificationTarget,
+        ) ?? fallback.bottomUp.inactiveAgentNotificationTarget,
+    },
   };
 }
 
-function isSameBottomUpTaskDelegationSettings(
-  left: UiTaskDelegationStrategiesSettings["bottomUp"],
-  right: UiTaskDelegationStrategiesSettings["bottomUp"],
+function isSameTaskDelegationStrategies(
+  left: UiTaskDelegationStrategiesSettings,
+  right: UiTaskDelegationStrategiesSettings,
 ): boolean {
   return (
-    left.enabled === right.enabled &&
-    left.maxInactivityMinutes === right.maxInactivityMinutes &&
-    left.inactiveAgentNotificationTarget ===
-      right.inactiveAgentNotificationTarget
+    left.topDown.enabled === right.topDown.enabled &&
+    left.topDown.openTasksThreshold === right.topDown.openTasksThreshold &&
+    left.bottomUp.enabled === right.bottomUp.enabled &&
+    left.bottomUp.maxInactivityMinutes === right.bottomUp.maxInactivityMinutes &&
+    left.bottomUp.inactiveAgentNotificationTarget ===
+      right.bottomUp.inactiveAgentNotificationTarget
   );
 }

@@ -76,6 +76,7 @@ import {
   buildNotificationSessionRef,
   buildPendingTaskMessage,
   buildReporteeStats,
+  buildTopDownTaskDelegationMessage,
   buildTodoTaskMessage,
   collectAllReportees,
   containsAgentNotFoundMessage,
@@ -89,6 +90,7 @@ import {
   prepareOpenClawCommandEnv,
   resolveInProgressTimeoutMinutes,
   resolveBottomUpTaskDelegationStrategy,
+  resolveTopDownTaskDelegationStrategy,
   resolveMaxParallelFlows,
   toErrorMessage,
   type OpenClawAgentPathEntry,
@@ -121,7 +123,7 @@ export interface RuntimeDefaultsSyncResult {
 }
 
 export interface TaskCronDispatchResult {
-  kind: "todo" | "doing" | "pending" | "blocked" | "inactive";
+  kind: "todo" | "doing" | "pending" | "blocked" | "inactive" | "topdown";
   targetAgentId: string;
   sessionRef: string;
   taskId?: string;
@@ -1007,6 +1009,7 @@ export class OpenGoatService {
     const inProgressMinutes = resolveInProgressTimeoutMinutes(
       options.inProgressMinutes,
     );
+    const topDownStrategy = resolveTopDownTaskDelegationStrategy(options);
     const bottomUpStrategy = resolveBottomUpTaskDelegationStrategy(options);
     const maxParallelFlows = resolveMaxParallelFlows(options.maxParallelFlows);
     const inactiveCandidates = bottomUpStrategy.enabled
@@ -1019,6 +1022,16 @@ export class OpenGoatService {
       : [];
 
     const tasks = await this.boardService.listTasks(paths, { limit: 10_000 });
+    const topDownDispatches = topDownStrategy.enabled
+      ? await this.dispatchTopDownTaskDelegationAutomations(
+          paths,
+          tasks,
+          manifests,
+          topDownStrategy.openTasksThreshold,
+          ranAt,
+          maxParallelFlows,
+        )
+      : [];
     const pendingTaskIds = new Set(
       await this.boardService.listPendingTaskIdsOlderThan(
         paths,
@@ -1050,6 +1063,7 @@ export class OpenGoatService {
       maxParallelFlows,
     );
     const dispatches = [
+      ...topDownDispatches,
       ...taskStatusDispatch.dispatches,
       ...inactiveDispatches,
     ];
@@ -1066,6 +1080,87 @@ export class OpenGoatService {
       failed,
       dispatches,
     };
+  }
+
+  private async dispatchTopDownTaskDelegationAutomations(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    tasks: TaskRecord[],
+    manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
+    openTasksThreshold: number,
+    notificationTimestamp: string,
+    maxParallelFlows = 1,
+  ): Promise<TaskCronDispatchResult[]> {
+    const openTasks = tasks
+      .filter((task) => task.status.trim().toLowerCase() !== "done")
+      .sort((left, right) => {
+        const leftTimestamp = Date.parse(left.updatedAt);
+        const rightTimestamp = Date.parse(right.updatedAt);
+        if (Number.isFinite(leftTimestamp) && Number.isFinite(rightTimestamp)) {
+          return rightTimestamp - leftTimestamp;
+        }
+        if (Number.isFinite(rightTimestamp)) {
+          return 1;
+        }
+        if (Number.isFinite(leftTimestamp)) {
+          return -1;
+        }
+        return right.taskId.localeCompare(left.taskId);
+      });
+    if (openTasks.length > openTasksThreshold) {
+      return [];
+    }
+
+    const managerAgents = manifests.filter(
+      (manifest) => manifest.metadata.type === "manager",
+    ).length;
+    const ceoDirectReportees = manifests.filter(
+      (manifest) =>
+        normalizeAgentId(manifest.metadata.reportsTo ?? "") === DEFAULT_AGENT_ID,
+    ).length;
+    const sessionRef = buildNotificationSessionRef(DEFAULT_AGENT_ID);
+    const message = buildTopDownTaskDelegationMessage({
+      openTasksThreshold,
+      openTasksCount: openTasks.length,
+      totalAgents: manifests.length,
+      managerAgents,
+      ceoDirectReportees,
+      openTasks: openTasks.map((task) => ({
+        taskId: task.taskId,
+        title: task.title,
+        status: task.status,
+        assignedTo: task.assignedTo,
+      })),
+      notificationTimestamp,
+    });
+
+    const requests = [
+      {
+        targetAgentId: DEFAULT_AGENT_ID,
+        sessionRef,
+        message,
+      },
+    ];
+    return runWithConcurrencyByKey(
+      requests,
+      maxParallelFlows,
+      (request) => request.targetAgentId,
+      async (request) => {
+        const result = await this.dispatchAutomationMessage(
+          paths,
+          request.targetAgentId,
+          request.sessionRef,
+          request.message,
+        );
+        return {
+          kind: "topdown" as const,
+          targetAgentId: request.targetAgentId,
+          sessionRef: request.sessionRef,
+          message: request.message,
+          ok: result.ok,
+          error: result.error,
+        };
+      },
+    );
   }
 
   private async dispatchTaskStatusAutomations(

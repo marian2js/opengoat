@@ -7,9 +7,11 @@ import {
   buildInactiveSessionRef,
   buildNotificationSessionRef,
   buildPendingTaskMessage,
+  buildTopDownTaskDelegationMessage,
   buildTaskSessionRef,
   buildTodoTaskMessage,
   resolveBottomUpTaskDelegationStrategy,
+  resolveTopDownTaskDelegationStrategy,
 } from "./opengoat.service.helpers.js";
 
 describe("opengoat task cron notification helpers", () => {
@@ -156,6 +158,57 @@ describe("opengoat task cron notification helpers", () => {
       inactiveMinutes: 45,
       notificationTarget: "ceo-only",
     });
+  });
+
+  it("defaults bottom-up strategy to disabled without explicit config", () => {
+    const resolved = resolveBottomUpTaskDelegationStrategy({});
+
+    expect(resolved).toEqual({
+      enabled: false,
+      inactiveMinutes: 30,
+      notificationTarget: "all-managers",
+    });
+  });
+
+  it("defaults top-down strategy to enabled with threshold 5", () => {
+    const resolved = resolveTopDownTaskDelegationStrategy({});
+
+    expect(resolved).toEqual({
+      enabled: true,
+      openTasksThreshold: 5,
+    });
+  });
+
+  it("builds a concise top-down task delegation message for the ceo", () => {
+    const message = buildTopDownTaskDelegationMessage({
+      openTasksThreshold: 5,
+      openTasksCount: 2,
+      totalAgents: 4,
+      managerAgents: 2,
+      ceoDirectReportees: 2,
+      openTasks: [
+        {
+          taskId: "task-1",
+          title: "Improve onboarding",
+          status: "todo",
+          assignedTo: "cto",
+        },
+        {
+          taskId: "task-2",
+          title: "Stabilize release pipeline",
+          status: "blocked",
+          assignedTo: "engineer",
+        },
+      ],
+      notificationTimestamp: "2026-02-16T11:30:00-05:00",
+    });
+
+    expect(message).toContain("Top-Down threshold (5)");
+    expect(message).toContain("Organization context: 4 total agents");
+    expect(message).toContain("high-value, low-effort");
+    expect(message).toContain("decompose work and pass it down");
+    expect(message).toContain("task-1 [todo] @cto");
+    expect(message).toContain("Notification timestamp: 2026-02-16T16:30:00.000Z");
   });
 });
 

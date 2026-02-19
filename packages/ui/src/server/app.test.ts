@@ -220,8 +220,12 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: true,
         maxParallelFlows: 3,
         taskDelegationStrategies: {
-          bottomUp: {
+          topDown: {
             enabled: true,
+            openTasksThreshold: 5,
+          },
+          bottomUp: {
+            enabled: false,
             maxInactivityMinutes: 30,
             inactiveAgentNotificationTarget: "all-managers",
           },
@@ -236,6 +240,10 @@ describe("OpenGoat UI server API", () => {
       payload: {
         taskCronEnabled: false,
         taskDelegationStrategies: {
+          topDown: {
+            enabled: true,
+            openTasksThreshold: 5,
+          },
           bottomUp: {
             enabled: false,
             maxInactivityMinutes: 45,
@@ -267,6 +275,10 @@ describe("OpenGoat UI server API", () => {
       payload: {
         taskCronEnabled: true,
         taskDelegationStrategies: {
+          topDown: {
+            enabled: true,
+            openTasksThreshold: 5,
+          },
           bottomUp: {
             enabled: false,
             maxInactivityMinutes: 45,
@@ -282,6 +294,10 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: true,
         maxParallelFlows: 6,
         taskDelegationStrategies: {
+          topDown: {
+            enabled: true,
+            openTasksThreshold: 5,
+          },
           bottomUp: {
             enabled: false,
             maxInactivityMinutes: 45,
@@ -932,6 +948,10 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: false,
         maxParallelFlows: 3,
         taskDelegationStrategies: {
+          topDown: {
+            enabled: true,
+            openTasksThreshold: 5,
+          },
           bottomUp: {
             enabled: false,
             maxInactivityMinutes: 30,

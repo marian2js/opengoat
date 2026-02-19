@@ -6,13 +6,16 @@ import {
   DEFAULT_MAX_INACTIVITY_MINUTES,
   DEFAULT_MAX_IN_PROGRESS_MINUTES,
   DEFAULT_MAX_PARALLEL_FLOWS,
+  DEFAULT_TOP_DOWN_OPEN_TASKS_THRESHOLD,
   MAX_LOG_STREAM_LIMIT,
   MAX_MAX_INACTIVITY_MINUTES,
   MAX_MAX_IN_PROGRESS_MINUTES,
   MAX_MAX_PARALLEL_FLOWS,
+  MAX_TOP_DOWN_OPEN_TASKS_THRESHOLD,
   MIN_MAX_IN_PROGRESS_MINUTES,
   MIN_MAX_PARALLEL_FLOWS,
   MIN_MAX_INACTIVITY_MINUTES,
+  MIN_TOP_DOWN_OPEN_TASKS_THRESHOLD,
   UI_SETTINGS_FILENAME,
 } from "./constants.js";
 import {
@@ -26,6 +29,7 @@ import type {
   UiAuthenticationSettingsResponse,
   UiServerSettings,
   UiServerSettingsResponse,
+  UiTopDownTaskDelegationStrategySettings,
   UiTaskDelegationStrategiesSettings,
 } from "./types.js";
 
@@ -71,14 +75,22 @@ export function parseTaskCronEnabled(value: unknown): boolean | undefined {
 
 export function defaultBottomUpTaskDelegationStrategySettings(): UiBottomUpTaskDelegationStrategySettings {
   return {
-    enabled: true,
+    enabled: false,
     maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
     inactiveAgentNotificationTarget: "all-managers",
   };
 }
 
+export function defaultTopDownTaskDelegationStrategySettings(): UiTopDownTaskDelegationStrategySettings {
+  return {
+    enabled: true,
+    openTasksThreshold: DEFAULT_TOP_DOWN_OPEN_TASKS_THRESHOLD,
+  };
+}
+
 export function defaultTaskDelegationStrategies(): UiTaskDelegationStrategiesSettings {
   return {
+    topDown: defaultTopDownTaskDelegationStrategySettings(),
     bottomUp: defaultBottomUpTaskDelegationStrategySettings(),
   };
 }
@@ -188,6 +200,27 @@ export function parseMaxParallelFlows(value: unknown): number | undefined {
   return parsed;
 }
 
+export function parseTopDownOpenTasksThreshold(
+  value: unknown,
+): number | undefined {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isInteger(parsed)) {
+    return undefined;
+  }
+  if (
+    parsed < MIN_TOP_DOWN_OPEN_TASKS_THRESHOLD ||
+    parsed > MAX_TOP_DOWN_OPEN_TASKS_THRESHOLD
+  ) {
+    return undefined;
+  }
+  return parsed;
+}
+
 export async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> {
   const settingsPath = path.resolve(homeDir, UI_SETTINGS_FILENAME);
   if (!existsSync(settingsPath)) {
@@ -204,6 +237,10 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
       maxParallelFlows?: unknown;
       inactiveAgentNotificationTarget?: unknown;
       taskDelegationStrategies?: {
+        topDown?: {
+          enabled?: unknown;
+          openTasksThreshold?: unknown;
+        };
         bottomUp?: {
           enabled?: unknown;
           maxInactivityMinutes?: unknown;
@@ -238,6 +275,12 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
       parsed.authentication?.passwordHash,
     );
     const defaults = defaultUiServerSettings();
+    const parsedTopDown = parsed.taskDelegationStrategies?.topDown;
+    const parsedTopDownEnabled = parseBooleanSetting(parsedTopDown?.enabled);
+    const parsedTopDownOpenTasksThreshold = parseTopDownOpenTasksThreshold(
+      parsedTopDown?.openTasksThreshold,
+    );
+
     const parsedBottomUp = parsed.taskDelegationStrategies?.bottomUp;
     const parsedBottomUpEnabled = parseBooleanSetting(parsedBottomUp?.enabled);
     const parsedBottomUpMaxInactivityMinutes = parseMaxInactivityMinutes(
@@ -246,6 +289,11 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
     const parsedBottomUpNotificationTarget = parseInactiveAgentNotificationTarget(
       parsedBottomUp?.inactiveAgentNotificationTarget,
     );
+
+    const defaultTopDown = defaults.taskDelegationStrategies.topDown;
+    const topDownEnabled = parsedTopDownEnabled ?? defaultTopDown.enabled;
+    const topDownOpenTasksThreshold =
+      parsedTopDownOpenTasksThreshold ?? defaultTopDown.openTasksThreshold;
 
     const defaultBottomUp = defaults.taskDelegationStrategies.bottomUp;
     const bottomUpEnabled =
@@ -267,6 +315,10 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
         maxInProgressMinutes ?? defaults.maxInProgressMinutes,
       maxParallelFlows: maxParallelFlows ?? defaults.maxParallelFlows,
       taskDelegationStrategies: {
+        topDown: {
+          enabled: topDownEnabled,
+          openTasksThreshold: topDownOpenTasksThreshold,
+        },
         bottomUp: {
           enabled: bottomUpEnabled,
           maxInactivityMinutes: bottomUpMaxInactivityMinutes,

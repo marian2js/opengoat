@@ -2029,15 +2029,27 @@ describe("OpenGoatService", () => {
       "Waiting for production credentials",
     );
 
-    const cycle = await service.runTaskCronCycle({ inactiveMinutes: 30 });
+    const cycle = await service.runTaskCronCycle({
+      inactiveMinutes: 30,
+      delegationStrategies: {
+        bottomUp: {
+          enabled: true,
+        },
+      },
+    });
 
     expect(cycle.todoTasks).toBe(1);
     expect(cycle.blockedTasks).toBe(1);
     expect(cycle.inactiveAgents).toBe(1);
     expect(cycle.failed).toBe(0);
-    expect(cycle.dispatches.length).toBe(3);
+    expect(cycle.dispatches.length).toBe(4);
     expect(cycle.dispatches).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          kind: "topdown",
+          targetAgentId: "ceo",
+          message: expect.stringContaining("Top-Down threshold"),
+        }),
         expect.objectContaining({
           kind: "todo",
           targetAgentId: "engineer",
@@ -2099,6 +2111,18 @@ describe("OpenGoatService", () => {
     );
     expect(inactivityInvocation?.cwd).toBeUndefined();
 
+    const topDownInvocation = provider.invocations.find(
+      (entry) =>
+        entry.agent === "ceo" &&
+        entry.message.includes("CEO guidance for creating next tasks"),
+    );
+    expect(topDownInvocation?.message).toContain(
+      "decompose work and pass it down",
+    );
+    expect(topDownInvocation?.message).toContain(
+      `Notification timestamp: ${cycle.ranAt}`,
+    );
+
     const engineerSessions = await service.listSessions("engineer");
     const engineerNotificationSessionKey =
       "agent:engineer:agent_engineer_notifications";
@@ -2153,7 +2177,17 @@ describe("OpenGoatService", () => {
       reportsTo: "ceo",
     });
 
-    const cycle = await service.runTaskCronCycle({ inactiveMinutes: 30 });
+    const cycle = await service.runTaskCronCycle({
+      inactiveMinutes: 30,
+      delegationStrategies: {
+        bottomUp: {
+          enabled: true,
+        },
+        topDown: {
+          enabled: false,
+        },
+      },
+    });
     const inactiveDispatches = cycle.dispatches.filter(
       (dispatch) => dispatch.kind === "inactive",
     );
@@ -2222,6 +2256,11 @@ describe("OpenGoatService", () => {
     const cycle = await service.runTaskCronCycle({
       inactiveMinutes: 30,
       notifyInactiveAgents: false,
+      delegationStrategies: {
+        topDown: {
+          enabled: false,
+        },
+      },
     });
 
     expect(cycle.todoTasks).toBe(0);
@@ -2283,6 +2322,11 @@ describe("OpenGoatService", () => {
     const cycle = await service.runTaskCronCycle({
       inactiveMinutes: 30,
       notifyInactiveAgents: false,
+      delegationStrategies: {
+        topDown: {
+          enabled: false,
+        },
+      },
     });
 
     expect(cycle.dispatches).toHaveLength(0);
@@ -2321,6 +2365,11 @@ describe("OpenGoatService", () => {
     const firstCycle = await service.runTaskCronCycle({
       inProgressMinutes: 240,
       notifyInactiveAgents: false,
+      delegationStrategies: {
+        topDown: {
+          enabled: false,
+        },
+      },
     });
     expect(firstCycle.doingTasks).toBe(1);
     expect(firstCycle.dispatches).toHaveLength(1);
@@ -2347,6 +2396,11 @@ describe("OpenGoatService", () => {
     const secondCycle = await service.runTaskCronCycle({
       inProgressMinutes: 240,
       notifyInactiveAgents: false,
+      delegationStrategies: {
+        topDown: {
+          enabled: false,
+        },
+      },
     });
     expect(secondCycle.doingTasks).toBe(0);
     expect(secondCycle.dispatches).toHaveLength(0);
@@ -2355,6 +2409,11 @@ describe("OpenGoatService", () => {
     const thirdCycle = await service.runTaskCronCycle({
       inProgressMinutes: 240,
       notifyInactiveAgents: false,
+      delegationStrategies: {
+        topDown: {
+          enabled: false,
+        },
+      },
     });
     expect(thirdCycle.doingTasks).toBe(1);
     expect(thirdCycle.dispatches).toHaveLength(1);
@@ -2393,6 +2452,11 @@ describe("OpenGoatService", () => {
     const firstCycle = await service.runTaskCronCycle({
       inProgressMinutes: 240,
       notifyInactiveAgents: false,
+      delegationStrategies: {
+        topDown: {
+          enabled: false,
+        },
+      },
     });
     expect(firstCycle.doingTasks).toBe(1);
     expect(firstCycle.failed).toBe(1);
@@ -2400,6 +2464,11 @@ describe("OpenGoatService", () => {
     const secondCycle = await service.runTaskCronCycle({
       inProgressMinutes: 240,
       notifyInactiveAgents: false,
+      delegationStrategies: {
+        topDown: {
+          enabled: false,
+        },
+      },
     });
     expect(secondCycle.doingTasks).toBe(1);
     expect(secondCycle.failed).toBe(1);
@@ -2424,6 +2493,14 @@ describe("OpenGoatService", () => {
     const cycle = await service.runTaskCronCycle({
       inactiveMinutes: 30,
       notificationTarget: "ceo-only",
+      delegationStrategies: {
+        bottomUp: {
+          enabled: true,
+        },
+        topDown: {
+          enabled: false,
+        },
+      },
     });
 
     expect(cycle.inactiveAgents).toBe(1);
@@ -2478,6 +2555,11 @@ describe("OpenGoatService", () => {
     const cycle = await service.runTaskCronCycle({
       inactiveMinutes: 30,
       notifyInactiveAgents: false,
+      delegationStrategies: {
+        topDown: {
+          enabled: false,
+        },
+      },
     });
 
     expect(cycle.todoTasks).toBe(1);
@@ -2567,6 +2649,11 @@ describe("OpenGoatService", () => {
     const cycle = await service.runTaskCronCycle({
       notifyInactiveAgents: false,
       maxParallelFlows: 2,
+      delegationStrategies: {
+        topDown: {
+          enabled: false,
+        },
+      },
     });
 
     expect(cycle.todoTasks).toBe(4);
@@ -2637,6 +2724,11 @@ describe("OpenGoatService", () => {
     const cycle = await service.runTaskCronCycle({
       notifyInactiveAgents: false,
       maxParallelFlows: 4,
+      delegationStrategies: {
+        topDown: {
+          enabled: false,
+        },
+      },
     });
 
     expect(cycle.todoTasks).toBe(6);

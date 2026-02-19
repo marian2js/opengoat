@@ -62,6 +62,9 @@ export function resolveInProgressTimeoutMinutes(
 const DEFAULT_MAX_PARALLEL_FLOWS = 3;
 const MIN_MAX_PARALLEL_FLOWS = 1;
 const MAX_MAX_PARALLEL_FLOWS = 32;
+const DEFAULT_TOP_DOWN_OPEN_TASKS_THRESHOLD = 5;
+const MIN_TOP_DOWN_OPEN_TASKS_THRESHOLD = 0;
+const MAX_TOP_DOWN_OPEN_TASKS_THRESHOLD = 10_000;
 
 export function resolveMaxParallelFlows(value: number | undefined): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -90,14 +93,55 @@ export interface BottomUpTaskDelegationStrategyConfig {
   notificationTarget?: "all-managers" | "ceo-only";
 }
 
+export interface TopDownTaskDelegationStrategyConfig {
+  enabled?: boolean;
+  openTasksThreshold?: number;
+}
+
 export interface TaskDelegationStrategiesConfig {
+  topDown?: TopDownTaskDelegationStrategyConfig;
   bottomUp?: BottomUpTaskDelegationStrategyConfig;
+}
+
+export interface ResolvedTopDownTaskDelegationStrategy {
+  enabled: boolean;
+  openTasksThreshold: number;
 }
 
 export interface ResolvedBottomUpTaskDelegationStrategy {
   enabled: boolean;
   inactiveMinutes: number;
   notificationTarget: "all-managers" | "ceo-only";
+}
+
+export function resolveTopDownOpenTasksThreshold(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_TOP_DOWN_OPEN_TASKS_THRESHOLD;
+  }
+
+  const normalized = Math.floor(value);
+  if (normalized < MIN_TOP_DOWN_OPEN_TASKS_THRESHOLD) {
+    return MIN_TOP_DOWN_OPEN_TASKS_THRESHOLD;
+  }
+  if (normalized > MAX_TOP_DOWN_OPEN_TASKS_THRESHOLD) {
+    return MAX_TOP_DOWN_OPEN_TASKS_THRESHOLD;
+  }
+  return normalized;
+}
+
+export function resolveTopDownTaskDelegationStrategy(options: {
+  delegationStrategies?: TaskDelegationStrategiesConfig;
+}): ResolvedTopDownTaskDelegationStrategy {
+  const topDownConfig = options.delegationStrategies?.topDown;
+  const enabled =
+    typeof topDownConfig?.enabled === "boolean" ? topDownConfig.enabled : true;
+
+  return {
+    enabled,
+    openTasksThreshold: resolveTopDownOpenTasksThreshold(
+      topDownConfig?.openTasksThreshold,
+    ),
+  };
 }
 
 export function resolveBottomUpTaskDelegationStrategy(options: {
@@ -110,7 +154,9 @@ export function resolveBottomUpTaskDelegationStrategy(options: {
   const hasBottomUpEnabled = typeof bottomUpConfig?.enabled === "boolean";
   const enabled = hasBottomUpEnabled
     ? bottomUpConfig.enabled
-    : options.notifyInactiveAgents ?? true;
+    : typeof options.notifyInactiveAgents === "boolean"
+      ? options.notifyInactiveAgents
+      : false;
 
   return {
     enabled,
@@ -447,6 +493,70 @@ export function buildBlockedTaskMessage(params: {
     "Worklog:",
     worklog,
   ].join("\n");
+}
+
+export function buildTopDownTaskDelegationMessage(params: {
+  openTasksThreshold: number;
+  openTasksCount: number;
+  totalAgents: number;
+  managerAgents: number;
+  ceoDirectReportees: number;
+  openTasks: Array<{
+    taskId: string;
+    title: string;
+    status: string;
+    assignedTo: string;
+  }>;
+  notificationTimestamp?: string;
+}): string {
+  const notificationTimestamp = resolveNotificationTimestamp(
+    params.notificationTimestamp,
+  );
+  const openTasksPreview = params.openTasks.slice(0, 8);
+  const statusCounts = new Map<string, number>();
+  for (const task of params.openTasks) {
+    const key = task.status.trim().toLowerCase() || "unknown";
+    statusCounts.set(key, (statusCounts.get(key) ?? 0) + 1);
+  }
+  const statusSummary =
+    statusCounts.size === 0
+      ? "none"
+      : [...statusCounts.entries()]
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([status, count]) => `${status}:${count}`)
+          .join(", ");
+
+  const lines = [
+    `Open tasks are at ${params.openTasksCount}, which is at or below the Top-Down threshold (${params.openTasksThreshold}).`,
+    ...(notificationTimestamp
+      ? [`Notification timestamp: ${notificationTimestamp}`]
+      : []),
+    `Organization context: ${params.totalAgents} total agents, ${params.managerAgents} managers, ${params.ceoDirectReportees} direct CEO reportees.`,
+    `Open task status distribution: ${statusSummary}.`,
+    "",
+    "CEO guidance for creating next tasks:",
+    "1. Review current project status and near-term objectives before creating work.",
+    "2. Keep decisions aligned with MISSION, VISION, and STRATEGY.",
+    "3. Prioritize high-value, low-effort tasks when possible.",
+    "4. Match task size to organization capacity: larger teams can absorb broader scopes, smaller teams need tighter scopes.",
+    "5. Delegate realistically to reportees; tag reportees who should decompose work and pass it down.",
+    "6. Balance long-term direction with short-term deliverables that can be completed now.",
+    "",
+    "Open tasks snapshot:",
+    ...(openTasksPreview.length === 0
+      ? ["- none"]
+      : openTasksPreview.map(
+          (task) =>
+            `- ${task.taskId} [${task.status}] @${task.assignedTo}: ${task.title}`,
+        )),
+    ...(params.openTasks.length > openTasksPreview.length
+      ? [`- ...and ${params.openTasks.length - openTasksPreview.length} more`]
+      : []),
+    "",
+    "Create and assign the next set of practical, high-impact tasks now.",
+  ];
+
+  return lines.join("\n");
 }
 
 export function buildInactiveAgentMessage(params: {

@@ -155,7 +155,12 @@ export interface OrganizationAgentProfileUpdateInput {
 }
 
 export type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
-export type TaskDelegationStrategyId = "bottom-up";
+export type TaskDelegationStrategyId = "top-down" | "bottom-up";
+
+export interface TopDownTaskDelegationCronOptions {
+  enabled?: boolean;
+  openTasksThreshold?: number;
+}
 
 export interface BottomUpTaskDelegationCronOptions {
   enabled?: boolean;
@@ -164,6 +169,7 @@ export interface BottomUpTaskDelegationCronOptions {
 }
 
 export interface TaskDelegationStrategiesCronOptions {
+  topDown?: TopDownTaskDelegationCronOptions;
   bottomUp?: BottomUpTaskDelegationCronOptions;
 }
 
@@ -309,7 +315,7 @@ export interface TaskCronRunResult {
 }
 
 export interface TaskCronDispatchResult {
-  kind: "todo" | "doing" | "pending" | "blocked" | "inactive";
+  kind: "todo" | "doing" | "pending" | "blocked" | "inactive" | "topdown";
   targetAgentId: string;
   sessionRef: string;
   taskId?: string;
@@ -333,7 +339,13 @@ export interface UiBottomUpTaskDelegationStrategySettings {
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
 }
 
+export interface UiTopDownTaskDelegationStrategySettings {
+  enabled: boolean;
+  openTasksThreshold: number;
+}
+
 export interface UiTaskDelegationStrategiesSettings {
+  topDown: UiTopDownTaskDelegationStrategySettings;
   bottomUp: UiBottomUpTaskDelegationStrategySettings;
 }
 

@@ -19,7 +19,11 @@ interface SettingsPageProps {
   defaultAgentId: string;
   taskCronIntervalMinutes: number;
   taskCronEnabledInput: boolean;
+  topDownTaskDelegationEnabledInput: boolean;
+  topDownOpenTasksThresholdInput: string;
   bottomUpTaskDelegationEnabledInput: boolean;
+  minTopDownOpenTasksThreshold: number;
+  maxTopDownOpenTasksThreshold: number;
   maxInactivityMinutesInput: string;
   maxInProgressMinutesInput: string;
   minMaxInactivityMinutes: number;
@@ -46,6 +50,8 @@ interface SettingsPageProps {
   onOpenCeoChat: (agentId: string) => void;
   onTaskCronEnabledChange: (checked: boolean) => void;
   onMaxParallelFlowsInputChange: (value: string) => void;
+  onTopDownTaskDelegationEnabledChange: (checked: boolean) => void;
+  onTopDownOpenTasksThresholdInputChange: (value: string) => void;
   onBottomUpTaskDelegationEnabledChange: (checked: boolean) => void;
   onMaxInactivityMinutesInputChange: (value: string) => void;
   onMaxInProgressMinutesInputChange: (value: string) => void;
@@ -68,7 +74,11 @@ export function SettingsPage({
   defaultAgentId,
   taskCronIntervalMinutes,
   taskCronEnabledInput,
+  topDownTaskDelegationEnabledInput,
+  topDownOpenTasksThresholdInput,
   bottomUpTaskDelegationEnabledInput,
+  minTopDownOpenTasksThreshold,
+  maxTopDownOpenTasksThreshold,
   maxInactivityMinutesInput,
   maxInProgressMinutesInput,
   minMaxInactivityMinutes,
@@ -95,6 +105,8 @@ export function SettingsPage({
   onOpenCeoChat,
   onTaskCronEnabledChange,
   onMaxParallelFlowsInputChange,
+  onTopDownTaskDelegationEnabledChange,
+  onTopDownOpenTasksThresholdInputChange,
   onBottomUpTaskDelegationEnabledChange,
   onMaxInactivityMinutesInputChange,
   onMaxInProgressMinutesInputChange,
@@ -277,6 +289,74 @@ export function SettingsPage({
             !taskCronEnabledInput && "opacity-60",
           )}
         >
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-foreground">
+                Top-Down Task Delegation (Default)
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                When open tasks are low, the CEO is asked to define the next
+                highest-impact work and delegate it through the organization.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={topDownTaskDelegationEnabledInput}
+                disabled={!taskCronEnabledInput || isMutating || isLoading}
+                onCheckedChange={onTopDownTaskDelegationEnabledChange}
+                aria-label="Toggle top-down task delegation"
+              />
+              <span
+                className={cn(
+                  "text-xs font-medium",
+                  topDownTaskDelegationEnabledInput && taskCronEnabledInput
+                    ? "text-success"
+                    : "text-muted-foreground",
+                )}
+              >
+                {topDownTaskDelegationEnabledInput && taskCronEnabledInput
+                  ? "Enabled"
+                  : "Disabled"}
+              </span>
+            </div>
+          </div>
+
+          {topDownTaskDelegationEnabledInput ? (
+            <div className="space-y-3">
+              <label
+                className="text-sm font-medium text-foreground"
+                htmlFor="topDownOpenTasksThreshold"
+              >
+                Open Task Threshold
+              </label>
+              <div className="flex max-w-sm items-center gap-3">
+                <Input
+                  id="topDownOpenTasksThreshold"
+                  type="number"
+                  min={minTopDownOpenTasksThreshold}
+                  max={maxTopDownOpenTasksThreshold}
+                  step={1}
+                  value={topDownOpenTasksThresholdInput}
+                  disabled={!taskCronEnabledInput || isMutating || isLoading}
+                  onChange={(event) => {
+                    onTopDownOpenTasksThresholdInputChange(event.target.value);
+                  }}
+                />
+                <span className="text-sm text-muted-foreground">open tasks</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                CEO receives a strategy prompt when open tasks are at or below
+                this threshold.
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Top-Down task delegation is paused.
+            </p>
+          )}
+
+          <Separator className="bg-border/50" />
+
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1">
               <h3 className="text-sm font-semibold text-foreground">
@@ -566,11 +646,18 @@ export function SettingsPage({
               ? "Waiting for first CEO message to start checks"
               : !taskCronEnabledInput
                 ? "Background checks paused"
-                : !bottomUpTaskDelegationEnabledInput
-                  ? "Background checks active (Bottom-Up delegation paused)"
-                  : inactiveAgentNotificationTargetInput === "ceo-only"
-                    ? "Background checks active (Bottom-Up strategy: CEO-only inactivity routing)"
-                    : "Background checks active for all managers"}
+                : topDownTaskDelegationEnabledInput &&
+                    bottomUpTaskDelegationEnabledInput
+                  ? inactiveAgentNotificationTargetInput === "ceo-only"
+                    ? "Background checks active (Top-Down + Bottom-Up, CEO-only inactivity routing)"
+                    : "Background checks active (Top-Down + Bottom-Up)"
+                  : topDownTaskDelegationEnabledInput
+                    ? "Background checks active (Top-Down only)"
+                    : bottomUpTaskDelegationEnabledInput
+                      ? inactiveAgentNotificationTargetInput === "ceo-only"
+                        ? "Background checks active (Bottom-Up only, CEO-only inactivity routing)"
+                        : "Background checks active (Bottom-Up only)"
+                      : "Background checks active (task delegation strategies paused)"}
           </span>
         </p>
         <div className="flex items-center gap-2">
