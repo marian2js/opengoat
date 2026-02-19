@@ -202,6 +202,18 @@ export abstract class BaseCliProvider extends BaseProvider {
     };
   }
 
+  protected applyResolvedImagePaths(options: ProviderInvokeOptions, imagePaths: string[]): ProviderInvokeOptions {
+    const imageContext = renderImagePathContext(imagePaths);
+    if (!imageContext) {
+      return options;
+    }
+
+    return {
+      ...options,
+      message: `${options.message.trim()}\n\n${imageContext}`
+    };
+  }
+
   private async prepareImageInvocationOptions(options: ProviderInvokeOptions): Promise<{
     options: ProviderInvokeOptions;
     tempDirs: string[];
@@ -241,16 +253,8 @@ export abstract class BaseCliProvider extends BaseProvider {
       imagePaths.push(targetPath);
     }
 
-    const imageContext = renderImagePathContext(imagePaths);
-    if (!imageContext) {
-      return { options, tempDirs };
-    }
-
     return {
-      options: {
-        ...options,
-        message: `${options.message.trim()}\n\n${imageContext}`
-      },
+      options: this.applyResolvedImagePaths(options, imagePaths),
       tempDirs
     };
   }

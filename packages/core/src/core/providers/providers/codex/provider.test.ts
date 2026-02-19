@@ -23,6 +23,26 @@ describe("codex provider", () => {
     ]);
   });
 
+  it("maps image attachments to native codex --image flags", () => {
+    const provider = new CodexProvider();
+    const invocation = provider.buildInvocation({
+      message: "describe the screenshots",
+      imagePaths: ["/tmp/screenshot-1.png", "/tmp/screenshot-2.jpg"],
+    });
+
+    expect(invocation.args).toEqual([
+      "exec",
+      "--json",
+      "--skip-git-repo-check",
+      "--image",
+      "/tmp/screenshot-1.png",
+      "--image",
+      "/tmp/screenshot-2.jpg",
+      "--dangerously-bypass-approvals-and-sandbox",
+      "describe the screenshots",
+    ]);
+  });
+
   it("maps session invocation to codex exec resume", () => {
     const provider = new CodexProvider();
     const invocation = provider.buildInvocation({

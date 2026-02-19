@@ -453,19 +453,35 @@ export function normalizeUiImages(images: UiImageInput[] | undefined): UiImageIn
     return [];
   }
 
-  return images.filter((image) => {
+  const normalized: UiImageInput[] = [];
+  for (const image of images) {
     if (!image || typeof image !== "object") {
-      return false;
+      continue;
     }
 
     const dataUrl = image.dataUrl?.trim();
-    const mediaType = image.mediaType?.trim();
-    return Boolean(
-      dataUrl &&
-        dataUrl.startsWith("data:") &&
-        mediaType?.toLowerCase().startsWith("image/"),
-    );
-  });
+    if (!dataUrl || !dataUrl.startsWith("data:")) {
+      continue;
+    }
+
+    const mediaType = resolveImageMediaType(image.mediaType, dataUrl);
+    if (!mediaType) {
+      continue;
+    }
+
+    const name = image.name?.trim();
+    normalized.push({
+      dataUrl,
+      mediaType,
+      ...(name
+        ? {
+            name,
+          }
+        : {}),
+    });
+  }
+
+  return normalized;
 }
 
 export function buildWorkspaceSessionRef(
@@ -502,6 +518,39 @@ function normalizeProjectSegment(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return normalized || "project";
+}
+
+function resolveImageMediaType(
+  explicitMediaType: string | undefined,
+  dataUrl: string,
+): string | undefined {
+  const normalizedExplicitMediaType = normalizeMediaType(explicitMediaType);
+  if (normalizedExplicitMediaType?.startsWith("image/")) {
+    return normalizedExplicitMediaType;
+  }
+
+  const dataUrlMediaType = extractDataUrlMediaType(dataUrl);
+  if (dataUrlMediaType?.startsWith("image/")) {
+    return dataUrlMediaType;
+  }
+
+  return undefined;
+}
+
+function normalizeMediaType(value: string | undefined): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized ? normalized : undefined;
+}
+
+function extractDataUrlMediaType(dataUrl: string): string | undefined {
+  const separatorIndex = dataUrl.indexOf(",");
+  if (separatorIndex <= 5) {
+    return undefined;
+  }
+
+  const header = dataUrl.slice(5, separatorIndex);
+  const mediaType = header.split(";")[0]?.trim().toLowerCase();
+  return mediaType || undefined;
 }
 
 export async function pickProjectFolderFromSystem(): Promise<{

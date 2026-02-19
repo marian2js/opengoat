@@ -20,6 +20,8 @@ export interface ProviderCapabilities {
 export interface ProviderInvokeOptions {
   message: string;
   images?: ProviderImageInput[];
+  // Internal-only: normalized local image paths prepared by providers.
+  imagePaths?: string[];
   systemPrompt?: string;
   skillsPromptOverride?: string;
   sessionRef?: string;

@@ -2290,6 +2290,57 @@ describe("OpenGoat UI server API", () => {
     );
   });
 
+  it("derives image media type from data URLs when mediaType is omitted", async () => {
+    const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(async () => {
+      return {
+        code: 0,
+        stdout: "assistant response",
+        stderr: "",
+        providerId: "openclaw",
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        runAgent,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message",
+      payload: {
+        agentId: "ceo",
+        sessionRef: "workspace:tmp",
+        images: [
+          {
+            name: "chart.png",
+            dataUrl: "data:image/png;base64,Zm9v",
+          },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(runAgent).toHaveBeenCalledWith(
+      "ceo",
+      expect.objectContaining({
+        message: "Please analyze the attached image.",
+        sessionRef: "workspace:tmp",
+        images: [
+          {
+            name: "chart.png",
+            mediaType: "image/png",
+            dataUrl: "data:image/png;base64,Zm9v",
+          },
+        ],
+      }),
+    );
+  });
+
   it("streams session message progress events and final result", async () => {
     const runAgent = vi.fn<
       NonNullable<OpenClawUiService["runAgent"]>

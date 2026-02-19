@@ -38,11 +38,15 @@ export class CodexProvider extends BaseCliProvider {
     const model = options.model?.trim();
     const providerSessionId = options.providerSessionId?.trim();
     const passthrough = options.passthroughArgs ?? [];
+    const imagePaths = resolveImagePaths(options);
 
     if (providerSessionId) {
       const args = ["exec", "resume", "--json", "--skip-git-repo-check"];
       if (model) {
         args.push("--model", model);
+      }
+      for (const imagePath of imagePaths) {
+        args.push("--image", imagePath);
       }
       args.push(...passthrough);
       args.push(...CODEX_AUTONOMY_FLAGS);
@@ -54,10 +58,27 @@ export class CodexProvider extends BaseCliProvider {
     if (model) {
       args.push("--model", model);
     }
+    for (const imagePath of imagePaths) {
+      args.push("--image", imagePath);
+    }
     args.push(...passthrough);
     args.push(...CODEX_AUTONOMY_FLAGS);
     args.push(message);
     return args;
+  }
+
+  protected override applyResolvedImagePaths(
+    options: ProviderInvokeOptions,
+    imagePaths: string[],
+  ): ProviderInvokeOptions {
+    if (imagePaths.length === 0) {
+      return options;
+    }
+
+    return {
+      ...options,
+      imagePaths,
+    };
   }
 
   protected override buildAuthInvocationArgs(
@@ -82,6 +103,16 @@ export class CodexProvider extends BaseCliProvider {
       parsed?.providerSessionId,
     );
   }
+}
+
+function resolveImagePaths(options: ProviderInvokeOptions): string[] {
+  if (!Array.isArray(options.imagePaths) || options.imagePaths.length === 0) {
+    return [];
+  }
+
+  return options.imagePaths
+    .map((imagePath) => imagePath.trim())
+    .filter((imagePath) => imagePath.length > 0);
 }
 
 export function parseCodexExecResponse(raw: string): {

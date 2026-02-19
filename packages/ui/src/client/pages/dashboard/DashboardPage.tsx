@@ -15,6 +15,7 @@ import {
   PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
+  usePromptInputAttachments,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
 import {
@@ -95,6 +96,7 @@ import {
   ChevronRight,
   Clock3,
   Home,
+  ImagePlus,
   MessageSquare,
   MoreHorizontal,
   Plus,
@@ -102,6 +104,7 @@ import {
   Sparkles,
   TerminalSquare,
   UsersRound,
+  X,
 } from "lucide-react";
 import type {
   ComponentType,
@@ -515,6 +518,8 @@ const TASK_AUTO_REFRESH_INTERVAL_MS = 10_000;
 const TASK_AUTO_REFRESH_HIDDEN_INTERVAL_MS = 30_000;
 const MAX_VISIBLE_CEO_AGENT_SESSIONS = 5;
 const MAX_VISIBLE_NON_CEO_AGENT_SESSIONS = 2;
+const MAX_SESSION_MESSAGE_IMAGE_COUNT = 8;
+const MAX_SESSION_MESSAGE_IMAGE_BYTES = 10 * 1024 * 1024;
 const SIDEBAR_AGENT_ORDER_STORAGE_KEY = "opengoat:dashboard:sidebar-agent-order";
 const TASK_STATUS_OPTIONS = [
   { value: "todo", label: "To do" },
@@ -763,6 +768,84 @@ type OrgChartNode = Node<OrgNodeData, "orgNode">;
 const orgChartNodeTypes = {
   orgNode: OrganizationChartNode,
 } satisfies NodeTypes;
+
+function SessionPromptAttachmentStrip({
+  disabled,
+}: {
+  disabled: boolean;
+}): ReactElement | null {
+  const attachments = usePromptInputAttachments();
+  if (attachments.files.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2 border-border/70 border-b px-2 pt-2 pb-1">
+      {attachments.files.map((file) => (
+        <div key={file.id} className="w-20">
+          <div className="group relative overflow-hidden rounded-md border border-border/70 bg-muted/40">
+            <img
+              alt={file.filename || "Attached image"}
+              className="h-20 w-20 object-cover"
+              src={file.url}
+            />
+            <Button
+              aria-label={`Remove ${file.filename || "image"}`}
+              className="absolute top-1 right-1 h-5 w-5 rounded-full p-0 opacity-95"
+              disabled={disabled}
+              onClick={() => {
+                attachments.remove(file.id);
+              }}
+              size="icon-sm"
+              type="button"
+              variant="secondary"
+            >
+              <X className="size-3" />
+            </Button>
+          </div>
+          <p className="mt-1 truncate text-muted-foreground text-xs">
+            {file.filename || "image"}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SessionPromptAttachButton({
+  disabled,
+}: {
+  disabled: boolean;
+}): ReactElement {
+  const attachments = usePromptInputAttachments();
+  const isAtLimit = attachments.files.length >= MAX_SESSION_MESSAGE_IMAGE_COUNT;
+
+  return (
+    <Button
+      aria-label="Attach images"
+      className="h-8 gap-1.5 px-2 text-muted-foreground"
+      disabled={disabled || isAtLimit}
+      onClick={() => {
+        attachments.openFileDialog();
+      }}
+      size="sm"
+      title={
+        isAtLimit
+          ? `Maximum ${MAX_SESSION_MESSAGE_IMAGE_COUNT} images per message.`
+          : "Attach images"
+      }
+      type="button"
+      variant="ghost"
+    >
+      <ImagePlus className="size-4" />
+      <span className="text-xs">
+        {attachments.files.length > 0
+          ? `${attachments.files.length}/${MAX_SESSION_MESSAGE_IMAGE_COUNT}`
+          : "Attach"}
+      </span>
+    </Button>
+  );
+}
 
 export function DashboardPage(): ReactElement {
   const [route, setRoute] = useState<AppRoute>(() => getInitialRoute());
@@ -3263,6 +3346,30 @@ export function DashboardPage(): ReactElement {
     });
   }
 
+  function handleSessionPromptInputError(error: {
+    code: "max_files" | "max_file_size" | "accept";
+    message: string;
+  }): void {
+    if (error.code === "max_files") {
+      toast.error(
+        `You can attach up to ${MAX_SESSION_MESSAGE_IMAGE_COUNT} images per message.`,
+      );
+      return;
+    }
+    if (error.code === "max_file_size") {
+      toast.error(
+        `Each image must be ${Math.floor(MAX_SESSION_MESSAGE_IMAGE_BYTES / (1024 * 1024))}MB or smaller.`,
+      );
+      return;
+    }
+    if (error.code === "accept") {
+      toast.error("Only image files are supported.");
+      return;
+    }
+
+    toast.error(error.message);
+  }
+
   async function handleSessionPromptSubmit(
     promptMessage: PromptInputMessage,
   ): Promise<void> {
@@ -5118,11 +5225,22 @@ export function DashboardPage(): ReactElement {
                       <PromptInput
                         accept="image/*"
                         className="mt-4 shrink-0"
+                        maxFileSize={MAX_SESSION_MESSAGE_IMAGE_BYTES}
+                        maxFiles={MAX_SESSION_MESSAGE_IMAGE_COUNT}
+                        multiple
+                        onError={handleSessionPromptInputError}
                         onSubmit={(message) => {
                           void handleSessionPromptSubmit(message);
                         }}
                       >
                         <PromptInputBody>
+                          <SessionPromptAttachmentStrip
+                            disabled={
+                              isLoading ||
+                              isMutating ||
+                              sessionChatStatus === "streaming"
+                            }
+                          />
                           <PromptInputTextarea
                             placeholder="Message this session..."
                             onKeyDown={handleSessionPromptTextareaKeyDown}
@@ -5134,8 +5252,15 @@ export function DashboardPage(): ReactElement {
                         </PromptInputBody>
                         <PromptInputFooter
                           align="inline-end"
-                          className="self-end justify-end pb-2 pr-2"
+                          className="self-end justify-between pb-2 pr-2 pl-1"
                         >
+                          <SessionPromptAttachButton
+                            disabled={
+                              isLoading ||
+                              isMutating ||
+                              sessionChatStatus === "streaming"
+                            }
+                          />
                           <PromptInputSubmit
                             status={sessionChatStatus}
                             onStop={handleStopSessionPrompt}
@@ -6532,24 +6657,60 @@ function toSessionMessageImages(
   const images: SessionMessageImageInput[] = [];
 
   for (const file of files) {
-    const mediaType = file.mediaType?.trim();
-    if (!mediaType?.toLowerCase().startsWith("image/")) {
-      continue;
-    }
-
     const dataUrl = file.url?.trim();
     if (!dataUrl?.startsWith("data:")) {
+      continue;
+    }
+    const mediaType = resolveImageMediaType(file.mediaType, dataUrl);
+    if (!mediaType) {
       continue;
     }
 
     images.push({
       dataUrl,
       mediaType,
-      name: file.filename,
+      ...(file.filename?.trim()
+        ? {
+            name: file.filename.trim(),
+          }
+        : {}),
     });
   }
 
   return images;
+}
+
+function resolveImageMediaType(
+  explicitMediaType: string | undefined,
+  dataUrl: string,
+): string | undefined {
+  const normalizedExplicit = normalizeMediaType(explicitMediaType);
+  if (normalizedExplicit?.startsWith("image/")) {
+    return normalizedExplicit;
+  }
+
+  const dataUrlMediaType = extractDataUrlMediaType(dataUrl);
+  if (dataUrlMediaType?.startsWith("image/")) {
+    return dataUrlMediaType;
+  }
+
+  return undefined;
+}
+
+function normalizeMediaType(value: string | undefined): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized ? normalized : undefined;
+}
+
+function extractDataUrlMediaType(dataUrl: string): string | undefined {
+  const separatorIndex = dataUrl.indexOf(",");
+  if (separatorIndex <= 5) {
+    return undefined;
+  }
+
+  const header = dataUrl.slice(5, separatorIndex);
+  const mediaType = header.split(";")[0]?.trim().toLowerCase();
+  return mediaType || undefined;
 }
 
 function mapHistoryToSessionMessages(
