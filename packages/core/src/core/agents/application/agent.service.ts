@@ -1087,7 +1087,7 @@ function normalizeAgentsMarkdown(
 }
 
 function hasOrganizationSectionHeading(markdown: string): boolean {
-  return /^##\s+the organization\s*$/im.test(markdown);
+  return /the organization/i.test(markdown);
 }
 
 function rewriteSecondLevelSection(

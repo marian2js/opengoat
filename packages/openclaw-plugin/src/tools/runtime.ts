@@ -13,8 +13,20 @@ interface CoreModuleLoadAttempt {
 
 const CORE_MODULE_LOAD_ATTEMPTS: readonly CoreModuleLoadAttempt[] = [
   {
-    label: "bundled-local-core",
+    label: "bundled-local-core-src",
     load: () => import("../../../core/src/index.js"),
+  },
+  {
+    label: "bundled-local-core-dist",
+    load: () => import("../../../core/dist/index.js"),
+  },
+  {
+    label: "monorepo-dist-plugin-core-src",
+    load: () => import("../../../../../../core/src/index.js"),
+  },
+  {
+    label: "monorepo-dist-plugin-core-dist",
+    load: () => import("../../../../../../core/dist/index.js"),
   },
   {
     label: "@opengoat/core",
