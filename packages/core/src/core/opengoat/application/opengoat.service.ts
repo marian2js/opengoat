@@ -414,10 +414,12 @@ export class OpenGoatService {
     let openClawAgentEntriesById:
       | Map<string, OpenClawAgentPathEntry>
       | undefined;
+    let openClawInventoryAvailable = false;
     try {
       openClawAgentEntriesById = new Map(
         (await this.listOpenClawAgents(paths)).map((entry) => [entry.id, entry]),
       );
+      openClawInventoryAvailable = true;
     } catch (error) {
       warnings.push(
         `OpenClaw startup inventory check failed: ${toErrorMessage(error)}`,
@@ -426,15 +428,22 @@ export class OpenGoatService {
 
     try {
       localAgents = await this.agentService.listAgents(paths);
-      for (const agent of localAgents) {
-        const sync = await this.syncOpenClawAgentRegistration(paths, {
-          descriptor: agent,
-          existingEntry: openClawAgentEntriesById?.get(agent.id),
-        });
-        warnings.push(...sync.warnings);
-        if (agent.id === DEFAULT_AGENT_ID) {
-          ceoSynced = sync.synced;
-          ceoSyncCode = sync.code;
+      if (!openClawInventoryAvailable) {
+        warnings.push(
+          "OpenClaw startup registration sync skipped because agent inventory is unavailable.",
+        );
+        ceoSynced = localAgents.some((agent) => agent.id === DEFAULT_AGENT_ID);
+      } else {
+        for (const agent of localAgents) {
+          const sync = await this.syncOpenClawAgentRegistration(paths, {
+            descriptor: agent,
+            existingEntry: openClawAgentEntriesById?.get(agent.id),
+          });
+          warnings.push(...sync.warnings);
+          if (agent.id === DEFAULT_AGENT_ID) {
+            ceoSynced = sync.synced;
+            ceoSyncCode = sync.code;
+          }
         }
       }
     } catch (error) {
@@ -475,13 +484,6 @@ export class OpenGoatService {
     } catch (error) {
       warnings.push(
         `OpenGoat workspace command shim sync failed: ${toErrorMessage(error)}`,
-      );
-    }
-    try {
-      await this.ensureCeoBootstrapSingleUse(paths);
-    } catch (error) {
-      warnings.push(
-        `CEO bootstrap lifecycle sync failed: ${toErrorMessage(error)}`,
       );
     }
 
@@ -574,35 +576,26 @@ export class OpenGoatService {
       );
     }
     await this.syncOpenClawAgentExecutionPolicies(paths, [created.agent.id]);
-    try {
-      const workspaceBootstrap =
-        await this.agentService.ensureAgentWorkspaceBootstrap(paths, {
-          agentId: created.agent.id,
-          displayName: created.agent.displayName,
-          role:
-            options.role?.trim() ??
-            (created.alreadyExisted ? created.agent.role : ""),
-        }, {
-          syncBootstrapMarkdown: false,
-        });
-      created.createdPaths.push(...workspaceBootstrap.createdPaths);
-      created.skippedPaths.push(...workspaceBootstrap.skippedPaths);
-      created.skippedPaths.push(...workspaceBootstrap.removedPaths);
-    } catch (error) {
-      if (!created.alreadyExisted) {
-        await this.agentService.removeAgent(paths, created.agent.id);
-      }
-      throw new Error(
-        `Failed to update workspace bootstrap for "${
-          created.agent.id
-        }". ${toErrorMessage(error)}`,
-      );
-    }
-    if (created.agent.id === DEFAULT_AGENT_ID) {
+    if (!created.alreadyExisted) {
       try {
-        await this.ensureCeoBootstrapSingleUse(paths);
-      } catch {
-        // Keep agent creation non-blocking even if bootstrap lifecycle cleanup fails.
+        const workspaceBootstrap =
+          await this.agentService.ensureAgentWorkspaceBootstrap(paths, {
+            agentId: created.agent.id,
+            displayName: created.agent.displayName,
+            role: options.role?.trim() ?? "",
+          }, {
+            syncBootstrapMarkdown: false,
+          });
+        created.createdPaths.push(...workspaceBootstrap.createdPaths);
+        created.skippedPaths.push(...workspaceBootstrap.skippedPaths);
+        created.skippedPaths.push(...workspaceBootstrap.removedPaths);
+      } catch (error) {
+        await this.agentService.removeAgent(paths, created.agent.id);
+        throw new Error(
+          `Failed to update workspace bootstrap for "${
+            created.agent.id
+          }". ${toErrorMessage(error)}`,
+        );
       }
     }
     return {
@@ -848,17 +841,7 @@ export class OpenGoatService {
     options: OrchestrationRunOptions,
   ): Promise<OrchestrationRunResult> {
     const paths = this.pathsProvider.getPaths();
-    const result = await this.orchestrationService.runAgent(
-      paths,
-      agentId,
-      options,
-    );
-    try {
-      await this.ensureCeoBootstrapSingleUse(paths);
-    } catch {
-      // Best-effort cleanup; invocation result should still be returned.
-    }
-    return result;
+    return this.orchestrationService.runAgent(paths, agentId, options);
   }
 
   public async createTask(
@@ -1567,40 +1550,6 @@ export class OpenGoatService {
         error: toErrorMessage(error),
       };
     }
-  }
-
-  private async ensureCeoBootstrapSingleUse(
-    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
-  ): Promise<void> {
-    const agents = await this.agentService.listAgents(paths);
-    const ceoDescriptor = agents.find((agent) => agent.id === DEFAULT_AGENT_ID);
-    if (!ceoDescriptor) {
-      return;
-    }
-
-    const hasMultipleAgents = agents.length > 1;
-    const ceoSessions = await this.sessionService.listSessions(
-      paths,
-      DEFAULT_AGENT_ID,
-    );
-    const hasCeoSessions = ceoSessions.length > 0;
-    if (!hasCeoSessions && !hasMultipleAgents) {
-      return;
-    }
-
-    await this.agentService.ensureAgentWorkspaceBootstrap(
-      paths,
-      {
-        agentId: ceoDescriptor.id,
-        displayName: ceoDescriptor.displayName,
-        role: ceoDescriptor.role,
-      },
-      {
-        syncBootstrapMarkdown: false,
-        keepFirstRunSection: false,
-        removeBootstrapMarkdownWhenDisabled: true,
-      },
-    );
   }
 
   private resolveNowIso(): string {

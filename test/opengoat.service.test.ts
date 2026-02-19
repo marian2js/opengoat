@@ -1621,16 +1621,34 @@ describe("OpenGoatService", () => {
     await service.initialize();
 
     const bootstrapPath = path.join(root, "workspaces", "ceo", "BOOTSTRAP.md");
+    const agentsPath = path.join(root, "workspaces", "ceo", "AGENTS.md");
     await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
     await rm(bootstrapPath);
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
+    await writeFile(
+      agentsPath,
+      [
+        "## Every Session",
+        "",
+        "custom instructions",
+        "",
+        "## Another section",
+        "keep me",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
 
     const recreated = await service.createAgent("CEO");
     expect(recreated.alreadyExisted).toBe(true);
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
+    const agentsMarkdown = await readFile(agentsPath, "utf-8");
+    expect(agentsMarkdown).toContain("custom instructions");
+    expect(agentsMarkdown).toContain("## Another section");
+    expect(agentsMarkdown).toContain("keep me");
   });
 
-  it("removes recreated ceo bootstrap artifacts after the first ceo session", async () => {
+  it("does not mutate ceo bootstrap artifacts after the first ceo session", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -1664,10 +1682,11 @@ describe("OpenGoatService", () => {
 
     await service.syncRuntimeDefaults();
 
-    await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
+    await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
-    expect(agentsMarkdown).not.toContain("## First Run");
-    expect(agentsMarkdown).not.toContain("first-run-content");
+    expect(agentsMarkdown).toContain("## First Run");
+    expect(agentsMarkdown).toContain("first-run-content");
+    expect(agentsMarkdown).toContain("legacy session instructions");
     expect(agentsMarkdown).toContain("## Every Session");
   });
 
@@ -1740,7 +1759,7 @@ describe("OpenGoatService", () => {
       .toHaveLength(0);
   });
 
-  it("removes recreated ceo bootstrap artifacts when organization has multiple agents", async () => {
+  it("does not re-register ceo when OpenClaw inventory is unavailable", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -1794,7 +1813,14 @@ describe("OpenGoatService", () => {
         warning.includes("OpenClaw startup inventory check failed"),
       ),
     ).toBe(true);
-    expect(ceoCreateCallsAfter).toBeGreaterThan(ceoCreateCallsBefore);
+    expect(
+      sync.warnings.some((warning) =>
+        warning.includes(
+          "OpenClaw startup registration sync skipped because agent inventory is unavailable.",
+        ),
+      ),
+    ).toBe(true);
+    expect(ceoCreateCallsAfter).toBe(ceoCreateCallsBefore);
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
   });
 
