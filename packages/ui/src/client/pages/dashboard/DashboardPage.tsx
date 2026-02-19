@@ -11,10 +11,6 @@ import {
 } from "@/components/ai-elements/message";
 import {
   PromptInput,
-  PromptInputActionAddAttachments,
-  PromptInputActionMenu,
-  PromptInputActionMenuContent,
-  PromptInputActionMenuTrigger,
   PromptInputBody,
   PromptInputFooter,
   PromptInputSubmit,
@@ -46,7 +42,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { resolveAgentAvatarSource } from "@/lib/agent-avatar";
 import { cn } from "@/lib/utils";
 import {
@@ -822,21 +817,35 @@ function SessionPromptAttachButton({
   const isAtLimit = attachments.files.length >= MAX_SESSION_MESSAGE_IMAGE_COUNT;
 
   return (
-    <TooltipProvider>
-      <PromptInputActionMenu>
-        <PromptInputActionMenuTrigger
-          disabled={disabled || isAtLimit}
-          tooltip={
-            isAtLimit
-              ? `Maximum ${MAX_SESSION_MESSAGE_IMAGE_COUNT} images per message.`
-              : "Attach images"
-          }
-        />
-        <PromptInputActionMenuContent>
-          <PromptInputActionAddAttachments />
-        </PromptInputActionMenuContent>
-      </PromptInputActionMenu>
-    </TooltipProvider>
+    <Button
+      aria-label="Attach images"
+      className="h-8 w-8 text-muted-foreground"
+      disabled={disabled || isAtLimit}
+      onClick={() => {
+        attachments.openFileDialog();
+      }}
+      size="icon-sm"
+      title={
+        isAtLimit
+          ? `Maximum ${MAX_SESSION_MESSAGE_IMAGE_COUNT} images per message.`
+          : "Attach images"
+      }
+      type="button"
+      variant="ghost"
+    >
+      <Plus className="size-4" />
+    </Button>
+  );
+}
+
+function SessionPromptDropOverlay(): ReactElement {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-md border-2 border-dashed border-primary/60 bg-primary/10">
+      <div className="rounded-full bg-background/90 px-4 py-2 text-center shadow-sm">
+        <p className="font-medium text-sm text-foreground">Drop images here</p>
+        <p className="text-muted-foreground text-xs">PNG, JPG, WebP and more</p>
+      </div>
+    </div>
   );
 }
 
@@ -877,12 +886,15 @@ export function DashboardPage(): ReactElement {
   >({});
   const [sessionChatStatus, setSessionChatStatus] =
     useState<ChatStatus>("ready");
+  const [isSessionPromptDragActive, setSessionPromptDragActive] =
+    useState(false);
   const [sessionMessagesById, setSessionMessagesById] = useState<
     Record<string, SessionChatMessage[]>
   >({});
   const [sessionReasoningById, setSessionReasoningById] = useState<
     Record<string, SessionReasoningEvent[]>
   >({});
+  const sessionPromptDragDepthRef = useRef(0);
   const hydratedSessionIdsRef = useRef<Set<string>>(new Set());
   const attemptedSessionFetchAgentIdsRef = useRef<Set<string>>(new Set());
   const activeSessionRunAbortControllerRef = useRef<AbortController | null>(
@@ -3841,6 +3853,53 @@ export function DashboardPage(): ReactElement {
       : route.kind === "session"
       ? selectedSessionAgentId
       : null;
+  const handleSessionPromptDragEnter = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!dragEventHasFiles(event)) {
+        return;
+      }
+      sessionPromptDragDepthRef.current += 1;
+      setSessionPromptDragActive(true);
+    },
+    [],
+  );
+  const handleSessionPromptDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!dragEventHasFiles(event)) {
+        return;
+      }
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      if (!isSessionPromptDragActive) {
+        setSessionPromptDragActive(true);
+      }
+    },
+    [isSessionPromptDragActive],
+  );
+  const handleSessionPromptDragLeave = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!dragEventHasFiles(event)) {
+        return;
+      }
+      if (
+        event.currentTarget.contains(
+          event.relatedTarget as globalThis.Node | null,
+        )
+      ) {
+        return;
+      }
+      sessionPromptDragDepthRef.current = 0;
+      setSessionPromptDragActive(false);
+    },
+    [],
+  );
+  const handleSessionPromptDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (!dragEventHasFiles(event)) {
+      return;
+    }
+    sessionPromptDragDepthRef.current = 0;
+    setSessionPromptDragActive(false);
+  }, []);
   const handleSessionPromptTextareaKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
       if (sessionChatStatus !== "streaming") {
@@ -5267,50 +5326,66 @@ export function DashboardPage(): ReactElement {
                         <ConversationScrollButton />
                       </Conversation>
 
-                      <PromptInput
-                        accept="image/*"
-                        className="mt-4 shrink-0"
-                        maxFileSize={MAX_SESSION_MESSAGE_IMAGE_BYTES}
-                        maxFiles={MAX_SESSION_MESSAGE_IMAGE_COUNT}
-                        multiple
-                        globalDrop
-                        onError={handleSessionPromptInputError}
-                        onSubmit={(message) => {
-                          void handleSessionPromptSubmit(message);
-                        }}
+                      <div
+                        className="relative mt-4 shrink-0"
+                        onDragEnter={handleSessionPromptDragEnter}
+                        onDragLeave={handleSessionPromptDragLeave}
+                        onDragOver={handleSessionPromptDragOver}
+                        onDrop={handleSessionPromptDrop}
                       >
-                        <PromptInputBody>
-                          <SessionPromptAttachmentStrip
-                            disabled={
-                              isLoading ||
-                              isMutating ||
-                              sessionChatStatus === "streaming"
-                            }
-                          />
-                          <PromptInputTextarea
-                            placeholder="Message this session..."
-                            onKeyDown={handleSessionPromptTextareaKeyDown}
-                            disabled={isLoading || isMutating}
-                          />
-                        </PromptInputBody>
-                        <PromptInputFooter
-                          align="inline-end"
-                          className="self-end justify-between pb-2 pr-2 pl-1"
+                        <PromptInput
+                          accept="image/*"
+                          className={cn(
+                            "shrink-0 transition-colors",
+                            isSessionPromptDragActive &&
+                              "[&_[data-slot=input-group]]:border-primary/60 [&_[data-slot=input-group]]:bg-primary/5 [&_[data-slot=input-group]]:ring-1 [&_[data-slot=input-group]]:ring-primary/40",
+                          )}
+                          maxFileSize={MAX_SESSION_MESSAGE_IMAGE_BYTES}
+                          maxFiles={MAX_SESSION_MESSAGE_IMAGE_COUNT}
+                          multiple
+                          onError={handleSessionPromptInputError}
+                          onSubmit={(message) => {
+                            void handleSessionPromptSubmit(message);
+                          }}
                         >
-                          <SessionPromptAttachButton
-                            disabled={
-                              isLoading ||
-                              isMutating ||
-                              sessionChatStatus === "streaming"
-                            }
-                          />
-                          <PromptInputSubmit
-                            status={sessionChatStatus}
-                            onStop={handleStopSessionPrompt}
-                            disabled={isLoading || isMutating}
-                          />
-                        </PromptInputFooter>
-                      </PromptInput>
+                          <PromptInputBody>
+                            <SessionPromptAttachmentStrip
+                              disabled={
+                                isLoading ||
+                                isMutating ||
+                                sessionChatStatus === "streaming"
+                              }
+                            />
+                            <PromptInputTextarea
+                              className="!border-0 !border-b-0 !shadow-none"
+                              placeholder="Message this session..."
+                              onKeyDown={handleSessionPromptTextareaKeyDown}
+                              disabled={isLoading || isMutating}
+                            />
+                          </PromptInputBody>
+                          <PromptInputFooter
+                            align="block-end"
+                            className="items-center justify-between gap-2 !border-0 !border-t-0 bg-transparent px-2 pt-1 pb-2 shadow-none"
+                          >
+                            <SessionPromptAttachButton
+                              disabled={
+                                isLoading ||
+                                isMutating ||
+                                sessionChatStatus === "streaming"
+                              }
+                            />
+                            <PromptInputSubmit
+                              className="ml-auto"
+                              status={sessionChatStatus}
+                              onStop={handleStopSessionPrompt}
+                              disabled={isLoading || isMutating}
+                            />
+                          </PromptInputFooter>
+                        </PromptInput>
+                        {isSessionPromptDragActive ? (
+                          <SessionPromptDropOverlay />
+                        ) : null}
+                      </div>
                     </div>
                   ) : (
                     <div className="flex h-full min-h-[260px] flex-col items-center justify-center gap-3 rounded-xl border border-border/70 bg-background/40 px-6 text-center">
@@ -6703,6 +6778,13 @@ function persistSidebarAgentOrder(agentIds: string[]): void {
   } catch {
     // Non-fatal: sidebar order will fall back to default sorting.
   }
+}
+
+function dragEventHasFiles(event: { dataTransfer: DataTransfer | null }): boolean {
+  if (!event.dataTransfer) {
+    return false;
+  }
+  return [...event.dataTransfer.types].includes("Files");
 }
 
 function toSessionMessageImages(
