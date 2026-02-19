@@ -240,6 +240,7 @@ interface UiSettings {
   taskCronEnabled: boolean;
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
+  maxInProgressMinutes: number;
   maxParallelFlows: number;
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
   authentication: UiAuthenticationSettings;
@@ -480,10 +481,13 @@ const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
 const DEFAULT_AGENT_ID = "ceo";
 const DEFAULT_MAX_INACTIVITY_MINUTES = 30;
+const DEFAULT_MAX_IN_PROGRESS_MINUTES = 4 * 60;
 const DEFAULT_MAX_PARALLEL_FLOWS = 3;
 const TASK_CRON_INTERVAL_MINUTES = 1;
 const MIN_MAX_INACTIVITY_MINUTES = 1;
 const MAX_MAX_INACTIVITY_MINUTES = 10_080;
+const MIN_MAX_IN_PROGRESS_MINUTES = 1;
+const MAX_MAX_IN_PROGRESS_MINUTES = 10_080;
 const MIN_MAX_PARALLEL_FLOWS = 1;
 const MAX_MAX_PARALLEL_FLOWS = 32;
 const DEFAULT_LOG_STREAM_LIMIT = 300;
@@ -516,6 +520,7 @@ function defaultUiSettings(): UiSettings {
     taskCronEnabled: true,
     notifyManagersOfInactiveAgents: true,
     maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
+    maxInProgressMinutes: DEFAULT_MAX_IN_PROGRESS_MINUTES,
     maxParallelFlows: DEFAULT_MAX_PARALLEL_FLOWS,
     inactiveAgentNotificationTarget: "all-managers",
     authentication: defaultAuthenticationSettings(),
@@ -557,6 +562,25 @@ function resolveMaxParallelFlowsValue(value: unknown): number {
   }
   if (parsed > MAX_MAX_PARALLEL_FLOWS) {
     return MAX_MAX_PARALLEL_FLOWS;
+  }
+  return parsed;
+}
+
+function resolveMaxInProgressMinutesValue(value: unknown): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
+    return DEFAULT_MAX_IN_PROGRESS_MINUTES;
+  }
+  if (parsed < MIN_MAX_IN_PROGRESS_MINUTES) {
+    return MIN_MAX_IN_PROGRESS_MINUTES;
+  }
+  if (parsed > MAX_MAX_IN_PROGRESS_MINUTES) {
+    return MAX_MAX_IN_PROGRESS_MINUTES;
   }
   return parsed;
 }
@@ -606,6 +630,9 @@ function normalizeUiSettings(
         : defaults.notifyManagersOfInactiveAgents,
     maxInactivityMinutes: resolveMaxInactivityMinutesValue(
       raw.maxInactivityMinutes,
+    ),
+    maxInProgressMinutes: resolveMaxInProgressMinutesValue(
+      raw.maxInProgressMinutes,
     ),
     maxParallelFlows: resolveMaxParallelFlowsValue(raw.maxParallelFlows),
     inactiveAgentNotificationTarget: resolveInactiveAgentNotificationTarget(
@@ -698,6 +725,9 @@ export function DashboardPage(): ReactElement {
   >(null);
   const [maxInactivityMinutesInput, setMaxInactivityMinutesInput] = useState(
     String(DEFAULT_MAX_INACTIVITY_MINUTES),
+  );
+  const [maxInProgressMinutesInput, setMaxInProgressMinutesInput] = useState(
+    String(DEFAULT_MAX_IN_PROGRESS_MINUTES),
   );
   const [maxParallelFlowsInput, setMaxParallelFlowsInput] = useState(
     String(DEFAULT_MAX_PARALLEL_FLOWS),
@@ -933,6 +963,7 @@ export function DashboardPage(): ReactElement {
       });
       setTaskCronEnabledInput(normalizedSettings.taskCronEnabled);
       setMaxInactivityMinutesInput(String(normalizedSettings.maxInactivityMinutes));
+      setMaxInProgressMinutesInput(String(normalizedSettings.maxInProgressMinutes));
       setMaxParallelFlowsInput(String(normalizedSettings.maxParallelFlows));
       setNotifyManagersOfInactiveAgentsInput(
         normalizedSettings.notifyManagersOfInactiveAgents,
@@ -2454,6 +2485,10 @@ export function DashboardPage(): ReactElement {
       maxInactivityMinutesInput.trim(),
       10,
     );
+    const parsedMaxInProgressMinutes = Number.parseInt(
+      maxInProgressMinutesInput.trim(),
+      10,
+    );
     const parsedMaxParallelFlows = Number.parseInt(
       maxParallelFlowsInput.trim(),
       10,
@@ -2462,6 +2497,10 @@ export function DashboardPage(): ReactElement {
       Number.isFinite(parsedMaxInactivityMinutes) &&
       parsedMaxInactivityMinutes >= MIN_MAX_INACTIVITY_MINUTES &&
       parsedMaxInactivityMinutes <= MAX_MAX_INACTIVITY_MINUTES;
+    const isMaxInProgressValid =
+      Number.isFinite(parsedMaxInProgressMinutes) &&
+      parsedMaxInProgressMinutes >= MIN_MAX_IN_PROGRESS_MINUTES &&
+      parsedMaxInProgressMinutes <= MAX_MAX_IN_PROGRESS_MINUTES;
     const isMaxParallelFlowsValid =
       Number.isFinite(parsedMaxParallelFlows) &&
       parsedMaxParallelFlows >= MIN_MAX_PARALLEL_FLOWS &&
@@ -2482,8 +2521,16 @@ export function DashboardPage(): ReactElement {
       );
       return;
     }
+    if (taskCronEnabledInput && !isMaxInProgressValid) {
+      toast.error(
+        `In progress timeout must be an integer between ${MIN_MAX_IN_PROGRESS_MINUTES} and ${MAX_MAX_IN_PROGRESS_MINUTES} minutes.`,
+      );
+      return;
+    }
     const fallbackMaxInactivityMinutes =
       state?.settings.maxInactivityMinutes ?? DEFAULT_MAX_INACTIVITY_MINUTES;
+    const fallbackMaxInProgressMinutes =
+      state?.settings.maxInProgressMinutes ?? DEFAULT_MAX_IN_PROGRESS_MINUTES;
     const fallbackMaxParallelFlows =
       state?.settings.maxParallelFlows ?? DEFAULT_MAX_PARALLEL_FLOWS;
     const resolvedMaxInactivityMinutes = isMaxInactivityValid
@@ -2492,6 +2539,9 @@ export function DashboardPage(): ReactElement {
     const resolvedMaxParallelFlows = isMaxParallelFlowsValid
       ? parsedMaxParallelFlows
       : fallbackMaxParallelFlows;
+    const resolvedMaxInProgressMinutes = isMaxInProgressValid
+      ? parsedMaxInProgressMinutes
+      : fallbackMaxInProgressMinutes;
 
     setMutating(true);
     try {
@@ -2499,6 +2549,7 @@ export function DashboardPage(): ReactElement {
         taskCronEnabled: boolean;
         notifyManagersOfInactiveAgents: boolean;
         maxInactivityMinutes: number;
+        maxInProgressMinutes: number;
         maxParallelFlows: number;
         inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
         authentication?: {
@@ -2511,6 +2562,7 @@ export function DashboardPage(): ReactElement {
         taskCronEnabled: taskCronEnabledInput,
         notifyManagersOfInactiveAgents: notifyManagersOfInactiveAgentsInput,
         maxInactivityMinutes: resolvedMaxInactivityMinutes,
+        maxInProgressMinutes: resolvedMaxInProgressMinutes,
         maxParallelFlows: resolvedMaxParallelFlows,
         inactiveAgentNotificationTarget:
           inactiveAgentNotificationTargetInput,
@@ -2548,8 +2600,8 @@ export function DashboardPage(): ReactElement {
         : response.settings.ceoBootstrapPending
           ? "Task automation checks are waiting for the first CEO message."
         : notifyManagersOfInactiveAgentsInput
-          ? `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; inactivity notifications enabled (${resolvedMaxInactivityMinutes} minutes).`
-          : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; inactivity notifications disabled.`;
+          ? `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; in-progress timeout set to ${resolvedMaxInProgressMinutes} minutes; inactivity notifications enabled (${resolvedMaxInactivityMinutes} minutes).`
+          : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; in-progress timeout set to ${resolvedMaxInProgressMinutes} minutes; inactivity notifications disabled.`;
       toast.success(response.message ?? statusMessage);
       await refreshAuthenticationStatus();
     } catch (requestError) {
@@ -2568,6 +2620,7 @@ export function DashboardPage(): ReactElement {
       taskCronEnabled: boolean;
       notifyManagersOfInactiveAgents: boolean;
       maxInactivityMinutes: number;
+      maxInProgressMinutes: number;
       maxParallelFlows: number;
       inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
       authentication?: {
@@ -2605,6 +2658,9 @@ export function DashboardPage(): ReactElement {
     setTaskCronEnabledInput(normalizedSettings.taskCronEnabled);
     setMaxInactivityMinutesInput(
       String(normalizedSettings.maxInactivityMinutes),
+    );
+    setMaxInProgressMinutesInput(
+      String(normalizedSettings.maxInProgressMinutes),
     );
     setMaxParallelFlowsInput(String(normalizedSettings.maxParallelFlows));
     setNotifyManagersOfInactiveAgentsInput(
@@ -4971,8 +5027,11 @@ export function DashboardPage(): ReactElement {
                       notifyManagersOfInactiveAgentsInput
                     }
                     maxInactivityMinutesInput={maxInactivityMinutesInput}
+                    maxInProgressMinutesInput={maxInProgressMinutesInput}
                     minMaxInactivityMinutes={MIN_MAX_INACTIVITY_MINUTES}
                     maxMaxInactivityMinutes={MAX_MAX_INACTIVITY_MINUTES}
+                    minMaxInProgressMinutes={MIN_MAX_IN_PROGRESS_MINUTES}
+                    maxMaxInProgressMinutes={MAX_MAX_IN_PROGRESS_MINUTES}
                     maxParallelFlowsInput={maxParallelFlowsInput}
                     minMaxParallelFlows={MIN_MAX_PARALLEL_FLOWS}
                     maxMaxParallelFlows={MAX_MAX_PARALLEL_FLOWS}
@@ -5016,6 +5075,9 @@ export function DashboardPage(): ReactElement {
                     }}
                     onMaxInactivityMinutesInputChange={(value) => {
                       setMaxInactivityMinutesInput(value);
+                    }}
+                    onMaxInProgressMinutesInputChange={(value) => {
+                      setMaxInProgressMinutesInput(value);
                     }}
                     onInactiveAgentNotificationTargetInputChange={(nextValue) => {
                       setInactiveAgentNotificationTargetInput(nextValue);

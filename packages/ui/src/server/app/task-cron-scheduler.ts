@@ -5,6 +5,7 @@ import {
   isCeoBootstrapPending,
   parseInactiveAgentNotificationTarget,
   parseMaxInactivityMinutes,
+  parseMaxInProgressMinutes,
   parseMaxParallelFlows,
   parseNotifyManagersOfInactiveAgents,
   parseTaskCronEnabled,
@@ -37,6 +38,9 @@ export function createTaskCronScheduler(
       setMaxInactivityMinutes: () => {
         // no-op when runtime task cron is unavailable.
       },
+      setMaxInProgressMinutes: () => {
+        // no-op when runtime task cron is unavailable.
+      },
       setMaxParallelFlows: () => {
         // no-op when runtime task cron is unavailable.
       },
@@ -59,6 +63,9 @@ export function createTaskCronScheduler(
   let maxInactivityMinutes =
     parseMaxInactivityMinutes(initialSettings.maxInactivityMinutes) ??
     defaultUiServerSettings().maxInactivityMinutes;
+  let maxInProgressMinutes =
+    parseMaxInProgressMinutes(initialSettings.maxInProgressMinutes) ??
+    defaultUiServerSettings().maxInProgressMinutes;
   let maxParallelFlows =
     parseMaxParallelFlows(initialSettings.maxParallelFlows) ??
     defaultUiServerSettings().maxParallelFlows;
@@ -88,6 +95,9 @@ export function createTaskCronScheduler(
     const persistedMaxInactivityMinutes =
       parseMaxInactivityMinutes(persisted.maxInactivityMinutes) ??
       maxInactivityMinutes;
+    const persistedMaxInProgressMinutes =
+      parseMaxInProgressMinutes(persisted.maxInProgressMinutes) ??
+      maxInProgressMinutes;
     const persistedMaxParallelFlows =
       parseMaxParallelFlows(persisted.maxParallelFlows) ?? maxParallelFlows;
     const persistedNotificationTarget =
@@ -100,6 +110,8 @@ export function createTaskCronScheduler(
       persistedNotifyManagers !== notifyManagersOfInactiveAgents;
     const hasMaxInactivityChange =
       persistedMaxInactivityMinutes !== maxInactivityMinutes;
+    const hasMaxInProgressChange =
+      persistedMaxInProgressMinutes !== maxInProgressMinutes;
     const hasMaxParallelFlowsChange =
       persistedMaxParallelFlows !== maxParallelFlows;
     const hasNotificationTargetChange =
@@ -108,6 +120,7 @@ export function createTaskCronScheduler(
       !hasTaskCronEnabledChange &&
       !hasNotifyManagersChange &&
       !hasMaxInactivityChange &&
+      !hasMaxInProgressChange &&
       !hasMaxParallelFlowsChange &&
       !hasNotificationTargetChange
     ) {
@@ -117,6 +130,7 @@ export function createTaskCronScheduler(
     taskCronEnabled = persistedTaskCronEnabled;
     notifyManagersOfInactiveAgents = persistedNotifyManagers;
     maxInactivityMinutes = persistedMaxInactivityMinutes;
+    maxInProgressMinutes = persistedMaxInProgressMinutes;
     maxParallelFlows = persistedMaxParallelFlows;
     inactiveAgentNotificationTarget = persistedNotificationTarget;
     if (hasTaskCronEnabledChange) {
@@ -127,6 +141,7 @@ export function createTaskCronScheduler(
         taskCronEnabled,
         notifyManagersOfInactiveAgents,
         maxInactivityMinutes,
+        maxInProgressMinutes,
         maxParallelFlows,
         inactiveAgentNotificationTarget,
       },
@@ -150,6 +165,7 @@ export function createTaskCronScheduler(
       }
       const cycle = await service.runTaskCronCycle?.({
         inactiveMinutes: maxInactivityMinutes,
+        inProgressMinutes: maxInProgressMinutes,
         notificationTarget: inactiveAgentNotificationTarget,
         notifyInactiveAgents: notifyManagersOfInactiveAgents,
         maxParallelFlows,
@@ -160,6 +176,7 @@ export function createTaskCronScheduler(
             ranAt: cycle.ranAt,
             scanned: cycle.scannedTasks,
             todo: cycle.todoTasks,
+            doing: cycle.doingTasks,
             blocked: cycle.blockedTasks,
             inactive: cycle.inactiveAgents,
             maxParallelFlows,
@@ -172,7 +189,7 @@ export function createTaskCronScheduler(
           timestamp: new Date().toISOString(),
           level: cycle.failed > 0 ? "warn" : "info",
           source: "opengoat",
-          message: `[task-cron] cycle completed ran=${cycle.ranAt} scanned=${cycle.scannedTasks} todo=${cycle.todoTasks} blocked=${cycle.blockedTasks} inactive=${cycle.inactiveAgents} sent=${cycle.sent} failed=${cycle.failed}`,
+          message: `[task-cron] cycle completed ran=${cycle.ranAt} scanned=${cycle.scannedTasks} todo=${cycle.todoTasks} doing=${cycle.doingTasks} blocked=${cycle.blockedTasks} inactive=${cycle.inactiveAgents} sent=${cycle.sent} failed=${cycle.failed}`,
         });
         for (const dispatch of cycle.dispatches ?? []) {
           logs.append({
@@ -316,6 +333,25 @@ export function createTaskCronScheduler(
         level: "info",
         source: "opengoat",
         message: `[task-cron] inactivity threshold updated to ${maxInactivityMinutes} minute(s).`,
+      });
+    },
+    setMaxInProgressMinutes: (nextMaxInProgressMinutes: number) => {
+      const parsed = parseMaxInProgressMinutes(nextMaxInProgressMinutes);
+      if (!parsed || parsed === maxInProgressMinutes) {
+        return;
+      }
+      maxInProgressMinutes = parsed;
+      app.log.info(
+        {
+          maxInProgressMinutes,
+        },
+        "[task-cron] in-progress timeout updated",
+      );
+      logs.append({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "opengoat",
+        message: `[task-cron] in-progress timeout updated to ${maxInProgressMinutes} minute(s).`,
       });
     },
     setMaxParallelFlows: (nextMaxParallelFlows: number) => {

@@ -205,6 +205,7 @@ export interface OpenClawUiService {
   addTaskWorklog?: (actorId: string, taskId: string, content: string) => Promise<TaskRecord>;
   runTaskCronCycle?: (options?: {
     inactiveMinutes?: number;
+    inProgressMinutes?: number;
     notificationTarget?: InactiveAgentNotificationTarget;
     notifyInactiveAgents?: boolean;
     maxParallelFlows?: number;
@@ -286,6 +287,7 @@ export interface TaskCronRunResult {
   ranAt: string;
   scannedTasks: number;
   todoTasks: number;
+  doingTasks: number;
   blockedTasks: number;
   inactiveAgents: number;
   sent: number;
@@ -294,7 +296,7 @@ export interface TaskCronRunResult {
 }
 
 export interface TaskCronDispatchResult {
-  kind: "todo" | "pending" | "blocked" | "inactive";
+  kind: "todo" | "doing" | "pending" | "blocked" | "inactive";
   targetAgentId: string;
   sessionRef: string;
   taskId?: string;
@@ -308,6 +310,7 @@ export interface UiServerSettings {
   taskCronEnabled: boolean;
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
+  maxInProgressMinutes: number;
   maxParallelFlows: number;
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
   authentication: UiServerAuthenticationSettings;
@@ -334,6 +337,7 @@ export interface UiServerSettingsResponse {
   taskCronEnabled: boolean;
   notifyManagersOfInactiveAgents: boolean;
   maxInactivityMinutes: number;
+  maxInProgressMinutes: number;
   maxParallelFlows: number;
   inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
   authentication: UiAuthenticationSettingsResponse;
@@ -515,6 +519,7 @@ export interface TaskCronScheduler {
   setTaskCronEnabled: (enabled: boolean) => void;
   setNotifyManagersOfInactiveAgents: (enabled: boolean) => void;
   setMaxInactivityMinutes: (maxInactivityMinutes: number) => void;
+  setMaxInProgressMinutes: (maxInProgressMinutes: number) => void;
   setMaxParallelFlows: (maxParallelFlows: number) => void;
   setInactiveAgentNotificationTarget: (
     target: InactiveAgentNotificationTarget,

@@ -21,8 +21,11 @@ interface SettingsPageProps {
   taskCronEnabledInput: boolean;
   notifyManagersOfInactiveAgentsInput: boolean;
   maxInactivityMinutesInput: string;
+  maxInProgressMinutesInput: string;
   minMaxInactivityMinutes: number;
   maxMaxInactivityMinutes: number;
+  minMaxInProgressMinutes: number;
+  maxMaxInProgressMinutes: number;
   maxParallelFlowsInput: string;
   minMaxParallelFlows: number;
   maxMaxParallelFlows: number;
@@ -45,6 +48,7 @@ interface SettingsPageProps {
   onMaxParallelFlowsInputChange: (value: string) => void;
   onNotifyManagersOfInactiveAgentsChange: (checked: boolean) => void;
   onMaxInactivityMinutesInputChange: (value: string) => void;
+  onMaxInProgressMinutesInputChange: (value: string) => void;
   onInactiveAgentNotificationTargetInputChange: (
     nextValue: InactiveAgentNotificationTarget,
   ) => void;
@@ -66,8 +70,11 @@ export function SettingsPage({
   taskCronEnabledInput,
   notifyManagersOfInactiveAgentsInput,
   maxInactivityMinutesInput,
+  maxInProgressMinutesInput,
   minMaxInactivityMinutes,
   maxMaxInactivityMinutes,
+  minMaxInProgressMinutes,
+  maxMaxInProgressMinutes,
   maxParallelFlowsInput,
   minMaxParallelFlows,
   maxMaxParallelFlows,
@@ -90,6 +97,7 @@ export function SettingsPage({
   onMaxParallelFlowsInputChange,
   onNotifyManagersOfInactiveAgentsChange,
   onMaxInactivityMinutesInputChange,
+  onMaxInProgressMinutesInputChange,
   onInactiveAgentNotificationTargetInputChange,
   onUiAuthenticationEnabledChange,
   onUiAuthenticationUsernameInputChange,
@@ -137,8 +145,8 @@ export function SettingsPage({
             </h2>
             <p className="text-xs text-muted-foreground">
               Keep this on to run recurring background checks. These checks
-              drive task follow-ups (like todo and blocked reminders) and
-              optional inactivity alerts.
+              drive task follow-ups (todo, in-progress timeout reminders, and
+              blocked reminders) and optional inactivity alerts.
             </p>
             <p className="text-xs text-muted-foreground">
               Check cadence: every {taskCronIntervalMinutes} minute.
@@ -197,6 +205,36 @@ export function SettingsPage({
             <p className="text-xs text-muted-foreground">
               Controls how many task automation flows can run at the same time.
               Higher values increase throughput.
+            </p>
+          </div>
+
+          <Separator className="bg-border/50" />
+
+          <div className="space-y-3">
+            <label
+              className="text-sm font-medium text-foreground"
+              htmlFor="maxInProgressMinutes"
+            >
+              In Progress Timeout
+            </label>
+            <div className="flex max-w-sm items-center gap-3">
+              <Input
+                id="maxInProgressMinutes"
+                type="number"
+                min={minMaxInProgressMinutes}
+                max={maxMaxInProgressMinutes}
+                step={1}
+                value={maxInProgressMinutesInput}
+                disabled={!taskCronEnabledInput || isMutating || isLoading}
+                onChange={(event) => {
+                  onMaxInProgressMinutesInputChange(event.target.value);
+                }}
+              />
+              <span className="text-sm text-muted-foreground">minutes</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              If a task stays in <strong>In progress</strong> longer than this
+              timeout, the assignee gets a reminder and the countdown restarts.
             </p>
           </div>
 
@@ -312,13 +350,13 @@ export function SettingsPage({
           ) : !taskCronEnabledInput ? (
             <p className="text-xs text-muted-foreground">
               Background checks are paused. Enable task automation above to
-              resume todo, blocked, and inactivity checks.
+              resume todo, in-progress timeout, blocked, and inactivity checks.
             </p>
           ) : !notifyManagersOfInactiveAgentsInput ? (
             <p className="text-xs text-muted-foreground">
               Task automation is still running every {taskCronIntervalMinutes}{" "}
-              minute for todo and blocked follow-ups. Only inactivity alerts are
-              paused.
+              minute for todo, in-progress timeout, and blocked follow-ups.
+              Only inactivity alerts are paused.
             </p>
           ) : null}
         </div>
