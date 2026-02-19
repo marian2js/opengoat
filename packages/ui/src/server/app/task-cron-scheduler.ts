@@ -3,18 +3,19 @@ import { DEFAULT_TASK_CHECK_FREQUENCY_MINUTES } from "./constants.js";
 import {
   defaultUiServerSettings,
   isCeoBootstrapPending,
-  parseInactiveAgentNotificationTarget,
-  parseBooleanSetting,
-  parseMaxInactivityMinutes,
   parseMaxInProgressMinutes,
   parseMaxParallelFlows,
-  parseTopDownOpenTasksThreshold,
   parseTaskCronEnabled,
   readUiServerSettings,
 } from "./settings.js";
-import { formatUiLogQuotedPreview } from "./text.js";
+import { buildTaskCronCycleOptions } from "./task-cron-scheduler/cycle-options.js";
+import { formatTaskCronDispatchLogMessage } from "./task-cron-scheduler/dispatch-log.js";
+import {
+  describeTaskDelegationStrategies,
+  isSameTaskDelegationStrategies,
+  normalizeTaskDelegationStrategies,
+} from "./task-cron-scheduler/strategies/index.js";
 import type {
-  TaskCronDispatchResult,
   OpenClawUiService,
   TaskCronScheduler,
   UiTaskDelegationStrategiesSettings,
@@ -136,27 +137,13 @@ export function createTaskCronScheduler(
         schedule();
         return;
       }
-      const topDownTaskDelegation = taskDelegationStrategies.topDown;
-      const bottomUpTaskDelegation = taskDelegationStrategies.bottomUp;
-      const cycle = await service.runTaskCronCycle?.({
-        inactiveMinutes: bottomUpTaskDelegation.maxInactivityMinutes,
-        inProgressMinutes: maxInProgressMinutes,
-        notificationTarget: bottomUpTaskDelegation.inactiveAgentNotificationTarget,
-        notifyInactiveAgents: bottomUpTaskDelegation.enabled,
-        delegationStrategies: {
-          topDown: {
-            enabled: topDownTaskDelegation.enabled,
-            openTasksThreshold: topDownTaskDelegation.openTasksThreshold,
-          },
-          bottomUp: {
-            enabled: bottomUpTaskDelegation.enabled,
-            inactiveMinutes: bottomUpTaskDelegation.maxInactivityMinutes,
-            notificationTarget:
-              bottomUpTaskDelegation.inactiveAgentNotificationTarget,
-          },
-        },
-        maxParallelFlows,
-      });
+      const cycle = await service.runTaskCronCycle?.(
+        buildTaskCronCycleOptions({
+          taskDelegationStrategies,
+          maxInProgressMinutes,
+          maxParallelFlows,
+        }),
+      );
       if (cycle) {
         const doingTasks = cycle.doingTasks ?? 0;
         app.log.info(
@@ -305,17 +292,11 @@ export function createTaskCronScheduler(
         },
         "[task-cron] task delegation strategies updated",
       );
-      const topDownTaskDelegation = taskDelegationStrategies.topDown;
-      const bottomUpTaskDelegation = taskDelegationStrategies.bottomUp;
       logs.append({
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `[task-cron] top-down task delegation ${
-          topDownTaskDelegation.enabled ? "enabled" : "disabled"
-        } (open task threshold ${topDownTaskDelegation.openTasksThreshold}); bottom-up task delegation ${
-          bottomUpTaskDelegation.enabled ? "enabled" : "disabled"
-        } (max inactivity ${bottomUpTaskDelegation.maxInactivityMinutes}m, audience ${bottomUpTaskDelegation.inactiveAgentNotificationTarget}).`,
+        message: `[task-cron] ${describeTaskDelegationStrategies(taskDelegationStrategies)}.`,
       });
     },
     setMaxInProgressMinutes: (nextMaxInProgressMinutes: number) => {
@@ -364,64 +345,4 @@ export function createTaskCronScheduler(
       stopBootstrapCheck();
     },
   };
-}
-
-function formatTaskCronDispatchLogMessage(
-  dispatch: TaskCronDispatchResult,
-): string {
-  const messagePreview = formatUiLogQuotedPreview(dispatch.message ?? "");
-  const taskSuffix = dispatch.taskId ? ` task=${dispatch.taskId}` : "";
-  const subjectSuffix = dispatch.subjectAgentId
-    ? ` subject=@${dispatch.subjectAgentId}`
-    : "";
-  const previewSuffix = messagePreview ? ` message="${messagePreview}"` : "";
-  const sessionSuffix = ` session=${dispatch.sessionRef}`;
-  const target = `@${dispatch.targetAgentId}`;
-  if (!dispatch.ok) {
-    const errorPreview = formatUiLogQuotedPreview(dispatch.error ?? "", 160);
-    const errorSuffix = errorPreview ? ` error="${errorPreview}"` : "";
-    return `[task-cron] Failed to deliver ${dispatch.kind} message to ${target}.${taskSuffix}${subjectSuffix}${sessionSuffix}${previewSuffix}${errorSuffix}`;
-  }
-  return `[task-cron] Agent ${target} received ${dispatch.kind} message.${taskSuffix}${subjectSuffix}${sessionSuffix}${previewSuffix}`;
-}
-
-function normalizeTaskDelegationStrategies(
-  value: Partial<UiTaskDelegationStrategiesSettings> | undefined,
-  fallback: UiTaskDelegationStrategiesSettings,
-): UiTaskDelegationStrategiesSettings {
-  const topDown = value?.topDown;
-  const bottomUp = value?.bottomUp;
-
-  return {
-    topDown: {
-      enabled: parseBooleanSetting(topDown?.enabled) ?? fallback.topDown.enabled,
-      openTasksThreshold:
-        parseTopDownOpenTasksThreshold(topDown?.openTasksThreshold) ??
-        fallback.topDown.openTasksThreshold,
-    },
-    bottomUp: {
-      enabled: parseBooleanSetting(bottomUp?.enabled) ?? fallback.bottomUp.enabled,
-      maxInactivityMinutes:
-        parseMaxInactivityMinutes(bottomUp?.maxInactivityMinutes) ??
-        fallback.bottomUp.maxInactivityMinutes,
-      inactiveAgentNotificationTarget:
-        parseInactiveAgentNotificationTarget(
-          bottomUp?.inactiveAgentNotificationTarget,
-        ) ?? fallback.bottomUp.inactiveAgentNotificationTarget,
-    },
-  };
-}
-
-function isSameTaskDelegationStrategies(
-  left: UiTaskDelegationStrategiesSettings,
-  right: UiTaskDelegationStrategiesSettings,
-): boolean {
-  return (
-    left.topDown.enabled === right.topDown.enabled &&
-    left.topDown.openTasksThreshold === right.topDown.openTasksThreshold &&
-    left.bottomUp.enabled === right.bottomUp.enabled &&
-    left.bottomUp.maxInactivityMinutes === right.bottomUp.maxInactivityMinutes &&
-    left.bottomUp.inactiveAgentNotificationTarget ===
-      right.bottomUp.inactiveAgentNotificationTarget
-  );
 }
