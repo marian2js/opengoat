@@ -1572,18 +1572,19 @@ export class OpenGoatService {
   private async ensureCeoBootstrapSingleUse(
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
   ): Promise<void> {
+    const agents = await this.agentService.listAgents(paths);
+    const ceoDescriptor = agents.find((agent) => agent.id === DEFAULT_AGENT_ID);
+    if (!ceoDescriptor) {
+      return;
+    }
+
+    const hasMultipleAgents = agents.length > 1;
     const ceoSessions = await this.sessionService.listSessions(
       paths,
       DEFAULT_AGENT_ID,
     );
-    if (ceoSessions.length === 0) {
-      return;
-    }
-
-    const ceoDescriptor = (await this.agentService.listAgents(paths)).find(
-      (agent) => agent.id === DEFAULT_AGENT_ID,
-    );
-    if (!ceoDescriptor) {
+    const hasCeoSessions = ceoSessions.length > 0;
+    if (!hasCeoSessions && !hasMultipleAgents) {
       return;
     }
 
@@ -2561,10 +2562,16 @@ function parseLooseJson(raw: string): unknown {
     return undefined;
   }
 
-  try {
-    return JSON.parse(trimmed) as unknown;
-  } catch {
-    // continue
+  const exact = tryParseJson(trimmed);
+  if (exact !== undefined) {
+    return exact;
+  }
+
+  for (const line of trimmed.split(/\r?\n/)) {
+    const parsedLine = tryParseJson(line.trim());
+    if (parsedLine !== undefined) {
+      return parsedLine;
+    }
   }
 
   const starts = dedupeNumbers([
@@ -2579,10 +2586,75 @@ function parseLooseJson(raw: string): unknown {
     if (!candidate) {
       continue;
     }
-    try {
-      return JSON.parse(candidate) as unknown;
-    } catch {
-      // keep trying candidates
+    const parsedCandidate = tryParseJson(candidate);
+    if (parsedCandidate !== undefined) {
+      return parsedCandidate;
+    }
+
+    const balancedCandidate = extractBalancedJsonCandidate(trimmed, startIndex);
+    if (!balancedCandidate) {
+      continue;
+    }
+    const parsedBalancedCandidate = tryParseJson(balancedCandidate);
+    if (parsedBalancedCandidate !== undefined) {
+      return parsedBalancedCandidate;
+    }
+  }
+
+  return undefined;
+}
+
+function tryParseJson(raw: string): unknown {
+  if (!raw) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function extractBalancedJsonCandidate(
+  raw: string,
+  startIndex: number,
+): string | undefined {
+  const opening = raw[startIndex];
+  if (opening !== "{" && opening !== "[") {
+    return undefined;
+  }
+  const closing = opening === "{" ? "}" : "]";
+  let depth = 0;
+  let inString = false;
+  let escaping = false;
+
+  for (let index = startIndex; index < raw.length; index += 1) {
+    const char = raw[index];
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+      } else if (char === "\\") {
+        escaping = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+    if (char === opening) {
+      depth += 1;
+      continue;
+    }
+    if (char !== closing) {
+      continue;
+    }
+    depth -= 1;
+    if (depth === 0) {
+      return raw.slice(startIndex, index + 1).trim();
     }
   }
 

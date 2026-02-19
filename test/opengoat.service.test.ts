@@ -1671,6 +1671,133 @@ describe("OpenGoatService", () => {
     expect(agentsMarkdown).toContain("## Every Session");
   });
 
+  it("parses noisy OpenClaw JSON list output without re-registering ceo", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const commandRunner = createRuntimeDefaultsCommandRunner(
+      root,
+      async (request) => {
+        if (
+          request.args[0] === "skills" &&
+          request.args[1] === "list" &&
+          request.args.includes("--json")
+        ) {
+          return {
+            code: 0,
+            stdout: [
+              "[openclaw] preparing skills payload",
+              JSON.stringify({
+                workspaceDir: path.join(root, "openclaw-workspace"),
+                managedSkillsDir: path.join(root, "openclaw-managed-skills"),
+                skills: [],
+              }),
+              "[openclaw] done",
+            ].join("\n"),
+            stderr: "",
+          };
+        }
+        if (
+          request.args[0] === "agents" &&
+          request.args[1] === "list" &&
+          request.args.includes("--json")
+        ) {
+          return {
+            code: 0,
+            stdout: [
+              "OpenClaw inventory start",
+              JSON.stringify([
+                {
+                  id: "ceo",
+                  workspace: path.join(root, "workspaces", "ceo"),
+                  agentDir: path.join(root, "agents", "ceo"),
+                },
+              ]),
+              "OpenClaw inventory end",
+            ].join("\n"),
+            stderr: "",
+          };
+        }
+        return undefined;
+      },
+    );
+
+    const { service, provider } = createService(
+      root,
+      new FakeOpenClawProvider(),
+      commandRunner,
+    );
+
+    await service.initialize();
+    const sync = await service.syncRuntimeDefaults();
+
+    expect(
+      sync.warnings.some((warning) =>
+        warning.includes("OpenClaw agents list returned non-JSON output"),
+      ),
+    ).toBe(false);
+    expect(provider.createdAgents.filter((entry) => entry.agentId === "ceo"))
+      .toHaveLength(0);
+  });
+
+  it("removes recreated ceo bootstrap artifacts when organization has multiple agents", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    let emitInvalidAgentList = false;
+    const commandRunner = createRuntimeDefaultsCommandRunner(
+      root,
+      async (request) => {
+        if (
+          emitInvalidAgentList &&
+          request.args[0] === "agents" &&
+          request.args[1] === "list" &&
+          request.args.includes("--json")
+        ) {
+          return {
+            code: 0,
+            stdout: [
+              "OpenClaw inventory temporarily unavailable",
+              "Not JSON output",
+              "Retry later",
+            ].join("\n"),
+            stderr: "",
+          };
+        }
+        return undefined;
+      },
+    );
+    const provider = new FakeOpenClawProvider();
+    provider.seedBootstrapOnCreate = true;
+    const { service } = createService(root, provider, commandRunner);
+
+    await service.initialize();
+    await service.createAgent("Engineer");
+
+    const ceoWorkspace = path.join(root, "workspaces", "ceo");
+    const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
+    await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
+    await rm(bootstrapPath);
+    await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
+
+    const ceoCreateCallsBefore = provider.createdAgents.filter(
+      (entry) => entry.agentId === "ceo",
+    ).length;
+    emitInvalidAgentList = true;
+    const sync = await service.syncRuntimeDefaults();
+    const ceoCreateCallsAfter = provider.createdAgents.filter(
+      (entry) => entry.agentId === "ceo",
+    ).length;
+
+    expect(
+      sync.warnings.some((warning) =>
+        warning.includes("OpenClaw startup inventory check failed"),
+      ),
+    ).toBe(true);
+    expect(ceoCreateCallsAfter).toBeGreaterThan(ceoCreateCallsBefore);
+    await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
+  });
+
   it("updates who an agent reports to", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
@@ -2902,6 +3029,7 @@ class FakeOpenClawProvider extends BaseProvider {
   public createAlreadyExists = false;
   public failDelete = false;
   public seedUserMarkdownOnCreate = false;
+  public seedBootstrapOnCreate = false;
 
   public constructor() {
     super({
@@ -2953,6 +3081,13 @@ class FakeOpenClawProvider extends BaseProvider {
       await writeFile(
         path.join(options.workspaceDir, "USER.md"),
         "# USER.md\n",
+        "utf-8",
+      );
+    }
+    if (this.seedBootstrapOnCreate && options.agentId === "ceo") {
+      await writeFile(
+        path.join(options.workspaceDir, "BOOTSTRAP.md"),
+        "# BOOTSTRAP.md\n",
         "utf-8",
       );
     }
