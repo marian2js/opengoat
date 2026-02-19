@@ -11,6 +11,10 @@ import {
 } from "@/components/ai-elements/message";
 import {
   PromptInput,
+  PromptInputActionAddAttachments,
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuTrigger,
   PromptInputBody,
   PromptInputFooter,
   PromptInputSubmit,
@@ -23,7 +27,6 @@ import {
   ReasoningContent,
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -45,13 +48,13 @@ import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/sonner";
 import { resolveAgentAvatarSource } from "@/lib/agent-avatar";
 import { cn } from "@/lib/utils";
-import { CreateAgentDialog } from "@/pages/agents/CreateAgentDialog";
 import {
   AgentProfilePage,
   type AgentProfile,
   type AgentProfileUpdateInput,
 } from "@/pages/agents/AgentProfilePage";
 import { AgentsPage } from "@/pages/agents/AgentsPage";
+import { CreateAgentDialog } from "@/pages/agents/CreateAgentDialog";
 import { useCreateAgentDialog } from "@/pages/agents/useCreateAgentDialog";
 import {
   SidebarVersionStatus,
@@ -85,8 +88,8 @@ import {
   type Edge,
   type Node,
   type NodeProps,
-  type ReactFlowInstance,
   type NodeTypes,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import type { ChatStatus, FileUIPart } from "ai";
 import {
@@ -96,7 +99,6 @@ import {
   ChevronRight,
   Clock3,
   Home,
-  ImagePlus,
   MessageSquare,
   MoreHorizontal,
   Plus,
@@ -520,7 +522,8 @@ const MAX_VISIBLE_CEO_AGENT_SESSIONS = 5;
 const MAX_VISIBLE_NON_CEO_AGENT_SESSIONS = 2;
 const MAX_SESSION_MESSAGE_IMAGE_COUNT = 8;
 const MAX_SESSION_MESSAGE_IMAGE_BYTES = 10 * 1024 * 1024;
-const SIDEBAR_AGENT_ORDER_STORAGE_KEY = "opengoat:dashboard:sidebar-agent-order";
+const SIDEBAR_AGENT_ORDER_STORAGE_KEY =
+  "opengoat:dashboard:sidebar-agent-order";
 const TASK_STATUS_OPTIONS = [
   { value: "todo", label: "To do" },
   { value: "doing", label: "In progress" },
@@ -567,8 +570,8 @@ function resolveTopDownOpenTasksThresholdValue(value: unknown): number {
     typeof value === "number"
       ? value
       : typeof value === "string"
-        ? Number.parseInt(value, 10)
-        : Number.NaN;
+      ? Number.parseInt(value, 10)
+      : Number.NaN;
   if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
     return DEFAULT_TOP_DOWN_OPEN_TASKS_THRESHOLD;
   }
@@ -586,8 +589,8 @@ function resolveMaxInactivityMinutesValue(value: unknown): number {
     typeof value === "number"
       ? value
       : typeof value === "string"
-        ? Number.parseInt(value, 10)
-        : Number.NaN;
+      ? Number.parseInt(value, 10)
+      : Number.NaN;
   if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
     return DEFAULT_MAX_INACTIVITY_MINUTES;
   }
@@ -605,8 +608,8 @@ function resolveMaxParallelFlowsValue(value: unknown): number {
     typeof value === "number"
       ? value
       : typeof value === "string"
-        ? Number.parseInt(value, 10)
-        : Number.NaN;
+      ? Number.parseInt(value, 10)
+      : Number.NaN;
   if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
     return DEFAULT_MAX_PARALLEL_FLOWS;
   }
@@ -624,8 +627,8 @@ function resolveMaxInProgressMinutesValue(value: unknown): number {
     typeof value === "number"
       ? value
       : typeof value === "string"
-        ? Number.parseInt(value, 10)
-        : Number.NaN;
+      ? Number.parseInt(value, 10)
+      : Number.NaN;
   if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
     return DEFAULT_MAX_IN_PROGRESS_MINUTES;
   }
@@ -644,7 +647,8 @@ function resolveInactiveAgentNotificationTarget(
   if (value === "all-managers" || value === "ceo-only") {
     return value;
   }
-  return defaultTaskDelegationStrategies().bottomUp.inactiveAgentNotificationTarget;
+  return defaultTaskDelegationStrategies().bottomUp
+    .inactiveAgentNotificationTarget;
 }
 
 function normalizeAuthenticationSettings(
@@ -689,15 +693,11 @@ function normalizeUiSettings(
 
   const rawTopDown = raw.taskDelegationStrategies?.topDown;
   const rawTopDownEnabled =
-    typeof rawTopDown?.enabled === "boolean"
-      ? rawTopDown.enabled
-      : undefined;
+    typeof rawTopDown?.enabled === "boolean" ? rawTopDown.enabled : undefined;
   const rawTopDownOpenTasksThreshold = rawTopDown?.openTasksThreshold;
   const rawBottomUp = raw.taskDelegationStrategies?.bottomUp;
   const rawBottomUpEnabled =
-    typeof rawBottomUp?.enabled === "boolean"
-      ? rawBottomUp.enabled
-      : undefined;
+    typeof rawBottomUp?.enabled === "boolean" ? rawBottomUp.enabled : undefined;
   const rawBottomUpMaxInactivityMinutes = rawBottomUp?.maxInactivityMinutes;
   const rawBottomUpNotificationTarget =
     rawBottomUp?.inactiveAgentNotificationTarget;
@@ -821,29 +821,19 @@ function SessionPromptAttachButton({
   const isAtLimit = attachments.files.length >= MAX_SESSION_MESSAGE_IMAGE_COUNT;
 
   return (
-    <Button
-      aria-label="Attach images"
-      className="h-8 gap-1.5 px-2 text-muted-foreground"
-      disabled={disabled || isAtLimit}
-      onClick={() => {
-        attachments.openFileDialog();
-      }}
-      size="sm"
-      title={
-        isAtLimit
-          ? `Maximum ${MAX_SESSION_MESSAGE_IMAGE_COUNT} images per message.`
-          : "Attach images"
-      }
-      type="button"
-      variant="ghost"
-    >
-      <ImagePlus className="size-4" />
-      <span className="text-xs">
-        {attachments.files.length > 0
-          ? `${attachments.files.length}/${MAX_SESSION_MESSAGE_IMAGE_COUNT}`
-          : "Attach"}
-      </span>
-    </Button>
+    <PromptInputActionMenu>
+      <PromptInputActionMenuTrigger
+        disabled={disabled || isAtLimit}
+        tooltip={
+          isAtLimit
+            ? `Maximum ${MAX_SESSION_MESSAGE_IMAGE_COUNT} images per message.`
+            : "Attach images"
+        }
+      />
+      <PromptInputActionMenuContent>
+        <PromptInputActionAddAttachments />
+      </PromptInputActionMenuContent>
+    </PromptInputActionMenu>
   );
 }
 
@@ -864,8 +854,9 @@ export function DashboardPage(): ReactElement {
   const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(
     null,
   );
-  const [expandedAgentSessionIds, setExpandedAgentSessionIds] =
-    useState<Set<string>>(() => new Set());
+  const [expandedAgentSessionIds, setExpandedAgentSessionIds] = useState<
+    Set<string>
+  >(() => new Set());
   const [sidebarAgentOrderIds, setSidebarAgentOrderIds] = useState<string[]>(
     () => loadSidebarAgentOrder(),
   );
@@ -877,9 +868,7 @@ export function DashboardPage(): ReactElement {
     position: "before" | "after";
   } | null>(null);
   const [selectedSessionRefByAgentId, setSelectedSessionRefByAgentId] =
-    useState<Record<string, string>>(
-      {},
-    );
+    useState<Record<string, string>>({});
   const [sessionsByAgentId, setSessionsByAgentId] = useState<
     Record<string, Session[]>
   >({});
@@ -921,8 +910,10 @@ export function DashboardPage(): ReactElement {
     String(DEFAULT_MAX_PARALLEL_FLOWS),
   );
   const [taskCronEnabledInput, setTaskCronEnabledInput] = useState(true);
-  const [topDownTaskDelegationEnabledInput, setTopDownTaskDelegationEnabledInput] =
-    useState(true);
+  const [
+    topDownTaskDelegationEnabledInput,
+    setTopDownTaskDelegationEnabledInput,
+  ] = useState(true);
   const [
     bottomUpTaskDelegationEnabledInput,
     setBottomUpTaskDelegationEnabledInput,
@@ -931,26 +922,18 @@ export function DashboardPage(): ReactElement {
     inactiveAgentNotificationTargetInput,
     setInactiveAgentNotificationTargetInput,
   ] = useState<InactiveAgentNotificationTarget>("all-managers");
-  const [
-    uiAuthenticationEnabledInput,
-    setUiAuthenticationEnabledInput,
-  ] = useState(false);
-  const [
-    uiAuthenticationUsernameInput,
-    setUiAuthenticationUsernameInput,
-  ] = useState("");
-  const [
-    uiAuthenticationHasPassword,
-    setUiAuthenticationHasPassword,
-  ] = useState(false);
+  const [uiAuthenticationEnabledInput, setUiAuthenticationEnabledInput] =
+    useState(false);
+  const [uiAuthenticationUsernameInput, setUiAuthenticationUsernameInput] =
+    useState("");
+  const [uiAuthenticationHasPassword, setUiAuthenticationHasPassword] =
+    useState(false);
   const [
     uiAuthenticationCurrentPasswordInput,
     setUiAuthenticationCurrentPasswordInput,
   ] = useState("");
-  const [
-    uiAuthenticationPasswordInput,
-    setUiAuthenticationPasswordInput,
-  ] = useState("");
+  const [uiAuthenticationPasswordInput, setUiAuthenticationPasswordInput] =
+    useState("");
   const [
     uiAuthenticationPasswordConfirmationInput,
     setUiAuthenticationPasswordConfirmationInput,
@@ -1167,7 +1150,9 @@ export function DashboardPage(): ReactElement {
             .maxInactivityMinutes,
         ),
       );
-      setMaxInProgressMinutesInput(String(normalizedSettings.maxInProgressMinutes));
+      setMaxInProgressMinutesInput(
+        String(normalizedSettings.maxInProgressMinutes),
+      );
       setMaxParallelFlowsInput(String(normalizedSettings.maxParallelFlows));
       setBottomUpTaskDelegationEnabledInput(
         normalizedSettings.taskDelegationStrategies.bottomUp.enabled,
@@ -1176,9 +1161,15 @@ export function DashboardPage(): ReactElement {
         normalizedSettings.taskDelegationStrategies.bottomUp
           .inactiveAgentNotificationTarget,
       );
-      setUiAuthenticationEnabledInput(normalizedSettings.authentication.enabled);
-      setUiAuthenticationUsernameInput(normalizedSettings.authentication.username);
-      setUiAuthenticationHasPassword(normalizedSettings.authentication.hasPassword);
+      setUiAuthenticationEnabledInput(
+        normalizedSettings.authentication.enabled,
+      );
+      setUiAuthenticationUsernameInput(
+        normalizedSettings.authentication.username,
+      );
+      setUiAuthenticationHasPassword(
+        normalizedSettings.authentication.hasPassword,
+      );
       attemptedSessionFetchAgentIdsRef.current = new Set([sessions.agentId]);
       setSessionsByAgentId({
         [sessions.agentId]: sessions.sessions,
@@ -1541,11 +1532,7 @@ export function DashboardPage(): ReactElement {
       targetAgentId: string,
       position: "before" | "after",
     ) => {
-      if (
-        !sourceAgentId ||
-        !targetAgentId ||
-        sourceAgentId === targetAgentId
-      ) {
+      if (!sourceAgentId || !targetAgentId || sourceAgentId === targetAgentId) {
         return;
       }
 
@@ -1633,11 +1620,10 @@ export function DashboardPage(): ReactElement {
       const sourceAgentId =
         draggingSidebarAgentId ??
         event.dataTransfer.getData("text/plain").trim();
-      const target =
-        sidebarDropTarget ?? {
-          agentId: targetAgentId,
-          position: resolveSidebarDropPosition(event),
-        };
+      const target = sidebarDropTarget ?? {
+        agentId: targetAgentId,
+        position: resolveSidebarDropPosition(event),
+      };
       moveSidebarAgent(sourceAgentId, target.agentId, target.position);
       setDraggingSidebarAgentId(null);
       setSidebarDropTarget(null);
@@ -2073,7 +2059,10 @@ export function DashboardPage(): ReactElement {
         changed = true;
       }
 
-      if (!changed && Object.keys(next).length === Object.keys(current).length) {
+      if (
+        !changed &&
+        Object.keys(next).length === Object.keys(current).length
+      ) {
         return current;
       }
 
@@ -2183,7 +2172,13 @@ export function DashboardPage(): ReactElement {
       kind: "worklog",
       content: "",
     });
-  }, [navigateToRoute, route, selectedTask, selectedTaskId, selectedTaskWorkspace]);
+  }, [
+    navigateToRoute,
+    route,
+    selectedTask,
+    selectedTaskId,
+    selectedTaskWorkspace,
+  ]);
 
   useEffect(() => {
     setSelectedTaskIdsByWorkspaceId((current) => {
@@ -2255,11 +2250,7 @@ export function DashboardPage(): ReactElement {
       }
       return next;
     });
-  }, [
-    taskWorkspaces,
-    getAssignableAgents,
-    taskActorId,
-  ]);
+  }, [taskWorkspaces, getAssignableAgents, taskActorId]);
 
   const openTaskCount = useMemo(() => {
     if (!state) {
@@ -2417,8 +2408,9 @@ export function DashboardPage(): ReactElement {
     const nextSession =
       selectedSessionRef &&
       sessions.some((session) => session.sessionKey === selectedSessionRef)
-        ? sessions.find((session) => session.sessionKey === selectedSessionRef) ??
-          sessions[0]
+        ? sessions.find(
+            (session) => session.sessionKey === selectedSessionRef,
+          ) ?? sessions[0]
         : sessions[0];
 
     if (nextSession) {
@@ -2653,7 +2645,9 @@ export function DashboardPage(): ReactElement {
       currentAuthenticationSettings.enabled && authenticationSettingsChanged;
 
     if (uiAuthenticationEnabledInput && !normalizedAuthUsername) {
-      toast.error("Authentication username is required when protection is enabled.");
+      toast.error(
+        "Authentication username is required when protection is enabled.",
+      );
       return;
     }
     if (
@@ -2666,7 +2660,10 @@ export function DashboardPage(): ReactElement {
       );
       return;
     }
-    if (hasNewAuthPassword && nextAuthPassword !== nextAuthPasswordConfirmation) {
+    if (
+      hasNewAuthPassword &&
+      nextAuthPassword !== nextAuthPasswordConfirmation
+    ) {
       toast.error("Password confirmation does not match.");
       return;
     }
@@ -2682,7 +2679,9 @@ export function DashboardPage(): ReactElement {
       requiresCurrentPassword &&
       uiAuthenticationCurrentPasswordInput.trim().length === 0
     ) {
-      toast.error("Current password is required to change authentication settings.");
+      toast.error(
+        "Current password is required to change authentication settings.",
+      );
       return;
     }
 
@@ -2808,7 +2807,8 @@ export function DashboardPage(): ReactElement {
           bottomUp: {
             enabled: bottomUpTaskDelegationEnabledInput,
             maxInactivityMinutes: resolvedMaxInactivityMinutes,
-            inactiveAgentNotificationTarget: inactiveAgentNotificationTargetInput,
+            inactiveAgentNotificationTarget:
+              inactiveAgentNotificationTargetInput,
           },
         },
       };
@@ -2843,8 +2843,16 @@ export function DashboardPage(): ReactElement {
       const statusMessage = !taskCronEnabledInput
         ? "Task automation checks disabled."
         : response.settings.ceoBootstrapPending
-          ? "Task automation checks are waiting for the first CEO message."
-        : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; in-progress timeout set to ${resolvedMaxInProgressMinutes} minutes; Top-Down ${topDownTaskDelegationEnabledInput ? `enabled (threshold ${resolvedTopDownOpenTasksThreshold})` : "disabled"}; Bottom-Up ${bottomUpTaskDelegationEnabledInput ? `enabled (${resolvedMaxInactivityMinutes} minutes)` : "disabled"}.`;
+        ? "Task automation checks are waiting for the first CEO message."
+        : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; in-progress timeout set to ${resolvedMaxInProgressMinutes} minutes; Top-Down ${
+            topDownTaskDelegationEnabledInput
+              ? `enabled (threshold ${resolvedTopDownOpenTasksThreshold})`
+              : "disabled"
+          }; Bottom-Up ${
+            bottomUpTaskDelegationEnabledInput
+              ? `enabled (${resolvedMaxInactivityMinutes} minutes)`
+              : "disabled"
+          }.`;
       toast.success(response.message ?? statusMessage);
       await refreshAuthenticationStatus();
     } catch (requestError) {
@@ -2858,30 +2866,28 @@ export function DashboardPage(): ReactElement {
     }
   }
 
-  async function persistUiSettings(
-    settings: {
-      taskCronEnabled: boolean;
-      maxInProgressMinutes: number;
-      maxParallelFlows: number;
-      taskDelegationStrategies: {
-        topDown: {
-          enabled: boolean;
-          openTasksThreshold: number;
-        };
-        bottomUp: {
-          enabled: boolean;
-          maxInactivityMinutes: number;
-          inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
-        };
-      };
-      authentication?: {
+  async function persistUiSettings(settings: {
+    taskCronEnabled: boolean;
+    maxInProgressMinutes: number;
+    maxParallelFlows: number;
+    taskDelegationStrategies: {
+      topDown: {
         enabled: boolean;
-        username?: string;
-        password?: string;
-        currentPassword?: string;
+        openTasksThreshold: number;
       };
-    },
-  ): Promise<{ settings: UiSettings; message?: string }> {
+      bottomUp: {
+        enabled: boolean;
+        maxInactivityMinutes: number;
+        inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+      };
+    };
+    authentication?: {
+      enabled: boolean;
+      username?: string;
+      password?: string;
+      currentPassword?: string;
+    };
+  }): Promise<{ settings: UiSettings; message?: string }> {
     return fetchJson<{
       settings: UiSettings;
       message?: string;
@@ -2933,8 +2939,12 @@ export function DashboardPage(): ReactElement {
         .inactiveAgentNotificationTarget,
     );
     setUiAuthenticationEnabledInput(normalizedSettings.authentication.enabled);
-    setUiAuthenticationUsernameInput(normalizedSettings.authentication.username);
-    setUiAuthenticationHasPassword(normalizedSettings.authentication.hasPassword);
+    setUiAuthenticationUsernameInput(
+      normalizedSettings.authentication.username,
+    );
+    setUiAuthenticationHasPassword(
+      normalizedSettings.authentication.hasPassword,
+    );
   }
 
   async function handleCreateTask(
@@ -3358,7 +3368,9 @@ export function DashboardPage(): ReactElement {
     }
     if (error.code === "max_file_size") {
       toast.error(
-        `Each image must be ${Math.floor(MAX_SESSION_MESSAGE_IMAGE_BYTES / (1024 * 1024))}MB or smaller.`,
+        `Each image must be ${Math.floor(
+          MAX_SESSION_MESSAGE_IMAGE_BYTES / (1024 * 1024),
+        )}MB or smaller.`,
       );
       return;
     }
@@ -3625,12 +3637,15 @@ export function DashboardPage(): ReactElement {
     return sendSessionMessage(payload, options?.signal);
   }
 
-  async function sendSessionMessage(payload: {
-    agentId: string;
-    sessionRef: string;
-    message: string;
-    images?: SessionMessageImageInput[];
-  }, signal?: AbortSignal): Promise<SessionSendMessageResponse> {
+  async function sendSessionMessage(
+    payload: {
+      agentId: string;
+      sessionRef: string;
+      message: string;
+      images?: SessionMessageImageInput[];
+    },
+    signal?: AbortSignal,
+  ): Promise<SessionSendMessageResponse> {
     const routes = ["/api/sessions/message", "/api/session/message"];
     let lastError: unknown;
 
@@ -3821,8 +3836,8 @@ export function DashboardPage(): ReactElement {
     route.kind === "agent"
       ? route.agentId
       : route.kind === "session"
-        ? selectedSessionAgentId
-        : null;
+      ? selectedSessionAgentId
+      : null;
   const handleSessionPromptTextareaKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
       if (sessionChatStatus !== "streaming") {
@@ -3940,7 +3955,10 @@ export function DashboardPage(): ReactElement {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="ui-signin-username">
+              <label
+                className="text-sm font-medium text-foreground"
+                htmlFor="ui-signin-username"
+              >
                 Username
               </label>
               <Input
@@ -3954,7 +3972,10 @@ export function DashboardPage(): ReactElement {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="ui-signin-password">
+              <label
+                className="text-sm font-medium text-foreground"
+                htmlFor="ui-signin-password"
+              >
                 Password
               </label>
               <Input
@@ -4031,34 +4052,36 @@ export function DashboardPage(): ReactElement {
                 Main Menu
               </p>
             ) : null}
-            {SIDEBAR_ITEMS.filter((item) => !item.hiddenInSidebar).map((item) => {
-              const Icon = item.icon;
-              const active =
-                (route.kind === "page" && item.id === route.view) ||
-                (route.kind === "taskWorkspace" && item.id === "tasks") ||
-                (route.kind === "agent" && item.id === "agents");
+            {SIDEBAR_ITEMS.filter((item) => !item.hiddenInSidebar).map(
+              (item) => {
+                const Icon = item.icon;
+                const active =
+                  (route.kind === "page" && item.id === route.view) ||
+                  (route.kind === "taskWorkspace" && item.id === "tasks") ||
+                  (route.kind === "agent" && item.id === "agents");
 
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  title={item.label}
-                  onClick={() => handleViewChange(item.id)}
-                  className={cn(
-                    "mb-1 flex w-full items-center rounded-lg border px-3 py-2.5 text-[14px] font-medium transition-colors",
-                    active
-                      ? "border-border bg-accent/90 text-foreground"
-                      : "border-transparent text-muted-foreground hover:border-border/60 hover:bg-accent/60 hover:text-foreground",
-                    isSidebarCollapsed && "justify-center px-2",
-                  )}
-                >
-                  <Icon className="size-4 shrink-0" />
-                  {!isSidebarCollapsed ? (
-                    <span className="ml-2">{item.label}</span>
-                  ) : null}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    title={item.label}
+                    onClick={() => handleViewChange(item.id)}
+                    className={cn(
+                      "mb-1 flex w-full items-center rounded-lg border px-3 py-2.5 text-[14px] font-medium transition-colors",
+                      active
+                        ? "border-border bg-accent/90 text-foreground"
+                        : "border-transparent text-muted-foreground hover:border-border/60 hover:bg-accent/60 hover:text-foreground",
+                      isSidebarCollapsed && "justify-center px-2",
+                    )}
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    {!isSidebarCollapsed ? (
+                      <span className="ml-2">{item.label}</span>
+                    ) : null}
+                  </button>
+                );
+              },
+            )}
 
             <Separator className="my-2 bg-border/70" />
             {!isSidebarCollapsed ? (
@@ -4071,138 +4094,146 @@ export function DashboardPage(): ReactElement {
                   onDragOver={handleSidebarListDragOver}
                   onDrop={handleSidebarListDrop}
                 >
-                  {sidebarSessionsByAgent.map(({ agent, sessions, visibleLimit }) => {
-                    const isAgentActive = activeSidebarAgentId === agent.id;
-                    const isExpanded = expandedAgentSessionIds.has(agent.id);
-                    const hasHiddenSessions = sessions.length > visibleLimit;
-                    const visibleSessions = isExpanded
-                      ? sessions
-                      : sessions.slice(0, visibleLimit);
-                    const dropIndicatorPosition =
-                      draggingSidebarAgentId &&
-                      draggingSidebarAgentId !== agent.id &&
-                      sidebarDropTarget?.agentId === agent.id
-                        ? sidebarDropTarget.position
-                        : null;
+                  {sidebarSessionsByAgent.map(
+                    ({ agent, sessions, visibleLimit }) => {
+                      const isAgentActive = activeSidebarAgentId === agent.id;
+                      const isExpanded = expandedAgentSessionIds.has(agent.id);
+                      const hasHiddenSessions = sessions.length > visibleLimit;
+                      const visibleSessions = isExpanded
+                        ? sessions
+                        : sessions.slice(0, visibleLimit);
+                      const dropIndicatorPosition =
+                        draggingSidebarAgentId &&
+                        draggingSidebarAgentId !== agent.id &&
+                        sidebarDropTarget?.agentId === agent.id
+                          ? sidebarDropTarget.position
+                          : null;
 
-                    return (
-                      <div
-                        key={agent.id}
-                        data-sidebar-agent-id={agent.id}
-                        draggable
-                        onDragStart={(event) => {
-                          handleSidebarAgentDragStart(agent.id, event);
-                        }}
-                        onDragOver={(event) => {
-                          handleSidebarAgentDragOver(agent.id, event);
-                        }}
-                        onDrop={(event) => {
-                          handleSidebarAgentDrop(agent.id, event);
-                        }}
-                        onDragEnd={handleSidebarAgentDragEnd}
-                        className={cn(
-                          "relative rounded-lg border px-1 py-1 transition-colors cursor-grab active:cursor-grabbing",
-                          isAgentActive
-                            ? "border-border/80 bg-accent/35"
-                            : draggingSidebarAgentId
+                      return (
+                        <div
+                          key={agent.id}
+                          data-sidebar-agent-id={agent.id}
+                          draggable
+                          onDragStart={(event) => {
+                            handleSidebarAgentDragStart(agent.id, event);
+                          }}
+                          onDragOver={(event) => {
+                            handleSidebarAgentDragOver(agent.id, event);
+                          }}
+                          onDrop={(event) => {
+                            handleSidebarAgentDrop(agent.id, event);
+                          }}
+                          onDragEnd={handleSidebarAgentDragEnd}
+                          className={cn(
+                            "relative rounded-lg border px-1 py-1 transition-colors cursor-grab active:cursor-grabbing",
+                            isAgentActive
+                              ? "border-border/80 bg-accent/35"
+                              : draggingSidebarAgentId
                               ? "border-transparent"
                               : "border-transparent hover:border-border/50 hover:bg-accent/20",
-                          draggingSidebarAgentId === agent.id && "opacity-60",
-                          dropIndicatorPosition !== null && "border-primary/60",
-                        )}
-                      >
-                        {dropIndicatorPosition ? (
-                          <span
-                            className={cn(
-                              "pointer-events-none absolute left-2 right-2 z-10 h-0.5 rounded-full bg-primary shadow-[0_0_0_1px_hsl(var(--background))]",
-                              dropIndicatorPosition === "before"
-                                ? "-top-px"
-                                : "-bottom-px",
-                            )}
-                            aria-hidden="true"
-                          />
-                        ) : null}
-                        <div className="group/agent flex items-center">
-                          <button
-                            type="button"
-                            title={`Open ${agent.displayName}`}
-                            onClick={() => {
-                              void handleSelectSidebarAgent(agent.id);
-                            }}
-                            className="flex min-w-0 flex-1 items-center rounded-md px-2 py-1.5 text-left"
-                          >
-                            <AgentAvatar
-                              agentId={agent.id}
-                              displayName={agent.displayName}
-                              size="xs"
-                            />
+                            draggingSidebarAgentId === agent.id && "opacity-60",
+                            dropIndicatorPosition !== null &&
+                              "border-primary/60",
+                          )}
+                        >
+                          {dropIndicatorPosition ? (
                             <span
                               className={cn(
-                                "ml-2 truncate text-[13px] font-medium",
-                                isAgentActive
-                                  ? "text-foreground"
-                                  : "text-muted-foreground",
+                                "pointer-events-none absolute left-2 right-2 z-10 h-0.5 rounded-full bg-primary shadow-[0_0_0_1px_hsl(var(--background))]",
+                                dropIndicatorPosition === "before"
+                                  ? "-top-px"
+                                  : "-bottom-px",
                               )}
+                              aria-hidden="true"
+                            />
+                          ) : null}
+                          <div className="group/agent flex items-center">
+                            <button
+                              type="button"
+                              title={`Open ${agent.displayName}`}
+                              onClick={() => {
+                                void handleSelectSidebarAgent(agent.id);
+                              }}
+                              className="flex min-w-0 flex-1 items-center rounded-md px-2 py-1.5 text-left"
                             >
-                              {agent.displayName}
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={`New session with ${agent.displayName}`}
-                            title="New session"
-                            disabled={isMutating || isLoading}
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              void handleCreateAgentSession(agent.id, {
-                                navigate: true,
-                              });
-                            }}
-                            className="mr-1 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/agent:opacity-100 disabled:opacity-40"
-                          >
-                            <Plus className="size-3.5 icon-stroke-1" />
-                          </button>
-                        </div>
-
-                        {visibleSessions.length > 0 ? (
-                          <div className="space-y-0.5 pb-1">
-                            {visibleSessions.map((session) =>
-                              renderAgentSessionRow(
-                                session,
-                                `${agent.id}:${session.sessionId}`,
-                              ),
-                            )}
-                            {hasHiddenSessions ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setExpandedAgentSessionIds((current) => {
-                                    const next = new Set(current);
-                                    if (next.has(agent.id)) {
-                                      next.delete(agent.id);
-                                    } else {
-                                      next.add(agent.id);
-                                    }
-                                    return next;
-                                  });
-                                  setOpenSessionMenuId(null);
-                                }}
-                                className="flex w-full items-center rounded-md px-3 py-1 text-left text-[12px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                              <AgentAvatar
+                                agentId={agent.id}
+                                displayName={agent.displayName}
+                                size="xs"
+                              />
+                              <span
+                                className={cn(
+                                  "ml-2 truncate text-[13px] font-medium",
+                                  isAgentActive
+                                    ? "text-foreground"
+                                    : "text-muted-foreground",
+                                )}
                               >
-                                <span className="inline-block size-4 shrink-0" aria-hidden="true" />
-                                <span className="ml-2">
-                                  {isExpanded
-                                    ? "Show less"
-                                    : `Show more (${sessions.length - visibleLimit})`}
-                                </span>
-                              </button>
-                            ) : null}
+                                {agent.displayName}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`New session with ${agent.displayName}`}
+                              title="New session"
+                              disabled={isMutating || isLoading}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                void handleCreateAgentSession(agent.id, {
+                                  navigate: true,
+                                });
+                              }}
+                              className="mr-1 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/agent:opacity-100 disabled:opacity-40"
+                            >
+                              <Plus className="size-3.5 icon-stroke-1" />
+                            </button>
                           </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+
+                          {visibleSessions.length > 0 ? (
+                            <div className="space-y-0.5 pb-1">
+                              {visibleSessions.map((session) =>
+                                renderAgentSessionRow(
+                                  session,
+                                  `${agent.id}:${session.sessionId}`,
+                                ),
+                              )}
+                              {hasHiddenSessions ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setExpandedAgentSessionIds((current) => {
+                                      const next = new Set(current);
+                                      if (next.has(agent.id)) {
+                                        next.delete(agent.id);
+                                      } else {
+                                        next.add(agent.id);
+                                      }
+                                      return next;
+                                    });
+                                    setOpenSessionMenuId(null);
+                                  }}
+                                  className="flex w-full items-center rounded-md px-3 py-1 text-left text-[12px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                                >
+                                  <span
+                                    className="inline-block size-4 shrink-0"
+                                    aria-hidden="true"
+                                  />
+                                  <span className="ml-2">
+                                    {isExpanded
+                                      ? "Show less"
+                                      : `Show more (${
+                                          sessions.length - visibleLimit
+                                        })`}
+                                  </span>
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    },
+                  )}
                 </div>
               </>
             ) : (
@@ -4245,8 +4276,8 @@ export function DashboardPage(): ReactElement {
                         isAgentActive
                           ? "border-border bg-accent/90"
                           : draggingSidebarAgentId
-                            ? "border-transparent"
-                            : "border-transparent hover:border-border/60 hover:bg-accent/60",
+                          ? "border-transparent"
+                          : "border-transparent hover:border-border/60 hover:bg-accent/60",
                         draggingSidebarAgentId === agent.id && "opacity-60",
                         dropIndicatorPosition !== null && "border-primary/60",
                       )}
@@ -4381,7 +4412,11 @@ export function DashboardPage(): ReactElement {
                   >
                     {route.kind === "page" && route.view === "wiki"
                       ? selectedWikiTitle
-                      : viewTitle(route, selectedSession, selectedTaskWorkspace)}
+                      : viewTitle(
+                          route,
+                          selectedSession,
+                          selectedTaskWorkspace,
+                        )}
                   </h1>
                 </div>
               )}
@@ -4438,7 +4473,9 @@ export function DashboardPage(): ReactElement {
                       size="sm"
                       variant="ghost"
                       className="h-10"
-                      disabled={wikiController.isSaving || wikiController.isDeleting}
+                      disabled={
+                        wikiController.isSaving || wikiController.isDeleting
+                      }
                       onClick={wikiController.cancelEditing}
                     >
                       Cancel
@@ -4746,13 +4783,17 @@ export function DashboardPage(): ReactElement {
                           className="rounded-full border border-border/60 bg-background/50 px-2.5 py-1 text-xs text-muted-foreground"
                           title={formatAbsoluteTime(selectedTask.createdAt)}
                         >
-                          {`Created ${formatRelativeTime(selectedTask.createdAt)}`}
+                          {`Created ${formatRelativeTime(
+                            selectedTask.createdAt,
+                          )}`}
                         </span>
                         <span
                           className="rounded-full border border-border/60 bg-background/50 px-2.5 py-1 text-xs text-muted-foreground"
                           title={formatAbsoluteTime(selectedTaskUpdatedAt)}
                         >
-                          {`Updated ${formatRelativeTime(selectedTaskUpdatedAt)}`}
+                          {`Updated ${formatRelativeTime(
+                            selectedTaskUpdatedAt,
+                          )}`}
                         </span>
                       </div>
                     </div>
@@ -4931,39 +4972,38 @@ export function DashboardPage(): ReactElement {
 
           <div className="border-b border-border px-3 py-2 md:hidden">
             <div className="flex gap-1 overflow-x-auto">
-              {SIDEBAR_ITEMS.filter((item) => !item.hiddenInSidebar).map((item) => {
-                const Icon = item.icon;
-                const active =
-                  (route.kind === "page" && item.id === route.view) ||
-                  (route.kind === "taskWorkspace" && item.id === "tasks");
+              {SIDEBAR_ITEMS.filter((item) => !item.hiddenInSidebar).map(
+                (item) => {
+                  const Icon = item.icon;
+                  const active =
+                    (route.kind === "page" && item.id === route.view) ||
+                    (route.kind === "taskWorkspace" && item.id === "tasks");
 
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleViewChange(item.id)}
-                    className={cn(
-                      "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm whitespace-nowrap",
-                      active
-                        ? "border-border bg-accent text-foreground"
-                        : "border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground",
-                    )}
-                  >
-                    <Icon className="size-4" />
-                    {item.label}
-                  </button>
-                );
-              })}
-
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleViewChange(item.id)}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm whitespace-nowrap",
+                        active
+                          ? "border-border bg-accent text-foreground"
+                          : "border-transparent text-muted-foreground hover:bg-accent/70 hover:text-foreground",
+                      )}
+                    >
+                      <Icon className="size-4" />
+                      {item.label}
+                    </button>
+                  );
+                },
+              )}
             </div>
           </div>
 
           <main
             className={cn(
               "flex min-h-0 flex-1 flex-col gap-4 p-4 sm:p-6",
-              route.kind === "session"
-                ? "overflow-hidden"
-                : "overflow-y-auto",
+              route.kind === "session" ? "overflow-hidden" : "overflow-y-auto",
             )}
           >
             {error ? (
@@ -5038,7 +5078,9 @@ export function DashboardPage(): ReactElement {
                     ) : agents.length === 1 ? (
                       <OrganizationGetStartedPanel
                         ceoAgent={
-                          agents.find((agent) => agent.id === DEFAULT_AGENT_ID) ??
+                          agents.find(
+                            (agent) => agent.id === DEFAULT_AGENT_ID,
+                          ) ??
                           agents[0] ??
                           null
                         }
@@ -5228,6 +5270,7 @@ export function DashboardPage(): ReactElement {
                         maxFileSize={MAX_SESSION_MESSAGE_IMAGE_BYTES}
                         maxFiles={MAX_SESSION_MESSAGE_IMAGE_COUNT}
                         multiple
+                        globalDrop
                         onError={handleSessionPromptInputError}
                         onSubmit={(message) => {
                           void handleSessionPromptSubmit(message);
@@ -5244,10 +5287,7 @@ export function DashboardPage(): ReactElement {
                           <PromptInputTextarea
                             placeholder="Message this session..."
                             onKeyDown={handleSessionPromptTextareaKeyDown}
-                            disabled={
-                              isLoading ||
-                              isMutating
-                            }
+                            disabled={isLoading || isMutating}
                           />
                         </PromptInputBody>
                         <PromptInputFooter
@@ -5264,10 +5304,7 @@ export function DashboardPage(): ReactElement {
                           <PromptInputSubmit
                             status={sessionChatStatus}
                             onStop={handleStopSessionPrompt}
-                            disabled={
-                              isLoading ||
-                              isMutating
-                            }
+                            disabled={isLoading || isMutating}
                           />
                         </PromptInputFooter>
                       </PromptInput>
@@ -5356,7 +5393,9 @@ export function DashboardPage(): ReactElement {
                       inactiveAgentNotificationTargetInput
                     }
                     uiAuthenticationEnabledInput={uiAuthenticationEnabledInput}
-                    uiAuthenticationUsernameInput={uiAuthenticationUsernameInput}
+                    uiAuthenticationUsernameInput={
+                      uiAuthenticationUsernameInput
+                    }
                     uiAuthenticationHasPassword={uiAuthenticationHasPassword}
                     uiAuthenticationPasswordEditorOpen={
                       uiAuthenticationPasswordEditorOpen
@@ -5370,7 +5409,9 @@ export function DashboardPage(): ReactElement {
                     uiAuthenticationCurrentPasswordInput={
                       uiAuthenticationCurrentPasswordInput
                     }
-                    uiAuthenticationPasswordInput={uiAuthenticationPasswordInput}
+                    uiAuthenticationPasswordInput={
+                      uiAuthenticationPasswordInput
+                    }
                     uiAuthenticationPasswordConfirmationInput={
                       uiAuthenticationPasswordConfirmationInput
                     }
@@ -5402,7 +5443,9 @@ export function DashboardPage(): ReactElement {
                     onMaxInProgressMinutesInputChange={(value) => {
                       setMaxInProgressMinutesInput(value);
                     }}
-                    onInactiveAgentNotificationTargetInputChange={(nextValue) => {
+                    onInactiveAgentNotificationTargetInputChange={(
+                      nextValue,
+                    ) => {
                       setInactiveAgentNotificationTargetInput(nextValue);
                     }}
                     onUiAuthenticationEnabledChange={(checked) => {
@@ -6135,7 +6178,9 @@ function resolveAgentRoleLabel(agent: Agent | undefined): string | undefined {
   return undefined;
 }
 
-function validateAuthenticationPasswordStrength(password: string): string | undefined {
+function validateAuthenticationPasswordStrength(
+  password: string,
+): string | undefined {
   if (password.length < 12) {
     return "Password must be at least 12 characters long.";
   }
@@ -6307,7 +6352,10 @@ async function streamUiLogs(
   }
 }
 
-function areTaskRecordListsEqual(left: TaskRecord[], right: TaskRecord[]): boolean {
+function areTaskRecordListsEqual(
+  left: TaskRecord[],
+  right: TaskRecord[],
+): boolean {
   if (left.length !== right.length) {
     return false;
   }
@@ -6347,7 +6395,10 @@ function areTaskRecordListsEqual(left: TaskRecord[], right: TaskRecord[]): boole
   return true;
 }
 
-function areTaskEntryListsEqual(left: TaskEntry[], right: TaskEntry[]): boolean {
+function areTaskEntryListsEqual(
+  left: TaskEntry[],
+  right: TaskEntry[],
+): boolean {
   if (left.length !== right.length) {
     return false;
   }
