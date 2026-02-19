@@ -238,13 +238,21 @@ interface TasksResponse {
 
 interface UiSettings {
   taskCronEnabled: boolean;
-  notifyManagersOfInactiveAgents: boolean;
-  maxInactivityMinutes: number;
   maxInProgressMinutes: number;
   maxParallelFlows: number;
-  inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+  taskDelegationStrategies: UiTaskDelegationStrategies;
   authentication: UiAuthenticationSettings;
   ceoBootstrapPending: boolean;
+}
+
+interface UiBottomUpTaskDelegationStrategy {
+  enabled: boolean;
+  maxInactivityMinutes: number;
+  inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+}
+
+interface UiTaskDelegationStrategies {
+  bottomUp: UiBottomUpTaskDelegationStrategy;
 }
 
 interface UiAuthenticationSettings {
@@ -518,13 +526,21 @@ function defaultAuthenticationSettings(): UiAuthenticationSettings {
 function defaultUiSettings(): UiSettings {
   return {
     taskCronEnabled: true,
-    notifyManagersOfInactiveAgents: true,
-    maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
     maxInProgressMinutes: DEFAULT_MAX_IN_PROGRESS_MINUTES,
     maxParallelFlows: DEFAULT_MAX_PARALLEL_FLOWS,
-    inactiveAgentNotificationTarget: "all-managers",
+    taskDelegationStrategies: defaultTaskDelegationStrategies(),
     authentication: defaultAuthenticationSettings(),
     ceoBootstrapPending: false,
+  };
+}
+
+function defaultTaskDelegationStrategies(): UiTaskDelegationStrategies {
+  return {
+    bottomUp: {
+      enabled: true,
+      maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
+      inactiveAgentNotificationTarget: "all-managers",
+    },
   };
 }
 
@@ -591,7 +607,7 @@ function resolveInactiveAgentNotificationTarget(
   if (value === "all-managers" || value === "ceo-only") {
     return value;
   }
-  return defaultUiSettings().inactiveAgentNotificationTarget;
+  return defaultTaskDelegationStrategies().bottomUp.inactiveAgentNotificationTarget;
 }
 
 function normalizeAuthenticationSettings(
@@ -617,27 +633,63 @@ function normalizeUiSettings(
   settings: Partial<UiSettings> | null | undefined,
 ): UiSettings {
   const defaults = defaultUiSettings();
-  const raw = settings ?? {};
+  const raw = (settings ?? {}) as Partial<UiSettings> & {
+    notifyManagersOfInactiveAgents?: unknown;
+    maxInactivityMinutes?: unknown;
+    inactiveAgentNotificationTarget?: unknown;
+    taskDelegationStrategies?: {
+      bottomUp?: {
+        enabled?: unknown;
+        maxInactivityMinutes?: unknown;
+        inactiveAgentNotificationTarget?: unknown;
+      };
+    };
+  };
+
+  const rawBottomUp = raw.taskDelegationStrategies?.bottomUp;
+  const rawBottomUpEnabled =
+    typeof rawBottomUp?.enabled === "boolean"
+      ? rawBottomUp.enabled
+      : undefined;
+  const rawBottomUpMaxInactivityMinutes = rawBottomUp?.maxInactivityMinutes;
+  const rawBottomUpNotificationTarget =
+    rawBottomUp?.inactiveAgentNotificationTarget;
+  const legacyBottomUpEnabled =
+    typeof raw.notifyManagersOfInactiveAgents === "boolean"
+      ? raw.notifyManagersOfInactiveAgents
+      : undefined;
+  const legacyBottomUpMaxInactivityMinutes = raw.maxInactivityMinutes;
+  const legacyBottomUpNotificationTarget = raw.inactiveAgentNotificationTarget;
+
+  const bottomUpEnabled =
+    rawBottomUpEnabled ??
+    legacyBottomUpEnabled ??
+    defaults.taskDelegationStrategies.bottomUp.enabled;
+  const bottomUpMaxInactivityMinutes = resolveMaxInactivityMinutesValue(
+    rawBottomUpMaxInactivityMinutes ?? legacyBottomUpMaxInactivityMinutes,
+  );
+  const bottomUpInactiveAgentNotificationTarget =
+    resolveInactiveAgentNotificationTarget(
+      rawBottomUpNotificationTarget ?? legacyBottomUpNotificationTarget,
+    );
 
   return {
     taskCronEnabled:
       typeof raw.taskCronEnabled === "boolean"
         ? raw.taskCronEnabled
         : defaults.taskCronEnabled,
-    notifyManagersOfInactiveAgents:
-      typeof raw.notifyManagersOfInactiveAgents === "boolean"
-        ? raw.notifyManagersOfInactiveAgents
-        : defaults.notifyManagersOfInactiveAgents,
-    maxInactivityMinutes: resolveMaxInactivityMinutesValue(
-      raw.maxInactivityMinutes,
-    ),
     maxInProgressMinutes: resolveMaxInProgressMinutesValue(
       raw.maxInProgressMinutes,
     ),
     maxParallelFlows: resolveMaxParallelFlowsValue(raw.maxParallelFlows),
-    inactiveAgentNotificationTarget: resolveInactiveAgentNotificationTarget(
-      raw.inactiveAgentNotificationTarget,
-    ),
+    taskDelegationStrategies: {
+      bottomUp: {
+        enabled: bottomUpEnabled,
+        maxInactivityMinutes: bottomUpMaxInactivityMinutes,
+        inactiveAgentNotificationTarget:
+          bottomUpInactiveAgentNotificationTarget,
+      },
+    },
     authentication: normalizeAuthenticationSettings(raw.authentication),
     ceoBootstrapPending:
       typeof raw.ceoBootstrapPending === "boolean"
@@ -734,8 +786,8 @@ export function DashboardPage(): ReactElement {
   );
   const [taskCronEnabledInput, setTaskCronEnabledInput] = useState(true);
   const [
-    notifyManagersOfInactiveAgentsInput,
-    setNotifyManagersOfInactiveAgentsInput,
+    bottomUpTaskDelegationEnabledInput,
+    setBottomUpTaskDelegationEnabledInput,
   ] = useState(true);
   const [
     inactiveAgentNotificationTargetInput,
@@ -962,14 +1014,20 @@ export function DashboardPage(): ReactElement {
         settings: normalizedSettings,
       });
       setTaskCronEnabledInput(normalizedSettings.taskCronEnabled);
-      setMaxInactivityMinutesInput(String(normalizedSettings.maxInactivityMinutes));
+      setMaxInactivityMinutesInput(
+        String(
+          normalizedSettings.taskDelegationStrategies.bottomUp
+            .maxInactivityMinutes,
+        ),
+      );
       setMaxInProgressMinutesInput(String(normalizedSettings.maxInProgressMinutes));
       setMaxParallelFlowsInput(String(normalizedSettings.maxParallelFlows));
-      setNotifyManagersOfInactiveAgentsInput(
-        normalizedSettings.notifyManagersOfInactiveAgents,
+      setBottomUpTaskDelegationEnabledInput(
+        normalizedSettings.taskDelegationStrategies.bottomUp.enabled,
       );
       setInactiveAgentNotificationTargetInput(
-        normalizedSettings.inactiveAgentNotificationTarget,
+        normalizedSettings.taskDelegationStrategies.bottomUp
+          .inactiveAgentNotificationTarget,
       );
       setUiAuthenticationEnabledInput(normalizedSettings.authentication.enabled);
       setUiAuthenticationUsernameInput(normalizedSettings.authentication.username);
@@ -2507,7 +2565,7 @@ export function DashboardPage(): ReactElement {
       parsedMaxParallelFlows <= MAX_MAX_PARALLEL_FLOWS;
     if (
       taskCronEnabledInput &&
-      notifyManagersOfInactiveAgentsInput &&
+      bottomUpTaskDelegationEnabledInput &&
       !isMaxInactivityValid
     ) {
       toast.error(
@@ -2528,7 +2586,8 @@ export function DashboardPage(): ReactElement {
       return;
     }
     const fallbackMaxInactivityMinutes =
-      state?.settings.maxInactivityMinutes ?? DEFAULT_MAX_INACTIVITY_MINUTES;
+      state?.settings.taskDelegationStrategies.bottomUp.maxInactivityMinutes ??
+      DEFAULT_MAX_INACTIVITY_MINUTES;
     const fallbackMaxInProgressMinutes =
       state?.settings.maxInProgressMinutes ?? DEFAULT_MAX_IN_PROGRESS_MINUTES;
     const fallbackMaxParallelFlows =
@@ -2547,11 +2606,15 @@ export function DashboardPage(): ReactElement {
     try {
       const settingsPayload: {
         taskCronEnabled: boolean;
-        notifyManagersOfInactiveAgents: boolean;
-        maxInactivityMinutes: number;
         maxInProgressMinutes: number;
         maxParallelFlows: number;
-        inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+        taskDelegationStrategies: {
+          bottomUp: {
+            enabled: boolean;
+            maxInactivityMinutes: number;
+            inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+          };
+        };
         authentication?: {
           enabled: boolean;
           username?: string;
@@ -2560,12 +2623,15 @@ export function DashboardPage(): ReactElement {
         };
       } = {
         taskCronEnabled: taskCronEnabledInput,
-        notifyManagersOfInactiveAgents: notifyManagersOfInactiveAgentsInput,
-        maxInactivityMinutes: resolvedMaxInactivityMinutes,
         maxInProgressMinutes: resolvedMaxInProgressMinutes,
         maxParallelFlows: resolvedMaxParallelFlows,
-        inactiveAgentNotificationTarget:
-          inactiveAgentNotificationTargetInput,
+        taskDelegationStrategies: {
+          bottomUp: {
+            enabled: bottomUpTaskDelegationEnabledInput,
+            maxInactivityMinutes: resolvedMaxInactivityMinutes,
+            inactiveAgentNotificationTarget: inactiveAgentNotificationTargetInput,
+          },
+        },
       };
       if (authenticationSettingsChanged) {
         settingsPayload.authentication = {
@@ -2599,9 +2665,9 @@ export function DashboardPage(): ReactElement {
         ? "Task automation checks disabled."
         : response.settings.ceoBootstrapPending
           ? "Task automation checks are waiting for the first CEO message."
-        : notifyManagersOfInactiveAgentsInput
-          ? `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; in-progress timeout set to ${resolvedMaxInProgressMinutes} minutes; inactivity notifications enabled (${resolvedMaxInactivityMinutes} minutes).`
-          : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; in-progress timeout set to ${resolvedMaxInProgressMinutes} minutes; inactivity notifications disabled.`;
+        : bottomUpTaskDelegationEnabledInput
+          ? `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; in-progress timeout set to ${resolvedMaxInProgressMinutes} minutes; Bottom-Up task delegation enabled (${resolvedMaxInactivityMinutes} minutes).`
+          : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; in-progress timeout set to ${resolvedMaxInProgressMinutes} minutes; Bottom-Up task delegation disabled.`;
       toast.success(response.message ?? statusMessage);
       await refreshAuthenticationStatus();
     } catch (requestError) {
@@ -2618,11 +2684,15 @@ export function DashboardPage(): ReactElement {
   async function persistUiSettings(
     settings: {
       taskCronEnabled: boolean;
-      notifyManagersOfInactiveAgents: boolean;
-      maxInactivityMinutes: number;
       maxInProgressMinutes: number;
       maxParallelFlows: number;
-      inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+      taskDelegationStrategies: {
+        bottomUp: {
+          enabled: boolean;
+          maxInactivityMinutes: number;
+          inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+        };
+      };
       authentication?: {
         enabled: boolean;
         username?: string;
@@ -2657,17 +2727,21 @@ export function DashboardPage(): ReactElement {
     });
     setTaskCronEnabledInput(normalizedSettings.taskCronEnabled);
     setMaxInactivityMinutesInput(
-      String(normalizedSettings.maxInactivityMinutes),
+      String(
+        normalizedSettings.taskDelegationStrategies.bottomUp
+          .maxInactivityMinutes,
+      ),
     );
     setMaxInProgressMinutesInput(
       String(normalizedSettings.maxInProgressMinutes),
     );
     setMaxParallelFlowsInput(String(normalizedSettings.maxParallelFlows));
-    setNotifyManagersOfInactiveAgentsInput(
-      normalizedSettings.notifyManagersOfInactiveAgents,
+    setBottomUpTaskDelegationEnabledInput(
+      normalizedSettings.taskDelegationStrategies.bottomUp.enabled,
     );
     setInactiveAgentNotificationTargetInput(
-      normalizedSettings.inactiveAgentNotificationTarget,
+      normalizedSettings.taskDelegationStrategies.bottomUp
+        .inactiveAgentNotificationTarget,
     );
     setUiAuthenticationEnabledInput(normalizedSettings.authentication.enabled);
     setUiAuthenticationUsernameInput(normalizedSettings.authentication.username);
@@ -5023,8 +5097,8 @@ export function DashboardPage(): ReactElement {
                     defaultAgentId={DEFAULT_AGENT_ID}
                     taskCronIntervalMinutes={TASK_CRON_INTERVAL_MINUTES}
                     taskCronEnabledInput={taskCronEnabledInput}
-                    notifyManagersOfInactiveAgentsInput={
-                      notifyManagersOfInactiveAgentsInput
+                    bottomUpTaskDelegationEnabledInput={
+                      bottomUpTaskDelegationEnabledInput
                     }
                     maxInactivityMinutesInput={maxInactivityMinutesInput}
                     maxInProgressMinutesInput={maxInProgressMinutesInput}
@@ -5070,8 +5144,8 @@ export function DashboardPage(): ReactElement {
                     onMaxParallelFlowsInputChange={(value) => {
                       setMaxParallelFlowsInput(value);
                     }}
-                    onNotifyManagersOfInactiveAgentsChange={(checked) => {
-                      setNotifyManagersOfInactiveAgentsInput(checked);
+                    onBottomUpTaskDelegationEnabledChange={(checked) => {
+                      setBottomUpTaskDelegationEnabledInput(checked);
                     }}
                     onMaxInactivityMinutesInputChange={(value) => {
                       setMaxInactivityMinutesInput(value);

@@ -218,10 +218,14 @@ describe("OpenGoat UI server API", () => {
     expect(defaultResponse.json()).toMatchObject({
       settings: {
         taskCronEnabled: true,
-        notifyManagersOfInactiveAgents: true,
-        maxInactivityMinutes: 30,
         maxParallelFlows: 3,
-        inactiveAgentNotificationTarget: "all-managers",
+        taskDelegationStrategies: {
+          bottomUp: {
+            enabled: true,
+            maxInactivityMinutes: 30,
+            inactiveAgentNotificationTarget: "all-managers",
+          },
+        },
         ceoBootstrapPending: false,
       },
     });
@@ -231,20 +235,28 @@ describe("OpenGoat UI server API", () => {
       url: "/api/settings",
       payload: {
         taskCronEnabled: false,
-        notifyManagersOfInactiveAgents: false,
-        maxInactivityMinutes: 45,
+        taskDelegationStrategies: {
+          bottomUp: {
+            enabled: false,
+            maxInactivityMinutes: 45,
+            inactiveAgentNotificationTarget: "ceo-only",
+          },
+        },
         maxParallelFlows: 6,
-        inactiveAgentNotificationTarget: "ceo-only",
       },
     });
     expect(updateResponse.statusCode).toBe(200);
     expect(updateResponse.json()).toMatchObject({
       settings: {
         taskCronEnabled: false,
-        notifyManagersOfInactiveAgents: false,
-        maxInactivityMinutes: 45,
         maxParallelFlows: 6,
-        inactiveAgentNotificationTarget: "ceo-only",
+        taskDelegationStrategies: {
+          bottomUp: {
+            enabled: false,
+            maxInactivityMinutes: 45,
+            inactiveAgentNotificationTarget: "ceo-only",
+          },
+        },
         ceoBootstrapPending: false,
       },
     });
@@ -254,20 +266,28 @@ describe("OpenGoat UI server API", () => {
       url: "/api/settings",
       payload: {
         taskCronEnabled: true,
-        notifyManagersOfInactiveAgents: false,
-        maxInactivityMinutes: 45,
+        taskDelegationStrategies: {
+          bottomUp: {
+            enabled: false,
+            maxInactivityMinutes: 45,
+            inactiveAgentNotificationTarget: "ceo-only",
+          },
+        },
         maxParallelFlows: 6,
-        inactiveAgentNotificationTarget: "ceo-only",
       },
     });
     expect(automationOnlyResponse.statusCode).toBe(200);
     expect(automationOnlyResponse.json()).toMatchObject({
       settings: {
         taskCronEnabled: true,
-        notifyManagersOfInactiveAgents: false,
-        maxInactivityMinutes: 45,
         maxParallelFlows: 6,
-        inactiveAgentNotificationTarget: "ceo-only",
+        taskDelegationStrategies: {
+          bottomUp: {
+            enabled: false,
+            maxInactivityMinutes: 45,
+            inactiveAgentNotificationTarget: "ceo-only",
+          },
+        },
         ceoBootstrapPending: false,
       },
     });
@@ -280,10 +300,14 @@ describe("OpenGoat UI server API", () => {
     expect(updatedResponse.json()).toMatchObject({
       settings: {
         taskCronEnabled: true,
-        notifyManagersOfInactiveAgents: false,
-        maxInactivityMinutes: 45,
         maxParallelFlows: 6,
-        inactiveAgentNotificationTarget: "ceo-only",
+        taskDelegationStrategies: {
+          bottomUp: {
+            enabled: false,
+            maxInactivityMinutes: 45,
+            inactiveAgentNotificationTarget: "ceo-only",
+          },
+        },
         ceoBootstrapPending: false,
       },
     });
@@ -726,10 +750,14 @@ describe("OpenGoat UI server API", () => {
         `${uniqueHomeDir}/ui-settings.json`,
         `${JSON.stringify({
           taskCronEnabled: false,
-          notifyManagersOfInactiveAgents: false,
-          maxInactivityMinutes: 30,
+          taskDelegationStrategies: {
+            bottomUp: {
+              enabled: false,
+              maxInactivityMinutes: 30,
+              inactiveAgentNotificationTarget: "ceo-only",
+            },
+          },
           maxParallelFlows: 4,
-          inactiveAgentNotificationTarget: "ceo-only",
         }, null, 2)}\n`,
         "utf8"
       );
@@ -902,10 +930,14 @@ describe("OpenGoat UI server API", () => {
     expect(response.json()).toMatchObject({
       settings: {
         taskCronEnabled: false,
-        notifyManagersOfInactiveAgents: false,
-        maxInactivityMinutes: 30,
         maxParallelFlows: 3,
-        inactiveAgentNotificationTarget: "all-managers",
+        taskDelegationStrategies: {
+          bottomUp: {
+            enabled: false,
+            maxInactivityMinutes: 30,
+            inactiveAgentNotificationTarget: "all-managers",
+          },
+        },
       },
     });
   });

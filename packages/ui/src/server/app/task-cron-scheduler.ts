@@ -4,19 +4,19 @@ import {
   defaultUiServerSettings,
   isCeoBootstrapPending,
   parseInactiveAgentNotificationTarget,
+  parseBooleanSetting,
   parseMaxInactivityMinutes,
   parseMaxInProgressMinutes,
   parseMaxParallelFlows,
-  parseNotifyManagersOfInactiveAgents,
   parseTaskCronEnabled,
   readUiServerSettings,
 } from "./settings.js";
 import { formatUiLogQuotedPreview } from "./text.js";
 import type {
-  InactiveAgentNotificationTarget,
   TaskCronDispatchResult,
   OpenClawUiService,
   TaskCronScheduler,
+  UiTaskDelegationStrategiesSettings,
   UiLogBuffer,
   UiServerSettings,
 } from "./types.js";
@@ -32,19 +32,13 @@ export function createTaskCronScheduler(
       setTaskCronEnabled: () => {
         // no-op when runtime task cron is unavailable.
       },
-      setNotifyManagersOfInactiveAgents: () => {
-        // no-op when runtime task cron is unavailable.
-      },
-      setMaxInactivityMinutes: () => {
+      setTaskDelegationStrategies: () => {
         // no-op when runtime task cron is unavailable.
       },
       setMaxInProgressMinutes: () => {
         // no-op when runtime task cron is unavailable.
       },
       setMaxParallelFlows: () => {
-        // no-op when runtime task cron is unavailable.
-      },
-      setInactiveAgentNotificationTarget: () => {
         // no-op when runtime task cron is unavailable.
       },
       stop: () => {
@@ -56,23 +50,16 @@ export function createTaskCronScheduler(
   let taskCronEnabled =
     parseTaskCronEnabled(initialSettings.taskCronEnabled) ??
     defaultUiServerSettings().taskCronEnabled;
-  let notifyManagersOfInactiveAgents =
-    parseNotifyManagersOfInactiveAgents(
-      initialSettings.notifyManagersOfInactiveAgents,
-    ) ?? defaultUiServerSettings().notifyManagersOfInactiveAgents;
-  let maxInactivityMinutes =
-    parseMaxInactivityMinutes(initialSettings.maxInactivityMinutes) ??
-    defaultUiServerSettings().maxInactivityMinutes;
+  let bottomUpTaskDelegation = normalizeBottomUpTaskDelegationSettings(
+    initialSettings.taskDelegationStrategies?.bottomUp,
+    defaultUiServerSettings().taskDelegationStrategies.bottomUp,
+  );
   let maxInProgressMinutes =
     parseMaxInProgressMinutes(initialSettings.maxInProgressMinutes) ??
     defaultUiServerSettings().maxInProgressMinutes;
   let maxParallelFlows =
     parseMaxParallelFlows(initialSettings.maxParallelFlows) ??
     defaultUiServerSettings().maxParallelFlows;
-  let inactiveAgentNotificationTarget =
-    parseInactiveAgentNotificationTarget(
-      initialSettings.inactiveAgentNotificationTarget,
-    ) ?? defaultUiServerSettings().inactiveAgentNotificationTarget;
   const homeDir = service.getHomeDir();
   let intervalHandle: NodeJS.Timeout | undefined;
   let bootstrapCheckHandle: NodeJS.Timeout | undefined;
@@ -86,64 +73,51 @@ export function createTaskCronScheduler(
       return;
     }
 
-    const persistedNotifyManagers =
-      parseNotifyManagersOfInactiveAgents(
-        persisted.notifyManagersOfInactiveAgents,
-      ) ?? notifyManagersOfInactiveAgents;
     const persistedTaskCronEnabled =
       parseTaskCronEnabled(persisted.taskCronEnabled) ?? taskCronEnabled;
-    const persistedMaxInactivityMinutes =
-      parseMaxInactivityMinutes(persisted.maxInactivityMinutes) ??
-      maxInactivityMinutes;
+    const persistedBottomUpTaskDelegation = normalizeBottomUpTaskDelegationSettings(
+      persisted.taskDelegationStrategies?.bottomUp,
+      bottomUpTaskDelegation,
+    );
     const persistedMaxInProgressMinutes =
       parseMaxInProgressMinutes(persisted.maxInProgressMinutes) ??
       maxInProgressMinutes;
     const persistedMaxParallelFlows =
       parseMaxParallelFlows(persisted.maxParallelFlows) ?? maxParallelFlows;
-    const persistedNotificationTarget =
-      parseInactiveAgentNotificationTarget(
-        persisted.inactiveAgentNotificationTarget,
-      ) ?? inactiveAgentNotificationTarget;
 
     const hasTaskCronEnabledChange = persistedTaskCronEnabled !== taskCronEnabled;
-    const hasNotifyManagersChange =
-      persistedNotifyManagers !== notifyManagersOfInactiveAgents;
-    const hasMaxInactivityChange =
-      persistedMaxInactivityMinutes !== maxInactivityMinutes;
+    const hasBottomUpChange = !isSameBottomUpTaskDelegationSettings(
+      persistedBottomUpTaskDelegation,
+      bottomUpTaskDelegation,
+    );
     const hasMaxInProgressChange =
       persistedMaxInProgressMinutes !== maxInProgressMinutes;
     const hasMaxParallelFlowsChange =
       persistedMaxParallelFlows !== maxParallelFlows;
-    const hasNotificationTargetChange =
-      persistedNotificationTarget !== inactiveAgentNotificationTarget;
     if (
       !hasTaskCronEnabledChange &&
-      !hasNotifyManagersChange &&
-      !hasMaxInactivityChange &&
+      !hasBottomUpChange &&
       !hasMaxInProgressChange &&
-      !hasMaxParallelFlowsChange &&
-      !hasNotificationTargetChange
+      !hasMaxParallelFlowsChange
     ) {
       return;
     }
 
     taskCronEnabled = persistedTaskCronEnabled;
-    notifyManagersOfInactiveAgents = persistedNotifyManagers;
-    maxInactivityMinutes = persistedMaxInactivityMinutes;
+    bottomUpTaskDelegation = persistedBottomUpTaskDelegation;
     maxInProgressMinutes = persistedMaxInProgressMinutes;
     maxParallelFlows = persistedMaxParallelFlows;
-    inactiveAgentNotificationTarget = persistedNotificationTarget;
     if (hasTaskCronEnabledChange) {
       schedule();
     }
     app.log.info(
       {
         taskCronEnabled,
-        notifyManagersOfInactiveAgents,
-        maxInactivityMinutes,
+        taskDelegationStrategies: {
+          bottomUp: bottomUpTaskDelegation,
+        },
         maxInProgressMinutes,
         maxParallelFlows,
-        inactiveAgentNotificationTarget,
       },
       "[task-cron] scheduler synchronized from persisted settings",
     );
@@ -164,10 +138,18 @@ export function createTaskCronScheduler(
         return;
       }
       const cycle = await service.runTaskCronCycle?.({
-        inactiveMinutes: maxInactivityMinutes,
+        inactiveMinutes: bottomUpTaskDelegation.maxInactivityMinutes,
         inProgressMinutes: maxInProgressMinutes,
-        notificationTarget: inactiveAgentNotificationTarget,
-        notifyInactiveAgents: notifyManagersOfInactiveAgents,
+        notificationTarget: bottomUpTaskDelegation.inactiveAgentNotificationTarget,
+        notifyInactiveAgents: bottomUpTaskDelegation.enabled,
+        delegationStrategies: {
+          bottomUp: {
+            enabled: bottomUpTaskDelegation.enabled,
+            inactiveMinutes: bottomUpTaskDelegation.maxInactivityMinutes,
+            notificationTarget:
+              bottomUpTaskDelegation.inactiveAgentNotificationTarget,
+          },
+        },
         maxParallelFlows,
       });
       if (cycle) {
@@ -298,42 +280,30 @@ export function createTaskCronScheduler(
         message: `[task-cron] automation checks ${taskCronEnabled ? "enabled" : "disabled"}.`,
       });
     },
-    setNotifyManagersOfInactiveAgents: (nextEnabled: boolean) => {
-      const parsed = parseNotifyManagersOfInactiveAgents(nextEnabled);
-      if (parsed === undefined || parsed === notifyManagersOfInactiveAgents) {
+    setTaskDelegationStrategies: (nextStrategies: UiTaskDelegationStrategiesSettings) => {
+      const nextBottomUp = normalizeBottomUpTaskDelegationSettings(
+        nextStrategies?.bottomUp,
+        bottomUpTaskDelegation,
+      );
+      if (isSameBottomUpTaskDelegationSettings(nextBottomUp, bottomUpTaskDelegation)) {
         return;
       }
-      notifyManagersOfInactiveAgents = parsed;
+      bottomUpTaskDelegation = nextBottomUp;
       app.log.info(
         {
-          notifyManagersOfInactiveAgents,
+          taskDelegationStrategies: {
+            bottomUp: bottomUpTaskDelegation,
+          },
         },
-        "[task-cron] inactivity notification state updated",
+        "[task-cron] task delegation strategies updated",
       );
       logs.append({
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `[task-cron] inactive-manager notifications ${notifyManagersOfInactiveAgents ? "enabled" : "disabled"}.`,
-      });
-    },
-    setMaxInactivityMinutes: (nextMaxInactivityMinutes: number) => {
-      const parsed = parseMaxInactivityMinutes(nextMaxInactivityMinutes);
-      if (!parsed || parsed === maxInactivityMinutes) {
-        return;
-      }
-      maxInactivityMinutes = parsed;
-      app.log.info(
-        {
-          maxInactivityMinutes,
-        },
-        "[task-cron] inactivity threshold updated",
-      );
-      logs.append({
-        timestamp: new Date().toISOString(),
-        level: "info",
-        source: "opengoat",
-        message: `[task-cron] inactivity threshold updated to ${maxInactivityMinutes} minute(s).`,
+        message: `[task-cron] bottom-up task delegation ${
+          bottomUpTaskDelegation.enabled ? "enabled" : "disabled"
+        } (max inactivity ${bottomUpTaskDelegation.maxInactivityMinutes}m, audience ${bottomUpTaskDelegation.inactiveAgentNotificationTarget}).`,
       });
     },
     setMaxInProgressMinutes: (nextMaxInProgressMinutes: number) => {
@@ -374,27 +344,6 @@ export function createTaskCronScheduler(
         message: `[task-cron] max parallel flows updated to ${maxParallelFlows}.`,
       });
     },
-    setInactiveAgentNotificationTarget: (
-      nextTarget: InactiveAgentNotificationTarget,
-    ) => {
-      const parsed = parseInactiveAgentNotificationTarget(nextTarget);
-      if (!parsed || parsed === inactiveAgentNotificationTarget) {
-        return;
-      }
-      inactiveAgentNotificationTarget = parsed;
-      app.log.info(
-        {
-          inactiveAgentNotificationTarget,
-        },
-        "[task-cron] inactivity notification target updated",
-      );
-      logs.append({
-        timestamp: new Date().toISOString(),
-        level: "info",
-        source: "opengoat",
-        message: `[task-cron] inactivity notification target set to ${inactiveAgentNotificationTarget}.`,
-      });
-    },
     stop: () => {
       if (intervalHandle) {
         clearInterval(intervalHandle);
@@ -422,4 +371,38 @@ function formatTaskCronDispatchLogMessage(
     return `[task-cron] Failed to deliver ${dispatch.kind} message to ${target}.${taskSuffix}${subjectSuffix}${sessionSuffix}${previewSuffix}${errorSuffix}`;
   }
   return `[task-cron] Agent ${target} received ${dispatch.kind} message.${taskSuffix}${subjectSuffix}${sessionSuffix}${previewSuffix}`;
+}
+
+function normalizeBottomUpTaskDelegationSettings(
+  value:
+    | Partial<UiTaskDelegationStrategiesSettings["bottomUp"]>
+    | UiTaskDelegationStrategiesSettings["bottomUp"]
+    | undefined,
+  fallback: UiTaskDelegationStrategiesSettings["bottomUp"],
+): UiTaskDelegationStrategiesSettings["bottomUp"] {
+  const enabled = parseBooleanSetting(value?.enabled) ?? fallback.enabled;
+  const maxInactivityMinutes =
+    parseMaxInactivityMinutes(value?.maxInactivityMinutes) ??
+    fallback.maxInactivityMinutes;
+  const inactiveAgentNotificationTarget =
+    parseInactiveAgentNotificationTarget(value?.inactiveAgentNotificationTarget) ??
+    fallback.inactiveAgentNotificationTarget;
+
+  return {
+    enabled,
+    maxInactivityMinutes,
+    inactiveAgentNotificationTarget,
+  };
+}
+
+function isSameBottomUpTaskDelegationSettings(
+  left: UiTaskDelegationStrategiesSettings["bottomUp"],
+  right: UiTaskDelegationStrategiesSettings["bottomUp"],
+): boolean {
+  return (
+    left.enabled === right.enabled &&
+    left.maxInactivityMinutes === right.maxInactivityMinutes &&
+    left.inactiveAgentNotificationTarget ===
+      right.inactiveAgentNotificationTarget
+  );
 }

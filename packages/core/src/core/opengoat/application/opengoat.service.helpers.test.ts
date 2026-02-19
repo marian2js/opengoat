@@ -9,6 +9,7 @@ import {
   buildPendingTaskMessage,
   buildTaskSessionRef,
   buildTodoTaskMessage,
+  resolveBottomUpTaskDelegationStrategy,
 } from "./opengoat.service.helpers.js";
 
 describe("opengoat task cron notification helpers", () => {
@@ -120,6 +121,41 @@ describe("opengoat task cron notification helpers", () => {
     expect(message).toContain("Last action: 2026-02-16T15:45:00.000Z");
     expect(message).toContain("Last action: none recorded");
     expect(message).toContain("Notification timestamp: 2026-02-16T16:30:00.000Z");
+  });
+
+  it("resolves bottom-up strategy from explicit strategy config", () => {
+    const resolved = resolveBottomUpTaskDelegationStrategy({
+      inactiveMinutes: 30,
+      notificationTarget: "all-managers",
+      notifyInactiveAgents: true,
+      delegationStrategies: {
+        bottomUp: {
+          enabled: false,
+          inactiveMinutes: 90,
+          notificationTarget: "ceo-only",
+        },
+      },
+    });
+
+    expect(resolved).toEqual({
+      enabled: false,
+      inactiveMinutes: 90,
+      notificationTarget: "ceo-only",
+    });
+  });
+
+  it("falls back to legacy inactive settings when bottom-up config is absent", () => {
+    const resolved = resolveBottomUpTaskDelegationStrategy({
+      inactiveMinutes: 45,
+      notificationTarget: "ceo-only",
+      notifyInactiveAgents: true,
+    });
+
+    expect(resolved).toEqual({
+      enabled: true,
+      inactiveMinutes: 45,
+      notificationTarget: "ceo-only",
+    });
   });
 });
 
