@@ -256,7 +256,8 @@ export interface TaskEntry {
 export interface TaskRecord {
   taskId: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
+  project?: string;
   owner: string;
   assignedTo: string;
   title: string;
@@ -287,7 +288,7 @@ export interface TaskCronRunResult {
   ranAt: string;
   scannedTasks: number;
   todoTasks: number;
-  doingTasks: number;
+  doingTasks?: number;
   blockedTasks: number;
   inactiveAgents: number;
   sent: number;

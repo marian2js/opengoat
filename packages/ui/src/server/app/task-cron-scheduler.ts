@@ -171,12 +171,13 @@ export function createTaskCronScheduler(
         maxParallelFlows,
       });
       if (cycle) {
+        const doingTasks = cycle.doingTasks ?? 0;
         app.log.info(
           {
             ranAt: cycle.ranAt,
             scanned: cycle.scannedTasks,
             todo: cycle.todoTasks,
-            doing: cycle.doingTasks,
+            doing: doingTasks,
             blocked: cycle.blockedTasks,
             inactive: cycle.inactiveAgents,
             maxParallelFlows,
@@ -189,7 +190,7 @@ export function createTaskCronScheduler(
           timestamp: new Date().toISOString(),
           level: cycle.failed > 0 ? "warn" : "info",
           source: "opengoat",
-          message: `[task-cron] cycle completed ran=${cycle.ranAt} scanned=${cycle.scannedTasks} todo=${cycle.todoTasks} doing=${cycle.doingTasks} blocked=${cycle.blockedTasks} inactive=${cycle.inactiveAgents} sent=${cycle.sent} failed=${cycle.failed}`,
+          message: `[task-cron] cycle completed ran=${cycle.ranAt} scanned=${cycle.scannedTasks} todo=${cycle.todoTasks} doing=${doingTasks} blocked=${cycle.blockedTasks} inactive=${cycle.inactiveAgents} sent=${cycle.sent} failed=${cycle.failed}`,
         });
         for (const dispatch of cycle.dispatches ?? []) {
           logs.append({
