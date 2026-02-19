@@ -87,12 +87,12 @@ import {
   pathIsWithin,
   pathMatches,
   prepareOpenClawCommandEnv,
-  resolveInactiveAgentNotificationTarget,
   resolveInProgressTimeoutMinutes,
-  resolveInactiveMinutes,
+  resolveBottomUpTaskDelegationStrategy,
   resolveMaxParallelFlows,
   toErrorMessage,
   type OpenClawAgentPathEntry,
+  type TaskDelegationStrategiesConfig,
 } from "./opengoat.service.helpers.js";
 
 interface OpenGoatServiceDeps {
@@ -997,27 +997,24 @@ export class OpenGoatService {
       inProgressMinutes?: number;
       notificationTarget?: InactiveAgentNotificationTarget;
       notifyInactiveAgents?: boolean;
+      delegationStrategies?: TaskDelegationStrategiesConfig;
       maxParallelFlows?: number;
     } = {},
   ): Promise<TaskCronRunResult> {
     const paths = this.pathsProvider.getPaths();
     const ranAt = this.resolveNowIso();
     const manifests = await this.agentManifestService.listManifests(paths);
-    const inactiveMinutes = resolveInactiveMinutes(options.inactiveMinutes);
     const inProgressMinutes = resolveInProgressTimeoutMinutes(
       options.inProgressMinutes,
     );
-    const notificationTarget = resolveInactiveAgentNotificationTarget(
-      options.notificationTarget,
-    );
-    const notifyInactiveAgents = options.notifyInactiveAgents ?? true;
+    const bottomUpStrategy = resolveBottomUpTaskDelegationStrategy(options);
     const maxParallelFlows = resolveMaxParallelFlows(options.maxParallelFlows);
-    const inactiveCandidates = notifyInactiveAgents
+    const inactiveCandidates = bottomUpStrategy.enabled
       ? await this.collectInactiveAgents(
           paths,
           manifests,
-          inactiveMinutes,
-          notificationTarget,
+          bottomUpStrategy.inactiveMinutes,
+          bottomUpStrategy.notificationTarget,
         )
       : [];
 
@@ -1025,7 +1022,7 @@ export class OpenGoatService {
     const pendingTaskIds = new Set(
       await this.boardService.listPendingTaskIdsOlderThan(
         paths,
-        inactiveMinutes,
+        bottomUpStrategy.inactiveMinutes,
       ),
     );
     const doingTaskIds = new Set(
@@ -1041,14 +1038,14 @@ export class OpenGoatService {
       doingTaskIds,
       pendingTaskIds,
       inProgressMinutes,
-      inactiveMinutes,
+      bottomUpStrategy.inactiveMinutes,
       ranAt,
       maxParallelFlows,
     );
     const inactiveDispatches = await this.dispatchInactiveAgentAutomations(
       paths,
       inactiveCandidates,
-      inactiveMinutes,
+      bottomUpStrategy.inactiveMinutes,
       ranAt,
       maxParallelFlows,
     );

@@ -315,6 +315,14 @@ export function registerApiRoutes(
   app.post<{
     Body: {
       taskCronEnabled?: boolean;
+      taskDelegationStrategies?: {
+        bottomUp?: {
+          enabled?: boolean;
+          maxInactivityMinutes?: number;
+          inactiveAgentNotificationTarget?: InactiveAgentNotificationTarget;
+        };
+      };
+      // Legacy settings support (read/write compatibility).
       notifyManagersOfInactiveAgents?: boolean;
       maxInactivityMinutes?: number;
       maxInProgressMinutes?: number;
@@ -334,6 +342,11 @@ export function registerApiRoutes(
         request.body ?? {},
         "taskCronEnabled",
       );
+      const hasTaskDelegationStrategiesSetting =
+        Object.prototype.hasOwnProperty.call(
+          request.body ?? {},
+          "taskDelegationStrategies",
+        );
       const hasNotifyManagersSetting = Object.prototype.hasOwnProperty.call(
         request.body ?? {},
         "notifyManagersOfInactiveAgents",
@@ -370,22 +383,96 @@ export function registerApiRoutes(
         };
       }
 
-      const parsedNotifyManagers = hasNotifyManagersSetting
+      const currentBottomUpStrategy =
+        currentSettings.taskDelegationStrategies.bottomUp;
+      if (
+        hasTaskDelegationStrategiesSetting &&
+        (!request.body?.taskDelegationStrategies ||
+          typeof request.body.taskDelegationStrategies !== "object" ||
+          Array.isArray(request.body.taskDelegationStrategies))
+      ) {
+        reply.code(400);
+        return {
+          error: "taskDelegationStrategies must be an object",
+        };
+      }
+      const requestedTaskDelegationStrategies =
+        request.body?.taskDelegationStrategies;
+      const hasBottomUpStrategySetting = Object.prototype.hasOwnProperty.call(
+        requestedTaskDelegationStrategies ?? {},
+        "bottomUp",
+      );
+      if (
+        hasBottomUpStrategySetting &&
+        (!requestedTaskDelegationStrategies?.bottomUp ||
+          typeof requestedTaskDelegationStrategies.bottomUp !== "object" ||
+          Array.isArray(requestedTaskDelegationStrategies.bottomUp))
+      ) {
+        reply.code(400);
+        return {
+          error: "taskDelegationStrategies.bottomUp must be an object",
+        };
+      }
+      const requestedBottomUpStrategy =
+        requestedTaskDelegationStrategies?.bottomUp;
+
+      const hasBottomUpEnabledSetting = Object.prototype.hasOwnProperty.call(
+        requestedBottomUpStrategy ?? {},
+        "enabled",
+      );
+      const hasBottomUpMaxInactivitySetting =
+        Object.prototype.hasOwnProperty.call(
+          requestedBottomUpStrategy ?? {},
+          "maxInactivityMinutes",
+        );
+      const hasBottomUpNotificationTargetSetting =
+        Object.prototype.hasOwnProperty.call(
+          requestedBottomUpStrategy ?? {},
+          "inactiveAgentNotificationTarget",
+        );
+
+      const parsedBottomUpEnabledFromStrategy = hasBottomUpEnabledSetting
+        ? parseBooleanSetting(requestedBottomUpStrategy?.enabled)
+        : undefined;
+      if (hasBottomUpEnabledSetting && parsedBottomUpEnabledFromStrategy === undefined) {
+        reply.code(400);
+        return {
+          error: "taskDelegationStrategies.bottomUp.enabled must be true or false",
+        };
+      }
+
+      const parsedBottomUpEnabledFromLegacy = hasNotifyManagersSetting
         ? parseNotifyManagersOfInactiveAgents(
             request.body?.notifyManagersOfInactiveAgents,
           )
-        : currentSettings.notifyManagersOfInactiveAgents;
-      if (parsedNotifyManagers === undefined) {
+        : undefined;
+      if (hasNotifyManagersSetting && parsedBottomUpEnabledFromLegacy === undefined) {
         reply.code(400);
         return {
           error: "notifyManagersOfInactiveAgents must be true or false",
         };
       }
 
-      const parsedMaxInactivityMinutes = hasMaxInactivitySetting
+      const parsedBottomUpMaxInactivityFromStrategy =
+        hasBottomUpMaxInactivitySetting
+          ? parseMaxInactivityMinutes(
+              requestedBottomUpStrategy?.maxInactivityMinutes,
+            )
+          : undefined;
+      if (
+        hasBottomUpMaxInactivitySetting &&
+        parsedBottomUpMaxInactivityFromStrategy === undefined
+      ) {
+        reply.code(400);
+        return {
+          error: `taskDelegationStrategies.bottomUp.maxInactivityMinutes must be an integer between ${MIN_MAX_INACTIVITY_MINUTES} and ${MAX_MAX_INACTIVITY_MINUTES}`,
+        };
+      }
+
+      const parsedBottomUpMaxInactivityFromLegacy = hasMaxInactivitySetting
         ? parseMaxInactivityMinutes(request.body?.maxInactivityMinutes)
-        : currentSettings.maxInactivityMinutes;
-      if (!parsedMaxInactivityMinutes) {
+        : undefined;
+      if (hasMaxInactivitySetting && parsedBottomUpMaxInactivityFromLegacy === undefined) {
         reply.code(400);
         return {
           error: `maxInactivityMinutes must be an integer between ${MIN_MAX_INACTIVITY_MINUTES} and ${MAX_MAX_INACTIVITY_MINUTES}`,
@@ -409,18 +496,52 @@ export function registerApiRoutes(
           error: `maxParallelFlows must be an integer between ${MIN_MAX_PARALLEL_FLOWS} and ${MAX_MAX_PARALLEL_FLOWS}`,
         };
       }
-      const parsedNotificationTarget = hasNotificationTargetSetting
-        ? parseInactiveAgentNotificationTarget(
-            request.body?.inactiveAgentNotificationTarget,
-          )
-        : currentSettings.inactiveAgentNotificationTarget;
-      if (!parsedNotificationTarget) {
+      const parsedBottomUpNotificationTargetFromStrategy =
+        hasBottomUpNotificationTargetSetting
+          ? parseInactiveAgentNotificationTarget(
+              requestedBottomUpStrategy?.inactiveAgentNotificationTarget,
+            )
+          : undefined;
+      if (
+        hasBottomUpNotificationTargetSetting &&
+        parsedBottomUpNotificationTargetFromStrategy === undefined
+      ) {
+        reply.code(400);
+        return {
+          error:
+            "taskDelegationStrategies.bottomUp.inactiveAgentNotificationTarget must be either all-managers or ceo-only",
+        };
+      }
+
+      const parsedBottomUpNotificationTargetFromLegacy =
+        hasNotificationTargetSetting
+          ? parseInactiveAgentNotificationTarget(
+              request.body?.inactiveAgentNotificationTarget,
+            )
+          : undefined;
+      if (
+        hasNotificationTargetSetting &&
+        parsedBottomUpNotificationTargetFromLegacy === undefined
+      ) {
         reply.code(400);
         return {
           error:
             "inactiveAgentNotificationTarget must be either all-managers or ceo-only",
         };
       }
+
+      const resolvedBottomUpEnabled =
+        parsedBottomUpEnabledFromStrategy ??
+        parsedBottomUpEnabledFromLegacy ??
+        currentBottomUpStrategy.enabled;
+      const resolvedBottomUpMaxInactivityMinutes =
+        parsedBottomUpMaxInactivityFromStrategy ??
+        parsedBottomUpMaxInactivityFromLegacy ??
+        currentBottomUpStrategy.maxInactivityMinutes;
+      const resolvedBottomUpNotificationTarget =
+        parsedBottomUpNotificationTargetFromStrategy ??
+        parsedBottomUpNotificationTargetFromLegacy ??
+        currentBottomUpStrategy.inactiveAgentNotificationTarget;
 
       let nextAuthentication: UiServerAuthenticationSettings =
         currentSettings.authentication;
@@ -544,11 +665,15 @@ export function registerApiRoutes(
 
       const nextSettings: UiServerSettings = {
         taskCronEnabled: parsedTaskCronEnabled,
-        notifyManagersOfInactiveAgents: parsedNotifyManagers,
-        maxInactivityMinutes: parsedMaxInactivityMinutes,
         maxInProgressMinutes: parsedMaxInProgressMinutes,
         maxParallelFlows: parsedMaxParallelFlows,
-        inactiveAgentNotificationTarget: parsedNotificationTarget,
+        taskDelegationStrategies: {
+          bottomUp: {
+            enabled: resolvedBottomUpEnabled,
+            maxInactivityMinutes: resolvedBottomUpMaxInactivityMinutes,
+            inactiveAgentNotificationTarget: resolvedBottomUpNotificationTarget,
+          },
+        },
         authentication: nextAuthentication,
       };
       await deps.updateSettings(nextSettings);
@@ -611,7 +736,7 @@ export function registerApiRoutes(
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes} maxInProgressMinutes=${nextSettings.maxInProgressMinutes} maxParallelFlows=${nextSettings.maxParallelFlows} inactiveAgentNotificationTarget=${nextSettings.inactiveAgentNotificationTarget} authEnabled=${nextSettings.authentication.enabled}`,
+        message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} bottomUpTaskDelegationEnabled=${nextSettings.taskDelegationStrategies.bottomUp.enabled} bottomUpMaxInactivityMinutes=${nextSettings.taskDelegationStrategies.bottomUp.maxInactivityMinutes} bottomUpNotificationTarget=${nextSettings.taskDelegationStrategies.bottomUp.inactiveAgentNotificationTarget} maxInProgressMinutes=${nextSettings.maxInProgressMinutes} maxParallelFlows=${nextSettings.maxParallelFlows} authEnabled=${nextSettings.authentication.enabled}`,
       });
       const ceoBootstrapPending = isCeoBootstrapPending(service.getHomeDir());
       const taskAutomationMessage = !nextSettings.taskCronEnabled
@@ -619,15 +744,16 @@ export function registerApiRoutes(
         : ceoBootstrapPending
           ? "enabled, waiting for the first CEO message before checks start"
           : "enabled";
+      const bottomUpStrategy = nextSettings.taskDelegationStrategies.bottomUp;
       return {
         settings: toPublicUiServerSettings(nextSettings, nextAuthResponse, {
           ceoBootstrapPending,
         }),
-        message: `Task automation checks ${taskAutomationMessage} (runs every ${DEFAULT_TASK_CHECK_FREQUENCY_MINUTES} minute(s)). Inactive-agent manager notifications ${
-          nextSettings.notifyManagersOfInactiveAgents
+        message: `Task automation checks ${taskAutomationMessage} (runs every ${DEFAULT_TASK_CHECK_FREQUENCY_MINUTES} minute(s)). Bottom-Up task delegation ${
+          bottomUpStrategy.enabled
             ? "enabled"
             : "disabled"
-        }; inactivity threshold ${nextSettings.maxInactivityMinutes} minute(s); in-progress timeout ${nextSettings.maxInProgressMinutes} minute(s); max parallel flows ${nextSettings.maxParallelFlows}; audience ${nextSettings.inactiveAgentNotificationTarget}.`,
+        }; inactivity threshold ${bottomUpStrategy.maxInactivityMinutes} minute(s); in-progress timeout ${nextSettings.maxInProgressMinutes} minute(s); max parallel flows ${nextSettings.maxParallelFlows}; audience ${bottomUpStrategy.inactiveAgentNotificationTarget}.`,
       };
     });
   });

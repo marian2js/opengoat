@@ -22,19 +22,19 @@ import {
 import { DEFAULT_AGENT_ID } from "./constants.js";
 import type {
   InactiveAgentNotificationTarget,
+  UiBottomUpTaskDelegationStrategySettings,
   UiAuthenticationSettingsResponse,
   UiServerSettings,
   UiServerSettingsResponse,
+  UiTaskDelegationStrategiesSettings,
 } from "./types.js";
 
 export function defaultUiServerSettings(): UiServerSettings {
   return {
     taskCronEnabled: true,
-    notifyManagersOfInactiveAgents: true,
-    maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
     maxInProgressMinutes: DEFAULT_MAX_IN_PROGRESS_MINUTES,
     maxParallelFlows: DEFAULT_MAX_PARALLEL_FLOWS,
-    inactiveAgentNotificationTarget: "all-managers",
+    taskDelegationStrategies: defaultTaskDelegationStrategies(),
     authentication: {
       enabled: false,
       username: undefined,
@@ -67,6 +67,20 @@ export function parseNotifyManagersOfInactiveAgents(
 
 export function parseTaskCronEnabled(value: unknown): boolean | undefined {
   return parseBooleanSetting(value);
+}
+
+export function defaultBottomUpTaskDelegationStrategySettings(): UiBottomUpTaskDelegationStrategySettings {
+  return {
+    enabled: true,
+    maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
+    inactiveAgentNotificationTarget: "all-managers",
+  };
+}
+
+export function defaultTaskDelegationStrategies(): UiTaskDelegationStrategiesSettings {
+  return {
+    bottomUp: defaultBottomUpTaskDelegationStrategySettings(),
+  };
 }
 
 export function parseInactiveAgentNotificationTarget(
@@ -189,6 +203,13 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
       maxInProgressMinutes?: unknown;
       maxParallelFlows?: unknown;
       inactiveAgentNotificationTarget?: unknown;
+      taskDelegationStrategies?: {
+        bottomUp?: {
+          enabled?: unknown;
+          maxInactivityMinutes?: unknown;
+          inactiveAgentNotificationTarget?: unknown;
+        };
+      };
       authentication?: {
         enabled?: unknown;
         username?: unknown;
@@ -196,17 +217,17 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
       };
     };
     const taskCronEnabled = parseTaskCronEnabled(parsed?.taskCronEnabled);
-    const notifyManagersOfInactiveAgents =
+    const legacyNotifyManagersOfInactiveAgents =
       parseNotifyManagersOfInactiveAgents(parsed?.notifyManagersOfInactiveAgents) ??
       taskCronEnabled;
-    const maxInactivityMinutes = parseMaxInactivityMinutes(
+    const legacyMaxInactivityMinutes = parseMaxInactivityMinutes(
       parsed?.maxInactivityMinutes,
     );
     const maxInProgressMinutes = parseMaxInProgressMinutes(
       parsed?.maxInProgressMinutes,
     );
     const maxParallelFlows = parseMaxParallelFlows(parsed?.maxParallelFlows);
-    const inactiveAgentNotificationTarget = parseInactiveAgentNotificationTarget(
+    const legacyInactiveAgentNotificationTarget = parseInactiveAgentNotificationTarget(
       parsed?.inactiveAgentNotificationTarget,
     );
     const authEnabled = parseBooleanSetting(parsed.authentication?.enabled);
@@ -217,16 +238,41 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
       parsed.authentication?.passwordHash,
     );
     const defaults = defaultUiServerSettings();
+    const parsedBottomUp = parsed.taskDelegationStrategies?.bottomUp;
+    const parsedBottomUpEnabled = parseBooleanSetting(parsedBottomUp?.enabled);
+    const parsedBottomUpMaxInactivityMinutes = parseMaxInactivityMinutes(
+      parsedBottomUp?.maxInactivityMinutes,
+    );
+    const parsedBottomUpNotificationTarget = parseInactiveAgentNotificationTarget(
+      parsedBottomUp?.inactiveAgentNotificationTarget,
+    );
+
+    const defaultBottomUp = defaults.taskDelegationStrategies.bottomUp;
+    const bottomUpEnabled =
+      parsedBottomUpEnabled ??
+      legacyNotifyManagersOfInactiveAgents ??
+      defaultBottomUp.enabled;
+    const bottomUpMaxInactivityMinutes =
+      parsedBottomUpMaxInactivityMinutes ??
+      legacyMaxInactivityMinutes ??
+      defaultBottomUp.maxInactivityMinutes;
+    const bottomUpNotificationTarget =
+      parsedBottomUpNotificationTarget ??
+      legacyInactiveAgentNotificationTarget ??
+      defaultBottomUp.inactiveAgentNotificationTarget;
+
     return {
       taskCronEnabled: taskCronEnabled ?? defaults.taskCronEnabled,
-      notifyManagersOfInactiveAgents:
-        notifyManagersOfInactiveAgents ?? defaults.notifyManagersOfInactiveAgents,
-      maxInactivityMinutes: maxInactivityMinutes ?? defaults.maxInactivityMinutes,
       maxInProgressMinutes:
         maxInProgressMinutes ?? defaults.maxInProgressMinutes,
       maxParallelFlows: maxParallelFlows ?? defaults.maxParallelFlows,
-      inactiveAgentNotificationTarget:
-        inactiveAgentNotificationTarget ?? defaults.inactiveAgentNotificationTarget,
+      taskDelegationStrategies: {
+        bottomUp: {
+          enabled: bottomUpEnabled,
+          maxInactivityMinutes: bottomUpMaxInactivityMinutes,
+          inactiveAgentNotificationTarget: bottomUpNotificationTarget,
+        },
+      },
       authentication: {
         enabled: authEnabled === true && Boolean(authUsername && authPasswordHash),
         username: authUsername,
@@ -262,11 +308,9 @@ export function toPublicUiServerSettings(
 ): UiServerSettingsResponse {
   return {
     taskCronEnabled: settings.taskCronEnabled,
-    notifyManagersOfInactiveAgents: settings.notifyManagersOfInactiveAgents,
-    maxInactivityMinutes: settings.maxInactivityMinutes,
     maxInProgressMinutes: settings.maxInProgressMinutes,
     maxParallelFlows: settings.maxParallelFlows,
-    inactiveAgentNotificationTarget: settings.inactiveAgentNotificationTarget,
+    taskDelegationStrategies: settings.taskDelegationStrategies,
     authentication,
     ceoBootstrapPending: options.ceoBootstrapPending ?? false,
   };

@@ -19,7 +19,7 @@ interface SettingsPageProps {
   defaultAgentId: string;
   taskCronIntervalMinutes: number;
   taskCronEnabledInput: boolean;
-  notifyManagersOfInactiveAgentsInput: boolean;
+  bottomUpTaskDelegationEnabledInput: boolean;
   maxInactivityMinutesInput: string;
   maxInProgressMinutesInput: string;
   minMaxInactivityMinutes: number;
@@ -46,7 +46,7 @@ interface SettingsPageProps {
   onOpenCeoChat: (agentId: string) => void;
   onTaskCronEnabledChange: (checked: boolean) => void;
   onMaxParallelFlowsInputChange: (value: string) => void;
-  onNotifyManagersOfInactiveAgentsChange: (checked: boolean) => void;
+  onBottomUpTaskDelegationEnabledChange: (checked: boolean) => void;
   onMaxInactivityMinutesInputChange: (value: string) => void;
   onMaxInProgressMinutesInputChange: (value: string) => void;
   onInactiveAgentNotificationTargetInputChange: (
@@ -68,7 +68,7 @@ export function SettingsPage({
   defaultAgentId,
   taskCronIntervalMinutes,
   taskCronEnabledInput,
-  notifyManagersOfInactiveAgentsInput,
+  bottomUpTaskDelegationEnabledInput,
   maxInactivityMinutesInput,
   maxInProgressMinutesInput,
   minMaxInactivityMinutes,
@@ -95,7 +95,7 @@ export function SettingsPage({
   onOpenCeoChat,
   onTaskCronEnabledChange,
   onMaxParallelFlowsInputChange,
-  onNotifyManagersOfInactiveAgentsChange,
+  onBottomUpTaskDelegationEnabledChange,
   onMaxInactivityMinutesInputChange,
   onMaxInProgressMinutesInputChange,
   onInactiveAgentNotificationTargetInputChange,
@@ -113,7 +113,8 @@ export function SettingsPage({
     <section className="mx-auto w-full max-w-3xl space-y-6">
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">
-          Control background automation checks and inactive-agent alerts.
+          Control automation runtime, task delegation strategy rules, and UI
+          access controls.
         </p>
       </div>
 
@@ -146,7 +147,7 @@ export function SettingsPage({
             <p className="text-xs text-muted-foreground">
               Keep this on to run recurring background checks. These checks
               drive task follow-ups (todo, in-progress timeout reminders, and
-              blocked reminders) and optional inactivity alerts.
+              blocked reminders) and execute enabled delegation strategies.
             </p>
             <p className="text-xs text-muted-foreground">
               Check cadence: every {taskCronIntervalMinutes} minute.
@@ -238,42 +239,80 @@ export function SettingsPage({
             </p>
           </div>
 
-          <Separator className="bg-border/50" />
+          {ceoBootstrapPending ? (
+            <p className="text-xs text-muted-foreground">
+              Background checks stay paused until the first CEO message removes
+              bootstrap mode.
+            </p>
+          ) : !taskCronEnabledInput ? (
+            <p className="text-xs text-muted-foreground">
+              Background checks are paused. Enable task automation above to
+              resume task follow-up and delegation checks.
+            </p>
+          ) : null}
+        </div>
+      </section>
 
+      <section className="overflow-hidden rounded-xl border border-border/70 bg-background/40">
+        <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+          <div className="space-y-1">
+            <h2 className="text-sm font-semibold text-foreground">
+              Task Delegation Strategy
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              This section defines how OpenGoat decides what tasks to create
+              for agents to work on.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Multiple strategies can be enabled at the same time.
+            </p>
+          </div>
+        </div>
+
+        <Separator className="bg-border/60" />
+
+        <div
+          className={cn(
+            "space-y-4 px-5 py-4",
+            !taskCronEnabledInput && "opacity-60",
+          )}
+        >
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1">
               <h3 className="text-sm font-semibold text-foreground">
-                Notify Managers of Inactive Agents
+                Bottom-Up Task Delegation
               </h3>
               <p className="text-xs text-muted-foreground">
-                Alert managers when their reportees have no recent assistant
-                activity.
+                Detects inactive agents and creates manager-facing follow-up
+                tasks so delegation starts from team-level activity signals.
               </p>
             </div>
             <div className="flex items-center gap-2">
               <Switch
-                checked={notifyManagersOfInactiveAgentsInput}
+                checked={bottomUpTaskDelegationEnabledInput}
                 disabled={!taskCronEnabledInput || isMutating || isLoading}
-                onCheckedChange={onNotifyManagersOfInactiveAgentsChange}
-                aria-label="Toggle inactive-agent manager notifications"
+                onCheckedChange={onBottomUpTaskDelegationEnabledChange}
+                aria-label="Toggle bottom-up task delegation"
               />
               <span
                 className={cn(
                   "text-xs font-medium",
-                  notifyManagersOfInactiveAgentsInput && taskCronEnabledInput
+                  bottomUpTaskDelegationEnabledInput && taskCronEnabledInput
                     ? "text-success"
                     : "text-muted-foreground",
                 )}
               >
-                {notifyManagersOfInactiveAgentsInput && taskCronEnabledInput
+                {bottomUpTaskDelegationEnabledInput && taskCronEnabledInput
                   ? "Enabled"
                   : "Disabled"}
               </span>
             </div>
           </div>
 
-          {notifyManagersOfInactiveAgentsInput ? (
+          {bottomUpTaskDelegationEnabledInput ? (
             <>
+              <Separator className="bg-border/50" />
+
               <div className="space-y-3">
                 <label
                   className="text-sm font-medium text-foreground"
@@ -297,8 +336,8 @@ export function SettingsPage({
                   <span className="text-sm text-muted-foreground">minutes</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Managers are notified after this many minutes with no
-                  assistant activity.
+                  Bottom-Up delegation checks inactivity with this threshold
+                  before generating follow-up tasks.
                 </p>
               </div>
 
@@ -340,25 +379,12 @@ export function SettingsPage({
                 </p>
               </div>
             </>
-          ) : null}
-
-          {ceoBootstrapPending ? (
+          ) : (
             <p className="text-xs text-muted-foreground">
-              Background checks stay paused until the first CEO message removes
-              bootstrap mode.
+              Bottom-Up task delegation is paused. Task automation can still run
+              other enabled strategies and follow-up checks.
             </p>
-          ) : !taskCronEnabledInput ? (
-            <p className="text-xs text-muted-foreground">
-              Background checks are paused. Enable task automation above to
-              resume todo, in-progress timeout, blocked, and inactivity checks.
-            </p>
-          ) : !notifyManagersOfInactiveAgentsInput ? (
-            <p className="text-xs text-muted-foreground">
-              Task automation is still running every {taskCronIntervalMinutes}{" "}
-              minute for todo, in-progress timeout, and blocked follow-ups.
-              Only inactivity alerts are paused.
-            </p>
-          ) : null}
+          )}
         </div>
       </section>
 
@@ -540,10 +566,10 @@ export function SettingsPage({
               ? "Waiting for first CEO message to start checks"
               : !taskCronEnabledInput
                 ? "Background checks paused"
-                : !notifyManagersOfInactiveAgentsInput
-                  ? "Background checks active (inactivity notifications paused)"
+                : !bottomUpTaskDelegationEnabledInput
+                  ? "Background checks active (Bottom-Up delegation paused)"
                   : inactiveAgentNotificationTargetInput === "ceo-only"
-                    ? "Background checks active (direct CEO inactivity notifications only)"
+                    ? "Background checks active (Bottom-Up strategy: CEO-only inactivity routing)"
                     : "Background checks active for all managers"}
           </span>
         </p>

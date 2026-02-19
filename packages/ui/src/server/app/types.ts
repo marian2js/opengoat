@@ -155,6 +155,17 @@ export interface OrganizationAgentProfileUpdateInput {
 }
 
 export type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
+export type TaskDelegationStrategyId = "bottom-up";
+
+export interface BottomUpTaskDelegationCronOptions {
+  enabled?: boolean;
+  inactiveMinutes?: number;
+  notificationTarget?: InactiveAgentNotificationTarget;
+}
+
+export interface TaskDelegationStrategiesCronOptions {
+  bottomUp?: BottomUpTaskDelegationCronOptions;
+}
 
 export interface OpenClawUiService {
   initialize?: () => Promise<unknown>;
@@ -208,6 +219,7 @@ export interface OpenClawUiService {
     inProgressMinutes?: number;
     notificationTarget?: InactiveAgentNotificationTarget;
     notifyInactiveAgents?: boolean;
+    delegationStrategies?: TaskDelegationStrategiesCronOptions;
     maxParallelFlows?: number;
   }) => Promise<TaskCronRunResult>;
 }
@@ -309,12 +321,20 @@ export interface TaskCronDispatchResult {
 
 export interface UiServerSettings {
   taskCronEnabled: boolean;
-  notifyManagersOfInactiveAgents: boolean;
-  maxInactivityMinutes: number;
   maxInProgressMinutes: number;
   maxParallelFlows: number;
-  inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+  taskDelegationStrategies: UiTaskDelegationStrategiesSettings;
   authentication: UiServerAuthenticationSettings;
+}
+
+export interface UiBottomUpTaskDelegationStrategySettings {
+  enabled: boolean;
+  maxInactivityMinutes: number;
+  inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+}
+
+export interface UiTaskDelegationStrategiesSettings {
+  bottomUp: UiBottomUpTaskDelegationStrategySettings;
 }
 
 export interface UiServerAuthenticationSettings {
@@ -336,11 +356,9 @@ export interface UiAuthenticationSettingsResponse {
 
 export interface UiServerSettingsResponse {
   taskCronEnabled: boolean;
-  notifyManagersOfInactiveAgents: boolean;
-  maxInactivityMinutes: number;
   maxInProgressMinutes: number;
   maxParallelFlows: number;
-  inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
+  taskDelegationStrategies: UiTaskDelegationStrategiesSettings;
   authentication: UiAuthenticationSettingsResponse;
   ceoBootstrapPending: boolean;
 }
@@ -518,13 +536,11 @@ export interface RuntimeLogExtractionResult {
 
 export interface TaskCronScheduler {
   setTaskCronEnabled: (enabled: boolean) => void;
-  setNotifyManagersOfInactiveAgents: (enabled: boolean) => void;
-  setMaxInactivityMinutes: (maxInactivityMinutes: number) => void;
+  setTaskDelegationStrategies: (
+    strategies: UiTaskDelegationStrategiesSettings,
+  ) => void;
   setMaxInProgressMinutes: (maxInProgressMinutes: number) => void;
   setMaxParallelFlows: (maxParallelFlows: number) => void;
-  setInactiveAgentNotificationTarget: (
-    target: InactiveAgentNotificationTarget,
-  ) => void;
   stop: () => void;
 }
 

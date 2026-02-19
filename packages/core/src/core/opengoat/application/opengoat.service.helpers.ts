@@ -84,6 +84,45 @@ export function resolveInactiveAgentNotificationTarget(
   return value === "ceo-only" ? "ceo-only" : "all-managers";
 }
 
+export interface BottomUpTaskDelegationStrategyConfig {
+  enabled?: boolean;
+  inactiveMinutes?: number;
+  notificationTarget?: "all-managers" | "ceo-only";
+}
+
+export interface TaskDelegationStrategiesConfig {
+  bottomUp?: BottomUpTaskDelegationStrategyConfig;
+}
+
+export interface ResolvedBottomUpTaskDelegationStrategy {
+  enabled: boolean;
+  inactiveMinutes: number;
+  notificationTarget: "all-managers" | "ceo-only";
+}
+
+export function resolveBottomUpTaskDelegationStrategy(options: {
+  inactiveMinutes?: number;
+  notificationTarget?: "all-managers" | "ceo-only";
+  notifyInactiveAgents?: boolean;
+  delegationStrategies?: TaskDelegationStrategiesConfig;
+}): ResolvedBottomUpTaskDelegationStrategy {
+  const bottomUpConfig = options.delegationStrategies?.bottomUp;
+  const hasBottomUpEnabled = typeof bottomUpConfig?.enabled === "boolean";
+  const enabled = hasBottomUpEnabled
+    ? bottomUpConfig.enabled
+    : options.notifyInactiveAgents ?? true;
+
+  return {
+    enabled,
+    inactiveMinutes: resolveInactiveMinutes(
+      bottomUpConfig?.inactiveMinutes ?? options.inactiveMinutes,
+    ),
+    notificationTarget: resolveInactiveAgentNotificationTarget(
+      bottomUpConfig?.notificationTarget ?? options.notificationTarget,
+    ),
+  };
+}
+
 export function extractManagedSkillsDir(payload: unknown): string | null {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return null;

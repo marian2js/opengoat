@@ -100,15 +100,11 @@ export async function createOpenGoatUiServer(
       await writeUiServerSettings(service.getHomeDir(), uiSettings);
       auth.handleSettingsMutation(previousAuth, uiSettings.authentication);
       taskCronScheduler.setTaskCronEnabled(uiSettings.taskCronEnabled);
-      taskCronScheduler.setNotifyManagersOfInactiveAgents(
-        uiSettings.notifyManagersOfInactiveAgents,
+      taskCronScheduler.setTaskDelegationStrategies(
+        uiSettings.taskDelegationStrategies,
       );
-      taskCronScheduler.setMaxInactivityMinutes(uiSettings.maxInactivityMinutes);
       taskCronScheduler.setMaxInProgressMinutes(uiSettings.maxInProgressMinutes);
       taskCronScheduler.setMaxParallelFlows(uiSettings.maxParallelFlows);
-      taskCronScheduler.setInactiveAgentNotificationTarget(
-        uiSettings.inactiveAgentNotificationTarget,
-      );
     },
     getVersionInfo,
     logs,
