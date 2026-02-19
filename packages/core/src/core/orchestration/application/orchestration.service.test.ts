@@ -496,6 +496,69 @@ describe("OrchestrationService manager runtime", () => {
     expect(result.stdout).toContain("Recovered after gateway restart");
   });
 
+  it("does not trigger missing-agent repair for generic not-found runtime errors", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-manager-repair-generic-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+
+    const providerService = {
+      invokeAgent: vi.fn(async () => ({
+        code: 1,
+        stdout: "",
+        stderr: "workspace file not found: /tmp/missing.txt",
+        agentId: "ceo",
+        providerId: "openclaw"
+      })),
+      createProviderAgent: vi.fn(async () => ({
+        code: 0,
+        stdout: "",
+        stderr: "",
+        agentId: "ceo",
+        providerId: "openclaw"
+      }))
+    };
+
+    const sessionService = {
+      prepareRunSession: vi.fn(async () => ({
+        enabled: true,
+        info: {
+          agentId: "ceo",
+          sessionKey: "agent:ceo:main",
+          sessionId: "session-generic-not-found",
+          transcriptPath: path.join(paths.sessionsDir, "ceo", "session-generic-not-found.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "ceo"),
+          isNewSession: true
+        },
+        compactionApplied: false
+      })),
+      recordAssistantReply: vi.fn(async () => ({
+        sessionKey: "agent:ceo:main",
+        sessionId: "session-generic-not-found",
+        transcriptPath: path.join(paths.sessionsDir, "ceo", "session-generic-not-found.jsonl"),
+        applied: false,
+        compactedMessages: 0
+      }))
+    };
+
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      agentManifestService: createManifestServiceStub(["ceo"], paths.workspacesDir) as unknown as AgentManifestService,
+      sessionService: sessionService as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-10T10:00:00.000Z"
+    });
+
+    const result = await service.runAgent(paths, "ceo", {
+      message: "hello"
+    });
+
+    expect(providerService.invokeAgent).toHaveBeenCalledTimes(1);
+    expect(providerService.createProviderAgent).not.toHaveBeenCalled();
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("workspace file not found");
+  });
+
 });
 
 function createPaths(root: string): OpenGoatPaths {

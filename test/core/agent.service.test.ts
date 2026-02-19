@@ -354,6 +354,41 @@ describe("AgentService", () => {
     expect(agentsMarkdown).toContain("baz");
   });
 
+  it("does not rewrite CEO AGENTS.md when The Organization is already present", async () => {
+    const { service, paths, fileSystem } = await createAgentServiceWithPaths();
+    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+
+    const ceoWorkspace = path.join(paths.workspacesDir, "ceo");
+    const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
+    await fileSystem.ensureDir(ceoWorkspace);
+
+    const source = [
+      "foo",
+      "",
+      "## Every Session",
+      "custom session instructions that should remain untouched",
+      "",
+      "## The Organization",
+      "existing organization section",
+      "",
+      "## Repositories",
+      "existing repositories section",
+      "",
+      "## Another section",
+      "baz",
+      "",
+    ].join("\n");
+    await writeFile(agentsPath, source, "utf-8");
+
+    await service.ensureCeoWorkspaceBootstrap(paths, {
+      syncBootstrapMarkdown: false,
+      removeBootstrapMarkdownWhenDisabled: true,
+    });
+
+    const agentsMarkdown = await readFile(agentsPath, "utf-8");
+    expect(agentsMarkdown).toBe(source);
+  });
+
   it("removes First Run and replaces Every Session for non-ceo AGENTS.md", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "engineer", displayName: "Avery" });
