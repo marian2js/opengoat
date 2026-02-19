@@ -252,8 +252,6 @@ export class AgentService {
       {
         keepFirstRunSection:
           options.keepFirstRunSection ?? isDefaultAgentId(normalizedAgentId),
-        skipRewriteWhenOrganizationSectionExists:
-          isDefaultAgentId(normalizedAgentId),
       },
       createdPaths,
       skippedPaths,
@@ -687,10 +685,7 @@ export class AgentService {
 
   private async rewriteAgentsMarkdown(
     filePath: string,
-    options: {
-      keepFirstRunSection: boolean;
-      skipRewriteWhenOrganizationSectionExists?: boolean;
-    },
+    options: { keepFirstRunSection: boolean },
     createdPaths: string[],
     skippedPaths: string[],
   ): Promise<void> {
@@ -701,10 +696,7 @@ export class AgentService {
     }
 
     const source = await this.fileSystem.readFile(filePath);
-    if (
-      options.skipRewriteWhenOrganizationSectionExists &&
-      /^##\s+the organization\s*$/im.test(source)
-    ) {
+    if (hasOrganizationSectionHeading(source)) {
       skippedPaths.push(filePath);
       return;
     }
@@ -1092,6 +1084,10 @@ function normalizeAgentsMarkdown(
       ],
     },
   );
+}
+
+function hasOrganizationSectionHeading(markdown: string): boolean {
+  return /^##\s+the organization\s*$/im.test(markdown);
 }
 
 function rewriteSecondLevelSection(
