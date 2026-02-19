@@ -151,9 +151,9 @@ export function resolveBottomUpTaskDelegationStrategy(options: {
   delegationStrategies?: TaskDelegationStrategiesConfig;
 }): ResolvedBottomUpTaskDelegationStrategy {
   const bottomUpConfig = options.delegationStrategies?.bottomUp;
-  const hasBottomUpEnabled = typeof bottomUpConfig?.enabled === "boolean";
-  const enabled = hasBottomUpEnabled
-    ? bottomUpConfig.enabled
+  const bottomUpEnabled = bottomUpConfig?.enabled;
+  const enabled = typeof bottomUpEnabled === "boolean"
+    ? bottomUpEnabled
     : typeof options.notifyInactiveAgents === "boolean"
       ? options.notifyInactiveAgents
       : false;
