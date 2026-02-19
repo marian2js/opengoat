@@ -4,10 +4,13 @@ import path from "node:path";
 import {
   DEFAULT_LOG_STREAM_LIMIT,
   DEFAULT_MAX_INACTIVITY_MINUTES,
+  DEFAULT_MAX_IN_PROGRESS_MINUTES,
   DEFAULT_MAX_PARALLEL_FLOWS,
   MAX_LOG_STREAM_LIMIT,
   MAX_MAX_INACTIVITY_MINUTES,
+  MAX_MAX_IN_PROGRESS_MINUTES,
   MAX_MAX_PARALLEL_FLOWS,
+  MIN_MAX_IN_PROGRESS_MINUTES,
   MIN_MAX_PARALLEL_FLOWS,
   MIN_MAX_INACTIVITY_MINUTES,
   UI_SETTINGS_FILENAME,
@@ -29,6 +32,7 @@ export function defaultUiServerSettings(): UiServerSettings {
     taskCronEnabled: true,
     notifyManagersOfInactiveAgents: true,
     maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
+    maxInProgressMinutes: DEFAULT_MAX_IN_PROGRESS_MINUTES,
     maxParallelFlows: DEFAULT_MAX_PARALLEL_FLOWS,
     inactiveAgentNotificationTarget: "all-managers",
     authentication: {
@@ -135,6 +139,25 @@ export function parseMaxInactivityMinutes(value: unknown): number | undefined {
   return parsed;
 }
 
+export function parseMaxInProgressMinutes(value: unknown): number | undefined {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseInt(value, 10)
+        : Number.NaN;
+  if (!Number.isInteger(parsed)) {
+    return undefined;
+  }
+  if (
+    parsed < MIN_MAX_IN_PROGRESS_MINUTES ||
+    parsed > MAX_MAX_IN_PROGRESS_MINUTES
+  ) {
+    return undefined;
+  }
+  return parsed;
+}
+
 export function parseMaxParallelFlows(value: unknown): number | undefined {
   const parsed =
     typeof value === "number"
@@ -163,6 +186,7 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
       taskCronEnabled?: unknown;
       notifyManagersOfInactiveAgents?: unknown;
       maxInactivityMinutes?: unknown;
+      maxInProgressMinutes?: unknown;
       maxParallelFlows?: unknown;
       inactiveAgentNotificationTarget?: unknown;
       authentication?: {
@@ -177,6 +201,9 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
       taskCronEnabled;
     const maxInactivityMinutes = parseMaxInactivityMinutes(
       parsed?.maxInactivityMinutes,
+    );
+    const maxInProgressMinutes = parseMaxInProgressMinutes(
+      parsed?.maxInProgressMinutes,
     );
     const maxParallelFlows = parseMaxParallelFlows(parsed?.maxParallelFlows);
     const inactiveAgentNotificationTarget = parseInactiveAgentNotificationTarget(
@@ -195,6 +222,8 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
       notifyManagersOfInactiveAgents:
         notifyManagersOfInactiveAgents ?? defaults.notifyManagersOfInactiveAgents,
       maxInactivityMinutes: maxInactivityMinutes ?? defaults.maxInactivityMinutes,
+      maxInProgressMinutes:
+        maxInProgressMinutes ?? defaults.maxInProgressMinutes,
       maxParallelFlows: maxParallelFlows ?? defaults.maxParallelFlows,
       inactiveAgentNotificationTarget:
         inactiveAgentNotificationTarget ?? defaults.inactiveAgentNotificationTarget,
@@ -235,6 +264,7 @@ export function toPublicUiServerSettings(
     taskCronEnabled: settings.taskCronEnabled,
     notifyManagersOfInactiveAgents: settings.notifyManagersOfInactiveAgents,
     maxInactivityMinutes: settings.maxInactivityMinutes,
+    maxInProgressMinutes: settings.maxInProgressMinutes,
     maxParallelFlows: settings.maxParallelFlows,
     inactiveAgentNotificationTarget: settings.inactiveAgentNotificationTarget,
     authentication,

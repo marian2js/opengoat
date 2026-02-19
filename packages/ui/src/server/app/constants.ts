@@ -1,9 +1,12 @@
 export const DEFAULT_AGENT_ID = "ceo";
 export const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
 export const DEFAULT_MAX_INACTIVITY_MINUTES = 30;
+export const DEFAULT_MAX_IN_PROGRESS_MINUTES = 4 * 60;
 export const DEFAULT_MAX_PARALLEL_FLOWS = 3;
 export const MIN_MAX_INACTIVITY_MINUTES = 1;
 export const MAX_MAX_INACTIVITY_MINUTES = 10_080;
+export const MIN_MAX_IN_PROGRESS_MINUTES = 1;
+export const MAX_MAX_IN_PROGRESS_MINUTES = 10_080;
 export const MIN_MAX_PARALLEL_FLOWS = 1;
 export const MAX_MAX_PARALLEL_FLOWS = 32;
 export const UI_SETTINGS_FILENAME = "ui-settings.json";

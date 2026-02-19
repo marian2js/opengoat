@@ -5,8 +5,10 @@ import {
   DEFAULT_TASK_CHECK_FREQUENCY_MINUTES,
   LOG_STREAM_HEARTBEAT_MS,
   MAX_MAX_INACTIVITY_MINUTES,
+  MAX_MAX_IN_PROGRESS_MINUTES,
   MAX_MAX_PARALLEL_FLOWS,
   MIN_MAX_INACTIVITY_MINUTES,
+  MIN_MAX_IN_PROGRESS_MINUTES,
   MIN_MAX_PARALLEL_FLOWS,
 } from "./constants.js";
 import {
@@ -23,6 +25,7 @@ import {
   parseBooleanSetting,
   parseInactiveAgentNotificationTarget,
   parseMaxInactivityMinutes,
+  parseMaxInProgressMinutes,
   parseMaxParallelFlows,
   parseNotifyManagersOfInactiveAgents,
   parseTaskCronEnabled,
@@ -314,6 +317,7 @@ export function registerApiRoutes(
       taskCronEnabled?: boolean;
       notifyManagersOfInactiveAgents?: boolean;
       maxInactivityMinutes?: number;
+      maxInProgressMinutes?: number;
       maxParallelFlows?: number;
       inactiveAgentNotificationTarget?: InactiveAgentNotificationTarget;
       authentication?: {
@@ -337,6 +341,10 @@ export function registerApiRoutes(
       const hasMaxInactivitySetting = Object.prototype.hasOwnProperty.call(
         request.body ?? {},
         "maxInactivityMinutes",
+      );
+      const hasMaxInProgressSetting = Object.prototype.hasOwnProperty.call(
+        request.body ?? {},
+        "maxInProgressMinutes",
       );
       const hasMaxParallelFlowsSetting = Object.prototype.hasOwnProperty.call(
         request.body ?? {},
@@ -381,6 +389,15 @@ export function registerApiRoutes(
         reply.code(400);
         return {
           error: `maxInactivityMinutes must be an integer between ${MIN_MAX_INACTIVITY_MINUTES} and ${MAX_MAX_INACTIVITY_MINUTES}`,
+        };
+      }
+      const parsedMaxInProgressMinutes = hasMaxInProgressSetting
+        ? parseMaxInProgressMinutes(request.body?.maxInProgressMinutes)
+        : currentSettings.maxInProgressMinutes;
+      if (!parsedMaxInProgressMinutes) {
+        reply.code(400);
+        return {
+          error: `maxInProgressMinutes must be an integer between ${MIN_MAX_IN_PROGRESS_MINUTES} and ${MAX_MAX_IN_PROGRESS_MINUTES}`,
         };
       }
       const parsedMaxParallelFlows = hasMaxParallelFlowsSetting
@@ -529,6 +546,7 @@ export function registerApiRoutes(
         taskCronEnabled: parsedTaskCronEnabled,
         notifyManagersOfInactiveAgents: parsedNotifyManagers,
         maxInactivityMinutes: parsedMaxInactivityMinutes,
+        maxInProgressMinutes: parsedMaxInProgressMinutes,
         maxParallelFlows: parsedMaxParallelFlows,
         inactiveAgentNotificationTarget: parsedNotificationTarget,
         authentication: nextAuthentication,
@@ -593,7 +611,7 @@ export function registerApiRoutes(
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
-        message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes} maxParallelFlows=${nextSettings.maxParallelFlows} inactiveAgentNotificationTarget=${nextSettings.inactiveAgentNotificationTarget} authEnabled=${nextSettings.authentication.enabled}`,
+        message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} notifyManagersOfInactiveAgents=${nextSettings.notifyManagersOfInactiveAgents} maxInactivityMinutes=${nextSettings.maxInactivityMinutes} maxInProgressMinutes=${nextSettings.maxInProgressMinutes} maxParallelFlows=${nextSettings.maxParallelFlows} inactiveAgentNotificationTarget=${nextSettings.inactiveAgentNotificationTarget} authEnabled=${nextSettings.authentication.enabled}`,
       });
       const ceoBootstrapPending = isCeoBootstrapPending(service.getHomeDir());
       const taskAutomationMessage = !nextSettings.taskCronEnabled
@@ -609,7 +627,7 @@ export function registerApiRoutes(
           nextSettings.notifyManagersOfInactiveAgents
             ? "enabled"
             : "disabled"
-        }; threshold ${nextSettings.maxInactivityMinutes} minute(s); max parallel flows ${nextSettings.maxParallelFlows}; audience ${nextSettings.inactiveAgentNotificationTarget}.`,
+        }; inactivity threshold ${nextSettings.maxInactivityMinutes} minute(s); in-progress timeout ${nextSettings.maxInProgressMinutes} minute(s); max parallel flows ${nextSettings.maxParallelFlows}; audience ${nextSettings.inactiveAgentNotificationTarget}.`,
       };
     });
   });

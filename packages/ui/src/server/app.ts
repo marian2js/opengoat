@@ -104,6 +104,7 @@ export async function createOpenGoatUiServer(
         uiSettings.notifyManagersOfInactiveAgents,
       );
       taskCronScheduler.setMaxInactivityMinutes(uiSettings.maxInactivityMinutes);
+      taskCronScheduler.setMaxInProgressMinutes(uiSettings.maxInProgressMinutes);
       taskCronScheduler.setMaxParallelFlows(uiSettings.maxParallelFlows);
       taskCronScheduler.setInactiveAgentNotificationTarget(
         uiSettings.inactiveAgentNotificationTarget,
