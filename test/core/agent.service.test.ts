@@ -303,6 +303,57 @@ describe("AgentService", () => {
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });
 
+  it("does not duplicate The Organization section after repeated CEO bootstrap normalization", async () => {
+    const { service, paths, fileSystem } = await createAgentServiceWithPaths();
+    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+
+    const ceoWorkspace = path.join(paths.workspacesDir, "ceo");
+    const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
+    await fileSystem.ensureDir(ceoWorkspace);
+    await writeFile(
+      agentsPath,
+      [
+        "foo",
+        "",
+        "## Every Session",
+        "legacy session instructions",
+        "",
+        "## The Organization",
+        "legacy organization block",
+        "",
+        "## Repositories",
+        "legacy repositories block",
+        "",
+        "## Another section",
+        "baz",
+        "",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    await service.ensureCeoWorkspaceBootstrap(paths, {
+      syncBootstrapMarkdown: false,
+      removeBootstrapMarkdownWhenDisabled: true,
+    });
+    await service.ensureCeoWorkspaceBootstrap(paths, {
+      syncBootstrapMarkdown: false,
+      removeBootstrapMarkdownWhenDisabled: true,
+    });
+
+    const agentsMarkdown = await readFile(agentsPath, "utf-8");
+    const organizationHeadingCount =
+      agentsMarkdown.match(/^## The Organization$/gm)?.length ?? 0;
+    const repositoriesHeadingCount =
+      agentsMarkdown.match(/^## Repositories$/gm)?.length ?? 0;
+    const everySessionHeadingCount =
+      agentsMarkdown.match(/^## Every Session$/gm)?.length ?? 0;
+    expect(everySessionHeadingCount).toBe(1);
+    expect(organizationHeadingCount).toBe(1);
+    expect(repositoriesHeadingCount).toBe(1);
+    expect(agentsMarkdown).toContain("## Another section");
+    expect(agentsMarkdown).toContain("baz");
+  });
+
   it("removes First Run and replaces Every Session for non-ceo AGENTS.md", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "engineer", displayName: "Avery" });

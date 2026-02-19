@@ -1073,6 +1073,12 @@ function normalizeAgentsMarkdown(
     withFirstRunApplied,
     /^##\s+every session\s*$/i,
     EVERY_SESSION_SECTION_LINES,
+    {
+      consumeFollowingHeadingPatterns: [
+        /^##\s+the organization\s*$/i,
+        /^##\s+repositories\s*$/i,
+      ],
+    },
   );
 }
 
@@ -1080,6 +1086,9 @@ function rewriteSecondLevelSection(
   markdown: string,
   headingPattern: RegExp,
   replacementLines: string[] | null,
+  options: {
+    consumeFollowingHeadingPatterns?: RegExp[];
+  } = {},
 ): string {
   const lineBreak = markdown.includes("\r\n") ? "\r\n" : "\n";
   const lines = markdown.split(/\r?\n/);
@@ -1087,6 +1096,8 @@ function rewriteSecondLevelSection(
   const kept: string[] = [];
   let index = 0;
   let replaced = false;
+  const consumeFollowingHeadingPatterns =
+    options.consumeFollowingHeadingPatterns ?? [];
 
   while (index < lines.length) {
     const line = lines[index];
@@ -1103,7 +1114,15 @@ function rewriteSecondLevelSection(
       index += 1;
       while (index < lines.length) {
         const nextLine = lines[index];
-        if (nextLine !== undefined && /^##\s+/.test(nextLine.trim())) {
+        const nextTrimmed = nextLine?.trim() ?? "";
+        const isSecondLevelHeading = /^##\s+/.test(nextTrimmed);
+        const shouldConsumeFollowingHeading =
+          isSecondLevelHeading &&
+          (headingPattern.test(nextTrimmed) ||
+            consumeFollowingHeadingPatterns.some((pattern) =>
+              pattern.test(nextTrimmed),
+            ));
+        if (isSecondLevelHeading && !shouldConsumeFollowingHeading) {
           break;
         }
         index += 1;
