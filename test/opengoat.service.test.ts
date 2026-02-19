@@ -970,6 +970,15 @@ describe("OpenGoatService", () => {
           request.args[3] === "[\"*\"]",
       ),
     ).toBe(true);
+    expect(
+      commandRunner.requests.some(
+        (request) =>
+          request.args[0] === "config" &&
+          request.args[1] === "set" &&
+          request.args[2] === "agents.list[0].skipBootstrap" &&
+          request.args[3] === "true",
+      ),
+    ).toBe(true);
   });
 
   it("configures OpenClaw plugin source path and enables the OpenGoat plugin", async () => {

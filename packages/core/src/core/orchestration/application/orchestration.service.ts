@@ -484,8 +484,18 @@ function resolveInvocationCwd(params: {
 }
 
 function containsMissingAgentMessage(stdout: string, stderr: string): boolean {
-  return /\b(not found|does not exist|no such agent|unknown agent|could not find|no agent found|not exist)\b/i.test(
-    `${stdout}\n${stderr}`
+  const text = `${stdout}\n${stderr}`;
+  if (!/\bagent\b/i.test(text)) {
+    return false;
+  }
+
+  return (
+    /\b(unknown agent|no such agent|no agent found|could not find agent|invalid agent params)\b/i.test(
+      text,
+    ) ||
+    /\bagent\b[\s\S]{0,160}\b(not found|does not exist|not exist)\b/i.test(
+      text,
+    )
   );
 }
 

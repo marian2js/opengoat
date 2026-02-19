@@ -111,6 +111,7 @@ const OPENCLAW_PROVIDER_ID = "openclaw";
 const OPENCLAW_DEFAULT_AGENT_ID = "main";
 const OPENCLAW_AGENT_SANDBOX_MODE = "off";
 const OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON = "[\"*\"]";
+const OPENCLAW_AGENT_SKIP_BOOTSTRAP = true;
 const OPENCLAW_OPENGOAT_PLUGIN_ID = "openclaw-plugin";
 const OPENCLAW_OPENGOAT_PLUGIN_ROOT_ID = "opengoat-plugin";
 const OPENCLAW_OPENGOAT_PLUGIN_LEGACY_PACK_ID = "openclaw-plugin-pack";
@@ -2109,6 +2110,20 @@ export class OpenGoatService {
           );
         }
       }
+
+      if (readAgentSkipBootstrap(entry) !== OPENCLAW_AGENT_SKIP_BOOTSTRAP) {
+        const bootstrapSet = await this.runOpenClaw(
+          ["config", "set", `agents.list[${index}].skipBootstrap`, "true"],
+          { env },
+        );
+        if (bootstrapSet.code !== 0) {
+          warnings.push(
+            `OpenClaw bootstrap policy sync failed for "${agentId}" (code ${bootstrapSet.code}). ${
+              bootstrapSet.stderr.trim() || bootstrapSet.stdout.trim() || ""
+            }`.trim(),
+          );
+        }
+      }
     }
 
     return warnings;
@@ -2430,6 +2445,25 @@ function hasAgentToolsAllowAll(entry: Record<string, unknown>): boolean {
   return allow.some(
     (value) => typeof value === "string" && value.trim() === "*",
   );
+}
+
+function readAgentSkipBootstrap(
+  entry: Record<string, unknown>,
+): boolean | undefined {
+  const value = entry.skipBootstrap;
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") {
+      return true;
+    }
+    if (normalized === "false") {
+      return false;
+    }
+  }
+  return undefined;
 }
 
 function readStringArray(value: unknown): string[] {
