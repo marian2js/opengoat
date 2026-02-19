@@ -50,6 +50,15 @@ export function resolveInactiveMinutes(value: number | undefined): number {
   return Math.floor(value);
 }
 
+export function resolveInProgressTimeoutMinutes(
+  value: number | undefined,
+): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return 4 * 60;
+  }
+  return Math.floor(value);
+}
+
 const DEFAULT_MAX_PARALLEL_FLOWS = 3;
 const MIN_MAX_PARALLEL_FLOWS = 1;
 const MAX_MAX_PARALLEL_FLOWS = 32;
@@ -287,6 +296,60 @@ export function buildPendingTaskMessage(params: {
     `Assigned to: @${params.task.assignedTo}`,
     `Created at: ${params.task.createdAt}`,
     `Reason: ${params.task.statusReason ?? "n/a"}`,
+    `Blockers: ${blockers}`,
+    "Artifacts:",
+    artifacts,
+    "Worklog:",
+    worklog,
+    "",
+    statusUpdateReminder,
+  ].join("\n");
+}
+
+export function buildDoingTaskMessage(params: {
+  task: TaskRecord;
+  doingMinutes: number;
+  notificationTimestamp?: string;
+}): string {
+  const statusUpdateReminder = "Make sure the task status is updated";
+  const blockers =
+    params.task.blockers.length > 0 ? params.task.blockers.join("; ") : "None";
+  const artifacts =
+    params.task.artifacts.length > 0
+      ? params.task.artifacts
+          .map(
+            (entry) =>
+              `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`,
+          )
+          .join("\n")
+      : "- None";
+  const worklog =
+    params.task.worklog.length > 0
+      ? params.task.worklog
+          .map(
+            (entry) =>
+              `- ${entry.createdAt} @${entry.createdBy}: ${entry.content}`,
+          )
+          .join("\n")
+      : "- None";
+  const notificationTimestamp = resolveNotificationTimestamp(
+    params.notificationTimestamp,
+  );
+
+  return [
+    `Task #${params.task.taskId} is still in progress after ${params.doingMinutes} minutes.`,
+    ...(notificationTimestamp
+      ? [`Notification timestamp: ${notificationTimestamp}`]
+      : []),
+    "Please continue working on it or update the task status if needed.",
+    "",
+    `Task ID: ${params.task.taskId}`,
+    `Title: ${params.task.title}`,
+    `Description: ${params.task.description}`,
+    `Status: ${params.task.status}`,
+    `Owner: @${params.task.owner}`,
+    `Assigned to: @${params.task.assignedTo}`,
+    `Created at: ${params.task.createdAt}`,
     `Blockers: ${blockers}`,
     "Artifacts:",
     artifacts,

@@ -389,6 +389,57 @@ export class BoardService {
     return rows.map((row) => row.task_id);
   }
 
+  public async listDoingTaskIdsOlderThan(
+    paths: OpenGoatPaths,
+    olderThanMinutes: number,
+  ): Promise<string[]> {
+    if (!Number.isFinite(olderThanMinutes) || olderThanMinutes <= 0) {
+      return [];
+    }
+
+    const db = await this.getDatabase(paths);
+    const nowMs = Date.parse(this.nowIso());
+    const referenceNowMs = Number.isFinite(nowMs) ? nowMs : Date.now();
+    const cutoffIso = new Date(
+      referenceNowMs - Math.floor(olderThanMinutes) * 60_000,
+    ).toISOString();
+    const rows = this.queryAll<PendingTaskIdRow>(
+      db,
+      `SELECT task_id
+       FROM tasks
+       WHERE status = 'doing'
+         AND COALESCE(status_updated_at, created_at) <= ?
+       ORDER BY COALESCE(status_updated_at, created_at) ASC, task_id ASC`,
+      [cutoffIso],
+    );
+
+    return rows.map((row) => row.task_id);
+  }
+
+  public async resetTaskStatusTimeout(
+    paths: OpenGoatPaths,
+    taskId: string,
+    status: string,
+  ): Promise<boolean> {
+    const db = await this.getDatabase(paths);
+    const normalizedStatus = normalizeTaskStatus(status, true);
+    const resolvedTaskId = this.resolveTaskId(db, taskId);
+    const now = this.nowIso();
+    this.execute(
+      db,
+      `UPDATE tasks
+       SET status_updated_at = ?
+       WHERE task_id = ? AND status = ?`,
+      [now, resolvedTaskId, normalizedStatus],
+    );
+    const changesRow = this.queryOne<{ changed: number }>(
+      db,
+      "SELECT changes() as changed",
+    );
+    await this.persistDatabase(paths, db);
+    return (changesRow?.changed ?? 0) > 0;
+  }
+
   public async addTaskBlocker(
     paths: OpenGoatPaths,
     actorId: string,
