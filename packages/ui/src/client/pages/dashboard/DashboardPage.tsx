@@ -46,6 +46,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { resolveAgentAvatarSource } from "@/lib/agent-avatar";
 import { cn } from "@/lib/utils";
 import {
@@ -821,19 +822,21 @@ function SessionPromptAttachButton({
   const isAtLimit = attachments.files.length >= MAX_SESSION_MESSAGE_IMAGE_COUNT;
 
   return (
-    <PromptInputActionMenu>
-      <PromptInputActionMenuTrigger
-        disabled={disabled || isAtLimit}
-        tooltip={
-          isAtLimit
-            ? `Maximum ${MAX_SESSION_MESSAGE_IMAGE_COUNT} images per message.`
-            : "Attach images"
-        }
-      />
-      <PromptInputActionMenuContent>
-        <PromptInputActionAddAttachments />
-      </PromptInputActionMenuContent>
-    </PromptInputActionMenu>
+    <TooltipProvider>
+      <PromptInputActionMenu>
+        <PromptInputActionMenuTrigger
+          disabled={disabled || isAtLimit}
+          tooltip={
+            isAtLimit
+              ? `Maximum ${MAX_SESSION_MESSAGE_IMAGE_COUNT} images per message.`
+              : "Attach images"
+          }
+        />
+        <PromptInputActionMenuContent>
+          <PromptInputActionAddAttachments />
+        </PromptInputActionMenuContent>
+      </PromptInputActionMenu>
+    </TooltipProvider>
   );
 }
 
