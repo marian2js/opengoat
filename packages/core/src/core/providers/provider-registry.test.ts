@@ -9,6 +9,7 @@ describe("provider registry", () => {
     expect(providerIds).toEqual([
       "claude-code",
       "codex",
+      "copilot-cli",
       "cursor",
       "gemini-cli",
       "openclaw",
@@ -23,6 +24,11 @@ describe("provider registry", () => {
     ).toBe(true);
     expect(
       registry.getProviderOnboarding("codex")?.env?.some((field) => field.key === "CODEX_CMD"),
+    ).toBe(true);
+    expect(
+      registry
+        .getProviderOnboarding("copilot-cli")
+        ?.env?.some((field) => field.key === "COPILOT_CLI_CMD"),
     ).toBe(true);
     expect(
       registry.getProviderOnboarding("cursor")?.env?.some((field) => field.key === "CURSOR_CMD"),

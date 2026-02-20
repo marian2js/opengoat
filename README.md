@@ -9,7 +9,7 @@
   <a href="https://discord.gg/JWGqXJMwYE"><img src="https://img.shields.io/badge/discord-7289DA?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
 </p>
 
-**OpenGoat** allows you to build herarchical organizations of AI agents that coordinate work across multiple tools, including Claude Code, Codex, Cursor, Lovable, and more.
+**OpenGoat** allows you to build herarchical organizations of AI agents that coordinate work across multiple tools, including Claude Code, Codex, Cursor, GitHub Copilot CLI, Lovable, and more.
 
 [![OpenGoat UI](/assets/org-example.png)](https://opengoat.ai)
 
