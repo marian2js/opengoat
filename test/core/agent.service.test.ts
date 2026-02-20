@@ -231,7 +231,7 @@ describe("AgentService", () => {
     );
     expect(agentsMarkdown).toContain("## The Organization");
     expect(agentsMarkdown).toContain(
-      "You have access to the organization's context and wiki on `~/.opengoat/organization`",
+      "You have access to the organization's context and wiki on the `organization` folder",
     );
     expect(roleMarkdown).toContain(
       "# ROLE.md - Your position in the organization",

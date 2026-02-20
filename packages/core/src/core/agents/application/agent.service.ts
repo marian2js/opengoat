@@ -300,7 +300,11 @@ export class AgentService {
       );
     } else if (isDefaultAgentId(normalizedAgentId)) {
       if (options.removeBootstrapMarkdownWhenDisabled) {
-        await this.removePathIfExists(bootstrapPath, removedPaths, skippedPaths);
+        await this.removePathIfExists(
+          bootstrapPath,
+          removedPaths,
+          skippedPaths,
+        );
       } else {
         skippedPaths.push(bootstrapPath);
       }
@@ -1220,11 +1224,11 @@ const EVERY_SESSION_SECTION_LINES = [
   "",
   "## The Organization",
   "",
-  "You are part of an organization run by AI agents. You have access to the organization's context and wiki on `~/.opengoat/organization`",
+  "You are part of an organization run by AI agents. You have access to the organization's context and wiki on the `organization` folder",
   "",
   "## Repositories",
   "",
-  "If you need to use a repo, clone it or copy it into your own workspace at `~/.opengoat/workspaces/<agent-id>/<repo>`.",
+  "If you need to use a repo, clone it or copy it into a new folder on your workspace `./<repo>`.",
   "",
 ];
 
@@ -1248,9 +1252,9 @@ function renderRoleMarkdown(profile: {
     `- For info about your level on the organization, call tool \`opengoat_agent_info\` with \`{"agentId":"${profile.agentId}"}\`.`,
     "- Use OpenGoat tools directly (`opengoat_*`), not shell CLI commands.",
     "- To delegate and coordinate work, use `og-*` skills.",
-    "- Organization context is available in `~/.opengoat/organization` - read them",
-    "- You can view and edit the wiki in `~/.opengoat/organization/wiki`",
-    "- If you need to use a repo, clone it or copy it into your own workspace at `~/.opengoat/workspaces/<agent-id>/<repo>`.",
+    "- Organization context is available in the `organization` folder - read them",
+    "- You can view and edit the wiki in `organization/wiki`",
+    "- If you need to use a repo, clone it or copy it into a new folder on your workspace `./<repo>`",
     "",
     "---",
     "",
