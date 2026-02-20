@@ -65,6 +65,11 @@ describe("BootstrapService", () => {
     expect(
       await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "ROLE.md")),
     ).toBe(true);
+    expect(
+      await fileSystem.exists(
+        path.join(paths.workspacesDir, "ceo", "reportees"),
+      ),
+    ).toBe(true);
     const ceoOrganizationLinkPath = path.join(
       paths.workspacesDir,
       "ceo",

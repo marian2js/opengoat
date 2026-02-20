@@ -489,6 +489,66 @@ describe("AgentService", () => {
     ).toBe(path.resolve(paths.organizationDir));
   });
 
+  it("syncs manager reportees folders with direct-report symlinks", async () => {
+    const { service, paths, fileSystem } = await createAgentServiceWithPaths();
+    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    await service.ensureAgent(
+      paths,
+      { id: "cto", displayName: "CTO" },
+      { type: "manager", reportsTo: "ceo" },
+    );
+    await service.ensureAgent(
+      paths,
+      { id: "qa", displayName: "QA" },
+      { reportsTo: "ceo" },
+    );
+    await service.ensureAgent(
+      paths,
+      { id: "engineer", displayName: "Engineer" },
+      { reportsTo: "cto" },
+    );
+
+    await service.syncWorkspaceReporteeLinks(paths);
+
+    const ceoReporteesDir = path.join(paths.workspacesDir, "ceo", "reportees");
+    const ctoReporteesDir = path.join(paths.workspacesDir, "cto", "reportees");
+    expect(await fileSystem.exists(ceoReporteesDir)).toBe(true);
+    expect(await fileSystem.exists(ctoReporteesDir)).toBe(true);
+
+    const ceoCtoLink = path.join(ceoReporteesDir, "cto");
+    const ceoQaLink = path.join(ceoReporteesDir, "qa");
+    const ctoEngineerLink = path.join(ctoReporteesDir, "engineer");
+    expect((await lstat(ceoCtoLink)).isSymbolicLink()).toBe(true);
+    expect((await lstat(ceoQaLink)).isSymbolicLink()).toBe(true);
+    expect((await lstat(ctoEngineerLink)).isSymbolicLink()).toBe(true);
+    expect(
+      path.resolve(path.dirname(ceoCtoLink), await readlink(ceoCtoLink)),
+    ).toBe(path.resolve(paths.workspacesDir, "cto"));
+    expect(path.resolve(path.dirname(ceoQaLink), await readlink(ceoQaLink))).toBe(
+      path.resolve(paths.workspacesDir, "qa"),
+    );
+    expect(
+      path.resolve(
+        path.dirname(ctoEngineerLink),
+        await readlink(ctoEngineerLink),
+      ),
+    ).toBe(path.resolve(paths.workspacesDir, "engineer"));
+
+    await service.setAgentManager(paths, "engineer", "ceo");
+    await service.removeAgent(paths, "qa");
+    await service.syncWorkspaceReporteeLinks(paths);
+
+    expect(await fileSystem.exists(path.join(ctoReporteesDir, "engineer"))).toBe(
+      false,
+    );
+    expect(
+      await fileSystem.exists(path.join(ceoReporteesDir, "engineer")),
+    ).toBe(true);
+    expect(await fileSystem.exists(path.join(ceoReporteesDir, "qa"))).toBe(
+      false,
+    );
+  });
+
   it("never changes global default agent during agent creation", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
 
