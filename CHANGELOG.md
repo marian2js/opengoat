@@ -2,11 +2,11 @@
 
 ## 2026.2.20
 
-- Release quality and task-cron reliability improvements across notifications and delegation.
-
-- keep notification continuity in the same session while recovering from provider context overflow by triggering in-session compaction and retrying delivery once
-- refine top-down delegation logic so blocked tasks are no longer counted as open tasks for threshold checks
-- add regression coverage to protect top-down blocked-task semantics and notification behavior stability
+- Improve task-cron notification reliability while preserving session continuity:
+  - on provider context overflow, notification delivery now compacts the same OpenClaw notification session and retries once (no session-id rotation).
+- Refine top-down delegation threshold behavior:
+  - `blocked` tasks are no longer counted as "open" tasks when evaluating top-down trigger thresholds.
+- Add regression coverage for both behaviors to prevent future cron-strategy drift.
 
 ## 2026.2.19
 
