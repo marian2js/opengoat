@@ -47,4 +47,26 @@ describe("NodeFileSystem", () => {
 
     expect(await fs.listDirectories(path.join(root, "missing"))).toEqual([]);
   });
+
+  it("creates and resolves symbolic links", async () => {
+    const root = await createTempDir("opengoat-fs-");
+    roots.push(root);
+
+    const fs = new NodeFileSystem();
+    const targetDir = path.join(root, "target");
+    const linkPath = path.join(root, "link");
+    const plainFile = path.join(root, "plain.txt");
+
+    await fs.ensureDir(targetDir);
+    await fs.writeFile(plainFile, "content\n");
+    await fs.createSymbolicLink(targetDir, linkPath);
+
+    expect(
+      path.resolve(path.dirname(linkPath), (await fs.readSymbolicLink(linkPath)) ?? ""),
+    ).toBe(path.resolve(targetDir));
+    expect(await fs.readSymbolicLink(path.join(root, "missing-link"))).toBe(
+      null,
+    );
+    expect(await fs.readSymbolicLink(plainFile)).toBe(null);
+  });
 });

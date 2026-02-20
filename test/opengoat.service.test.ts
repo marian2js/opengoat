@@ -1,5 +1,13 @@
 import { constants } from "node:fs";
-import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  lstat,
+  mkdir,
+  readFile,
+  readlink,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -793,6 +801,43 @@ describe("OpenGoatService", () => {
       provider.createdAgents.some((entry) => entry.agentId === "ceo"),
     ).toBe(true);
     expect(provider.deletedAgents).toHaveLength(0);
+  });
+
+  it("repairs workspace organization symlinks during runtime defaults sync", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    const ceoOrganizationLink = path.join(root, "workspaces", "ceo", "organization");
+    const engineerOrganizationLink = path.join(
+      root,
+      "workspaces",
+      "engineer",
+      "organization",
+    );
+    await rm(ceoOrganizationLink, { force: true, recursive: true });
+    await rm(engineerOrganizationLink, { force: true, recursive: true });
+    await service.syncRuntimeDefaults();
+
+    expect((await lstat(ceoOrganizationLink)).isSymbolicLink()).toBe(true);
+    expect((await lstat(engineerOrganizationLink)).isSymbolicLink()).toBe(
+      true,
+    );
+    expect(
+      path.resolve(path.dirname(ceoOrganizationLink), await readlink(ceoOrganizationLink)),
+    ).toBe(path.resolve(root, "organization"));
+    expect(
+      path.resolve(
+        path.dirname(engineerOrganizationLink),
+        await readlink(engineerOrganizationLink),
+      ),
+    ).toBe(path.resolve(root, "organization"));
   });
 
   it("parses OpenClaw skills list JSON even when config warnings are prefixed", async () => {

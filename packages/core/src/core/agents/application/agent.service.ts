@@ -1,4 +1,9 @@
-import { basename, isAbsolute, resolve as resolvePath } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  resolve as resolvePath,
+} from "node:path";
 import {
   DEFAULT_AGENT_ID,
   isDefaultAgentId,
@@ -246,6 +251,13 @@ export class AgentService {
       createdPaths,
       skippedPaths,
     );
+    await this.ensureWorkspaceOrganizationSymlink(
+      workspaceDir,
+      paths.organizationDir,
+      createdPaths,
+      skippedPaths,
+      removedPaths,
+    );
 
     await this.rewriteAgentsMarkdown(
       agentsPath,
@@ -319,6 +331,12 @@ export class AgentService {
     await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
     await this.writeOpenGoatWorkspaceShim(
       workspaceDir,
+      createdPaths,
+      skippedPaths,
+    );
+    await this.ensureWorkspaceOrganizationSymlink(
+      workspaceDir,
+      paths.organizationDir,
       createdPaths,
       skippedPaths,
     );
@@ -756,6 +774,40 @@ export class AgentService {
       skippedPaths,
       { overwrite: true },
     );
+  }
+
+  private async ensureWorkspaceOrganizationSymlink(
+    workspaceDir: string,
+    organizationDir: string,
+    createdPaths: string[],
+    skippedPaths: string[],
+    removedPaths?: string[],
+  ): Promise<void> {
+    const linkPath = this.pathPort.join(workspaceDir, "organization");
+    const desiredTarget = resolvePath(organizationDir);
+    const existingSymlinkTarget = await this.fileSystem.readSymbolicLink(
+      linkPath,
+    );
+
+    if (existingSymlinkTarget !== null) {
+      const resolvedExistingTarget = resolvePath(
+        dirname(linkPath),
+        existingSymlinkTarget,
+      );
+      if (resolvedExistingTarget === desiredTarget) {
+        skippedPaths.push(linkPath);
+        return;
+      }
+      await this.fileSystem.removeDir(linkPath);
+      removedPaths?.push(linkPath);
+    } else if (await this.fileSystem.exists(linkPath)) {
+      // Do not overwrite user-managed files/directories.
+      skippedPaths.push(linkPath);
+      return;
+    }
+
+    await this.fileSystem.createSymbolicLink(desiredTarget, linkPath);
+    createdPaths.push(linkPath);
   }
 
   private async readJsonIfPresent<T>(filePath: string): Promise<T | null> {

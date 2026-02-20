@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { lstat, readFile, readlink } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentService } from "../../packages/core/src/core/agents/index.js";
@@ -65,6 +65,18 @@ describe("BootstrapService", () => {
     expect(
       await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "ROLE.md")),
     ).toBe(true);
+    const ceoOrganizationLinkPath = path.join(
+      paths.workspacesDir,
+      "ceo",
+      "organization",
+    );
+    expect((await lstat(ceoOrganizationLinkPath)).isSymbolicLink()).toBe(true);
+    expect(
+      path.resolve(
+        path.dirname(ceoOrganizationLinkPath),
+        await readlink(ceoOrganizationLinkPath),
+      ),
+    ).toBe(path.resolve(paths.organizationDir));
     expect(
       await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "SOUL.md")),
     ).toBe(false);
