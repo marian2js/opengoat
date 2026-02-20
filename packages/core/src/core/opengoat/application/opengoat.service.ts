@@ -1173,7 +1173,8 @@ export class OpenGoatService {
     let pendingTasks = 0;
     let blockedTasks = 0;
 
-    for (const task of tasks) {
+    const orderedTasks = [...tasks].sort(compareTaskCreatedAtAscending);
+    for (const task of orderedTasks) {
       if (task.status === "todo") {
         todoTasks += 1;
         const targetAgentId = task.assignedTo;
@@ -2537,6 +2538,28 @@ async function runWithConcurrencyByKey<T, R>(
   );
 
   return results;
+}
+
+function compareTaskCreatedAtAscending(
+  left: TaskRecord,
+  right: TaskRecord,
+): number {
+  const leftTimestamp = Date.parse(left.createdAt);
+  const rightTimestamp = Date.parse(right.createdAt);
+  if (Number.isFinite(leftTimestamp) && Number.isFinite(rightTimestamp)) {
+    const timestampDiff = leftTimestamp - rightTimestamp;
+    if (timestampDiff !== 0) {
+      return timestampDiff;
+    }
+    return left.taskId.localeCompare(right.taskId);
+  }
+  if (Number.isFinite(leftTimestamp)) {
+    return -1;
+  }
+  if (Number.isFinite(rightTimestamp)) {
+    return 1;
+  }
+  return left.taskId.localeCompare(right.taskId);
 }
 
 function parseLooseJson(raw: string): unknown {

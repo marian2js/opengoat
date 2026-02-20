@@ -2798,6 +2798,76 @@ describe("OpenGoatService", () => {
     ).toBe(true);
   });
 
+  it("dispatches todo task notifications oldest-first by creation time", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const provider = new FakeOpenClawProvider();
+    let nowMs = Date.parse("2026-02-06T00:00:00.000Z");
+    const { service } = createService(root, provider, undefined, {
+      nowIso: () => new Date(nowMs).toISOString(),
+    });
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+
+    const firstTask = await service.createTask("ceo", {
+      title: "First task",
+      description: "Oldest todo task",
+      assignedTo: "engineer",
+      status: "todo",
+    });
+    nowMs += 60_000;
+    const secondTask = await service.createTask("ceo", {
+      title: "Second task",
+      description: "Middle todo task",
+      assignedTo: "engineer",
+      status: "todo",
+    });
+    nowMs += 60_000;
+    const thirdTask = await service.createTask("ceo", {
+      title: "Third task",
+      description: "Newest todo task",
+      assignedTo: "engineer",
+      status: "todo",
+    });
+
+    const cycle = await service.runTaskCronCycle({
+      notifyInactiveAgents: false,
+      delegationStrategies: {
+        topDown: {
+          enabled: false,
+        },
+      },
+    });
+
+    const todoDispatches = cycle.dispatches.filter(
+      (dispatch) =>
+        dispatch.kind === "todo" && dispatch.targetAgentId === "engineer",
+    );
+    expect(todoDispatches.map((dispatch) => dispatch.taskId)).toEqual([
+      firstTask.taskId,
+      secondTask.taskId,
+      thirdTask.taskId,
+    ]);
+
+    const invokedTodoTaskIds = provider.invocations
+      .filter(
+        (entry) =>
+          entry.agent === "engineer" &&
+          entry.message.includes("currently in TODO"),
+      )
+      .map((entry) => extractTaskIdFromTaskMessage(entry.message))
+      .filter((taskId): taskId is string => typeof taskId === "string");
+    expect(invokedTodoTaskIds).toEqual([
+      firstTask.taskId,
+      secondTask.taskId,
+      thirdTask.taskId,
+    ]);
+  });
+
   it("limits task automation dispatch concurrency using maxParallelFlows", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
@@ -3098,6 +3168,11 @@ function createService(
     service,
     provider,
   };
+}
+
+function extractTaskIdFromTaskMessage(message: string): string | undefined {
+  const match = message.match(/^Task ID: (\S+)$/m);
+  return match?.[1];
 }
 
 class FakeOpenClawProvider extends BaseProvider {
