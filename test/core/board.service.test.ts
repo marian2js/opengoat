@@ -27,6 +27,21 @@ afterEach(async () => {
 });
 
 describe("BoardService (tasks-only)", () => {
+  it("auto-populates createdAt and updatedAt during task creation", async () => {
+    const harness = await createHarness({
+      nowIso: () => "2026-02-10T12:34:56.000Z",
+    });
+
+    const task = await harness.boardService.createTask(harness.paths, "ceo", {
+      title: "Auto timestamp test",
+      description: "Verify internal timestamp defaults",
+      assignedTo: "cto",
+    });
+
+    expect(task.createdAt).toBe("2026-02-10T12:34:56.000Z");
+    expect(task.updatedAt).toBe("2026-02-10T12:34:56.000Z");
+  });
+
   it("allows assigning tasks to direct and indirect reportees", async () => {
     const harness = await createHarness();
 
@@ -435,9 +450,14 @@ describe("BoardService (tasks-only)", () => {
       new Uint8Array(await readFileBuffer(dbPath)),
     );
     const columnRows = migratedDb.exec("PRAGMA table_info(tasks);");
+    const createdAtColumn = (columnRows[0]?.values ?? []).find(
+      (row) => row[1] === "created_at",
+    );
     const updatedAtColumn = (columnRows[0]?.values ?? []).find(
       (row) => row[1] === "updated_at",
     );
+    expect(createdAtColumn?.[3]).toBe(1);
+    expect(createdAtColumn?.[4]).toBe("''");
     expect(updatedAtColumn?.[3]).toBe(1);
     expect(updatedAtColumn?.[4]).toBe("''");
     migratedDb.close();
@@ -679,6 +699,10 @@ describe("BoardService (tasks-only)", () => {
       assignedTo: "engineer",
       status: "doing",
     });
+    const initialTask = await harness.boardService.getTask(
+      harness.paths,
+      task.taskId,
+    );
 
     nowMs += 4 * 60_000;
     const dueAtFourMinutes = await harness.boardService.listDoingTaskIdsOlderThan(
@@ -693,6 +717,12 @@ describe("BoardService (tasks-only)", () => {
       "doing",
     );
     expect(resetApplied).toBe(true);
+    const taskAfterReset = await harness.boardService.getTask(
+      harness.paths,
+      task.taskId,
+    );
+    expect(taskAfterReset.updatedAt).not.toBe(initialTask.updatedAt);
+    expect(taskAfterReset.updatedAt).toBe("2026-02-10T00:04:00.000Z");
 
     const dueImmediatelyAfterReset =
       await harness.boardService.listDoingTaskIdsOlderThan(harness.paths, 4);
