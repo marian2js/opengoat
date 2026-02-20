@@ -1105,7 +1105,7 @@ export class OpenGoatService {
     maxParallelFlows = 1,
   ): Promise<TaskCronDispatchResult[]> {
     const openTasks = tasks
-      .filter((task) => task.status.trim().toLowerCase() !== "done")
+      .filter((task) => isTopDownOpenTaskStatus(task.status))
       .sort((left, right) => {
         const leftTimestamp = Date.parse(left.updatedAt);
         const rightTimestamp = Date.parse(right.updatedAt);
@@ -2829,4 +2829,9 @@ function isContextOverflowError(stderr: string, stdout: string): boolean {
     combined.includes("prompt too large") ||
     combined.includes("context length")
   );
+}
+
+function isTopDownOpenTaskStatus(status: string): boolean {
+  const normalized = status.trim().toLowerCase();
+  return normalized !== "done" && normalized !== "blocked";
 }
