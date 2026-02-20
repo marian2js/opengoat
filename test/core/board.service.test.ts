@@ -364,6 +364,126 @@ describe("BoardService (tasks-only)", () => {
     migratedDb.close();
   });
 
+  it("adds updated_at default for legacy runtimes that omit the column on insert", async () => {
+    const harness = await createHarness();
+    const SQL = await initSqlJs({
+      locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm"),
+    });
+    const legacyDb = new SQL.Database();
+    legacyDb.exec(`
+      CREATE TABLE boards (
+        board_id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        owner_agent_id TEXT NOT NULL,
+        is_default INTEGER NOT NULL DEFAULT 0
+      );
+      INSERT INTO boards (board_id, title, created_at, owner_agent_id, is_default)
+      VALUES ('tasks', 'Tasks', '2026-02-10T00:00:00.000Z', 'ceo', 0);
+
+      CREATE TABLE tasks (
+        task_id TEXT PRIMARY KEY,
+        board_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        status_updated_at TEXT,
+        owner_agent_id TEXT NOT NULL,
+        assigned_to_agent_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        status TEXT NOT NULL,
+        status_reason TEXT,
+        FOREIGN KEY(board_id) REFERENCES boards(board_id) ON DELETE CASCADE
+      );
+      INSERT INTO tasks (
+        task_id,
+        board_id,
+        created_at,
+        updated_at,
+        status_updated_at,
+        owner_agent_id,
+        assigned_to_agent_id,
+        title,
+        description,
+        status,
+        status_reason
+      ) VALUES (
+        'legacy-task-existing',
+        'tasks',
+        '2026-02-10T00:00:00.000Z',
+        '2026-02-10T00:00:00.000Z',
+        '2026-02-10T00:00:00.000Z',
+        'ceo',
+        'cto',
+        'Legacy existing',
+        'Exists before migration',
+        'todo',
+        NULL
+      );
+    `);
+
+    const dbPath = path.join(harness.paths.homeDir, "boards.sqlite");
+    await writeFileBuffer(dbPath, legacyDb.export());
+    legacyDb.close();
+
+    const tasks = await harness.boardService.listTasks(harness.paths, {
+      limit: 10,
+    });
+    expect(tasks.map((task) => task.taskId)).toEqual(["legacy-task-existing"]);
+
+    const migratedDb = new SQL.Database(
+      new Uint8Array(await readFileBuffer(dbPath)),
+    );
+    const columnRows = migratedDb.exec("PRAGMA table_info(tasks);");
+    const updatedAtColumn = (columnRows[0]?.values ?? []).find(
+      (row) => row[1] === "updated_at",
+    );
+    expect(updatedAtColumn?.[3]).toBe(1);
+    expect(updatedAtColumn?.[4]).toBe("''");
+    migratedDb.close();
+
+    const boardServiceInternals = harness.boardService as unknown as {
+      getDatabase: (paths: OpenGoatPaths) => Promise<unknown>;
+      execute: (db: unknown, sql: string, params?: unknown[]) => void;
+      persistDatabase: (paths: OpenGoatPaths, db: unknown) => Promise<void>;
+    };
+    const db = await boardServiceInternals.getDatabase(harness.paths);
+    boardServiceInternals.execute(
+      db,
+      `INSERT INTO tasks (
+         task_id,
+         board_id,
+         created_at,
+         status_updated_at,
+         owner_agent_id,
+         assigned_to_agent_id,
+         title,
+         description,
+         status,
+         status_reason
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        "legacy-runtime-insert",
+        INTERNAL_TASK_BUCKET_ID,
+        "2026-02-11T00:00:00.000Z",
+        "2026-02-11T00:00:00.000Z",
+        "ceo",
+        "cto",
+        "Inserted by legacy runtime",
+        "No updated_at column provided",
+        "todo",
+        null,
+      ],
+    );
+    await boardServiceInternals.persistDatabase(harness.paths, db);
+
+    const inserted = await harness.boardService.getTask(
+      harness.paths,
+      "legacy-runtime-insert",
+    );
+    expect(inserted.updatedAt).toBe("2026-02-11T00:00:00.000Z");
+  });
+
   it("reloads database state when another process updates boards.sqlite", async () => {
     const harness = await createHarness();
 

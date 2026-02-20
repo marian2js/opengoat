@@ -702,7 +702,7 @@ export class BoardService {
          task_id TEXT PRIMARY KEY,
          board_id TEXT NOT NULL,
          created_at TEXT NOT NULL,
-         updated_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL DEFAULT '',
          status_updated_at TEXT,
          owner_agent_id TEXT NOT NULL,
          assigned_to_agent_id TEXT NOT NULL,
@@ -717,6 +717,7 @@ export class BoardService {
     this.ensureTaskStatusUpdatedAtColumn(db);
     this.ensureTaskProjectColumnRemoved(db);
     this.ensureTaskUpdatedAtColumn(db);
+    this.ensureTaskUpdatedAtInsertCompatibility(db);
     this.execute(
       db,
       `CREATE TABLE IF NOT EXISTS task_blockers (
@@ -907,6 +908,7 @@ export class BoardService {
     const hasUpdatedAt = columns.some(
       (column) => column.name === "updated_at",
     );
+    const fallbackCreatedAt = this.resolveNowIso();
 
     this.execute(db, "PRAGMA foreign_keys = OFF;");
     try {
@@ -916,7 +918,7 @@ export class BoardService {
            task_id TEXT PRIMARY KEY,
            board_id TEXT NOT NULL,
            created_at TEXT NOT NULL,
-           updated_at TEXT NOT NULL,
+           updated_at TEXT NOT NULL DEFAULT '',
            status_updated_at TEXT,
            owner_agent_id TEXT NOT NULL,
            assigned_to_agent_id TEXT NOT NULL,
@@ -945,11 +947,16 @@ export class BoardService {
          SELECT
            task_id,
            board_id,
-           created_at,
+           COALESCE(
+             NULLIF(TRIM(created_at), ''),
+             NULLIF(TRIM(status_updated_at), ''),
+             ${hasUpdatedAt ? "NULLIF(TRIM(updated_at), '')" : "NULL"},
+             ?
+           ),
            ${
              hasUpdatedAt
-               ? "COALESCE(updated_at, status_updated_at, created_at)"
-               : "COALESCE(status_updated_at, created_at)"
+               ? "COALESCE(NULLIF(TRIM(updated_at), ''), NULLIF(TRIM(status_updated_at), ''), NULLIF(TRIM(created_at), ''), '')"
+               : "COALESCE(NULLIF(TRIM(status_updated_at), ''), NULLIF(TRIM(created_at), ''), '')"
            },
            ${hasStatusUpdatedAt ? "status_updated_at" : "created_at"},
            owner_agent_id,
@@ -959,6 +966,7 @@ export class BoardService {
            status,
            ${hasStatusReason ? "status_reason" : "NULL"}
          FROM tasks;`,
+        [fallbackCreatedAt],
       );
       this.execute(db, "DROP TABLE tasks;");
       this.execute(db, "ALTER TABLE tasks_without_project RENAME TO tasks;");
@@ -1021,10 +1029,102 @@ export class BoardService {
     this.execute(
       db,
       `UPDATE tasks
-       SET updated_at = COALESCE(status_updated_at, created_at)
+       SET updated_at = COALESCE(
+         NULLIF(TRIM(status_updated_at), ''),
+         NULLIF(TRIM(created_at), ''),
+         ''
+       )
        WHERE updated_at IS NULL
           OR TRIM(updated_at) = '';`,
     );
+  }
+
+  private ensureTaskUpdatedAtInsertCompatibility(db: SqlJsDatabase): void {
+    const columns = this.queryAll<{
+      name: string;
+      notnull: number;
+      dflt_value: string | null;
+    }>(db, "PRAGMA table_info(tasks);");
+    const updatedAt = columns.find((column) => column.name === "updated_at");
+    if (!updatedAt) {
+      return;
+    }
+
+    const hasDefault =
+      typeof updatedAt.dflt_value === "string" &&
+      updatedAt.dflt_value.trim().length > 0;
+    if (updatedAt.notnull !== 1 || hasDefault) {
+      return;
+    }
+
+    this.execute(db, "PRAGMA foreign_keys = OFF;");
+    try {
+      const fallbackCreatedAt = this.resolveNowIso();
+      this.execute(
+        db,
+        `CREATE TABLE tasks_with_updated_at_default (
+           task_id TEXT PRIMARY KEY,
+           board_id TEXT NOT NULL,
+           created_at TEXT NOT NULL,
+           updated_at TEXT NOT NULL DEFAULT '',
+           status_updated_at TEXT,
+           owner_agent_id TEXT NOT NULL,
+           assigned_to_agent_id TEXT NOT NULL,
+           title TEXT NOT NULL,
+           description TEXT NOT NULL,
+           status TEXT NOT NULL,
+           status_reason TEXT,
+           FOREIGN KEY(board_id) REFERENCES boards(board_id) ON DELETE CASCADE
+         );`,
+      );
+      this.execute(
+        db,
+        `INSERT INTO tasks_with_updated_at_default (
+           task_id,
+           board_id,
+           created_at,
+           updated_at,
+           status_updated_at,
+           owner_agent_id,
+           assigned_to_agent_id,
+           title,
+           description,
+           status,
+           status_reason
+         )
+         SELECT
+           task_id,
+           board_id,
+           COALESCE(
+             NULLIF(TRIM(created_at), ''),
+             NULLIF(TRIM(status_updated_at), ''),
+             NULLIF(TRIM(updated_at), ''),
+             ?
+           ),
+           COALESCE(
+             NULLIF(TRIM(updated_at), ''),
+             NULLIF(TRIM(status_updated_at), ''),
+             NULLIF(TRIM(created_at), ''),
+             ''
+           ),
+           status_updated_at,
+           owner_agent_id,
+           assigned_to_agent_id,
+           title,
+           description,
+           status,
+           status_reason
+         FROM tasks;`,
+        [fallbackCreatedAt],
+      );
+      this.execute(db, "DROP TABLE tasks;");
+      this.execute(
+        db,
+        "ALTER TABLE tasks_with_updated_at_default RENAME TO tasks;",
+      );
+    } finally {
+      this.execute(db, "PRAGMA foreign_keys = ON;");
+    }
   }
 
   private ensureBoardDefaultColumn(db: SqlJsDatabase): void {
@@ -1053,6 +1153,14 @@ export class BoardService {
        WHERE task_id = ?`,
       [this.nowIso(), taskId],
     );
+  }
+
+  private resolveNowIso(): string {
+    const raw = this.nowIso();
+    if (typeof raw === "string" && raw.trim().length > 0) {
+      return raw.trim();
+    }
+    return new Date().toISOString();
   }
 }
 
