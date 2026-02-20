@@ -116,6 +116,11 @@ const OPENCLAW_OPENGOAT_PLUGIN_ID = "openclaw-plugin";
 const OPENCLAW_OPENGOAT_PLUGIN_ROOT_ID = "opengoat-plugin";
 const OPENCLAW_OPENGOAT_PLUGIN_LEGACY_PACK_ID = "openclaw-plugin-pack";
 const OPENCLAW_OPENGOAT_PLUGIN_FALLBACK_ID = "workspace";
+const NOTIFICATION_SESSION_COMPACTION_COMMAND = [
+  "/compact",
+  "Keep only the last 3 notification exchanges plus active task ids, statuses, blockers, and explicit next actions.",
+  "Remove redundant older notification chatter.",
+].join(" ");
 
 export interface RuntimeDefaultsSyncResult {
   ceoSyncCode?: number;
@@ -1546,20 +1551,54 @@ export class OpenGoatService {
   }
 
   private async dispatchAutomationMessage(
-    _paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
     agentId: string,
     sessionRef: string,
     message: string,
     options: { cwd?: string; disableSession?: boolean } = {},
   ): Promise<{ ok: boolean; error?: string }> {
-    try {
-      const result = await this.runAgent(agentId, {
-        message,
+    const invoke = async (
+      nextMessage: string,
+    ): Promise<OrchestrationRunResult> =>
+      this.runAgent(agentId, {
+        message: nextMessage,
         sessionRef,
         disableSession: options.disableSession ?? false,
         cwd: options.cwd,
         env: process.env,
       });
+
+    try {
+      let result = await invoke(message);
+      if (
+        !isNotificationSessionRef(sessionRef) ||
+        options.disableSession === true ||
+        !isContextOverflowError(result.stderr, result.stdout)
+      ) {
+        if (result.code !== 0) {
+          return {
+            ok: false,
+            error: (
+              result.stderr ||
+              result.stdout ||
+              `Runtime exited with code ${result.code}.`
+            ).trim(),
+          };
+        }
+        return { ok: true };
+      }
+
+      const binding = await this.providerService.getAgentProvider(paths, agentId);
+      if (
+        binding.providerId === OPENCLAW_PROVIDER_ID &&
+        !message.trim().startsWith("/")
+      ) {
+        const compact = await invoke(NOTIFICATION_SESSION_COMPACTION_COMMAND);
+        if (compact.code === 0) {
+          result = await invoke(message);
+        }
+      }
+
       if (result.code !== 0) {
         return {
           ok: false,
@@ -2777,4 +2816,17 @@ function isOpenGoatPluginId(pluginId: string): boolean {
 
 function isPluginNotFoundMessage(message: string): boolean {
   return message.toLowerCase().includes("plugin not found");
+}
+
+function isNotificationSessionRef(sessionRef: string): boolean {
+  return sessionRef.trim().toLowerCase().endsWith("_notifications");
+}
+
+function isContextOverflowError(stderr: string, stdout: string): boolean {
+  const combined = `${stderr}\n${stdout}`.toLowerCase();
+  return (
+    combined.includes("context overflow") ||
+    combined.includes("prompt too large") ||
+    combined.includes("context length")
+  );
 }
