@@ -44,8 +44,11 @@ describe("NodeFileSystem", () => {
 
     const dirs = await fs.listDirectories(parent);
     expect(dirs.sort()).toEqual(["alpha", "beta"]);
+    const entries = await fs.listEntries(parent);
+    expect(entries.sort()).toEqual(["README.md", "alpha", "beta"]);
 
     expect(await fs.listDirectories(path.join(root, "missing"))).toEqual([]);
+    expect(await fs.listEntries(path.join(root, "missing"))).toEqual([]);
   });
 
   it("creates and resolves symbolic links", async () => {

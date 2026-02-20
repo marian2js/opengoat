@@ -103,6 +103,17 @@ describe("OpenGoatService", () => {
         constants.F_OK,
       ),
     ).resolves.toBeUndefined();
+    const ceoReporteeLink = path.join(
+      root,
+      "workspaces",
+      "ceo",
+      "reportees",
+      "research-analyst",
+    );
+    expect((await lstat(ceoReporteeLink)).isSymbolicLink()).toBe(true);
+    expect(
+      path.resolve(path.dirname(ceoReporteeLink), await readlink(ceoReporteeLink)),
+    ).toBe(path.resolve(root, "workspaces", "research-analyst"));
 
     const agents = await service.listAgents();
     expect(agents.map((agent) => agent.id)).toEqual([
@@ -757,6 +768,18 @@ describe("OpenGoatService", () => {
     const { service, provider } = createService(root);
     await service.initialize();
     await service.createAgent("Research Analyst");
+    await expect(
+      access(
+        path.join(
+          root,
+          "workspaces",
+          "ceo",
+          "reportees",
+          "research-analyst",
+        ),
+        constants.F_OK,
+      ),
+    ).resolves.toBeUndefined();
 
     const deleted = await service.deleteAgent("research-analyst");
 
@@ -765,6 +788,18 @@ describe("OpenGoatService", () => {
     expect(provider.deletedAgents.map((entry) => entry.agentId)).toContain(
       "research-analyst",
     );
+    await expect(
+      access(
+        path.join(
+          root,
+          "workspaces",
+          "ceo",
+          "reportees",
+          "research-analyst",
+        ),
+        constants.F_OK,
+      ),
+    ).rejects.toBeTruthy();
   });
 
   it("supports force delete when OpenClaw delete fails", async () => {
@@ -821,8 +856,16 @@ describe("OpenGoatService", () => {
       "engineer",
       "organization",
     );
+    const ceoEngineerReporteeLink = path.join(
+      root,
+      "workspaces",
+      "ceo",
+      "reportees",
+      "engineer",
+    );
     await rm(ceoOrganizationLink, { force: true, recursive: true });
     await rm(engineerOrganizationLink, { force: true, recursive: true });
+    await rm(ceoEngineerReporteeLink, { force: true, recursive: true });
     await service.syncRuntimeDefaults();
 
     expect((await lstat(ceoOrganizationLink)).isSymbolicLink()).toBe(true);
@@ -834,10 +877,17 @@ describe("OpenGoatService", () => {
     ).toBe(path.resolve(root, "organization"));
     expect(
       path.resolve(
-        path.dirname(engineerOrganizationLink),
+      path.dirname(engineerOrganizationLink),
         await readlink(engineerOrganizationLink),
       ),
     ).toBe(path.resolve(root, "organization"));
+    expect((await lstat(ceoEngineerReporteeLink)).isSymbolicLink()).toBe(true);
+    expect(
+      path.resolve(
+        path.dirname(ceoEngineerReporteeLink),
+        await readlink(ceoEngineerReporteeLink),
+      ),
+    ).toBe(path.resolve(root, "workspaces", "engineer"));
   });
 
   it("parses OpenClaw skills list JSON even when config warnings are prefixed", async () => {
@@ -1886,10 +1936,28 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("CTO", { type: "manager", reportsTo: "ceo" });
     await service.createAgent("Engineer");
+    await expect(
+      access(
+        path.join(root, "workspaces", "ceo", "reportees", "engineer"),
+        constants.F_OK,
+      ),
+    ).resolves.toBeUndefined();
 
     const updated = await service.setAgentManager("engineer", "cto");
     expect(updated.previousReportsTo).toBe("ceo");
     expect(updated.reportsTo).toBe("cto");
+    await expect(
+      access(
+        path.join(root, "workspaces", "ceo", "reportees", "engineer"),
+        constants.F_OK,
+      ),
+    ).rejects.toBeTruthy();
+    await expect(
+      access(
+        path.join(root, "workspaces", "cto", "reportees", "engineer"),
+        constants.F_OK,
+      ),
+    ).resolves.toBeUndefined();
   });
 
   it("rejects assigning reportees to non-openclaw managers", async () => {

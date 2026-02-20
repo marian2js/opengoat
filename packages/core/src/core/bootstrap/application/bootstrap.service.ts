@@ -94,12 +94,17 @@ export class BootstrapService {
       : await this.agentService.ensureCeoWorkspaceBootstrap(paths, {
           syncBootstrapMarkdown: !globalConfigExisted,
         });
+    const workspaceReporteesSync =
+      await this.agentService.syncWorkspaceReporteeLinks(paths);
 
     createdPaths.push(...agentResult.createdPaths);
     skippedPaths.push(...agentResult.skippedPaths);
     createdPaths.push(...workspaceBootstrapResult.createdPaths);
     skippedPaths.push(...workspaceBootstrapResult.skippedPaths);
     skippedPaths.push(...workspaceBootstrapResult.removedPaths);
+    createdPaths.push(...workspaceReporteesSync.createdPaths);
+    skippedPaths.push(...workspaceReporteesSync.skippedPaths);
+    skippedPaths.push(...workspaceReporteesSync.removedPaths);
 
     return {
       paths,

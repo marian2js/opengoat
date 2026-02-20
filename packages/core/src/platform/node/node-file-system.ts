@@ -76,6 +76,17 @@ export class NodeFileSystem implements FileSystemPort {
       throw error;
     }
   }
+
+  public async listEntries(path: string): Promise<string[]> {
+    try {
+      return await readdir(path);
+    } catch (error) {
+      if (isNotFound(error)) {
+        return [];
+      }
+      throw error;
+    }
+  }
 }
 
 function isNotFound(error: unknown): error is NodeJS.ErrnoException {

@@ -105,6 +105,12 @@ export interface WorkspaceCommandShimSyncResult {
   skippedPaths: string[];
 }
 
+export interface WorkspaceReporteeLinksSyncResult {
+  createdPaths: string[];
+  skippedPaths: string[];
+  removedPaths: string[];
+}
+
 export class AgentService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
@@ -347,6 +353,92 @@ export class AgentService {
     return {
       createdPaths,
       skippedPaths,
+    };
+  }
+
+  public async syncWorkspaceReporteeLinks(
+    paths: OpenGoatPaths,
+  ): Promise<WorkspaceReporteeLinksSyncResult> {
+    const createdPaths: string[] = [];
+    const skippedPaths: string[] = [];
+    const removedPaths: string[] = [];
+    const knownAgents = dedupe(
+      await this.fileSystem.listDirectories(paths.agentsDir),
+    );
+    const directReporteesByManager = new Map<string, string[]>();
+    const configuredManagerIds = new Set<string>();
+
+    for (const agentId of knownAgents) {
+      if (
+        isDefaultAgentId(agentId) ||
+        (await this.readAgentConfiguredType(paths, agentId)) === "manager"
+      ) {
+        configuredManagerIds.add(agentId);
+      }
+      const reportsTo = await this.readAgentReportsTo(paths, agentId);
+      if (reportsTo) {
+        const currentReportees = directReporteesByManager.get(reportsTo) ?? [];
+        currentReportees.push(agentId);
+        directReporteesByManager.set(reportsTo, currentReportees);
+      }
+    }
+
+    const managerCandidates = new Set<string>(configuredManagerIds);
+    for (const managerId of directReporteesByManager.keys()) {
+      managerCandidates.add(managerId);
+    }
+
+    for (const agentId of knownAgents) {
+      const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
+      const reporteesDir = this.pathPort.join(workspaceDir, "reportees");
+      const directReportees = dedupe(
+        directReporteesByManager.get(agentId) ?? [],
+      );
+      const expectedReportees = new Set(directReportees);
+      const isManager = managerCandidates.has(agentId);
+      const reporteesDirExists = await this.fileSystem.exists(reporteesDir);
+
+      await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
+      if (isManager) {
+        await this.ensureDirectory(reporteesDir, createdPaths, skippedPaths);
+      } else if (!reporteesDirExists) {
+        skippedPaths.push(reporteesDir);
+        continue;
+      }
+
+      for (const reporteeId of directReportees) {
+        await this.ensureWorkspaceSymlink(
+          this.pathPort.join(paths.workspacesDir, reporteeId),
+          this.pathPort.join(reporteesDir, reporteeId),
+          createdPaths,
+          skippedPaths,
+          removedPaths,
+        );
+      }
+
+      for (const entryName of await this.fileSystem.listEntries(reporteesDir)) {
+        if (expectedReportees.has(entryName)) {
+          continue;
+        }
+
+        const entryPath = this.pathPort.join(reporteesDir, entryName);
+        const staleSymlinkTarget = await this.fileSystem.readSymbolicLink(
+          entryPath,
+        );
+        if (staleSymlinkTarget === null) {
+          skippedPaths.push(entryPath);
+          continue;
+        }
+
+        await this.fileSystem.removeDir(entryPath);
+        removedPaths.push(entryPath);
+      }
+    }
+
+    return {
+      createdPaths,
+      skippedPaths,
+      removedPaths,
     };
   }
 
@@ -787,12 +879,26 @@ export class AgentService {
     skippedPaths: string[],
     removedPaths?: string[],
   ): Promise<void> {
-    const linkPath = this.pathPort.join(workspaceDir, "organization");
-    const desiredTarget = resolvePath(organizationDir);
+    await this.ensureWorkspaceSymlink(
+      organizationDir,
+      this.pathPort.join(workspaceDir, "organization"),
+      createdPaths,
+      skippedPaths,
+      removedPaths,
+    );
+  }
+
+  private async ensureWorkspaceSymlink(
+    targetPath: string,
+    linkPath: string,
+    createdPaths: string[],
+    skippedPaths: string[],
+    removedPaths?: string[],
+  ): Promise<void> {
+    const desiredTarget = resolvePath(targetPath);
     const existingSymlinkTarget = await this.fileSystem.readSymbolicLink(
       linkPath,
     );
-
     if (existingSymlinkTarget !== null) {
       const resolvedExistingTarget = resolvePath(
         dirname(linkPath),
@@ -812,6 +918,19 @@ export class AgentService {
 
     await this.fileSystem.createSymbolicLink(desiredTarget, linkPath);
     createdPaths.push(linkPath);
+  }
+
+  private async readAgentConfiguredType(
+    paths: OpenGoatPaths,
+    agentId: string,
+  ): Promise<"manager" | "individual" | undefined> {
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      agentId,
+      "config.json",
+    );
+    const config = await this.readJsonIfPresent<AgentConfigShape>(configPath);
+    return config?.organization?.type;
   }
 
   private async readJsonIfPresent<T>(filePath: string): Promise<T | null> {

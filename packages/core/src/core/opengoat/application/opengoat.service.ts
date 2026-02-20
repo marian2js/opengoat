@@ -487,6 +487,13 @@ export class OpenGoatService {
         `OpenGoat workspace command shim sync failed: ${toErrorMessage(error)}`,
       );
     }
+    try {
+      await this.agentService.syncWorkspaceReporteeLinks(paths);
+    } catch (error) {
+      warnings.push(
+        `OpenGoat workspace reportees sync failed: ${toErrorMessage(error)}`,
+      );
+    }
 
     return {
       ceoSyncCode,
@@ -599,6 +606,22 @@ export class OpenGoatService {
         );
       }
     }
+    try {
+      const workspaceReporteesSync =
+        await this.agentService.syncWorkspaceReporteeLinks(paths);
+      created.createdPaths.push(...workspaceReporteesSync.createdPaths);
+      created.skippedPaths.push(...workspaceReporteesSync.skippedPaths);
+      created.skippedPaths.push(...workspaceReporteesSync.removedPaths);
+    } catch (error) {
+      if (!created.alreadyExisted) {
+        await this.agentService.removeAgent(paths, created.agent.id);
+      }
+      throw new Error(
+        `Failed to sync reportees workspace links for "${
+          created.agent.id
+        }". ${toErrorMessage(error)}`,
+      );
+    }
     return {
       ...created,
       runtimeSync: {
@@ -645,6 +668,7 @@ export class OpenGoatService {
     }
 
     const removed = await this.agentService.removeAgent(paths, agentId);
+    await this.agentService.syncWorkspaceReporteeLinks(paths);
     return {
       ...removed,
       runtimeSync: {
@@ -677,6 +701,7 @@ export class OpenGoatService {
     if (updated.reportsTo) {
       await this.syncOpenClawRoleSkills(paths, updated.reportsTo);
     }
+    await this.agentService.syncWorkspaceReporteeLinks(paths);
     return updated;
   }
 
