@@ -71,6 +71,7 @@ const TASK_STATUSES = ["todo", "doing", "pending", "blocked", "done"] as const;
 const MAX_TASK_LIST_LIMIT = 100;
 const INTERNAL_TASK_BUCKET_ID = "tasks";
 const INTERNAL_TASK_BUCKET_TITLE = "Tasks";
+const EMPTY_TIMESTAMP_SQL_DEFAULT = "''";
 const require = createRequire(import.meta.url);
 
 export class BoardService {
@@ -133,7 +134,7 @@ export class BoardService {
 
     const status = normalizeTaskStatus(options.status);
     const taskId = createEntityId(`task-${title}`);
-    const createdAt = this.nowIso();
+    const createdAt = this.resolveNowIso();
 
     this.execute(
       db,
@@ -349,7 +350,7 @@ export class BoardService {
 
     const nextStatus = normalizeTaskStatus(status, true);
     const nextStatusReason = normalizeTaskStatusReason(nextStatus, reason);
-    const updatedAt = this.nowIso();
+    const updatedAt = this.resolveNowIso();
 
     this.execute(
       db,
@@ -371,7 +372,7 @@ export class BoardService {
     }
 
     const db = await this.getDatabase(paths);
-    const nowMs = Date.parse(this.nowIso());
+    const nowMs = Date.parse(this.resolveNowIso());
     const referenceNowMs = Number.isFinite(nowMs) ? nowMs : Date.now();
     const cutoffIso = new Date(
       referenceNowMs - Math.floor(olderThanMinutes) * 60_000,
@@ -398,7 +399,7 @@ export class BoardService {
     }
 
     const db = await this.getDatabase(paths);
-    const nowMs = Date.parse(this.nowIso());
+    const nowMs = Date.parse(this.resolveNowIso());
     const referenceNowMs = Number.isFinite(nowMs) ? nowMs : Date.now();
     const cutoffIso = new Date(
       referenceNowMs - Math.floor(olderThanMinutes) * 60_000,
@@ -424,7 +425,7 @@ export class BoardService {
     const db = await this.getDatabase(paths);
     const normalizedStatus = normalizeTaskStatus(status, true);
     const resolvedTaskId = this.resolveTaskId(db, taskId);
-    const now = this.nowIso();
+    const now = this.resolveNowIso();
     this.execute(
       db,
       `UPDATE tasks
@@ -436,8 +437,12 @@ export class BoardService {
       db,
       "SELECT changes() as changed",
     );
+    const didChange = (changesRow?.changed ?? 0) > 0;
+    if (didChange) {
+      this.touchTaskUpdatedAt(db, resolvedTaskId);
+    }
     await this.persistDatabase(paths, db);
-    return (changesRow?.changed ?? 0) > 0;
+    return didChange;
   }
 
   public async addTaskBlocker(
@@ -462,7 +467,7 @@ export class BoardService {
       db,
       `INSERT INTO task_blockers (task_id, created_at, created_by_agent_id, content)
        VALUES (?, ?, ?, ?)`,
-      [resolvedTaskId, this.nowIso(), normalizedActorId, content],
+      [resolvedTaskId, this.resolveNowIso(), normalizedActorId, content],
     );
     this.touchTaskUpdatedAt(db, resolvedTaskId);
     await this.persistDatabase(paths, db);
@@ -492,7 +497,7 @@ export class BoardService {
       db,
       `INSERT INTO task_artifacts (task_id, created_at, created_by_agent_id, content)
        VALUES (?, ?, ?, ?)`,
-      [resolvedTaskId, this.nowIso(), normalizedActorId, cleaned],
+      [resolvedTaskId, this.resolveNowIso(), normalizedActorId, cleaned],
     );
     this.touchTaskUpdatedAt(db, resolvedTaskId);
     await this.persistDatabase(paths, db);
@@ -522,7 +527,7 @@ export class BoardService {
       db,
       `INSERT INTO task_worklog (task_id, created_at, created_by_agent_id, content)
        VALUES (?, ?, ?, ?)`,
-      [resolvedTaskId, this.nowIso(), normalizedActorId, cleaned],
+      [resolvedTaskId, this.resolveNowIso(), normalizedActorId, cleaned],
     );
     this.touchTaskUpdatedAt(db, resolvedTaskId);
     await this.persistDatabase(paths, db);
@@ -701,8 +706,8 @@ export class BoardService {
       `CREATE TABLE IF NOT EXISTS tasks (
          task_id TEXT PRIMARY KEY,
          board_id TEXT NOT NULL,
-         created_at TEXT NOT NULL,
-         updated_at TEXT NOT NULL DEFAULT '',
+         created_at TEXT NOT NULL DEFAULT ${EMPTY_TIMESTAMP_SQL_DEFAULT},
+         updated_at TEXT NOT NULL DEFAULT ${EMPTY_TIMESTAMP_SQL_DEFAULT},
          status_updated_at TEXT,
          owner_agent_id TEXT NOT NULL,
          assigned_to_agent_id TEXT NOT NULL,
@@ -717,7 +722,7 @@ export class BoardService {
     this.ensureTaskStatusUpdatedAtColumn(db);
     this.ensureTaskProjectColumnRemoved(db);
     this.ensureTaskUpdatedAtColumn(db);
-    this.ensureTaskUpdatedAtInsertCompatibility(db);
+    this.ensureTaskTimestampInsertCompatibility(db);
     this.execute(
       db,
       `CREATE TABLE IF NOT EXISTS task_blockers (
@@ -751,6 +756,7 @@ export class BoardService {
          FOREIGN KEY(task_id) REFERENCES tasks(task_id) ON DELETE CASCADE
        );`,
     );
+    this.ensureTaskTimestampAutomation(db);
     this.execute(
       db,
       "CREATE INDEX IF NOT EXISTS idx_tasks_board_id ON tasks(board_id);",
@@ -811,7 +817,7 @@ export class BoardService {
       [
         INTERNAL_TASK_BUCKET_ID,
         INTERNAL_TASK_BUCKET_TITLE,
-        this.nowIso(),
+        this.resolveNowIso(),
         DEFAULT_AGENT_ID,
       ],
     );
@@ -917,8 +923,8 @@ export class BoardService {
         `CREATE TABLE tasks_without_project (
            task_id TEXT PRIMARY KEY,
            board_id TEXT NOT NULL,
-           created_at TEXT NOT NULL,
-           updated_at TEXT NOT NULL DEFAULT '',
+           created_at TEXT NOT NULL DEFAULT ${EMPTY_TIMESTAMP_SQL_DEFAULT},
+           updated_at TEXT NOT NULL DEFAULT ${EMPTY_TIMESTAMP_SQL_DEFAULT},
            status_updated_at TEXT,
            owner_agent_id TEXT NOT NULL,
            assigned_to_agent_id TEXT NOT NULL,
@@ -1002,12 +1008,17 @@ export class BoardService {
       this.execute(db, "ALTER TABLE tasks ADD COLUMN status_updated_at TEXT;");
     }
 
+    const fallbackNowIso = this.resolveNowIso();
     this.execute(
       db,
       `UPDATE tasks
-       SET status_updated_at = created_at
+       SET status_updated_at = COALESCE(
+         NULLIF(TRIM(created_at), ''),
+         ?
+       )
        WHERE status_updated_at IS NULL
           OR TRIM(status_updated_at) = '';`,
+      [fallbackNowIso],
     );
   }
 
@@ -1026,34 +1037,45 @@ export class BoardService {
       );
     }
 
+    const fallbackNowIso = this.resolveNowIso();
     this.execute(
       db,
       `UPDATE tasks
        SET updated_at = COALESCE(
          NULLIF(TRIM(status_updated_at), ''),
          NULLIF(TRIM(created_at), ''),
-         ''
+         ?
        )
        WHERE updated_at IS NULL
           OR TRIM(updated_at) = '';`,
+      [fallbackNowIso],
     );
   }
 
-  private ensureTaskUpdatedAtInsertCompatibility(db: SqlJsDatabase): void {
+  private ensureTaskTimestampInsertCompatibility(db: SqlJsDatabase): void {
     const columns = this.queryAll<{
       name: string;
       notnull: number;
       dflt_value: string | null;
     }>(db, "PRAGMA table_info(tasks);");
+    const createdAt = columns.find((column) => column.name === "created_at");
     const updatedAt = columns.find((column) => column.name === "updated_at");
-    if (!updatedAt) {
+    if (!createdAt || !updatedAt) {
       return;
     }
 
-    const hasDefault =
+    const hasCreatedAtDefault =
+      typeof createdAt.dflt_value === "string" &&
+      createdAt.dflt_value.trim().length > 0;
+    const hasUpdatedAtDefault =
       typeof updatedAt.dflt_value === "string" &&
       updatedAt.dflt_value.trim().length > 0;
-    if (updatedAt.notnull !== 1 || hasDefault) {
+    if (
+      createdAt.notnull === 1 &&
+      updatedAt.notnull === 1 &&
+      hasCreatedAtDefault &&
+      hasUpdatedAtDefault
+    ) {
       return;
     }
 
@@ -1062,11 +1084,11 @@ export class BoardService {
       const fallbackCreatedAt = this.resolveNowIso();
       this.execute(
         db,
-        `CREATE TABLE tasks_with_updated_at_default (
+        `CREATE TABLE tasks_with_timestamp_defaults (
            task_id TEXT PRIMARY KEY,
            board_id TEXT NOT NULL,
-           created_at TEXT NOT NULL,
-           updated_at TEXT NOT NULL DEFAULT '',
+           created_at TEXT NOT NULL DEFAULT ${EMPTY_TIMESTAMP_SQL_DEFAULT},
+           updated_at TEXT NOT NULL DEFAULT ${EMPTY_TIMESTAMP_SQL_DEFAULT},
            status_updated_at TEXT,
            owner_agent_id TEXT NOT NULL,
            assigned_to_agent_id TEXT NOT NULL,
@@ -1079,7 +1101,7 @@ export class BoardService {
       );
       this.execute(
         db,
-        `INSERT INTO tasks_with_updated_at_default (
+        `INSERT INTO tasks_with_timestamp_defaults (
            task_id,
            board_id,
            created_at,
@@ -1120,11 +1142,62 @@ export class BoardService {
       this.execute(db, "DROP TABLE tasks;");
       this.execute(
         db,
-        "ALTER TABLE tasks_with_updated_at_default RENAME TO tasks;",
+        "ALTER TABLE tasks_with_timestamp_defaults RENAME TO tasks;",
       );
     } finally {
       this.execute(db, "PRAGMA foreign_keys = ON;");
     }
+  }
+
+  private ensureTaskTimestampAutomation(db: SqlJsDatabase): void {
+    this.execute(
+      db,
+      "DROP TRIGGER IF EXISTS trg_tasks_touch_updated_at_on_update;",
+    );
+    this.execute(
+      db,
+      "DROP TRIGGER IF EXISTS trg_task_blockers_touch_updated_at;",
+    );
+    this.execute(
+      db,
+      "DROP TRIGGER IF EXISTS trg_task_artifacts_touch_updated_at;",
+    );
+    this.execute(
+      db,
+      "DROP TRIGGER IF EXISTS trg_task_worklog_touch_updated_at;",
+    );
+    this.execute(
+      db,
+      "DROP TRIGGER IF EXISTS trg_tasks_normalize_insert_timestamps;",
+    );
+    this.execute(
+      db,
+      `CREATE TRIGGER trg_tasks_normalize_insert_timestamps
+       AFTER INSERT ON tasks
+       FOR EACH ROW
+       WHEN TRIM(NEW.created_at) = ''
+         OR TRIM(NEW.updated_at) = ''
+         OR NEW.status_updated_at IS NULL
+         OR TRIM(NEW.status_updated_at) = ''
+       BEGIN
+         UPDATE tasks
+         SET created_at = COALESCE(
+               NULLIF(TRIM(created_at), ''),
+               STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
+             ),
+             updated_at = COALESCE(
+               NULLIF(TRIM(updated_at), ''),
+               NULLIF(TRIM(created_at), ''),
+               STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
+             ),
+             status_updated_at = COALESCE(
+               NULLIF(TRIM(status_updated_at), ''),
+               NULLIF(TRIM(created_at), ''),
+               STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
+             )
+         WHERE task_id = NEW.task_id;
+       END;`,
+    );
   }
 
   private ensureBoardDefaultColumn(db: SqlJsDatabase): void {
@@ -1151,7 +1224,7 @@ export class BoardService {
       `UPDATE tasks
        SET updated_at = ?
        WHERE task_id = ?`,
-      [this.nowIso(), taskId],
+      [this.resolveNowIso(), taskId],
     );
   }
 
