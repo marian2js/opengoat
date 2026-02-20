@@ -67,6 +67,7 @@ Role skill materialization is provider-aware.
   - `openclaw`: `skills/`
   - `claude-code`: `.claude/skills/`
   - `codex`: `.agents/skills/`
+  - `copilot-cli`: `.copilot/skills/`
   - `cursor`: `.cursor/skills/`
   - `opencode`: `.opencode/skills/`
   - `gemini-cli`: `.gemini/skills/`

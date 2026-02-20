@@ -10,6 +10,7 @@ describe("provider loader", () => {
     expect(registry.listProviderIds()).toEqual([
       "claude-code",
       "codex",
+      "copilot-cli",
       "cursor",
       "gemini-cli",
       "openclaw",
