@@ -2437,6 +2437,48 @@ describe("OpenGoatService", () => {
     ).toBe(false);
   });
 
+  it("excludes blocked tasks from top-down open task threshold checks", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+
+    const blockedTask = await service.createTask("ceo", {
+      title: "Unblock deployment",
+      description: "Resolve release blocker",
+      assignedTo: "ceo",
+      status: "blocked",
+    });
+
+    const cycle = await service.runTaskCronCycle({
+      notifyInactiveAgents: false,
+      delegationStrategies: {
+        topDown: {
+          enabled: true,
+          openTasksThreshold: 0,
+        },
+        bottomUp: {
+          enabled: false,
+        },
+      },
+    });
+
+    expect(cycle.blockedTasks).toBe(1);
+    expect(cycle.dispatches).toHaveLength(2);
+
+    const topDownDispatch = cycle.dispatches.find(
+      (dispatch) => dispatch.kind === "topdown",
+    );
+    expect(topDownDispatch).toMatchObject({
+      kind: "topdown",
+      targetAgentId: "ceo",
+      ok: true,
+    });
+    expect(topDownDispatch?.message).toContain("Open tasks are at 0");
+    expect(topDownDispatch?.message).not.toContain(blockedTask.taskId);
+  });
+
   it("sends one inactive notification per manager when multiple reportees are inactive", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
