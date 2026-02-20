@@ -1,4 +1,15 @@
-import { access, cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  cp,
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  readlink,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { constants } from "node:fs";
 import type { FileSystemPort } from "../../core/ports/file-system.port.js";
 
@@ -13,6 +24,28 @@ export class NodeFileSystem implements FileSystemPort {
 
   public async copyDir(sourcePath: string, targetPath: string): Promise<void> {
     await cp(sourcePath, targetPath, { recursive: true, force: true });
+  }
+
+  public async createSymbolicLink(
+    targetPath: string,
+    linkPath: string,
+  ): Promise<void> {
+    await symlink(targetPath, linkPath, "junction");
+  }
+
+  public async readSymbolicLink(path: string): Promise<string | null> {
+    try {
+      const stats = await lstat(path);
+      if (!stats.isSymbolicLink()) {
+        return null;
+      }
+      return await readlink(path);
+    } catch (error) {
+      if (isNotFound(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   public async exists(path: string): Promise<boolean> {

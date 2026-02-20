@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { lstat, readFile, readlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentService } from "../../packages/core/src/core/agents/index.js";
@@ -478,6 +478,15 @@ describe("AgentService", () => {
     expect(await fileSystem.exists(path.join(workspace, "opengoat"))).toBe(
       true,
     );
+    const organizationLinkPath = path.join(workspace, "organization");
+    const organizationLinkStats = await lstat(organizationLinkPath);
+    expect(organizationLinkStats.isSymbolicLink()).toBe(true);
+    expect(
+      path.resolve(
+        path.dirname(organizationLinkPath),
+        await readlink(organizationLinkPath),
+      ),
+    ).toBe(path.resolve(paths.organizationDir));
   });
 
   it("never changes global default agent during agent creation", async () => {
@@ -705,6 +714,7 @@ async function createAgentServiceWithPaths(): Promise<{
 
   await fileSystem.ensureDir(paths.homeDir);
   await fileSystem.ensureDir(paths.workspacesDir);
+  await fileSystem.ensureDir(paths.organizationDir);
   await fileSystem.ensureDir(paths.agentsDir);
   await fileSystem.ensureDir(paths.skillsDir);
   await fileSystem.ensureDir(paths.providersDir);
