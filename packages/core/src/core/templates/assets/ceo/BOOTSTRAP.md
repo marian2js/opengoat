@@ -26,9 +26,9 @@ Then figure out together:
 
 Write them down:
 
-- Update `~/.opengoat/organization/MISSION.md` with the "what / who / problem"
-- Update `~/.opengoat/organization/VISION.md` with the vision
-- Update `~/.opengoat/organization/STRATEGY.md` only if the answers clearly imply changes to "where we play / how we win"
+- Update `organization/MISSION.md` with the "what / who / problem"
+- Update `organization/VISION.md` with the vision
+- Update `organization/STRATEGY.md` only if the answers clearly imply changes to "where we play / how we win"
 
 Then propose the next 1 to 3 concrete tasks and start.
 
