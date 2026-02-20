@@ -243,7 +243,7 @@ describe("AgentService", () => {
     expect(roleMarkdown).toContain("- Your name: CEO");
     expect(roleMarkdown).toContain("- Role: CEO");
     expect(roleMarkdown).toContain(
-      '- For info about your reportees, call tool `opengoat_agent_info` with `{"agentId":"ceo"}`.',
+      '- For info about your reportees, see folder `reportees` or call tool `opengoat_agent_info` with `{"agentId":"ceo"}`.',
     );
     expect(roleMarkdown).toContain(
       "- Use OpenGoat tools directly (`opengoat_*`), not shell CLI commands.",
@@ -524,9 +524,9 @@ describe("AgentService", () => {
     expect(
       path.resolve(path.dirname(ceoCtoLink), await readlink(ceoCtoLink)),
     ).toBe(path.resolve(paths.workspacesDir, "cto"));
-    expect(path.resolve(path.dirname(ceoQaLink), await readlink(ceoQaLink))).toBe(
-      path.resolve(paths.workspacesDir, "qa"),
-    );
+    expect(
+      path.resolve(path.dirname(ceoQaLink), await readlink(ceoQaLink)),
+    ).toBe(path.resolve(paths.workspacesDir, "qa"));
     expect(
       path.resolve(
         path.dirname(ctoEngineerLink),
@@ -538,9 +538,9 @@ describe("AgentService", () => {
     await service.removeAgent(paths, "qa");
     await service.syncWorkspaceReporteeLinks(paths);
 
-    expect(await fileSystem.exists(path.join(ctoReporteesDir, "engineer"))).toBe(
-      false,
-    );
+    expect(
+      await fileSystem.exists(path.join(ctoReporteesDir, "engineer")),
+    ).toBe(false);
     expect(
       await fileSystem.exists(path.join(ceoReporteesDir, "engineer")),
     ).toBe(true);
