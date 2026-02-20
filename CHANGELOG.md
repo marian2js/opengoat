@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026.2.20
+
+- Release quality and task-cron reliability improvements across notifications and delegation.
+
+- keep notification continuity in the same session while recovering from provider context overflow by triggering in-session compaction and retrying delivery once
+- refine top-down delegation logic so blocked tasks are no longer counted as open tasks for threshold checks
+- add regression coverage to protect top-down blocked-task semantics and notification behavior stability
+
 ## 2026.2.19
 
 - Feature-focused release: add strategy-based task delegation (top-down default with configurable bottom-up controls), in-progress timeout reminders, richer task timestamp visibility, and end-to-end chat image attachments (multi-image UI composer, backend normalization, provider forwarding, and native Codex `--image` support).
