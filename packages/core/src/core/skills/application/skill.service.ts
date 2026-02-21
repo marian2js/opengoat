@@ -12,6 +12,8 @@ import {
   type AgentSkillsConfig,
   type InstallSkillRequest,
   type InstallSkillResult,
+  type RemoveSkillRequest,
+  type RemoveSkillResult,
   type ResolvedSkill,
   type SkillScope,
   type SkillsPromptResult,
@@ -336,6 +338,78 @@ export class SkillService {
     );
   }
 
+  public async removeSkill(
+    paths: OpenGoatPaths,
+    request: RemoveSkillRequest,
+    options: AgentSkillInstallOptions = {},
+  ): Promise<RemoveSkillResult> {
+    const scope: SkillScope = request.scope === "global" ? "global" : "agent";
+    const normalizedSkillId = normalizeAgentId(request.skillId ?? "");
+    if (!normalizedSkillId) {
+      throw new Error(
+        "Skill id must contain at least one alphanumeric character.",
+      );
+    }
+
+    if (scope === "global") {
+      const globalSkillDir = this.pathPort.join(paths.skillsDir, normalizedSkillId);
+      const removedFromGlobal = await this.fileSystem.exists(globalSkillDir);
+      await this.fileSystem.removeDir(globalSkillDir);
+      return {
+        scope: "global",
+        skillId: normalizedSkillId,
+        removedFromGlobal,
+        removedFromAgentIds: [],
+        removedWorkspacePaths: [],
+      };
+    }
+
+    const normalizedAgentId =
+      normalizeAgentId(request.agentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
+    const removed = await this.removeSkillForAgent(
+      paths,
+      normalizedAgentId,
+      normalizedSkillId,
+      options,
+    );
+    return {
+      scope: "agent",
+      agentId: normalizedAgentId,
+      skillId: normalizedSkillId,
+      removedFromGlobal: false,
+      removedFromAgentIds:
+        removed.removedFromConfig || removed.removedWorkspacePaths.length > 0
+          ? [normalizedAgentId]
+          : [],
+      removedWorkspacePaths: removed.removedWorkspacePaths,
+    };
+  }
+
+  public async removeAssignedSkillFromAgent(
+    paths: OpenGoatPaths,
+    agentId: string,
+    skillId: string,
+    options: AgentSkillInstallOptions = {},
+  ): Promise<{
+    removedFromConfig: boolean;
+    removedWorkspacePaths: string[];
+  }> {
+    const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
+    const normalizedSkillId = normalizeAgentId(skillId ?? "");
+    if (!normalizedSkillId) {
+      throw new Error(
+        "Skill id must contain at least one alphanumeric character.",
+      );
+    }
+
+    return this.removeSkillForAgent(
+      paths,
+      normalizedAgentId,
+      normalizedSkillId,
+      options,
+    );
+  }
+
   private async installSkillForAgent(
     paths: OpenGoatPaths,
     agentId: string,
@@ -345,6 +419,32 @@ export class SkillService {
     await this.assignSkillToAgent(paths, agentId, skillId);
     await this.reconcileRoleSkillsIfNeeded(paths, agentId, skillId);
     return this.syncSkillToWorkspace(paths, agentId, skillId, options);
+  }
+
+  private async removeSkillForAgent(
+    paths: OpenGoatPaths,
+    agentId: string,
+    skillId: string,
+    options: AgentSkillInstallOptions,
+  ): Promise<{
+    removedFromConfig: boolean;
+    removedWorkspacePaths: string[];
+  }> {
+    const removedFromConfig = await this.unassignSkillFromAgent(
+      paths,
+      agentId,
+      skillId,
+    );
+    const removedWorkspacePaths = await this.removeSkillFromWorkspace(
+      paths,
+      agentId,
+      skillId,
+      options,
+    );
+    return {
+      removedFromConfig,
+      removedWorkspacePaths,
+    };
   }
 
   private async syncSkillToWorkspace(
@@ -379,6 +479,36 @@ export class SkillService {
     }
 
     return installedPaths;
+  }
+
+  private async removeSkillFromWorkspace(
+    paths: OpenGoatPaths,
+    agentId: string,
+    skillId: string,
+    options: AgentSkillInstallOptions,
+  ): Promise<string[]> {
+    const workspaceDir =
+      options.workspaceDir?.trim() ||
+      this.pathPort.join(paths.workspacesDir, agentId);
+    const normalizedDirectories = normalizeWorkspaceSkillDirectories(
+      options.workspaceSkillDirectories,
+    );
+    if (normalizedDirectories.length === 0) {
+      return [];
+    }
+
+    const removedPaths: string[] = [];
+    for (const relativeSkillsDir of normalizedDirectories) {
+      const skillsDir = this.pathPort.join(workspaceDir, relativeSkillsDir);
+      const targetSkillDir = this.pathPort.join(skillsDir, skillId);
+      if (!(await this.fileSystem.exists(targetSkillDir))) {
+        continue;
+      }
+      await this.fileSystem.removeDir(targetSkillDir);
+      removedPaths.push(this.pathPort.join(targetSkillDir, "SKILL.md"));
+    }
+
+    return removedPaths;
   }
 
   private async resolveInstallSourceFromPath(
@@ -725,6 +855,59 @@ export class SkillService {
       configPath,
       `${JSON.stringify(parsed, null, 2)}\n`,
     );
+  }
+
+  private async unassignSkillFromAgent(
+    paths: OpenGoatPaths,
+    agentId: string,
+    skillId: string,
+  ): Promise<boolean> {
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      agentId,
+      "config.json",
+    );
+    if (!(await this.fileSystem.exists(configPath))) {
+      return false;
+    }
+
+    const raw = await this.fileSystem.readFile(configPath);
+    const parsed = JSON.parse(raw) as AgentConfigShape;
+    const runtimeRecord =
+      parsed.runtime &&
+      typeof parsed.runtime === "object" &&
+      !Array.isArray(parsed.runtime)
+        ? (parsed.runtime as Record<string, unknown>)
+        : {};
+    const skillsRecord =
+      runtimeRecord.skills &&
+      typeof runtimeRecord.skills === "object" &&
+      !Array.isArray(runtimeRecord.skills)
+        ? (runtimeRecord.skills as Record<string, unknown>)
+        : {};
+    const assignedRaw = Array.isArray(skillsRecord.assigned)
+      ? skillsRecord.assigned
+      : [];
+    const assigned = [
+      ...new Set(
+        assignedRaw
+          .map((value) => String(value).trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    ];
+    const nextAssigned = assigned.filter((entry) => entry !== skillId);
+    if (nextAssigned.length === assigned.length) {
+      return false;
+    }
+
+    skillsRecord.assigned = nextAssigned;
+    runtimeRecord.skills = skillsRecord;
+    parsed.runtime = runtimeRecord as AgentConfigShape["runtime"];
+    await this.fileSystem.writeFile(
+      configPath,
+      `${JSON.stringify(parsed, null, 2)}\n`,
+    );
+    return true;
   }
 
   private async reconcileRoleSkillsIfNeeded(

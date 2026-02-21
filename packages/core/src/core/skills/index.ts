@@ -5,6 +5,8 @@ export type {
   AgentSkillsPromptConfig,
   InstallSkillRequest,
   InstallSkillResult,
+  RemoveSkillRequest,
+  RemoveSkillResult,
   ResolvedSkill,
   SkillFrontmatter,
   SkillScope,

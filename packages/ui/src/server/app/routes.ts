@@ -1199,6 +1199,47 @@ export function registerApiRoutes(
     });
   });
 
+  app.post<{
+    Body: {
+      scope?: "agent" | "global";
+      agentId?: string;
+      skillId?: string;
+    };
+  }>("/api/skills/remove", async (request, reply) => {
+    return safeReply(reply, async () => {
+      if (typeof service.removeSkill !== "function") {
+        reply.code(501);
+        return {
+          error: "Skill removal is unavailable on this runtime.",
+        };
+      }
+
+      const scope = request.body?.scope === "global" ? "global" : "agent";
+      const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
+      const skillId = request.body?.skillId?.trim();
+      if (!skillId) {
+        reply.code(400);
+        return {
+          error: "skillId is required.",
+        };
+      }
+
+      const result = await service.removeSkill({
+        scope,
+        agentId: scope === "agent" ? agentId : undefined,
+        skillId,
+      });
+
+      return {
+        result,
+        message:
+          result.scope === "global"
+            ? `Removed global skill "${result.skillId}".`
+            : `Removed skill "${result.skillId}" from agent "${result.agentId ?? agentId}".`,
+      };
+    });
+  });
+
   app.get<{ Querystring: { assignee?: string; limit?: string } }>(
     "/api/tasks",
     async (request, reply) => {

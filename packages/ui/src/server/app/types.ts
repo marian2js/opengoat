@@ -96,6 +96,21 @@ export interface InstallSkillResult {
   replaced: boolean;
 }
 
+export interface RemoveSkillRequest {
+  scope?: "agent" | "global";
+  agentId?: string;
+  skillId: string;
+}
+
+export interface RemoveSkillResult {
+  scope: "agent" | "global";
+  skillId: string;
+  agentId?: string;
+  removedFromGlobal: boolean;
+  removedFromAgentIds: string[];
+  removedWorkspacePaths: string[];
+}
+
 export interface UiImageInput {
   dataUrl?: string;
   mediaType?: string;
@@ -208,6 +223,7 @@ export interface OpenClawUiService {
   listSkills: (agentId?: string) => Promise<ResolvedSkill[]>;
   listGlobalSkills: () => Promise<ResolvedSkill[]>;
   installSkill?: (request: InstallSkillRequest) => Promise<InstallSkillResult>;
+  removeSkill?: (request: RemoveSkillRequest) => Promise<RemoveSkillResult>;
   listProviders?: () => Promise<UiProviderSummary[]>;
   getOpenClawGatewayConfig?: () => Promise<UiOpenClawGatewayConfig>;
   setAgentProvider?: (agentId: string, providerId: string) => Promise<AgentProviderBinding>;

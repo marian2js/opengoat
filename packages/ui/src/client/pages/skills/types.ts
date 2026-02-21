@@ -33,3 +33,18 @@ export interface SkillInstallResult {
   workspaceInstallPaths?: string[];
   replaced: boolean;
 }
+
+export interface SkillRemoveRequest {
+  scope: "agent" | "global";
+  agentId?: string;
+  skillId: string;
+}
+
+export interface SkillRemoveResult {
+  scope: "agent" | "global";
+  skillId: string;
+  agentId?: string;
+  removedFromGlobal: boolean;
+  removedFromAgentIds: string[];
+  removedWorkspacePaths: string[];
+}

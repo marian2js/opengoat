@@ -66,6 +66,8 @@ import {
   SkillService,
   type InstallSkillRequest,
   type InstallSkillResult,
+  type RemoveSkillRequest,
+  type RemoveSkillResult,
   type ResolvedSkill,
 } from "../../skills/index.js";
 import {
@@ -1468,6 +1470,65 @@ export class OpenGoatService {
       ...globalResult,
       assignedAgentIds,
       workspaceInstallPaths: [...new Set(workspaceInstallPaths)],
+    };
+  }
+
+  public async removeSkill(
+    request: RemoveSkillRequest,
+  ): Promise<RemoveSkillResult> {
+    const paths = this.pathsProvider.getPaths();
+    const scope = request.scope === "global" ? "global" : "agent";
+
+    if (scope === "agent") {
+      const normalizedAgentId =
+        normalizeAgentId(request.agentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
+      const installOptions = await this.resolveAgentSkillInstallOptions(
+        paths,
+        normalizedAgentId,
+      );
+      const result = await this.skillService.removeSkill(
+        paths,
+        {
+          ...request,
+          scope: "agent",
+          agentId: normalizedAgentId,
+        },
+        installOptions,
+      );
+      await this.syncOpenClawRoleSkills(paths, normalizedAgentId);
+      return result;
+    }
+
+    const globalResult = await this.skillService.removeSkill(paths, {
+      ...request,
+      scope: "global",
+    });
+    const agents = await this.agentService.listAgents(paths);
+    const removedFromAgentIds: string[] = [];
+    const removedWorkspacePaths = [...globalResult.removedWorkspacePaths];
+
+    for (const agent of agents) {
+      const installOptions = await this.resolveAgentSkillInstallOptions(
+        paths,
+        agent.id,
+      );
+      const removed = await this.skillService.removeAssignedSkillFromAgent(
+        paths,
+        agent.id,
+        globalResult.skillId,
+        installOptions,
+      );
+      if (removed.removedFromConfig || removed.removedWorkspacePaths.length > 0) {
+        removedFromAgentIds.push(agent.id);
+      }
+      removedWorkspacePaths.push(...removed.removedWorkspacePaths);
+      await this.syncOpenClawRoleSkills(paths, agent.id);
+    }
+
+    return {
+      ...globalResult,
+      removedFromAgentIds: [...new Set(removedFromAgentIds)],
+      removedWorkspacePaths: [...new Set(removedWorkspacePaths)],
     };
   }
 

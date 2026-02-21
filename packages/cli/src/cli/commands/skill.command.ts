@@ -2,7 +2,7 @@ import type { CliCommand } from "../framework/command.js";
 
 export const skillCommand: CliCommand = {
   path: ["skill"],
-  description: "Skill commands (list/install).",
+  description: "Skill commands (list/install/remove).",
   async run(args, context): Promise<number> {
     if (args[0] === "--help" || args[0] === "-h" || args[0] === "help" || args.length === 0) {
       printHelp(context.stdout);
@@ -21,4 +21,5 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write(
     "  opengoat skill install <name> [--agent <id> | --global] [--from <path> | --from-url <url>] [--source-skill <name>] [--all-agents] [--description <text>] [--json]\n"
   );
+  output.write("  opengoat skill remove <id> [--agent <id> | --global] [--json]\n");
 }
