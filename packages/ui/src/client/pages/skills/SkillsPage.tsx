@@ -15,7 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -23,17 +22,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import type {
   Skill,
-  SkillInstallRequest,
-  SkillInstallResult,
   SkillRemoveRequest,
   SkillRemoveResult,
 } from "@/pages/skills/types";
 import {
-  Bot,
-  Github,
   Globe,
   PackagePlus,
   Sparkles,
@@ -53,12 +47,12 @@ interface SkillsPageProps {
   agents: SkillsPageAgent[];
   globalSkills: Skill[];
   skillsByAgentId: Record<string, Skill[]>;
-  defaultAgentId: string;
   isBusy: boolean;
   onLoadAgentSkills: (agentId: string) => Promise<void>;
-  onInstallSkill: (
-    request: SkillInstallRequest,
-  ) => Promise<SkillInstallResult>;
+  onOpenInstallSkillModal: (options?: {
+    scope?: "agent" | "global";
+    agentId?: string;
+  }) => void;
   onRemoveSkill: (request: SkillRemoveRequest) => Promise<SkillRemoveResult>;
 }
 
@@ -89,39 +83,19 @@ export function SkillsPage({
   agents,
   globalSkills,
   skillsByAgentId,
-  defaultAgentId,
   isBusy,
   onLoadAgentSkills,
-  onInstallSkill,
+  onOpenInstallSkillModal,
   onRemoveSkill,
 }: SkillsPageProps): ReactElement {
-  const [installDialogOpen, setInstallDialogOpen] = useState(false);
-  const [scope, setScope] = useState<"agent" | "global">("agent");
-  const [selectedAgentId, setSelectedAgentId] = useState(defaultAgentId);
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [sourceSkillName, setSourceSkillName] = useState("");
-  const [targetSkillName, setTargetSkillName] = useState("");
-  const [description, setDescription] = useState("");
-  const [installError, setInstallError] = useState<string | null>(null);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(
     null,
   );
   const [removeAgentId, setRemoveAgentId] = useState("");
   const [removeError, setRemoveError] = useState<string | null>(null);
-  const [isSubmitting, setSubmitting] = useState(false);
   const [isRemoving, setRemoving] = useState(false);
   const requestedAgentSkillsRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (!selectedAgentId && agents.length > 0) {
-      setSelectedAgentId(agents[0]?.id ?? defaultAgentId);
-      return;
-    }
-    if (!agents.some((agent) => agent.id === selectedAgentId)) {
-      setSelectedAgentId(agents[0]?.id ?? defaultAgentId);
-    }
-  }, [agents, defaultAgentId, selectedAgentId]);
 
   useEffect(() => {
     for (const agent of agents) {
@@ -134,10 +108,6 @@ export function SkillsPage({
       });
     }
   }, [agents, onLoadAgentSkills, skillsByAgentId]);
-
-  const selectedAgent = useMemo(() => {
-    return agents.find((agent) => agent.id === selectedAgentId) ?? null;
-  }, [agents, selectedAgentId]);
 
   const globalSkillsSorted = useMemo(() => {
     return [...globalSkills].sort((left, right) => left.name.localeCompare(right.name));
@@ -197,64 +167,6 @@ export function SkillsPage({
       .map((agent) => agent.displayName)
       .sort((left, right) => left.localeCompare(right));
   }, [agents, skillsByAgentId]);
-
-  const sourceSkillNameNormalized = sourceSkillName.trim();
-  const effectiveSkillName =
-    targetSkillName.trim() || sourceSkillNameNormalized || "new-skill";
-
-  const installLocations = useMemo(() => {
-    if (scope === "global") {
-      const providerIds = [...new Set(agents.map((agent) => agent.providerId))];
-      return providerIds.map((providerId) =>
-        resolveWorkspaceSkillLocation(providerId, effectiveSkillName),
-      );
-    }
-
-    if (!selectedAgent) {
-      return [];
-    }
-
-    return [
-      resolveWorkspaceSkillLocation(selectedAgent.providerId, effectiveSkillName),
-    ];
-  }, [agents, effectiveSkillName, scope, selectedAgent]);
-
-  const canSubmit =
-    sourceUrl.trim().length > 0 &&
-    sourceSkillNameNormalized.length > 0 &&
-    (scope === "global" || selectedAgentId.trim().length > 0);
-
-  const handleInstall = async (): Promise<void> => {
-    if (!canSubmit || isBusy || isSubmitting) {
-      return;
-    }
-
-    setInstallError(null);
-    setSubmitting(true);
-    try {
-      const payload: SkillInstallRequest = {
-        scope,
-        agentId: scope === "agent" ? selectedAgentId : undefined,
-        skillName: targetSkillName.trim() || undefined,
-        sourceUrl: sourceUrl.trim(),
-        sourceSkillName: sourceSkillNameNormalized,
-        description: description.trim() || undefined,
-        assignToAllAgents: scope === "global",
-      };
-
-      await onInstallSkill(payload);
-      setInstallDialogOpen(false);
-      setInstallError(null);
-      setSourceUrl("");
-      setSourceSkillName("");
-      setTargetSkillName("");
-      setDescription("");
-    } catch (error) {
-      setInstallError(error instanceof Error ? error.message : "Install failed.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const canSubmitRemoval =
     pendingRemoval !== null &&
@@ -334,8 +246,9 @@ export function SkillsPage({
             <Button
               type="button"
               onClick={() => {
-                setInstallDialogOpen(true);
-                setInstallError(null);
+                onOpenInstallSkillModal({
+                  scope: "agent",
+                });
               }}
               disabled={isBusy}
             >
@@ -395,7 +308,7 @@ export function SkillsPage({
                         onClick={() => {
                           openGlobalRemoveDialog(skill);
                         }}
-                        disabled={isBusy || isSubmitting || isRemoving}
+                        disabled={isBusy || isRemoving}
                         aria-label={`Remove global skill ${skill.id}`}
                       >
                         <Trash2 className="size-3.5" />
@@ -453,7 +366,7 @@ export function SkillsPage({
                         onClick={() => {
                           openAgentRemoveDialog(skill);
                         }}
-                        disabled={isBusy || isSubmitting || isRemoving}
+                        disabled={isBusy || isRemoving}
                         aria-label={`Remove skill ${skill.id} from an agent`}
                       >
                         <Trash2 className="size-3.5" />
@@ -492,188 +405,6 @@ export function SkillsPage({
           ) : null}
         </CardContent>
       </Card>
-
-      <Dialog open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Install Skill</DialogTitle>
-            <DialogDescription>
-              Add a skill from a repository URL and choose whether to install globally or for one agent.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Button
-                type="button"
-                variant={scope === "agent" ? "default" : "outline"}
-                className="justify-start"
-                onClick={() => {
-                  setScope("agent");
-                }}
-                disabled={isBusy || isSubmitting}
-              >
-                <Bot className="size-4" />
-                Install for specific agent
-              </Button>
-              <Button
-                type="button"
-                variant={scope === "global" ? "default" : "outline"}
-                className="justify-start"
-                onClick={() => {
-                  setScope("global");
-                }}
-                disabled={isBusy || isSubmitting}
-              >
-                <Globe className="size-4" />
-                Install globally (all agents)
-              </Button>
-            </div>
-
-            {scope === "agent" ? (
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Target agent
-                </p>
-                <Select
-                  value={selectedAgentId}
-                  onValueChange={(value) => {
-                    setSelectedAgentId(value);
-                  }}
-                  disabled={isBusy || isSubmitting || agents.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select agent" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agents.map((agent) => (
-                      <SelectItem key={agent.id} value={agent.id}>
-                        {agent.displayName} ({agent.providerId})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
-
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Repository URL
-              </p>
-              <div className="relative">
-                <Github className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="https://github.com/anthropics/skills"
-                  className="pl-9"
-                  value={sourceUrl}
-                  onChange={(event) => {
-                    setSourceUrl(event.target.value);
-                  }}
-                  disabled={isBusy || isSubmitting}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Skill in repository
-                </p>
-                <Input
-                  placeholder="frontend-design"
-                  value={sourceSkillName}
-                  onChange={(event) => {
-                    setSourceSkillName(event.target.value);
-                  }}
-                  disabled={isBusy || isSubmitting}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Install as (optional)
-                </p>
-                <Input
-                  placeholder="frontend-design"
-                  value={targetSkillName}
-                  onChange={(event) => {
-                    setTargetSkillName(event.target.value);
-                  }}
-                  disabled={isBusy || isSubmitting}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Description (optional)
-              </p>
-              <Input
-                placeholder="Short description for runtime context"
-                value={description}
-                onChange={(event) => {
-                  setDescription(event.target.value);
-                }}
-                disabled={isBusy || isSubmitting}
-              />
-            </div>
-
-            <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Install preview
-              </p>
-              <p className="mt-1 text-sm text-foreground">
-                {scope === "global"
-                  ? "Global install + assignment to all agents"
-                  : `Install for ${selectedAgent?.displayName ?? "selected agent"}`}
-              </p>
-              <code className="mt-2 block rounded bg-background px-2 py-1 text-xs">
-                skill id: {effectiveSkillName}
-              </code>
-              <div className="mt-2 space-y-1">
-                {installLocations.map((location) => (
-                  <code
-                    key={location}
-                    className={cn(
-                      "block rounded bg-background px-2 py-1 text-xs",
-                    )}
-                  >
-                    {location}
-                  </code>
-                ))}
-              </div>
-            </div>
-
-            {installError ? (
-              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {installError}
-              </p>
-            ) : null}
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setInstallDialogOpen(false);
-              }}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={!canSubmit || isBusy || isSubmitting}
-              onClick={() => {
-                void handleInstall();
-              }}
-            >
-              <PackagePlus className="size-4" />
-              {scope === "global" ? "Install For All Agents" : "Install For Agent"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={removeDialogOpen}
