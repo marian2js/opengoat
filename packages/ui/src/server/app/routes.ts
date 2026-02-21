@@ -1129,6 +1129,76 @@ export function registerApiRoutes(
     });
   });
 
+  app.post<{
+    Body: {
+      scope?: "agent" | "global";
+      agentId?: string;
+      skillName?: string;
+      sourcePath?: string;
+      sourceUrl?: string;
+      sourceSkillName?: string;
+      description?: string;
+      assignToAllAgents?: boolean;
+    };
+  }>("/api/skills/install", async (request, reply) => {
+    return safeReply(reply, async () => {
+      if (typeof service.installSkill !== "function") {
+        reply.code(501);
+        return {
+          error: "Skill installation is unavailable on this runtime.",
+        };
+      }
+
+      const scope = request.body?.scope === "global" ? "global" : "agent";
+      const agentId = request.body?.agentId?.trim() || DEFAULT_AGENT_ID;
+      const skillName = request.body?.skillName?.trim();
+      const sourcePath = request.body?.sourcePath?.trim();
+      const sourceUrl = request.body?.sourceUrl?.trim();
+      const sourceSkillName = request.body?.sourceSkillName?.trim();
+      const description = request.body?.description?.trim();
+      const assignToAllAgents = request.body?.assignToAllAgents === true;
+
+      if (sourcePath && sourceUrl) {
+        reply.code(400);
+        return {
+          error: "Use either sourcePath or sourceUrl, not both.",
+        };
+      }
+      if (scope === "agent" && assignToAllAgents) {
+        reply.code(400);
+        return {
+          error: "assignToAllAgents can only be used with global scope.",
+        };
+      }
+      const resolvedSkillName = skillName || sourceSkillName;
+      if (!resolvedSkillName) {
+        reply.code(400);
+        return {
+          error: "skillName or sourceSkillName is required.",
+        };
+      }
+
+      const result = await service.installSkill({
+        scope,
+        agentId: scope === "agent" ? agentId : undefined,
+        skillName: resolvedSkillName,
+        sourcePath,
+        sourceUrl,
+        sourceSkillName,
+        description,
+        assignToAllAgents,
+      });
+
+      return {
+        result,
+        message:
+          result.scope === "global"
+            ? `Installed global skill "${result.skillId}".`
+            : `Installed skill "${result.skillId}" for agent "${result.agentId ?? agentId}".`,
+      };
+    });
+  });
+
   app.get<{ Querystring: { assignee?: string; limit?: string } }>(
     "/api/tasks",
     async (request, reply) => {

@@ -62,7 +62,12 @@ import {
   type InactiveAgentNotificationTarget,
 } from "@/pages/settings/SettingsPage";
 import { SkillsPage } from "@/pages/skills/SkillsPage";
-import type { SkillsResponse } from "@/pages/skills/types";
+import type {
+  Skill,
+  SkillInstallRequest,
+  SkillInstallResult,
+  SkillsResponse,
+} from "@/pages/skills/types";
 import { TasksPage } from "@/pages/tasks/TasksPage";
 import {
   formatAbsoluteTime,
@@ -754,7 +759,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "overview", label: "Overview", icon: Home },
   { id: "tasks", label: "Tasks", icon: Boxes },
   { id: "agents", label: "Agents", icon: UsersRound },
-  { id: "skills", label: "Skills", icon: Sparkles, hiddenInSidebar: true },
+  { id: "skills", label: "Skills", icon: Sparkles },
   { id: "wiki", label: "Wiki", icon: BookOpen },
   { id: "logs", label: "Logs", icon: TerminalSquare },
 ];
@@ -883,6 +888,9 @@ export function DashboardPage(): ReactElement {
     useState<Record<string, string>>({});
   const [sessionsByAgentId, setSessionsByAgentId] = useState<
     Record<string, Session[]>
+  >({});
+  const [skillsByAgentId, setSkillsByAgentId] = useState<
+    Record<string, Skill[]>
   >({});
   const [sessionChatStatus, setSessionChatStatus] =
     useState<ChatStatus>("ready");
@@ -1189,6 +1197,9 @@ export function DashboardPage(): ReactElement {
       setSessionsByAgentId({
         [sessions.agentId]: sessions.sessions,
       });
+      setSkillsByAgentId({
+        [agentSkills.agentId ?? DEFAULT_AGENT_ID]: agentSkills.skills,
+      });
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -1262,6 +1273,74 @@ export function DashboardPage(): ReactElement {
       });
     },
     [],
+  );
+
+  const loadAgentSkills = useCallback(async (agentId: string) => {
+    const response = await fetchJson<SkillsResponse>(
+      `/api/skills?agentId=${encodeURIComponent(agentId)}`,
+    );
+    setSkillsByAgentId((current) => ({
+      ...current,
+      [response.agentId ?? agentId]: response.skills,
+    }));
+  }, []);
+
+  const refreshGlobalSkills = useCallback(async () => {
+    const response = await fetchJson<SkillsResponse>("/api/skills?global=true");
+    setState((current) => {
+      if (!current) {
+        return current;
+      }
+      return {
+        ...current,
+        globalSkills: response,
+      };
+    });
+    return response;
+  }, []);
+
+  const installSkill = useCallback(
+    async (payload: SkillInstallRequest): Promise<SkillInstallResult> => {
+      setMutating(true);
+      try {
+        const response = await fetchJson<{
+          result: SkillInstallResult;
+          message?: string;
+        }>("/api/skills/install", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        await refreshGlobalSkills();
+        const affectedAgentIds = new Set<string>([
+          ...(response.result.assignedAgentIds ?? []),
+        ]);
+        if (response.result.agentId) {
+          affectedAgentIds.add(response.result.agentId);
+        }
+        await Promise.all(
+          [...affectedAgentIds].map(async (agentId) => {
+            await loadAgentSkills(agentId);
+          }),
+        );
+
+        toast.success(response.message ?? `Installed skill "${response.result.skillId}".`);
+        return response.result;
+      } catch (requestError) {
+        const message =
+          requestError instanceof Error
+            ? requestError.message
+            : "Unable to install skill.";
+        toast.error(message);
+        throw requestError;
+      } finally {
+        setMutating(false);
+      }
+    },
+    [loadAgentSkills, refreshGlobalSkills],
   );
 
   const refreshTasks = useCallback(async () => {
@@ -5398,8 +5477,13 @@ export function DashboardPage(): ReactElement {
 
                 {route.kind === "page" && route.view === "skills" ? (
                   <SkillsPage
-                    liveAssignedSkillsCount={state.agentSkills.skills.length}
-                    liveGlobalSkillsCount={state.globalSkills.skills.length}
+                    agents={agents}
+                    globalSkills={state.globalSkills.skills}
+                    skillsByAgentId={skillsByAgentId}
+                    defaultAgentId={DEFAULT_AGENT_ID}
+                    isBusy={isLoading || isMutating}
+                    onLoadAgentSkills={loadAgentSkills}
+                    onInstallSkill={installSkill}
                   />
                 ) : null}
 

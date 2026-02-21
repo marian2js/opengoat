@@ -50,18 +50,23 @@ export interface InstallSkillRequest {
   agentId?: string;
   skillName: string;
   sourcePath?: string;
+  sourceUrl?: string;
+  sourceSkillName?: string;
   description?: string;
   content?: string;
   scope?: SkillScope;
+  assignToAllAgents?: boolean;
 }
 
 export interface InstallSkillResult {
   scope: SkillScope;
   agentId?: string;
+  assignedAgentIds?: string[];
   skillId: string;
   skillName: string;
-  source: "managed" | "source-path" | "generated";
+  source: "managed" | "source-path" | "source-url" | "generated";
   installedPath: string;
+  workspaceInstallPaths?: string[];
   replaced: boolean;
 }
 

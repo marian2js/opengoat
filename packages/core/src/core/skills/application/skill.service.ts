@@ -1,8 +1,10 @@
 import os from "node:os";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { BOARD_MANAGER_SKILL_ID } from "../../agents/domain/agent-manifest.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
+import type { CommandRunnerPort } from "../../ports/command-runner.port.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import {
@@ -18,6 +20,18 @@ import {
 interface SkillServiceDeps {
   fileSystem: FileSystemPort;
   pathPort: PathPort;
+  commandRunner?: CommandRunnerPort;
+}
+
+interface AgentSkillInstallOptions {
+  workspaceDir?: string;
+  workspaceSkillDirectories?: string[];
+}
+
+interface ResolvedInstallSource {
+  sourceDir: string;
+  source: "source-path" | "source-url";
+  cleanup?: () => Promise<void>;
 }
 
 interface AgentConfigShape {
@@ -34,10 +48,12 @@ interface AgentConfigShape {
 export class SkillService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
+  private readonly commandRunner?: CommandRunnerPort;
 
   public constructor(deps: SkillServiceDeps) {
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
+    this.commandRunner = deps.commandRunner;
   }
 
   public async listSkills(
@@ -166,11 +182,20 @@ export class SkillService {
   public async installSkill(
     paths: OpenGoatPaths,
     request: InstallSkillRequest,
+    options: AgentSkillInstallOptions = {},
   ): Promise<InstallSkillResult> {
+    const hasSourcePath = Boolean(request.sourcePath?.trim());
+    const hasSourceUrl = Boolean(request.sourceUrl?.trim());
+    if (hasSourcePath && hasSourceUrl) {
+      throw new Error("Use either sourcePath or sourceUrl, not both.");
+    }
+
     const scope: SkillScope = request.scope === "global" ? "global" : "agent";
     const normalizedAgentId =
       normalizeAgentId(request.agentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
-    const skillId = normalizeAgentId(request.skillName);
+    const requestedSkillName =
+      request.skillName?.trim() || request.sourceSkillName?.trim();
+    const skillId = normalizeAgentId(requestedSkillName);
     if (!skillId) {
       throw new Error(
         "Skill name must contain at least one alphanumeric character.",
@@ -184,38 +209,46 @@ export class SkillService {
 
     await this.fileSystem.ensureDir(baseDir);
 
-    if (request.sourcePath?.trim()) {
-      const sourcePath = resolveUserPath(request.sourcePath.trim());
-      const sourceSkillFile =
-        sourcePath.toLowerCase().endsWith("/skill.md") ||
-        sourcePath.toLowerCase().endsWith("\\skill.md")
-          ? sourcePath
-          : this.pathPort.join(sourcePath, "SKILL.md");
-      const sourceFileExists = await this.fileSystem.exists(sourceSkillFile);
-      if (!sourceFileExists) {
-        throw new Error(`Source skill not found: ${sourceSkillFile}`);
-      }
-      const sourceDir =
-        sourceSkillFile === sourcePath ? path.dirname(sourcePath) : sourcePath;
+    let workspaceInstallPaths: string[] = [];
 
-      await this.fileSystem.removeDir(targetDir);
-      await this.fileSystem.copyDir(sourceDir, targetDir);
+    if (hasSourcePath || hasSourceUrl) {
+      let resolvedSource: ResolvedInstallSource | undefined;
+      try {
+        resolvedSource = hasSourcePath
+          ? await this.resolveInstallSourceFromPath(request.sourcePath?.trim() ?? "")
+          : await this.resolveInstallSourceFromUrl(
+              paths,
+              request.sourceUrl?.trim() ?? "",
+              request.sourceSkillName,
+              skillId,
+            );
+
+        await this.fileSystem.removeDir(targetDir);
+        await this.fileSystem.copyDir(resolvedSource.sourceDir, targetDir);
+      } finally {
+        if (resolvedSource?.cleanup) {
+          await resolvedSource.cleanup();
+        }
+      }
+
       if (scope === "agent") {
-        await this.assignSkillToAgent(paths, normalizedAgentId, skillId);
-        await this.reconcileRoleSkillsIfNeeded(
+        workspaceInstallPaths = await this.installSkillForAgent(
           paths,
           normalizedAgentId,
           skillId,
+          options,
         );
       }
 
       return {
         scope,
         agentId: scope === "agent" ? normalizedAgentId : undefined,
+        assignedAgentIds: scope === "agent" ? [normalizedAgentId] : undefined,
         skillId,
-        skillName: request.skillName.trim(),
-        source: "source-path",
+        skillName: requestedSkillName ?? skillId,
+        source: hasSourcePath ? "source-path" : "source-url",
         installedPath: targetSkillFile,
+        workspaceInstallPaths,
         replaced,
       };
     }
@@ -234,7 +267,7 @@ export class SkillService {
     } else {
       const description =
         request.description?.trim() ||
-        `Skill instructions for ${request.skillName.trim()}.`;
+        `Skill instructions for ${requestedSkillName ?? skillId}.`;
       const content =
         request.content?.trim() ||
         renderSkillMarkdown({ skillId, description });
@@ -247,19 +280,281 @@ export class SkillService {
     }
 
     if (scope === "agent") {
-      await this.assignSkillToAgent(paths, normalizedAgentId, skillId);
-      await this.reconcileRoleSkillsIfNeeded(paths, normalizedAgentId, skillId);
+      workspaceInstallPaths = await this.installSkillForAgent(
+        paths,
+        normalizedAgentId,
+        skillId,
+        options,
+      );
     }
 
     return {
       scope,
       agentId: scope === "agent" ? normalizedAgentId : undefined,
+      assignedAgentIds: scope === "agent" ? [normalizedAgentId] : undefined,
       skillId,
-      skillName: request.skillName.trim(),
+      skillName: requestedSkillName ?? skillId,
       source,
       installedPath: targetSkillFile,
+      workspaceInstallPaths,
       replaced,
     };
+  }
+
+  public async assignInstalledSkillToAgent(
+    paths: OpenGoatPaths,
+    agentId: string,
+    skillId: string,
+    options: AgentSkillInstallOptions = {},
+  ): Promise<string[]> {
+    const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
+    const normalizedSkillId = normalizeAgentId(skillId);
+    if (!normalizedSkillId) {
+      throw new Error("Skill id must contain at least one alphanumeric character.");
+    }
+
+    const sourceSkillFile = this.pathPort.join(
+      paths.skillsDir,
+      normalizedSkillId,
+      "SKILL.md",
+    );
+    if (!(await this.fileSystem.exists(sourceSkillFile))) {
+      throw new Error(`Skill "${normalizedSkillId}" is not installed in global storage.`);
+    }
+
+    return this.installSkillForAgent(
+      paths,
+      normalizedAgentId,
+      normalizedSkillId,
+      options,
+    );
+  }
+
+  private async installSkillForAgent(
+    paths: OpenGoatPaths,
+    agentId: string,
+    skillId: string,
+    options: AgentSkillInstallOptions,
+  ): Promise<string[]> {
+    await this.assignSkillToAgent(paths, agentId, skillId);
+    await this.reconcileRoleSkillsIfNeeded(paths, agentId, skillId);
+    return this.syncSkillToWorkspace(paths, agentId, skillId, options);
+  }
+
+  private async syncSkillToWorkspace(
+    paths: OpenGoatPaths,
+    agentId: string,
+    skillId: string,
+    options: AgentSkillInstallOptions,
+  ): Promise<string[]> {
+    const workspaceDir =
+      options.workspaceDir?.trim() ||
+      this.pathPort.join(paths.workspacesDir, agentId);
+    const normalizedDirectories = normalizeWorkspaceSkillDirectories(
+      options.workspaceSkillDirectories,
+    );
+    if (normalizedDirectories.length === 0) {
+      return [];
+    }
+
+    const sourceSkillDir = this.pathPort.join(paths.skillsDir, skillId);
+    if (!(await this.fileSystem.exists(sourceSkillDir))) {
+      return [];
+    }
+
+    const installedPaths: string[] = [];
+    for (const relativeSkillsDir of normalizedDirectories) {
+      const skillsDir = this.pathPort.join(workspaceDir, relativeSkillsDir);
+      const targetSkillDir = this.pathPort.join(skillsDir, skillId);
+      await this.fileSystem.ensureDir(skillsDir);
+      await this.fileSystem.removeDir(targetSkillDir);
+      await this.fileSystem.copyDir(sourceSkillDir, targetSkillDir);
+      installedPaths.push(this.pathPort.join(targetSkillDir, "SKILL.md"));
+    }
+
+    return installedPaths;
+  }
+
+  private async resolveInstallSourceFromPath(
+    sourcePathInput: string,
+  ): Promise<ResolvedInstallSource> {
+    const sourcePath = resolveUserPath(sourcePathInput);
+    const sourceSkillFile =
+      sourcePath.toLowerCase().endsWith("/skill.md") ||
+      sourcePath.toLowerCase().endsWith("\\skill.md")
+        ? sourcePath
+        : this.pathPort.join(sourcePath, "SKILL.md");
+    const sourceFileExists = await this.fileSystem.exists(sourceSkillFile);
+    if (!sourceFileExists) {
+      throw new Error(`Source skill not found: ${sourceSkillFile}`);
+    }
+    const sourceDir =
+      sourceSkillFile === sourcePath ? path.dirname(sourcePath) : sourcePath;
+    return {
+      sourceDir,
+      source: "source-path",
+    };
+  }
+
+  private async resolveInstallSourceFromUrl(
+    paths: OpenGoatPaths,
+    sourceUrl: string,
+    sourceSkillName: string | undefined,
+    fallbackSkillId: string,
+  ): Promise<ResolvedInstallSource> {
+    if (!this.commandRunner) {
+      throw new Error(
+        "Installing skills from URL requires a configured command runner.",
+      );
+    }
+
+    const resolvedUrl = sourceUrl.trim();
+    if (!resolvedUrl) {
+      throw new Error("sourceUrl cannot be empty.");
+    }
+
+    const tempRoot = this.pathPort.join(
+      paths.homeDir,
+      ".tmp",
+      "skill-installs",
+      randomUUID(),
+    );
+    const cloneDir = this.pathPort.join(tempRoot, "repo");
+    await this.fileSystem.ensureDir(tempRoot);
+
+    const cloneSource = stripGitHubTreePath(resolvedUrl);
+    const cloneResult = await this.commandRunner.run({
+      command: "git",
+      args: ["clone", "--depth", "1", cloneSource, cloneDir],
+      cwd: paths.homeDir,
+    });
+    if (cloneResult.code !== 0) {
+      throw new Error(
+        `Unable to clone skill source URL "${resolvedUrl}". ${
+          cloneResult.stderr.trim() || cloneResult.stdout.trim() || ""
+        }`.trim(),
+      );
+    }
+
+    const pathHint = resolveGitHubTreePathHint(resolvedUrl);
+    const skillHint = sourceSkillName?.trim() || fallbackSkillId;
+    const resolvedSkillDir = await this.resolveRepositorySkillDirectory(
+      cloneDir,
+      skillHint,
+      pathHint,
+    );
+
+    return {
+      sourceDir: resolvedSkillDir,
+      source: "source-url",
+      cleanup: async () => {
+        await this.fileSystem.removeDir(tempRoot);
+      },
+    };
+  }
+
+  private async resolveRepositorySkillDirectory(
+    repositoryDir: string,
+    skillHint: string,
+    pathHint?: string,
+  ): Promise<string> {
+    const normalizedSkillHint = normalizeAgentId(skillHint);
+    const normalizedPathHint = normalizeRelativeDirectory(pathHint);
+
+    if (normalizedPathHint) {
+      const hinted = this.pathPort.join(repositoryDir, normalizedPathHint);
+      const hintedSkillFile = this.pathPort.join(hinted, "SKILL.md");
+      if (await this.fileSystem.exists(hintedSkillFile)) {
+        return hinted;
+      }
+    }
+
+    if (normalizedSkillHint) {
+      const candidateRelativePaths = [
+        normalizedSkillHint,
+        `skills/${normalizedSkillHint}`,
+        `.claude/skills/${normalizedSkillHint}`,
+        ".claude-plugin/skills/" + normalizedSkillHint,
+        ".agents/skills/" + normalizedSkillHint,
+        ".agent/skills/" + normalizedSkillHint,
+        ".cursor/skills/" + normalizedSkillHint,
+        ".copilot/skills/" + normalizedSkillHint,
+        ".opencode/skills/" + normalizedSkillHint,
+        ".gemini/skills/" + normalizedSkillHint,
+      ];
+      for (const relativeCandidate of candidateRelativePaths) {
+        const candidate = this.pathPort.join(repositoryDir, relativeCandidate);
+        const candidateSkillFile = this.pathPort.join(candidate, "SKILL.md");
+        if (await this.fileSystem.exists(candidateSkillFile)) {
+          return candidate;
+        }
+      }
+    }
+
+    const discovered = await this.discoverSkillDirectories(repositoryDir, 0, 7);
+    if (normalizedSkillHint) {
+      const matched = discovered.find((directoryPath) => {
+        const relativePath = path
+          .relative(repositoryDir, directoryPath)
+          .replace(/\\/g, "/");
+        const directoryName = path.basename(directoryPath).trim();
+        return (
+          normalizeAgentId(directoryName) === normalizedSkillHint ||
+          normalizeAgentId(relativePath) === normalizedSkillHint
+        );
+      });
+      if (matched) {
+        return matched;
+      }
+    }
+
+    if (discovered.length === 1) {
+      return discovered[0] as string;
+    }
+
+    if (discovered.length === 0) {
+      throw new Error("No valid SKILL.md definitions were found in the source URL.");
+    }
+
+    const available = discovered
+      .slice(0, 10)
+      .map((directoryPath) => path.relative(repositoryDir, directoryPath))
+      .join(", ");
+    throw new Error(
+      `Multiple skills were found in the source URL. Specify sourceSkillName. Available candidates: ${available}`,
+    );
+  }
+
+  private async discoverSkillDirectories(
+    rootDir: string,
+    depth: number,
+    maxDepth: number,
+  ): Promise<string[]> {
+    if (depth > maxDepth) {
+      return [];
+    }
+
+    const skillFile = this.pathPort.join(rootDir, "SKILL.md");
+    const found: string[] = [];
+    if (await this.fileSystem.exists(skillFile)) {
+      found.push(rootDir);
+    }
+
+    const childDirectories = await this.fileSystem.listDirectories(rootDir);
+    for (const childDirectory of childDirectories) {
+      if (!childDirectory || childDirectory.startsWith(".git")) {
+        continue;
+      }
+      const childPath = this.pathPort.join(rootDir, childDirectory);
+      const nested = await this.discoverSkillDirectories(
+        childPath,
+        depth + 1,
+        maxDepth,
+      );
+      found.push(...nested);
+    }
+
+    return dedupe(found).sort((left, right) => left.localeCompare(right));
   }
 
   private async loadSkillsWithPrecedence(
@@ -663,6 +958,94 @@ function resolveUserPath(value: string): string {
     return path.join(os.homedir(), value.slice(2));
   }
   return path.resolve(value);
+}
+
+function normalizeWorkspaceSkillDirectories(
+  input: string[] | undefined,
+): string[] {
+  if (!Array.isArray(input) || input.length === 0) {
+    return [];
+  }
+
+  const directories: string[] = [];
+  for (const candidate of input) {
+    const normalized = normalizeRelativeDirectory(candidate);
+    if (!normalized || directories.includes(normalized)) {
+      continue;
+    }
+    directories.push(normalized);
+  }
+  return directories;
+}
+
+function normalizeRelativeDirectory(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
+  if (!normalized || normalized.startsWith("..")) {
+    return null;
+  }
+
+  const parts = normalized
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length === 0 || parts.includes("..")) {
+    return null;
+  }
+
+  return parts.join("/");
+}
+
+function stripGitHubTreePath(sourceUrl: string): string {
+  try {
+    const parsed = new URL(sourceUrl);
+    if (parsed.hostname !== "github.com") {
+      return sourceUrl;
+    }
+
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    if (segments.length >= 4 && segments[2] === "tree") {
+      const owner = segments[0];
+      const repo = segments[1]?.replace(/\.git$/i, "");
+      if (owner && repo) {
+        return `https://github.com/${owner}/${repo}.git`;
+      }
+    }
+    return sourceUrl;
+  } catch {
+    return sourceUrl;
+  }
+}
+
+function resolveGitHubTreePathHint(sourceUrl: string): string | undefined {
+  try {
+    const parsed = new URL(sourceUrl);
+    if (parsed.hostname !== "github.com") {
+      return undefined;
+    }
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    if (segments.length <= 4 || segments[2] !== "tree") {
+      return undefined;
+    }
+    const relativeSegments = segments.slice(4);
+    if (relativeSegments.length === 0) {
+      return undefined;
+    }
+    return relativeSegments.join("/");
+  } catch {
+    return undefined;
+  }
+}
+
+function dedupe(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 function escapeXml(value: string): string {

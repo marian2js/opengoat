@@ -90,8 +90,11 @@ describe("skill commands", () => {
       agentId: "developer",
       skillName: "Code Review",
       sourcePath: "/tmp/skills/code-review",
+      sourceUrl: undefined,
+      sourceSkillName: undefined,
       description: undefined,
-      scope: "agent"
+      scope: "agent",
+      assignToAllAgents: false
     });
     expect(stdout.output()).toContain("Installed skill: code-review");
   });
@@ -114,10 +117,73 @@ describe("skill commands", () => {
       agentId: undefined,
       skillName: "Global Helper",
       sourcePath: undefined,
+      sourceUrl: undefined,
+      sourceSkillName: undefined,
       description: undefined,
-      scope: "global"
+      scope: "global",
+      assignToAllAgents: false
     });
     expect(stdout.output()).toContain("Scope: global");
     expect(stdout.output()).toContain("Installed skill: global-helper");
+  });
+
+  it("installs a global skill from URL for all agents", async () => {
+    const installSkill = vi.fn(async () => ({
+      scope: "global",
+      skillId: "frontend-design",
+      skillName: "frontend-design",
+      source: "source-url",
+      installedPath: "/tmp/opengoat/skills/frontend-design/SKILL.md",
+      assignedAgentIds: ["ceo", "developer"],
+      workspaceInstallPaths: [
+        "/tmp/workspaces/ceo/skills/frontend-design/SKILL.md",
+        "/tmp/workspaces/developer/.agents/skills/frontend-design/SKILL.md",
+      ],
+      replaced: true,
+    }));
+    const { context, stdout } = createContext({ installSkill });
+
+    const code = await skillInstallCommand.run(
+      [
+        "frontend-design",
+        "--global",
+        "--all-agents",
+        "--from-url",
+        "https://github.com/anthropics/skills",
+        "--source-skill",
+        "frontend-design",
+      ],
+      context,
+    );
+
+    expect(code).toBe(0);
+    expect(installSkill).toHaveBeenCalledWith({
+      agentId: undefined,
+      skillName: "frontend-design",
+      sourcePath: undefined,
+      sourceUrl: "https://github.com/anthropics/skills",
+      sourceSkillName: "frontend-design",
+      description: undefined,
+      scope: "global",
+      assignToAllAgents: true,
+    });
+    expect(stdout.output()).toContain("Assigned agents: ceo, developer");
+    expect(stdout.output()).toContain("Workspace installs: 2");
+  });
+
+  it("rejects --all-agents without --global", async () => {
+    const installSkill = vi.fn(async () => ({
+      scope: "agent",
+    }));
+    const { context, stderr } = createContext({ installSkill });
+
+    const code = await skillInstallCommand.run(
+      ["frontend-design", "--all-agents"],
+      context,
+    );
+
+    expect(code).toBe(1);
+    expect(stderr.output()).toContain("--all-agents requires --global.");
+    expect(installSkill).not.toHaveBeenCalled();
   });
 });
