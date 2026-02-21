@@ -1,5 +1,4 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -29,7 +28,6 @@ import type {
 } from "@/pages/skills/types";
 import {
   Globe,
-  PackagePlus,
   Sparkles,
   Trash2,
   UsersRound,
@@ -49,10 +47,6 @@ interface SkillsPageProps {
   skillsByAgentId: Record<string, Skill[]>;
   isBusy: boolean;
   onLoadAgentSkills: (agentId: string) => Promise<void>;
-  onOpenInstallSkillModal: (options?: {
-    scope?: "agent" | "global";
-    agentId?: string;
-  }) => void;
   onRemoveSkill: (request: SkillRemoveRequest) => Promise<SkillRemoveResult>;
 }
 
@@ -85,7 +79,6 @@ export function SkillsPage({
   skillsByAgentId,
   isBusy,
   onLoadAgentSkills,
-  onOpenInstallSkillModal,
   onRemoveSkill,
 }: SkillsPageProps): ReactElement {
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
@@ -233,28 +226,14 @@ export function SkillsPage({
     <section className="space-y-4">
       <Card className="border-border/80 bg-card">
         <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Sparkles className="size-4 text-foreground" />
-                <CardTitle>Skills</CardTitle>
-              </div>
-              <CardDescription>
-                Installed skills overview with aggregated agent coverage.
-              </CardDescription>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-4 text-foreground" />
+              <CardTitle>Skills</CardTitle>
             </div>
-            <Button
-              type="button"
-              onClick={() => {
-                onOpenInstallSkillModal({
-                  scope: "agent",
-                });
-              }}
-              disabled={isBusy}
-            >
-              <PackagePlus className="size-4" />
-              Install Skill
-            </Button>
+            <CardDescription>
+              Installed skills overview with aggregated agent coverage.
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent>

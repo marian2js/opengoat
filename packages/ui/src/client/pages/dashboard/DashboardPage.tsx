@@ -105,6 +105,7 @@ import {
   Home,
   MessageSquare,
   MoreHorizontal,
+  PackagePlus,
   Plus,
   Settings,
   Sparkles,
@@ -4661,6 +4662,21 @@ export function DashboardPage(): ReactElement {
                 </Button>
               ) : null}
 
+              {route.kind === "page" && route.view === "skills" ? (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    openSkillInstallDialog({
+                      scope: "agent",
+                    });
+                  }}
+                  disabled={isLoading || isMutating}
+                >
+                  <PackagePlus className="size-4" />
+                  Install Skill
+                </Button>
+              ) : null}
+
               {route.kind === "page" && route.view === "overview" ? (
                 <button
                   type="button"
@@ -5596,7 +5612,6 @@ export function DashboardPage(): ReactElement {
                     skillsByAgentId={skillsByAgentId}
                     isBusy={isLoading || isMutating}
                     onLoadAgentSkills={loadAgentSkills}
-                    onOpenInstallSkillModal={openSkillInstallDialog}
                     onRemoveSkill={removeSkill}
                   />
                 ) : null}
