@@ -7,6 +7,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -22,15 +30,15 @@ import type {
   SkillInstallResult,
 } from "@/pages/skills/types";
 import {
-  Boxes,
   Bot,
   Github,
   Globe,
   PackagePlus,
   Sparkles,
-  UserRound,
+  UsersRound,
+  WandSparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
 interface SkillsPageAgent {
   id: string;
@@ -50,6 +58,15 @@ interface SkillsPageProps {
   ) => Promise<SkillInstallResult>;
 }
 
+interface AggregatedAgentSkill {
+  id: string;
+  name: string;
+  description: string;
+  source: string;
+  agentIds: string[];
+  agentLabels: string[];
+}
+
 export function SkillsPage({
   agents,
   globalSkills,
@@ -59,6 +76,7 @@ export function SkillsPage({
   onLoadAgentSkills,
   onInstallSkill,
 }: SkillsPageProps): ReactElement {
+  const [installDialogOpen, setInstallDialogOpen] = useState(false);
   const [scope, setScope] = useState<"agent" | "global">("agent");
   const [selectedAgentId, setSelectedAgentId] = useState(defaultAgentId);
   const [sourceUrl, setSourceUrl] = useState("");
@@ -67,6 +85,7 @@ export function SkillsPage({
   const [description, setDescription] = useState("");
   const [installError, setInstallError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
+  const requestedAgentSkillsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!selectedAgentId && agents.length > 0) {
@@ -79,20 +98,70 @@ export function SkillsPage({
   }, [agents, defaultAgentId, selectedAgentId]);
 
   useEffect(() => {
-    if (!selectedAgentId) {
-      return;
+    for (const agent of agents) {
+      if (skillsByAgentId[agent.id] || requestedAgentSkillsRef.current.has(agent.id)) {
+        continue;
+      }
+      requestedAgentSkillsRef.current.add(agent.id);
+      void onLoadAgentSkills(agent.id).catch(() => {
+        requestedAgentSkillsRef.current.delete(agent.id);
+      });
     }
-    void onLoadAgentSkills(selectedAgentId).catch(() => {
-      // handled by parent toasts
-    });
-  }, [onLoadAgentSkills, selectedAgentId]);
+  }, [agents, onLoadAgentSkills, skillsByAgentId]);
 
   const selectedAgent = useMemo(() => {
     return agents.find((agent) => agent.id === selectedAgentId) ?? null;
   }, [agents, selectedAgentId]);
 
-  const selectedAgentSkills =
-    (selectedAgentId ? skillsByAgentId[selectedAgentId] : undefined) ?? [];
+  const globalSkillsSorted = useMemo(() => {
+    return [...globalSkills].sort((left, right) => left.name.localeCompare(right.name));
+  }, [globalSkills]);
+
+  const aggregatedAgentSkills = useMemo(() => {
+    const map = new Map<string, AggregatedAgentSkill>();
+
+    for (const agent of agents) {
+      const skills = skillsByAgentId[agent.id] ?? [];
+      for (const skill of skills) {
+        const current = map.get(skill.id);
+        if (!current) {
+          map.set(skill.id, {
+            id: skill.id,
+            name: skill.name,
+            description: skill.description,
+            source: skill.source,
+            agentIds: [agent.id],
+            agentLabels: [agent.displayName],
+          });
+          continue;
+        }
+
+        if (!current.agentIds.includes(agent.id)) {
+          current.agentIds.push(agent.id);
+          current.agentLabels.push(agent.displayName);
+        }
+      }
+    }
+
+    return [...map.values()]
+      .map((entry) => ({
+        ...entry,
+        agentIds: [...entry.agentIds].sort((left, right) => left.localeCompare(right)),
+        agentLabels: [...entry.agentLabels].sort((left, right) => left.localeCompare(right)),
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }, [agents, skillsByAgentId]);
+
+  const agentsWithSkillsCount = useMemo(() => {
+    return agents.filter((agent) => (skillsByAgentId[agent.id] ?? []).length > 0).length;
+  }, [agents, skillsByAgentId]);
+
+  const agentsWithoutSkills = useMemo(() => {
+    return agents
+      .filter((agent) => (skillsByAgentId[agent.id] ?? []).length === 0)
+      .map((agent) => agent.displayName)
+      .sort((left, right) => left.localeCompare(right));
+  }, [agents, skillsByAgentId]);
 
   const sourceSkillNameNormalized = sourceSkillName.trim();
   const effectiveSkillName =
@@ -109,6 +178,7 @@ export function SkillsPage({
     if (!selectedAgent) {
       return [];
     }
+
     return [
       resolveWorkspaceSkillLocation(selectedAgent.providerId, effectiveSkillName),
     ];
@@ -138,6 +208,12 @@ export function SkillsPage({
       };
 
       await onInstallSkill(payload);
+      setInstallDialogOpen(false);
+      setInstallError(null);
+      setSourceUrl("");
+      setSourceSkillName("");
+      setTargetSkillName("");
+      setDescription("");
     } catch (error) {
       setInstallError(error instanceof Error ? error.message : "Install failed.");
     } finally {
@@ -147,49 +223,158 @@ export function SkillsPage({
 
   return (
     <section className="space-y-4">
-      <Card className="overflow-hidden border-border/80 bg-gradient-to-br from-amber-50 via-card to-emerald-50">
-        <CardHeader className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Sparkles className="size-4 text-amber-600" />
-              <CardTitle>Skill Installer</CardTitle>
+      <Card className="border-border/80 bg-card">
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="size-4 text-foreground" />
+                <CardTitle>Skills</CardTitle>
+              </div>
+              <CardDescription>
+                Installed skills overview with aggregated agent coverage.
+              </CardDescription>
             </div>
-            <Badge variant="secondary">URL-first flow</Badge>
+            <Button
+              type="button"
+              onClick={() => {
+                setInstallDialogOpen(true);
+                setInstallError(null);
+              }}
+              disabled={isBusy}
+            >
+              <PackagePlus className="size-4" />
+              Install Skill
+            </Button>
           </div>
-          <CardDescription>
-            Install from GitHub and apply to one agent or every agent in your org.
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-3">
             <MetricTile
-              icon={Boxes}
+              icon={Globe}
               label="Global skills"
-              value={String(globalSkills.length)}
+              value={String(globalSkillsSorted.length)}
             />
             <MetricTile
-              icon={Bot}
-              label="Agents"
-              value={String(agents.length)}
+              icon={WandSparkles}
+              label="Agent skills"
+              value={String(aggregatedAgentSkills.length)}
             />
             <MetricTile
-              icon={UserRound}
-              label="Selected agent skills"
-              value={String(selectedAgentSkills.length)}
+              icon={UsersRound}
+              label="Agents with skills"
+              value={`${agentsWithSkillsCount}/${agents.length}`}
             />
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr,0.8fr]">
-        <Card className="border-border/80 bg-card/90">
-          <CardHeader>
-            <CardTitle className="text-base">Add New Skill</CardTitle>
-            <CardDescription>
-              Provide repository URL + skill name. Target scope decides where it is installed.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <Card className="border-border/80 bg-card">
+        <CardHeader>
+          <CardTitle className="text-base">Global Skills</CardTitle>
+          <CardDescription>
+            Skills installed globally in OpenGoat central storage.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {globalSkillsSorted.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No global skills installed yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {globalSkillsSorted.map((skill) => (
+                <article
+                  key={skill.id}
+                  className="rounded-lg border border-border/70 bg-background px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate font-medium text-sm">{skill.name}</p>
+                    <Badge variant="secondary" className="text-[11px]">
+                      {skill.source}
+                    </Badge>
+                  </div>
+                  <p
+                    className="mt-1 text-xs text-muted-foreground"
+                    title={skill.description}
+                  >
+                    {skill.description || "No description provided."}
+                  </p>
+                  <code className="mt-2 block text-xs text-muted-foreground">{skill.id}</code>
+                </article>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/80 bg-card">
+        <CardHeader>
+          <CardTitle className="text-base">Per-Agent Coverage (Aggregated)</CardTitle>
+          <CardDescription>
+            Each skill grouped once with all agents where it is installed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {aggregatedAgentSkills.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No agent-specific skills installed yet.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {aggregatedAgentSkills.map((skill) => (
+                <article
+                  key={skill.id}
+                  className="rounded-lg border border-border/70 bg-background px-3 py-2"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-sm">{skill.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Installed in {skill.agentIds.length} agent{skill.agentIds.length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="text-[11px]">
+                      {skill.id}
+                    </Badge>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {skill.agentLabels.map((agentLabel) => (
+                      <Badge
+                        key={`${skill.id}:${agentLabel}`}
+                        variant="secondary"
+                        className="text-[11px]"
+                      >
+                        {agentLabel}
+                      </Badge>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+
+          {agentsWithoutSkills.length > 0 ? (
+            <div className="rounded-lg border border-dashed border-border/70 bg-muted/30 px-3 py-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Agents without installed skills
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {agentsWithoutSkills.join(", ")}
+              </p>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Dialog open={installDialogOpen} onOpenChange={setInstallDialogOpen}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Install Skill</DialogTitle>
+            <DialogDescription>
+              Add a skill from a repository URL and choose whether to install globally or for one agent.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
             <div className="grid gap-2 sm:grid-cols-2">
               <Button
                 type="button"
@@ -200,8 +385,8 @@ export function SkillsPage({
                 }}
                 disabled={isBusy || isSubmitting}
               >
-                <UserRound className="size-4" />
-                Specific agent
+                <Bot className="size-4" />
+                Install for specific agent
               </Button>
               <Button
                 type="button"
@@ -213,7 +398,7 @@ export function SkillsPage({
                 disabled={isBusy || isSubmitting}
               >
                 <Globe className="size-4" />
-                Global (all agents)
+                Install globally (all agents)
               </Button>
             </div>
 
@@ -304,15 +489,52 @@ export function SkillsPage({
               />
             </div>
 
+            <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Install preview
+              </p>
+              <p className="mt-1 text-sm text-foreground">
+                {scope === "global"
+                  ? "Global install + assignment to all agents"
+                  : `Install for ${selectedAgent?.displayName ?? "selected agent"}`}
+              </p>
+              <code className="mt-2 block rounded bg-background px-2 py-1 text-xs">
+                skill id: {effectiveSkillName}
+              </code>
+              <div className="mt-2 space-y-1">
+                {installLocations.map((location) => (
+                  <code
+                    key={location}
+                    className={cn(
+                      "block rounded bg-background px-2 py-1 text-xs",
+                    )}
+                  >
+                    {location}
+                  </code>
+                ))}
+              </div>
+            </div>
+
             {installError ? (
               <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 {installError}
               </p>
             ) : null}
+          </div>
 
+          <DialogFooter>
             <Button
               type="button"
-              className="w-full"
+              variant="outline"
+              onClick={() => {
+                setInstallDialogOpen(false);
+              }}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
               disabled={!canSubmit || isBusy || isSubmitting}
               onClick={() => {
                 void handleInstall();
@@ -321,71 +543,9 @@ export function SkillsPage({
               <PackagePlus className="size-4" />
               {scope === "global" ? "Install For All Agents" : "Install For Agent"}
             </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/80 bg-card/80">
-          <CardHeader>
-            <CardTitle className="text-base">Install Preview</CardTitle>
-            <CardDescription>
-              Preview of where this skill will be written based on provider runtime policy.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="rounded-lg border border-border/70 bg-background/60 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Scope
-              </p>
-              <p className="mt-1 font-medium">
-                {scope === "global"
-                  ? "Global install + assignment to all agents"
-                  : `Agent install for ${selectedAgent?.displayName ?? "selected agent"}`}
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-border/70 bg-background/60 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Effective skill id
-              </p>
-              <code className="mt-1 block rounded bg-muted px-2 py-1 text-xs">
-                {effectiveSkillName}
-              </code>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Workspace locations
-              </p>
-              {installLocations.map((location) => (
-                <code
-                  key={location}
-                  className="block rounded-md border border-border/70 bg-background/60 px-2 py-1 text-xs"
-                >
-                  {location}
-                </code>
-              ))}
-              {installLocations.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Select an agent to preview installation paths.
-                </p>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <SkillListCard title="Global Skills" skills={globalSkills} />
-        <SkillListCard
-          title={selectedAgent ? `${selectedAgent.displayName} Skills` : "Agent Skills"}
-          skills={selectedAgentSkills}
-          emptyLabel={
-            selectedAgent
-              ? "No skills installed for this agent yet."
-              : "Select an agent to view installed skills."
-          }
-        />
-      </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
@@ -395,68 +555,18 @@ function MetricTile({
   label,
   value,
 }: {
-  icon: typeof Boxes;
+  icon: typeof Globe;
   label: string;
   value: string;
 }): ReactElement {
   return (
-    <div className="rounded-xl border border-border/70 bg-background/50 p-3">
+    <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Icon className="size-4" />
         <p className="text-xs uppercase tracking-wide">{label}</p>
       </div>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      <p className="mt-1 text-2xl font-semibold text-foreground">{value}</p>
     </div>
-  );
-}
-
-function SkillListCard({
-  title,
-  skills,
-  emptyLabel,
-}: {
-  title: string;
-  skills: Skill[];
-  emptyLabel?: string;
-}): ReactElement {
-  return (
-    <Card className="border-border/80 bg-card/80">
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-        <CardDescription>
-          {skills.length > 0
-            ? `${skills.length} installed`
-            : (emptyLabel ?? "No installed skills.")}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {skills.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{emptyLabel ?? "No skills installed."}</p>
-        ) : (
-          <div className="space-y-2">
-            {skills.map((skill) => (
-              <div
-                key={skill.id}
-                className={cn(
-                  "rounded-lg border border-border/70 bg-background/60 px-3 py-2",
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="truncate font-medium text-sm">{skill.name}</p>
-                  <Badge variant="secondary" className="text-[11px]">
-                    {skill.source}
-                  </Badge>
-                </div>
-                <p className="mt-1 truncate text-xs text-muted-foreground" title={skill.description}>
-                  {skill.description}
-                </p>
-                <code className="mt-2 block text-xs text-muted-foreground">{skill.id}</code>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 
