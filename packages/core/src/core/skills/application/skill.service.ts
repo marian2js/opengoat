@@ -1,5 +1,5 @@
-import os from "node:os";
 import { randomUUID } from "node:crypto";
+import os from "node:os";
 import path from "node:path";
 import { BOARD_MANAGER_SKILL_ID } from "../../agents/domain/agent-manifest.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
@@ -195,7 +195,7 @@ export class SkillService {
       normalizeAgentId(request.agentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
     const requestedSkillName =
       request.skillName?.trim() || request.sourceSkillName?.trim();
-    const skillId = normalizeAgentId(requestedSkillName);
+    const skillId = normalizeAgentId(requestedSkillName ?? "");
     if (!skillId) {
       throw new Error(
         "Skill name must contain at least one alphanumeric character.",
@@ -215,7 +215,9 @@ export class SkillService {
       let resolvedSource: ResolvedInstallSource | undefined;
       try {
         resolvedSource = hasSourcePath
-          ? await this.resolveInstallSourceFromPath(request.sourcePath?.trim() ?? "")
+          ? await this.resolveInstallSourceFromPath(
+              request.sourcePath?.trim() ?? "",
+            )
           : await this.resolveInstallSourceFromUrl(
               paths,
               request.sourceUrl?.trim() ?? "",
@@ -310,7 +312,9 @@ export class SkillService {
     const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
     const normalizedSkillId = normalizeAgentId(skillId);
     if (!normalizedSkillId) {
-      throw new Error("Skill id must contain at least one alphanumeric character.");
+      throw new Error(
+        "Skill id must contain at least one alphanumeric character.",
+      );
     }
 
     const sourceSkillFile = this.pathPort.join(
@@ -319,7 +323,9 @@ export class SkillService {
       "SKILL.md",
     );
     if (!(await this.fileSystem.exists(sourceSkillFile))) {
-      throw new Error(`Skill "${normalizedSkillId}" is not installed in global storage.`);
+      throw new Error(
+        `Skill "${normalizedSkillId}" is not installed in global storage.`,
+      );
     }
 
     return this.installSkillForAgent(
@@ -513,7 +519,9 @@ export class SkillService {
     }
 
     if (discovered.length === 0) {
-      throw new Error("No valid SKILL.md definitions were found in the source URL.");
+      throw new Error(
+        "No valid SKILL.md definitions were found in the source URL.",
+      );
     }
 
     const available = discovered
@@ -782,7 +790,9 @@ export class SkillService {
     }
 
     // Role skills live in OpenClaw workspace skill folders, not local assigned metadata.
-    skillsRecord.assigned = assigned.filter((entry) => !ROLE_SKILL_IDS.has(entry));
+    skillsRecord.assigned = assigned.filter(
+      (entry) => !ROLE_SKILL_IDS.has(entry),
+    );
 
     runtimeRecord.skills = skillsRecord;
     parsed.runtime = runtimeRecord as AgentConfigShape["runtime"];
