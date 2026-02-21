@@ -1,5 +1,5 @@
 {
-  "name": "@opengoat/opengoat-plugin",
+  "name": "@opengoat/opengoat-monorepo",
   "version": "0.1.0",
   "private": true,
   "description": "OpenGoat monorepo workspace",
@@ -17,22 +17,6 @@
     "version-packages": "node scripts/release.mjs",
     "release": "node scripts/release.mjs"
   },
-  "openclaw": {
-    "extensions": [
-      "./index.ts"
-    ]
-  },
-  "files": [
-    "index.ts",
-    "openclaw.plugin.json",
-    "packages/openclaw-plugin/index.ts",
-    "packages/openclaw-plugin/openclaw.plugin.json",
-    "packages/openclaw-plugin/src/**/*.ts",
-    "!packages/openclaw-plugin/src/**/*.test.ts",
-    "packages/core/src/**/*.ts",
-    "!packages/core/src/**/*.test.ts",
-    "packages/core/src/core/templates/assets/**/*.md"
-  ],
   "engines": {
     "node": ">=20.11.0"
   },
