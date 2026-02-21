@@ -18,7 +18,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { RotateCcw, Save } from "lucide-react";
+import { PackagePlus, RotateCcw, Save } from "lucide-react";
 import { type ReactElement, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -82,6 +82,7 @@ interface AgentProfileDraft {
 
 interface AgentProfilePageProps {
   agentId: string;
+  profileRefreshNonce?: number;
   selectedAgent: AgentProfilePageAgent | null;
   agents: AgentProfilePageAgent[];
   providers: AgentProfilePageProvider[];
@@ -93,11 +94,13 @@ interface AgentProfilePageProps {
   ) => Promise<{ agent: AgentProfile; message?: string }>;
   onRefreshOverview: () => Promise<void>;
   onOpenChat: (agentId: string) => void;
+  onOpenInstallSkillModal: (agentId: string) => void;
   onBackToAgents: () => void;
 }
 
 export function AgentProfilePage({
   agentId,
+  profileRefreshNonce = 0,
   selectedAgent,
   agents,
   providers,
@@ -106,6 +109,7 @@ export function AgentProfilePage({
   onSaveProfile,
   onRefreshOverview,
   onOpenChat,
+  onOpenInstallSkillModal,
   onBackToAgents,
 }: AgentProfilePageProps): ReactElement {
   const [profile, setProfile] = useState<AgentProfile | null>(null);
@@ -148,7 +152,7 @@ export function AgentProfilePage({
     return () => {
       cancelled = true;
     };
-  }, [agentId, onLoadProfile]);
+  }, [agentId, onLoadProfile, profileRefreshNonce]);
 
   const directReportCount = useMemo(() => {
     if (!profile) {
@@ -530,7 +534,7 @@ export function AgentProfilePage({
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Runtime</CardTitle>
-            <CardDescription>Provider and assigned skills.</CardDescription>
+            <CardDescription>Provider runtime configuration.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
@@ -554,31 +558,52 @@ export function AgentProfilePage({
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs uppercase tracking-wide text-muted-foreground">
-                Assigned Skills
-              </label>
-              {profile.skills.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {profile.skills.map((skillId) => (
-                    <Badge key={skillId} variant="secondary" className="font-mono text-[11px]">
-                      {skillId}
-                    </Badge>
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-md border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
-                  No assigned skills.
-                </p>
-              )}
-            </div>
-
             {!providerCanHaveReportees && directReportCount > 0 ? (
               <p className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
                 This provider does not support reportees, but this agent currently
                 has {directReportCount} direct reportee{directReportCount === 1 ? "" : "s"}.
               </p>
             ) : null}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base">Skills</CardTitle>
+                <CardDescription>Assigned skills for this agent.</CardDescription>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isBusy || isSaving}
+                onClick={() => {
+                  onOpenInstallSkillModal(profile.id);
+                }}
+              >
+                <PackagePlus className="size-4" />
+                Add Skill
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            <label className="text-xs uppercase tracking-wide text-muted-foreground">
+              Assigned Skills
+            </label>
+            {profile.skills.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {profile.skills.map((skillId) => (
+                  <Badge key={skillId} variant="secondary" className="font-mono text-[11px]">
+                    {skillId}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-md border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+                No assigned skills.
+              </p>
+            )}
           </CardContent>
         </Card>
 

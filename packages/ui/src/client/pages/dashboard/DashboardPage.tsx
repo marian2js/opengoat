@@ -61,6 +61,7 @@ import {
   SettingsPage,
   type InactiveAgentNotificationTarget,
 } from "@/pages/settings/SettingsPage";
+import { SkillInstallDialog } from "@/pages/skills/SkillInstallDialog";
 import { SkillsPage } from "@/pages/skills/SkillsPage";
 import type {
   Skill,
@@ -894,6 +895,17 @@ export function DashboardPage(): ReactElement {
   const [skillsByAgentId, setSkillsByAgentId] = useState<
     Record<string, Skill[]>
   >({});
+  const [skillInstallDialogState, setSkillInstallDialogState] = useState<{
+    open: boolean;
+    scope: "agent" | "global";
+    agentId: string;
+  }>({
+    open: false,
+    scope: "agent",
+    agentId: DEFAULT_AGENT_ID,
+  });
+  const [agentProfileRefreshNonceById, setAgentProfileRefreshNonceById] =
+    useState<Record<string, number>>({});
   const [sessionChatStatus, setSessionChatStatus] =
     useState<ChatStatus>("ready");
   const [isSessionPromptDragActive, setSessionPromptDragActive] =
@@ -1301,6 +1313,35 @@ export function DashboardPage(): ReactElement {
     return response;
   }, []);
 
+  const bumpAgentProfileRefreshNonce = useCallback((agentIds: string[]) => {
+    if (agentIds.length === 0) {
+      return;
+    }
+    setAgentProfileRefreshNonceById((current) => {
+      const next = { ...current };
+      for (const agentId of agentIds) {
+        next[agentId] = (next[agentId] ?? 0) + 1;
+      }
+      return next;
+    });
+  }, []);
+
+  const openSkillInstallDialog = useCallback(
+    (options?: {
+      scope?: "agent" | "global";
+      agentId?: string;
+    }) => {
+      const scope = options?.scope === "global" ? "global" : "agent";
+      const requestedAgentId = options?.agentId?.trim().toLowerCase();
+      setSkillInstallDialogState({
+        open: true,
+        scope,
+        agentId: requestedAgentId || DEFAULT_AGENT_ID,
+      });
+    },
+    [],
+  );
+
   const installSkill = useCallback(
     async (payload: SkillInstallRequest): Promise<SkillInstallResult> => {
       setMutating(true);
@@ -1328,6 +1369,7 @@ export function DashboardPage(): ReactElement {
             await loadAgentSkills(agentId);
           }),
         );
+        bumpAgentProfileRefreshNonce([...affectedAgentIds]);
 
         toast.success(response.message ?? `Installed skill "${response.result.skillId}".`);
         return response.result;
@@ -1342,7 +1384,7 @@ export function DashboardPage(): ReactElement {
         setMutating(false);
       }
     },
-    [loadAgentSkills, refreshGlobalSkills],
+    [bumpAgentProfileRefreshNonce, loadAgentSkills, refreshGlobalSkills],
   );
 
   const removeSkill = useCallback(
@@ -1372,6 +1414,7 @@ export function DashboardPage(): ReactElement {
             await loadAgentSkills(agentId);
           }),
         );
+        bumpAgentProfileRefreshNonce([...affectedAgentIds]);
 
         toast.success(response.message ?? `Removed skill "${response.result.skillId}".`);
         return response.result;
@@ -1386,7 +1429,7 @@ export function DashboardPage(): ReactElement {
         setMutating(false);
       }
     },
-    [loadAgentSkills, refreshGlobalSkills],
+    [bumpAgentProfileRefreshNonce, loadAgentSkills, refreshGlobalSkills],
   );
 
   const refreshTasks = useCallback(async () => {
@@ -4739,6 +4782,22 @@ export function DashboardPage(): ReactElement {
             onCancel={() => createAgentDialog.setOpen(false)}
           />
 
+          <SkillInstallDialog
+            open={skillInstallDialogState.open}
+            initialScope={skillInstallDialogState.scope}
+            initialAgentId={skillInstallDialogState.agentId}
+            agents={agents}
+            defaultAgentId={DEFAULT_AGENT_ID}
+            isBusy={isLoading || isMutating}
+            onInstallSkill={installSkill}
+            onOpenChange={(open) => {
+              setSkillInstallDialogState((current) => ({
+                ...current,
+                open,
+              }));
+            }}
+          />
+
           {selectedTaskWorkspace ? (
             <Dialog
               open={isCreateTaskDialogOpen}
@@ -5353,11 +5412,20 @@ export function DashboardPage(): ReactElement {
                     agents={agents}
                     providers={providers}
                     isBusy={isLoading || isMutating}
+                    profileRefreshNonce={
+                      agentProfileRefreshNonceById[route.agentId] ?? 0
+                    }
                     onLoadProfile={loadAgentProfile}
                     onSaveProfile={saveAgentProfile}
                     onRefreshOverview={refreshOverview}
                     onOpenChat={(agentId) => {
                       void handleSelectSidebarAgent(agentId);
+                    }}
+                    onOpenInstallSkillModal={(agentId) => {
+                      openSkillInstallDialog({
+                        scope: "agent",
+                        agentId,
+                      });
                     }}
                     onBackToAgents={() => {
                       navigateToRoute({
@@ -5526,10 +5594,9 @@ export function DashboardPage(): ReactElement {
                     agents={agents}
                     globalSkills={state.globalSkills.skills}
                     skillsByAgentId={skillsByAgentId}
-                    defaultAgentId={DEFAULT_AGENT_ID}
                     isBusy={isLoading || isMutating}
                     onLoadAgentSkills={loadAgentSkills}
-                    onInstallSkill={installSkill}
+                    onOpenInstallSkillModal={openSkillInstallDialog}
                     onRemoveSkill={removeSkill}
                   />
                 ) : null}
