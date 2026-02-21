@@ -531,98 +531,135 @@ export function AgentProfilePage({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Runtime</CardTitle>
-            <CardDescription>Provider runtime configuration.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-1.5">
-              <label className="text-xs uppercase tracking-wide text-muted-foreground">
-                Provider
-              </label>
-              <Select
-                value={profile.providerId}
-                disabled
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {providers.map((provider) => (
-                    <SelectItem key={provider.id} value={provider.id}>
-                      {provider.displayName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {!providerCanHaveReportees && directReportCount > 0 ? (
-              <p className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-                This provider does not support reportees, but this agent currently
-                has {directReportCount} direct reportee{directReportCount === 1 ? "" : "s"}.
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-base">Skills</CardTitle>
-                <CardDescription>Assigned skills for this agent.</CardDescription>
+        <div className="grid gap-4 lg:col-span-2 lg:grid-cols-5 lg:items-stretch">
+          <Card className="flex h-full flex-col lg:col-span-3">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base">Skills</CardTitle>
+                  <CardDescription>Assigned skills for this agent.</CardDescription>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isBusy || isSaving}
+                  onClick={() => {
+                    onOpenInstallSkillModal(profile.id);
+                  }}
+                >
+                  <PackagePlus className="size-4" />
+                  Add Skill
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={isBusy || isSaving}
-                onClick={() => {
-                  onOpenInstallSkillModal(profile.id);
-                }}
-              >
-                <PackagePlus className="size-4" />
-                Add Skill
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-1.5">
-            <label className="text-xs uppercase tracking-wide text-muted-foreground">
-              Assigned Skills
-            </label>
-            {profile.skills.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {profile.skills.map((skillId) => (
-                  <Badge key={skillId} variant="secondary" className="font-mono text-[11px]">
-                    {skillId}
-                  </Badge>
-                ))}
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col gap-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-border/70 bg-background/60 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Assigned
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold text-foreground">
+                    {profile.skills.length}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/70 bg-background/60 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Scope
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-foreground">
+                    This agent only
+                  </p>
+                </div>
               </div>
-            ) : (
-              <p className="rounded-md border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
-                No assigned skills.
-              </p>
-            )}
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Paths</CardTitle>
-            <CardDescription>Runtime file locations for this agent.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-xs">
-            <p className="text-muted-foreground">Workspace directory</p>
-            <p className="rounded-md border border-border/70 bg-background/60 px-3 py-2 font-mono text-foreground break-all">
-              {profile.workspaceDir}
-            </p>
-            <p className="text-muted-foreground">Config file</p>
-            <p className="rounded-md border border-border/70 bg-background/60 px-3 py-2 font-mono text-foreground break-all">
-              {profile.internalConfigDir}/config.json
-            </p>
-          </CardContent>
-        </Card>
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Assigned Skills
+                </label>
+                {profile.skills.length > 0 ? (
+                  <div className="grid gap-2">
+                    {profile.skills.map((skillId) => (
+                      <div
+                        key={skillId}
+                        className="rounded-lg border border-border/70 bg-background/60 px-3 py-2"
+                      >
+                        <Badge
+                          variant="secondary"
+                          className="font-mono text-[11px]"
+                        >
+                          {skillId}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-md border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+                    No assigned skills.
+                  </p>
+                )}
+              </div>
+
+              <p className="mt-auto rounded-lg border border-dashed border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                Install from a GitHub URL and this agent will be preselected.
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Runtime</CardTitle>
+                <CardDescription>Provider runtime configuration.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Provider
+                  </label>
+                  <Select
+                    value={profile.providerId}
+                    disabled
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {providers.map((provider) => (
+                        <SelectItem key={provider.id} value={provider.id}>
+                          {provider.displayName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {!providerCanHaveReportees && directReportCount > 0 ? (
+                  <p className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                    This provider does not support reportees, but this agent currently
+                    has {directReportCount} direct reportee{directReportCount === 1 ? "" : "s"}.
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Paths</CardTitle>
+                <CardDescription>Runtime file locations for this agent.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-xs">
+                <p className="text-muted-foreground">Workspace directory</p>
+                <p className="rounded-md border border-border/70 bg-background/60 px-3 py-2 font-mono text-foreground break-all">
+                  {profile.workspaceDir}
+                </p>
+                <p className="text-muted-foreground">Config file</p>
+                <p className="rounded-md border border-border/70 bg-background/60 px-3 py-2 font-mono text-foreground break-all">
+                  {profile.internalConfigDir}/config.json
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card/60 px-4 py-3">
