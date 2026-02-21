@@ -19,6 +19,6 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write("  opengoat skill list [--agent <id> | --global] [--json]\n");
   output.write(
-    "  opengoat skill install <name> [--agent <id> | --global] [--from <path>] [--description <text>] [--json]\n"
+    "  opengoat skill install <name> [--agent <id> | --global] [--from <path> | --from-url <url>] [--source-skill <name>] [--all-agents] [--description <text>] [--json]\n"
   );
 }

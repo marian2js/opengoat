@@ -72,6 +72,30 @@ export interface ResolvedSkill {
   source: string;
 }
 
+export interface InstallSkillRequest {
+  agentId?: string;
+  skillName: string;
+  sourcePath?: string;
+  sourceUrl?: string;
+  sourceSkillName?: string;
+  description?: string;
+  content?: string;
+  scope?: "agent" | "global";
+  assignToAllAgents?: boolean;
+}
+
+export interface InstallSkillResult {
+  scope: "agent" | "global";
+  agentId?: string;
+  assignedAgentIds?: string[];
+  skillId: string;
+  skillName: string;
+  source: "managed" | "source-path" | "source-url" | "generated";
+  installedPath: string;
+  workspaceInstallPaths?: string[];
+  replaced: boolean;
+}
+
 export interface UiImageInput {
   dataUrl?: string;
   mediaType?: string;
@@ -183,6 +207,7 @@ export interface OpenClawUiService {
   listSessions: (agentId?: string, options?: { activeMinutes?: number }) => Promise<SessionSummary[]>;
   listSkills: (agentId?: string) => Promise<ResolvedSkill[]>;
   listGlobalSkills: () => Promise<ResolvedSkill[]>;
+  installSkill?: (request: InstallSkillRequest) => Promise<InstallSkillResult>;
   listProviders?: () => Promise<UiProviderSummary[]>;
   getOpenClawGatewayConfig?: () => Promise<UiOpenClawGatewayConfig>;
   setAgentProvider?: (agentId: string, providerId: string) => Promise<AgentProviderBinding>;

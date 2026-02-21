@@ -231,6 +231,7 @@ export class OpenGoatService {
     this.skillService = new SkillService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
+      commandRunner: deps.commandRunner,
     });
     this.providerService = new ProviderService({
       fileSystem: deps.fileSystem,
@@ -1412,11 +1413,79 @@ export class OpenGoatService {
     request: InstallSkillRequest,
   ): Promise<InstallSkillResult> {
     const paths = this.pathsProvider.getPaths();
-    const result = await this.skillService.installSkill(paths, request);
-    if (result.scope === "agent" && result.agentId) {
-      await this.syncOpenClawRoleSkills(paths, result.agentId);
+    const scope = request.scope === "global" ? "global" : "agent";
+
+    if (scope === "agent") {
+      const normalizedAgentId =
+        normalizeAgentId(request.agentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
+      const installOptions = await this.resolveAgentSkillInstallOptions(
+        paths,
+        normalizedAgentId,
+      );
+      const result = await this.skillService.installSkill(
+        paths,
+        {
+          ...request,
+          scope: "agent",
+          agentId: normalizedAgentId,
+        },
+        installOptions,
+      );
+      await this.syncOpenClawRoleSkills(paths, normalizedAgentId);
+      return result;
     }
-    return result;
+
+    const globalResult = await this.skillService.installSkill(paths, {
+      ...request,
+      scope: "global",
+    });
+    if (!request.assignToAllAgents) {
+      return globalResult;
+    }
+
+    const agents = await this.agentService.listAgents(paths);
+    const assignedAgentIds: string[] = [];
+    const workspaceInstallPaths = [
+      ...(globalResult.workspaceInstallPaths ?? []),
+    ];
+    for (const agent of agents) {
+      const installOptions = await this.resolveAgentSkillInstallOptions(
+        paths,
+        agent.id,
+      );
+      const installedPaths = await this.skillService.assignInstalledSkillToAgent(
+        paths,
+        agent.id,
+        globalResult.skillId,
+        installOptions,
+      );
+      workspaceInstallPaths.push(...installedPaths);
+      assignedAgentIds.push(agent.id);
+      await this.syncOpenClawRoleSkills(paths, agent.id);
+    }
+
+    return {
+      ...globalResult,
+      assignedAgentIds,
+      workspaceInstallPaths: [...new Set(workspaceInstallPaths)],
+    };
+  }
+
+  private async resolveAgentSkillInstallOptions(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    agentId: string,
+  ): Promise<{
+    workspaceDir: string;
+    workspaceSkillDirectories: string[];
+  }> {
+    const runtimeProfile = await this.providerService.getAgentRuntimeProfile(
+      paths,
+      agentId,
+    );
+    return {
+      workspaceDir: this.pathPort.join(paths.workspacesDir, runtimeProfile.agentId),
+      workspaceSkillDirectories: runtimeProfile.roleSkillDirectories,
+    };
   }
 
   public async runOpenClaw(

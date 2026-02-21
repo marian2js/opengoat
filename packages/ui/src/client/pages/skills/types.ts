@@ -10,3 +10,26 @@ export interface SkillsResponse {
   skills: Skill[];
   agentId?: string;
 }
+
+export interface SkillInstallRequest {
+  scope: "agent" | "global";
+  agentId?: string;
+  skillName?: string;
+  sourcePath?: string;
+  sourceUrl?: string;
+  sourceSkillName?: string;
+  description?: string;
+  assignToAllAgents?: boolean;
+}
+
+export interface SkillInstallResult {
+  scope: "agent" | "global";
+  agentId?: string;
+  assignedAgentIds?: string[];
+  skillId: string;
+  skillName: string;
+  source: "managed" | "source-path" | "source-url" | "generated";
+  installedPath: string;
+  workspaceInstallPaths?: string[];
+  replaced: boolean;
+}

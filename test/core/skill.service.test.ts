@@ -1,7 +1,12 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { cp, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SkillService } from "../../packages/core/src/core/skills/index.js";
+import type {
+  CommandRunRequest,
+  CommandRunResult,
+  CommandRunnerPort,
+} from "../../packages/core/src/core/ports/command-runner.port.js";
 import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
 import { NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
 import {
@@ -189,6 +194,139 @@ describe("SkillService", () => {
     expect(config.runtime?.skills?.assigned).toContain("local-skill");
   });
 
+  it("installs a skill into provider-specific workspace directories", async () => {
+    const { service, paths, fileSystem } = await createHarness();
+    const sourceSkillDir = path.join(paths.homeDir, "workspace-source-skill");
+    await fileSystem.ensureDir(sourceSkillDir);
+    await fileSystem.writeFile(
+      path.join(sourceSkillDir, "SKILL.md"),
+      [
+        "---",
+        "name: Cursor Local Skill",
+        "description: Provider-specific workspace install",
+        "---",
+        "",
+        "# Cursor Local Skill",
+      ].join("\n"),
+    );
+
+    const result = await service.installSkill(
+      paths,
+      {
+        agentId: "ceo",
+        skillName: "cursor-local-skill",
+        sourcePath: sourceSkillDir,
+      },
+      {
+        workspaceDir: path.join(paths.workspacesDir, "ceo"),
+        workspaceSkillDirectories: [".agents/skills"],
+      },
+    );
+
+    expect(result.workspaceInstallPaths).toEqual([
+      path.join(
+        paths.workspacesDir,
+        "ceo",
+        ".agents",
+        "skills",
+        "cursor-local-skill",
+        "SKILL.md",
+      ),
+    ]);
+    const workspaceSkillMarkdown = await readFile(
+      path.join(
+        paths.workspacesDir,
+        "ceo",
+        ".agents",
+        "skills",
+        "cursor-local-skill",
+        "SKILL.md",
+      ),
+      "utf8",
+    );
+    expect(workspaceSkillMarkdown).toContain("Cursor Local Skill");
+  });
+
+  it("installs from URL by cloning the source repository and resolving source skill", async () => {
+    const sourceRepositoryRoot = await createTempDir("opengoat-skill-repo-");
+    roots.push(sourceRepositoryRoot);
+    const sourceSkillDir = path.join(
+      sourceRepositoryRoot,
+      "skills",
+      "frontend-design",
+    );
+    await new NodeFileSystem().ensureDir(sourceSkillDir);
+    await new NodeFileSystem().writeFile(
+      path.join(sourceSkillDir, "SKILL.md"),
+      [
+        "---",
+        "name: frontend-design",
+        "description: Frontend design workflow",
+        "---",
+        "",
+        "# Frontend design workflow",
+      ].join("\n"),
+    );
+
+    const commandRunner: CommandRunnerPort = {
+      run: async (
+        request: CommandRunRequest,
+      ): Promise<CommandRunResult> => {
+        if (
+          request.command === "git" &&
+          request.args[0] === "clone" &&
+          request.args[1] === "--depth" &&
+          request.args[2] === "1"
+        ) {
+          const destinationDir = request.args[4];
+          if (!destinationDir) {
+            return {
+              code: 1,
+              stdout: "",
+              stderr: "Missing destination dir",
+            };
+          }
+          await cp(sourceRepositoryRoot, destinationDir, {
+            recursive: true,
+            force: true,
+          });
+          return {
+            code: 0,
+            stdout: "",
+            stderr: "",
+          };
+        }
+        return {
+          code: 1,
+          stdout: "",
+          stderr: `Unsupported command: ${request.command}`,
+        };
+      },
+    };
+
+    const { service, paths } = await createHarness({
+      commandRunner,
+    });
+    const result = await service.installSkill(paths, {
+      agentId: "ceo",
+      skillName: "frontend-design",
+      sourceUrl: "https://github.com/anthropics/skills",
+      sourceSkillName: "frontend-design",
+    });
+
+    expect(result.skillId).toBe("frontend-design");
+    expect(result.source).toBe("source-url");
+    expect(await readFile(result.installedPath, "utf8")).toContain(
+      "Frontend design workflow",
+    );
+    const config = JSON.parse(
+      await readFile(path.join(paths.agentsDir, "ceo", "config.json"), "utf8"),
+    ) as {
+      runtime?: { skills?: { assigned?: string[] } };
+    };
+    expect(config.runtime?.skills?.assigned).toContain("frontend-design");
+  });
+
   it("installs and lists global managed skills", async () => {
     const { service, paths } = await createHarness();
     const result = await service.installSkill(paths, {
@@ -249,7 +387,18 @@ async function createHarness(): Promise<{
   paths: ReturnType<TestPathsProvider["getPaths"]>;
   fileSystem: NodeFileSystem;
 }>;
-async function createHarness(): Promise<{
+async function createHarness(options: {
+  commandRunner?: CommandRunnerPort;
+}): Promise<{
+  service: SkillService;
+  paths: ReturnType<TestPathsProvider["getPaths"]>;
+  fileSystem: NodeFileSystem;
+}>;
+async function createHarness(
+  options: {
+    commandRunner?: CommandRunnerPort;
+  } = {},
+): Promise<{
   service: SkillService;
   paths: ReturnType<TestPathsProvider["getPaths"]>;
   fileSystem: NodeFileSystem;
@@ -295,6 +444,7 @@ async function createHarness(): Promise<{
     service: new SkillService({
       fileSystem,
       pathPort,
+      commandRunner: options.commandRunner,
     }),
     paths,
     fileSystem,

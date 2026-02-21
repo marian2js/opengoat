@@ -962,6 +962,107 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("installs skills through the API and forwards install options", async () => {
+    const installSkill = vi.fn<
+      NonNullable<OpenClawUiService["installSkill"]>
+    >(async () => {
+      return {
+        scope: "global",
+        skillId: "frontend-design",
+        skillName: "frontend-design",
+        source: "source-url",
+        installedPath: "/tmp/opengoat/skills/frontend-design/SKILL.md",
+        assignedAgentIds: ["ceo", "developer"],
+        workspaceInstallPaths: [
+          "/tmp/workspaces/ceo/skills/frontend-design/SKILL.md",
+          "/tmp/workspaces/developer/.agents/skills/frontend-design/SKILL.md",
+        ],
+        replaced: false,
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        installSkill,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/skills/install",
+      payload: {
+        scope: "global",
+        sourceUrl: "https://github.com/anthropics/skills",
+        sourceSkillName: "frontend-design",
+        assignToAllAgents: true,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(installSkill).toHaveBeenCalledWith({
+      scope: "global",
+      agentId: undefined,
+      skillName: "frontend-design",
+      sourcePath: undefined,
+      sourceUrl: "https://github.com/anthropics/skills",
+      sourceSkillName: "frontend-design",
+      description: undefined,
+      assignToAllAgents: true,
+    });
+    expect(response.json()).toMatchObject({
+      result: {
+        skillId: "frontend-design",
+        scope: "global",
+      },
+    });
+  });
+
+  it("validates skills install payload for conflicting sources", async () => {
+    const installSkill = vi.fn<
+      NonNullable<OpenClawUiService["installSkill"]>
+    >(async () => {
+      return {
+        scope: "agent",
+        agentId: "ceo",
+        skillId: "frontend-design",
+        skillName: "frontend-design",
+        source: "source-path",
+        installedPath: "/tmp/opengoat/skills/frontend-design/SKILL.md",
+        replaced: false,
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        installSkill,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/skills/install",
+      payload: {
+        scope: "agent",
+        agentId: "ceo",
+        skillName: "frontend-design",
+        sourcePath: "/tmp/source",
+        sourceUrl: "https://github.com/anthropics/skills",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: "Use either sourcePath or sourceUrl, not both.",
+    });
+    expect(installSkill).not.toHaveBeenCalled();
+  });
+
   it("returns installed and latest versions from the version api", async () => {
     process.env.OPENGOAT_VERSION = "2026.2.9";
     vi.spyOn(globalThis, "fetch").mockResolvedValue(

@@ -2059,6 +2059,121 @@ describe("OpenGoatService", () => {
     ).rejects.toBeTruthy();
   });
 
+  it("installs agent skills into provider-specific workspace directories", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+    await service.setAgentProvider("engineer", "codex");
+
+    const installResult = await service.installSkill({
+      scope: "agent",
+      agentId: "engineer",
+      skillName: "frontend-design",
+      description: "Frontend design workflow",
+    });
+
+    expect(installResult.scope).toBe("agent");
+    expect(installResult.agentId).toBe("engineer");
+    await expect(
+      access(
+        path.join(
+          root,
+          "workspaces",
+          "engineer",
+          ".agents",
+          "skills",
+          "frontend-design",
+          "SKILL.md",
+        ),
+        constants.F_OK,
+      ),
+    ).resolves.toBeUndefined();
+    const engineerConfig = JSON.parse(
+      await readFile(
+        path.join(root, "agents", "engineer", "config.json"),
+        "utf-8",
+      ),
+    ) as {
+      runtime?: {
+        skills?: {
+          assigned?: string[];
+        };
+      };
+    };
+    expect(engineerConfig.runtime?.skills?.assigned).toContain(
+      "frontend-design",
+    );
+  });
+
+  it("assigns global skill installs to all agents when requested", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+    await service.setAgentProvider("engineer", "codex");
+
+    const installResult = await service.installSkill({
+      scope: "global",
+      skillName: "qa-checklist",
+      description: "Quality checklist",
+      assignToAllAgents: true,
+    });
+
+    expect(installResult.scope).toBe("global");
+    expect(installResult.assignedAgentIds).toEqual(["ceo", "engineer"]);
+    await expect(
+      access(
+        path.join(
+          root,
+          "workspaces",
+          "ceo",
+          "skills",
+          "qa-checklist",
+          "SKILL.md",
+        ),
+        constants.F_OK,
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      access(
+        path.join(
+          root,
+          "workspaces",
+          "engineer",
+          ".agents",
+          "skills",
+          "qa-checklist",
+          "SKILL.md",
+        ),
+        constants.F_OK,
+      ),
+    ).resolves.toBeUndefined();
+    const engineerConfig = JSON.parse(
+      await readFile(
+        path.join(root, "agents", "engineer", "config.json"),
+        "utf-8",
+      ),
+    ) as {
+      runtime?: {
+        skills?: {
+          assigned?: string[];
+        };
+      };
+    };
+    expect(engineerConfig.runtime?.skills?.assigned).toContain("qa-checklist");
+  });
+
   it("enforces assignment restrictions through the service facade", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
