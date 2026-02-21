@@ -15,7 +15,8 @@
     "typecheck": "pnpm --filter @opengoat/core typecheck && pnpm --filter opengoat typecheck",
     "changeset": "changeset",
     "version-packages": "node scripts/release.mjs",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=20.11.0"
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
     "@types/node": "^22.13.4",
+    "husky": "^9.1.7",
     "typescript": "^5.9.3",
     "vitest": "^4.0.5"
   },
