@@ -74,6 +74,7 @@ export class SkillService {
 
     const discovered = await this.loadSkillsWithPrecedence(
       paths,
+      normalizedAgentId,
       resolvedConfig,
     );
     const assigned = new Set(resolvedConfig.assigned);
@@ -144,7 +145,7 @@ export class SkillService {
       "- If exactly one skill clearly applies, follow that skill.",
       "- If multiple skills could apply, choose the most specific.",
       "- If none apply, continue without using a skill.",
-      "Skill definitions are centralized under the global skills store.",
+      "Skill definitions may come from global and agent-specific stores.",
       "",
     ];
 
@@ -204,16 +205,29 @@ export class SkillService {
       );
     }
 
-    const baseDir = paths.skillsDir;
-    const targetDir = this.pathPort.join(baseDir, skillId);
+    const globalSkillDir = this.pathPort.join(paths.skillsDir, skillId);
+    const globalSkillFile = this.pathPort.join(globalSkillDir, "SKILL.md");
+    const agentScopedSkillsBaseDir = this.pathPort.join(
+      paths.skillsDir,
+      AGENT_SCOPED_STORE_DIR,
+      normalizedAgentId,
+    );
+    const agentScopedSkillDir = this.pathPort.join(
+      agentScopedSkillsBaseDir,
+      skillId,
+    );
+    const targetDir =
+      scope === "global" ? globalSkillDir : agentScopedSkillDir;
     const targetSkillFile = this.pathPort.join(targetDir, "SKILL.md");
-    const replaced = await this.fileSystem.exists(targetDir);
-
-    await this.fileSystem.ensureDir(baseDir);
+    let replaced = await this.fileSystem.exists(targetDir);
 
     let workspaceInstallPaths: string[] = [];
 
     if (hasSourcePath || hasSourceUrl) {
+      await this.fileSystem.ensureDir(
+        scope === "global" ? paths.skillsDir : agentScopedSkillsBaseDir,
+      );
+
       let resolvedSource: ResolvedInstallSource | undefined;
       try {
         resolvedSource = hasSourcePath
@@ -241,6 +255,7 @@ export class SkillService {
           normalizedAgentId,
           skillId,
           options,
+          targetDir,
         );
       }
 
@@ -258,16 +273,17 @@ export class SkillService {
     }
 
     let source: InstallSkillResult["source"] = "generated";
-    const existingGlobalSkill = this.pathPort.join(
-      paths.skillsDir,
-      skillId,
-      "SKILL.md",
-    );
-    if (
-      scope === "agent" &&
-      (await this.fileSystem.exists(existingGlobalSkill))
-    ) {
+    let installedPath = targetSkillFile;
+    let workspaceSourceDir = targetDir;
+    if (scope === "agent" && (await this.fileSystem.exists(globalSkillFile))) {
+      const hadAgentOverride = await this.fileSystem.exists(agentScopedSkillDir);
+      if (hadAgentOverride) {
+        await this.fileSystem.removeDir(agentScopedSkillDir);
+      }
+      replaced = hadAgentOverride;
       source = "managed";
+      installedPath = globalSkillFile;
+      workspaceSourceDir = globalSkillDir;
     } else {
       const description =
         request.description?.trim() ||
@@ -275,6 +291,9 @@ export class SkillService {
       const content =
         request.content?.trim() ||
         renderSkillMarkdown({ skillId, description });
+      await this.fileSystem.ensureDir(
+        scope === "global" ? paths.skillsDir : agentScopedSkillsBaseDir,
+      );
       await this.fileSystem.ensureDir(targetDir);
       await this.fileSystem.writeFile(
         targetSkillFile,
@@ -289,6 +308,7 @@ export class SkillService {
         normalizedAgentId,
         skillId,
         options,
+        workspaceSourceDir,
       );
     }
 
@@ -299,7 +319,7 @@ export class SkillService {
       skillId,
       skillName: requestedSkillName ?? skillId,
       source,
-      installedPath: targetSkillFile,
+      installedPath,
       workspaceInstallPaths,
       replaced,
     };
@@ -335,6 +355,7 @@ export class SkillService {
       normalizedAgentId,
       normalizedSkillId,
       options,
+      this.pathPort.join(paths.skillsDir, normalizedSkillId),
     );
   }
 
@@ -378,7 +399,9 @@ export class SkillService {
       skillId: normalizedSkillId,
       removedFromGlobal: false,
       removedFromAgentIds:
-        removed.removedFromConfig || removed.removedWorkspacePaths.length > 0
+        removed.removedFromConfig ||
+        removed.removedFromWorkspace ||
+        removed.removedFromAgentStore
           ? [normalizedAgentId]
           : [],
       removedWorkspacePaths: removed.removedWorkspacePaths,
@@ -392,6 +415,8 @@ export class SkillService {
     options: AgentSkillInstallOptions = {},
   ): Promise<{
     removedFromConfig: boolean;
+    removedFromAgentStore: boolean;
+    removedFromWorkspace: boolean;
     removedWorkspacePaths: string[];
   }> {
     const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
@@ -415,10 +440,17 @@ export class SkillService {
     agentId: string,
     skillId: string,
     options: AgentSkillInstallOptions,
+    sourceSkillDir?: string,
   ): Promise<string[]> {
     await this.assignSkillToAgent(paths, agentId, skillId);
     await this.reconcileRoleSkillsIfNeeded(paths, agentId, skillId);
-    return this.syncSkillToWorkspace(paths, agentId, skillId, options);
+    return this.syncSkillToWorkspace(
+      paths,
+      agentId,
+      skillId,
+      options,
+      sourceSkillDir,
+    );
   }
 
   private async removeSkillForAgent(
@@ -428,8 +460,15 @@ export class SkillService {
     options: AgentSkillInstallOptions,
   ): Promise<{
     removedFromConfig: boolean;
+    removedFromAgentStore: boolean;
+    removedFromWorkspace: boolean;
     removedWorkspacePaths: string[];
   }> {
+    const removedFromAgentStore = await this.removeAgentScopedSkill(
+      paths,
+      agentId,
+      skillId,
+    );
     const removedFromConfig = await this.unassignSkillFromAgent(
       paths,
       agentId,
@@ -443,6 +482,8 @@ export class SkillService {
     );
     return {
       removedFromConfig,
+      removedFromAgentStore,
+      removedFromWorkspace: removedWorkspacePaths.length > 0,
       removedWorkspacePaths,
     };
   }
@@ -452,6 +493,7 @@ export class SkillService {
     agentId: string,
     skillId: string,
     options: AgentSkillInstallOptions,
+    sourceSkillDir?: string,
   ): Promise<string[]> {
     const workspaceDir =
       options.workspaceDir?.trim() ||
@@ -463,8 +505,13 @@ export class SkillService {
       return [];
     }
 
-    const sourceSkillDir = this.pathPort.join(paths.skillsDir, skillId);
-    if (!(await this.fileSystem.exists(sourceSkillDir))) {
+    const resolvedSourceDir =
+      sourceSkillDir ??
+      (await this.resolveInstalledSkillSourceDir(paths, agentId, skillId));
+    if (
+      !resolvedSourceDir ||
+      !(await this.fileSystem.exists(resolvedSourceDir))
+    ) {
       return [];
     }
 
@@ -474,7 +521,7 @@ export class SkillService {
       const targetSkillDir = this.pathPort.join(skillsDir, skillId);
       await this.fileSystem.ensureDir(skillsDir);
       await this.fileSystem.removeDir(targetSkillDir);
-      await this.fileSystem.copyDir(sourceSkillDir, targetSkillDir);
+      await this.fileSystem.copyDir(resolvedSourceDir, targetSkillDir);
       installedPaths.push(this.pathPort.join(targetSkillDir, "SKILL.md"));
     }
 
@@ -509,6 +556,48 @@ export class SkillService {
     }
 
     return removedPaths;
+  }
+
+  private async resolveInstalledSkillSourceDir(
+    paths: OpenGoatPaths,
+    agentId: string,
+    skillId: string,
+  ): Promise<string | undefined> {
+    const agentScopedDir = this.pathPort.join(
+      paths.skillsDir,
+      AGENT_SCOPED_STORE_DIR,
+      agentId,
+      skillId,
+    );
+    if (await this.fileSystem.exists(agentScopedDir)) {
+      return agentScopedDir;
+    }
+
+    const globalDir = this.pathPort.join(paths.skillsDir, skillId);
+    if (await this.fileSystem.exists(globalDir)) {
+      return globalDir;
+    }
+
+    return undefined;
+  }
+
+  private async removeAgentScopedSkill(
+    paths: OpenGoatPaths,
+    agentId: string,
+    skillId: string,
+  ): Promise<boolean> {
+    const agentScopedDir = this.pathPort.join(
+      paths.skillsDir,
+      AGENT_SCOPED_STORE_DIR,
+      agentId,
+      skillId,
+    );
+    const exists = await this.fileSystem.exists(agentScopedDir);
+    if (!exists) {
+      return false;
+    }
+    await this.fileSystem.removeDir(agentScopedDir);
+    return true;
   }
 
   private async resolveInstallSourceFromPath(
@@ -697,8 +786,14 @@ export class SkillService {
 
   private async loadSkillsWithPrecedence(
     paths: OpenGoatPaths,
+    agentId: string,
     config: ReturnType<typeof resolveSkillsConfig>,
   ): Promise<ResolvedSkill[]> {
+    const agentScopedDir = this.pathPort.join(
+      paths.skillsDir,
+      AGENT_SCOPED_STORE_DIR,
+      agentId,
+    );
     const extraDirs = config.load.extraDirs.map(resolveUserPath);
     const sources: Array<{
       source: ResolvedSkill["source"];
@@ -708,6 +803,11 @@ export class SkillService {
       {
         source: "managed",
         dir: paths.skillsDir,
+        enabled: config.includeManaged,
+      },
+      {
+        source: "managed",
+        dir: agentScopedDir,
         enabled: config.includeManaged,
       },
       ...extraDirs.map((dir) => ({
@@ -992,6 +1092,7 @@ const BOARD_INDIVIDUAL_SKILL_ID = "og-board-individual";
 const BOARDS_SKILL_ID = "og-boards";
 const LEGACY_BOARD_MANAGER_SKILL_ID = "board-manager";
 const LEGACY_BOARD_INDIVIDUAL_SKILL_ID = "board-individual";
+const AGENT_SCOPED_STORE_DIR = ".agent-scoped";
 const ROLE_SKILL_IDS = new Set([
   BOARDS_SKILL_ID,
   BOARD_MANAGER_SKILL_ID,

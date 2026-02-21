@@ -74,7 +74,9 @@ describe("SkillService", () => {
     expect(prompt.prompt).toContain("## Skills");
     expect(prompt.prompt).toContain("<available_skills>");
     expect(prompt.prompt).toContain("deploy-checklist");
-    expect(prompt.prompt).toContain("global skills store");
+    expect(prompt.prompt).toContain(
+      "global and agent-specific stores",
+    );
   });
 
   it("omits disable-model-invocation skills from prompt while keeping them installed", async () => {
@@ -192,6 +194,12 @@ describe("SkillService", () => {
       runtime?: { skills?: { assigned?: string[] } };
     };
     expect(config.runtime?.skills?.assigned).toContain("local-skill");
+    expect(await fileSystem.exists(path.join(paths.skillsDir, "local-skill"))).toBe(
+      false,
+    );
+    expect(result.installedPath).toContain(
+      `${path.sep}.agent-scoped${path.sep}ceo${path.sep}local-skill${path.sep}SKILL.md`,
+    );
   });
 
   it("installs a skill into provider-specific workspace directories", async () => {
@@ -304,7 +312,7 @@ describe("SkillService", () => {
       },
     };
 
-    const { service, paths } = await createHarness({
+    const { service, paths, fileSystem } = await createHarness({
       commandRunner,
     });
     const result = await service.installSkill(paths, {
@@ -325,6 +333,9 @@ describe("SkillService", () => {
       runtime?: { skills?: { assigned?: string[] } };
     };
     expect(config.runtime?.skills?.assigned).toContain("frontend-design");
+    expect(
+      await fileSystem.exists(path.join(paths.skillsDir, "frontend-design")),
+    ).toBe(false);
   });
 
   it("installs and lists global managed skills", async () => {
@@ -431,7 +442,18 @@ describe("SkillService", () => {
       await fileSystem.exists(
         path.join(paths.skillsDir, "frontend-design", "SKILL.md"),
       ),
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      await fileSystem.exists(
+        path.join(
+          paths.skillsDir,
+          ".agent-scoped",
+          "ceo",
+          "frontend-design",
+          "SKILL.md",
+        ),
+      ),
+    ).toBe(false);
   });
 
   it("reconciles role types without persisting role skills locally", async () => {

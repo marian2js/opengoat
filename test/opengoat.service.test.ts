@@ -2109,6 +2109,12 @@ describe("OpenGoatService", () => {
     expect(engineerConfig.runtime?.skills?.assigned).toContain(
       "frontend-design",
     );
+    await expect(
+      access(
+        path.join(root, "skills", "frontend-design", "SKILL.md"),
+        constants.F_OK,
+      ),
+    ).rejects.toBeTruthy();
   });
 
   it("assigns global skill installs to all agents when requested", async () => {
@@ -2234,7 +2240,7 @@ describe("OpenGoatService", () => {
         path.join(root, "skills", "frontend-design", "SKILL.md"),
         constants.F_OK,
       ),
-    ).resolves.toBeUndefined();
+    ).rejects.toBeTruthy();
   });
 
   it("removes global skills and cleans agent assignments", async () => {

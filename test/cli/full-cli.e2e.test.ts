@@ -210,7 +210,7 @@ describe("CLI full e2e smoke", () => {
     );
     await expectOk(
       await runBinary(["skill", "list", "--global"], opengoatHome, env),
-      "helper",
+      "No skills installed.",
     );
 
     await expectOk(
