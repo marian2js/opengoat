@@ -1063,6 +1063,93 @@ describe("OpenGoat UI server API", () => {
     expect(installSkill).not.toHaveBeenCalled();
   });
 
+  it("removes skills through the API and forwards remove options", async () => {
+    const removeSkill = vi.fn<
+      NonNullable<OpenClawUiService["removeSkill"]>
+    >(async () => {
+      return {
+        scope: "global",
+        skillId: "frontend-design",
+        removedFromGlobal: true,
+        removedFromAgentIds: ["ceo", "developer"],
+        removedWorkspacePaths: [
+          "/tmp/workspaces/ceo/skills/frontend-design/SKILL.md",
+          "/tmp/workspaces/developer/.agents/skills/frontend-design/SKILL.md",
+        ],
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        removeSkill,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/skills/remove",
+      payload: {
+        scope: "global",
+        skillId: "frontend-design",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(removeSkill).toHaveBeenCalledWith({
+      scope: "global",
+      agentId: undefined,
+      skillId: "frontend-design",
+    });
+    expect(response.json()).toMatchObject({
+      result: {
+        skillId: "frontend-design",
+        scope: "global",
+      },
+    });
+  });
+
+  it("validates skill remove payload when skillId is missing", async () => {
+    const removeSkill = vi.fn<
+      NonNullable<OpenClawUiService["removeSkill"]>
+    >(async () => {
+      return {
+        scope: "agent",
+        agentId: "ceo",
+        skillId: "frontend-design",
+        removedFromGlobal: false,
+        removedFromAgentIds: ["ceo"],
+        removedWorkspacePaths: [],
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        removeSkill,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/skills/remove",
+      payload: {
+        scope: "agent",
+        agentId: "ceo",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: "skillId is required.",
+    });
+    expect(removeSkill).not.toHaveBeenCalled();
+  });
+
   it("returns installed and latest versions from the version api", async () => {
     process.env.OPENGOAT_VERSION = "2026.2.9";
     vi.spyOn(globalThis, "fetch").mockResolvedValue(

@@ -66,6 +66,8 @@ import type {
   Skill,
   SkillInstallRequest,
   SkillInstallResult,
+  SkillRemoveRequest,
+  SkillRemoveResult,
   SkillsResponse,
 } from "@/pages/skills/types";
 import { TasksPage } from "@/pages/tasks/TasksPage";
@@ -1334,6 +1336,50 @@ export function DashboardPage(): ReactElement {
           requestError instanceof Error
             ? requestError.message
             : "Unable to install skill.";
+        toast.error(message);
+        throw requestError;
+      } finally {
+        setMutating(false);
+      }
+    },
+    [loadAgentSkills, refreshGlobalSkills],
+  );
+
+  const removeSkill = useCallback(
+    async (payload: SkillRemoveRequest): Promise<SkillRemoveResult> => {
+      setMutating(true);
+      try {
+        const response = await fetchJson<{
+          result: SkillRemoveResult;
+          message?: string;
+        }>("/api/skills/remove", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        await refreshGlobalSkills();
+        const affectedAgentIds = new Set<string>([
+          ...(response.result.removedFromAgentIds ?? []),
+        ]);
+        if (response.result.agentId) {
+          affectedAgentIds.add(response.result.agentId);
+        }
+        await Promise.all(
+          [...affectedAgentIds].map(async (agentId) => {
+            await loadAgentSkills(agentId);
+          }),
+        );
+
+        toast.success(response.message ?? `Removed skill "${response.result.skillId}".`);
+        return response.result;
+      } catch (requestError) {
+        const message =
+          requestError instanceof Error
+            ? requestError.message
+            : "Unable to remove skill.";
         toast.error(message);
         throw requestError;
       } finally {
@@ -5484,6 +5530,7 @@ export function DashboardPage(): ReactElement {
                     isBusy={isLoading || isMutating}
                     onLoadAgentSkills={loadAgentSkills}
                     onInstallSkill={installSkill}
+                    onRemoveSkill={removeSkill}
                   />
                 ) : null}
 

@@ -70,6 +70,21 @@ export interface InstallSkillResult {
   replaced: boolean;
 }
 
+export interface RemoveSkillRequest {
+  scope?: SkillScope;
+  agentId?: string;
+  skillId: string;
+}
+
+export interface RemoveSkillResult {
+  scope: SkillScope;
+  skillId: string;
+  agentId?: string;
+  removedFromGlobal: boolean;
+  removedFromAgentIds: string[];
+  removedWorkspacePaths: string[];
+}
+
 export const DEFAULT_SKILLS_CONFIG: Required<Omit<AgentSkillsConfig, "load" | "prompt">> & {
   load: Required<AgentSkillsLoadConfig>;
   prompt: Required<AgentSkillsPromptConfig>;

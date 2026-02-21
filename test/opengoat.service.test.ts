@@ -2174,6 +2174,151 @@ describe("OpenGoatService", () => {
     expect(engineerConfig.runtime?.skills?.assigned).toContain("qa-checklist");
   });
 
+  it("removes agent skills from provider-specific workspace directories", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+    await service.setAgentProvider("engineer", "codex");
+    await service.installSkill({
+      scope: "agent",
+      agentId: "engineer",
+      skillName: "frontend-design",
+      description: "Frontend design workflow",
+    });
+
+    const removeResult = await service.removeSkill({
+      scope: "agent",
+      agentId: "engineer",
+      skillId: "frontend-design",
+    });
+
+    expect(removeResult.scope).toBe("agent");
+    expect(removeResult.agentId).toBe("engineer");
+    expect(removeResult.removedFromAgentIds).toEqual(["engineer"]);
+    await expect(
+      access(
+        path.join(
+          root,
+          "workspaces",
+          "engineer",
+          ".agents",
+          "skills",
+          "frontend-design",
+        ),
+        constants.F_OK,
+      ),
+    ).rejects.toBeTruthy();
+    const engineerConfig = JSON.parse(
+      await readFile(
+        path.join(root, "agents", "engineer", "config.json"),
+        "utf-8",
+      ),
+    ) as {
+      runtime?: {
+        skills?: {
+          assigned?: string[];
+        };
+      };
+    };
+    expect(engineerConfig.runtime?.skills?.assigned).not.toContain(
+      "frontend-design",
+    );
+    await expect(
+      access(
+        path.join(root, "skills", "frontend-design", "SKILL.md"),
+        constants.F_OK,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("removes global skills and cleans agent assignments", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("Engineer", {
+      type: "individual",
+      reportsTo: "ceo",
+    });
+    await service.setAgentProvider("engineer", "codex");
+    await service.installSkill({
+      scope: "global",
+      skillName: "qa-checklist",
+      description: "Quality checklist",
+      assignToAllAgents: true,
+    });
+
+    const removeResult = await service.removeSkill({
+      scope: "global",
+      skillId: "qa-checklist",
+    });
+
+    expect(removeResult.scope).toBe("global");
+    expect(removeResult.removedFromGlobal).toBe(true);
+    expect(removeResult.removedFromAgentIds).toEqual(["ceo", "engineer"]);
+    await expect(
+      access(path.join(root, "skills", "qa-checklist"), constants.F_OK),
+    ).rejects.toBeTruthy();
+    await expect(
+      access(
+        path.join(
+          root,
+          "workspaces",
+          "ceo",
+          "skills",
+          "qa-checklist",
+        ),
+        constants.F_OK,
+      ),
+    ).rejects.toBeTruthy();
+    await expect(
+      access(
+        path.join(
+          root,
+          "workspaces",
+          "engineer",
+          ".agents",
+          "skills",
+          "qa-checklist",
+        ),
+        constants.F_OK,
+      ),
+    ).rejects.toBeTruthy();
+
+    const ceoConfig = JSON.parse(
+      await readFile(path.join(root, "agents", "ceo", "config.json"), "utf-8"),
+    ) as {
+      runtime?: {
+        skills?: {
+          assigned?: string[];
+        };
+      };
+    };
+    const engineerConfig = JSON.parse(
+      await readFile(
+        path.join(root, "agents", "engineer", "config.json"),
+        "utf-8",
+      ),
+    ) as {
+      runtime?: {
+        skills?: {
+          assigned?: string[];
+        };
+      };
+    };
+    expect(ceoConfig.runtime?.skills?.assigned).not.toContain("qa-checklist");
+    expect(engineerConfig.runtime?.skills?.assigned).not.toContain(
+      "qa-checklist",
+    );
+  });
+
   it("enforces assignment restrictions through the service facade", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);

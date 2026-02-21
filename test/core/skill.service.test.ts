@@ -347,6 +347,93 @@ describe("SkillService", () => {
     );
   });
 
+  it("removes a global managed skill from central storage", async () => {
+    const { service, paths, fileSystem } = await createHarness();
+    await service.installSkill(paths, {
+      skillName: "Global Helper",
+      scope: "global",
+      description: "Global helper instructions",
+    });
+
+    const result = await service.removeSkill(paths, {
+      scope: "global",
+      skillId: "global-helper",
+    });
+
+    expect(result.scope).toBe("global");
+    expect(result.removedFromGlobal).toBe(true);
+    expect(
+      await fileSystem.exists(
+        path.join(paths.skillsDir, "global-helper", "SKILL.md"),
+      ),
+    ).toBe(false);
+  });
+
+  it("removes an assigned skill from agent config and workspace directories", async () => {
+    const { service, paths, fileSystem } = await createHarness();
+    await service.installSkill(
+      paths,
+      {
+        agentId: "ceo",
+        skillName: "frontend-design",
+        description: "Frontend design workflow",
+      },
+      {
+        workspaceDir: path.join(paths.workspacesDir, "ceo"),
+        workspaceSkillDirectories: [".agents/skills"],
+      },
+    );
+
+    const result = await service.removeSkill(
+      paths,
+      {
+        scope: "agent",
+        agentId: "ceo",
+        skillId: "frontend-design",
+      },
+      {
+        workspaceDir: path.join(paths.workspacesDir, "ceo"),
+        workspaceSkillDirectories: [".agents/skills"],
+      },
+    );
+
+    expect(result.scope).toBe("agent");
+    expect(result.agentId).toBe("ceo");
+    expect(result.removedFromAgentIds).toEqual(["ceo"]);
+    expect(result.removedWorkspacePaths).toEqual([
+      path.join(
+        paths.workspacesDir,
+        "ceo",
+        ".agents",
+        "skills",
+        "frontend-design",
+        "SKILL.md",
+      ),
+    ]);
+    const config = JSON.parse(
+      await readFile(path.join(paths.agentsDir, "ceo", "config.json"), "utf8"),
+    ) as {
+      runtime?: { skills?: { assigned?: string[] } };
+    };
+    expect(config.runtime?.skills?.assigned).not.toContain("frontend-design");
+    expect(
+      await fileSystem.exists(
+        path.join(
+          paths.workspacesDir,
+          "ceo",
+          ".agents",
+          "skills",
+          "frontend-design",
+        ),
+      ),
+    ).toBe(false);
+    expect(
+      await fileSystem.exists(
+        path.join(paths.skillsDir, "frontend-design", "SKILL.md"),
+      ),
+    ).toBe(true);
+  });
+
   it("reconciles role types without persisting role skills locally", async () => {
     const { service, paths } = await createHarness();
 
