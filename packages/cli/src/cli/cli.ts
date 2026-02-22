@@ -16,6 +16,7 @@ import { agentInfoCommand } from "./commands/agent-info.command.js";
 import { agentProviderGetCommand } from "./commands/agent-provider-get.command.js";
 import { agentProviderSetCommand } from "./commands/agent-provider-set.command.js";
 import { agentRunCommand } from "./commands/agent-run.command.js";
+import { agentSetDefaultCommand } from "./commands/agent-set-default.command.js";
 import { agentSetManagerCommand } from "./commands/agent-set-manager.command.js";
 import { hardResetCommand } from "./commands/hard-reset.command.js";
 import { initCommand } from "./commands/init.command.js";
@@ -88,6 +89,7 @@ export async function runCli(argv: string[]): Promise<number> {
       agentCreateCommand,
       agentDeleteCommand,
       agentSetManagerCommand,
+      agentSetDefaultCommand,
       agentDirectReporteesCommand,
       agentAllReporteesCommand,
       agentInfoCommand,

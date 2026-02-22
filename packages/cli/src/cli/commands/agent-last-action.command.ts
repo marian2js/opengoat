@@ -1,5 +1,5 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
+import { resolveCliDefaultAgentId } from "./default-agent.js";
 
 export const agentLastActionCommand: CliCommand = {
   path: ["agent", "last-action"],
@@ -17,7 +17,8 @@ export const agentLastActionCommand: CliCommand = {
       return 0;
     }
 
-    const result = await context.service.getAgentLastAction(parsed.agentId);
+    const agentId = parsed.agentId ?? (await resolveCliDefaultAgentId(context));
+    const result = await context.service.getAgentLastAction(agentId);
     if (parsed.json) {
       context.stdout.write(
         `${JSON.stringify(result ? { ...result, iso: new Date(result.timestamp).toISOString() } : null, null, 2)}\n`
@@ -26,7 +27,7 @@ export const agentLastActionCommand: CliCommand = {
     }
 
     if (!result) {
-      context.stdout.write(`No AI actions found for agent "${parsed.agentId}".\n`);
+      context.stdout.write(`No AI actions found for agent "${agentId}".\n`);
       return 0;
     }
 
@@ -44,7 +45,7 @@ type Parsed =
     ok: true;
     help: boolean;
     json: boolean;
-    agentId: string;
+    agentId?: string;
   }
   | {
     ok: false;
@@ -54,7 +55,7 @@ type Parsed =
 function parseArgs(args: string[]): Parsed {
   let help = false;
   let json = false;
-  let agentId = DEFAULT_AGENT_ID;
+  let agentId: string | undefined;
   let agentSet = false;
 
   for (let index = 0; index < args.length; index += 1) {
@@ -110,5 +111,5 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write("  opengoat agent last-action [agent-id] [--json]\n");
   output.write("\n");
-  output.write(`Defaults: agent-id=${DEFAULT_AGENT_ID}\n`);
+  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo\n");
 }

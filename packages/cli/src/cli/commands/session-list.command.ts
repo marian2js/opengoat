@@ -1,5 +1,5 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
+import { resolveCliDefaultAgentId } from "./default-agent.js";
 
 export const sessionListCommand: CliCommand = {
   path: ["session", "list"],
@@ -17,7 +17,8 @@ export const sessionListCommand: CliCommand = {
       return 0;
     }
 
-    const sessions = await context.service.listSessions(parsed.agentId, {
+    const agentId = parsed.agentId ?? (await resolveCliDefaultAgentId(context));
+    const sessions = await context.service.listSessions(agentId, {
       activeMinutes: parsed.activeMinutes
     });
 
@@ -42,13 +43,13 @@ export const sessionListCommand: CliCommand = {
 };
 
 type Parsed =
-  | { ok: true; help: boolean; json: boolean; agentId: string; activeMinutes?: number }
+  | { ok: true; help: boolean; json: boolean; agentId?: string; activeMinutes?: number }
   | { ok: false; error: string };
 
 function parseArgs(args: string[]): Parsed {
   let help = false;
   let json = false;
-  let agentId = DEFAULT_AGENT_ID;
+  let agentId: string | undefined;
   let activeMinutes: number | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
@@ -101,5 +102,5 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write("  opengoat session list [--agent <id>] [--active-minutes <n>] [--json]\n");
   output.write("\n");
-  output.write(`Defaults: agent-id=${DEFAULT_AGENT_ID}\n`);
+  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo\n");
 }

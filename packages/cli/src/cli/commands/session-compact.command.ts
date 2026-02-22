@@ -1,5 +1,5 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
+import { resolveCliDefaultAgentId } from "./default-agent.js";
 
 export const sessionCompactCommand: CliCommand = {
   path: ["session", "compact"],
@@ -17,7 +17,8 @@ export const sessionCompactCommand: CliCommand = {
       return 0;
     }
 
-    const result = await context.service.compactSession(parsed.agentId, parsed.sessionRef);
+    const agentId = parsed.agentId ?? (await resolveCliDefaultAgentId(context));
+    const result = await context.service.compactSession(agentId, parsed.sessionRef);
     context.stdout.write(`Session key: ${result.sessionKey}\n`);
     context.stdout.write(`Session id: ${result.sessionId}\n`);
     context.stdout.write(`Transcript: ${result.transcriptPath}\n`);
@@ -31,12 +32,12 @@ export const sessionCompactCommand: CliCommand = {
 };
 
 type Parsed =
-  | { ok: true; help: boolean; agentId: string; sessionRef?: string }
+  | { ok: true; help: boolean; agentId?: string; sessionRef?: string }
   | { ok: false; error: string };
 
 function parseArgs(args: string[]): Parsed {
   let help = false;
-  let agentId = DEFAULT_AGENT_ID;
+  let agentId: string | undefined;
   let sessionRef: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
@@ -80,5 +81,5 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write("  opengoat session compact [--agent <id>] [--session <key|id>]\n");
   output.write("\n");
-  output.write(`Defaults: agent-id=${DEFAULT_AGENT_ID}, session=main\n`);
+  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo, session=main\n");
 }

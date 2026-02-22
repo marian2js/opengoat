@@ -1,5 +1,6 @@
 import type { CliCommand } from "../framework/command.js";
 import { startOpenGoatAcpServer } from "@opengoat/core";
+import { resolveCliDefaultAgentId } from "./default-agent.js";
 
 export const acpCommand: CliCommand = {
   path: ["acp"],
@@ -18,8 +19,9 @@ export const acpCommand: CliCommand = {
     }
 
     await context.service.initialize();
+    const defaultAgentId = parsed.agentId ?? (await resolveCliDefaultAgentId(context));
     const server = startOpenGoatAcpServer(context.service, {
-      defaultAgentId: parsed.agentId,
+      defaultAgentId,
       defaultSessionKeyPrefix: parsed.sessionKeyPrefix,
       replayHistoryLimit: parsed.replayHistoryLimit,
       verbose: parsed.verbose

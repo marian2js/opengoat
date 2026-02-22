@@ -22,7 +22,10 @@ import type {
   CreateAgentOptions,
   DeleteAgentOptions,
 } from "../../domain/agent.js";
-import type { InitializationResult } from "../../domain/opengoat-paths.js";
+import type {
+  InitializationResult,
+  OpenGoatConfig,
+} from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
 import {
   OrchestrationService,
@@ -118,6 +121,7 @@ const OPENCLAW_OPENGOAT_PLUGIN_ID = "openclaw-plugin";
 const OPENCLAW_OPENGOAT_PLUGIN_ROOT_ID = "opengoat-plugin";
 const OPENCLAW_OPENGOAT_PLUGIN_LEGACY_PACK_ID = "openclaw-plugin-pack";
 const OPENCLAW_OPENGOAT_PLUGIN_FALLBACK_ID = "workspace";
+const OPENGOAT_DEFAULT_AGENT_ENV = "OPENGOAT_DEFAULT_AGENT";
 const NOTIFICATION_SESSION_COMPACTION_COMMAND = [
   "/compact",
   "Keep only the last 3 notification exchanges plus active task ids, statuses, blockers, and explicit next actions.",
@@ -128,6 +132,12 @@ export interface RuntimeDefaultsSyncResult {
   ceoSyncCode?: number;
   ceoSynced: boolean;
   warnings: string[];
+}
+
+export interface DefaultAgentUpdateResult {
+  defaultAgent: string;
+  previousDefaultAgent: string;
+  configPath: string;
 }
 
 export interface TaskCronDispatchResult {
@@ -273,6 +283,52 @@ export class OpenGoatService {
     return this.initializeRuntimeDefaults({
       syncRuntimeDefaults: options.syncRuntimeDefaults ?? true,
     });
+  }
+
+  public async getDefaultAgentId(
+    options: { requireExisting?: boolean } = {},
+  ): Promise<string> {
+    const paths = this.pathsProvider.getPaths();
+    return this.resolveDefaultAgentId(paths, {
+      requireExisting: options.requireExisting ?? true,
+    });
+  }
+
+  public async setDefaultAgent(
+    rawAgentId: string,
+  ): Promise<DefaultAgentUpdateResult> {
+    const defaultAgent = normalizeAgentId(rawAgentId);
+    if (!defaultAgent) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const paths = this.pathsProvider.getPaths();
+    await this.bootstrapService.initialize();
+    const agents = await this.agentService.listAgents(paths);
+    if (!agents.some((agent) => agent.id === defaultAgent)) {
+      throw new Error(`Agent "${defaultAgent}" does not exist.`);
+    }
+
+    const now = this.resolveNowIso();
+    const currentConfig = await this.readGlobalConfig(paths);
+    const previousDefaultAgent =
+      normalizeAgentId(currentConfig?.defaultAgent ?? "") || DEFAULT_AGENT_ID;
+    const nextConfig: OpenGoatConfig = {
+      schemaVersion: 1,
+      defaultAgent,
+      createdAt: currentConfig?.createdAt ?? now,
+      updatedAt: now,
+    };
+    await this.fileSystem.writeFile(
+      paths.globalConfigJsonPath,
+      `${JSON.stringify(nextConfig, null, 2)}\n`,
+    );
+
+    return {
+      defaultAgent,
+      previousDefaultAgent,
+      configPath: paths.globalConfigJsonPath,
+    };
   }
 
   public async hardReset(): Promise<HardResetResult> {
@@ -515,17 +571,22 @@ export class OpenGoatService {
     options: CreateAgentOptions = {},
   ): Promise<AgentCreationResult> {
     const identity = this.agentService.normalizeAgentName(rawName);
+    const paths = this.pathsProvider.getPaths();
+    const defaultManagerAgentId = await this.resolveDefaultAgentId(paths, {
+      requireExisting: true,
+    });
     const managerAgentId = resolveCreateAgentManagerId(
       identity.id,
       options.reportsTo,
+      defaultManagerAgentId,
     );
     if (managerAgentId) {
       await this.assertManagerSupportsReportees(managerAgentId);
     }
-    const paths = this.pathsProvider.getPaths();
     const created = await this.agentService.ensureAgent(paths, identity, {
       type: options.type,
-      reportsTo: options.reportsTo,
+      reportsTo:
+        options.reportsTo === undefined ? managerAgentId : options.reportsTo,
       skills: options.skills,
       role: options.role,
     });
@@ -692,15 +753,22 @@ export class OpenGoatService {
     rawAgentId: string,
     rawReportsTo: string | null,
   ): Promise<AgentManagerUpdateResult> {
-    const managerAgentId = resolveCreateAgentManagerId(rawAgentId, rawReportsTo);
+    const paths = this.pathsProvider.getPaths();
+    const defaultManagerAgentId = await this.resolveDefaultAgentId(paths, {
+      requireExisting: true,
+    });
+    const managerAgentId = resolveCreateAgentManagerId(
+      rawAgentId,
+      rawReportsTo,
+      defaultManagerAgentId,
+    );
     if (managerAgentId) {
       await this.assertManagerSupportsReportees(managerAgentId);
     }
-    const paths = this.pathsProvider.getPaths();
     const updated = await this.agentService.setAgentManager(
       paths,
       rawAgentId,
-      rawReportsTo,
+      managerAgentId,
     );
     await this.syncOpenClawRoleSkills(paths, updated.agentId);
     if (updated.previousReportsTo) {
@@ -1021,6 +1089,9 @@ export class OpenGoatService {
     } = {},
   ): Promise<TaskCronRunResult> {
     const paths = this.pathsProvider.getPaths();
+    const defaultAgentId = await this.resolveDefaultAgentId(paths, {
+      requireExisting: true,
+    });
     const ranAt = this.resolveNowIso();
     const manifests = await this.agentManifestService.listManifests(paths);
     const inProgressMinutes = resolveInProgressTimeoutMinutes(
@@ -1035,6 +1106,7 @@ export class OpenGoatService {
           manifests,
           bottomUpStrategy.inactiveMinutes,
           bottomUpStrategy.notificationTarget,
+          defaultAgentId,
         )
       : [];
 
@@ -1046,6 +1118,7 @@ export class OpenGoatService {
           manifests,
           topDownStrategy.openTasksThreshold,
           ranAt,
+          defaultAgentId,
           maxParallelFlows,
         )
       : [];
@@ -1070,6 +1143,7 @@ export class OpenGoatService {
       inProgressMinutes,
       bottomUpStrategy.inactiveMinutes,
       ranAt,
+      defaultAgentId,
       maxParallelFlows,
     );
     const inactiveDispatches = await this.dispatchInactiveAgentAutomations(
@@ -1077,6 +1151,7 @@ export class OpenGoatService {
       inactiveCandidates,
       bottomUpStrategy.inactiveMinutes,
       ranAt,
+      defaultAgentId,
       maxParallelFlows,
     );
     const dispatches = [
@@ -1105,6 +1180,7 @@ export class OpenGoatService {
     manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
     openTasksThreshold: number,
     notificationTimestamp: string,
+    defaultAgentId: string,
     maxParallelFlows = 1,
   ): Promise<TaskCronDispatchResult[]> {
     const openTasks = tasks
@@ -1132,9 +1208,9 @@ export class OpenGoatService {
     ).length;
     const ceoDirectReportees = manifests.filter(
       (manifest) =>
-        normalizeAgentId(manifest.metadata.reportsTo ?? "") === DEFAULT_AGENT_ID,
+        normalizeAgentId(manifest.metadata.reportsTo ?? "") === defaultAgentId,
     ).length;
-    const sessionRef = buildNotificationSessionRef(DEFAULT_AGENT_ID);
+    const sessionRef = buildNotificationSessionRef(defaultAgentId);
     const message = buildTopDownTaskDelegationMessage({
       openTasksThreshold,
       openTasksCount: openTasks.length,
@@ -1152,7 +1228,7 @@ export class OpenGoatService {
 
     const requests = [
       {
-        targetAgentId: DEFAULT_AGENT_ID,
+        targetAgentId: defaultAgentId,
         sessionRef,
         message,
       },
@@ -1189,6 +1265,7 @@ export class OpenGoatService {
     doingMinutes: number,
     pendingMinutes: number,
     notificationTimestamp: string,
+    defaultAgentId: string,
     maxParallelFlows: number,
   ): Promise<TaskStatusDispatchSummary> {
     const manifestsById = new Map(
@@ -1275,7 +1352,7 @@ export class OpenGoatService {
         const assigneeManifest = manifestsById.get(task.assignedTo);
         const managerAgentId =
           normalizeAgentId(assigneeManifest?.metadata.reportsTo ?? "") ||
-          DEFAULT_AGENT_ID;
+          defaultAgentId;
         const sessionRef = buildNotificationSessionRef(managerAgentId);
         const message = buildBlockedTaskMessage({
           task,
@@ -1294,7 +1371,7 @@ export class OpenGoatService {
     const dispatches = await runWithConcurrencyByKey(
       requests,
       maxParallelFlows,
-      (request) => normalizeAgentId(request.targetAgentId) || DEFAULT_AGENT_ID,
+      (request) => normalizeAgentId(request.targetAgentId) || defaultAgentId,
       async (request) => {
         const result = await this.dispatchAutomationMessage(
           paths,
@@ -1340,12 +1417,13 @@ export class OpenGoatService {
     inactiveCandidates: InactiveAgentCandidate[],
     inactiveMinutes: number,
     notificationTimestamp: string,
+    defaultAgentId: string,
     maxParallelFlows = 1,
   ): Promise<TaskCronDispatchResult[]> {
     const groupedCandidatesByManager = new Map<string, InactiveAgentCandidate[]>();
     for (const candidate of inactiveCandidates) {
       const managerAgentId =
-        normalizeAgentId(candidate.managerAgentId) || DEFAULT_AGENT_ID;
+        normalizeAgentId(candidate.managerAgentId) || defaultAgentId;
       const bucket = groupedCandidatesByManager.get(managerAgentId) ?? [];
       bucket.push(candidate);
       groupedCandidatesByManager.set(managerAgentId, bucket);
@@ -1399,11 +1477,10 @@ export class OpenGoatService {
     );
   }
 
-  public async listSkills(
-    agentId = DEFAULT_AGENT_ID,
-  ): Promise<ResolvedSkill[]> {
+  public async listSkills(agentId?: string): Promise<ResolvedSkill[]> {
     const paths = this.pathsProvider.getPaths();
-    return this.skillService.listSkills(paths, agentId);
+    const resolvedAgentId = await this.resolveInputAgentId(paths, agentId);
+    return this.skillService.listSkills(paths, resolvedAgentId);
   }
 
   public async listGlobalSkills(): Promise<ResolvedSkill[]> {
@@ -1418,8 +1495,10 @@ export class OpenGoatService {
     const scope = request.scope === "global" ? "global" : "agent";
 
     if (scope === "agent") {
-      const normalizedAgentId =
-        normalizeAgentId(request.agentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
+      const normalizedAgentId = await this.resolveInputAgentId(
+        paths,
+        request.agentId,
+      );
       const installOptions = await this.resolveAgentSkillInstallOptions(
         paths,
         normalizedAgentId,
@@ -1480,8 +1559,10 @@ export class OpenGoatService {
     const scope = request.scope === "global" ? "global" : "agent";
 
     if (scope === "agent") {
-      const normalizedAgentId =
-        normalizeAgentId(request.agentId ?? DEFAULT_AGENT_ID) || DEFAULT_AGENT_ID;
+      const normalizedAgentId = await this.resolveInputAgentId(
+        paths,
+        request.agentId,
+      );
       const installOptions = await this.resolveAgentSkillInstallOptions(
         paths,
         normalizedAgentId,
@@ -1588,24 +1669,26 @@ export class OpenGoatService {
   }
 
   public async listSessions(
-    agentId = DEFAULT_AGENT_ID,
+    agentId?: string,
     options: { activeMinutes?: number } = {},
   ): Promise<SessionSummary[]> {
     const paths = this.pathsProvider.getPaths();
-    return this.sessionService.listSessions(paths, agentId, options);
+    const resolvedAgentId = await this.resolveInputAgentId(paths, agentId);
+    return this.sessionService.listSessions(paths, resolvedAgentId, options);
   }
 
   public async prepareSession(
-    agentId = DEFAULT_AGENT_ID,
+    agentId?: string,
     options: {
       sessionRef?: string;
       forceNew?: boolean;
     } = {},
   ): Promise<SessionRunInfo> {
     const paths = this.pathsProvider.getPaths();
+    const resolvedAgentId = await this.resolveInputAgentId(paths, agentId);
     const prepared = await this.sessionService.prepareRunSession(
       paths,
-      agentId,
+      resolvedAgentId,
       {
         sessionRef: options.sessionRef,
         forceNew: options.forceNew,
@@ -1621,14 +1704,15 @@ export class OpenGoatService {
   }
 
   public async getAgentLastAction(
-    agentId = DEFAULT_AGENT_ID,
+    agentId?: string,
   ): Promise<AgentLastAction | null> {
     const paths = this.pathsProvider.getPaths();
-    return this.sessionService.getLastAgentAction(paths, agentId);
+    const resolvedAgentId = await this.resolveInputAgentId(paths, agentId);
+    return this.sessionService.getLastAgentAction(paths, resolvedAgentId);
   }
 
   public async getSessionHistory(
-    agentId = DEFAULT_AGENT_ID,
+    agentId?: string,
     options: {
       sessionRef?: string;
       limit?: number;
@@ -1636,40 +1720,58 @@ export class OpenGoatService {
     } = {},
   ): Promise<SessionHistoryResult> {
     const paths = this.pathsProvider.getPaths();
-    return this.sessionService.getSessionHistory(paths, agentId, options);
+    const resolvedAgentId = await this.resolveInputAgentId(paths, agentId);
+    return this.sessionService.getSessionHistory(
+      paths,
+      resolvedAgentId,
+      options,
+    );
   }
 
   public async resetSession(
-    agentId = DEFAULT_AGENT_ID,
+    agentId?: string,
     sessionRef?: string,
   ): Promise<SessionRunInfo> {
     const paths = this.pathsProvider.getPaths();
-    return this.sessionService.resetSession(paths, agentId, sessionRef);
+    const resolvedAgentId = await this.resolveInputAgentId(paths, agentId);
+    return this.sessionService.resetSession(paths, resolvedAgentId, sessionRef);
   }
 
   public async compactSession(
-    agentId = DEFAULT_AGENT_ID,
+    agentId?: string,
     sessionRef?: string,
   ): Promise<SessionCompactionResult> {
     const paths = this.pathsProvider.getPaths();
-    return this.sessionService.compactSession(paths, agentId, sessionRef);
+    const resolvedAgentId = await this.resolveInputAgentId(paths, agentId);
+    return this.sessionService.compactSession(
+      paths,
+      resolvedAgentId,
+      sessionRef,
+    );
   }
 
   public async renameSession(
-    agentId = DEFAULT_AGENT_ID,
+    agentId?: string,
     title = "",
     sessionRef?: string,
   ): Promise<SessionSummary> {
     const paths = this.pathsProvider.getPaths();
-    return this.sessionService.renameSession(paths, agentId, title, sessionRef);
+    const resolvedAgentId = await this.resolveInputAgentId(paths, agentId);
+    return this.sessionService.renameSession(
+      paths,
+      resolvedAgentId,
+      title,
+      sessionRef,
+    );
   }
 
   public async removeSession(
-    agentId = DEFAULT_AGENT_ID,
+    agentId?: string,
     sessionRef?: string,
   ): Promise<SessionRemoveResult> {
     const paths = this.pathsProvider.getPaths();
-    return this.sessionService.removeSession(paths, agentId, sessionRef);
+    const resolvedAgentId = await this.resolveInputAgentId(paths, agentId);
+    return this.sessionService.removeSession(paths, resolvedAgentId, sessionRef);
   }
 
   public getHomeDir(): string {
@@ -1752,6 +1854,70 @@ export class OpenGoatService {
     return this.nowIso();
   }
 
+  private async resolveInputAgentId(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    requestedAgentId?: string,
+  ): Promise<string> {
+    const normalizedRequested = normalizeAgentId(requestedAgentId ?? "");
+    if (normalizedRequested) {
+      return normalizedRequested;
+    }
+    return this.resolveDefaultAgentId(paths, { requireExisting: true });
+  }
+
+  private async resolveDefaultAgentId(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    options: { requireExisting: boolean },
+  ): Promise<string> {
+    const envDefaultAgent = normalizeAgentId(
+      process.env[OPENGOAT_DEFAULT_AGENT_ENV] ?? "",
+    );
+    const configDefaultAgent = normalizeAgentId(
+      (await this.readGlobalConfig(paths))?.defaultAgent ?? "",
+    );
+    const candidates = dedupeStrings([
+      envDefaultAgent,
+      configDefaultAgent,
+      DEFAULT_AGENT_ID,
+    ]);
+    if (!options.requireExisting) {
+      return candidates[0] ?? DEFAULT_AGENT_ID;
+    }
+
+    let knownAgentIds: Set<string>;
+    try {
+      knownAgentIds = new Set(
+        (await this.agentService.listAgents(paths)).map((agent) => agent.id),
+      );
+    } catch {
+      return candidates[0] ?? DEFAULT_AGENT_ID;
+    }
+    for (const candidate of candidates) {
+      if (knownAgentIds.has(candidate)) {
+        return candidate;
+      }
+    }
+    return DEFAULT_AGENT_ID;
+  }
+
+  private async readGlobalConfig(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+  ): Promise<OpenGoatConfig | null> {
+    return this.readJsonFileIfPresent<OpenGoatConfig>(paths.globalConfigJsonPath);
+  }
+
+  private async readJsonFileIfPresent<T>(filePath: string): Promise<T | null> {
+    if (!(await this.fileSystem.exists(filePath))) {
+      return null;
+    }
+    try {
+      const raw = await this.fileSystem.readFile(filePath);
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
+    }
+  }
+
   private async initializeRuntimeDefaults(options: {
     syncRuntimeDefaults: boolean;
   }): Promise<InitializationResult> {
@@ -1763,7 +1929,13 @@ export class OpenGoatService {
         // Startup remains functional even if OpenClaw CLI/runtime is unavailable.
       }
     }
-    return initialization;
+    const defaultAgent = await this.resolveDefaultAgentId(initialization.paths, {
+      requireExisting: true,
+    });
+    return {
+      ...initialization,
+      defaultAgent,
+    };
   }
 
   private resolveNowMs(): number {
@@ -2552,6 +2724,7 @@ export class OpenGoatService {
     manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
     inactiveMinutes: number,
     notificationTarget: InactiveAgentNotificationTarget,
+    defaultAgentId: string,
   ): Promise<InactiveAgentCandidate[]> {
     const nowMs = this.resolveNowMs();
     const inactiveCutoffMs = nowMs - inactiveMinutes * 60_000;
@@ -2567,7 +2740,7 @@ export class OpenGoatService {
       }
       if (
         notificationTarget === "ceo-only" &&
-        managerAgentId !== DEFAULT_AGENT_ID
+        managerAgentId !== defaultAgentId
       ) {
         continue;
       }
@@ -2868,6 +3041,7 @@ function dedupeNumbers(values: number[]): number[] {
 function resolveCreateAgentManagerId(
   agentId: string,
   reportsTo: string | null | undefined,
+  defaultManagerAgentId: string,
 ): string | null {
   const normalizedAgentId = normalizeAgentId(agentId);
   if (isDefaultAgentId(normalizedAgentId)) {
@@ -2875,12 +3049,12 @@ function resolveCreateAgentManagerId(
   }
 
   if (reportsTo === null || reportsTo === undefined) {
-    return DEFAULT_AGENT_ID;
+    return defaultManagerAgentId;
   }
 
   const normalizedManagerId = normalizeAgentId(reportsTo);
   if (!normalizedManagerId || normalizedManagerId === normalizedAgentId) {
-    return DEFAULT_AGENT_ID;
+    return defaultManagerAgentId;
   }
 
   return normalizedManagerId;

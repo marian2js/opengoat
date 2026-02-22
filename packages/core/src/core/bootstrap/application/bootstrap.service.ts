@@ -1,5 +1,5 @@
 import { AgentService } from "../../agents/application/agent.service.js";
-import { DEFAULT_AGENT_ID } from "../../domain/agent-id.js";
+import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { AgentIdentity } from "../../domain/agent.js";
 import type {
   InitializationResult,
@@ -62,7 +62,7 @@ export class BootstrapService {
     );
 
     const now = this.nowIso();
-    await this.ensureGlobalConfig(
+    const defaultAgent = await this.ensureGlobalConfig(
       paths.globalConfigJsonPath,
       now,
       createdPaths,
@@ -110,7 +110,7 @@ export class BootstrapService {
       paths,
       createdPaths,
       skippedPaths,
-      defaultAgent: DEFAULT_AGENT_ID,
+      defaultAgent,
     };
   }
 
@@ -119,23 +119,47 @@ export class BootstrapService {
     now: string,
     createdPaths: string[],
     skippedPaths: string[],
-  ): Promise<void> {
+  ): Promise<string> {
     const exists = await this.fileSystem.exists(globalConfigJsonPath);
     if (!exists) {
+      const created = renderGlobalConfig(now);
       await this.fileSystem.writeFile(
         globalConfigJsonPath,
-        `${JSON.stringify(renderGlobalConfig(now), null, 2)}\n`,
+        `${JSON.stringify(created, null, 2)}\n`,
       );
       createdPaths.push(globalConfigJsonPath);
-      return;
+      return created.defaultAgent;
     }
 
     const current = await this.readJsonIfPresent<OpenGoatConfig>(
       globalConfigJsonPath,
     );
-    if (current && current.defaultAgent === DEFAULT_AGENT_ID) {
+    const normalizedDefaultAgent = normalizeAgentId(current?.defaultAgent ?? "");
+    if (current && normalizedDefaultAgent) {
+      if (
+        current.schemaVersion === 1 &&
+        current.defaultAgent === normalizedDefaultAgent &&
+        typeof current.createdAt === "string" &&
+        current.createdAt.trim() &&
+        typeof current.updatedAt === "string" &&
+        current.updatedAt.trim()
+      ) {
+        skippedPaths.push(globalConfigJsonPath);
+        return normalizedDefaultAgent;
+      }
+
+      const repairedCurrent: OpenGoatConfig = {
+        schemaVersion: 1,
+        defaultAgent: normalizedDefaultAgent,
+        createdAt: current.createdAt ?? now,
+        updatedAt: now,
+      };
+      await this.fileSystem.writeFile(
+        globalConfigJsonPath,
+        `${JSON.stringify(repairedCurrent, null, 2)}\n`,
+      );
       skippedPaths.push(globalConfigJsonPath);
-      return;
+      return repairedCurrent.defaultAgent;
     }
 
     const repaired: OpenGoatConfig = {
@@ -150,6 +174,7 @@ export class BootstrapService {
       `${JSON.stringify(repaired, null, 2)}\n`,
     );
     skippedPaths.push(globalConfigJsonPath);
+    return repaired.defaultAgent;
   }
 
   private async ensureAgentsIndex(

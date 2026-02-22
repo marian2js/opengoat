@@ -16,7 +16,7 @@ Reference: [Agent Client Protocol](https://agentclientprotocol.com/get-started/i
 
 OpenGoat remains a manager runtime with ACP surface, now OpenClaw-first:
 
-- default entry agent is `ceo`
+- default entry agent resolves from `OPENGOAT_DEFAULT_AGENT`, then `config.defaultAgent`, then `ceo`
 - agent execution runtime is OpenClaw
 - direct agent invocation + session semantics are preserved
 

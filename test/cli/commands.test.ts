@@ -7,6 +7,7 @@ import { agentInfoCommand } from "../../packages/cli/src/cli/commands/agent-info
 import { agentLastActionCommand } from "../../packages/cli/src/cli/commands/agent-last-action.command.js";
 import { agentListCommand } from "../../packages/cli/src/cli/commands/agent-list.command.js";
 import { agentSetManagerCommand } from "../../packages/cli/src/cli/commands/agent-set-manager.command.js";
+import { agentSetDefaultCommand } from "../../packages/cli/src/cli/commands/agent-set-default.command.js";
 import { agentCommand } from "../../packages/cli/src/cli/commands/agent.command.js";
 import { initCommand } from "../../packages/cli/src/cli/commands/init.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
@@ -328,21 +329,23 @@ describe("CLI commands", () => {
     expect(second.stdout.output()).toContain("research [Developer]\n");
   });
 
-  it("agent command defaults to ceo when agent id is omitted", async () => {
+  it("agent command defaults to configured default agent when agent id is omitted", async () => {
     const runAgent = vi.fn(async () => ({
       code: 0,
       stdout: "ok\n",
       stderr: "",
-      agentId: "ceo",
+      agentId: "stone",
       providerId: "openclaw",
     }));
 
-    const { context, stderr } = createContext({ runAgent });
+    const getDefaultAgentId = vi.fn(async () => "stone");
+    const { context, stderr } = createContext({ runAgent, getDefaultAgentId });
     const code = await agentCommand.run(["--message", "hello"], context);
 
     expect(code).toBe(0);
+    expect(getDefaultAgentId).toHaveBeenCalledWith({ requireExisting: true });
     expect(runAgent).toHaveBeenCalledWith(
-      "ceo",
+      "stone",
       expect.objectContaining({
         message: "hello",
       }),
@@ -375,11 +378,35 @@ describe("CLI commands", () => {
     const secondCode = await agentCommand.run(["--help"], second.context);
     expect(secondCode).toBe(0);
     expect(second.stdout.output()).toContain("opengoat agent [agent-id]");
-    expect(second.stdout.output()).toContain("agent-id defaults to ceo");
+    expect(second.stdout.output()).toContain("agent-id defaults to config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo");
     expect(second.stdout.output()).toContain("agent last-action");
+    expect(second.stdout.output()).toContain("agent set-default");
     expect(second.stdout.output()).toContain("agent info");
     expect(second.stdout.output()).toContain("agent direct-reportees");
     expect(second.stdout.output()).toContain("agent all-reportees");
+  });
+
+  it("agent set-default updates configured default agent", async () => {
+    const initialize = vi.fn(async () => ({
+      paths: { homeDir: "/tmp/opengoat" },
+      defaultAgent: "ceo",
+      createdPaths: [],
+      skippedPaths: [],
+    }));
+    const setDefaultAgent = vi.fn(async () => ({
+      defaultAgent: "stone",
+      previousDefaultAgent: "ceo",
+      configPath: "/tmp/opengoat/config.json",
+    }));
+    const { context, stdout } = createContext({ initialize, setDefaultAgent });
+
+    const code = await agentSetDefaultCommand.run(["stone"], context);
+
+    expect(code).toBe(0);
+    expect(initialize).toHaveBeenCalledOnce();
+    expect(setDefaultAgent).toHaveBeenCalledWith("stone");
+    expect(stdout.output()).toContain("Default agent: stone");
+    expect(stdout.output()).toContain("Previous default: ceo");
   });
 
   it("agent command rejects removed --project-path option", async () => {

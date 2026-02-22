@@ -131,6 +131,22 @@ describe("CLI full e2e smoke", () => {
       ),
       "stub-agent-reply",
     );
+    await expectOk(
+      await runBinary(
+        ["agent", "set-default", "developer"],
+        opengoatHome,
+        env,
+      ),
+      "Default agent: developer",
+    );
+    const updatedConfig = JSON.parse(
+      await readFile(path.join(opengoatHome, "config.json"), "utf-8"),
+    ) as { defaultAgent: string };
+    expect(updatedConfig.defaultAgent).toBe("developer");
+    await expectOk(
+      await runBinary(["session", "list"], opengoatHome, env),
+      "agent:developer:main",
+    );
 
     await expectOk(
       await runBinary(

@@ -1,5 +1,5 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
+import { resolveCliDefaultAgentId } from "./default-agent.js";
 
 export const routeCommand: CliCommand = {
   path: ["route"],
@@ -18,7 +18,8 @@ export const routeCommand: CliCommand = {
     }
 
     await context.service.initialize();
-    const decision = await context.service.routeMessage(parsed.agentId, parsed.message);
+    const agentId = parsed.agentId ?? (await resolveCliDefaultAgentId(context));
+    const decision = await context.service.routeMessage(agentId, parsed.message);
 
     if (parsed.json) {
       context.stdout.write(`${JSON.stringify(decision, null, 2)}\n`);
@@ -52,7 +53,7 @@ type ParsedArgs =
       ok: true;
       help: boolean;
       json: boolean;
-      agentId: string;
+      agentId?: string;
       message: string;
     }
   | {
@@ -63,7 +64,7 @@ type ParsedArgs =
 function parseArgs(args: string[]): ParsedArgs {
   let help = false;
   let json = false;
-  let agentId = DEFAULT_AGENT_ID;
+  let agentId: string | undefined;
   let message: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
@@ -129,5 +130,5 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("  opengoat route --message <text> [--agent <id>] [--json]\n");
   output.write("\n");
   output.write("Defaults:\n");
-  output.write(`  agent-id defaults to ${DEFAULT_AGENT_ID}\n`);
+  output.write("  agent-id defaults to config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo\n");
 }

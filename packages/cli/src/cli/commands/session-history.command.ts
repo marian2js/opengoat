@@ -1,5 +1,5 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
+import { resolveCliDefaultAgentId } from "./default-agent.js";
 
 export const sessionHistoryCommand: CliCommand = {
   path: ["session", "history"],
@@ -17,7 +17,8 @@ export const sessionHistoryCommand: CliCommand = {
       return 0;
     }
 
-    const result = await context.service.getSessionHistory(parsed.agentId, {
+    const agentId = parsed.agentId ?? (await resolveCliDefaultAgentId(context));
+    const result = await context.service.getSessionHistory(agentId, {
       sessionRef: parsed.sessionRef,
       limit: parsed.limit,
       includeCompaction: parsed.includeCompaction
@@ -60,7 +61,7 @@ type Parsed =
       ok: true;
       help: boolean;
       json: boolean;
-      agentId: string;
+      agentId?: string;
       sessionRef?: string;
       includeCompaction: boolean;
       limit?: number;
@@ -70,7 +71,7 @@ type Parsed =
 function parseArgs(args: string[]): Parsed {
   let help = false;
   let json = false;
-  let agentId = DEFAULT_AGENT_ID;
+  let agentId: string | undefined;
   let sessionRef: string | undefined;
   let includeCompaction = false;
   let limit: number | undefined;
@@ -142,5 +143,5 @@ function printHelp(output: NodeJS.WritableStream): void {
     "  opengoat session history [--agent <id>] [--session <key|id>] [--limit <n>] [--include-compaction] [--json]\n"
   );
   output.write("\n");
-  output.write(`Defaults: agent-id=${DEFAULT_AGENT_ID}, session=main\n`);
+  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo, session=main\n");
 }

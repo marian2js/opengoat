@@ -1,5 +1,6 @@
-import { DEFAULT_AGENT_ID, normalizeAgentId, type TaskRecord } from "@opengoat/core";
+import { normalizeAgentId, type TaskRecord } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
+import { resolveCliDefaultAgentId } from "./default-agent.js";
 
 const MAX_TASK_LIST_RESULTS = 100;
 
@@ -25,7 +26,8 @@ export const taskCommand: CliCommand = {
           return 1;
         }
 
-        const task = await context.service.createTask(parsed.actorId, {
+        const actorId = parsed.actorId ?? (await resolveCliDefaultAgentId(context));
+        const task = await context.service.createTask(actorId, {
           title: parsed.title,
           description: parsed.description,
           assignedTo: parsed.assignedTo,
@@ -139,7 +141,8 @@ export const taskCommand: CliCommand = {
           printHelp(context.stderr);
           return 1;
         }
-        const task = await context.service.updateTaskStatus(parsed.actorId, parsed.taskId, parsed.status, parsed.reason);
+        const actorId = parsed.actorId ?? (await resolveCliDefaultAgentId(context));
+        const task = await context.service.updateTaskStatus(actorId, parsed.taskId, parsed.status, parsed.reason);
         context.stdout.write(`Task updated: ${task.taskId}\n`);
         context.stdout.write(`Status: ${task.status}\n`);
         if (task.statusReason) {
@@ -155,7 +158,8 @@ export const taskCommand: CliCommand = {
           printHelp(context.stderr);
           return 1;
         }
-        const task = await context.service.addTaskBlocker(parsed.actorId, parsed.taskId, parsed.content);
+        const actorId = parsed.actorId ?? (await resolveCliDefaultAgentId(context));
+        const task = await context.service.addTaskBlocker(actorId, parsed.taskId, parsed.content);
         context.stdout.write(`Task updated: ${task.taskId}\n`);
         context.stdout.write(`Blockers: ${task.blockers.length}\n`);
         return 0;
@@ -168,7 +172,8 @@ export const taskCommand: CliCommand = {
           printHelp(context.stderr);
           return 1;
         }
-        const task = await context.service.addTaskArtifact(parsed.actorId, parsed.taskId, parsed.content);
+        const actorId = parsed.actorId ?? (await resolveCliDefaultAgentId(context));
+        const task = await context.service.addTaskArtifact(actorId, parsed.taskId, parsed.content);
         context.stdout.write(`Task updated: ${task.taskId}\n`);
         context.stdout.write(`Artifacts: ${task.artifacts.length}\n`);
         return 0;
@@ -181,7 +186,8 @@ export const taskCommand: CliCommand = {
           printHelp(context.stderr);
           return 1;
         }
-        const task = await context.service.addTaskWorklog(parsed.actorId, parsed.taskId, parsed.content);
+        const actorId = parsed.actorId ?? (await resolveCliDefaultAgentId(context));
+        const task = await context.service.addTaskWorklog(actorId, parsed.taskId, parsed.content);
         context.stdout.write(`Task updated: ${task.taskId}\n`);
         context.stdout.write(`Worklog entries: ${task.worklog.length}\n`);
         return 0;
@@ -199,7 +205,7 @@ export const taskCommand: CliCommand = {
 
 interface TaskCreateArgsOk {
   ok: true;
-  actorId: string;
+  actorId?: string;
   title: string;
   description: string;
   assignedTo?: string;
@@ -208,7 +214,7 @@ interface TaskCreateArgsOk {
 
 interface TaskStatusArgsOk {
   ok: true;
-  actorId: string;
+  actorId?: string;
   taskId: string;
   status: string;
   reason?: string;
@@ -216,7 +222,7 @@ interface TaskStatusArgsOk {
 
 interface TaskEntryArgsOk {
   ok: true;
-  actorId: string;
+  actorId?: string;
   taskId: string;
   content: string;
 }
@@ -241,7 +247,7 @@ type ParseCronResult = { ok: false; error: string } | TaskCronArgsOk;
 type ParseListResult = { ok: false; error: string } | TaskListArgsOk;
 
 function parseCreateArgs(args: string[]): ParseCreateResult {
-  let actorId = DEFAULT_AGENT_ID;
+  let actorId: string | undefined;
   let title: string | undefined;
   let description: string | undefined;
   let assignedTo: string | undefined;
@@ -330,7 +336,7 @@ function parseStatusArgs(args: string[]): ParseStatusResult {
     };
   }
 
-  let actorId = DEFAULT_AGENT_ID;
+  let actorId: string | undefined;
   let reason: string | undefined;
   for (let index = 2; index < args.length; index += 1) {
     const token = args[index];
@@ -380,7 +386,7 @@ function parseEntryArgs(args: string[], kind: "blocker" | "artifact" | "worklog"
     return { ok: false, error: "Missing <task-id>." };
   }
 
-  let actorId = DEFAULT_AGENT_ID;
+  let actorId: string | undefined;
   const contentParts: string[] = [];
 
   for (let index = 2; index < args.length; index += 1) {

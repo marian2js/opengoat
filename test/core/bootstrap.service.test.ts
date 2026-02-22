@@ -165,7 +165,7 @@ describe("BootstrapService", () => {
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });
 
-  it("forces ceo as default even when config was changed", async () => {
+  it("preserves configured defaultAgent when config was changed", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     await fileSystem.ensureDir(paths.homeDir);
@@ -185,7 +185,7 @@ describe("BootstrapService", () => {
       ) + "\n",
     );
 
-    await service.initialize();
+    const result = await service.initialize();
 
     const config = JSON.parse(
       await readFile(paths.globalConfigJsonPath, "utf-8"),
@@ -193,7 +193,8 @@ describe("BootstrapService", () => {
       defaultAgent: string;
     };
 
-    expect(config.defaultAgent).toBe("ceo");
+    expect(config.defaultAgent).toBe("custom-agent");
+    expect(result.defaultAgent).toBe("custom-agent");
   });
 
   it("repairs config when it is malformed", async () => {

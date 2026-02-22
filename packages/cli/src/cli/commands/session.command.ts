@@ -1,4 +1,3 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
 
 export const sessionCommand: CliCommand = {
@@ -21,7 +20,7 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("  opengoat session <command> [options]\n");
   output.write("\n");
   output.write("Defaults:\n");
-  output.write(`  agent-id defaults to ${DEFAULT_AGENT_ID}\n`);
+  output.write("  agent-id defaults to config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo\n");
   output.write("  session defaults to agent main session\n");
   output.write("\n");
   output.write("Commands:\n");
