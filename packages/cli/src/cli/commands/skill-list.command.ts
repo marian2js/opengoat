@@ -1,5 +1,5 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
+import { resolveCliDefaultAgentId } from "./default-agent.js";
 
 export const skillListCommand: CliCommand = {
   path: ["skill", "list"],
@@ -12,13 +12,18 @@ export const skillListCommand: CliCommand = {
       return 1;
     }
 
-    const skills = parsed.global ? await context.service.listGlobalSkills() : await context.service.listSkills(parsed.agentId);
+    const agentId = parsed.global
+      ? undefined
+      : parsed.agentId ?? (await resolveCliDefaultAgentId(context));
+    const skills = parsed.global
+      ? await context.service.listGlobalSkills()
+      : await context.service.listSkills(agentId);
     if (parsed.json) {
       context.stdout.write(
         `${JSON.stringify(
           {
             scope: parsed.global ? "global" : "agent",
-            agentId: parsed.global ? undefined : parsed.agentId,
+            agentId: parsed.global ? undefined : agentId,
             count: skills.length,
             skills: skills.map((skill) => ({
               id: skill.id,
@@ -35,7 +40,7 @@ export const skillListCommand: CliCommand = {
       return 0;
     }
 
-    context.stdout.write(parsed.global ? "Scope: global\n" : `Agent: ${parsed.agentId}\n`);
+    context.stdout.write(parsed.global ? "Scope: global\n" : `Agent: ${agentId}\n`);
     if (skills.length === 0) {
       context.stdout.write("No skills installed.\n");
       context.stdout.write(parsed.global
@@ -55,7 +60,7 @@ export const skillListCommand: CliCommand = {
 type ParsedArgs =
   | {
       ok: true;
-      agentId: string;
+      agentId?: string;
       global: boolean;
       json: boolean;
     }
@@ -65,7 +70,7 @@ type ParsedArgs =
     };
 
 function parseListArgs(args: string[]): ParsedArgs {
-  let agentId = DEFAULT_AGENT_ID;
+  let agentId: string | undefined;
   let global = false;
   let json = false;
 
@@ -88,7 +93,7 @@ function parseListArgs(args: string[]): ParsedArgs {
       continue;
     }
     if (token === "--global") {
-      if (agentId !== DEFAULT_AGENT_ID) {
+      if (agentId) {
         return { ok: false, error: "Use either --agent or --global, not both." };
       }
       global = true;

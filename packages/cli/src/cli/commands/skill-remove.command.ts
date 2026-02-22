@@ -1,5 +1,5 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
+import { resolveCliDefaultAgentId } from "./default-agent.js";
 
 export const skillRemoveCommand: CliCommand = {
   path: ["skill", "remove"],
@@ -14,9 +14,12 @@ export const skillRemoveCommand: CliCommand = {
       return 1;
     }
 
+    const agentId = parsed.global
+      ? undefined
+      : parsed.agentId ?? (await resolveCliDefaultAgentId(context));
     const result = await context.service.removeSkill({
       scope: parsed.global ? "global" : "agent",
-      agentId: parsed.global ? undefined : parsed.agentId,
+      agentId,
       skillId: parsed.skillId,
     });
 
@@ -54,7 +57,7 @@ type ParsedArgs =
   | {
       ok: true;
       skillId: string;
-      agentId: string;
+      agentId?: string;
       global: boolean;
       json: boolean;
     }
@@ -69,7 +72,7 @@ function parseRemoveArgs(args: string[]): ParsedArgs {
     return { ok: false, error: "Missing <id>." };
   }
 
-  let agentId = DEFAULT_AGENT_ID;
+  let agentId: string | undefined;
   let global = false;
   let json = false;
 
@@ -92,7 +95,7 @@ function parseRemoveArgs(args: string[]): ParsedArgs {
       continue;
     }
     if (token === "--global") {
-      if (agentId !== DEFAULT_AGENT_ID) {
+      if (agentId) {
         return { ok: false, error: "Use either --agent or --global, not both." };
       }
       global = true;

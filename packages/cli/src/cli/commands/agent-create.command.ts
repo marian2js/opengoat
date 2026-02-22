@@ -153,7 +153,7 @@ function parseAgentCreateArgs(args: string[]): ParsedAgentCreateArgs {
 
 function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage: opengoat agent create <name> [--manager|--individual] [--role <title>] [--reports-to <agent-id|none>] [--skill <skill-id>]\n");
-  output.write("Defaults: new agents report to ceo when --reports-to is omitted.\n");
+  output.write("Defaults: new agents report to the configured default agent when --reports-to is omitted.\n");
 }
 
 function dedupeSkills(_type: "manager" | "individual" | undefined, input: string[]): string[] | undefined {

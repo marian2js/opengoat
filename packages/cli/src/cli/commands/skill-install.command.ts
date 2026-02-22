@@ -1,5 +1,5 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
+import { resolveCliDefaultAgentId } from "./default-agent.js";
 
 export const skillInstallCommand: CliCommand = {
   path: ["skill", "install"],
@@ -14,8 +14,11 @@ export const skillInstallCommand: CliCommand = {
       return 1;
     }
 
+    const agentId = parsed.global
+      ? undefined
+      : parsed.agentId ?? (await resolveCliDefaultAgentId(context));
     const result = await context.service.installSkill({
-      agentId: parsed.global ? undefined : parsed.agentId,
+      agentId,
       skillName: parsed.skillName,
       sourcePath: parsed.sourcePath,
       sourceUrl: parsed.sourceUrl,
@@ -54,7 +57,7 @@ type ParsedArgs =
   | {
       ok: true;
       skillName: string;
-      agentId: string;
+      agentId?: string;
       global: boolean;
       sourcePath?: string;
       sourceUrl?: string;
@@ -74,7 +77,7 @@ function parseInstallArgs(args: string[]): ParsedArgs {
     return { ok: false, error: "Missing <name>." };
   }
 
-  let agentId = DEFAULT_AGENT_ID;
+  let agentId: string | undefined;
   let global = false;
   let sourcePath: string | undefined;
   let sourceUrl: string | undefined;
@@ -102,7 +105,7 @@ function parseInstallArgs(args: string[]): ParsedArgs {
       continue;
     }
     if (token === "--global") {
-      if (agentId !== DEFAULT_AGENT_ID) {
+      if (agentId) {
         return { ok: false, error: "Use either --agent or --global, not both." };
       }
       global = true;

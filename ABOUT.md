@@ -11,13 +11,14 @@ Current policy:
 - `ceo` is always bound to OpenClaw
 - every agent has a runtime provider binding (`runtime.provider.id`)
 - default provider binding is `openclaw` unless explicitly changed
-- `ceo` is the immutable default manager (head of organization)
+- `ceo` is the immutable root manager (head of organization)
+- default entry agent is configurable via `config.defaultAgent` / `OPENGOAT_DEFAULT_AGENT`
 - organizations are hierarchical (`reportsTo`)
 - managers act through skills, not hardcoded control-flow logic
 
 ## 2) Core Rules
 
-1. `ceo` is always the default entry agent.
+1. default entry agent resolves from `OPENGOAT_DEFAULT_AGENT`, then `config.defaultAgent`, then `ceo`.
 2. `ceo` cannot be deleted.
 3. OpenGoat is source of truth for which agents exist.
 4. creating/deleting an OpenGoat agent syncs create/delete in OpenClaw.

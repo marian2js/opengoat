@@ -64,6 +64,84 @@ describe("OpenGoatService", () => {
     expect(config.defaultAgent).toBe("ceo");
   });
 
+  it("updates and resolves default agent from config", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("Stone", {
+      type: "manager",
+      reportsTo: "ceo",
+    });
+
+    const updated = await service.setDefaultAgent("stone");
+    expect(updated.previousDefaultAgent).toBe("ceo");
+    expect(updated.defaultAgent).toBe("stone");
+
+    const config = JSON.parse(
+      await readFile(path.join(root, "config.json"), "utf-8"),
+    ) as {
+      defaultAgent: string;
+    };
+    expect(config.defaultAgent).toBe("stone");
+    await expect(service.getDefaultAgentId()).resolves.toBe("stone");
+  });
+
+  it("prioritizes OPENGOAT_DEFAULT_AGENT over config when valid", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const previousEnv = process.env.OPENGOAT_DEFAULT_AGENT;
+    try {
+      const { service } = createService(root);
+      await service.initialize();
+      await service.createAgent("Stone", {
+        type: "manager",
+        reportsTo: "ceo",
+      });
+      process.env.OPENGOAT_DEFAULT_AGENT = "stone";
+
+      await expect(service.getDefaultAgentId()).resolves.toBe("stone");
+    } finally {
+      if (previousEnv === undefined) {
+        delete process.env.OPENGOAT_DEFAULT_AGENT;
+      } else {
+        process.env.OPENGOAT_DEFAULT_AGENT = previousEnv;
+      }
+    }
+  });
+
+  it("routes top-down task cron notifications to configured default agent", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service } = createService(root);
+    await service.initialize();
+    await service.createAgent("Stone", {
+      type: "manager",
+      reportsTo: "ceo",
+    });
+    await service.setDefaultAgent("stone");
+
+    const cycle = await service.runTaskCronCycle({
+      delegationStrategies: {
+        topDown: {
+          enabled: true,
+          openTasksThreshold: 100,
+        },
+        bottomUp: {
+          enabled: false,
+        },
+      },
+    });
+
+    const topDownDispatch = cycle.dispatches.find(
+      (entry) => entry.kind === "topdown",
+    );
+    expect(topDownDispatch?.targetAgentId).toBe("stone");
+  });
+
   it("creates and lists agents through the facade", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);

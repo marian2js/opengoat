@@ -1,5 +1,5 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
+import { resolveCliDefaultAgentId } from "./default-agent.js";
 
 export const sessionRenameCommand: CliCommand = {
   path: ["session", "rename"],
@@ -17,7 +17,8 @@ export const sessionRenameCommand: CliCommand = {
       return 0;
     }
 
-    const result = await context.service.renameSession(parsed.agentId, parsed.title, parsed.sessionRef);
+    const agentId = parsed.agentId ?? (await resolveCliDefaultAgentId(context));
+    const result = await context.service.renameSession(agentId, parsed.title, parsed.sessionRef);
     if (parsed.json) {
       context.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
       return 0;
@@ -31,13 +32,13 @@ export const sessionRenameCommand: CliCommand = {
 };
 
 type Parsed =
-  | { ok: true; help: boolean; json: boolean; agentId: string; sessionRef?: string; title: string }
+  | { ok: true; help: boolean; json: boolean; agentId?: string; sessionRef?: string; title: string }
   | { ok: false; error: string };
 
 function parseArgs(args: string[]): Parsed {
   let help = false;
   let json = false;
-  let agentId = DEFAULT_AGENT_ID;
+  let agentId: string | undefined;
   let sessionRef: string | undefined;
   let title = "";
 
@@ -101,5 +102,5 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write("  opengoat session rename --title <text> [--agent <id>] [--session <key|id>] [--json]\n");
   output.write("\n");
-  output.write(`Defaults: agent-id=${DEFAULT_AGENT_ID}, session=main\n`);
+  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo, session=main\n");
 }

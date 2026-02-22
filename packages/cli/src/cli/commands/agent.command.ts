@@ -1,10 +1,10 @@
-import { DEFAULT_AGENT_ID } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
+import { resolveCliDefaultAgentId } from "./default-agent.js";
 import { executeAgentRun } from "./agent-run.shared.js";
 
 export const agentCommand: CliCommand = {
   path: ["agent"],
-  description: "Send a message to an agent (default: ceo).",
+  description: "Send a message to an agent (default: configured default agent).",
   async run(args, context): Promise<number> {
     if (isHelpRequest(args)) {
       printHelp(context.stdout);
@@ -18,14 +18,21 @@ export const agentCommand: CliCommand = {
       return 1;
     }
 
-    return executeAgentRun(parsed, context);
+    const agentId = parsed.agentId ?? (await resolveCliDefaultAgentId(context));
+    return executeAgentRun(
+      {
+        ...parsed,
+        agentId,
+      },
+      context,
+    );
   }
 };
 
 type AgentArgsResult =
   | {
       ok: true;
-      agentId: string;
+      agentId?: string;
       message: string;
       images: Array<{ path: string }>;
       model?: string;
@@ -41,7 +48,7 @@ type AgentArgsResult =
     };
 
 function parseAgentArgs(args: string[]): AgentArgsResult {
-  let agentId = DEFAULT_AGENT_ID;
+  let agentId: string | undefined;
   let working = args;
 
   const first = args[0]?.trim();
@@ -164,13 +171,14 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("                [--model <model>] [--no-stream] [-- <runtime-args>]\n");
   output.write("\n");
   output.write("Defaults:\n");
-  output.write(`  agent-id defaults to ${DEFAULT_AGENT_ID}\n`);
+  output.write("  agent-id defaults to config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo\n");
   output.write("\n");
   output.write("Subcommands:\n");
   output.write("  agent create        Create an OpenClaw-backed agent.\n");
   output.write("  agent delete        Delete an agent locally and in OpenClaw.\n");
   output.write("  agent list          List known agents.\n");
   output.write("  agent info          Show one agent's organization details.\n");
+  output.write("  agent set-default   Set the configured default entry agent.\n");
   output.write("  agent set-manager   Reassign who an agent reports to.\n");
   output.write("  agent direct-reportees  List one manager's direct reportees.\n");
   output.write("  agent all-reportees     List one manager's full report tree.\n");

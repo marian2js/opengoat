@@ -104,6 +104,18 @@ opengoat agent cto --message "Plan the Q2 engineering roadmap and split it into 
 opengoat agent engineer --message "Implement the auth middleware for this sprint."
 ```
 
+### Configure the default entry agent
+
+```bash
+# Persist in config.json
+opengoat agent set-default stone
+
+# Or override at runtime
+export OPENGOAT_DEFAULT_AGENT=stone
+```
+
+You can also set `defaultAgent` directly in `~/.opengoat/config.json`.
+
 ### Keep session continuity
 
 ```bash
