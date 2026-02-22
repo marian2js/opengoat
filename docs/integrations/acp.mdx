@@ -1,0 +1,38 @@
+---
+title: "ACP Integration"
+description: "Run OpenGoat as an ACP server over stdio for editor and IDE integrations."
+---
+
+ACP (Agent Client Protocol) gives OpenGoat a stable integration surface for tools that speak ACP over JSON-RPC.
+
+## Run ACP Server
+
+```bash
+opengoat acp [--agent <id>] [--session-prefix <prefix>] [--history-limit <n>] [--verbose]
+```
+
+## Supported Flows
+
+- `initialize`
+- `session/new`
+- `session/load`
+- `session/resume`
+- `session/list`
+- `session/prompt`
+- `session/cancel`
+
+`session/prompt` maps into OpenGoat runtime agent execution and emits streaming updates through ACP events.
+
+## OpenGoat `_meta` Aliases
+
+Supported request aliases:
+
+- agent: `agentId`, `agent`, `targetAgent`
+- session: `sessionKey`, `sessionRef`, `session`
+- force new session: `forceNewSession`, `newSession`
+- disable session: `disableSession`, `noSession`
+
+## Notes
+
+- Default ACP agent follows OpenGoat default-agent resolution unless `--agent` is passed.
+- Use `--verbose` during IDE integration setup to inspect ACP startup behavior.

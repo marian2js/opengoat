@@ -1,0 +1,34 @@
+---
+title: "Session Commands"
+description: "List, inspect, compact, reset, rename, and remove agent sessions."
+---
+
+## Session Command Group
+
+```bash
+opengoat session <command> [options]
+```
+
+Defaults:
+
+- agent id: `config.defaultAgent` / `OPENGOAT_DEFAULT_AGENT` / `ceo`
+- session: `main`
+
+## Commands
+
+```bash
+opengoat session list [--agent <id>] [--active-minutes <n>] [--json]
+opengoat session history [--agent <id>] [--session <key|id>] [--limit <n>] [--include-compaction] [--json]
+opengoat session reset [--agent <id>] [--session <key|id>]
+opengoat session compact [--agent <id>] [--session <key|id>]
+opengoat session rename --title <text> [--agent <id>] [--session <key|id>] [--json]
+opengoat session remove [--agent <id>] [--session <key|id>] [--json]
+```
+
+## Typical Sequence
+
+```bash
+opengoat session list --agent cto
+opengoat session history --agent cto --session planning --limit 50
+opengoat session compact --agent cto --session planning
+```

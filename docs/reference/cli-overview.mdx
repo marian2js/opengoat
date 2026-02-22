@@ -1,0 +1,41 @@
+---
+title: "CLI Overview"
+description: "Top-level command map and global runtime flags for OpenGoat CLI."
+---
+
+## Global Flags
+
+OpenGoat supports these process-level options before commands:
+
+- `--version` / `-v`
+- `--log-level <silent|error|warn|info|debug>`
+- `--log-format <pretty|json>`
+
+Example:
+
+```bash
+opengoat --log-level info --log-format pretty agent list
+```
+
+## Top-Level Commands
+
+- `init`
+- `onboard`
+- `start`
+- `restart`
+- `agent`
+- `task`
+- `session`
+- `skill`
+- `provider`
+- `route`
+- `acp`
+- `scenario`
+- `hard-reset`
+
+## High-Value Paths
+
+- Agent execution: [Agent Commands](/reference/cli-agent)
+- Task lifecycle: [Task Commands](/reference/cli-task)
+- Continuity controls: [Session Commands](/reference/cli-session)
+- Provider/skill controls: [Skill and Provider Commands](/reference/cli-skill-and-provider)
