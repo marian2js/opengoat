@@ -1,0 +1,52 @@
+---
+title: "Build an Organization"
+description: "Create a manager/individual hierarchy, inspect reporting chains, and set a default entry agent."
+---
+
+## 1. Bootstrap Manager Layer
+
+```bash
+opengoat agent create "CTO" --manager --reports-to ceo
+opengoat agent create "Head of Product" --manager --reports-to ceo
+```
+
+## 2. Add Individual Contributors
+
+```bash
+opengoat agent create "Backend Engineer" --individual --reports-to cto
+opengoat agent create "Frontend Engineer" --individual --reports-to cto
+opengoat agent create "Product Designer" --individual --reports-to head-of-product
+```
+
+## 3. Inspect Hierarchy
+
+```bash
+opengoat agent list
+opengoat agent info cto
+opengoat agent direct-reportees cto
+opengoat agent all-reportees ceo
+```
+
+## 4. Reassign Reporting When Needed
+
+```bash
+opengoat agent set-manager product-designer cto
+```
+
+Use `none` to move an agent to root (use carefully):
+
+```bash
+opengoat agent set-manager product-designer none
+```
+
+## 5. Set the Entry Agent for Daily Usage
+
+```bash
+opengoat agent set-default cto
+```
+
+Environment variable still overrides config:
+
+```bash
+export OPENGOAT_DEFAULT_AGENT=ceo
+```

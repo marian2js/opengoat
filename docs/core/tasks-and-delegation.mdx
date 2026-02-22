@@ -1,0 +1,48 @@
+---
+title: "Tasks and Delegation"
+description: "Task model, status lifecycle, permission boundaries, and automation loops."
+---
+
+## Task Model
+
+Task records store:
+
+- owner (`owner`)
+- assignee (`assignedTo`)
+- status (`todo | doing | pending | blocked | done`)
+- blockers, artifacts, and worklog entries
+
+## Permission Rules
+
+OpenGoat enforces organization-aware permissions:
+
+- Agents can assign tasks only to themselves or reportees (direct or indirect).
+- Agents can update tasks they own/are assigned, or tasks owned by reportees.
+- `pending` and `blocked` status updates require `--reason`.
+
+## Core Task Commands
+
+```bash
+opengoat task create --title <title> --description <text> [--owner <agent-id>] [--assign <agent-id>] [--status <todo|doing|pending|blocked|done>]
+opengoat task list [--as <agent-id>] [--json]
+opengoat task show <task-id> [--json]
+opengoat task status <task-id> <todo|doing|pending|blocked|done> [--reason <text>] [--as <agent-id>]
+opengoat task blocker add <task-id> <content> [--as <agent-id>]
+opengoat task artifact add <task-id> <content> [--as <agent-id>]
+opengoat task worklog add <task-id> <content> [--as <agent-id>]
+```
+
+## Task Cron Loop
+
+OpenGoat provides a task dispatch cycle:
+
+```bash
+opengoat task cron [--once] [--interval-minutes <n>] [--inactive-minutes <n>]
+```
+
+Defaults:
+
+- interval: 5 minutes
+- inactive threshold: 30 minutes
+
+Use `--once` for single-cycle diagnostics.

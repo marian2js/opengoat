@@ -1,0 +1,34 @@
+---
+title: "Skill and Provider Commands"
+description: "Manage provider registry visibility and centralized or agent-scoped skills."
+---
+
+## Provider Commands
+
+```bash
+opengoat provider list
+opengoat agent provider get <agent-id>
+opengoat agent provider set <agent-id> <provider-id>
+```
+
+## Skill Commands
+
+```bash
+opengoat skill list [--agent <id> | --global] [--json]
+opengoat skill install <name> [--agent <id> | --global] [--from <path> | --from-url <url>] [--source-skill <name>] [--all-agents] [--description <text>] [--json]
+opengoat skill remove <id> [--agent <id> | --global] [--json]
+```
+
+## Scope Behavior
+
+- `--global` acts on centralized skill storage.
+- `--agent <id>` acts on one target agent.
+- If neither is provided for list/install/remove, OpenGoat resolves the default agent.
+
+## Source Options
+
+- `--from <path>` installs from local filesystem.
+- `--from-url <url>` installs from remote source.
+- `--source-skill <name>` can select a nested skill name from the source.
+
+`--from` and `--from-url` are mutually exclusive.

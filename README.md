@@ -47,6 +47,15 @@ pnpm build
 ./bin/opengoat --help
 ```
 
+### Documentation (Mintlify)
+
+```bash
+cd docs
+mintlify dev
+```
+
+Use `mintlify broken-links` before publishing documentation changes.
+
 When agents execute commands from their OpenGoat workspace, use the workspace shim:
 
 ```bash

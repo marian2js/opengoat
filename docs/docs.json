@@ -1,0 +1,125 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "OpenGoat",
+  "description": "Build AI autonomous organizations of OpenClaw agents.",
+  "theme": "mint",
+  "colors": {
+    "primary": "#f97316",
+    "light": "#fb923c",
+    "dark": "#ea580c"
+  },
+  "logo": {
+    "light": "/images/opengoat.png",
+    "dark": "/images/opengoat.png",
+    "href": "https://github.com/marian2js/opengoat"
+  },
+  "favicon": "/images/favicon.png",
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/marian2js/opengoat"
+      },
+      {
+        "label": "Discord",
+        "href": "https://discord.gg/JWGqXJMwYE"
+      }
+    ],
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/marian2js/opengoat"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Start",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "index",
+              "start/hubs",
+              "start/quickstart",
+              "start/installation"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Core",
+        "groups": [
+          {
+            "group": "Runtime",
+            "pages": [
+              "core/organization-runtime",
+              "core/sessions",
+              "core/tasks-and-delegation",
+              "core/providers-and-skills"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Workflows",
+            "pages": [
+              "guides/build-an-organization",
+              "guides/run-workflows"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "CLI",
+            "pages": [
+              "reference/cli-overview",
+              "reference/cli-agent",
+              "reference/cli-task",
+              "reference/cli-session",
+              "reference/cli-skill-and-provider"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Integrations",
+        "groups": [
+          {
+            "group": "Runtime Integrations",
+            "pages": [
+              "integrations/acp",
+              "deployment/docker"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/marian2js/opengoat",
+      "discord": "https://discord.gg/JWGqXJMwYE"
+    },
+    "links": [
+      {
+        "header": "Project",
+        "items": [
+          {
+            "label": "Repository",
+            "href": "https://github.com/marian2js/opengoat"
+          },
+          {
+            "label": "NPM",
+            "href": "https://www.npmjs.com/package/opengoat"
+          }
+        ]
+      }
+    ]
+  }
+}

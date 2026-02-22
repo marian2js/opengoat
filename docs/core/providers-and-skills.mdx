@@ -1,0 +1,58 @@
+---
+title: "Providers and Skills"
+description: "Provider registry, per-agent provider bindings, and skill installation/assignment behavior."
+---
+
+## Built-in Providers
+
+`opengoat provider list` returns built-ins:
+
+- `claude-code`
+- `codex`
+- `copilot-cli`
+- `cursor`
+- `gemini-cli`
+- `openclaw`
+- `opencode`
+
+## Provider Commands
+
+```bash
+opengoat provider list
+opengoat agent provider get <agent-id>
+opengoat agent provider set <agent-id> <provider-id>
+```
+
+## Skill Commands
+
+```bash
+opengoat skill list [--agent <id> | --global] [--json]
+opengoat skill install <name> [--agent <id> | --global] [--from <path> | --from-url <url>] [--source-skill <name>] [--all-agents] [--description <text>] [--json]
+opengoat skill remove <id> [--agent <id> | --global] [--json]
+```
+
+## Role Skill Behavior
+
+Role skill assignment is provider-aware and mutually exclusive per agent:
+
+- `openclaw`
+  - manager: `og-board-manager`
+  - individual: `og-board-individual`
+- non-`openclaw`
+  - manager: `og-boards`
+  - individual: `og-boards`
+
+## Example: Install a Global Skill and Assign to All Agents
+
+```bash
+opengoat skill install jira-tools \
+  --global \
+  --from /path/to/skill \
+  --all-agents
+```
+
+## Example: Agent-Scoped Skill
+
+```bash
+opengoat skill install coding --agent engineer --from /path/to/skill
+```

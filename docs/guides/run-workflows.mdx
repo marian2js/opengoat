@@ -1,0 +1,49 @@
+---
+title: "Run Workflows"
+description: "Execute work through agents, route messages, preserve context, and coordinate with tasks."
+---
+
+## Run Work Through an Agent
+
+```bash
+opengoat agent cto --message "Break down platform migration into deliverable streams."
+```
+
+Use `opengoat agent run` when you want explicit agent id in command shape:
+
+```bash
+opengoat agent run cto --message "Draft sprint goals"
+```
+
+## Use Session Continuity
+
+```bash
+opengoat agent cto --session migration-q2 --message "Create migration phases"
+opengoat agent cto --session migration-q2 --message "Now assign owners and risks"
+```
+
+## Dry-Run Routing Decisions
+
+```bash
+opengoat route --agent cto --message "Who should implement auth middleware?"
+```
+
+JSON output:
+
+```bash
+opengoat route --agent cto --message "Who should own observability?" --json
+```
+
+## Coordinate Tasks During Execution
+
+```bash
+opengoat task create --title "Auth middleware" --description "Implement + test" --owner cto --assign backend-engineer
+opengoat task status <task-id> doing --as backend-engineer
+opengoat task worklog add <task-id> "Implemented middleware and added unit tests" --as backend-engineer
+```
+
+## Monitor Agent Activity
+
+```bash
+opengoat agent last-action cto
+```

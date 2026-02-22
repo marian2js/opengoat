@@ -1,9 +1,13 @@
 # Documentation Moved
 
-OpenGoat is organization-first.
+OpenGoat no longer uses an internal planner/delegation loop.
 
-The canonical runtime document is now:
+The runtime architecture is documented at:
 
-- `docs/organization-runtime.md`
+- `/core/organization-runtime`
+- `/core/tasks-and-delegation`
 
-This file remains only as a compatibility pointer for older references.
+Source files:
+
+- `docs/core/organization-runtime.mdx`
+- `docs/core/tasks-and-delegation.mdx`

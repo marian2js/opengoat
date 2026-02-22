@@ -1,0 +1,48 @@
+---
+title: "Docker Runtime"
+description: "Build and run OpenGoat with Docker for isolated runtime execution."
+---
+
+## Build
+
+```bash
+docker build -t opengoat:latest .
+```
+
+## Run UI
+
+```bash
+docker run --rm \
+  -p 19123:19123 \
+  -e OPENGOAT_UI_HOST=0.0.0.0 \
+  -e OPENGOAT_UI_PORT=19123 \
+  -v opengoat-data:/data/opengoat \
+  opengoat:latest
+```
+
+## Run CLI Commands in Container
+
+```bash
+docker run --rm -v opengoat-data:/data/opengoat opengoat:latest cli --help
+docker run --rm -v opengoat-data:/data/opengoat opengoat:latest cli agent list
+```
+
+## Verify OpenClaw in Image
+
+```bash
+docker run --rm opengoat:latest openclaw --version
+```
+
+## Compose
+
+```bash
+docker compose up --build
+docker compose run --rm opengoat cli --help
+```
+
+## Runtime Defaults in Image
+
+- `OPENGOAT_HOME=/data/opengoat`
+- `OPENGOAT_UI_HOST=0.0.0.0`
+- `OPENGOAT_UI_PORT=19123`
+- `OPENGOAT_USE_DIST=1`

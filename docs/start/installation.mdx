@@ -1,0 +1,60 @@
+---
+title: "Installation"
+description: "Install OpenGoat with npm, Docker, or from source."
+---
+
+## Option A: Global npm Install
+
+```bash
+npm i -g openclaw opengoat
+```
+
+Verify:
+
+```bash
+openclaw --version
+opengoat --version
+```
+
+## Option B: Docker Runtime
+
+```bash
+docker build -t opengoat:latest .
+docker run --rm -p 19123:19123 -v opengoat-data:/data/opengoat opengoat:latest
+```
+
+Open `http://127.0.0.1:19123`.
+
+## Option C: From Source
+
+```bash
+pnpm install
+pnpm build
+./bin/opengoat --help
+```
+
+When invoking from an agent workspace, use the workspace shim:
+
+```bash
+sh ./opengoat agent list
+sh ./opengoat agent info ceo
+```
+
+## Runtime Paths
+
+By default OpenGoat stores runtime state under `~/.opengoat`.
+
+Override home path:
+
+```bash
+export OPENGOAT_HOME=/absolute/path
+```
+
+## UI Host and Port
+
+`opengoat start` and `opengoat restart` support:
+
+```bash
+opengoat start --host 127.0.0.1 --port 19123
+opengoat restart --host 127.0.0.1 --port 19123
+```

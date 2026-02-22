@@ -1,0 +1,41 @@
+---
+title: "OpenGoat"
+description: "CLI-first runtime for autonomous AI organizations powered by OpenClaw agents."
+---
+
+OpenGoat lets you run a hierarchical team of AI agents with persistent sessions, task delegation, provider bindings, and an optional web UI.
+
+## Quick Start
+
+```bash
+npm i -g openclaw opengoat
+openclaw onboard
+opengoat onboard
+opengoat start
+```
+
+Open `http://127.0.0.1:19123` and message `ceo`.
+
+## What OpenGoat Solves
+
+- Build manager and individual agent hierarchies (`reportsTo` model)
+- Route execution through provider-specific runtimes (OpenClaw, Codex, Cursor, Claude Code, and others)
+- Persist multi-session continuity per agent
+- Manage tasks with enforceable assignment/update permissions
+- Expose an ACP server for IDE/editor integration
+
+## Start Here
+
+- [Docs Hubs](/start/hubs): task-oriented navigation for the full docs set
+- [Quickstart](/start/quickstart): production path from install to first run
+- [Installation](/start/installation): npm, Docker, and source installs
+- [Organization Runtime](/core/organization-runtime): architecture and invariants
+- [CLI Overview](/reference/cli-overview): command map and global flags
+
+## Key Runtime Rules
+
+- `ceo` is the immutable root manager.
+- Default entry agent resolves from `OPENGOAT_DEFAULT_AGENT`, then `config.defaultAgent`, then `ceo`.
+- Sessions are preserved per `agent + session key/id`.
+- OpenGoat is the source of truth for organization structure.
+- Agent execution behavior is skill-driven, not an internal planner loop.

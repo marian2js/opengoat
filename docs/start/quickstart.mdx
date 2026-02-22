@@ -1,0 +1,65 @@
+---
+title: "Quickstart"
+description: "Install OpenGoat, configure OpenClaw connectivity, and run your first organization flow."
+---
+
+## Prerequisites
+
+- Node.js `>=20.11`
+- npm
+- A shell environment where `openclaw` and `opengoat` can run
+
+## 1. Install CLI Tools
+
+```bash
+npm i -g openclaw opengoat
+```
+
+## 2. Configure OpenClaw
+
+```bash
+openclaw onboard
+```
+
+If you use an external gateway, keep the URL/token available for OpenGoat onboarding.
+
+## 3. Configure OpenGoat Runtime
+
+```bash
+opengoat onboard
+```
+
+Non-interactive examples:
+
+```bash
+# Local OpenClaw gateway
+opengoat onboard --local --non-interactive
+
+# External OpenClaw gateway
+opengoat onboard --external \
+  --gateway-url ws://host:18789 \
+  --gateway-token <token> \
+  --non-interactive
+```
+
+## 4. Start the UI
+
+```bash
+opengoat start
+```
+
+Default bind: `127.0.0.1:19123`.
+
+## 5. Create and Run Your First Team
+
+```bash
+opengoat agent create "CTO" --manager --reports-to ceo
+opengoat agent create "Engineer" --individual --reports-to cto
+opengoat agent cto --message "Plan the next sprint and split the work."
+```
+
+## Next Steps
+
+- Learn runtime invariants in [Organization Runtime](/core/organization-runtime)
+- Learn continuity controls in [Sessions](/core/sessions)
+- Learn execution controls in [Agent Commands](/reference/cli-agent)

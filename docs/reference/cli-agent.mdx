@@ -1,0 +1,53 @@
+---
+title: "Agent Commands"
+description: "Create, run, inspect, and manage provider bindings for agents."
+---
+
+## Primary Run Command
+
+```bash
+opengoat agent [agent-id] --message <text> [--image <path>] [--session <key|id>] [--new-session|--no-session]
+               [--model <model>] [--no-stream] [-- <runtime-args>]
+```
+
+Defaults:
+
+- `agent-id` defaults to `config.defaultAgent`, then `OPENGOAT_DEFAULT_AGENT`, then `ceo`
+
+## Create and Delete
+
+```bash
+opengoat agent create <name> [--manager|--individual] [--role <title>] [--reports-to <agent-id|none>] [--skill <skill-id>]
+opengoat agent delete <agent-id> [--force]
+```
+
+## Inspect Organization Shape
+
+```bash
+opengoat agent list
+opengoat agent info <agent-id>
+opengoat agent direct-reportees <agent-id>
+opengoat agent all-reportees <agent-id>
+opengoat agent last-action [agent-id] [--json]
+```
+
+## Update Organization Structure
+
+```bash
+opengoat agent set-manager <agent-id> <manager-id|none>
+opengoat agent set-default <agent-id> [--json]
+```
+
+## Provider Binding
+
+```bash
+opengoat agent provider get <agent-id>
+opengoat agent provider set <agent-id> <provider-id>
+```
+
+## Explicit Run Variant
+
+```bash
+opengoat agent run <agent-id> --message <text> [--image <path>] [--session <key|id>] [--new-session|--no-session]
+                     [--model <model>] [--no-stream] [-- <runtime-args>]
+```

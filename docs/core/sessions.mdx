@@ -1,0 +1,52 @@
+---
+title: "Sessions"
+description: "How OpenGoat persists continuity and how to manage session history, resets, compaction, and cleanup."
+---
+
+## Session Semantics
+
+OpenGoat maintains continuity per `agent + session key/id`.
+
+- Default session key is `main`.
+- `--session <key|id>` reuses an existing logical thread.
+- `--new-session` forces a fresh session id.
+- `--no-session` runs statelessly.
+
+## Where Sessions Are Stored
+
+- Transcript/session state: `agents/<agent-id>/sessions/`
+- Run traces: `runs/`
+
+## Core Commands
+
+```bash
+opengoat session list [--agent <id>] [--active-minutes <n>] [--json]
+opengoat session history [--agent <id>] [--session <key|id>] [--limit <n>] [--include-compaction] [--json]
+opengoat session reset [--agent <id>] [--session <key|id>]
+opengoat session compact [--agent <id>] [--session <key|id>]
+opengoat session rename --title <text> [--agent <id>] [--session <key|id>] [--json]
+opengoat session remove [--agent <id>] [--session <key|id>] [--json]
+```
+
+Agent defaults for all commands: `config.defaultAgent` / `OPENGOAT_DEFAULT_AGENT` / `ceo`.
+
+## Practical Patterns
+
+### Continue one workstream
+
+```bash
+opengoat agent ceo --session q2-planning --message "Create release plan"
+opengoat agent ceo --session q2-planning --message "Now generate milestones"
+```
+
+### Compact long transcripts
+
+```bash
+opengoat session compact --agent ceo --session q2-planning
+```
+
+### Reset context while keeping session key
+
+```bash
+opengoat session reset --agent ceo --session q2-planning
+```

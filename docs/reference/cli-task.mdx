@@ -1,0 +1,27 @@
+---
+title: "Task Commands"
+description: "Manage task creation, status transitions, evidence entries, and cron dispatch cycles."
+---
+
+## Usage
+
+```bash
+opengoat task create --title <title> --description <text> [--owner <agent-id>] [--assign <agent-id>] [--status <todo|doing|pending|blocked|done>]
+opengoat task list [--as <agent-id>] [--json]
+opengoat task show <task-id> [--json]
+opengoat task status <task-id> <todo|doing|pending|blocked|done> [--reason <text>] [--as <agent-id>]
+opengoat task blocker add <task-id> <content> [--as <agent-id>]
+opengoat task artifact add <task-id> <content> [--as <agent-id>]
+opengoat task worklog add <task-id> <content> [--as <agent-id>]
+opengoat task cron [--once] [--interval-minutes <n>] [--inactive-minutes <n>]
+```
+
+## Important Rules
+
+- `--reason` is required when status is `pending` or `blocked`.
+- `task list` returns newest records first.
+- `task cron` runs continuously unless `--once` is used.
+
+## JSON Output
+
+Commands supporting `--json` return machine-readable output for automation pipelines.
