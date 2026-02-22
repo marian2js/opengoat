@@ -1,5 +1,5 @@
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useEffect, useState, type ReactElement } from "react";
 import {
@@ -65,7 +65,9 @@ export function TasksPage({
   onToggleTaskSelection,
   onOpenTaskDetails,
 }: TasksPageProps): ReactElement {
-  const [referenceTimestampMs, setReferenceTimestampMs] = useState(() => Date.now());
+  const [referenceTimestampMs, setReferenceTimestampMs] = useState(() =>
+    Date.now(),
+  );
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -146,7 +148,8 @@ export function TasksPage({
         {selectedTaskWorkspace.tasks.length === 0 ? (
           <div className="px-4 py-8">
             <p className="text-sm text-muted-foreground">
-              No tasks yet. Use Create Task in the top right.
+              No tasks yet. Ask the CEO to start planning, or create tasks
+              manually.
             </p>
           </div>
         ) : (
@@ -187,7 +190,10 @@ export function TasksPage({
                         <Checkbox
                           checked={selectedTaskIdSet.has(task.taskId)}
                           onCheckedChange={(checked) => {
-                            onToggleTaskSelection(task.taskId, checked === true);
+                            onToggleTaskSelection(
+                              task.taskId,
+                              checked === true,
+                            );
                           }}
                           aria-label={`Select task ${task.title}`}
                         />
