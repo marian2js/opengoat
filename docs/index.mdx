@@ -1,41 +1,70 @@
 ---
 title: "OpenGoat"
-description: "CLI-first runtime for autonomous AI organizations powered by OpenClaw agents."
+description: "Build and run automated organizations of AI agents on top of OpenClaw."
 ---
 
-OpenGoat lets you run a hierarchical team of AI agents with persistent sessions, task delegation, provider bindings, and an optional web UI.
+OpenGoat is the easiest way to go from "one agent" to "a small AI team" that can plan work, delegate tasks, and keep context over time.
+
+The first experience is intentionally simple:
+
+1. Create a few agents
+2. Message the CEO with your project idea
+3. Watch the team come alive and start executing
 
 ## Quick Start
 
 ```bash
 npm i -g openclaw opengoat
 openclaw onboard
-opengoat onboard
 opengoat start
 ```
 
-Open `http://127.0.0.1:19123` and message `ceo`.
+Then open `http://127.0.0.1:19123`.
 
-## What OpenGoat Solves
+## Your dashboard is the starting point
 
-- Build manager and individual agent hierarchies (`reportsTo` model)
-- Route execution through provider-specific runtimes (OpenClaw, Codex, Cursor, Claude Code, and others)
-- Persist multi-session continuity per agent
-- Manage tasks with enforceable assignment/update permissions
-- Expose an ACP server for IDE/editor integration
+![Dashboard](/images/dashboard.png)
 
-## Start Here
+When you open the UI, you land on the Dashboard. It shows:
+
+- **Organization Chart**: the hierarchical chart of your organization
+- **Agent Sessions**: you can chat with any agent, or just interact with the CEO
+
+You can always ask the CEO to "hire" new agents, but its recommended to create the first ones yourself.
+
+## Step 1: Create a small team
+
+On the Dashboard, click **Create Agent**, and select who the agent reports to.
+
+#### Developers/Engineers
+
+One key feature of OpenGoat, is that it support multiple agent runtimes.
+You can run your developer agents on Claude Code, Codex, Cursor, etc.
+
+## Step 2: Message the CEO to begin
+
+In the left sidebar, under **Agents & Sessions**, click **CEO**.
+
+The CEO will ask you about your project, will plan it, and break it down into smaller tasks.
+
+## Step 3: Follow the work as it gets organized
+
+Once the CEO starts, OpenGoat turns the plan into execution:
+
+- tasks get created and assigned
+- agents start working on their tasks one by one
+- the CEO will delegate tasks accordingly to the organization size
+
+You can watch things happen in:
+
+- **Tasks**: see what’s open and what’s done
+- **Agents**: inspect your org and who reports to whom
+- **Logs**: view activity and runs
+
+## What to do next
 
 - [Docs Hubs](/start/hubs): task-oriented navigation for the full docs set
 - [Quickstart](/start/quickstart): production path from install to first run
 - [Installation](/start/installation): npm, Docker, and source installs
 - [Organization Runtime](/core/organization-runtime): architecture and invariants
 - [CLI Overview](/reference/cli-overview): command map and global flags
-
-## Key Runtime Rules
-
-- `ceo` is the immutable root manager.
-- Default entry agent resolves from `OPENGOAT_DEFAULT_AGENT`, then `config.defaultAgent`, then `ceo`.
-- Sessions are preserved per `agent + session key/id`.
-- OpenGoat is the source of truth for organization structure.
-- Agent execution behavior is skill-driven, not an internal planner loop.

@@ -4,7 +4,7 @@ This document is the current architecture reference for OpenGoat.
 
 ## 1) Product Definition
 
-OpenGoat is a CLI-first organization runtime.
+OpenGoat is a platform to build AI organizations of OpenClaw agents.
 
 Current policy:
 

@@ -23,26 +23,7 @@ openclaw onboard
 
 If you use an external gateway, keep the URL/token available for OpenGoat onboarding.
 
-## 3. Configure OpenGoat Runtime
-
-```bash
-opengoat onboard
-```
-
-Non-interactive examples:
-
-```bash
-# Local OpenClaw gateway
-opengoat onboard --local --non-interactive
-
-# External OpenClaw gateway
-opengoat onboard --external \
-  --gateway-url ws://host:18789 \
-  --gateway-token <token> \
-  --non-interactive
-```
-
-## 4. Start the UI
+## 3. Start the UI
 
 ```bash
 opengoat start
@@ -50,7 +31,7 @@ opengoat start
 
 Default bind: `127.0.0.1:19123`.
 
-## 5. Create and Run Your First Team
+## 4. Create and Run Your First Team
 
 ```bash
 opengoat agent create "CTO" --manager --reports-to ceo

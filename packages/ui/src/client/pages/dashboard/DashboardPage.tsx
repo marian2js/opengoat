@@ -5298,7 +5298,7 @@ export function DashboardPage(): ReactElement {
                           Runtime Overview
                         </p>
                       </div>
-                      <div className="grid gap-3 xl:grid-cols-3">
+                      <div className="grid grid-cols-3 gap-3">
                         {metrics.map((metric) => {
                           const Icon = metric.icon;
                           return (
