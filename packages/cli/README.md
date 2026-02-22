@@ -47,6 +47,15 @@ pnpm build
 ./bin/opengoat --help
 ```
 
+### Documentation (Mintlify)
+
+```bash
+cd docs
+mintlify dev
+```
+
+Use `mintlify broken-links` before publishing documentation changes.
+
 When agents execute commands from their OpenGoat workspace, use the workspace shim:
 
 ```bash
@@ -103,6 +112,18 @@ opengoat agent list
 opengoat agent cto --message "Plan the Q2 engineering roadmap and split it into streams."
 opengoat agent engineer --message "Implement the auth middleware for this sprint."
 ```
+
+### Configure the default entry agent
+
+```bash
+# Persist in config.json
+opengoat agent set-default stone
+
+# Or override at runtime
+export OPENGOAT_DEFAULT_AGENT=stone
+```
+
+You can also set `defaultAgent` directly in `~/.opengoat/config.json`.
 
 ### Keep session continuity
 
