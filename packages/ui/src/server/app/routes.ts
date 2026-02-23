@@ -22,6 +22,7 @@ import {
   extractRuntimeActivityFromLogLines,
   fetchOpenClawGatewayLogTail,
 } from "./runtime-logs.js";
+import { resolveOpenClawOnboardingGatewayStatus } from "./openclaw-onboarding.js";
 import {
   isCeoBootstrapPending,
   parseBooleanSetting,
@@ -912,6 +913,26 @@ export function registerApiRoutes(
         totals: {
           agents: agents.length
         }
+      };
+    });
+  });
+
+  app.get("/api/openclaw/onboarding", async (_request, reply) => {
+    return safeReply(reply, async () => {
+      const [agents, gateway] = await Promise.all([
+        resolveOrganizationAgents(service),
+        resolveOpenClawOnboardingGatewayStatus(service),
+      ]);
+      const hasCeoAgent = agents.some((agent) => agent.id === DEFAULT_AGENT_ID);
+      const ceoBootstrapPending = isCeoBootstrapPending(service.getHomeDir());
+
+      return {
+        onboarding: {
+          shouldShow: !hasCeoAgent || ceoBootstrapPending,
+          hasCeoAgent,
+          ceoBootstrapPending,
+          gateway,
+        },
       };
     });
   });

@@ -171,6 +171,87 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("returns first-run onboarding status when OpenClaw gateway is running", async () => {
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        agents: [],
+        runOpenClaw: async (args) => {
+          if (args[0] === "--version") {
+            return {
+              code: 0,
+              stdout: "openclaw 1.6.2\n",
+              stderr: "",
+            };
+          }
+          return {
+            code: 0,
+            stdout: JSON.stringify({
+              port: {
+                status: "listening",
+              },
+            }),
+            stderr: "",
+          };
+        },
+      }),
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/openclaw/onboarding",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      onboarding: {
+        shouldShow: true,
+        hasCeoAgent: false,
+        ceoBootstrapPending: false,
+        gateway: {
+          installed: true,
+          gatewayRunning: true,
+          version: "1.6.2",
+          installCommand: "npm i -g openclaw@latest",
+        },
+      },
+    });
+  });
+
+  it("returns install guidance when OpenClaw is missing", async () => {
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        agents: [],
+        runOpenClaw: async () => {
+          const error = new Error("spawn openclaw ENOENT");
+          (error as NodeJS.ErrnoException).code = "ENOENT";
+          throw error;
+        },
+      }),
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/openclaw/onboarding",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      onboarding: {
+        shouldShow: true,
+        gateway: {
+          installed: false,
+          gatewayRunning: false,
+          installCommand: "npm i -g openclaw@latest",
+          startCommand: "openclaw gateway --allow-unconfigured",
+        },
+      },
+    });
+  });
+
   it("returns a logs snapshot through the stream api", async () => {
     activeServer = await createOpenGoatUiServer({
       logger: false,
@@ -3047,14 +3128,23 @@ function extractCookieHeader(response: { headers: Record<string, unknown> }): st
   return "";
 }
 
-function createMockService(options: { homeDir?: string } = {}): OpenClawUiService {
+function createMockService(
+  options: {
+    homeDir?: string;
+    agents?: AgentDescriptor[];
+    runOpenClaw?: (
+      args: string[],
+      runtimeOptions?: { cwd?: string; env?: NodeJS.ProcessEnv },
+    ) => Promise<{ code: number; stdout: string; stderr: string }>;
+  } = {},
+): OpenClawUiService {
   const homeDir = options.homeDir ?? "/tmp/opengoat-home";
   return {
     initialize: async () => {
       return undefined;
     },
     getHomeDir: () => homeDir,
-    listAgents: async (): Promise<AgentDescriptor[]> => [],
+    listAgents: async (): Promise<AgentDescriptor[]> => options.agents ?? [],
     createAgent: async (name: string): Promise<AgentCreationResult> => {
       return {
         agent: {
@@ -3190,6 +3280,11 @@ function createMockService(options: { homeDir?: string } = {}): OpenClawUiServic
         stderr: "",
         providerId: "openclaw"
       };
-    }
+    },
+    ...(options.runOpenClaw
+      ? {
+          runOpenClaw: options.runOpenClaw,
+        }
+      : {}),
   };
 }
