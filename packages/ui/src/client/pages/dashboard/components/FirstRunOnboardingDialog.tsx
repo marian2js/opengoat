@@ -44,6 +44,8 @@ export function FirstRunOnboardingDialog({
   const statusTone = resolveStatusTone(status);
   const statusLabel = resolveStatusLabel(status);
   const statusSummary = resolveStatusSummary(status);
+  const isGatewayReady =
+    !isLoading && !error && status?.installed === true && status.gatewayRunning;
   const checkedAtLabel =
     status?.checkedAt && !Number.isNaN(Date.parse(status.checkedAt))
       ? new Date(status.checkedAt).toLocaleTimeString()
@@ -139,15 +141,21 @@ export function FirstRunOnboardingDialog({
           ) : null}
         </div>
 
-        <DialogFooter className="border-border/70 border-t px-6 py-4 sm:justify-between sm:space-x-0">
-          <Button variant="ghost" onClick={onDismiss}>
-            Continue later
-          </Button>
-          <Button variant="secondary" onClick={onRefresh}>
-            <RefreshCcw className="size-4" />
-            Re-check
-          </Button>
-        </DialogFooter>
+        {isGatewayReady ? (
+          <DialogFooter className="border-border/70 border-t px-6 py-4 sm:justify-end">
+            <Button onClick={onDismiss}>Continue</Button>
+          </DialogFooter>
+        ) : (
+          <DialogFooter className="border-border/70 border-t px-6 py-4 sm:justify-between sm:space-x-0">
+            <Button variant="ghost" onClick={onDismiss}>
+              Continue later
+            </Button>
+            <Button variant="secondary" onClick={onRefresh}>
+              <RefreshCcw className="size-4" />
+              Re-check
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
