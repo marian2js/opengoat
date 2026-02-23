@@ -112,4 +112,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="$(node -p "require('./packages/cli/package.json').version")"
-          gh release create "v${VERSION}" --title "v${VERSION}" --generate-notes
+          NOTES_FILE="/tmp/release-notes-${VERSION}.md"
+
+          awk -v version="$VERSION" '
+            $0 ~ "^## "version"$" {capture=1; next}
+            capture && $0 ~ "^## " {exit}
+            capture {print}
+          ' CHANGELOG.md > "$NOTES_FILE"
+
+          if [ ! -s "$NOTES_FILE" ]; then
+            echo "Failed to find changelog entry for ${VERSION}."
+            exit 1
+          fi
+
+          gh release create "v${VERSION}" --title "v${VERSION}" --notes-file "$NOTES_FILE"
