@@ -22,22 +22,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-
-      # Trusted Publishing requires Node 22.14+ and npm 11.5.1+ (per npm docs)
-      - name: Setup Node.js 22.14.0
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22.14.0
-          cache: pnpm
-
-      - name: Upgrade npm (required for Trusted Publishing)
-        run: npm i -g npm@11.5.1
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Check for Changesets
         id: check_changesets
         run: |
@@ -46,8 +30,24 @@ jobs:
             echo "Changesets found."
           else
             echo "has_changesets=false" >> "$GITHUB_OUTPUT"
-            echo "No changesets found."
+            echo "No changesets found. Skipping release steps."
           fi
+
+      - name: Setup pnpm
+        if: steps.check_changesets.outputs.has_changesets == 'true'
+        uses: pnpm/action-setup@v2
+
+      # Trusted publishing requires a modern Node/npm toolchain.
+      - name: Setup Node.js 22.14.0
+        if: steps.check_changesets.outputs.has_changesets == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+
+      - name: Install Dependencies
+        if: steps.check_changesets.outputs.has_changesets == 'true'
+        run: pnpm install --frozen-lockfile
 
       - name: Configure Git
         if: steps.check_changesets.outputs.has_changesets == 'true'
