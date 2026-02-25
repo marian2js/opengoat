@@ -367,6 +367,7 @@ export class AgentService {
     );
     const directReporteesByManager = new Map<string, string[]>();
     const configuredManagerIds = new Set<string>();
+    const directManagerByAgent = new Map<string, string | null>();
 
     for (const agentId of knownAgents) {
       if (
@@ -376,6 +377,7 @@ export class AgentService {
         configuredManagerIds.add(agentId);
       }
       const reportsTo = await this.readAgentReportsTo(paths, agentId);
+      directManagerByAgent.set(agentId, reportsTo);
       if (reportsTo) {
         const currentReportees = directReporteesByManager.get(reportsTo) ?? [];
         currentReportees.push(agentId);
@@ -390,15 +392,32 @@ export class AgentService {
 
     for (const agentId of knownAgents) {
       const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
+      const managerLinkPath = this.pathPort.join(workspaceDir, "manager");
       const reporteesDir = this.pathPort.join(workspaceDir, "reportees");
       const directReportees = dedupe(
         directReporteesByManager.get(agentId) ?? [],
       );
+      const managerId = directManagerByAgent.get(agentId) ?? null;
       const expectedReportees = new Set(directReportees);
       const isManager = managerCandidates.has(agentId);
       const reporteesDirExists = await this.fileSystem.exists(reporteesDir);
 
       await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
+      if (managerId) {
+        await this.ensureWorkspaceSymlink(
+          this.pathPort.join(paths.workspacesDir, managerId),
+          managerLinkPath,
+          createdPaths,
+          skippedPaths,
+          removedPaths,
+        );
+      } else {
+        await this.removeWorkspaceSymlinkIfPresent(
+          managerLinkPath,
+          removedPaths,
+          skippedPaths,
+        );
+      }
       if (isManager) {
         await this.ensureDirectory(reporteesDir, createdPaths, skippedPaths);
       } else if (!reporteesDirExists) {
@@ -918,6 +937,22 @@ export class AgentService {
 
     await this.fileSystem.createSymbolicLink(desiredTarget, linkPath);
     createdPaths.push(linkPath);
+  }
+
+  private async removeWorkspaceSymlinkIfPresent(
+    linkPath: string,
+    removedPaths: string[],
+    skippedPaths: string[],
+  ): Promise<void> {
+    const existingSymlinkTarget = await this.fileSystem.readSymbolicLink(
+      linkPath,
+    );
+    if (existingSymlinkTarget !== null) {
+      await this.fileSystem.removeDir(linkPath);
+      removedPaths.push(linkPath);
+      return;
+    }
+    skippedPaths.push(linkPath);
   }
 
   private async readAgentConfiguredType(
