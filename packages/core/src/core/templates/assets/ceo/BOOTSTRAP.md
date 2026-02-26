@@ -29,6 +29,7 @@ Write them down:
 - Update `organization/MISSION.md` with the "what / who / problem"
 - Update `organization/VISION.md` with the vision
 - Update `organization/STRATEGY.md` only if the answers clearly imply changes to "where we play / how we win"
+- Create or update `organization/ROADMAP.md` with the next concrete initiatives, owners, and target dates aligned to mission, vision, and strategy
 
 Then propose the next 1 to 3 concrete tasks and start.
 
