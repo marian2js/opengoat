@@ -1,10 +1,10 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ArrowRight, GitBranch, Plus, Rocket, Sparkles } from "lucide-react";
+import { ArrowRight, GitBranch, Plus } from "lucide-react";
 import { useMemo, useState, type ReactElement } from "react";
+import opengoatLogo from "../../../../../../assets/opengoat.png";
 
 type BuildMode = "new" | "existing" | null;
 
@@ -21,8 +21,10 @@ export function OnboardPage(): ReactElement {
   const repoLooksValid = useMemo(
     () =>
       githubRepoUrl.trim().length === 0 ||
-      /^https?:\/\/github\.com\/[^/\s]+\/[^/\s]+\/?$/i.test(githubRepoUrl.trim()),
-    [githubRepoUrl]
+      /^https?:\/\/github\.com\/[^/\s]+\/[^/\s]+\/?$/i.test(
+        githubRepoUrl.trim(),
+      ),
+    [githubRepoUrl],
   );
   const existingFlowComplete =
     githubRepoUrl.trim().length > 0 &&
@@ -36,13 +38,15 @@ export function OnboardPage(): ReactElement {
     (buildMode === "existing"
       ? existingFlowComplete
       : buildMode === "new"
-        ? newFlowComplete
-        : false);
+      ? newFlowComplete
+      : false);
 
   return (
     <main
       className="opengoat-onboard-shell relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_18%_-5%,rgba(91,141,255,0.2),transparent_45%),radial-gradient(circle_at_85%_10%,rgba(38,213,184,0.14),transparent_34%),linear-gradient(160deg,#06070d_0%,#0a1121_46%,#06080f_100%)] text-foreground"
-      style={{ fontFamily: "\"Space Grotesk\", \"Avenir Next\", \"Segoe UI\", sans-serif" }}
+      style={{
+        fontFamily: '"Space Grotesk", "Avenir Next", "Segoe UI", sans-serif',
+      }}
     >
       <div className="-left-20 absolute top-20 size-72 rounded-full bg-sky-400/12 blur-3xl opengoat-onboard-orb" />
       <div className="absolute bottom-16 right-0 size-72 rounded-full bg-cyan-300/10 blur-3xl opengoat-onboard-orb [animation-delay:1.8s]" />
@@ -50,35 +54,31 @@ export function OnboardPage(): ReactElement {
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-14">
         <section className="opengoat-onboard-hero-card rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.03)_42%,rgba(255,255,255,0.01)_100%)] p-6 shadow-[0_30px_90px_rgba(2,6,23,0.58)] backdrop-blur-xl sm:p-8">
-          <Badge
-            variant="secondary"
-            className="w-fit border-sky-300/30 bg-sky-300/10 text-sky-100"
-          >
-            OpenGoat onboarding
-          </Badge>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
             Welcome to OpenGoat.
           </h1>
+          <div className="mt-5 flex items-center gap-3 rounded-2xl border border-white/12 bg-white/[0.03] px-3 py-2.5 sm:gap-4 sm:px-4">
+            <div className="relative shrink-0">
+              <div className="absolute inset-0 rounded-xl bg-sky-300/30 blur-md" />
+              <img
+                src={opengoatLogo}
+                alt="OpenGoat logo"
+                className="relative size-12 rounded-full shadow-[0_10px_24px_rgba(30,144,255,0.28)] sm:size-14"
+              />
+            </div>
+            <p className="text-lg font-medium text-slate-100 sm:text-xl">
+              I&apos;m Goat, your AI Co-Founder.
+            </p>
+          </div>
           <div className="mt-4 space-y-2 text-base text-slate-200/90 sm:text-lg">
             <p>
-              I&apos;m Goat - your AI Co-Founder.
+              I run a self-driving dev team that evolves your app every single
+              day.
             </p>
-            <p>I run a self-driving dev team that evolves your app every single day.</p>
-            <p>Let&apos;s get you set up in under a minute so we can start shipping.</p>
-          </div>
-          <div className="mt-7 flex flex-wrap gap-2">
-            <FeatureChip
-              icon={<Sparkles className="size-4 text-sky-200" />}
-              label="AI-first setup"
-            />
-            <FeatureChip
-              icon={<GitBranch className="size-4 text-cyan-200" />}
-              label="Repo-aware"
-            />
-            <FeatureChip
-              icon={<Rocket className="size-4 text-teal-200" />}
-              label="Fast MVP cycle"
-            />
+            <p>
+              Let&apos;s get you set up in under a minute so we can start
+              shipping.
+            </p>
           </div>
         </section>
 
@@ -145,12 +145,14 @@ export function OnboardPage(): ReactElement {
                     placeholder="https://github.com/owner/repository"
                     className={cn(
                       "mt-3 border-white/15 bg-black/25",
-                      !repoLooksValid && "border-danger/65 focus-visible:ring-danger"
+                      !repoLooksValid &&
+                        "border-danger/65 focus-visible:ring-danger",
                     )}
                   />
                   {!repoLooksValid ? (
                     <p className="mt-2 text-danger text-xs">
-                      Use a valid GitHub URL like `https://github.com/owner/repo`.
+                      Use a valid GitHub URL like
+                      `https://github.com/owner/repo`.
                     </p>
                   ) : null}
                 </div>
@@ -239,14 +241,16 @@ function StepTitle({
             "inline-flex size-6 items-center justify-center rounded-full border text-xs font-semibold",
             active
               ? "border-sky-300/45 bg-sky-300/15 text-sky-100"
-              : "border-white/20 bg-white/5 text-slate-300"
+              : "border-white/20 bg-white/5 text-slate-300",
           )}
         >
           {number}
         </span>
         <p className="font-medium text-sm text-slate-100">{title}</p>
       </div>
-      {helper ? <p className="pl-8 text-muted-foreground text-xs">{helper}</p> : null}
+      {helper ? (
+        <p className="pl-8 text-muted-foreground text-xs">{helper}</p>
+      ) : null}
     </div>
   );
 }
@@ -271,7 +275,7 @@ function ModeOption({
         "group rounded-2xl border px-4 py-3 text-left transition-colors duration-150",
         selected
           ? "border-sky-300/50 bg-sky-300/12"
-          : "border-white/15 bg-black/20 hover:border-slate-300/35 hover:bg-white/[0.06]"
+          : "border-white/15 bg-black/20 hover:border-slate-300/35 hover:bg-white/[0.06]",
       )}
       onClick={onClick}
     >
@@ -281,20 +285,5 @@ function ModeOption({
       <p className="font-medium text-sm text-slate-100">{title}</p>
       <p className="mt-1 text-muted-foreground text-xs">{description}</p>
     </button>
-  );
-}
-
-function FeatureChip({
-  icon,
-  label,
-}: {
-  icon: ReactElement;
-  label: string;
-}): ReactElement {
-  return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/20 px-3 py-1.5">
-      {icon}
-      <span className="text-sm text-slate-100">{label}</span>
-    </div>
   );
 }
