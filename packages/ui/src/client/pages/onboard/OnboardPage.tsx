@@ -220,10 +220,11 @@ export function OnboardPage(): ReactElement {
   );
 }
 
-function PromptHeader({
+function StepTitle({
   number,
   title,
   helper,
+  active = false,
 }: {
   number: number;
   title: string;
