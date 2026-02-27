@@ -128,3 +128,46 @@ body {
   animation: opengoat-ai-shimmer var(--opengoat-shimmer-duration) linear
     infinite;
 }
+
+@keyframes opengoat-onboard-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes opengoat-onboard-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -14px, 0) scale(1.04);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.opengoat-onboard-shell {
+  isolation: isolate;
+}
+
+.opengoat-onboard-hero-card {
+  animation: opengoat-onboard-rise 500ms ease-out both;
+}
+
+.opengoat-onboard-flow {
+  animation: opengoat-onboard-rise 620ms ease-out both;
+}
+
+.opengoat-onboard-reveal {
+  animation: opengoat-onboard-rise 420ms ease-out both;
+}
+
+.opengoat-onboard-orb {
+  animation: opengoat-onboard-drift 9s ease-in-out infinite;
+}
