@@ -91,6 +91,8 @@ type SessionMessageStreamEvent =
 
 const ONBOARDING_PAYLOAD_KEY = "opengoat:onboard:payload";
 const ONBOARDING_CHAT_STATE_KEY = "opengoat:onboard:chat-state";
+export const ONBOARDING_START_MARKER = "{{START}}";
+const ONBOARDING_START_MARKER_REGEX = /(?:^|\n)\s*\{\{START\}\}\s*$/u;
 
 export const DEFAULT_AGENT_ID = "goat";
 export const ONBOARDING_WORKSPACE_NAME = "Onboarding Roadmap";
@@ -212,7 +214,45 @@ export function buildInitialRoadmapPrompt(input: OnboardingPayload): string {
     `- Be ambitious but realistic`,
     `- Strongly align with the long-term vision and short-term goals the user gave`,
     `- Phase 1 must deliver real user value quickly`,
+    ``,
+    ...buildOnboardingStartMarkerProtocolLines(),
   ].join("\n");
+}
+
+export function buildOnboardingFollowUpPrompt(userMessage: string): string {
+  const normalizedMessage = userMessage.trim();
+  return [
+    normalizedMessage,
+    ``,
+    ...buildOnboardingStartMarkerProtocolLines(),
+  ].join("\n");
+}
+
+export function parseOnboardingAssistantOutput(output: string): {
+  cleanedContent: string;
+  shouldRedirectToDashboard: boolean;
+} {
+  const trimmedOutput = output.trim();
+  if (!trimmedOutput) {
+    return {
+      cleanedContent: "",
+      shouldRedirectToDashboard: false,
+    };
+  }
+
+  if (!ONBOARDING_START_MARKER_REGEX.test(trimmedOutput)) {
+    return {
+      cleanedContent: trimmedOutput,
+      shouldRedirectToDashboard: false,
+    };
+  }
+
+  return {
+    cleanedContent: trimmedOutput
+      .replace(ONBOARDING_START_MARKER_REGEX, "")
+      .trim(),
+    shouldRedirectToDashboard: true,
+  };
 }
 
 export function normalizeRunError(message: string): string {
@@ -415,4 +455,12 @@ async function readResponseError(response: Response): Promise<string> {
   }
 
   return normalized;
+}
+
+function buildOnboardingStartMarkerProtocolLines(): string[] {
+  return [
+    `Conversation protocol:`,
+    `- When the user explicitly approves the roadmap and wants to begin execution, end your response with ${ONBOARDING_START_MARKER} on its own final line.`,
+    `- Never output ${ONBOARDING_START_MARKER} unless the user is clearly approving and ready to start.`,
+  ];
 }
