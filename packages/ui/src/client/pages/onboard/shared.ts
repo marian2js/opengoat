@@ -223,6 +223,12 @@ export function normalizeRunError(message: string): string {
   ) {
     return "OpenClaw gateway auth failed for this device. Run `openclaw onboard`, then retry.";
   }
+  if (
+    (lower.includes("plugins.entries.") && lower.includes("plugin not found")) ||
+    lower.includes("stale config entry ignored")
+  ) {
+    return "OpenClaw has stale plugin config warnings. Run `openclaw onboard` to refresh plugin config, then retry.";
+  }
   return message;
 }
 

@@ -2821,6 +2821,71 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("strips stale OpenClaw plugin warning noise from stream progress and result output", async () => {
+    const runAgent = vi.fn<
+      NonNullable<OpenClawUiService["runAgent"]>
+    >(async (_agentId, options) => {
+      options.onStderr?.(
+        "Config warnings:\n- plugins.entries.opengoat-plugin: plugin not found: opengoat-plugin (stale config entry ignored; remove it from plugins config)",
+      );
+
+      return {
+        code: 1,
+        stdout: "",
+        stderr:
+          "Config warnings:\n- plugins.entries.opengoat-plugin: plugin not found: opengoat-plugin (stale config entry ignored; remove it from plugins config)",
+        providerId: "openclaw",
+      };
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        runAgent,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message/stream",
+      payload: {
+        agentId: "goat",
+        sessionRef: "workspace:tmp",
+        message: "hello",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const lines = response.body
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            type: string;
+            phase?: string;
+            message?: string;
+            output?: string;
+          },
+      );
+
+    const progressMessages = lines
+      .filter((line) => line.type === "progress")
+      .map((line) => line.message ?? "");
+    const resultLine = lines.find((line) => line.type === "result");
+
+    expect(
+      progressMessages.some((message) =>
+        message.toLowerCase().includes("plugin not found"),
+      ),
+    ).toBe(false);
+    expect(resultLine?.output ?? "").toBe("");
+  });
+
   it("returns persisted session history", async () => {
     const getSessionHistory = vi.fn<NonNullable<OpenClawUiService["getSessionHistory"]>>(async (): Promise<{
       sessionKey: string;

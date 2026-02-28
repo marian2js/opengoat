@@ -41,6 +41,7 @@ export interface UiServerConfig {
   port: number;
   cliPackageRoot: string;
   resolvedEntry: string;
+  resolvedEntryUsesTsx: boolean;
   env: NodeJS.ProcessEnv;
   stateFilePath: string;
 }
@@ -48,6 +49,11 @@ export interface UiServerConfig {
 export type UiServerConfigResolution =
   | { ok: true; config: UiServerConfig }
   | { ok: false; candidates: string[] };
+
+interface UiEntrypointCandidate {
+  path: string;
+  usesTsx: boolean;
+}
 
 export interface UiServerStopResult {
   ok: boolean;
@@ -163,7 +169,9 @@ export function resolveUiServerConfig(params: {
     path.dirname(fileURLToPath(import.meta.url)),
   );
   const resolvedEntry = resolveUiEntrypoint(cliPackageRoot);
-  const candidates = listUiEntrypointCandidates(cliPackageRoot);
+  const candidates = listUiEntrypointCandidates(cliPackageRoot).map(
+    (candidate) => candidate.path,
+  );
   if (!resolvedEntry) {
     return {
       ok: false,
@@ -197,7 +205,8 @@ export function resolveUiServerConfig(params: {
       host: effectiveHost,
       port: effectivePort,
       cliPackageRoot,
-      resolvedEntry,
+      resolvedEntry: resolvedEntry.path,
+      resolvedEntryUsesTsx: resolvedEntry.usesTsx,
       env,
       stateFilePath: resolveUiServerStatePath(effectivePort),
     },
@@ -209,7 +218,10 @@ export async function runUiServerProcess(
   context: CliContext,
   commandName: "start" | "restart",
 ): Promise<number> {
-  const child = spawn(process.execPath, [config.resolvedEntry], {
+  const childArgs = config.resolvedEntryUsesTsx
+    ? ["--import", "tsx", config.resolvedEntry]
+    : [config.resolvedEntry];
+  const child = spawn(process.execPath, childArgs, {
     stdio: "inherit",
     env: config.env,
     cwd: config.cliPackageRoot,
@@ -359,25 +371,56 @@ function parseIntegerPort(raw: string | undefined): number | undefined {
   return value;
 }
 
-function resolveUiEntrypoint(cliPackageRoot: string): string | undefined {
+function resolveUiEntrypoint(
+  cliPackageRoot: string,
+): UiEntrypointCandidate | undefined {
   const explicit = process.env.OPENGOAT_UI_SERVER_ENTRY?.trim();
   if (explicit) {
     const explicitPath = path.resolve(explicit);
-    return existsSync(explicitPath) ? explicitPath : undefined;
+    if (!existsSync(explicitPath)) {
+      return undefined;
+    }
+    return {
+      path: explicitPath,
+      usesTsx: explicitPath.endsWith(".ts"),
+    };
   }
 
+  const forceDist =
+    process.env.OPENGOAT_UI_USE_DIST === "1" ||
+    process.env.OPENGOAT_USE_DIST === "1";
+
   for (const candidate of listUiEntrypointCandidates(cliPackageRoot)) {
-    if (existsSync(candidate)) {
+    if (forceDist && candidate.usesTsx) {
+      continue;
+    }
+    if (existsSync(candidate.path)) {
       return candidate;
     }
   }
   return undefined;
 }
 
-function listUiEntrypointCandidates(cliPackageRoot: string): string[] {
+function listUiEntrypointCandidates(
+  cliPackageRoot: string,
+): UiEntrypointCandidate[] {
+  const srcCandidate = {
+    path: path.join(cliPackageRoot, "..", "ui", "src", "server", "index.ts"),
+    usesTsx: true,
+  } satisfies UiEntrypointCandidate;
+  const distWorkspaceCandidate = {
+    path: path.join(cliPackageRoot, "..", "ui", "dist", "server", "index.js"),
+    usesTsx: false,
+  } satisfies UiEntrypointCandidate;
+  const distBundledCandidate = {
+    path: path.join(cliPackageRoot, "dist", "ui", "dist", "server", "index.js"),
+    usesTsx: false,
+  } satisfies UiEntrypointCandidate;
+
   return [
-    path.join(cliPackageRoot, "dist", "ui", "dist", "server", "index.js"),
-    path.join(cliPackageRoot, "..", "ui", "dist", "server", "index.js"),
+    srcCandidate,
+    distWorkspaceCandidate,
+    distBundledCandidate,
   ];
 }
 
