@@ -18,6 +18,7 @@ import {
   DEFAULT_AGENT_ID,
   ONBOARDING_WORKSPACE_NAME,
   buildInitialRoadmapPrompt,
+  buildOnboardingFollowUpPrompt,
   buildOnboardingSummaryForUser,
   clearOnboardingChatState,
   clearOnboardingPayload,
@@ -26,6 +27,7 @@ import {
   loadOnboardingChatState,
   loadOnboardingPayload,
   normalizeRunError,
+  parseOnboardingAssistantOutput,
   saveOnboardingChatState,
   sendSessionMessageStream,
   type OnboardingChatMessage,
@@ -51,7 +53,9 @@ export function OnboardChatPage(): ReactElement {
   const abortControllerRef = useRef<AbortController | null>(null);
   const initialRoadmapStartedRef = useRef(false);
   const streamTimeoutRef = useRef<number | null>(null);
+  const redirectTimeoutRef = useRef<number | null>(null);
   const stopRequestedRef = useRef(false);
+  const redirectTriggeredRef = useRef(false);
 
   const hasMessages = chatState.messages.length > 0;
   const hasAssistantReply = useMemo(
@@ -177,12 +181,31 @@ export function OnboardChatPage(): ReactElement {
             return;
           }
 
+          const parsedOutput = parseOnboardingAssistantOutput(assistantOutput);
+          const assistantMessageContent =
+            parsedOutput.cleanedContent ||
+            (parsedOutput.shouldRedirectToDashboard
+              ? "Roadmap approved. Opening your dashboard..."
+              : "Goat returned no output.");
+
           appendMessage({
             id: createMessageId("assistant"),
             role: "assistant",
-            content: assistantOutput || "Goat returned no output.",
+            content: assistantMessageContent,
           });
           setChatStatus("ready");
+          if (
+            parsedOutput.shouldRedirectToDashboard &&
+            !redirectTriggeredRef.current
+          ) {
+            redirectTriggeredRef.current = true;
+            clearOnboardingPayload();
+            clearOnboardingChatState();
+            setRuntimeStatusLine("Approved. Taking you to the dashboard...");
+            redirectTimeoutRef.current = window.setTimeout(() => {
+              window.location.assign("/dashboard");
+            }, 150);
+          }
           return;
         } catch (requestError) {
           if (isAbortError(requestError)) {
@@ -304,6 +327,11 @@ export function OnboardChatPage(): ReactElement {
         window.clearTimeout(timeoutHandle);
         streamTimeoutRef.current = null;
       }
+      const redirectTimeoutHandle = redirectTimeoutRef.current;
+      if (redirectTimeoutHandle !== null) {
+        window.clearTimeout(redirectTimeoutHandle);
+        redirectTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -315,7 +343,7 @@ export function OnboardChatPage(): ReactElement {
       }
       await runAssistantTurn({
         userText: text,
-        agentText: text,
+        agentText: buildOnboardingFollowUpPrompt(text),
       });
     },
     [payload, runAssistantTurn],
