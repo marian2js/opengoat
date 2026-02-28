@@ -51,6 +51,7 @@ export function OnboardChatPage(): ReactElement {
   const abortControllerRef = useRef<AbortController | null>(null);
   const initialRoadmapStartedRef = useRef(false);
   const streamTimeoutRef = useRef<number | null>(null);
+  const stopRequestedRef = useRef(false);
 
   const hasMessages = chatState.messages.length > 0;
   const hasAssistantReply = useMemo(
@@ -130,6 +131,7 @@ export function OnboardChatPage(): ReactElement {
 
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
+      stopRequestedRef.current = false;
       let streamTimedOut = false;
       streamTimeoutRef.current = window.setTimeout(() => {
         streamTimedOut = true;
@@ -187,7 +189,14 @@ export function OnboardChatPage(): ReactElement {
             setChatStatus("error");
             return;
           }
-          setChatStatus("ready");
+          if (stopRequestedRef.current) {
+            setChatStatus("ready");
+            return;
+          }
+          setError(
+            "Connection to Goat was interrupted. Please retry roadmap generation.",
+          );
+          setChatStatus("error");
           return;
         }
 
@@ -304,6 +313,7 @@ export function OnboardChatPage(): ReactElement {
     if (!controller || controller.signal.aborted) {
       return;
     }
+    stopRequestedRef.current = true;
     controller.abort();
   }, []);
 
@@ -367,6 +377,23 @@ export function OnboardChatPage(): ReactElement {
           {error ? (
             <div className="mb-3 rounded-xl border border-danger/40 bg-danger/15 px-3 py-2 text-danger text-sm">
               {error}
+              {hasAssistantReply ? null : (
+                <div className="mt-2">
+                  <Button
+                    className="h-8 px-3 text-xs"
+                    onClick={() => {
+                      setError(null);
+                      setInitializing(true);
+                      initialRoadmapStartedRef.current = false;
+                      void runInitialRoadmapTurn();
+                    }}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Retry generating roadmap
+                  </Button>
+                </div>
+              )}
             </div>
           ) : null}
 
