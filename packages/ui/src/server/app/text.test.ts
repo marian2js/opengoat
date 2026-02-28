@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  extractAssistantTextFromStructuredOutput,
   formatRunStatusMessage,
   sanitizeConversationText,
   sanitizeRuntimeProgressChunk,
@@ -83,5 +84,40 @@ describe("sanitizeRuntimeProgressChunk", () => {
     const input =
       "Config warnings:\n- plugins.entries.opengoat-plugin: plugin not found: opengoat-plugin (stale config entry ignored; remove it from plugins config)\nStarting @goat.";
     expect(sanitizeRuntimeProgressChunk(input)).toBe("Starting @goat.");
+  });
+});
+
+describe("extractAssistantTextFromStructuredOutput", () => {
+  it("extracts assistant text from OpenClaw payload envelopes", () => {
+    const input = JSON.stringify({
+      runId: "run-1",
+      status: "ok",
+      result: {
+        payloads: [
+          { text: "## Proposed Roadmap\nDay 1: validate scope." },
+          { text: "### Confirmation\nIs this roadmap okay?" },
+        ],
+      },
+    });
+
+    expect(extractAssistantTextFromStructuredOutput(input)).toBe(
+      "## Proposed Roadmap\nDay 1: validate scope.\n\n### Confirmation\nIs this roadmap okay?",
+    );
+  });
+
+  it("extracts assistant text when stdout has non-JSON prelude noise", () => {
+    const input = [
+      "warning: stale config entry ignored",
+      JSON.stringify({
+        runId: "run-2",
+        result: {
+          payloads: [{ text: "Roadmap draft ready." }],
+        },
+      }),
+    ].join("\n");
+
+    expect(extractAssistantTextFromStructuredOutput(input)).toBe(
+      "Roadmap draft ready.",
+    );
   });
 });

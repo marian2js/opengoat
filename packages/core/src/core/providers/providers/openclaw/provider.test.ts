@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OpenClawProvider } from "./provider.js";
+import { OpenClawProvider, parseGatewayAgentResponse } from "./provider.js";
 import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 
@@ -229,6 +229,49 @@ describe("openclaw provider", () => {
     expect(entries).toContain(join(homedir(), ".npm-global", "bin"));
     expect(entries).toContain(join("/tmp/opengoat-prefix", "bin"));
     expect(entries).toContain("/usr/bin");
+  });
+
+  it("parses OpenClaw gateway final payload JSON into assistant text", () => {
+    const parsed = parseGatewayAgentResponse(
+      JSON.stringify({
+        runId: "run-1",
+        status: "ok",
+        result: {
+          payloads: [
+            { text: "## Proposed Roadmap\nDay 1: Scope freeze." },
+            { text: "### Confirmation\nIs this roadmap okay?" },
+          ],
+          meta: {
+            agentMeta: {
+              sessionId: "agent:goat:roadmap",
+            },
+          },
+        },
+      }),
+    );
+
+    expect(parsed).toEqual({
+      assistantText:
+        "## Proposed Roadmap\nDay 1: Scope freeze.\n\n### Confirmation\nIs this roadmap okay?",
+      providerSessionId: "agent:goat:roadmap",
+    });
+  });
+
+  it("parses OpenClaw gateway JSON even with non-JSON prelude text", () => {
+    const parsed = parseGatewayAgentResponse(
+      [
+        "warning: stale config entry ignored",
+        JSON.stringify({
+          runId: "run-2",
+          status: "ok",
+          result: {
+            payloads: [{ text: "Roadmap draft ready." }],
+          },
+        }),
+      ].join("\n"),
+    );
+
+    expect(parsed?.assistantText).toBe("Roadmap draft ready.");
   });
 });
 

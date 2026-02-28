@@ -116,6 +116,7 @@ export function OnboardChatPage(): ReactElement {
       userText: string;
       agentText: string;
       appendUserMessage?: boolean;
+      retryOnTransientAbort?: boolean;
     }): Promise<void> => {
       setError(null);
       setRuntimeStatusLine(null);
@@ -129,91 +130,102 @@ export function OnboardChatPage(): ReactElement {
         });
       }
 
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
       stopRequestedRef.current = false;
-      let streamTimedOut = false;
-      streamTimeoutRef.current = window.setTimeout(() => {
-        streamTimedOut = true;
-        if (!abortController.signal.aborted) {
-          abortController.abort();
-        }
-      }, 180000);
+      const maxAttempts = input.retryOnTransientAbort ? 2 : 1;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
+        let streamTimedOut = false;
+        streamTimeoutRef.current = window.setTimeout(() => {
+          streamTimedOut = true;
+          if (!abortController.signal.aborted) {
+            abortController.abort();
+          }
+        }, 180000);
 
-      try {
-        const sessionInfo = await ensureSession();
-        const response = await sendSessionMessageStream(
-          {
-            agentId: sessionInfo.agentId,
-            sessionRef: sessionInfo.sessionRef,
-            message: input.agentText,
-          },
-          {
-            signal: abortController.signal,
-            onEvent: (event) => {
-              if (event.type === "progress") {
-                const trimmed = event.message.trim();
-                if (trimmed) {
-                  setRuntimeStatusLine(trimmed);
-                }
-              }
+        try {
+          const sessionInfo = await ensureSession();
+          const response = await sendSessionMessageStream(
+            {
+              agentId: sessionInfo.agentId,
+              sessionRef: sessionInfo.sessionRef,
+              message: input.agentText,
             },
-          },
-        );
-
-        const assistantOutput = response.output.trim();
-        if (response.result.code !== 0) {
-          setError(
-            normalizeRunError(
-              assistantOutput ||
-                response.result.stderr.trim() ||
-                `Goat completed with code ${response.result.code}.`,
-            ),
+            {
+              signal: abortController.signal,
+              onEvent: (event) => {
+                if (event.type === "progress") {
+                  const trimmed = event.message.trim();
+                  if (trimmed) {
+                    setRuntimeStatusLine(trimmed);
+                  }
+                }
+              },
+            },
           );
-          setChatStatus("error");
-          return;
-        }
 
-        appendMessage({
-          id: createMessageId("assistant"),
-          role: "assistant",
-          content: assistantOutput || "Goat returned no output.",
-        });
-        setChatStatus("ready");
-      } catch (requestError) {
-        if (isAbortError(requestError)) {
-          if (streamTimedOut) {
+          const assistantOutput = response.output.trim();
+          if (response.result.code !== 0) {
             setError(
-              "Goat is taking longer than expected. Please retry, or run `openclaw onboard` and try again.",
+              normalizeRunError(
+                assistantOutput ||
+                  response.result.stderr.trim() ||
+                  `Goat completed with code ${response.result.code}.`,
+              ),
             );
             setChatStatus("error");
             return;
           }
-          if (stopRequestedRef.current) {
-            setChatStatus("ready");
+
+          appendMessage({
+            id: createMessageId("assistant"),
+            role: "assistant",
+            content: assistantOutput || "Goat returned no output.",
+          });
+          setChatStatus("ready");
+          return;
+        } catch (requestError) {
+          if (isAbortError(requestError)) {
+            if (streamTimedOut) {
+              setError(
+                "Goat is taking longer than expected. Please retry, or run `openclaw onboard` and try again.",
+              );
+              setChatStatus("error");
+              return;
+            }
+            if (stopRequestedRef.current) {
+              setChatStatus("ready");
+              return;
+            }
+            if (attempt < maxAttempts) {
+              setRuntimeStatusLine(
+                "Connection interrupted. Retrying roadmap generation...",
+              );
+              continue;
+            }
+            setError(
+              "Connection to Goat was interrupted. Please retry roadmap generation.",
+            );
+            setChatStatus("error");
             return;
           }
-          setError(
-            "Connection to Goat was interrupted. Please retry roadmap generation.",
-          );
+
+          const message =
+            requestError instanceof Error
+              ? requestError.message
+              : "Unable to send message to Goat.";
+          setError(normalizeRunError(message));
           setChatStatus("error");
           return;
-        }
-
-        const message =
-          requestError instanceof Error
-            ? requestError.message
-            : "Unable to send message to Goat.";
-        setError(normalizeRunError(message));
-        setChatStatus("error");
-      } finally {
-        if (abortControllerRef.current === abortController) {
-          abortControllerRef.current = null;
-        }
-        const timeoutHandle = streamTimeoutRef.current;
-        if (timeoutHandle !== null) {
-          window.clearTimeout(timeoutHandle);
-          streamTimeoutRef.current = null;
+        } finally {
+          if (abortControllerRef.current === abortController) {
+            abortControllerRef.current = null;
+          }
+          const timeoutHandle = streamTimeoutRef.current;
+          if (timeoutHandle !== null) {
+            window.clearTimeout(timeoutHandle);
+            streamTimeoutRef.current = null;
+          }
         }
       }
     },
@@ -251,6 +263,7 @@ export function OnboardChatPage(): ReactElement {
       userText: onboardingSummary,
       agentText: buildInitialRoadmapPrompt(payload),
       appendUserMessage: !hasSummaryUserMessage,
+      retryOnTransientAbort: true,
     });
     setInitializing(false);
   }, [payload, runAssistantTurn]);

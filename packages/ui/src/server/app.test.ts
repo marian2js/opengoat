@@ -2448,6 +2448,60 @@ describe("OpenGoat UI server API", () => {
     expect(aliasResponse.statusCode).toBe(200);
   });
 
+  it("extracts structured assistant payload text from session message output", async () => {
+    const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(
+      async () => {
+        return {
+          code: 0,
+          stdout: [
+            "warning: stale config entry ignored",
+            JSON.stringify({
+              runId: "run-1",
+              status: "ok",
+              result: {
+                payloads: [
+                  {
+                    text: "## Proposed Roadmap\nDay 1: validate scope.",
+                  },
+                  {
+                    text: "### Confirmation\nIs this roadmap okay?",
+                  },
+                ],
+              },
+            }),
+          ].join("\n"),
+          stderr: "",
+          providerId: "openclaw",
+        };
+      },
+    );
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        runAgent,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message",
+      payload: {
+        agentId: "goat",
+        sessionRef: "workspace:tmp",
+        message: "hello",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      output:
+        "## Proposed Roadmap\nDay 1: validate scope.\n\n### Confirmation\nIs this roadmap okay?",
+    });
+  });
+
   it("logs incoming session message previews to the logs stream", async () => {
     const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(async () => {
       return {
@@ -2694,6 +2748,59 @@ describe("OpenGoat UI server API", () => {
         onStderr: expect.any(Function),
       }),
     );
+  });
+
+  it("streams extracted assistant payload text when runtime returns gateway json envelope", async () => {
+    const runAgent = vi.fn<NonNullable<OpenClawUiService["runAgent"]>>(
+      async (_agentId, options) => {
+        options.hooks?.onEvent?.({
+          stage: "run_started",
+          timestamp: "2026-02-13T00:00:00.000Z",
+          runId: "run-structured",
+          agentId: "goat",
+        });
+        return {
+          code: 0,
+          stdout: JSON.stringify({
+            runId: "run-structured",
+            status: "ok",
+            result: {
+              payloads: [{ text: "Roadmap draft ready." }],
+            },
+          }),
+          stderr: "",
+          providerId: "openclaw",
+        };
+      },
+    );
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        runAgent,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/sessions/message/stream",
+      payload: {
+        agentId: "goat",
+        sessionRef: "workspace:tmp",
+        message: "hello",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const events = response.body
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { type: string; output?: string });
+    const resultEvent = events.find((event) => event.type === "result");
+    expect(resultEvent?.output).toBe("Roadmap draft ready.");
   });
 
   it("does not poll OpenClaw runtime logs for non-OpenClaw providers", async () => {
