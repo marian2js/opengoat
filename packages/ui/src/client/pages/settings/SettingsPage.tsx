@@ -98,8 +98,8 @@ export function SettingsPage({
     <section className="mx-auto w-full max-w-3xl space-y-6">
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">
-          Control automation runtime, task delegation strategy rules, and UI
-          access controls.
+          Control automation runtime, task creation rules, and UI access
+          controls.
         </p>
       </div>
 
@@ -242,14 +242,15 @@ export function SettingsPage({
         <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
           <div className="space-y-1">
             <h2 className="text-sm font-semibold text-foreground">
-              Task Delegation Strategy
+              Task Backlog Refill
             </h2>
             <p className="text-xs text-muted-foreground">
-              This section defines how OpenGoat decides what tasks to create
-              for agents to work on.
+              Keep delivery flowing by letting your Product Manager create and
+              delegate follow-up work when open tasks run low.
             </p>
             <p className="text-xs text-muted-foreground">
-              Top-Down is the only delegation strategy available.
+              Set a trigger threshold so task creation starts before the team
+              runs out of work.
             </p>
           </div>
         </div>
@@ -262,14 +263,30 @@ export function SettingsPage({
             !taskCronEnabledInput && "opacity-60",
           )}
         >
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+            <h3 className="text-sm font-medium text-foreground">How It Works</h3>
+            <ol className="mt-2 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+              <li className="rounded-md border border-border/50 bg-background/60 px-3 py-2">
+                Background checks monitor how many tasks are currently open.
+              </li>
+              <li className="rounded-md border border-border/50 bg-background/60 px-3 py-2">
+                When open tasks are at or below your threshold, the trigger
+                fires.
+              </li>
+              <li className="rounded-md border border-border/50 bg-background/60 px-3 py-2">
+                Your Product Manager creates and delegates the next tasks.
+              </li>
+            </ol>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border/60 bg-background/60 px-4 py-3">
             <div className="space-y-1">
               <h3 className="text-sm font-semibold text-foreground">
-                Top-Down Task Delegation (Default)
+                Automatic Task Refill
               </h3>
               <p className="text-xs text-muted-foreground">
-                When open tasks are low, the Goat is asked to define the next
-                highest-impact work and delegate it through the organization.
+                Enable this to let your Product Manager generate and assign new
+                tasks whenever open work drops below your trigger.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -277,7 +294,7 @@ export function SettingsPage({
                 checked={topDownTaskDelegationEnabledInput}
                 disabled={!taskCronEnabledInput || isMutating || isLoading}
                 onCheckedChange={onTopDownTaskDelegationEnabledChange}
-                aria-label="Toggle top-down task delegation"
+                aria-label="Toggle automatic task refill"
               />
               <span
                 className={cn(
@@ -300,7 +317,7 @@ export function SettingsPage({
                 className="text-sm font-medium text-foreground"
                 htmlFor="topDownOpenTasksThreshold"
               >
-                Open Task Threshold
+                Open Task Trigger Threshold
               </label>
               <div className="flex max-w-sm items-center gap-3">
                 <Input
@@ -315,16 +332,18 @@ export function SettingsPage({
                     onTopDownOpenTasksThresholdInputChange(event.target.value);
                   }}
                 />
-                <span className="text-sm text-muted-foreground">open tasks</span>
+                <span className="text-sm text-muted-foreground">
+                  open tasks or fewer
+                </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Goat receives a strategy prompt when open tasks are at or below
-                this threshold.
+                When the number of open tasks reaches this value, your Product
+                Manager creates and delegates new tasks.
               </p>
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Top-Down task delegation is paused.
+              Automatic task refill is paused.
             </p>
           )}
         </div>
@@ -506,11 +525,11 @@ export function SettingsPage({
           <span className="font-medium text-foreground">
             {ceoBootstrapPending
               ? "Waiting for first Goat message to start checks"
-              : !taskCronEnabledInput
-                ? "Background checks paused"
-                : topDownTaskDelegationEnabledInput
-                  ? "Background checks active (Top-Down)"
-                  : "Background checks active (task delegation strategy paused)"}
+                : !taskCronEnabledInput
+                  ? "Background checks paused"
+                  : topDownTaskDelegationEnabledInput
+                  ? "Background checks active (task refill on)"
+                  : "Background checks active (task refill paused)"}
           </span>
         </p>
         <div className="flex items-center gap-2">

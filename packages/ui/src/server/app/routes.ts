@@ -666,7 +666,7 @@ export function registerApiRoutes(
         settings: toPublicUiServerSettings(nextSettings, nextAuthResponse, {
           ceoBootstrapPending,
         }),
-        message: `Task automation checks ${taskAutomationMessage} (runs every ${DEFAULT_TASK_CHECK_FREQUENCY_MINUTES} minute(s)). Top-Down task delegation ${
+        message: `Task automation checks ${taskAutomationMessage} (runs every ${DEFAULT_TASK_CHECK_FREQUENCY_MINUTES} minute(s)). Product Manager task refill ${
           topDownStrategy.enabled
             ? "enabled"
             : "disabled"
