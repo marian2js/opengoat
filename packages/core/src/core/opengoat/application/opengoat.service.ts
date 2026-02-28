@@ -1900,6 +1900,31 @@ export class OpenGoatService {
     );
 
     const env = await this.resolveOpenClawEnv(paths);
+    const hasExplicitOpenClawConfigPath =
+      typeof env.OPENCLAW_CONFIG_PATH === "string" &&
+      env.OPENCLAW_CONFIG_PATH.trim().length > 0;
+    const hasExplicitOpenClawStateDir =
+      typeof env.OPENCLAW_STATE_DIR === "string" &&
+      env.OPENCLAW_STATE_DIR.trim().length > 0;
+    const defaultOpenGoatHome = path.join(homedir(), ".opengoat");
+    const usingDefaultOpenGoatHome = pathMatches(
+      paths.homeDir,
+      defaultOpenGoatHome,
+    );
+    if (
+      !usingDefaultOpenGoatHome &&
+      !hasExplicitOpenClawConfigPath &&
+      !hasExplicitOpenClawStateDir
+    ) {
+      warnings.push(
+        "OpenClaw managed plugin config sync skipped because OPENGOAT_HOME is overridden without OPENCLAW_CONFIG_PATH/OPENCLAW_STATE_DIR.",
+      );
+      return {
+        configChanged: false,
+        warnings,
+      };
+    }
+
     const openClawConfigPath = resolveOpenClawConfigPath(env);
     const configDir = path.dirname(openClawConfigPath);
     await this.fileSystem.ensureDir(configDir);
