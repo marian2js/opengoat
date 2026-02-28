@@ -7,6 +7,7 @@ import { useMemo, useState, type ReactElement } from "react";
 import opengoatLogo from "../../../../../../assets/opengoat.png";
 import {
   clearOnboardingChatState,
+  loadOnboardingPayload,
   saveOnboardingPayload,
   type BuildMode,
   type OnboardingPayload,
@@ -15,12 +16,25 @@ import {
 type BuildModeSelection = BuildMode | null;
 
 export function OnboardPage(): ReactElement {
-  const [projectSummary, setProjectSummary] = useState("");
-  const [buildMode, setBuildMode] = useState<BuildModeSelection>(null);
-  const [githubRepoUrl, setGithubRepoUrl] = useState("");
-  const [sevenDayGoal, setSevenDayGoal] = useState("");
-  const [appName, setAppName] = useState("");
-  const [mvpFeature, setMvpFeature] = useState("");
+  const initialPayload = useMemo(() => loadOnboardingPayload(), []);
+  const initialBuildMode: BuildModeSelection =
+    initialPayload?.buildMode === "new" || initialPayload?.buildMode === "existing"
+      ? initialPayload.buildMode
+      : null;
+  const [projectSummary, setProjectSummary] = useState(
+    initialPayload?.projectSummary ?? "",
+  );
+  const [buildMode, setBuildMode] = useState<BuildModeSelection>(initialBuildMode);
+  const [githubRepoUrl, setGithubRepoUrl] = useState(
+    initialPayload?.githubRepoUrl ?? "",
+  );
+  const [sevenDayGoal, setSevenDayGoal] = useState(
+    initialPayload?.sevenDayGoal ?? "",
+  );
+  const [appName, setAppName] = useState(initialPayload?.appName ?? "");
+  const [mvpFeature, setMvpFeature] = useState(
+    initialPayload?.mvpFeature ?? "",
+  );
 
   const stepOneComplete = projectSummary.trim().length > 0;
   const stepTwoComplete = buildMode !== null;
