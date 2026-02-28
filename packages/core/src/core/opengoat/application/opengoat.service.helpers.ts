@@ -449,7 +449,7 @@ export function buildTopDownTaskDelegationMessage(params: {
   openTasksCount: number;
   totalAgents: number;
   managerAgents: number;
-  ceoDirectReportees: number;
+  sageDirectReportees: number;
   openTasks: Array<{
     taskId: string;
     title: string;
@@ -480,16 +480,16 @@ export function buildTopDownTaskDelegationMessage(params: {
     ...(notificationTimestamp
       ? [`Notification timestamp: ${notificationTimestamp}`]
       : []),
-    `Organization context: ${params.totalAgents} total agents, ${params.managerAgents} managers, ${params.ceoDirectReportees} direct Goat reportees.`,
+    `Organization context: ${params.totalAgents} total agents, ${params.managerAgents} managers, ${params.sageDirectReportees} direct Sage reportees.`,
     `Open task status distribution: ${statusSummary}.`,
     "",
-    "Goat guidance for creating next tasks:",
-    "1. Review current project status and near-term objectives before creating work.",
-    "2. Keep decisions aligned with MISSION, VISION, and STRATEGY.",
-    "3. Prioritize high-value, low-effort tasks when possible.",
-    "4. Match task size to organization capacity: larger teams can absorb broader scopes, smaller teams need tighter scopes.",
-    "5. Delegate realistically to reportees; tag reportees who should decompose work and pass it down.",
-    "6. Balance long-term direction with short-term deliverables that can be completed now.",
+    "Sage playbook for top-down delegation:",
+    "1. Review organization/ROADMAP.md and identify the active initiative.",
+    "2. If the active initiative is complete, mark it completed in the roadmap and move to the next initiative.",
+    "3. Break the active initiative into the next practical tasks for your reportees.",
+    "4. For each created task, include a concise PRD that defines outcomes and requirements (what we need), not implementation details (how to do it).",
+    "5. Delegate tasks to the right reportees and keep scope realistic for current capacity.",
+    "6. Keep decisions aligned with MISSION, VISION, and STRATEGY.",
     "",
     "Open tasks snapshot:",
     ...(openTasksPreview.length === 0
@@ -502,7 +502,7 @@ export function buildTopDownTaskDelegationMessage(params: {
       ? [`- ...and ${params.openTasks.length - openTasksPreview.length} more`]
       : []),
     "",
-    "Create and assign the next set of practical, high-impact tasks now.",
+    "Create and assign the next set of initiative-aligned tasks now.",
   ];
 
   return lines.join("\n");

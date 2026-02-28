@@ -18,6 +18,16 @@ const DEFAULT_PRODUCT_MANAGER_AGENT: AgentIdentity = {
   id: "sage",
   displayName: "Sage",
 };
+const DEFAULT_PRODUCT_MANAGER_ROLE = "Product Manager";
+const DEFAULT_PRODUCT_MANAGER_TYPE = "manager";
+
+interface AgentConfigShape {
+  role?: unknown;
+  organization?: {
+    type?: unknown;
+    reportsTo?: unknown;
+  };
+}
 
 interface BootstrapServiceDeps {
   fileSystem: FileSystemPort;
@@ -101,11 +111,13 @@ export class BootstrapService {
       paths,
       DEFAULT_PRODUCT_MANAGER_AGENT,
       {
-        type: "individual",
+        type: DEFAULT_PRODUCT_MANAGER_TYPE,
         reportsTo: DEFAULT_AGENT_ID,
-        role: "Product Manager",
+        role: DEFAULT_PRODUCT_MANAGER_ROLE,
       },
     );
+    const productManagerConfigRepairResult =
+      await this.repairProductManagerAgentConfig(paths);
     const productManagerWorkspaceBootstrapResult =
       productManagerResult.alreadyExisted
         ? {
@@ -118,12 +130,17 @@ export class BootstrapService {
             {
               agentId: DEFAULT_PRODUCT_MANAGER_AGENT.id,
               displayName: DEFAULT_PRODUCT_MANAGER_AGENT.displayName,
-              role: "Product Manager",
+              role: DEFAULT_PRODUCT_MANAGER_ROLE,
             },
             {
               syncBootstrapMarkdown: false,
             },
           );
+    const productManagerRoleSkillSync =
+      await this.agentService.ensureAgentWorkspaceRoleSkills(
+        paths,
+        DEFAULT_PRODUCT_MANAGER_AGENT.id,
+      );
     const workspaceReporteesSync =
       await this.agentService.syncWorkspaceReporteeLinks(paths);
 
@@ -134,9 +151,14 @@ export class BootstrapService {
     skippedPaths.push(...goatWorkspaceBootstrapResult.removedPaths);
     createdPaths.push(...productManagerResult.createdPaths);
     skippedPaths.push(...productManagerResult.skippedPaths);
+    createdPaths.push(...productManagerConfigRepairResult.updatedPaths);
+    skippedPaths.push(...productManagerConfigRepairResult.skippedPaths);
     createdPaths.push(...productManagerWorkspaceBootstrapResult.createdPaths);
     skippedPaths.push(...productManagerWorkspaceBootstrapResult.skippedPaths);
     skippedPaths.push(...productManagerWorkspaceBootstrapResult.removedPaths);
+    createdPaths.push(...productManagerRoleSkillSync.createdPaths);
+    skippedPaths.push(...productManagerRoleSkillSync.skippedPaths);
+    skippedPaths.push(...productManagerRoleSkillSync.removedPaths);
     createdPaths.push(...workspaceReporteesSync.createdPaths);
     skippedPaths.push(...workspaceReporteesSync.skippedPaths);
     skippedPaths.push(...workspaceReporteesSync.removedPaths);
@@ -289,6 +311,64 @@ export class BootstrapService {
       await this.fileSystem.writeFile(filePath, markdown);
       createdPaths.push(filePath);
     }
+  }
+
+  private async repairProductManagerAgentConfig(paths: {
+    agentsDir: string;
+  }): Promise<{ updatedPaths: string[]; skippedPaths: string[] }> {
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      DEFAULT_PRODUCT_MANAGER_AGENT.id,
+      "config.json",
+    );
+    const config = await this.readJsonIfPresent<AgentConfigShape>(configPath);
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      return {
+        updatedPaths: [],
+        skippedPaths: [configPath],
+      };
+    }
+
+    const organization =
+      config.organization && typeof config.organization === "object"
+        ? config.organization
+        : {};
+    const currentType =
+      typeof organization.type === "string" ? organization.type.trim() : "";
+    const currentReportsTo =
+      typeof organization.reportsTo === "string"
+        ? normalizeAgentId(organization.reportsTo)
+        : null;
+    const currentRole =
+      typeof config.role === "string" ? config.role.trim() : "";
+    const requiresUpdate =
+      currentType !== DEFAULT_PRODUCT_MANAGER_TYPE ||
+      currentReportsTo !== DEFAULT_AGENT_ID ||
+      !currentRole;
+    if (!requiresUpdate) {
+      return {
+        updatedPaths: [],
+        skippedPaths: [configPath],
+      };
+    }
+
+    const nextConfig: AgentConfigShape = {
+      ...config,
+      role: currentRole || DEFAULT_PRODUCT_MANAGER_ROLE,
+      organization: {
+        ...organization,
+        type: DEFAULT_PRODUCT_MANAGER_TYPE,
+        reportsTo: DEFAULT_AGENT_ID,
+      },
+    };
+    await this.fileSystem.writeFile(
+      configPath,
+      `${JSON.stringify(nextConfig, null, 2)}\n`,
+    );
+    return {
+      updatedPaths: [configPath],
+      skippedPaths: [],
+    };
   }
 
   private async readJsonIfPresent<T>(filePath: string): Promise<T | null> {

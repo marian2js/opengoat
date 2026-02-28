@@ -80,13 +80,13 @@ describe("opengoat task cron notification helpers", () => {
     });
   });
 
-  it("builds a concise top-down task delegation message for the goat", () => {
+  it("builds a concise top-down task delegation message for Sage", () => {
     const message = buildTopDownTaskDelegationMessage({
       openTasksThreshold: 5,
       openTasksCount: 2,
       totalAgents: 4,
       managerAgents: 2,
-      ceoDirectReportees: 2,
+      sageDirectReportees: 2,
       openTasks: [
         {
           taskId: "task-1",
@@ -106,8 +106,10 @@ describe("opengoat task cron notification helpers", () => {
 
     expect(message).toContain("Top-Down threshold (5)");
     expect(message).toContain("Organization context: 4 total agents");
-    expect(message).toContain("high-value, low-effort");
-    expect(message).toContain("decompose work and pass it down");
+    expect(message).toContain("Sage playbook for top-down delegation");
+    expect(message).toContain("organization/ROADMAP.md");
+    expect(message).toContain("what we need");
+    expect(message).toContain("not implementation details");
     expect(message).toContain("task-1 [todo] @cto");
     expect(message).toContain("Notification timestamp: 2026-02-16T16:30:00.000Z");
   });
