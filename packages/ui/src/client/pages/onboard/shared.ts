@@ -7,6 +7,7 @@ export interface OnboardingPayload {
   sevenDayGoal: string;
   appName: string;
   mvpFeature: string;
+  executionProviderId?: string;
 }
 
 export interface OnboardingSessionInfo {
@@ -112,7 +113,18 @@ export function loadOnboardingPayload(): OnboardingPayload | null {
     if (!parsed || typeof parsed.projectSummary !== "string") {
       return null;
     }
-    return parsed;
+    const executionProviderId =
+      typeof parsed.executionProviderId === "string"
+        ? parsed.executionProviderId.trim().toLowerCase()
+        : "";
+    return {
+      ...parsed,
+      ...(executionProviderId
+        ? {
+            executionProviderId,
+          }
+        : {}),
+    };
   } catch {
     return null;
   }
@@ -175,6 +187,9 @@ export function buildOnboardingSummaryForUser(
     input.buildMode === "existing"
       ? `Repository: ${input.githubRepoUrl}`
       : `New app: ${input.appName}`,
+    input.executionProviderId
+      ? `Execution agent: ${input.executionProviderId}`
+      : "",
     ``,
     input.buildMode === "existing"
       ? `Short-term focus: ${input.sevenDayGoal}`
@@ -205,6 +220,9 @@ export function buildInitialRoadmapPrompt(input: OnboardingPayload): string {
     `Read organization/ROADMAP.md file and update it based on this data:`,
     ``,
     `- Product summary: ${input.projectSummary}`,
+    input.executionProviderId
+      ? `- Preferred code execution provider: ${input.executionProviderId}`
+      : "",
     modeDetails,
     ``,
     `Rules for the roadmap:`,

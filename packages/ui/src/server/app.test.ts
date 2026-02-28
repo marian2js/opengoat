@@ -252,6 +252,83 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("lists execution-agent provider options for onboarding connect", async () => {
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService(),
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/openclaw/execution-agents",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      executionAgents: expect.arrayContaining([
+        expect.objectContaining({
+          id: "claude-code",
+          displayName: "Claude Code",
+        }),
+        expect.objectContaining({
+          id: "codex",
+          displayName: "Codex",
+        }),
+      ]),
+    });
+    const payload = response.json() as {
+      executionAgents: Array<{ id: string }>;
+    };
+    expect(payload.executionAgents.some((agent) => agent.id === "openclaw")).toBe(
+      false,
+    );
+  });
+
+  it("returns execution-agent readiness details for a selected provider", async () => {
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService(),
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/openclaw/execution-agents/codex/readiness",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      readiness: {
+        id: "codex",
+        displayName: "Codex",
+        commandCandidates: ["codex"],
+      },
+    });
+    const payload = response.json() as {
+      readiness: { installed: unknown };
+    };
+    expect(typeof payload.readiness.installed).toBe("boolean");
+  });
+
+  it("returns 404 when selected execution agent provider is unknown", async () => {
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService(),
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/openclaw/execution-agents/unknown/readiness",
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({
+      error: 'Execution agent "unknown" is not available.',
+    });
+  });
+
   it("returns a logs snapshot through the stream api", async () => {
     activeServer = await createOpenGoatUiServer({
       logger: false,

@@ -22,6 +22,10 @@ import {
 } from "./runtime-logs.js";
 import { resolveOpenClawOnboardingGatewayStatus } from "./openclaw-onboarding.js";
 import {
+  resolveExecutionAgentOptions,
+  resolveExecutionAgentReadiness,
+} from "./execution-agents.js";
+import {
   isCeoBootstrapPending,
   parseBooleanSetting,
   parseMaxInProgressMinutes,
@@ -773,6 +777,48 @@ export function registerApiRoutes(
       };
     });
   });
+
+  app.get("/api/openclaw/execution-agents", async (_request, reply) => {
+    return safeReply(reply, async () => {
+      const providers = await resolveUiProviders(service);
+      return {
+        executionAgents: resolveExecutionAgentOptions(providers),
+      };
+    });
+  });
+
+  app.get<{ Params: { providerId: string } }>(
+    "/api/openclaw/execution-agents/:providerId/readiness",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const providerId = request.params.providerId.trim().toLowerCase();
+        if (!providerId) {
+          reply.code(400);
+          return {
+            error: "providerId is required.",
+          };
+        }
+
+        const providers = await resolveUiProviders(service);
+        const executionAgents = resolveExecutionAgentOptions(providers);
+        const selectedExecutionAgent = executionAgents.find(
+          (agent) => agent.id === providerId,
+        );
+        if (!selectedExecutionAgent) {
+          reply.code(404);
+          return {
+            error: `Execution agent "${providerId}" is not available.`,
+          };
+        }
+
+        const readiness =
+          await resolveExecutionAgentReadiness(selectedExecutionAgent);
+        return {
+          readiness,
+        };
+      });
+    },
+  );
 
   app.get("/api/agents", async (_request, reply) => {
     return safeReply(reply, async () => {
