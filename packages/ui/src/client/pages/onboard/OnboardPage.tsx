@@ -62,7 +62,7 @@ export function OnboardPage(): ReactElement {
     };
     saveOnboardingPayload(payload);
     clearOnboardingChatState();
-    window.location.assign("/onboard/chat");
+    window.location.assign("/onboard/connect");
   }
 
   return (
@@ -237,7 +237,7 @@ export function OnboardPage(): ReactElement {
               disabled={!canContinue}
               onClick={handleStartRoadmapChat}
             >
-              Generate roadmap with Goat
+              Continue setup
               <ArrowRight className="size-4" />
             </Button>
           </div>
