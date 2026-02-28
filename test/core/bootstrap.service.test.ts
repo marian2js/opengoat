@@ -56,6 +56,16 @@ describe("BootstrapService", () => {
       await readFile(path.join(paths.agentsDir, "goat", "config.json"), "utf-8"),
     ) as { runtime?: { provider?: { id?: string } } };
     expect(ceoConfig.runtime?.provider?.id).toBe("openclaw");
+    const sageConfig = JSON.parse(
+      await readFile(path.join(paths.agentsDir, "sage", "config.json"), "utf-8"),
+    ) as {
+      role?: string;
+      organization?: { reportsTo?: string | null };
+      runtime?: { provider?: { id?: string } };
+    };
+    expect(sageConfig.role).toBe("Product Manager");
+    expect(sageConfig.organization?.reportsTo).toBe("goat");
+    expect(sageConfig.runtime?.provider?.id).toBe("openclaw");
 
     expect(
       await fileSystem.exists(
@@ -64,6 +74,9 @@ describe("BootstrapService", () => {
     ).toBe(false);
     expect(
       await fileSystem.exists(path.join(paths.workspacesDir, "goat", "ROLE.md")),
+    ).toBe(true);
+    expect(
+      await fileSystem.exists(path.join(paths.workspacesDir, "sage", "ROLE.md")),
     ).toBe(true);
     expect(
       await fileSystem.exists(
@@ -215,7 +228,7 @@ describe("BootstrapService", () => {
     expect(config.defaultAgent).toBe("goat");
   });
 
-  it("ensures agents index always includes goat", async () => {
+  it("ensures agents index always includes goat and sage", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     await fileSystem.ensureDir(paths.homeDir);
@@ -241,7 +254,7 @@ describe("BootstrapService", () => {
     ) as {
       agents: string[];
     };
-    expect(index.agents).toEqual(["goat", "research"]);
+    expect(index.agents).toEqual(["goat", "research", "sage"]);
   });
 });
 
