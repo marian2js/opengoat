@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  listAgentWorkspaceTemplates,
   listOrganizationMarkdownTemplates,
   renderAgentsIndex,
   renderGlobalConfig,
@@ -58,5 +59,22 @@ describe("default templates", () => {
       expect(template.fileName.toLowerCase().endsWith(".md")).toBe(true);
       expect(template.content.length).toBeGreaterThan(0);
     }
+  });
+
+  it("discovers agent workspace templates from assets/agents/<agent-id>", () => {
+    const goatTemplates = listAgentWorkspaceTemplates("goat");
+    const sageTemplates = listAgentWorkspaceTemplates("sage");
+    const missingTemplates = listAgentWorkspaceTemplates("unknown-agent");
+
+    expect(goatTemplates.some((template) => template.fileName === "ROLE.md")).toBe(
+      true,
+    );
+    expect(
+      goatTemplates.some((template) => template.fileName === "BOOTSTRAP.md"),
+    ).toBe(true);
+    expect(sageTemplates.some((template) => template.fileName === "ROLE.md")).toBe(
+      true,
+    );
+    expect(missingTemplates).toEqual([]);
   });
 });

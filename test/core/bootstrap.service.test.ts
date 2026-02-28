@@ -79,6 +79,11 @@ describe("BootstrapService", () => {
     expect(
       await fileSystem.exists(path.join(paths.workspacesDir, "sage", "ROLE.md")),
     ).toBe(true);
+    const sageRoleMarkdown = await readFile(
+      path.join(paths.workspacesDir, "sage", "ROLE.md"),
+      "utf-8",
+    );
+    expect(sageRoleMarkdown).toContain("You are Sage, the Product Manager");
     expect(
       await fileSystem.exists(
         path.join(paths.workspacesDir, "goat", "reportees"),

@@ -172,6 +172,22 @@ describe("AgentService", () => {
     ).toBe(false);
   });
 
+  it("syncs workspace template assets without overwriting existing files", async () => {
+    const { service, paths, fileSystem } = await createAgentServiceWithPaths();
+    await service.ensureAgent(paths, { id: "sage", displayName: "Sage" });
+
+    const workspaceDir = path.join(paths.workspacesDir, "sage");
+    const rolePath = path.join(workspaceDir, "ROLE.md");
+    await fileSystem.ensureDir(workspaceDir);
+    await writeFile(rolePath, "# custom role\n", "utf-8");
+
+    const sync = await service.syncAgentWorkspaceTemplateAssets(paths, "sage");
+    const roleMarkdown = await readFile(rolePath, "utf-8");
+
+    expect(sync.createdPaths).toEqual([]);
+    expect(roleMarkdown).toBe("# custom role\n");
+  });
+
   it("keeps Goat First Run, replaces Every Session, preserves SOUL.md, and writes ROLE/BOOTSTRAP", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });

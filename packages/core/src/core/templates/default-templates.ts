@@ -17,6 +17,11 @@ export interface OrganizationMarkdownTemplate {
   content: string;
 }
 
+export interface AgentWorkspaceTemplate {
+  fileName: string;
+  content: string;
+}
+
 const ROLE_SKILLS: Record<"manager" | "individual", string[]> = {
   manager: [],
   individual: [],
@@ -43,11 +48,11 @@ export function renderAgentsIndex(
 }
 
 export function renderCeoRoleMarkdown(): string {
-  return readMarkdownTemplate("goat/ROLE.md");
+  return readTemplateContent("agents/goat/ROLE.md");
 }
 
 export function renderCeoBootstrapMarkdown(): string {
-  return readMarkdownTemplate("goat/BOOTSTRAP.md");
+  return readTemplateContent("agents/goat/BOOTSTRAP.md");
 }
 
 export function renderBoardsSkillMarkdown(
@@ -62,11 +67,37 @@ export function renderBoardsSkillMarkdown(
       : normalizedSkillId === "og-board-individual"
         ? "skills/og-board-individual/SKILL.md"
         : "skills/og-boards/SKILL.md";
-  return readMarkdownTemplate(templatePath).replaceAll("<me>", resolvedAgentId);
+  return readTemplateContent(templatePath).replaceAll("<me>", resolvedAgentId);
 }
 
 export function listOrganizationMarkdownTemplates(): OrganizationMarkdownTemplate[] {
   return discoverOrganizationMarkdownTemplates();
+}
+
+export function listAgentWorkspaceTemplates(
+  rawAgentId: string,
+): AgentWorkspaceTemplate[] {
+  const agentId = normalizeAgentId(rawAgentId);
+  if (!agentId) {
+    return [];
+  }
+
+  let fileNames: string[];
+  try {
+    fileNames = listTemplateFileNames(
+      new URL(`./assets/agents/${agentId}/`, import.meta.url),
+    );
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return [];
+    }
+    throw error;
+  }
+
+  return fileNames.map((fileName) => ({
+    fileName,
+    content: readTemplateContent(`agents/${agentId}/${fileName}`),
+  }));
 }
 
 export function renderInternalAgentConfig(
@@ -166,10 +197,10 @@ function dedupe(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
-const markdownTemplateCache = new Map<string, string>();
+const templateContentCache = new Map<string, string>();
 
-function readMarkdownTemplate(relativePath: string): string {
-  const cached = markdownTemplateCache.get(relativePath);
+function readTemplateContent(relativePath: string): string {
+  const cached = templateContentCache.get(relativePath);
   if (cached) {
     return cached;
   }
@@ -180,14 +211,14 @@ function readMarkdownTemplate(relativePath: string): string {
   )
     .replace(/\r\n/g, "\n")
     .trimEnd();
-  markdownTemplateCache.set(relativePath, content);
+  templateContentCache.set(relativePath, content);
   return content;
 }
 
 function discoverOrganizationMarkdownTemplates(): OrganizationMarkdownTemplate[] {
   let fileNames: string[];
   try {
-    fileNames = listOrganizationMarkdownFileNames(
+    fileNames = listTemplateFileNames(
       new URL("./assets/organization/", import.meta.url),
     );
   } catch (error) {
@@ -197,17 +228,19 @@ function discoverOrganizationMarkdownTemplates(): OrganizationMarkdownTemplate[]
     throw error;
   }
 
-  return fileNames.map((fileName) => ({
-    fileName,
-    content: readOrganizationMarkdownTemplate(fileName),
-  }));
+  return fileNames
+    .filter((fileName) => isMarkdownFile(fileName))
+    .map((fileName) => ({
+      fileName,
+      content: readTemplateContent(`organization/${fileName}`),
+    }));
 }
 
 function isMarkdownFile(fileName: string): boolean {
   return fileName.toLowerCase().endsWith(".md");
 }
 
-function listOrganizationMarkdownFileNames(
+function listTemplateFileNames(
   directory: URL,
   relativePrefix = "",
 ): string[] {
@@ -219,7 +252,7 @@ function listOrganizationMarkdownFileNames(
   for (const entry of entries) {
     if (entry.isDirectory()) {
       fileNames.push(
-        ...listOrganizationMarkdownFileNames(
+        ...listTemplateFileNames(
           new URL(`${entry.name}/`, directory),
           `${relativePrefix}${entry.name}/`,
         ),
@@ -227,7 +260,7 @@ function listOrganizationMarkdownFileNames(
       continue;
     }
 
-    if (entry.isFile() && isMarkdownFile(entry.name)) {
+    if (entry.isFile()) {
       fileNames.push(`${relativePrefix}${entry.name}`);
     }
   }
@@ -241,13 +274,4 @@ function isNotFoundError(error: unknown): error is NodeJS.ErrnoException {
   }
 
   return (error as NodeJS.ErrnoException).code === "ENOENT";
-}
-
-function readOrganizationMarkdownTemplate(fileName: string): string {
-  return readFileSync(
-    new URL(`./assets/organization/${fileName}`, import.meta.url),
-    "utf-8",
-  )
-    .replace(/\r\n/g, "\n")
-    .trimEnd();
 }
