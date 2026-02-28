@@ -19,7 +19,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "rm -rf dist && cp ../../README.md . && tsc -p tsconfig.build.json && node scripts/copy-ui-build.mjs && node scripts/copy-openclaw-plugin.mjs",
+    "build": "rm -rf dist && cp ../../README.md . && tsc -p tsconfig.build.json && node scripts/copy-ui-build.mjs",
     "clean": "rm -rf dist",
     "dev": "tsx src/index.ts",
     "start": "node bin/opengoat",

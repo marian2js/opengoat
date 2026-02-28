@@ -2933,14 +2933,14 @@ describe("OpenGoat UI server API", () => {
       NonNullable<OpenClawUiService["runAgent"]>
     >(async (_agentId, options) => {
       options.onStderr?.(
-        "Config warnings:\n- plugins.entries.opengoat-plugin: plugin not found: opengoat-plugin (stale config entry ignored; remove it from plugins config)",
+        "Config warnings:\n- plugins.entries.legacy-tools: plugin not found: legacy-tools (stale config entry ignored; remove it from plugins config)",
       );
 
       return {
         code: 1,
         stdout: "",
         stderr:
-          "Config warnings:\n- plugins.entries.opengoat-plugin: plugin not found: opengoat-plugin (stale config entry ignored; remove it from plugins config)",
+          "Config warnings:\n- plugins.entries.legacy-tools: plugin not found: legacy-tools (stale config entry ignored; remove it from plugins config)",
         providerId: "openclaw",
       };
     });

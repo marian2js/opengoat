@@ -55,7 +55,6 @@ import {
   ProviderCommandNotFoundError,
   createDefaultProviderRegistry,
 } from "../../providers/index.js";
-import { dirname, resolve as resolvePath } from "node:path";
 import {
   SessionService,
   type AgentLastAction,
@@ -117,10 +116,6 @@ const OPENCLAW_DEFAULT_AGENT_ID = "main";
 const OPENCLAW_AGENT_SANDBOX_MODE = "off";
 const OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON = "[\"*\"]";
 const OPENCLAW_AGENT_SKIP_BOOTSTRAP = true;
-const OPENCLAW_OPENGOAT_PLUGIN_ID = "openclaw-plugin";
-const OPENCLAW_OPENGOAT_PLUGIN_ROOT_ID = "opengoat-plugin";
-const OPENCLAW_OPENGOAT_PLUGIN_LEGACY_PACK_ID = "openclaw-plugin-pack";
-const OPENCLAW_OPENGOAT_PLUGIN_FALLBACK_ID = "workspace";
 const OPENGOAT_DEFAULT_AGENT_ENV = "OPENGOAT_DEFAULT_AGENT";
 const NOTIFICATION_SESSION_COMPACTION_COMMAND = [
   "/compact",
@@ -535,14 +530,6 @@ export class OpenGoatService {
     } catch (error) {
       warnings.push(
         `OpenClaw agent policy sync failed: ${toErrorMessage(error)}`,
-      );
-    }
-
-    try {
-      warnings.push(...(await this.ensureOpenGoatPluginToolsRegistered(paths)));
-    } catch (error) {
-      warnings.push(
-        `OpenClaw plugin tool sync failed: ${toErrorMessage(error)}`,
       );
     }
 
@@ -2504,216 +2491,6 @@ export class OpenGoatService {
     return warnings;
   }
 
-  private async ensureOpenGoatPluginToolsRegistered(
-    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
-  ): Promise<string[]> {
-    if (!this.commandRunner) {
-      return [];
-    }
-
-    const warnings: string[] = [];
-    const env = await this.resolveOpenClawEnv(paths);
-    const pluginSourcePath = await this.resolveOpenGoatPluginSourcePath();
-    if (!pluginSourcePath) {
-      warnings.push(
-        "OpenClaw OpenGoat plugin source path was not found; OpenGoat tools may be unavailable to agents.",
-      );
-      return warnings;
-    }
-
-    warnings.push(
-      ...(await this.configureOpenClawPluginSourcePath(env, pluginSourcePath)),
-    );
-    return warnings;
-  }
-
-  private async resolveOpenGoatPluginSourcePath(): Promise<string | undefined> {
-    const explicit = process.env.OPENGOAT_OPENCLAW_PLUGIN_PATH?.trim();
-    const argvEntry = process.argv[1]?.trim();
-    const argvDir = argvEntry ? dirname(resolvePath(argvEntry)) : undefined;
-    const argvPathCandidates = argvDir
-      ? collectPluginPathCandidatesFromArgvDir(argvDir)
-      : [];
-    const candidates = dedupeStrings([
-      explicit,
-      ...argvPathCandidates,
-      resolvePath(process.cwd(), "packages", "openclaw-plugin"),
-      resolvePath(process.cwd(), "dist", "openclaw-plugin"),
-      resolvePath(process.cwd(), "node_modules", "@opengoat", "openclaw-plugin"),
-      argvDir ? resolvePath(argvDir, "..", "dist", "openclaw-plugin") : undefined,
-      argvDir
-        ? resolvePath(argvDir, "..", "node_modules", "@opengoat", "openclaw-plugin")
-        : undefined,
-      argvDir
-        ? resolvePath(argvDir, "..", "..", "@opengoat", "openclaw-plugin")
-        : undefined,
-    ]);
-
-    for (const candidate of candidates) {
-      const pluginManifestPath = this.pathPort.join(
-        candidate,
-        "openclaw.plugin.json",
-      );
-      if (await this.fileSystem.exists(pluginManifestPath)) {
-        return candidate;
-      }
-    }
-
-    return undefined;
-  }
-
-  private async configureOpenClawPluginSourcePath(
-    env: NodeJS.ProcessEnv,
-    pluginSourcePath: string,
-  ): Promise<string[]> {
-    const warnings: string[] = [];
-
-    const currentPathsResult = await this.runOpenClaw(
-      ["config", "get", "plugins.load.paths"],
-      { env },
-    );
-    const currentPaths =
-      currentPathsResult.code === 0
-        ? readStringArray(parseLooseJson(currentPathsResult.stdout))
-        : [];
-    const mergedPaths = await this.mergePluginLoadPaths(
-      pluginSourcePath,
-      currentPaths,
-    );
-
-    if (!samePathList(currentPaths, mergedPaths)) {
-      const setPaths = await this.runOpenClaw(
-        ["config", "set", "plugins.load.paths", JSON.stringify(mergedPaths)],
-        { env },
-      );
-      if (setPaths.code !== 0) {
-        warnings.push(
-          `OpenClaw plugin source path update failed (code ${setPaths.code}). ${
-            setPaths.stderr.trim() || setPaths.stdout.trim() || ""
-          }`.trim(),
-        );
-      }
-    }
-
-    const pluginIds = [
-      OPENCLAW_OPENGOAT_PLUGIN_ID,
-      OPENCLAW_OPENGOAT_PLUGIN_ROOT_ID,
-      OPENCLAW_OPENGOAT_PLUGIN_LEGACY_PACK_ID,
-      OPENCLAW_OPENGOAT_PLUGIN_FALLBACK_ID,
-    ];
-    const enableFailures: string[] = [];
-    let pluginEnabled = false;
-    let enabledPluginId: string | undefined;
-
-    for (const pluginId of pluginIds) {
-      const enablePlugin = await this.runOpenClaw(
-        ["config", "set", `plugins.entries.${pluginId}.enabled`, "true"],
-        { env },
-      );
-      if (enablePlugin.code === 0) {
-        pluginEnabled = true;
-        enabledPluginId = pluginId;
-        break;
-      }
-
-      const message =
-        enablePlugin.stderr.trim() || enablePlugin.stdout.trim() || "";
-      if (isPluginNotFoundMessage(message)) {
-        continue;
-      }
-
-      enableFailures.push(
-        `OpenClaw plugin enable failed for "${pluginId}" (code ${enablePlugin.code}). ${message}`.trim(),
-      );
-    }
-
-    if (!pluginEnabled) {
-      if (enableFailures.length === 0) {
-        warnings.push(
-          `OpenClaw plugin enable failed: no matching plugin id was found (${pluginIds.join(
-            ", ",
-          )}).`,
-        );
-      } else {
-        warnings.push(...enableFailures);
-      }
-    }
-
-    if (enabledPluginId) {
-      const idsToDisable = pluginIds.filter((pluginId) => pluginId !== enabledPluginId);
-      for (const pluginId of idsToDisable) {
-        const disablePlugin = await this.runOpenClaw(
-          ["config", "set", `plugins.entries.${pluginId}.enabled`, "false"],
-          { env },
-        );
-        if (disablePlugin.code === 0) {
-          continue;
-        }
-
-        const message =
-          disablePlugin.stderr.trim() || disablePlugin.stdout.trim() || "";
-        if (isPluginNotFoundMessage(message)) {
-          continue;
-        }
-
-        warnings.push(
-          `OpenClaw plugin cleanup failed for "${pluginId}" (code ${disablePlugin.code}). ${message}`.trim(),
-        );
-      }
-    }
-
-    return warnings;
-  }
-
-  private async mergePluginLoadPaths(
-    pluginSourcePath: string,
-    currentPaths: string[],
-  ): Promise<string[]> {
-    const merged = dedupeStrings([pluginSourcePath, ...currentPaths]);
-    const normalizedPluginSource = resolvePath(pluginSourcePath);
-    const filtered: string[] = [];
-
-    for (const candidate of merged) {
-      const normalizedCandidate = resolvePath(candidate);
-      if (pathMatches(normalizedCandidate, normalizedPluginSource)) {
-        filtered.push(candidate);
-        continue;
-      }
-
-      const manifestId = await this.readPluginManifestId(candidate);
-      if (
-        manifestId &&
-        isOpenGoatPluginId(manifestId)
-      ) {
-        continue;
-      }
-
-      filtered.push(candidate);
-    }
-
-    return dedupeStrings(filtered);
-  }
-
-  private async readPluginManifestId(path: string): Promise<string | undefined> {
-    const manifestPath = this.pathPort.join(path, "openclaw.plugin.json");
-    if (!(await this.fileSystem.exists(manifestPath))) {
-      return undefined;
-    }
-
-    try {
-      const raw = await this.fileSystem.readFile(manifestPath);
-      const parsed = parseLooseJson(raw);
-      const id = asRecord(parsed).id;
-      if (typeof id === "string" && id.trim().length > 0) {
-        return id.trim();
-      }
-    } catch {
-      // Ignore malformed manifests when cleaning up load paths.
-    }
-
-    return undefined;
-  }
-
   private async resolveOpenClawEnv(
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
   ): Promise<NodeJS.ProcessEnv> {
@@ -3068,25 +2845,6 @@ function resolveCreateAgentManagerId(
   return normalizedManagerId;
 }
 
-function collectPluginPathCandidatesFromArgvDir(argvDir: string): string[] {
-  const maxDepth = 8;
-  const candidates: Array<string | undefined> = [];
-  let currentDir = argvDir;
-
-  for (let depth = 0; depth < maxDepth; depth += 1) {
-    candidates.push(resolvePath(currentDir, "packages", "openclaw-plugin"));
-    candidates.push(resolvePath(currentDir, "openclaw-plugin"));
-
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-    currentDir = parentDir;
-  }
-
-  return dedupeStrings(candidates);
-}
-
 function dedupeStrings(values: Array<string | undefined>): string[] {
   const seen = new Set<string>();
   const deduped: string[] = [];
@@ -3099,35 +2857,6 @@ function dedupeStrings(values: Array<string | undefined>): string[] {
     deduped.push(trimmed);
   }
   return deduped;
-}
-
-function samePathList(left: readonly string[], right: readonly string[]): boolean {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  for (let index = 0; index < left.length; index += 1) {
-    const leftValue = left[index];
-    const rightValue = right[index];
-    if (!leftValue || !rightValue || !pathMatches(leftValue, rightValue)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function isOpenGoatPluginId(pluginId: string): boolean {
-  return [
-    OPENCLAW_OPENGOAT_PLUGIN_ID,
-    OPENCLAW_OPENGOAT_PLUGIN_ROOT_ID,
-    OPENCLAW_OPENGOAT_PLUGIN_LEGACY_PACK_ID,
-    OPENCLAW_OPENGOAT_PLUGIN_FALLBACK_ID,
-  ].includes(pluginId.trim().toLowerCase());
-}
-
-function isPluginNotFoundMessage(message: string): boolean {
-  return message.toLowerCase().includes("plugin not found");
 }
 
 function isNotificationSessionRef(sessionRef: string): boolean {
