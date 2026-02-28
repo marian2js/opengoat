@@ -67,11 +67,11 @@ describe("AgentService", () => {
       runtime?: { provider?: { id?: string } };
       organization?: { type?: string; reportsTo?: string | null };
     };
-    expect(config.role).toBe("co-founder");
+    expect(config.role).toBe("Co-Founder");
     expect(config.runtime?.provider?.id).toBe("openclaw");
     expect(config.organization?.type).toBe("manager");
     expect(config.organization?.reportsTo).toBeNull();
-    expect(result.agent.role).toBe("co-founder");
+    expect(result.agent.role).toBe("Co-Founder");
 
     const index = JSON.parse(
       await readFile(paths.agentsIndexJsonPath, "utf-8"),

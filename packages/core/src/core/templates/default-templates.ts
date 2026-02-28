@@ -187,7 +187,7 @@ export function resolveAgentRole(
   }
 
   if (isDefaultAgentId(agentId)) {
-    return "co-founder";
+    return "Co-Founder";
   }
 
   return type === "manager" ? "Manager" : "Team Member";

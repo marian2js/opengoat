@@ -475,8 +475,8 @@ export function normalizeUiImages(images: UiImageInput[] | undefined): UiImageIn
       mediaType,
       ...(name
         ? {
-            name,
-          }
+          name,
+        }
         : {}),
     });
   }
@@ -824,10 +824,10 @@ export async function updateOrganizationAgentProfile(
   );
   const previousDefaultDescription = resolveDefaultAgentDescription(
     refreshed.role ??
-      resolveDefaultAgentRole(
-        refreshed.id,
-        refreshed.type === "manager" ? "manager" : "individual",
-      ),
+    resolveDefaultAgentRole(
+      refreshed.id,
+      refreshed.type === "manager" ? "manager" : "individual",
+    ),
     refreshed.type === "manager" ? "manager" : "individual",
     refreshed.displayName,
   );
@@ -1254,7 +1254,7 @@ function resolveDefaultAgentRole(
   type: "manager" | "individual",
 ): string {
   if (agentId === DEFAULT_AGENT_ID) {
-    return "co-founder";
+    return "Co-Founder";
   }
   return type === "manager" ? "Manager" : "Team Member";
 }
