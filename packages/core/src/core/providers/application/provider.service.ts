@@ -1,6 +1,10 @@
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { isDefaultAgentId, normalizeAgentId } from "../../domain/agent-id.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
+import {
+  hasCoreFsToolsDenied,
+  mergeCoreFsToolsDenied,
+} from "../../openclaw/openclaw-managed-plugin.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import { executeCommand } from "../command-executor.js";
@@ -595,6 +599,15 @@ export class ProviderService {
         changed = true;
       }
 
+      const nextTools = asRecord(next.tools);
+      if (!hasCoreFsToolsDenied({ tools: nextTools })) {
+        next.tools = {
+          ...nextTools,
+          deny: mergeCoreFsToolsDenied(nextTools.deny),
+        };
+        changed = true;
+      }
+
       list[index] = next;
     }
 
@@ -880,8 +893,10 @@ export class ProviderService {
       const id = normalizeAgentId(asRecord(entry).id as string);
       return id === normalizedTarget;
     });
+    const existingEntry = index >= 0 ? asRecord(list[index]) : {};
+    const existingTools = asRecord(existingEntry.tools);
     const nextEntry: Record<string, unknown> = {
-      ...(index >= 0 ? asRecord(list[index]) : {}),
+      ...existingEntry,
       id: normalizedTarget,
       name: options.displayName,
       workspace: options.workspaceDir,
@@ -890,7 +905,9 @@ export class ProviderService {
         mode: "off",
       },
       tools: {
+        ...existingTools,
         allow: ["*"],
+        deny: mergeCoreFsToolsDenied(existingTools.deny),
       },
     };
     if (index >= 0) {

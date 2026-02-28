@@ -72,6 +72,9 @@ importers:
       '@agentclientprotocol/sdk':
         specifier: ^0.14.1
         version: 0.14.1(zod@4.3.6)
+      json5:
+        specifier: ^2.2.3
+        version: 2.2.3
       sql.js:
         specifier: ^1.13.0
         version: 1.13.0

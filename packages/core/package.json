@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.14.1",
+    "json5": "^2.2.3",
     "sql.js": "^1.13.0",
     "ws": "^8.18.3"
   },

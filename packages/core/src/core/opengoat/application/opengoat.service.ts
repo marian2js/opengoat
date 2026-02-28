@@ -1,3 +1,6 @@
+import path from "node:path";
+import { homedir } from "node:os";
+import * as JSON5 from "json5";
 import { AgentManifestService } from "../../agents/application/agent-manifest.service.js";
 import { AgentService } from "../../agents/application/agent.service.js";
 import {
@@ -27,6 +30,15 @@ import type {
   OpenGoatConfig,
 } from "../../domain/opengoat-paths.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
+import {
+  MANAGED_OPENCLAW_PLUGIN_DIR_NAME,
+  hasCoreFsToolsDenied,
+  mergeCoreFsToolsDenied,
+  mutateManagedOpenClawPluginConfig,
+  readManagedOpenClawPluginEntrypointTemplate,
+  readManagedOpenClawPluginManifestTemplate,
+  resolveOpenClawConfigPath,
+} from "../../openclaw/openclaw-managed-plugin.js";
 import {
   OrchestrationService,
   type OrchestrationRunOptions,
@@ -505,6 +517,35 @@ export class OpenGoatService {
       warnings.push(
         `OpenClaw startup sync failed: ${toErrorMessage(error)}`,
       );
+    }
+
+    let openClawPluginConfigChanged = false;
+    try {
+      const pluginSync = await this.syncManagedOpenClawPlugin(paths);
+      warnings.push(...pluginSync.warnings);
+      openClawPluginConfigChanged = pluginSync.configChanged;
+    } catch (error) {
+      warnings.push(
+        `OpenClaw managed plugin sync failed: ${toErrorMessage(error)}`,
+      );
+    }
+
+    if (openClawPluginConfigChanged) {
+      try {
+        const restarted = await this.providerService.restartLocalGateway(
+          paths,
+          await this.resolveOpenClawEnv(paths),
+        );
+        if (!restarted) {
+          warnings.push(
+            "OpenClaw managed plugin config changed, but gateway restart was skipped (external gateway mode).",
+          );
+        }
+      } catch (error) {
+        warnings.push(
+          `OpenClaw managed plugin restart failed: ${toErrorMessage(error)}`,
+        );
+      }
     }
 
     try {
@@ -1836,6 +1877,132 @@ export class OpenGoatService {
     };
   }
 
+  private async syncManagedOpenClawPlugin(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+  ): Promise<{ configChanged: boolean; warnings: string[] }> {
+    const warnings: string[] = [];
+    const pluginDir = this.pathPort.join(
+      paths.homeDir,
+      "plugins",
+      MANAGED_OPENCLAW_PLUGIN_DIR_NAME,
+    );
+    const pluginManifestPath = this.pathPort.join(pluginDir, "openclaw.plugin.json");
+    const pluginEntrypointPath = this.pathPort.join(pluginDir, "index.js");
+
+    await this.fileSystem.ensureDir(pluginDir);
+    await this.writeFileIfChanged(
+      pluginManifestPath,
+      `${readManagedOpenClawPluginManifestTemplate()}\n`,
+    );
+    await this.writeFileIfChanged(
+      pluginEntrypointPath,
+      `${readManagedOpenClawPluginEntrypointTemplate()}\n`,
+    );
+
+    const env = await this.resolveOpenClawEnv(paths);
+    const openClawConfigPath = resolveOpenClawConfigPath(env);
+    const configDir = path.dirname(openClawConfigPath);
+    await this.fileSystem.ensureDir(configDir);
+
+    const existingConfig = await this.readOpenClawConfigForMutation(
+      openClawConfigPath,
+    );
+    if (!existingConfig) {
+      warnings.push(
+        `OpenClaw config parse failed at ${openClawConfigPath}; managed plugin sync skipped.`,
+      );
+      return {
+        configChanged: false,
+        warnings,
+      };
+    }
+
+    const existingLoadPathSet =
+      await this.collectExistingOpenClawPluginLoadPaths(existingConfig);
+    existingLoadPathSet.add(path.resolve(pluginDir));
+
+    const mutated = mutateManagedOpenClawPluginConfig({
+      rootConfig: existingConfig,
+      managedPluginPath: pluginDir,
+      opengoatHomeDir: paths.homeDir,
+      existingLoadPathSet,
+    });
+
+    if (!mutated.changed) {
+      return {
+        configChanged: false,
+        warnings,
+      };
+    }
+
+    await this.fileSystem.writeFile(
+      openClawConfigPath,
+      `${JSON.stringify(mutated.config, null, 2)}\n`,
+    );
+
+    for (const missingPath of mutated.removedMissingLoadPaths) {
+      warnings.push(
+        `Removed stale OpenClaw plugin load path from config: ${missingPath}`,
+      );
+    }
+
+    return {
+      configChanged: true,
+      warnings,
+    };
+  }
+
+  private async readOpenClawConfigForMutation(
+    openClawConfigPath: string,
+  ): Promise<Record<string, unknown> | null> {
+    if (!(await this.fileSystem.exists(openClawConfigPath))) {
+      return {};
+    }
+
+    try {
+      const raw = await this.fileSystem.readFile(openClawConfigPath);
+      if (!raw.trim()) {
+        return {};
+      }
+      const parsed = JSON5.parse(raw) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return null;
+      }
+      return parsed as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  private async collectExistingOpenClawPluginLoadPaths(
+    config: Record<string, unknown>,
+  ): Promise<Set<string>> {
+    const plugins = asRecord(config.plugins);
+    const load = asRecord(plugins.load);
+    const set = new Set<string>();
+
+    for (const rawPath of readStringArray(load.paths)) {
+      const resolvedPath = resolveAbsolutePathWithTilde(rawPath);
+      if (await this.fileSystem.exists(resolvedPath)) {
+        set.add(resolvedPath);
+      }
+    }
+    return set;
+  }
+
+  private async writeFileIfChanged(
+    filePath: string,
+    content: string,
+  ): Promise<void> {
+    if (await this.fileSystem.exists(filePath)) {
+      const existing = await this.fileSystem.readFile(filePath);
+      if (existing === content) {
+        return;
+      }
+    }
+    await this.fileSystem.writeFile(filePath, content);
+  }
+
   private async syncOpenClawRoleSkills(
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
     rawAgentId: string,
@@ -2291,7 +2458,12 @@ export class OpenGoatService {
             listResult.stderr.trim() || listResult.stdout.trim() || ""
           }`.trim(),
         );
-        return warnings;
+        return this.syncOpenClawAgentExecutionPoliciesViaGatewayFallback(
+          paths,
+          agentIds,
+          env,
+          warnings,
+        );
       }
 
       const parsed = parseLooseJson(listResult.stdout);
@@ -2299,14 +2471,24 @@ export class OpenGoatService {
         warnings.push(
           "OpenClaw config read returned non-JSON for agents.list; skipping sandbox/tools policy sync.",
         );
-        return warnings;
+        return this.syncOpenClawAgentExecutionPoliciesViaGatewayFallback(
+          paths,
+          agentIds,
+          env,
+          warnings,
+        );
       }
 
       if (!Array.isArray(parsed)) {
         warnings.push(
           "OpenClaw config agents.list is not an array; skipping sandbox/tools policy sync.",
         );
-        return warnings;
+        return this.syncOpenClawAgentExecutionPoliciesViaGatewayFallback(
+          paths,
+          agentIds,
+          env,
+          warnings,
+        );
       }
 
       entries = parsed;
@@ -2372,6 +2554,26 @@ export class OpenGoatService {
         }
       }
 
+      if (!hasCoreFsToolsDenied(entry)) {
+        const mergedDeny = mergeCoreFsToolsDenied(asRecord(entry.tools).deny);
+        const denySet = await this.runOpenClaw(
+          [
+            "config",
+            "set",
+            `agents.list[${index}].tools.deny`,
+            JSON.stringify(mergedDeny),
+          ],
+          { env },
+        );
+        if (denySet.code !== 0) {
+          warnings.push(
+            `OpenClaw tools deny sync failed for "${agentId}" (code ${denySet.code}). ${
+              denySet.stderr.trim() || denySet.stdout.trim() || ""
+            }`.trim(),
+          );
+        }
+      }
+
       if (readAgentSkipBootstrap(entry) !== OPENCLAW_AGENT_SKIP_BOOTSTRAP) {
         const bootstrapSet = await this.runOpenClaw(
           ["config", "set", `agents.list[${index}].skipBootstrap`, "true"],
@@ -2388,6 +2590,28 @@ export class OpenGoatService {
     }
 
     return warnings;
+  }
+
+  private async syncOpenClawAgentExecutionPoliciesViaGatewayFallback(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    agentIds: string[],
+    env: NodeJS.ProcessEnv,
+    warnings: string[],
+  ): Promise<string[]> {
+    try {
+      const gatewayWarnings =
+        await this.providerService.syncOpenClawAgentExecutionPoliciesViaGateway(
+          paths,
+          agentIds,
+          env,
+        );
+      return [...warnings, ...gatewayWarnings];
+    } catch (error) {
+      warnings.push(
+        `OpenClaw gateway policy sync fallback failed: ${toErrorMessage(error)}`,
+      );
+      return warnings;
+    }
   }
 
   private async resolveOpenClawEnv(
@@ -2469,6 +2693,23 @@ function readStringArray(value: unknown): string[] {
   return value
     .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
     .filter((entry) => entry.length > 0);
+}
+
+function resolveAbsolutePathWithTilde(rawPath: string): string {
+  const trimmed = rawPath.trim();
+  if (!trimmed) {
+    return path.resolve(trimmed);
+  }
+  if (trimmed === "~") {
+    return homedir();
+  }
+  if (trimmed.startsWith("~/")) {
+    return path.resolve(homedir(), trimmed.slice(2));
+  }
+  if (trimmed.startsWith("~\\")) {
+    return path.resolve(homedir(), trimmed.slice(2));
+  }
+  return path.resolve(trimmed);
 }
 
 async function runWithConcurrency<T, R>(

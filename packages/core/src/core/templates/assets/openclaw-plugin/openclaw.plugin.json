@@ -1,0 +1,12 @@
+{
+  "id": "opengoat_shared_fs",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "opengoatHomeDir": {
+        "type": "string"
+      }
+    }
+  }
+}
