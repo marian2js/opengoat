@@ -261,51 +261,145 @@ function normalizeSessionSegment(value: string | undefined): string {
   return normalized;
 }
 
-function parseGatewayAgentResponse(raw: string): {
+export function parseGatewayAgentResponse(raw: string): {
   assistantText: string;
   providerSessionId?: string;
 } | null {
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return null;
+  const records = parseJsonRecords(raw);
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index];
+    if (!record) {
+      continue;
+    }
+    const normalized = normalizeGatewayAgentRecord(record);
+    if (normalized?.assistantText) {
+      return normalized;
+    }
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(trimmed) as unknown;
-  } catch {
-    return null;
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index];
+    if (!record) {
+      continue;
+    }
+    const normalized = normalizeGatewayAgentRecord(record);
+    if (normalized) {
+      return normalized;
+    }
   }
 
-  if (!parsed || typeof parsed !== "object") {
-    return null;
-  }
+  return null;
+}
 
-  const record = parsed as {
-    result?: {
-      payloads?: Array<{ text?: unknown; mediaUrl?: unknown; mediaUrls?: unknown }>;
-      meta?: { agentMeta?: { sessionId?: unknown } };
-    };
-  };
+function normalizeGatewayAgentRecord(record: Record<string, unknown>): {
+  assistantText: string;
+  providerSessionId?: string;
+} | null {
+  const result = asRecord(record.result);
+  const payloads = Array.isArray(result.payloads)
+    ? result.payloads
+    : Array.isArray(record.payloads)
+      ? record.payloads
+      : [];
 
   const lines: string[] = [];
-  for (const payload of record.result?.payloads ?? []) {
-    const text = typeof payload?.text === "string" ? payload.text.trim() : "";
+  for (const payload of payloads) {
+    const payloadRecord = asRecord(payload);
+    const text =
+      readOptionalString(payloadRecord.text) ??
+      readOptionalString(payloadRecord.content) ??
+      readOptionalString(payloadRecord.message);
     if (text) {
-      lines.push(text);
+      lines.push(text.trim());
     }
-    for (const mediaUrl of normalizeMediaUrls(payload?.mediaUrl, payload?.mediaUrls)) {
+    for (const mediaUrl of normalizeMediaUrls(
+      payloadRecord.mediaUrl,
+      payloadRecord.mediaUrls,
+    )) {
       lines.push(`MEDIA:${mediaUrl}`);
     }
   }
 
+  const assistantText = lines.join("\n\n").trim();
+  const providerSessionId =
+    readOptionalString(asRecord(asRecord(result.meta).agentMeta).sessionId) ??
+    readOptionalString(asRecord(asRecord(record.meta).agentMeta).sessionId);
+
+  if (!assistantText && !providerSessionId) {
+    return null;
+  }
+
   return {
-    assistantText: lines.join("\n\n").trim(),
-    providerSessionId:
-      typeof record.result?.meta?.agentMeta?.sessionId === "string"
-        ? record.result.meta.agentMeta.sessionId.trim() || undefined
-        : undefined,
+    assistantText,
+    providerSessionId,
   };
+}
+
+function parseJsonRecords(raw: string): Record<string, unknown>[] {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const direct = parseJsonRecord(trimmed);
+  if (direct) {
+    return [direct];
+  }
+
+  const records: Record<string, unknown>[] = [];
+  for (const line of trimmed.split(/\r?\n/)) {
+    const parsed = parseJsonRecord(line.trim());
+    if (parsed) {
+      records.push(parsed);
+    }
+  }
+  if (records.length > 0) {
+    return records;
+  }
+
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    const extracted = trimmed.slice(firstBrace, lastBrace + 1);
+    const parsed = parseJsonRecord(extracted);
+    if (parsed) {
+      return [parsed];
+    }
+  }
+
+  return [];
+}
+
+function parseJsonRecord(raw: string): Record<string, unknown> | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return undefined;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
 }
 
 function normalizeMediaUrls(mediaUrl: unknown, mediaUrls: unknown): string[] {

@@ -65,6 +65,7 @@ import {
   updateUiTaskStatus,
 } from "./session.js";
 import {
+  extractAssistantTextFromStructuredOutput,
   formatUiLogQuotedPreview,
   formatRunStatusMessage,
   mapRunStageToProgressPhase,
@@ -1726,7 +1727,7 @@ export function registerApiRoutes(
         },
       });
 
-      const output = sanitizeConversationText(result.stdout.trim() || result.stderr.trim());
+      const output = sanitizeConversationText(resolveAssistantOutput(result));
       deps.logs.append({
         timestamp: new Date().toISOString(),
         level: result.code === 0 ? "info" : "warn",
@@ -1981,9 +1982,7 @@ export function registerApiRoutes(
         },
       });
 
-      const output = sanitizeConversationText(
-        result.stdout.trim() || result.stderr.trim(),
-      );
+      const output = sanitizeConversationText(resolveAssistantOutput(result));
       writeEvent({
         type: "result",
         agentId,
@@ -2053,6 +2052,32 @@ export function registerApiRoutes(
     handleSessionMessageStream
   );
 
+}
+
+function resolveAssistantOutput(result: {
+  stdout: string;
+  stderr: string;
+}): string {
+  const structuredStdout = extractAssistantTextFromStructuredOutput(
+    result.stdout,
+  );
+  if (structuredStdout) {
+    return structuredStdout;
+  }
+
+  const trimmedStdout = result.stdout.trim();
+  if (trimmedStdout) {
+    return trimmedStdout;
+  }
+
+  const structuredStderr = extractAssistantTextFromStructuredOutput(
+    result.stderr,
+  );
+  if (structuredStderr) {
+    return structuredStderr;
+  }
+
+  return result.stderr.trim();
 }
 
 function parseOrganizationAgentProfileUpdate(

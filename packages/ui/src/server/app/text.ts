@@ -35,6 +35,24 @@ export function sanitizeConversationText(value: string): string {
   return withoutPrefix;
 }
 
+export function extractAssistantTextFromStructuredOutput(
+  value: string,
+): string | undefined {
+  const records = parseJsonRecords(value);
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index];
+    if (!record) {
+      continue;
+    }
+    const parsed = parseStructuredOutputRecord(record);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+}
+
 export function stripAnsiCodes(value: string): string {
   return value.replace(
     /[\u001B\u009B][[\]()#;?]*(?:\d{1,4}(?:;\d{0,4})*)?[0-9A-ORZcf-ntqry=><]/g,
@@ -141,6 +159,41 @@ const KNOWN_PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   openclaw: "OpenClaw",
 };
 
+function parseStructuredOutputRecord(record: Record<string, unknown>): string | undefined {
+  const resultRecord = asRecord(record.result);
+  const payloadCandidates: unknown[] = [];
+
+  if (Array.isArray(resultRecord.payloads)) {
+    payloadCandidates.push(...resultRecord.payloads);
+  }
+  if (Array.isArray(record.payloads)) {
+    payloadCandidates.push(...record.payloads);
+  }
+
+  const textChunks: string[] = [];
+  for (const payload of payloadCandidates) {
+    const payloadRecord = asRecord(payload);
+    const text =
+      readOptionalString(payloadRecord.text) ??
+      readOptionalString(payloadRecord.content) ??
+      readOptionalString(payloadRecord.message);
+    if (text) {
+      textChunks.push(text);
+    }
+  }
+
+  if (textChunks.length > 0) {
+    return textChunks.join("\n\n").trim() || undefined;
+  }
+
+  const directText =
+    readOptionalString(resultRecord.text) ??
+    readOptionalString(resultRecord.result) ??
+    readOptionalString(record.result) ??
+    readOptionalString(record.text);
+  return directText?.trim() || undefined;
+}
+
 function stripOpenClawStalePluginWarnings(value: string): string {
   const withoutLeadingWarningBlock = removeLeadingOpenClawWarningBlock(value);
   const lines = withoutLeadingWarningBlock.split("\n");
@@ -245,4 +298,69 @@ function isOpenClawWarningBlockLine(raw: string, normalized: string): boolean {
     return true;
   }
   return false;
+}
+
+function parseJsonRecords(raw: string): Record<string, unknown>[] {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const direct = parseJsonRecord(trimmed);
+  if (direct) {
+    return [direct];
+  }
+
+  const records: Record<string, unknown>[] = [];
+  for (const line of trimmed.split(/\r?\n/)) {
+    const parsed = parseJsonRecord(line.trim());
+    if (parsed) {
+      records.push(parsed);
+    }
+  }
+  if (records.length > 0) {
+    return records;
+  }
+
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    const parsed = parseJsonRecord(trimmed.slice(firstBrace, lastBrace + 1));
+    if (parsed) {
+      return [parsed];
+    }
+  }
+
+  return [];
+}
+
+function parseJsonRecord(raw: string): Record<string, unknown> | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return undefined;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
 }
