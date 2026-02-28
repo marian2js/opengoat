@@ -67,11 +67,11 @@ describe("AgentService", () => {
       runtime?: { provider?: { id?: string } };
       organization?: { type?: string; reportsTo?: string | null };
     };
-    expect(config.role).toBe("Goat");
+    expect(config.role).toBe("co-founder");
     expect(config.runtime?.provider?.id).toBe("openclaw");
     expect(config.organization?.type).toBe("manager");
     expect(config.organization?.reportsTo).toBeNull();
-    expect(result.agent.role).toBe("Goat");
+    expect(result.agent.role).toBe("co-founder");
 
     const index = JSON.parse(
       await readFile(paths.agentsIndexJsonPath, "utf-8"),
@@ -241,7 +241,7 @@ describe("AgentService", () => {
     );
     expect(roleMarkdown).toContain("- Your id: goat (agent id)");
     expect(roleMarkdown).toContain("- Your name: Goat");
-    expect(roleMarkdown).toContain("- Role: Goat");
+    expect(roleMarkdown).toContain("- Role: co-founder");
     expect(roleMarkdown).toContain(
       '- For info about your reportees, see folder `reportees` or call tool `opengoat_agent_info` with `{"agentId":"goat"}`.',
     );

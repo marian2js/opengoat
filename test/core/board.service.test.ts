@@ -779,7 +779,7 @@ async function createHarness(options?: {
   await agentService.ensureAgent(
     paths,
     { id: "goat", displayName: "Goat" },
-    { type: "manager", reportsTo: null, role: "Goat" },
+    { type: "manager", reportsTo: null, role: "co-founder" },
   );
   await agentService.ensureAgent(
     paths,

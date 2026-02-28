@@ -83,7 +83,7 @@ export class BootstrapService {
     const agentResult = await this.agentService.ensureAgent(paths, goat, {
       type: "manager",
       reportsTo: null,
-      role: "Goat",
+      role: "co-founder",
     });
     const workspaceBootstrapResult = agentResult.alreadyExisted
       ? {
