@@ -28,25 +28,25 @@ opengoat session rename --title <text> [--agent <id>] [--session <key|id>] [--js
 opengoat session remove [--agent <id>] [--session <key|id>] [--json]
 ```
 
-Agent defaults for all commands: `config.defaultAgent` / `OPENGOAT_DEFAULT_AGENT` / `ceo`.
+Agent defaults for all commands: `config.defaultAgent` / `OPENGOAT_DEFAULT_AGENT` / `goat`.
 
 ## Practical Patterns
 
 ### Continue one workstream
 
 ```bash
-opengoat agent ceo --session q2-planning --message "Create release plan"
-opengoat agent ceo --session q2-planning --message "Now generate milestones"
+opengoat agent goat --session q2-planning --message "Create release plan"
+opengoat agent goat --session q2-planning --message "Now generate milestones"
 ```
 
 ### Compact long transcripts
 
 ```bash
-opengoat session compact --agent ceo --session q2-planning
+opengoat session compact --agent goat --session q2-planning
 ```
 
 ### Reset context while keeping session key
 
 ```bash
-opengoat session reset --agent ceo --session q2-planning
+opengoat session reset --agent goat --session q2-planning
 ```

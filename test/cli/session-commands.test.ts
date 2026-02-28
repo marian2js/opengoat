@@ -37,7 +37,7 @@ describe("session CLI commands", () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
-          sessionKey: "agent:ceo:main",
+          sessionKey: "agent:goat:main",
           sessionId: "abc",
           title: "Main",
           updatedAt: Date.parse("2026-02-07T00:00:00.000Z"),
@@ -62,12 +62,12 @@ describe("session CLI commands", () => {
     const second = createContext({ listSessions });
     const secondCode = await sessionListCommand.run(["--active-minutes", "10"], second.context);
     expect(secondCode).toBe(0);
-    expect(second.stdout.output()).toContain("agent:ceo:main");
+    expect(second.stdout.output()).toContain("agent:goat:main");
   });
 
   it("session history prints transcript entries", async () => {
     const getSessionHistory = vi.fn(async () => ({
-      sessionKey: "agent:ceo:main",
+      sessionKey: "agent:goat:main",
       sessionId: "abc",
       transcriptPath: "/tmp/abc.jsonl",
       messages: [
@@ -94,14 +94,14 @@ describe("session CLI commands", () => {
 
   it("session reset and compact call service", async () => {
     const resetSession = vi.fn(async () => ({
-      agentId: "ceo",
-      sessionKey: "agent:ceo:main",
+      agentId: "goat",
+      sessionKey: "agent:goat:main",
       sessionId: "new-id",
       transcriptPath: "/tmp/new-id.jsonl",
       isNewSession: true
     }));
     const compactSession = vi.fn(async () => ({
-      sessionKey: "agent:ceo:main",
+      sessionKey: "agent:goat:main",
       sessionId: "new-id",
       transcriptPath: "/tmp/new-id.jsonl",
       applied: true,
@@ -112,24 +112,24 @@ describe("session CLI commands", () => {
     const resetCtx = createContext({ resetSession });
     const resetCode = await sessionResetCommand.run([], resetCtx.context);
     expect(resetCode).toBe(0);
-    expect(resetSession).toHaveBeenCalledWith("ceo", undefined);
+    expect(resetSession).toHaveBeenCalledWith("goat", undefined);
     expect(resetCtx.stdout.output()).toContain("Reset session");
 
     const compactCtx = createContext({ compactSession });
     const compactCode = await sessionCompactCommand.run([], compactCtx.context);
     expect(compactCode).toBe(0);
-    expect(compactSession).toHaveBeenCalledWith("ceo", undefined);
+    expect(compactSession).toHaveBeenCalledWith("goat", undefined);
     expect(compactCtx.stdout.output()).toContain("Compaction applied: true");
   });
 
   it("session rename validates args and calls service", async () => {
     const renameSession = vi.fn(async () => ({
-      sessionKey: "agent:ceo:main",
+      sessionKey: "agent:goat:main",
       sessionId: "abc",
       title: "Roadmap Work",
       updatedAt: Date.parse("2026-02-07T00:00:00.000Z"),
       transcriptPath: "/tmp/abc.jsonl",
-      workspacePath: "/tmp/workspaces/ceo",
+      workspacePath: "/tmp/workspaces/goat",
       inputChars: 0,
       outputChars: 0,
       totalChars: 0,
@@ -144,13 +144,13 @@ describe("session CLI commands", () => {
     const valid = createContext({ renameSession });
     const validCode = await sessionRenameCommand.run(["--title", "Roadmap Work"], valid.context);
     expect(validCode).toBe(0);
-    expect(renameSession).toHaveBeenCalledWith("ceo", "Roadmap Work", undefined);
+    expect(renameSession).toHaveBeenCalledWith("goat", "Roadmap Work", undefined);
     expect(valid.stdout.output()).toContain("Renamed session");
   });
 
   it("session remove calls service", async () => {
     const removeSession = vi.fn(async () => ({
-      sessionKey: "agent:ceo:main",
+      sessionKey: "agent:goat:main",
       sessionId: "abc",
       title: "Main",
       transcriptPath: "/tmp/abc.jsonl"
@@ -159,7 +159,7 @@ describe("session CLI commands", () => {
     const { context, stdout } = createContext({ removeSession });
     const code = await sessionRemoveCommand.run([], context);
     expect(code).toBe(0);
-    expect(removeSession).toHaveBeenCalledWith("ceo", undefined);
+    expect(removeSession).toHaveBeenCalledWith("goat", undefined);
     expect(stdout.output()).toContain("Removed session");
   });
 });

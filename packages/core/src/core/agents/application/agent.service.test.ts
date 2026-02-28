@@ -28,7 +28,7 @@ describe("AgentService workspace role skills", () => {
     await service.ensureAgent(
       paths,
       { id: "cto", displayName: "CTO" },
-      { type: "manager", reportsTo: "ceo" },
+      { type: "manager", reportsTo: "goat" },
     );
 
     await service.ensureAgentWorkspaceRoleSkills(paths, "cto", {
@@ -83,7 +83,7 @@ describe("AgentService workspace role skills", () => {
     await service.ensureAgent(
       paths,
       { id: "engineer", displayName: "Engineer" },
-      { type: "individual", reportsTo: "ceo" },
+      { type: "individual", reportsTo: "goat" },
     );
 
     await service.ensureAgentWorkspaceRoleSkills(paths, "engineer", {

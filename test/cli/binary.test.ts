@@ -68,7 +68,7 @@ describe("opengoat binary", () => {
     const config = JSON.parse(await readFile(path.join(root, "config.json"), "utf-8")) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("ceo");
+    expect(config.defaultAgent).toBe("goat");
   }, BOOTSTRAP_TIMEOUT_MS);
 
   it("runs init and creates config files", async () => {
@@ -87,12 +87,12 @@ describe("opengoat binary", () => {
       }
     });
 
-    expect(stdout).toContain("Default agent: ceo");
+    expect(stdout).toContain("Default agent: goat");
 
     const config = JSON.parse(await readFile(path.join(root, "config.json"), "utf-8")) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("ceo");
+    expect(config.defaultAgent).toBe("goat");
   }, INIT_TIMEOUT_MS);
 
   it("prints version without bootstrapping when --version is provided", async () => {

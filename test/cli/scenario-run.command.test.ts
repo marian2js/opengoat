@@ -32,9 +32,9 @@ describe("scenario run command", () => {
         code: 0,
         stdout: "ok\n",
         stderr: "",
-        agentId: "ceo",
+        agentId: "goat",
         providerId: "openclaw",
-        entryAgentId: "ceo",
+        entryAgentId: "goat",
         tracePath: "/tmp/trace.json"
       })
     });
@@ -59,9 +59,9 @@ describe("scenario run command", () => {
         code: 0,
         stdout: "done\n",
         stderr: "",
-        agentId: "ceo",
+        agentId: "goat",
         providerId: "openclaw",
-        entryAgentId: "ceo",
+        entryAgentId: "goat",
         tracePath: "/tmp/trace.json"
       })
     });
@@ -84,7 +84,7 @@ describe("scenario run command", () => {
       ],
       scripted: {
         agentReplies: {
-          ceo: "Scenario complete",
+          goat: "Scenario complete",
           worker: "WORK DONE"
         }
       },

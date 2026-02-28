@@ -30,9 +30,9 @@ describe("OrchestrationService manager runtime", () => {
     const providerService = {
       invokeAgent: vi.fn(async () => ({
         code: 0,
-        stdout: "hello from ceo\n",
+        stdout: "hello from goat\n",
         stderr: "",
-        agentId: "ceo",
+        agentId: "goat",
         providerId: "openclaw"
       }))
     };
@@ -41,19 +41,19 @@ describe("OrchestrationService manager runtime", () => {
       prepareRunSession: vi.fn(async () => ({
         enabled: true,
         info: {
-          agentId: "ceo",
-          sessionKey: "agent:ceo:main",
+          agentId: "goat",
+          sessionKey: "agent:goat:main",
           sessionId: "session-1",
-          transcriptPath: path.join(paths.sessionsDir, "ceo", "session-1.jsonl"),
-          workspacePath: path.join(paths.workspacesDir, "ceo"),
+          transcriptPath: path.join(paths.sessionsDir, "goat", "session-1.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "goat"),
           isNewSession: true
         },
         compactionApplied: false
       })),
       recordAssistantReply: vi.fn(async () => ({
-        sessionKey: "agent:ceo:main",
+        sessionKey: "agent:goat:main",
         sessionId: "session-1",
-        transcriptPath: path.join(paths.sessionsDir, "ceo", "session-1.jsonl"),
+        transcriptPath: path.join(paths.sessionsDir, "goat", "session-1.jsonl"),
         applied: false,
         compactedMessages: 0
       }))
@@ -61,21 +61,21 @@ describe("OrchestrationService manager runtime", () => {
 
     const service = new OrchestrationService({
       providerService: providerService as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["ceo"], paths.workspacesDir) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["goat"], paths.workspacesDir) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
       nowIso: () => "2026-02-10T10:00:00.000Z"
     });
 
-    const result = await service.runAgent(paths, "ceo", {
+    const result = await service.runAgent(paths, "goat", {
       message: "hello",
       cwd: tempDir
     });
 
     expect(providerService.invokeAgent).toHaveBeenCalledWith(
       paths,
-      "ceo",
+      "goat",
       expect.objectContaining({
         providerSessionId: "session-1"
       }),
@@ -83,14 +83,14 @@ describe("OrchestrationService manager runtime", () => {
     );
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("hello from ceo");
+    expect(result.stdout).toContain("hello from goat");
 
     const trace = JSON.parse(await readFile(result.tracePath, "utf8")) as {
       entryAgentId?: string;
       execution?: { stdout?: string };
     };
-    expect(trace.entryAgentId).toBe("ceo");
-    expect(trace.execution?.stdout).toContain("hello from ceo");
+    expect(trace.entryAgentId).toBe("goat");
+    expect(trace.execution?.stdout).toContain("hello from goat");
   });
 
   it("does not pass cwd for provider-default runtimes when no cwd is provided", async () => {
@@ -103,7 +103,7 @@ describe("OrchestrationService manager runtime", () => {
         code: 0,
         stdout: "ok\n",
         stderr: "",
-        agentId: "ceo",
+        agentId: "goat",
         providerId: "openclaw"
       }))
     };
@@ -112,11 +112,11 @@ describe("OrchestrationService manager runtime", () => {
       prepareRunSession: vi.fn(async () => ({
         enabled: true,
         info: {
-          agentId: "ceo",
+          agentId: "goat",
           sessionKey: "workspace:saaslib",
           sessionId: "session-2",
-          transcriptPath: path.join(paths.sessionsDir, "ceo", "session-2.jsonl"),
-          workspacePath: path.join(paths.workspacesDir, "ceo"),
+          transcriptPath: path.join(paths.sessionsDir, "goat", "session-2.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "goat"),
           isNewSession: false
         },
         compactionApplied: false
@@ -124,7 +124,7 @@ describe("OrchestrationService manager runtime", () => {
       recordAssistantReply: vi.fn(async () => ({
         sessionKey: "workspace:saaslib",
         sessionId: "session-2",
-        transcriptPath: path.join(paths.sessionsDir, "ceo", "session-2.jsonl"),
+        transcriptPath: path.join(paths.sessionsDir, "goat", "session-2.jsonl"),
         applied: false,
         compactedMessages: 0
       }))
@@ -132,20 +132,20 @@ describe("OrchestrationService manager runtime", () => {
 
     const service = new OrchestrationService({
       providerService: providerService as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["ceo"], paths.workspacesDir) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["goat"], paths.workspacesDir) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
       nowIso: () => "2026-02-10T10:00:00.000Z"
     });
 
-    await service.runAgent(paths, "ceo", {
+    await service.runAgent(paths, "goat", {
       message: "ship it"
     });
 
     expect(providerService.invokeAgent).toHaveBeenCalledWith(
       paths,
-      "ceo",
+      "goat",
       expect.objectContaining({
         providerSessionId: "session-2"
       }),
@@ -164,7 +164,7 @@ describe("OrchestrationService manager runtime", () => {
         code: 0,
         stdout: "ok\n",
         stderr: "",
-        agentId: "ceo",
+        agentId: "goat",
         providerId: "openclaw"
       }))
     };
@@ -173,11 +173,11 @@ describe("OrchestrationService manager runtime", () => {
       prepareRunSession: vi.fn(async () => ({
         enabled: true,
         info: {
-          agentId: "ceo",
+          agentId: "goat",
           sessionKey: "workspace:saaslib",
           sessionId: "session-3",
-          transcriptPath: path.join(paths.sessionsDir, "ceo", "session-3.jsonl"),
-          workspacePath: path.join(paths.workspacesDir, "ceo"),
+          transcriptPath: path.join(paths.sessionsDir, "goat", "session-3.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "goat"),
           isNewSession: false
         },
         compactionApplied: false
@@ -185,7 +185,7 @@ describe("OrchestrationService manager runtime", () => {
       recordAssistantReply: vi.fn(async () => ({
         sessionKey: "workspace:saaslib",
         sessionId: "session-3",
-        transcriptPath: path.join(paths.sessionsDir, "ceo", "session-3.jsonl"),
+        transcriptPath: path.join(paths.sessionsDir, "goat", "session-3.jsonl"),
         applied: false,
         compactedMessages: 0
       }))
@@ -193,20 +193,20 @@ describe("OrchestrationService manager runtime", () => {
 
     const service = new OrchestrationService({
       providerService: providerService as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["ceo"], paths.workspacesDir) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["goat"], paths.workspacesDir) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
       nowIso: () => "2026-02-10T10:00:00.000Z"
     });
 
-    await service.runAgent(paths, "ceo", {
+    await service.runAgent(paths, "goat", {
       message: "ship it"
     });
 
     expect(providerService.invokeAgent).toHaveBeenCalledWith(
       paths,
-      "ceo",
+      "goat",
       expect.objectContaining({}),
       expect.any(Object)
     );
@@ -265,7 +265,7 @@ describe("OrchestrationService manager runtime", () => {
 
     const service = new OrchestrationService({
       providerService: providerService as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["ceo", "developer"], paths.workspacesDir) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["goat", "developer"], paths.workspacesDir) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
@@ -309,7 +309,7 @@ describe("OrchestrationService manager runtime", () => {
           providerId: "openclaw"
         }))
       } as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["ceo", "developer"]) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["goat", "developer"]) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
@@ -339,22 +339,22 @@ describe("OrchestrationService manager runtime", () => {
         .mockResolvedValueOnce({
           code: 1,
           stdout: "",
-          stderr: 'invalid agent params: unknown agent id "ceo"',
-          agentId: "ceo",
+          stderr: 'invalid agent params: unknown agent id "goat"',
+          agentId: "goat",
           providerId: "openclaw"
         })
         .mockResolvedValueOnce({
           code: 0,
           stdout: "Recovered after repair\n",
           stderr: "",
-          agentId: "ceo",
+          agentId: "goat",
           providerId: "openclaw"
         }),
       createProviderAgent: vi.fn(async () => ({
         code: 0,
         stdout: "",
         stderr: "",
-        agentId: "ceo",
+        agentId: "goat",
         providerId: "openclaw"
       }))
     };
@@ -363,19 +363,19 @@ describe("OrchestrationService manager runtime", () => {
       prepareRunSession: vi.fn(async () => ({
         enabled: true,
         info: {
-          agentId: "ceo",
-          sessionKey: "agent:ceo:main",
+          agentId: "goat",
+          sessionKey: "agent:goat:main",
           sessionId: "session-repair",
-          transcriptPath: path.join(paths.sessionsDir, "ceo", "session-repair.jsonl"),
-          workspacePath: path.join(paths.workspacesDir, "ceo"),
+          transcriptPath: path.join(paths.sessionsDir, "goat", "session-repair.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "goat"),
           isNewSession: true
         },
         compactionApplied: false
       })),
       recordAssistantReply: vi.fn(async () => ({
-        sessionKey: "agent:ceo:main",
+        sessionKey: "agent:goat:main",
         sessionId: "session-repair",
-        transcriptPath: path.join(paths.sessionsDir, "ceo", "session-repair.jsonl"),
+        transcriptPath: path.join(paths.sessionsDir, "goat", "session-repair.jsonl"),
         applied: false,
         compactedMessages: 0
       }))
@@ -383,25 +383,25 @@ describe("OrchestrationService manager runtime", () => {
 
     const service = new OrchestrationService({
       providerService: providerService as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["ceo"], paths.workspacesDir) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["goat"], paths.workspacesDir) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
       nowIso: () => "2026-02-10T10:00:00.000Z"
     });
 
-    const result = await service.runAgent(paths, "ceo", {
+    const result = await service.runAgent(paths, "goat", {
       message: "hello"
     });
 
     expect(providerService.invokeAgent).toHaveBeenCalledTimes(2);
     expect(providerService.createProviderAgent).toHaveBeenCalledWith(
       paths,
-      "ceo",
+      "goat",
       expect.objectContaining({
-        displayName: "ceo",
-        workspaceDir: path.join(paths.workspacesDir, "ceo"),
-        internalConfigDir: path.join(paths.agentsDir, "ceo")
+        displayName: "goat",
+        workspaceDir: path.join(paths.workspacesDir, "goat"),
+        internalConfigDir: path.join(paths.agentsDir, "goat")
       })
     );
     expect(result.code).toBe(0);
@@ -426,29 +426,29 @@ describe("OrchestrationService manager runtime", () => {
         .mockResolvedValueOnce({
           code: 1,
           stdout: "",
-          stderr: 'invalid agent params: unknown agent id "ceo"',
-          agentId: "ceo",
+          stderr: 'invalid agent params: unknown agent id "goat"',
+          agentId: "goat",
           providerId: "openclaw"
         })
         .mockResolvedValueOnce({
           code: 1,
           stdout: "",
-          stderr: 'invalid agent params: unknown agent id "ceo"',
-          agentId: "ceo",
+          stderr: 'invalid agent params: unknown agent id "goat"',
+          agentId: "goat",
           providerId: "openclaw"
         })
         .mockResolvedValueOnce({
           code: 0,
           stdout: "Recovered after gateway restart\n",
           stderr: "",
-          agentId: "ceo",
+          agentId: "goat",
           providerId: "openclaw"
         }),
       createProviderAgent: vi.fn(async () => ({
         code: 0,
         stdout: "",
         stderr: "",
-        agentId: "ceo",
+        agentId: "goat",
         providerId: "openclaw"
       })),
       restartLocalGateway: vi.fn(async () => true)
@@ -458,19 +458,19 @@ describe("OrchestrationService manager runtime", () => {
       prepareRunSession: vi.fn(async () => ({
         enabled: true,
         info: {
-          agentId: "ceo",
-          sessionKey: "agent:ceo:main",
+          agentId: "goat",
+          sessionKey: "agent:goat:main",
           sessionId: "session-repair-restart",
-          transcriptPath: path.join(paths.sessionsDir, "ceo", "session-repair-restart.jsonl"),
-          workspacePath: path.join(paths.workspacesDir, "ceo"),
+          transcriptPath: path.join(paths.sessionsDir, "goat", "session-repair-restart.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "goat"),
           isNewSession: true
         },
         compactionApplied: false
       })),
       recordAssistantReply: vi.fn(async () => ({
-        sessionKey: "agent:ceo:main",
+        sessionKey: "agent:goat:main",
         sessionId: "session-repair-restart",
-        transcriptPath: path.join(paths.sessionsDir, "ceo", "session-repair-restart.jsonl"),
+        transcriptPath: path.join(paths.sessionsDir, "goat", "session-repair-restart.jsonl"),
         applied: false,
         compactedMessages: 0
       }))
@@ -478,14 +478,14 @@ describe("OrchestrationService manager runtime", () => {
 
     const service = new OrchestrationService({
       providerService: providerService as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["ceo"], paths.workspacesDir) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["goat"], paths.workspacesDir) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
       nowIso: () => "2026-02-10T10:00:00.000Z"
     });
 
-    const result = await service.runAgent(paths, "ceo", {
+    const result = await service.runAgent(paths, "goat", {
       message: "hello"
     });
 
@@ -506,14 +506,14 @@ describe("OrchestrationService manager runtime", () => {
         code: 1,
         stdout: "",
         stderr: "workspace file not found: /tmp/missing.txt",
-        agentId: "ceo",
+        agentId: "goat",
         providerId: "openclaw"
       })),
       createProviderAgent: vi.fn(async () => ({
         code: 0,
         stdout: "",
         stderr: "",
-        agentId: "ceo",
+        agentId: "goat",
         providerId: "openclaw"
       }))
     };
@@ -522,19 +522,19 @@ describe("OrchestrationService manager runtime", () => {
       prepareRunSession: vi.fn(async () => ({
         enabled: true,
         info: {
-          agentId: "ceo",
-          sessionKey: "agent:ceo:main",
+          agentId: "goat",
+          sessionKey: "agent:goat:main",
           sessionId: "session-generic-not-found",
-          transcriptPath: path.join(paths.sessionsDir, "ceo", "session-generic-not-found.jsonl"),
-          workspacePath: path.join(paths.workspacesDir, "ceo"),
+          transcriptPath: path.join(paths.sessionsDir, "goat", "session-generic-not-found.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "goat"),
           isNewSession: true
         },
         compactionApplied: false
       })),
       recordAssistantReply: vi.fn(async () => ({
-        sessionKey: "agent:ceo:main",
+        sessionKey: "agent:goat:main",
         sessionId: "session-generic-not-found",
-        transcriptPath: path.join(paths.sessionsDir, "ceo", "session-generic-not-found.jsonl"),
+        transcriptPath: path.join(paths.sessionsDir, "goat", "session-generic-not-found.jsonl"),
         applied: false,
         compactedMessages: 0
       }))
@@ -542,14 +542,14 @@ describe("OrchestrationService manager runtime", () => {
 
     const service = new OrchestrationService({
       providerService: providerService as unknown as ProviderService,
-      agentManifestService: createManifestServiceStub(["ceo"], paths.workspacesDir) as unknown as AgentManifestService,
+      agentManifestService: createManifestServiceStub(["goat"], paths.workspacesDir) as unknown as AgentManifestService,
       sessionService: sessionService as unknown as SessionService,
       fileSystem: new NodeFileSystem(),
       pathPort: new NodePathPort(),
       nowIso: () => "2026-02-10T10:00:00.000Z"
     });
 
-    const result = await service.runAgent(paths, "ceo", {
+    const result = await service.runAgent(paths, "goat", {
       message: "hello"
     });
 
@@ -591,14 +591,14 @@ function createManifestServiceStub(
       id: agentId,
       name: agentId,
       description: `${agentId} agent`,
-      type: agentId === "ceo" ? "manager" : "individual",
-      reportsTo: agentId === "ceo" ? null : "ceo",
+      type: agentId === "goat" ? "manager" : "individual",
+      reportsTo: agentId === "goat" ? null : "goat",
       discoverable: true,
       tags: [],
-      skills: agentId === "ceo" ? ["og-board-manager"] : [],
+      skills: agentId === "goat" ? ["og-board-manager"] : [],
       delegation: {
         canReceive: true,
-        canDelegate: agentId === "ceo"
+        canDelegate: agentId === "goat"
       },
       priority: 50
     }

@@ -43,7 +43,7 @@ describe("hard-reset command", () => {
     const hardReset = vi.fn(async () => ({
       homeDir: "/tmp/opengoat",
       homeRemoved: true,
-      deletedOpenClawAgents: ["ceo", "cto"],
+      deletedOpenClawAgents: ["goat", "cto"],
       failedOpenClawAgents: [],
       removedOpenClawManagedSkillDirs: ["/tmp/openclaw/skills/og-board-manager"],
       warnings: [],
@@ -61,7 +61,7 @@ describe("hard-reset command", () => {
     const hardReset = vi.fn(async () => ({
       homeDir: "/tmp/opengoat",
       homeRemoved: true,
-      deletedOpenClawAgents: ["ceo"],
+      deletedOpenClawAgents: ["goat"],
       failedOpenClawAgents: [
         {
           agentId: "cto",

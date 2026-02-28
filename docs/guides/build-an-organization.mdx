@@ -6,8 +6,8 @@ description: "Create a manager/individual hierarchy, inspect reporting chains, a
 ## 1. Bootstrap Manager Layer
 
 ```bash
-opengoat agent create "CTO" --manager --reports-to ceo
-opengoat agent create "Head of Product" --manager --reports-to ceo
+opengoat agent create "CTO" --manager --reports-to goat
+opengoat agent create "Head of Product" --manager --reports-to goat
 ```
 
 ## 2. Add Individual Contributors
@@ -24,7 +24,7 @@ opengoat agent create "Product Designer" --individual --reports-to head-of-produ
 opengoat agent list
 opengoat agent info cto
 opengoat agent direct-reportees cto
-opengoat agent all-reportees ceo
+opengoat agent all-reportees goat
 ```
 
 ## 4. Reassign Reporting When Needed
@@ -48,5 +48,5 @@ opengoat agent set-default cto
 Environment variable still overrides config:
 
 ```bash
-export OPENGOAT_DEFAULT_AGENT=ceo
+export OPENGOAT_DEFAULT_AGENT=goat
 ```

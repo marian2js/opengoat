@@ -19,11 +19,11 @@ function createContext(service: unknown) {
 
 describe("task CLI command", () => {
   it("task create forwards actor assignment and metadata", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
     const createTask = vi.fn(async () => ({
       taskId: "task-1234abcd",
       createdAt: "2026-02-10T00:00:00.000Z",
-      owner: "ceo",
+      owner: "goat",
       assignedTo: "cto",
       title: "Define API",
       description: "Draft API contract",
@@ -39,7 +39,7 @@ describe("task CLI command", () => {
       [
         "create",
         "--owner",
-        "ceo",
+        "goat",
         "--assign",
         "cto",
         "--title",
@@ -53,7 +53,7 @@ describe("task CLI command", () => {
     );
 
     expect(code).toBe(0);
-    expect(createTask).toHaveBeenCalledWith("ceo", {
+    expect(createTask).toHaveBeenCalledWith("goat", {
       title: "Define API",
       description: "Draft API contract",
       assignedTo: "cto",
@@ -63,11 +63,11 @@ describe("task CLI command", () => {
   });
 
   it("task status forwards actor and new status", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
     const updateTaskStatus = vi.fn(async () => ({
       taskId: "task-1234abcd",
       createdAt: "2026-02-10T00:00:00.000Z",
-      owner: "ceo",
+      owner: "goat",
       assignedTo: "cto",
       title: "Define API",
       description: "Draft API contract",
@@ -90,11 +90,11 @@ describe("task CLI command", () => {
   });
 
   it("task status forwards reason for blocked statuses", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
     const updateTaskStatus = vi.fn(async () => ({
       taskId: "task-1234abcd",
       createdAt: "2026-02-10T00:00:00.000Z",
-      owner: "ceo",
+      owner: "goat",
       assignedTo: "cto",
       title: "Define API",
       description: "Draft API contract",
@@ -130,7 +130,7 @@ describe("task CLI command", () => {
   });
 
   it("task status requires reason when status is pending or blocked", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
     const updateTaskStatus = vi.fn();
     const { context, stderr } = createContext({ initialize, updateTaskStatus });
 
@@ -145,11 +145,11 @@ describe("task CLI command", () => {
   });
 
   it("task blocker add forwards content", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
     const addTaskBlocker = vi.fn(async () => ({
       taskId: "task-1234abcd",
       createdAt: "2026-02-10T00:00:00.000Z",
-      owner: "ceo",
+      owner: "goat",
       assignedTo: "cto",
       title: "Define API",
       description: "Draft API contract",
@@ -172,7 +172,7 @@ describe("task CLI command", () => {
   });
 
   it("task cron --once runs one cycle", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
     const runTaskCronCycle = vi.fn(async () => ({
       ranAt: "2026-02-10T00:00:00.000Z",
       scannedTasks: 4,
@@ -196,14 +196,14 @@ describe("task CLI command", () => {
   });
 
   it("task list filters by assignee across all tasks", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
     const listTasks = vi.fn(async () => [
       {
         taskId: "task-a",
         createdAt: "2026-02-10T00:00:00.000Z",
-        owner: "ceo",
-        assignedTo: "ceo",
-        title: "CEO task",
+        owner: "goat",
+        assignedTo: "goat",
+        title: "Goat task",
         description: "A",
         status: "todo",
         blockers: [],
@@ -213,22 +213,22 @@ describe("task CLI command", () => {
     ]);
 
     const { context, stdout } = createContext({ initialize, listTasks });
-    const code = await taskCommand.run(["list", "--as", "ceo"], context);
+    const code = await taskCommand.run(["list", "--as", "goat"], context);
 
     expect(code).toBe(0);
-    expect(listTasks).toHaveBeenCalledWith({ assignee: "ceo", limit: 100 });
+    expect(listTasks).toHaveBeenCalledWith({ assignee: "goat", limit: 100 });
     expect(stdout.output()).toContain("task-a");
     expect(stdout.output()).not.toContain("board=");
   });
 
   it("task list without arguments returns latest tasks sorted descending", async () => {
-    const initialize = vi.fn(async () => ({ defaultAgent: "ceo" }));
+    const initialize = vi.fn(async () => ({ defaultAgent: "goat" }));
     const listTasks = vi.fn(async () => [
       {
         taskId: "task-old",
         createdAt: "2026-02-09T00:00:00.000Z",
-        owner: "ceo",
-        assignedTo: "ceo",
+        owner: "goat",
+        assignedTo: "goat",
         title: "Old task",
         description: "A",
         status: "todo",

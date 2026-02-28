@@ -148,7 +148,7 @@ export function TasksPage({
         {selectedTaskWorkspace.tasks.length === 0 ? (
           <div className="px-4 py-8">
             <p className="text-sm text-muted-foreground">
-              No tasks yet. Ask the CEO to start planning, or create tasks
+              No tasks yet. Ask the Goat to start planning, or create tasks
               manually.
             </p>
           </div>

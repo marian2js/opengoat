@@ -32,7 +32,7 @@ describe("AgentManifestService", () => {
           description: "Handles research tasks",
           organization: {
             type: "individual",
-            reportsTo: "ceo",
+            reportsTo: "goat",
             discoverable: false,
             tags: ["research", "docs"],
             priority: 80,
@@ -56,7 +56,7 @@ describe("AgentManifestService", () => {
 
     expect(manifest.metadata.name).toBe("Researcher");
     expect(manifest.metadata.type).toBe("individual");
-    expect(manifest.metadata.reportsTo).toBe("ceo");
+    expect(manifest.metadata.reportsTo).toBe("goat");
     expect(manifest.metadata.discoverable).toBe(false);
     expect(manifest.metadata.tags).toEqual(["research", "docs"]);
     expect(manifest.metadata.skills).toEqual(["research", "citations"]);
@@ -71,7 +71,7 @@ describe("AgentManifestService", () => {
     const manifest = await service.getManifest(paths, "developer");
     expect(manifest.source).toBe("derived");
     expect(manifest.metadata.type).toBe("individual");
-    expect(manifest.metadata.reportsTo).toBe("ceo");
+    expect(manifest.metadata.reportsTo).toBe("goat");
     expect(manifest.metadata.skills).toEqual([]);
   });
 });

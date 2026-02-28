@@ -46,7 +46,7 @@ describe("skill commands", () => {
     const code = await skillListCommand.run([], context);
 
     expect(code).toBe(0);
-    expect(listSkills).toHaveBeenCalledWith("ceo");
+    expect(listSkills).toHaveBeenCalledWith("goat");
     expect(stdout.output()).toContain("code-review");
   });
 
@@ -136,9 +136,9 @@ describe("skill commands", () => {
       skillName: "frontend-design",
       source: "source-url",
       installedPath: "/tmp/opengoat/skills/frontend-design/SKILL.md",
-      assignedAgentIds: ["ceo", "developer"],
+      assignedAgentIds: ["goat", "developer"],
       workspaceInstallPaths: [
-        "/tmp/workspaces/ceo/skills/frontend-design/SKILL.md",
+        "/tmp/workspaces/goat/skills/frontend-design/SKILL.md",
         "/tmp/workspaces/developer/.agents/skills/frontend-design/SKILL.md",
       ],
       replaced: true,
@@ -169,7 +169,7 @@ describe("skill commands", () => {
       scope: "global",
       assignToAllAgents: true,
     });
-    expect(stdout.output()).toContain("Assigned agents: ceo, developer");
+    expect(stdout.output()).toContain("Assigned agents: goat, developer");
     expect(stdout.output()).toContain("Workspace installs: 2");
   });
 
@@ -192,11 +192,11 @@ describe("skill commands", () => {
   it("removes an agent skill with default scope", async () => {
     const removeSkill = vi.fn(async () => ({
       scope: "agent",
-      agentId: "ceo",
+      agentId: "goat",
       skillId: "frontend-design",
       removedFromGlobal: false,
-      removedFromAgentIds: ["ceo"],
-      removedWorkspacePaths: ["/tmp/workspaces/ceo/skills/frontend-design/SKILL.md"],
+      removedFromAgentIds: ["goat"],
+      removedWorkspacePaths: ["/tmp/workspaces/goat/skills/frontend-design/SKILL.md"],
     }));
     const { context, stdout } = createContext({ removeSkill });
 
@@ -205,11 +205,11 @@ describe("skill commands", () => {
     expect(code).toBe(0);
     expect(removeSkill).toHaveBeenCalledWith({
       scope: "agent",
-      agentId: "ceo",
+      agentId: "goat",
       skillId: "frontend-design",
     });
     expect(stdout.output()).toContain("Removed skill: frontend-design");
-    expect(stdout.output()).toContain("Target agent: ceo");
+    expect(stdout.output()).toContain("Target agent: goat");
   });
 
   it("removes a global skill with --global", async () => {
@@ -217,9 +217,9 @@ describe("skill commands", () => {
       scope: "global",
       skillId: "qa-checklist",
       removedFromGlobal: true,
-      removedFromAgentIds: ["ceo", "developer"],
+      removedFromAgentIds: ["goat", "developer"],
       removedWorkspacePaths: [
-        "/tmp/workspaces/ceo/skills/qa-checklist/SKILL.md",
+        "/tmp/workspaces/goat/skills/qa-checklist/SKILL.md",
         "/tmp/workspaces/developer/.agents/skills/qa-checklist/SKILL.md",
       ],
     }));

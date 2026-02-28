@@ -571,7 +571,7 @@ export function registerApiRoutes(
         reply.code(400);
         return {
           error:
-            "taskDelegationStrategies.bottomUp.inactiveAgentNotificationTarget must be either all-managers or ceo-only",
+            "taskDelegationStrategies.bottomUp.inactiveAgentNotificationTarget must be either all-managers or goat-only",
         };
       }
 
@@ -588,7 +588,7 @@ export function registerApiRoutes(
         reply.code(400);
         return {
           error:
-            "inactiveAgentNotificationTarget must be either all-managers or ceo-only",
+            "inactiveAgentNotificationTarget must be either all-managers or goat-only",
         };
       }
 
@@ -813,7 +813,7 @@ export function registerApiRoutes(
       const taskAutomationMessage = !nextSettings.taskCronEnabled
         ? "disabled"
         : ceoBootstrapPending
-          ? "enabled, waiting for the first CEO message before checks start"
+          ? "enabled, waiting for the first Goat message before checks start"
           : "enabled";
       const topDownStrategy = nextSettings.taskDelegationStrategies.topDown;
       const bottomUpStrategy = nextSettings.taskDelegationStrategies.bottomUp;

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-const DEFAULT_REPORTS_TO = "ceo";
+const DEFAULT_REPORTS_TO = "goat";
 const OPENCLAW_PROVIDER_ID = "openclaw";
 
 export interface CreateAgentFormValue {

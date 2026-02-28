@@ -75,15 +75,15 @@ export class BootstrapService {
       skippedPaths,
     );
 
-    const ceo: AgentIdentity = {
+    const goat: AgentIdentity = {
       id: DEFAULT_AGENT_ID,
-      displayName: "CEO",
+      displayName: "Goat",
     };
 
-    const agentResult = await this.agentService.ensureAgent(paths, ceo, {
+    const agentResult = await this.agentService.ensureAgent(paths, goat, {
       type: "manager",
       reportsTo: null,
-      role: "CEO",
+      role: "Goat",
     });
     const workspaceBootstrapResult = agentResult.alreadyExisted
       ? {

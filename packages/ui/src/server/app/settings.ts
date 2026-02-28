@@ -105,8 +105,8 @@ export function parseInactiveAgentNotificationTarget(
   if (normalized === "all-managers") {
     return "all-managers";
   }
-  if (normalized === "ceo-only") {
-    return "ceo-only";
+  if (normalized === "goat-only" || normalized === "ceo-only") {
+    return "goat-only";
   }
   return undefined;
 }

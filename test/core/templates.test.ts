@@ -12,7 +12,7 @@ describe("default templates", () => {
 
     expect(config).toEqual({
       schemaVersion: 1,
-      defaultAgent: "ceo",
+      defaultAgent: "goat",
       createdAt: "2026-02-06T00:00:00.000Z",
       updatedAt: "2026-02-06T00:00:00.000Z",
     });
@@ -20,17 +20,17 @@ describe("default templates", () => {
 
   it("renders agents index payload", () => {
     const index = renderAgentsIndex("2026-02-06T00:00:00.000Z", [
-      "ceo",
+      "goat",
       "research",
     ]);
 
     expect(index.schemaVersion).toBe(1);
-    expect(index.agents).toEqual(["ceo", "research"]);
+    expect(index.agents).toEqual(["goat", "research"]);
     expect(index.updatedAt).toBe("2026-02-06T00:00:00.000Z");
   });
 
   it("renders internal agent config templates", () => {
-    const identity = { id: "ceo", displayName: "CEO" };
+    const identity = { id: "goat", displayName: "Goat" };
     const internalConfig = renderInternalAgentConfig(identity) as {
       role: string;
       organization: { type: string; reportsTo: string | null };
@@ -40,7 +40,7 @@ describe("default templates", () => {
         skills: { assigned: string[] };
       };
     };
-    expect(internalConfig.role).toBe("CEO");
+    expect(internalConfig.role).toBe("Goat");
     expect(internalConfig.organization.type).toBe("manager");
     expect(internalConfig.organization.reportsTo).toBeNull();
     expect(internalConfig.runtime.provider.id).toBe("openclaw");

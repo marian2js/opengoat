@@ -45,18 +45,18 @@ describe("ProviderService (OpenClaw runtime)", () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
     const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, "ceo");
+    await seedAgent(fileSystem, paths, "goat");
 
     const provider = new FakeOpenClawProvider();
     const service = createProviderService(fileSystem, createRegistry(provider));
 
-    const result = await service.invokeAgent(paths, "ceo", { message: "hello" });
+    const result = await service.invokeAgent(paths, "goat", { message: "hello" });
 
     expect(result.providerId).toBe("openclaw");
     expect(provider.lastInvoke?.cwd).toBeUndefined();
     expect(provider.lastInvoke?.systemPrompt).toBeUndefined();
     expect(provider.lastInvoke?.message).toBe("hello");
-    expect(provider.lastInvoke?.agent).toBe("ceo");
+    expect(provider.lastInvoke?.agent).toBe("goat");
   });
 
   it("stores and resolves external gateway config", async () => {
@@ -143,7 +143,7 @@ describe("ProviderService (OpenClaw runtime)", () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
     const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, "ceo");
+    await seedAgent(fileSystem, paths, "goat");
 
     const provider = new FlakyUvCwdProvider();
     const service = createProviderService(fileSystem, createRegistry(provider));
@@ -156,7 +156,7 @@ describe("ProviderService (OpenClaw runtime)", () => {
         stderr: ""
       });
 
-    const result = await service.invokeAgent(paths, "ceo", {
+    const result = await service.invokeAgent(paths, "goat", {
       message: "hello",
       cwd: "/tmp",
       env: {
@@ -180,13 +180,13 @@ describe("ProviderService (OpenClaw runtime)", () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
     const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, "ceo");
+    await seedAgent(fileSystem, paths, "goat");
 
     const provider = new FlakySessionLockProvider();
     const service = createProviderService(fileSystem, createRegistry(provider));
 
     const executeCommandSpy = vi.spyOn(commandExecutor, "executeCommand");
-    const result = await service.invokeAgent(paths, "ceo", {
+    const result = await service.invokeAgent(paths, "goat", {
       message: "hello after lock"
     });
 
@@ -199,7 +199,7 @@ describe("ProviderService (OpenClaw runtime)", () => {
     const root = await createTempDir("opengoat-provider-service-");
     roots.push(root);
     const { paths, fileSystem } = await createPaths(root);
-    await seedAgent(fileSystem, paths, "ceo");
+    await seedAgent(fileSystem, paths, "goat");
 
     const provider = new MissingCommandOpenClawProvider();
     const service = createProviderService(fileSystem, createRegistry(provider));
@@ -208,17 +208,17 @@ describe("ProviderService (OpenClaw runtime)", () => {
       .spyOn(gatewayRpc, "callOpenClawGatewayRpc")
       .mockResolvedValue({
         payloads: [{ text: "gateway hello" }],
-        meta: { agentMeta: { sessionId: "agent:ceo:main" } }
+        meta: { agentMeta: { sessionId: "agent:goat:main" } }
       });
 
-    const result = await service.invokeAgent(paths, "ceo", {
+    const result = await service.invokeAgent(paths, "goat", {
       message: "hello from fallback",
       providerSessionId: "main"
     });
 
     expect(result.code).toBe(0);
     expect(result.stdout).toBe("gateway hello");
-    expect(result.providerSessionId).toBe("agent:ceo:main");
+    expect(result.providerSessionId).toBe("agent:goat:main");
     expect(gatewayCallSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         method: "agent"
@@ -387,7 +387,7 @@ async function seedAgent(fileSystem: NodeFileSystem, paths: OpenGoatPaths, agent
     path.join(paths.agentsDir, agentId, "config.json"),
     JSON.stringify(
       {
-        displayName: "CEO",
+        displayName: "Goat",
         prompt: {
           bootstrapFiles: ["AGENTS.md"]
         },

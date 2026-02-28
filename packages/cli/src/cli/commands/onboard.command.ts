@@ -115,7 +115,7 @@ export const onboardCommand: CliCommand = {
       }
       if (runtimeSync) {
         context.stdout.write(
-          `OpenClaw default sync: ceo=${runtimeSync.ceoSynced ? "ok" : "failed"}`
+          `OpenClaw default sync: goat=${runtimeSync.ceoSynced ? "ok" : "failed"}`
         );
         if (typeof runtimeSync.ceoSyncCode === "number") {
           context.stdout.write(` (code ${runtimeSync.ceoSyncCode})`);

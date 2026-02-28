@@ -40,7 +40,7 @@ export function toBottomUpTaskDelegationRuntimeStrategy(
 ): {
   enabled: boolean;
   inactiveMinutes: number;
-  notificationTarget: "all-managers" | "ceo-only";
+  notificationTarget: "all-managers" | "goat-only";
 } {
   return {
     enabled: value.enabled,

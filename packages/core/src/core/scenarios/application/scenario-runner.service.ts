@@ -37,7 +37,7 @@ export class ScenarioRunnerService {
     scenario: ScenarioSpec,
   ): Promise<ScenarioRunResult> {
     await service.initialize();
-    const result = await service.runAgent(scenario.entryAgentId ?? "ceo", {
+    const result = await service.runAgent(scenario.entryAgentId ?? "goat", {
       message: scenario.message,
     });
     return this.evaluate("live", scenario, result);
@@ -64,7 +64,7 @@ export class ScenarioRunnerService {
       await service.createAgent(agent.name);
     }
 
-    const result = await service.runAgent(scenario.entryAgentId ?? "ceo", {
+    const result = await service.runAgent(scenario.entryAgentId ?? "goat", {
       message: scenario.message,
     });
     return this.evaluate("scripted", scenario, result);
@@ -160,6 +160,7 @@ class ScenarioScriptedProvider extends BaseProvider {
   private resolveOutput(agentId: string, message: string): string {
     const reply =
       this.scenario.scripted?.agentReplies[agentId] ??
+      this.scenario.scripted?.agentReplies.goat ??
       this.scenario.scripted?.agentReplies.ceo ??
       `handled-by:${agentId}`;
     return reply.endsWith("\n") ? reply : `${reply}\n`;

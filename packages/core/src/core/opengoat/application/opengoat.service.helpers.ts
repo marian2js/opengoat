@@ -82,15 +82,17 @@ export function resolveMaxParallelFlows(value: number | undefined): number {
 }
 
 export function resolveInactiveAgentNotificationTarget(
-  value: "all-managers" | "ceo-only" | undefined,
-): "all-managers" | "ceo-only" {
-  return value === "ceo-only" ? "ceo-only" : "all-managers";
+  value: "all-managers" | "goat-only" | "ceo-only" | undefined,
+): "all-managers" | "goat-only" {
+  return value === "goat-only" || value === "ceo-only"
+    ? "goat-only"
+    : "all-managers";
 }
 
 export interface BottomUpTaskDelegationStrategyConfig {
   enabled?: boolean;
   inactiveMinutes?: number;
-  notificationTarget?: "all-managers" | "ceo-only";
+  notificationTarget?: "all-managers" | "goat-only" | "ceo-only";
 }
 
 export interface TopDownTaskDelegationStrategyConfig {
@@ -111,7 +113,7 @@ export interface ResolvedTopDownTaskDelegationStrategy {
 export interface ResolvedBottomUpTaskDelegationStrategy {
   enabled: boolean;
   inactiveMinutes: number;
-  notificationTarget: "all-managers" | "ceo-only";
+  notificationTarget: "all-managers" | "goat-only";
 }
 
 export function resolveTopDownOpenTasksThreshold(value: number | undefined): number {
@@ -146,7 +148,7 @@ export function resolveTopDownTaskDelegationStrategy(options: {
 
 export function resolveBottomUpTaskDelegationStrategy(options: {
   inactiveMinutes?: number;
-  notificationTarget?: "all-managers" | "ceo-only";
+  notificationTarget?: "all-managers" | "goat-only" | "ceo-only";
   notifyInactiveAgents?: boolean;
   delegationStrategies?: TaskDelegationStrategiesConfig;
 }): ResolvedBottomUpTaskDelegationStrategy {
@@ -531,10 +533,10 @@ export function buildTopDownTaskDelegationMessage(params: {
     ...(notificationTimestamp
       ? [`Notification timestamp: ${notificationTimestamp}`]
       : []),
-    `Organization context: ${params.totalAgents} total agents, ${params.managerAgents} managers, ${params.ceoDirectReportees} direct CEO reportees.`,
+    `Organization context: ${params.totalAgents} total agents, ${params.managerAgents} managers, ${params.ceoDirectReportees} direct Goat reportees.`,
     `Open task status distribution: ${statusSummary}.`,
     "",
-    "CEO guidance for creating next tasks:",
+    "Goat guidance for creating next tasks:",
     "1. Review current project status and near-term objectives before creating work.",
     "2. Keep decisions aligned with MISSION, VISION, and STRATEGY.",
     "3. Prioritize high-value, low-effort tasks when possible.",

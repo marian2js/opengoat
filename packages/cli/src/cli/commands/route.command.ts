@@ -130,5 +130,5 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("  opengoat route --message <text> [--agent <id>] [--json]\n");
   output.write("\n");
   output.write("Defaults:\n");
-  output.write("  agent-id defaults to config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo\n");
+  output.write("  agent-id defaults to config defaultAgent / OPENGOAT_DEFAULT_AGENT / goat\n");
 }

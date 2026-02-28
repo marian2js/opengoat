@@ -30,7 +30,7 @@ describe("SessionService", () => {
     });
     const paths = createPaths(root);
 
-    const first = await service.prepareRunSession(paths, "ceo", {
+    const first = await service.prepareRunSession(paths, "goat", {
       sessionRef: "workspace:saaslib",
       userMessage: "first turn"
     });
@@ -39,7 +39,7 @@ describe("SessionService", () => {
       return;
     }
 
-    const second = await service.prepareRunSession(paths, "ceo", {
+    const second = await service.prepareRunSession(paths, "goat", {
       sessionRef: "workspace:saaslib",
       userMessage: "second turn"
     });
@@ -48,7 +48,7 @@ describe("SessionService", () => {
       return;
     }
 
-    expect(second.info.workspacePath).toBe(path.join(root, "workspaces", "ceo"));
+    expect(second.info.workspacePath).toBe(path.join(root, "workspaces", "goat"));
     expect(second.info.sessionId).toBe(first.info.sessionId);
   });
 
@@ -63,7 +63,7 @@ describe("SessionService", () => {
     });
     const paths = createPaths(root);
 
-    const first = await service.prepareRunSession(paths, "ceo", {
+    const first = await service.prepareRunSession(paths, "goat", {
       sessionRef: "workspace:shared",
       userMessage: "first turn"
     });
@@ -72,7 +72,7 @@ describe("SessionService", () => {
       return;
     }
 
-    const second = await service.prepareRunSession(paths, "ceo", {
+    const second = await service.prepareRunSession(paths, "goat", {
       sessionRef: "workspace:shared",
       forceNew: true,
       userMessage: "second turn"
@@ -97,19 +97,19 @@ describe("SessionService", () => {
     const paths = createPaths(root);
     const sessionRef = "workspace:autotitle";
 
-    await service.prepareRunSession(paths, "ceo", {
+    await service.prepareRunSession(paths, "goat", {
       sessionRef,
       userMessage: ""
     });
 
-    await service.renameSession(paths, "ceo", "New Session", sessionRef);
+    await service.renameSession(paths, "goat", "New Session", sessionRef);
 
-    await service.prepareRunSession(paths, "ceo", {
+    await service.prepareRunSession(paths, "goat", {
       sessionRef,
       userMessage: "Plan the migration and document each step."
     });
 
-    const sessions = await service.listSessions(paths, "ceo");
+    const sessions = await service.listSessions(paths, "goat");
     expect(sessions).toHaveLength(1);
     expect(sessions[0]?.title).toBe("Plan the migration a...");
   });
@@ -126,19 +126,19 @@ describe("SessionService", () => {
     const paths = createPaths(root);
     const sessionRef = "workspace:no-retitle";
 
-    await service.prepareRunSession(paths, "ceo", {
+    await service.prepareRunSession(paths, "goat", {
       sessionRef,
       userMessage: "Initial kickoff"
     });
 
-    await service.renameSession(paths, "ceo", "New Session", sessionRef);
+    await service.renameSession(paths, "goat", "New Session", sessionRef);
 
-    await service.prepareRunSession(paths, "ceo", {
+    await service.prepareRunSession(paths, "goat", {
       sessionRef,
       userMessage: "This should not overwrite a post-first-message manual title."
     });
 
-    const sessions = await service.listSessions(paths, "ceo");
+    const sessions = await service.listSessions(paths, "goat");
     expect(sessions).toHaveLength(1);
     expect(sessions[0]?.title).toBe("New Session");
   });

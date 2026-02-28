@@ -404,7 +404,7 @@ export class OpenGoatAcpAgent implements Agent {
           {
             id: this.defaultAgentId,
             name: "Manager",
-            description: "Default OpenGoat manager agent (ceo / head of organization)."
+            description: "Default OpenGoat manager agent (goat / head of organization)."
           }
         ]
       };
