@@ -32,7 +32,7 @@ describe("BoardService (tasks-only)", () => {
       nowIso: () => "2026-02-10T12:34:56.000Z",
     });
 
-    const task = await harness.boardService.createTask(harness.paths, "ceo", {
+    const task = await harness.boardService.createTask(harness.paths, "goat", {
       title: "Auto timestamp test",
       description: "Verify internal timestamp defaults",
       assignedTo: "cto",
@@ -45,14 +45,14 @@ describe("BoardService (tasks-only)", () => {
   it("allows assigning tasks to direct and indirect reportees", async () => {
     const harness = await createHarness();
 
-    const direct = await harness.boardService.createTask(harness.paths, "ceo", {
+    const direct = await harness.boardService.createTask(harness.paths, "goat", {
       title: "Define roadmap",
       description: "Draft roadmap",
       assignedTo: "cto",
     });
     expect(direct.assignedTo).toBe("cto");
 
-    const indirect = await harness.boardService.createTask(harness.paths, "ceo", {
+    const indirect = await harness.boardService.createTask(harness.paths, "goat", {
       title: "Deep implementation",
       description: "Implement execution detail",
       assignedTo: "engineer",
@@ -105,7 +105,7 @@ describe("BoardService (tasks-only)", () => {
   it("allows updating own tasks and tasks of reportees", async () => {
     const harness = await createHarness();
 
-    const task = await harness.boardService.createTask(harness.paths, "ceo", {
+    const task = await harness.boardService.createTask(harness.paths, "goat", {
       title: "Architecture review",
       description: "Review architecture and report",
       assignedTo: "engineer",
@@ -129,12 +129,12 @@ describe("BoardService (tasks-only)", () => {
 
     const upperManagerUpdate = await harness.boardService.addTaskArtifact(
       harness.paths,
-      "ceo",
+      "goat",
       task.taskId,
       "Architecture draft v1",
     );
     expect(upperManagerUpdate.artifacts).toHaveLength(1);
-    expect(upperManagerUpdate.artifacts[0]?.createdBy).toBe("ceo");
+    expect(upperManagerUpdate.artifacts[0]?.createdBy).toBe("goat");
 
     await expect(
       harness.boardService.updateTaskStatus(harness.paths, "qa", task.taskId, "done"),
@@ -146,7 +146,7 @@ describe("BoardService (tasks-only)", () => {
   it("deletes tasks in bulk when actor has permission", async () => {
     const harness = await createHarness();
 
-    const first = await harness.boardService.createTask(harness.paths, "ceo", {
+    const first = await harness.boardService.createTask(harness.paths, "goat", {
       title: "Delete first",
       description: "Clean this up",
       assignedTo: "cto",
@@ -157,7 +157,7 @@ describe("BoardService (tasks-only)", () => {
       assignedTo: "engineer",
     });
 
-    const result = await harness.boardService.deleteTasks(harness.paths, "ceo", [
+    const result = await harness.boardService.deleteTasks(harness.paths, "goat", [
       first.taskId,
       second.taskId,
       second.taskId,
@@ -192,7 +192,7 @@ describe("BoardService (tasks-only)", () => {
   it("accepts only todo/doing/pending/blocked/done as task status values", async () => {
     const harness = await createHarness();
 
-    const created = await harness.boardService.createTask(harness.paths, "ceo", {
+    const created = await harness.boardService.createTask(harness.paths, "goat", {
       title: "Prepare release",
       description: "Prepare release notes",
       assignedTo: "cto",
@@ -232,7 +232,7 @@ describe("BoardService (tasks-only)", () => {
     ).rejects.toThrow("Task status must be one of: todo, doing, pending, blocked, done.");
 
     await expect(
-      harness.boardService.createTask(harness.paths, "ceo", {
+      harness.boardService.createTask(harness.paths, "goat", {
         title: "Invalid status creation",
         description: "Should fail",
         assignedTo: "cto",
@@ -270,7 +270,7 @@ describe("BoardService (tasks-only)", () => {
         INTERNAL_TASK_BUCKET_ID,
         "2026-02-10T00:00:00.000Z",
         "2026-02-10T00:00:00.000Z",
-        "ceo",
+        "goat",
         "cto",
         "Write: Changelog",
         "Fix typo and publish notes",
@@ -314,7 +314,7 @@ describe("BoardService (tasks-only)", () => {
         is_default INTEGER NOT NULL DEFAULT 0
       );
       INSERT INTO boards (board_id, title, created_at, owner_agent_id, is_default)
-      VALUES ('tasks', 'Tasks', '2026-02-10T00:00:00.000Z', 'ceo', 0);
+      VALUES ('tasks', 'Tasks', '2026-02-10T00:00:00.000Z', 'goat', 0);
 
       CREATE TABLE tasks (
         task_id TEXT PRIMARY KEY,
@@ -348,7 +348,7 @@ describe("BoardService (tasks-only)", () => {
         '2026-02-10T00:00:00.000Z',
         '2026-02-10T00:00:00.000Z',
         '/workspace/legacy',
-        'ceo',
+        'goat',
         'cto',
         'Legacy task',
         'Migrate me',
@@ -394,7 +394,7 @@ describe("BoardService (tasks-only)", () => {
         is_default INTEGER NOT NULL DEFAULT 0
       );
       INSERT INTO boards (board_id, title, created_at, owner_agent_id, is_default)
-      VALUES ('tasks', 'Tasks', '2026-02-10T00:00:00.000Z', 'ceo', 0);
+      VALUES ('tasks', 'Tasks', '2026-02-10T00:00:00.000Z', 'goat', 0);
 
       CREATE TABLE tasks (
         task_id TEXT PRIMARY KEY,
@@ -428,7 +428,7 @@ describe("BoardService (tasks-only)", () => {
         '2026-02-10T00:00:00.000Z',
         '2026-02-10T00:00:00.000Z',
         '2026-02-10T00:00:00.000Z',
-        'ceo',
+        'goat',
         'cto',
         'Legacy existing',
         'Exists before migration',
@@ -487,7 +487,7 @@ describe("BoardService (tasks-only)", () => {
         INTERNAL_TASK_BUCKET_ID,
         "2026-02-11T00:00:00.000Z",
         "2026-02-11T00:00:00.000Z",
-        "ceo",
+        "goat",
         "cto",
         "Inserted by legacy runtime",
         "No updated_at column provided",
@@ -520,7 +520,7 @@ describe("BoardService (tasks-only)", () => {
       }),
     });
 
-    await externalWriter.createTask(harness.paths, "ceo", {
+    await externalWriter.createTask(harness.paths, "goat", {
       title: "Synced from external process",
       description: "Added from a second BoardService instance",
       assignedTo: "cto",
@@ -545,7 +545,7 @@ describe("BoardService (tasks-only)", () => {
       {
         taskId: "task-old",
         createdAt: "2026-02-10T00:00:00.000Z",
-        owner: "ceo",
+        owner: "goat",
         assignedTo: "cto",
         title: "Old",
       },
@@ -638,8 +638,8 @@ describe("BoardService (tasks-only)", () => {
           INTERNAL_TASK_BUCKET_ID,
           `2026-02-10T00:00:00.${sequence}Z`,
           `2026-02-10T00:00:00.${sequence}Z`,
-          "ceo",
-          "ceo",
+          "goat",
+          "goat",
           `Task ${sequence}`,
           `Description ${sequence}`,
           "todo",
@@ -660,7 +660,7 @@ describe("BoardService (tasks-only)", () => {
   it("creates indexes for task status and task ordering", async () => {
     const harness = await createHarness();
 
-    await harness.boardService.createTask(harness.paths, "ceo", {
+    await harness.boardService.createTask(harness.paths, "goat", {
       title: "Indexed task",
       description: "Ensures DB is initialized",
     });
@@ -693,7 +693,7 @@ describe("BoardService (tasks-only)", () => {
       nowIso: () => new Date(nowMs).toISOString(),
     });
 
-    const task = await harness.boardService.createTask(harness.paths, "ceo", {
+    const task = await harness.boardService.createTask(harness.paths, "goat", {
       title: "Long running implementation",
       description: "Build and validate long running flow",
       assignedTo: "engineer",
@@ -778,13 +778,13 @@ async function createHarness(options?: {
 
   await agentService.ensureAgent(
     paths,
-    { id: "ceo", displayName: "CEO" },
-    { type: "manager", reportsTo: null, role: "CEO" },
+    { id: "goat", displayName: "Goat" },
+    { type: "manager", reportsTo: null, role: "Goat" },
   );
   await agentService.ensureAgent(
     paths,
     { id: "cto", displayName: "CTO" },
-    { type: "manager", reportsTo: "ceo", role: "CTO" },
+    { type: "manager", reportsTo: "goat", role: "CTO" },
   );
   await agentService.ensureAgent(
     paths,
@@ -794,7 +794,7 @@ async function createHarness(options?: {
   await agentService.ensureAgent(
     paths,
     { id: "qa", displayName: "QA" },
-    { type: "individual", reportsTo: "ceo", role: "QA" },
+    { type: "individual", reportsTo: "goat", role: "QA" },
   );
 
   const boardService = new BoardService({

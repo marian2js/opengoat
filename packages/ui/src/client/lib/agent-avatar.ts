@@ -1,8 +1,8 @@
 import multiavatar from "@multiavatar/multiavatar/esm";
-import ceoAvatarImage from "../../../../../assets/opengoat.png";
+import rootAvatarImage from "../../../../../assets/opengoat.png";
 
 const MULTIAVATAR_API_BASE_URL = "https://api.multiavatar.com";
-const CEO_AGENT_ID = "ceo";
+const DEFAULT_AGENT_ID = "goat";
 
 export interface AgentAvatarSource {
   src: string;
@@ -11,9 +11,9 @@ export interface AgentAvatarSource {
 
 export function resolveAgentAvatarSource(agentId: string): AgentAvatarSource {
   const normalizedAgentId = agentId.trim();
-  if (normalizedAgentId.toLowerCase() === CEO_AGENT_ID) {
+  if (normalizedAgentId.toLowerCase() === DEFAULT_AGENT_ID) {
     return {
-      src: ceoAvatarImage,
+      src: rootAvatarImage,
       fallbackSrc: null,
     };
   }

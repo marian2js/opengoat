@@ -28,7 +28,7 @@ openclaw onboard
 opengoat start
 ```
 
-That's it. Open `http://127.0.0.1:19123` and start messaging the CEO. He will take care of the rest.
+That's it. Open `http://127.0.0.1:19123` and start messaging Goat, your AI co-founder.
 
 ### Alternative: Docker
 
@@ -60,7 +60,7 @@ When agents execute commands from their OpenGoat workspace, use the workspace sh
 
 ```bash
 sh ./opengoat agent list
-sh ./opengoat agent info ceo
+sh ./opengoat agent info goat
 ```
 
 ### CLI Quick Start (Optional)
@@ -100,7 +100,7 @@ opengoat onboard --external \
 ### Build the organization
 
 ```bash
-opengoat agent create "CTO" --manager --reports-to ceo
+opengoat agent create "CTO" --manager --reports-to goat
 opengoat agent create "Engineer" --individual --reports-to cto --skill coding
 opengoat agent create "Designer" --individual --reports-to cto
 opengoat agent list
@@ -128,11 +128,11 @@ You can also set `defaultAgent` directly in `~/.opengoat/config.json`.
 ### Keep session continuity
 
 ```bash
-opengoat agent ceo \
+opengoat agent goat \
   --session saaslib-planning \
   --message "Create a release checklist for v1.2"
 
-opengoat agent ceo \
+opengoat agent goat \
   --session saaslib-planning \
   --message "Now draft the changelog"
 ```
@@ -150,7 +150,7 @@ opengoat task status <task-id> doing
 ```bash
 opengoat skill install og-boards --from /path/to/skill
 opengoat skill install jira-tools --from /path/to/skill
-opengoat skill list --agent ceo
+opengoat skill list --agent goat
 ```
 
 Role skill behavior:

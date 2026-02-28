@@ -516,7 +516,7 @@ interface OrgNodeData {
 
 const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
-const DEFAULT_AGENT_ID = "ceo";
+const DEFAULT_AGENT_ID = "goat";
 const DEFAULT_TOP_DOWN_OPEN_TASKS_THRESHOLD = 5;
 const DEFAULT_MAX_INACTIVITY_MINUTES = 30;
 const DEFAULT_MAX_IN_PROGRESS_MINUTES = 4 * 60;
@@ -536,8 +536,8 @@ const LOG_FLUSH_INTERVAL_MS = 100;
 const LOG_AUTOSCROLL_BOTTOM_THRESHOLD_PX = 24;
 const TASK_AUTO_REFRESH_INTERVAL_MS = 10_000;
 const TASK_AUTO_REFRESH_HIDDEN_INTERVAL_MS = 30_000;
-const MAX_VISIBLE_CEO_AGENT_SESSIONS = 5;
-const MAX_VISIBLE_NON_CEO_AGENT_SESSIONS = 2;
+const MAX_VISIBLE_GOAT_AGENT_SESSIONS = 5;
+const MAX_VISIBLE_NON_GOAT_AGENT_SESSIONS = 2;
 const MAX_SESSION_MESSAGE_IMAGE_COUNT = 8;
 const MAX_SESSION_MESSAGE_IMAGE_BYTES = 10 * 1024 * 1024;
 const SIDEBAR_AGENT_ORDER_STORAGE_KEY =
@@ -664,8 +664,11 @@ function resolveMaxInProgressMinutesValue(value: unknown): number {
 function resolveInactiveAgentNotificationTarget(
   value: unknown,
 ): InactiveAgentNotificationTarget {
-  if (value === "all-managers" || value === "ceo-only") {
+  if (value === "all-managers" || value === "goat-only") {
     return value;
+  }
+  if (value === "ceo-only") {
+    return "goat-only";
   }
   return defaultTaskDelegationStrategies().bottomUp
     .inactiveAgentNotificationTarget;
@@ -938,7 +941,7 @@ export function DashboardPage(): ReactElement {
   const activeSessionRunAbortControllerRef = useRef<AbortController | null>(
     null,
   );
-  const [taskActorId, setTaskActorId] = useState("ceo");
+  const [taskActorId, setTaskActorId] = useState("goat");
   const [taskDraftByWorkspaceId, setTaskDraftByWorkspaceId] = useState<
     Record<string, TaskCreateDraft>
   >({});
@@ -1648,7 +1651,7 @@ export function DashboardPage(): ReactElement {
 
     const hasTaskActor = agentIds.includes(taskActorId);
     if (!hasTaskActor) {
-      setTaskActorId(agentIds[0] ?? "ceo");
+      setTaskActorId(agentIds[0] ?? "goat");
     }
   }, [state, taskActorId]);
   const createAgentRequest = useCallback(
@@ -1727,7 +1730,7 @@ export function DashboardPage(): ReactElement {
       return [];
     }
 
-    const ceo = agents.find((agent) => agent.id === DEFAULT_AGENT_ID) ?? null;
+    const goat = agents.find((agent) => agent.id === DEFAULT_AGENT_ID) ?? null;
     const others = agents
       .filter((agent) => agent.id !== DEFAULT_AGENT_ID)
       .sort((left, right) =>
@@ -1736,7 +1739,7 @@ export function DashboardPage(): ReactElement {
         }),
       );
 
-    return (ceo ? [ceo, ...others] : others).map((agent) => agent.id);
+    return (goat ? [goat, ...others] : others).map((agent) => agent.id);
   }, [agents]);
   const sortedSidebarAgents = useMemo(() => {
     if (agents.length === 0) {
@@ -2014,8 +2017,8 @@ export function DashboardPage(): ReactElement {
         sessions,
         visibleLimit:
           agent.id === DEFAULT_AGENT_ID
-            ? MAX_VISIBLE_CEO_AGENT_SESSIONS
-            : MAX_VISIBLE_NON_CEO_AGENT_SESSIONS,
+            ? MAX_VISIBLE_GOAT_AGENT_SESSIONS
+            : MAX_VISIBLE_NON_GOAT_AGENT_SESSIONS,
       };
     });
   }, [sortedSidebarAgents, sessionsByAgentId]);
@@ -2558,7 +2561,7 @@ export function DashboardPage(): ReactElement {
       },
       {
         id: "sessions",
-        label: "CEO Sessions",
+        label: "Goat Sessions",
         value: state.sessions.sessions.length,
         hint: "Saved conversation contexts",
         icon: Clock3,
@@ -2574,7 +2577,7 @@ export function DashboardPage(): ReactElement {
   }, [openTaskCount, state]);
 
   async function handleDeleteAgent(agentId: string): Promise<void> {
-    if (agentId === "ceo") {
+    if (agentId === "goat") {
       return;
     }
 
@@ -3118,7 +3121,7 @@ export function DashboardPage(): ReactElement {
       const statusMessage = !taskCronEnabledInput
         ? "Task automation checks disabled."
         : response.settings.ceoBootstrapPending
-        ? "Task automation checks are waiting for the first CEO message."
+        ? "Task automation checks are waiting for the first Goat message."
         : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; in-progress timeout set to ${resolvedMaxInProgressMinutes} minutes; Top-Down ${
             topDownTaskDelegationEnabledInput
               ? `enabled (threshold ${resolvedTopDownOpenTasksThreshold})`
@@ -5901,7 +5904,7 @@ function OrganizationGetStartedPanel({
 }): ReactElement {
   const ceoName =
     ceoAgent?.displayName?.trim() || DEFAULT_AGENT_ID.toUpperCase();
-  const ceoRole = ceoAgent?.role?.trim() || "Organization CEO";
+  const ceoRole = ceoAgent?.role?.trim() || "Organization Goat";
 
   return (
     <Card className="border-border/70 bg-card/70">
@@ -5910,7 +5913,7 @@ function OrganizationGetStartedPanel({
           Build Your Organization
         </CardTitle>
         <CardDescription className="text-[14px]">
-          Your CEO is ready. Create the next agent and they will report to CEO
+          Your Goat is ready. Create the next agent and they will report to Goat
           by default.
         </CardDescription>
       </CardHeader>
@@ -5949,7 +5952,7 @@ function OrganizationGetStartedPanel({
             </Button>
 
             <p className="text-center text-xs text-muted-foreground sm:text-sm">
-              The new agent will be created as a direct report to CEO.
+              The new agent will be created as a direct report to Goat.
             </p>
           </div>
         </div>

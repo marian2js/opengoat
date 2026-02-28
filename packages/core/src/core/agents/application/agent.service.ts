@@ -205,7 +205,17 @@ export class AgentService {
       });
     }
 
-    return descriptors.sort((left, right) => left.id.localeCompare(right.id));
+    return descriptors.sort((left, right) => {
+      const leftIsDefault = isDefaultAgentId(left.id);
+      const rightIsDefault = isDefaultAgentId(right.id);
+      if (leftIsDefault && !rightIsDefault) {
+        return -1;
+      }
+      if (!leftIsDefault && rightIsDefault) {
+        return 1;
+      }
+      return left.id.localeCompare(right.id);
+    });
   }
 
   public async ensureCeoWorkspaceBootstrap(
@@ -625,7 +635,7 @@ export class AgentService {
     }
     if (isDefaultAgentId(agentId)) {
       throw new Error(
-        "Cannot delete ceo. It is the immutable default entry agent.",
+        "Cannot delete goat. It is the immutable default entry agent.",
       );
     }
 
@@ -691,7 +701,7 @@ export class AgentService {
     }
     if (isDefaultAgentId(agentId) && explicitReportsTo) {
       throw new Error(
-        "ceo is the head of the organization and cannot report to another agent.",
+        "goat is the head of the organization and cannot report to another agent.",
       );
     }
     const reportsTo = resolveReportsTo(agentId, rawReportsTo);

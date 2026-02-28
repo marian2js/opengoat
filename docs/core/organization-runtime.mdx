@@ -7,7 +7,7 @@ description: "Core architecture, invariants, and execution model for OpenGoat or
 
 OpenGoat is an organization-first runtime with provider-bound agents.
 
-- `ceo` is the root manager and cannot be deleted.
+- `goat` is the root manager and cannot be deleted.
 - Every agent has a provider binding (`runtime.provider.id`).
 - Default provider binding is `openclaw` unless overridden per agent.
 - Manager behavior is implemented through skills and prompts, not a built-in planner loop.
@@ -18,7 +18,7 @@ OpenGoat resolves the target agent in this order:
 
 1. `OPENGOAT_DEFAULT_AGENT`
 2. `config.defaultAgent`
-3. `ceo`
+3. `goat`
 
 ## Hierarchy Model
 

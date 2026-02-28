@@ -97,7 +97,7 @@ describe("runCli", () => {
     ) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("ceo");
+    expect(config.defaultAgent).toBe("goat");
   }, BOOTSTRAP_TIMEOUT_MS);
 
   it("bootstraps through CLI init command", async () => {
@@ -115,7 +115,7 @@ describe("runCli", () => {
     ) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("ceo");
+    expect(config.defaultAgent).toBe("goat");
   }, INIT_TIMEOUT_MS);
 
   it("returns non-zero for unknown commands", async () => {

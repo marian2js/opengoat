@@ -3,12 +3,12 @@ import { RoutingService } from "../../packages/core/src/core/orchestration/index
 import type { AgentManifest } from "../../packages/core/src/core/agents/index.js";
 
 describe("RoutingService", () => {
-  it("routes ceo manager traffic to best matching direct report", () => {
+  it("routes goat manager traffic to best matching direct report", () => {
     const service = new RoutingService();
     const manifests = createManifests();
 
     const decision = service.decide({
-      entryAgentId: "ceo",
+      entryAgentId: "goat",
       message: "Please research API docs and summarize findings.",
       manifests
     });
@@ -47,26 +47,26 @@ describe("RoutingService", () => {
     );
 
     const decision = service.decide({
-      entryAgentId: "ceo",
+      entryAgentId: "goat",
       message: "Please research API docs and summarize findings.",
       manifests
     });
 
-    expect(decision.targetAgentId).toBe("ceo");
+    expect(decision.targetAgentId).toBe("goat");
   });
 });
 
 function createManifests(): AgentManifest[] {
   return [
     {
-      agentId: "ceo",
-      filePath: "/tmp/ceo/AGENTS.md",
-      workspaceDir: "/tmp/ceo",
+      agentId: "goat",
+      filePath: "/tmp/goat/AGENTS.md",
+      workspaceDir: "/tmp/goat",
       source: "frontmatter",
-      body: "# CEO",
+      body: "# Goat",
       metadata: {
-        id: "ceo",
-        name: "CEO",
+        id: "goat",
+        name: "Goat",
         description: "Routes tasks to specialists",
         type: "manager",
         reportsTo: null,
@@ -88,7 +88,7 @@ function createManifests(): AgentManifest[] {
         name: "Research Agent",
         description: "Researches documentation and technical topics",
         type: "individual",
-        reportsTo: "ceo",
+        reportsTo: "goat",
         discoverable: true,
         tags: ["research", "docs"],
         skills: [],
@@ -107,7 +107,7 @@ function createManifests(): AgentManifest[] {
         name: "Writer Agent",
         description: "Creates polished written content",
         type: "individual",
-        reportsTo: "ceo",
+        reportsTo: "goat",
         discoverable: true,
         tags: ["writing", "content"],
         skills: [],

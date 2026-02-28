@@ -69,7 +69,7 @@ export function AgentsPage({
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={agent.id === "ceo" || isMutating}
+                  disabled={agent.id === "goat" || isMutating}
                   onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();

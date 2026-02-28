@@ -25,13 +25,13 @@ afterEach(async () => {
 });
 
 describe("BootstrapService", () => {
-  it("initializes the full OpenGoat home and ceo manager agent", async () => {
+  it("initializes the full OpenGoat home and goat manager agent", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     const result = await service.initialize();
 
     expect(result.paths.homeDir).toBe(paths.homeDir);
-    expect(result.defaultAgent).toBe("ceo");
+    expect(result.defaultAgent).toBe("goat");
     expect(result.createdPaths.length).toBeGreaterThan(0);
     expect(await fileSystem.exists(paths.organizationDir)).toBe(true);
     const organizationTemplates = listOrganizationMarkdownTemplates();
@@ -50,29 +50,29 @@ describe("BootstrapService", () => {
     ) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("ceo");
+    expect(config.defaultAgent).toBe("goat");
 
     const ceoConfig = JSON.parse(
-      await readFile(path.join(paths.agentsDir, "ceo", "config.json"), "utf-8"),
+      await readFile(path.join(paths.agentsDir, "goat", "config.json"), "utf-8"),
     ) as { runtime?: { provider?: { id?: string } } };
     expect(ceoConfig.runtime?.provider?.id).toBe("openclaw");
 
     expect(
       await fileSystem.exists(
-        path.join(paths.workspacesDir, "ceo", "AGENTS.md"),
+        path.join(paths.workspacesDir, "goat", "AGENTS.md"),
       ),
     ).toBe(false);
     expect(
-      await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "ROLE.md")),
+      await fileSystem.exists(path.join(paths.workspacesDir, "goat", "ROLE.md")),
     ).toBe(true);
     expect(
       await fileSystem.exists(
-        path.join(paths.workspacesDir, "ceo", "reportees"),
+        path.join(paths.workspacesDir, "goat", "reportees"),
       ),
     ).toBe(true);
     const ceoOrganizationLinkPath = path.join(
       paths.workspacesDir,
-      "ceo",
+      "goat",
       "organization",
     );
     expect((await lstat(ceoOrganizationLinkPath)).isSymbolicLink()).toBe(true);
@@ -83,18 +83,18 @@ describe("BootstrapService", () => {
       ),
     ).toBe(path.resolve(paths.organizationDir));
     expect(
-      await fileSystem.exists(path.join(paths.workspacesDir, "ceo", "SOUL.md")),
+      await fileSystem.exists(path.join(paths.workspacesDir, "goat", "SOUL.md")),
     ).toBe(false);
     expect(
       await fileSystem.exists(
-        path.join(paths.workspacesDir, "ceo", "skills", "manager", "SKILL.md"),
+        path.join(paths.workspacesDir, "goat", "skills", "manager", "SKILL.md"),
       ),
     ).toBe(false);
     expect(
       await fileSystem.exists(
         path.join(
           paths.workspacesDir,
-          "ceo",
+          "goat",
           "skills",
           "og-board-manager",
           "SKILL.md",
@@ -103,17 +103,17 @@ describe("BootstrapService", () => {
     ).toBe(true);
     expect(
       await fileSystem.exists(
-        path.join(paths.workspacesDir, "ceo", "skills", "og-board-individual"),
+        path.join(paths.workspacesDir, "goat", "skills", "og-board-individual"),
       ),
     ).toBe(false);
     expect(
       await fileSystem.exists(
-        path.join(paths.workspacesDir, "ceo", "skills", "og-boards"),
+        path.join(paths.workspacesDir, "goat", "skills", "og-boards"),
       ),
     ).toBe(false);
     expect(
       await fileSystem.exists(
-        path.join(paths.workspacesDir, "ceo", "BOOTSTRAP.md"),
+        path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md"),
       ),
     ).toBe(true);
     expect(await fileSystem.exists(paths.skillsDir)).toBe(false);
@@ -130,11 +130,11 @@ describe("BootstrapService", () => {
     expect(second.skippedPaths.length).toBeGreaterThan(0);
   });
 
-  it("does not recreate ceo BOOTSTRAP.md after initial creation", async () => {
+  it("does not recreate goat BOOTSTRAP.md after initial creation", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     await service.initialize();
-    const bootstrapPath = path.join(paths.workspacesDir, "ceo", "BOOTSTRAP.md");
+    const bootstrapPath = path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md");
     expect(await fileSystem.exists(bootstrapPath)).toBe(true);
 
     await fileSystem.removeDir(bootstrapPath);
@@ -145,12 +145,12 @@ describe("BootstrapService", () => {
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });
 
-  it("does not recreate ceo BOOTSTRAP.md when repairing ceo on an existing home", async () => {
+  it("does not recreate goat BOOTSTRAP.md when repairing goat on an existing home", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     await service.initialize();
-    const bootstrapPath = path.join(paths.workspacesDir, "ceo", "BOOTSTRAP.md");
-    const ceoConfigDir = path.join(paths.agentsDir, "ceo");
+    const bootstrapPath = path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md");
+    const ceoConfigDir = path.join(paths.agentsDir, "goat");
     expect(await fileSystem.exists(bootstrapPath)).toBe(true);
     expect(await fileSystem.exists(ceoConfigDir)).toBe(true);
 
@@ -212,10 +212,10 @@ describe("BootstrapService", () => {
     ) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("ceo");
+    expect(config.defaultAgent).toBe("goat");
   });
 
-  it("ensures agents index always includes ceo", async () => {
+  it("ensures agents index always includes goat", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     await fileSystem.ensureDir(paths.homeDir);
@@ -241,7 +241,7 @@ describe("BootstrapService", () => {
     ) as {
       agents: string[];
     };
-    expect(index.agents).toEqual(["ceo", "research"]);
+    expect(index.agents).toEqual(["goat", "research"]);
   });
 });
 

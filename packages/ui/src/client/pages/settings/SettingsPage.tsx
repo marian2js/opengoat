@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import type { ReactElement } from "react";
 
-export type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
+export type InactiveAgentNotificationTarget = "all-managers" | "goat-only";
 
 interface SettingsPageProps {
   ceoBootstrapPending: boolean;
@@ -134,7 +134,7 @@ export function SettingsPage({
         <section className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-amber-100">
-              Send your first message to the CEO to finish setup and start
+              Send your first message to the Goat to finish setup and start
               background automation.
             </p>
             <Button
@@ -144,7 +144,7 @@ export function SettingsPage({
                 onOpenCeoChat(defaultAgentId);
               }}
             >
-              Open CEO chat
+              Open Goat chat
             </Button>
           </div>
         </section>
@@ -253,7 +253,7 @@ export function SettingsPage({
 
           {ceoBootstrapPending ? (
             <p className="text-xs text-muted-foreground">
-              Background checks stay paused until the first CEO message removes
+              Background checks stay paused until the first Goat message removes
               bootstrap mode.
             </p>
           ) : !taskCronEnabledInput ? (
@@ -295,7 +295,7 @@ export function SettingsPage({
                 Top-Down Task Delegation (Default)
               </h3>
               <p className="text-xs text-muted-foreground">
-                When open tasks are low, the CEO is asked to define the next
+                When open tasks are low, the Goat is asked to define the next
                 highest-impact work and delegate it through the organization.
               </p>
             </div>
@@ -345,7 +345,7 @@ export function SettingsPage({
                 <span className="text-sm text-muted-foreground">open tasks</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                CEO receives a strategy prompt when open tasks are at or below
+                Goat receives a strategy prompt when open tasks are at or below
                 this threshold.
               </p>
             </div>
@@ -428,7 +428,7 @@ export function SettingsPage({
                   className="text-sm font-medium text-foreground"
                   htmlFor="inactiveAgentNotificationTarget"
                 >
-                  Notify CEO only
+                  Notify Goat only
                 </label>
                 <Select
                   value={inactiveAgentNotificationTargetInput}
@@ -449,12 +449,12 @@ export function SettingsPage({
                     <SelectItem value="all-managers">
                       Notify all managers
                     </SelectItem>
-                    <SelectItem value="ceo-only">Notify only CEO</SelectItem>
+                    <SelectItem value="goat-only">Notify only Goat</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  {inactiveAgentNotificationTargetInput === "ceo-only"
-                    ? "Only the CEO receives inactivity alerts, and only for agents that report directly to the CEO."
+                  {inactiveAgentNotificationTargetInput === "goat-only"
+                    ? "Only the Goat receives inactivity alerts, and only for agents that report directly to the Goat."
                     : "Every manager receives inactivity alerts for their own direct reports."}
                 </p>
               </div>
@@ -643,19 +643,19 @@ export function SettingsPage({
           Status:{" "}
           <span className="font-medium text-foreground">
             {ceoBootstrapPending
-              ? "Waiting for first CEO message to start checks"
+              ? "Waiting for first Goat message to start checks"
               : !taskCronEnabledInput
                 ? "Background checks paused"
                 : topDownTaskDelegationEnabledInput &&
                     bottomUpTaskDelegationEnabledInput
-                  ? inactiveAgentNotificationTargetInput === "ceo-only"
-                    ? "Background checks active (Top-Down + Bottom-Up, CEO-only inactivity routing)"
+                  ? inactiveAgentNotificationTargetInput === "goat-only"
+                    ? "Background checks active (Top-Down + Bottom-Up, Goat-only inactivity routing)"
                     : "Background checks active (Top-Down + Bottom-Up)"
                   : topDownTaskDelegationEnabledInput
                     ? "Background checks active (Top-Down only)"
                     : bottomUpTaskDelegationEnabledInput
-                      ? inactiveAgentNotificationTargetInput === "ceo-only"
-                        ? "Background checks active (Bottom-Up only, CEO-only inactivity routing)"
+                      ? inactiveAgentNotificationTargetInput === "goat-only"
+                        ? "Background checks active (Bottom-Up only, Goat-only inactivity routing)"
                         : "Background checks active (Bottom-Up only)"
                       : "Background checks active (task delegation strategies paused)"}
           </span>

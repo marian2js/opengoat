@@ -102,5 +102,5 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write("  opengoat session list [--agent <id>] [--active-minutes <n>] [--json]\n");
   output.write("\n");
-  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo\n");
+  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / goat\n");
 }

@@ -88,5 +88,5 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write("  opengoat session remove [--agent <id>] [--session <key|id>] [--json]\n");
   output.write("\n");
-  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo, session=main\n");
+  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / goat, session=main\n");
 }

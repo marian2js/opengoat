@@ -216,13 +216,13 @@ export function createTaskCronScheduler(
         return;
       }
       stopBootstrapCheck();
-      app.log.info("[task-cron] scheduler resumed after CEO bootstrap completion");
+      app.log.info("[task-cron] scheduler resumed after Goat bootstrap completion");
       logs.append({
         timestamp: new Date().toISOString(),
         level: "info",
         source: "opengoat",
         message:
-          "[task-cron] scheduler resumed after first CEO message completed bootstrap.",
+          "[task-cron] scheduler resumed after first Goat message completed bootstrap.",
       });
       schedule();
     }, DEFAULT_TASK_CHECK_FREQUENCY_MINUTES * 60_000);

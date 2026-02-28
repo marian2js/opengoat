@@ -111,5 +111,5 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("Usage:\n");
   output.write("  opengoat agent last-action [agent-id] [--json]\n");
   output.write("\n");
-  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo\n");
+  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / goat\n");
 }

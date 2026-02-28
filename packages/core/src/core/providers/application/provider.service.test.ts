@@ -107,15 +107,15 @@ describe("ProviderService", () => {
     expect(config.runtime?.adapter).toBeUndefined();
   });
 
-  it("keeps ceo bound to openclaw", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-provider-service-ceo-"));
+  it("keeps goat bound to openclaw", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-provider-service-goat-"));
     tempDirs.push(tempDir);
     const paths = createPaths(tempDir);
 
     const { service } = await createService(paths);
-    await writeAgentConfig(paths, "ceo", {
-      id: "ceo",
-      displayName: "CEO",
+    await writeAgentConfig(paths, "goat", {
+      id: "goat",
+      displayName: "Goat",
       runtime: {
         provider: {
           id: "openclaw",
@@ -123,11 +123,11 @@ describe("ProviderService", () => {
       },
     });
 
-    await expect(service.setAgentProvider(paths, "ceo", "claude-code")).rejects.toThrow(
-      'ceo provider is fixed to "openclaw".',
+    await expect(service.setAgentProvider(paths, "goat", "claude-code")).rejects.toThrow(
+      'goat provider is fixed to "openclaw".',
     );
 
-    const binding = await service.getAgentProvider(paths, "ceo");
+    const binding = await service.getAgentProvider(paths, "goat");
     expect(binding.providerId).toBe("openclaw");
   });
 
@@ -168,7 +168,7 @@ describe("ProviderService", () => {
     const paths = createPaths(tempDir);
     const { service, openClawProvider } = await createService(paths);
     const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
-    const sessionKey = "agent:ceo:session-7";
+    const sessionKey = "agent:goat:session-7";
 
     callOpenClawGatewayRpcMock.mockImplementation(async (input: {
       method: string;
@@ -221,7 +221,7 @@ describe("ProviderService", () => {
       throw new Error(`Unexpected method: ${input.method}`);
     });
 
-    const result = await service.invokeAgent(paths, "ceo", {
+    const result = await service.invokeAgent(paths, "goat", {
       message: "/model",
       providerSessionId: "session-7",
     });
@@ -245,7 +245,7 @@ describe("ProviderService", () => {
     const paths = createPaths(tempDir);
     const { service, openClawProvider } = await createService(paths);
 
-    const result = await service.invokeAgent(paths, "ceo", {
+    const result = await service.invokeAgent(paths, "goat", {
       message: "hello",
       providerSessionId: "session-9",
     });
@@ -278,7 +278,7 @@ describe("ProviderService", () => {
         providerSessionId: "session-recovered",
       });
 
-    const result = await service.invokeAgent(paths, "ceo", {
+    const result = await service.invokeAgent(paths, "goat", {
       message: "hello",
       providerSessionId: "session-recovered",
     });

@@ -49,7 +49,7 @@ describe("opengoat task cron notification helpers", () => {
     ).toContain(`Notification timestamp: ${normalizedTimestamp}`);
     expect(
       buildInactiveAgentMessage({
-        managerAgentId: "ceo",
+        managerAgentId: "goat",
         subjectAgentId: "engineer",
         subjectName: "Engineer",
         role: "Backend Engineer",
@@ -134,7 +134,7 @@ describe("opengoat task cron notification helpers", () => {
         bottomUp: {
           enabled: false,
           inactiveMinutes: 90,
-          notificationTarget: "ceo-only",
+          notificationTarget: "goat-only",
         },
       },
     });
@@ -142,21 +142,35 @@ describe("opengoat task cron notification helpers", () => {
     expect(resolved).toEqual({
       enabled: false,
       inactiveMinutes: 90,
-      notificationTarget: "ceo-only",
+      notificationTarget: "goat-only",
     });
+  });
+
+  it("maps legacy ceo-only bottom-up target to goat-only", () => {
+    const resolved = resolveBottomUpTaskDelegationStrategy({
+      delegationStrategies: {
+        bottomUp: {
+          enabled: true,
+          inactiveMinutes: 45,
+          notificationTarget: "ceo-only",
+        },
+      },
+    });
+
+    expect(resolved.notificationTarget).toBe("goat-only");
   });
 
   it("falls back to legacy inactive settings when bottom-up config is absent", () => {
     const resolved = resolveBottomUpTaskDelegationStrategy({
       inactiveMinutes: 45,
-      notificationTarget: "ceo-only",
+      notificationTarget: "goat-only",
       notifyInactiveAgents: true,
     });
 
     expect(resolved).toEqual({
       enabled: true,
       inactiveMinutes: 45,
-      notificationTarget: "ceo-only",
+      notificationTarget: "goat-only",
     });
   });
 
@@ -179,7 +193,7 @@ describe("opengoat task cron notification helpers", () => {
     });
   });
 
-  it("builds a concise top-down task delegation message for the ceo", () => {
+  it("builds a concise top-down task delegation message for the goat", () => {
     const message = buildTopDownTaskDelegationMessage({
       openTasksThreshold: 5,
       openTasksCount: 2,
@@ -217,7 +231,7 @@ function buildTask(): TaskRecord {
     taskId: "task-123",
     createdAt: "2026-02-16T15:00:00.000Z",
     updatedAt: "2026-02-16T15:00:00.000Z",
-    owner: "ceo",
+    owner: "goat",
     assignedTo: "engineer",
     title: "Ship notification updates",
     description: "Implement and verify cron notification behavior updates.",

@@ -193,7 +193,7 @@ export interface OrganizationAgentProfileUpdateInput {
   skills?: string[];
 }
 
-export type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
+export type InactiveAgentNotificationTarget = "all-managers" | "goat-only";
 export type TaskDelegationStrategyId = "top-down" | "bottom-up";
 
 export interface TopDownTaskDelegationCronOptions {

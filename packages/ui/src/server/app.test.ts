@@ -328,7 +328,7 @@ describe("OpenGoat UI server API", () => {
           bottomUp: {
             enabled: false,
             maxInactivityMinutes: 45,
-            inactiveAgentNotificationTarget: "ceo-only",
+            inactiveAgentNotificationTarget: "goat-only",
           },
         },
         maxParallelFlows: 6,
@@ -343,7 +343,7 @@ describe("OpenGoat UI server API", () => {
           bottomUp: {
             enabled: false,
             maxInactivityMinutes: 45,
-            inactiveAgentNotificationTarget: "ceo-only",
+            inactiveAgentNotificationTarget: "goat-only",
           },
         },
         ceoBootstrapPending: false,
@@ -363,7 +363,7 @@ describe("OpenGoat UI server API", () => {
           bottomUp: {
             enabled: false,
             maxInactivityMinutes: 45,
-            inactiveAgentNotificationTarget: "ceo-only",
+            inactiveAgentNotificationTarget: "goat-only",
           },
         },
         maxParallelFlows: 6,
@@ -382,7 +382,7 @@ describe("OpenGoat UI server API", () => {
           bottomUp: {
             enabled: false,
             maxInactivityMinutes: 45,
-            inactiveAgentNotificationTarget: "ceo-only",
+            inactiveAgentNotificationTarget: "goat-only",
           },
         },
         ceoBootstrapPending: false,
@@ -402,7 +402,7 @@ describe("OpenGoat UI server API", () => {
           bottomUp: {
             enabled: false,
             maxInactivityMinutes: 45,
-            inactiveAgentNotificationTarget: "ceo-only",
+            inactiveAgentNotificationTarget: "goat-only",
           },
         },
         ceoBootstrapPending: false,
@@ -851,7 +851,7 @@ describe("OpenGoat UI server API", () => {
             bottomUp: {
               enabled: false,
               maxInactivityMinutes: 30,
-              inactiveAgentNotificationTarget: "ceo-only",
+              inactiveAgentNotificationTarget: "goat-only",
             },
           },
           maxParallelFlows: 4,
@@ -883,8 +883,8 @@ describe("OpenGoat UI server API", () => {
           dispatches: [
             {
               kind: "inactive",
-              targetAgentId: "ceo",
-              sessionRef: "agent:ceo:agent_ceo_inactive_engineer",
+              targetAgentId: "goat",
+              sessionRef: "agent:goat:agent_goat_inactive_engineer",
               subjectAgentId: "engineer",
               message:
                 'Your reportee "@engineer" (Engineer) has no activity in the last 30 minutes.',
@@ -925,7 +925,7 @@ describe("OpenGoat UI server API", () => {
           .filter(Boolean) ?? [];
       expect(
         messages.some((entry) =>
-          entry.includes("[task-cron] Agent @ceo received inactive message."),
+          entry.includes("[task-cron] Agent @goat received inactive message."),
         ),
       ).toBe(true);
       expect(
@@ -940,7 +940,7 @@ describe("OpenGoat UI server API", () => {
     }
   });
 
-  it("keeps scheduler paused while ceo bootstrap is pending", async () => {
+  it("keeps scheduler paused while goat bootstrap is pending", async () => {
     vi.useFakeTimers();
     try {
       const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -957,11 +957,11 @@ describe("OpenGoat UI server API", () => {
         };
       });
 
-      await mkdir(path.resolve(uniqueHomeDir, "workspaces", "ceo"), {
+      await mkdir(path.resolve(uniqueHomeDir, "workspaces", "goat"), {
         recursive: true,
       });
       await writeFile(
-        path.resolve(uniqueHomeDir, "workspaces", "ceo", "BOOTSTRAP.md"),
+        path.resolve(uniqueHomeDir, "workspaces", "goat", "BOOTSTRAP.md"),
         "# BOOTSTRAP.md\n",
         "utf8",
       );
@@ -1053,9 +1053,9 @@ describe("OpenGoat UI server API", () => {
         skillName: "frontend-design",
         source: "source-url",
         installedPath: "/tmp/opengoat/skills/frontend-design/SKILL.md",
-        assignedAgentIds: ["ceo", "developer"],
+        assignedAgentIds: ["goat", "developer"],
         workspaceInstallPaths: [
-          "/tmp/workspaces/ceo/skills/frontend-design/SKILL.md",
+          "/tmp/workspaces/goat/skills/frontend-design/SKILL.md",
           "/tmp/workspaces/developer/.agents/skills/frontend-design/SKILL.md",
         ],
         replaced: false,
@@ -1107,7 +1107,7 @@ describe("OpenGoat UI server API", () => {
     >(async () => {
       return {
         scope: "agent",
-        agentId: "ceo",
+        agentId: "goat",
         skillId: "frontend-design",
         skillName: "frontend-design",
         source: "source-path",
@@ -1130,7 +1130,7 @@ describe("OpenGoat UI server API", () => {
       url: "/api/skills/install",
       payload: {
         scope: "agent",
-        agentId: "ceo",
+        agentId: "goat",
         skillName: "frontend-design",
         sourcePath: "/tmp/source",
         sourceUrl: "https://github.com/anthropics/skills",
@@ -1152,9 +1152,9 @@ describe("OpenGoat UI server API", () => {
         scope: "global",
         skillId: "frontend-design",
         removedFromGlobal: true,
-        removedFromAgentIds: ["ceo", "developer"],
+        removedFromAgentIds: ["goat", "developer"],
         removedWorkspacePaths: [
-          "/tmp/workspaces/ceo/skills/frontend-design/SKILL.md",
+          "/tmp/workspaces/goat/skills/frontend-design/SKILL.md",
           "/tmp/workspaces/developer/.agents/skills/frontend-design/SKILL.md",
         ],
       };
@@ -1198,10 +1198,10 @@ describe("OpenGoat UI server API", () => {
     >(async () => {
       return {
         scope: "agent",
-        agentId: "ceo",
+        agentId: "goat",
         skillId: "frontend-design",
         removedFromGlobal: false,
-        removedFromAgentIds: ["ceo"],
+        removedFromAgentIds: ["goat"],
         removedWorkspacePaths: [],
       };
     });
@@ -1220,7 +1220,7 @@ describe("OpenGoat UI server API", () => {
       url: "/api/skills/remove",
       payload: {
         scope: "agent",
-        agentId: "ceo",
+        agentId: "goat",
       },
     });
 
@@ -1545,7 +1545,7 @@ describe("OpenGoat UI server API", () => {
           description: "Builds features.",
           organization: {
             type: "individual",
-            reportsTo: "ceo",
+            reportsTo: "goat",
             discoverable: false,
             tags: ["frontend", "ux"],
             priority: 65,
@@ -1570,10 +1570,10 @@ describe("OpenGoat UI server API", () => {
         ...createMockService({ homeDir: uniqueHomeDir }),
         listAgents: async (): Promise<AgentDescriptor[]> => [
           {
-            id: "ceo",
-            displayName: "CEO",
-            workspaceDir: "/tmp/workspaces/ceo",
-            internalConfigDir: path.resolve(uniqueHomeDir, "agents", "ceo"),
+            id: "goat",
+            displayName: "Goat",
+            workspaceDir: "/tmp/workspaces/goat",
+            internalConfigDir: path.resolve(uniqueHomeDir, "agents", "goat"),
           },
           {
             id: "developer",
@@ -1596,7 +1596,7 @@ describe("OpenGoat UI server API", () => {
         id: "developer",
         displayName: "Developer",
         type: "individual",
-        reportsTo: "ceo",
+        reportsTo: "goat",
         role: "Software Engineer",
         description: "Builds features.",
         discoverable: false,
@@ -1610,14 +1610,14 @@ describe("OpenGoat UI server API", () => {
 
   it("loads agent profiles even when route casing differs from stored agent id", async () => {
     const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-    const ceoConfigDir = path.resolve(uniqueHomeDir, "agents", "CEO");
+    const ceoConfigDir = path.resolve(uniqueHomeDir, "agents", "Goat");
     await mkdir(ceoConfigDir, { recursive: true });
     await writeFile(
       path.resolve(ceoConfigDir, "config.json"),
       JSON.stringify(
         {
-          id: "CEO",
-          displayName: "CEO",
+          id: "Goat",
+          displayName: "Goat",
           role: "Chief Executive Officer",
           description: "Leads the organization.",
           organization: {
@@ -1645,9 +1645,9 @@ describe("OpenGoat UI server API", () => {
         ...createMockService({ homeDir: uniqueHomeDir }),
         listAgents: async (): Promise<AgentDescriptor[]> => [
           {
-            id: "CEO",
-            displayName: "CEO",
-            workspaceDir: "/tmp/workspaces/CEO",
+            id: "Goat",
+            displayName: "Goat",
+            workspaceDir: "/tmp/workspaces/Goat",
             internalConfigDir: ceoConfigDir,
           },
         ],
@@ -1656,14 +1656,14 @@ describe("OpenGoat UI server API", () => {
 
     const response = await activeServer.inject({
       method: "GET",
-      url: "/api/agents/ceo",
+      url: "/api/agents/goat",
     });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       agent: {
-        id: "CEO",
-        displayName: "CEO",
+        id: "Goat",
+        displayName: "Goat",
         type: "manager",
       },
     });
@@ -1684,7 +1684,7 @@ describe("OpenGoat UI server API", () => {
           description: "Engineer OpenClaw agent for Developer.",
           organization: {
             type: "individual",
-            reportsTo: "ceo",
+            reportsTo: "goat",
             discoverable: true,
             tags: ["specialized"],
             priority: 50,
@@ -1710,7 +1710,7 @@ describe("OpenGoat UI server API", () => {
     >(async (agentId, reportsTo) => {
       return {
         agentId,
-        previousReportsTo: "ceo",
+        previousReportsTo: "goat",
         reportsTo,
         updatedPaths: [configPath],
       };
@@ -1725,10 +1725,10 @@ describe("OpenGoat UI server API", () => {
         setAgentManager,
         listAgents: async (): Promise<AgentDescriptor[]> => [
           {
-            id: "ceo",
-            displayName: "CEO",
-            workspaceDir: "/tmp/workspaces/ceo",
-            internalConfigDir: path.resolve(uniqueHomeDir, "agents", "ceo"),
+            id: "goat",
+            displayName: "Goat",
+            workspaceDir: "/tmp/workspaces/goat",
+            internalConfigDir: path.resolve(uniqueHomeDir, "agents", "goat"),
           },
           {
             id: "developer",
@@ -1748,7 +1748,7 @@ describe("OpenGoat UI server API", () => {
         role: "Frontend Engineer",
         description: "Owns UI architecture.",
         type: "individual",
-        reportsTo: "ceo",
+        reportsTo: "goat",
         providerId: "codex",
         discoverable: false,
         tags: "frontend, ui",
@@ -1759,7 +1759,7 @@ describe("OpenGoat UI server API", () => {
 
     expect(response.statusCode).toBe(200);
     expect(setAgentProvider).toHaveBeenCalledWith("developer", "codex");
-    expect(setAgentManager).toHaveBeenCalledWith("developer", "ceo");
+    expect(setAgentManager).toHaveBeenCalledWith("developer", "goat");
 
     const saved = JSON.parse(await readFile(configPath, "utf8")) as {
       displayName: string;
@@ -1782,7 +1782,7 @@ describe("OpenGoat UI server API", () => {
     expect(saved.description).toBe("Owns UI architecture.");
     expect(saved.organization).toMatchObject({
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
       discoverable: false,
       tags: ["frontend", "ui"],
       priority: 72,
@@ -1793,7 +1793,7 @@ describe("OpenGoat UI server API", () => {
 
   it("rejects assigning reports-to managers that are not OpenClaw agents", async () => {
     const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-    const ceoConfigDir = path.resolve(uniqueHomeDir, "agents", "ceo");
+    const ceoConfigDir = path.resolve(uniqueHomeDir, "agents", "goat");
     const ctoConfigDir = path.resolve(uniqueHomeDir, "agents", "cto");
     const developerConfigDir = path.resolve(uniqueHomeDir, "agents", "developer");
     await mkdir(ceoConfigDir, { recursive: true });
@@ -1808,7 +1808,7 @@ describe("OpenGoat UI server API", () => {
           displayName: "CTO",
           organization: {
             type: "individual",
-            reportsTo: "ceo",
+            reportsTo: "goat",
             discoverable: true,
             tags: ["specialized"],
             priority: 50,
@@ -1830,7 +1830,7 @@ describe("OpenGoat UI server API", () => {
           displayName: "Developer",
           organization: {
             type: "individual",
-            reportsTo: "ceo",
+            reportsTo: "goat",
             discoverable: true,
             tags: ["specialized"],
             priority: 50,
@@ -1850,7 +1850,7 @@ describe("OpenGoat UI server API", () => {
     >(async (agentId, reportsTo) => {
       return {
         agentId,
-        previousReportsTo: "ceo",
+        previousReportsTo: "goat",
         reportsTo,
         updatedPaths: [path.resolve(developerConfigDir, "config.json")],
       };
@@ -1864,9 +1864,9 @@ describe("OpenGoat UI server API", () => {
         setAgentManager,
         listAgents: async (): Promise<AgentDescriptor[]> => [
           {
-            id: "ceo",
-            displayName: "CEO",
-            workspaceDir: "/tmp/workspaces/ceo",
+            id: "goat",
+            displayName: "Goat",
+            workspaceDir: "/tmp/workspaces/goat",
             internalConfigDir: ceoConfigDir,
           },
           {
@@ -1924,10 +1924,10 @@ describe("OpenGoat UI server API", () => {
 
   it("creates project session through the api", async () => {
     const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(async (_agentId, options): Promise<SessionRunInfo> => {
-      const sessionKey = options?.sessionRef ?? "agent:ceo:main";
+      const sessionKey = options?.sessionRef ?? "agent:goat:main";
       const isProject = sessionKey.startsWith("project:");
       return {
-        agentId: "ceo",
+        agentId: "goat",
         sessionKey,
         sessionId: isProject ? "project-session-1" : "workspace-session-1",
         transcriptPath: "/tmp/transcript.jsonl",
@@ -1935,7 +1935,7 @@ describe("OpenGoat UI server API", () => {
         isNewSession: !isProject
       };
     });
-    const renameSession = vi.fn<NonNullable<OpenClawUiService["renameSession"]>>(async (_agentId, title = "Session", sessionRef = "agent:ceo:main"): Promise<SessionSummary> => {
+    const renameSession = vi.fn<NonNullable<OpenClawUiService["renameSession"]>>(async (_agentId, title = "Session", sessionRef = "agent:goat:main"): Promise<SessionSummary> => {
       return {
         sessionKey: sessionRef,
         sessionId: sessionRef.startsWith("project:") ? "project-session-1" : "workspace-session-1",
@@ -1987,9 +1987,9 @@ describe("OpenGoat UI server API", () => {
     const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     const listSessions = vi.fn<OpenClawUiService["listSessions"]>(async (): Promise<SessionSummary[]> => []);
     const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(async (_agentId, options): Promise<SessionRunInfo> => {
-      const sessionKey = options?.sessionRef ?? "agent:ceo:main";
+      const sessionKey = options?.sessionRef ?? "agent:goat:main";
       return {
-        agentId: "ceo",
+        agentId: "goat",
         sessionKey,
         sessionId: "workspace-org-1",
         transcriptPath: "/tmp/transcript.jsonl",
@@ -1997,7 +1997,7 @@ describe("OpenGoat UI server API", () => {
         isNewSession: true
       };
     });
-    const renameSession = vi.fn<NonNullable<OpenClawUiService["renameSession"]>>(async (_agentId, title = "Session", sessionRef = "agent:ceo:main"): Promise<SessionSummary> => {
+    const renameSession = vi.fn<NonNullable<OpenClawUiService["renameSession"]>>(async (_agentId, title = "Session", sessionRef = "agent:goat:main"): Promise<SessionSummary> => {
       return {
         sessionKey: sessionRef,
         sessionId: sessionRef.startsWith("project:") ? "project-org-1" : "workspace-org-1",
@@ -2032,12 +2032,12 @@ describe("OpenGoat UI server API", () => {
 
   it("creates project session through legacy core fallback when prepareSession is unavailable", async () => {
     const prepareRunSession = vi.fn(async (_paths: unknown, _agentId: string, request: { sessionRef?: string }): Promise<{ enabled: true; info: SessionRunInfo }> => {
-      const sessionKey = request.sessionRef ?? "agent:ceo:main";
+      const sessionKey = request.sessionRef ?? "agent:goat:main";
       const isProject = sessionKey.startsWith("project:");
       return {
         enabled: true,
         info: {
-          agentId: "ceo",
+          agentId: "goat",
           sessionKey,
           sessionId: isProject ? "legacy-project-session-1" : "legacy-workspace-session-1",
           transcriptPath: "/tmp/transcript.jsonl",
@@ -2104,7 +2104,7 @@ describe("OpenGoat UI server API", () => {
   it("creates a nested workspace session and assigns a default title", async () => {
     const prepareSession = vi.fn<NonNullable<OpenClawUiService["prepareSession"]>>(async (): Promise<SessionRunInfo> => {
       return {
-        agentId: "ceo",
+        agentId: "goat",
         sessionKey: "workspace:tmp",
         sessionId: "session-2",
         transcriptPath: "/tmp/transcript-2.jsonl",
@@ -2352,7 +2352,7 @@ describe("OpenGoat UI server API", () => {
       }
     });
     expect(renameResponse.statusCode).toBe(200);
-    expect(renameSession).toHaveBeenCalledWith("ceo", "Renamed", "project:tmp");
+    expect(renameSession).toHaveBeenCalledWith("goat", "Renamed", "project:tmp");
 
     const deleteResponse = await activeServer.inject({
       method: "POST",
@@ -2363,28 +2363,28 @@ describe("OpenGoat UI server API", () => {
     });
     expect(deleteResponse.statusCode).toBe(200);
     expect(removeSession).toHaveBeenCalledTimes(1);
-    expect(removeSession).toHaveBeenCalledWith("ceo", "project:tmp");
+    expect(removeSession).toHaveBeenCalledWith("goat", "project:tmp");
 
     const removeSessionResponse = await activeServer.inject({
       method: "POST",
       url: "/api/sessions/remove",
       payload: {
-        sessionRef: "agent:ceo:main"
+        sessionRef: "agent:goat:main"
       }
     });
     expect(removeSessionResponse.statusCode).toBe(200);
-    expect(removeSession).toHaveBeenCalledWith("ceo", "agent:ceo:main");
+    expect(removeSession).toHaveBeenCalledWith("goat", "agent:goat:main");
 
     const renameSessionResponse = await activeServer.inject({
       method: "POST",
       url: "/api/sessions/rename",
       payload: {
-        sessionRef: "agent:ceo:main",
+        sessionRef: "agent:goat:main",
         name: "Renamed Session"
       }
     });
     expect(renameSessionResponse.statusCode).toBe(200);
-    expect(renameSession).toHaveBeenCalledWith("ceo", "Renamed Session", "agent:ceo:main");
+    expect(renameSession).toHaveBeenCalledWith("goat", "Renamed Session", "agent:goat:main");
   });
 
   it("sends a message to an existing session", async () => {
@@ -2415,7 +2415,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/sessions/message",
       payload: {
-        agentId: "ceo",
+        agentId: "goat",
         sessionRef: "workspace:tmp",
         message: "hello"
       }
@@ -2423,7 +2423,7 @@ describe("OpenGoat UI server API", () => {
 
     expect(response.statusCode).toBe(200);
     expect(runAgent).toHaveBeenCalledWith(
-      "ceo",
+      "goat",
       expect.objectContaining({
         message: "hello",
         sessionRef: "workspace:tmp"
@@ -2440,7 +2440,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/session/message",
       payload: {
-        agentId: "ceo",
+        agentId: "goat",
         sessionRef: "workspace:tmp",
         message: "hello alias"
       }
@@ -2471,7 +2471,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/sessions/message",
       payload: {
-        agentId: "ceo",
+        agentId: "goat",
         sessionRef: "workspace:tmp",
         message: 'review "alpha" release',
       },
@@ -2496,7 +2496,7 @@ describe("OpenGoat UI server API", () => {
     expect(
       messages.some((entry) =>
         entry.includes(
-          `Agent @ceo received message: "review 'alpha' release" (session=workspace:tmp).`,
+          `Agent @goat received message: "review 'alpha' release" (session=workspace:tmp).`,
         ),
       ),
     ).toBe(true);
@@ -2530,7 +2530,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/sessions/message",
       payload: {
-        agentId: "ceo",
+        agentId: "goat",
         sessionRef: "workspace:tmp",
         images: [
           {
@@ -2544,7 +2544,7 @@ describe("OpenGoat UI server API", () => {
 
     expect(response.statusCode).toBe(200);
     expect(runAgent).toHaveBeenCalledWith(
-      "ceo",
+      "goat",
       expect.objectContaining({
         message: "Please analyze the attached image.",
         sessionRef: "workspace:tmp",
@@ -2582,7 +2582,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/sessions/message",
       payload: {
-        agentId: "ceo",
+        agentId: "goat",
         sessionRef: "workspace:tmp",
         images: [
           {
@@ -2595,7 +2595,7 @@ describe("OpenGoat UI server API", () => {
 
     expect(response.statusCode).toBe(200);
     expect(runAgent).toHaveBeenCalledWith(
-      "ceo",
+      "goat",
       expect.objectContaining({
         message: "Please analyze the attached image.",
         sessionRef: "workspace:tmp",
@@ -2618,13 +2618,13 @@ describe("OpenGoat UI server API", () => {
         stage: "run_started",
         timestamp: "2026-02-13T00:00:00.000Z",
         runId: "run-1",
-        agentId: "ceo",
+        agentId: "goat",
       });
       options.hooks?.onEvent?.({
         stage: "provider_invocation_started",
         timestamp: "2026-02-13T00:00:00.200Z",
         runId: "run-1",
-        agentId: "ceo",
+        agentId: "goat",
         providerId: "codex",
       });
       options.onStdout?.("first stdout line");
@@ -2633,7 +2633,7 @@ describe("OpenGoat UI server API", () => {
         stage: "provider_invocation_completed",
         timestamp: "2026-02-13T00:00:01.000Z",
         runId: "run-1",
-        agentId: "ceo",
+        agentId: "goat",
         providerId: "codex",
         code: 0,
       });
@@ -2659,7 +2659,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/sessions/message/stream",
       payload: {
-        agentId: "ceo",
+        agentId: "goat",
         sessionRef: "workspace:tmp",
         message: "hello",
       },
@@ -2686,7 +2686,7 @@ describe("OpenGoat UI server API", () => {
     ).toBe(true);
     expect(lines.some((line) => line.type === "result")).toBe(true);
     expect(runAgent).toHaveBeenCalledWith(
-      "ceo",
+      "goat",
       expect.objectContaining({
         message: "hello",
         sessionRef: "workspace:tmp",
@@ -2809,7 +2809,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/sessions/message",
       payload: {
-        agentId: "ceo",
+        agentId: "goat",
         sessionRef: "workspace:tmp",
         message: "hello"
       }
@@ -2865,11 +2865,11 @@ describe("OpenGoat UI server API", () => {
 
     const response = await activeServer.inject({
       method: "GET",
-      url: "/api/sessions/history?agentId=ceo&sessionRef=workspace%3Atmp&limit=50"
+      url: "/api/sessions/history?agentId=goat&sessionRef=workspace%3Atmp&limit=50"
     });
 
     expect(response.statusCode).toBe(200);
-    expect(getSessionHistory).toHaveBeenCalledWith("ceo", {
+    expect(getSessionHistory).toHaveBeenCalledWith("goat", {
       sessionRef: "workspace:tmp",
       limit: 50
     });
@@ -2929,7 +2929,7 @@ describe("OpenGoat UI server API", () => {
 
     const response = await activeServer.inject({
       method: "GET",
-      url: "/api/sessions/history?agentId=ceo&sessionRef=workspace%3Atmp&limit=50"
+      url: "/api/sessions/history?agentId=goat&sessionRef=workspace%3Atmp&limit=50"
     });
 
     expect(response.statusCode).toBe(200);
@@ -2948,7 +2948,7 @@ describe("OpenGoat UI server API", () => {
       taskId: "task-plan",
       createdAt: "2026-02-11T08:00:00.000Z",
       updatedAt: "2026-02-11T08:00:00.000Z",
-      owner: "ceo",
+      owner: "goat",
       assignedTo: "developer",
       title: "Plan roadmap",
       description: "Draft roadmap milestones",
@@ -2963,7 +2963,7 @@ describe("OpenGoat UI server API", () => {
         ...baseTask,
         title: options.title,
         description: options.description,
-        assignedTo: options.assignedTo ?? "ceo",
+        assignedTo: options.assignedTo ?? "goat",
         status: options.status ?? "todo",
       };
     });
@@ -3042,7 +3042,7 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/tasks",
       payload: {
-        actorId: "ceo",
+        actorId: "goat",
         title: "Design API",
         description: "Document API contracts",
         assignedTo: "developer",
@@ -3050,7 +3050,7 @@ describe("OpenGoat UI server API", () => {
       }
     });
     expect(createTaskResponse.statusCode).toBe(200);
-    expect(createTask).toHaveBeenCalledWith("ceo", {
+    expect(createTask).toHaveBeenCalledWith("goat", {
       title: "Design API",
       description: "Document API contracts",
       assignedTo: "developer",
@@ -3061,12 +3061,12 @@ describe("OpenGoat UI server API", () => {
       method: "POST",
       url: "/api/tasks/delete",
       payload: {
-        actorId: "ceo",
+        actorId: "goat",
         taskIds: ["task-plan", "task-archive"]
       }
     });
     expect(deleteTaskResponse.statusCode).toBe(200);
-    expect(deleteTasks).toHaveBeenCalledWith("ceo", ["task-plan", "task-archive"]);
+    expect(deleteTasks).toHaveBeenCalledWith("goat", ["task-plan", "task-archive"]);
 
     const statusResponse = await activeServer.inject({
       method: "POST",
@@ -3231,7 +3231,7 @@ function createMockService(
         }
       }
     ],
-    renameSession: async (_agentId, title = "Session", sessionRef = "agent:ceo:main"): Promise<SessionSummary> => {
+    renameSession: async (_agentId, title = "Session", sessionRef = "agent:goat:main"): Promise<SessionSummary> => {
       return {
         sessionKey: sessionRef,
         sessionId: "session-1",
@@ -3245,7 +3245,7 @@ function createMockService(
         compactionCount: 0
       };
     },
-    removeSession: async (_agentId, sessionRef = "agent:ceo:main"): Promise<{
+    removeSession: async (_agentId, sessionRef = "agent:goat:main"): Promise<{
       sessionKey: string;
       sessionId: string;
       title: string;
@@ -3260,8 +3260,8 @@ function createMockService(
     },
     prepareSession: async (): Promise<SessionRunInfo> => {
       return {
-        agentId: "ceo",
-        sessionKey: "agent:ceo:main",
+        agentId: "goat",
+        sessionKey: "agent:goat:main",
         sessionId: "session-1",
         transcriptPath: "/tmp/transcript.jsonl",
         workspacePath: "/tmp/workspace",

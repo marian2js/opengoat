@@ -1,4 +1,4 @@
-const DEFAULT_AGENT_ID = "ceo";
+const DEFAULT_AGENT_ID = "goat";
 
 export function readOptionalString(
   params: Record<string, unknown>,

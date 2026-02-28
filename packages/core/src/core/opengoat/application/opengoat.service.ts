@@ -163,7 +163,7 @@ export interface TaskCronRunResult {
   dispatches: TaskCronDispatchResult[];
 }
 
-export type InactiveAgentNotificationTarget = "all-managers" | "ceo-only";
+export type InactiveAgentNotificationTarget = "all-managers" | "goat-only";
 
 interface InactiveAgentCandidate {
   managerAgentId: string;
@@ -372,9 +372,17 @@ export class OpenGoatService {
       );
     }
 
-    for (const agentId of [...candidateOpenClawAgentIds].sort((left, right) =>
-      left.localeCompare(right),
-    )) {
+    for (const agentId of [...candidateOpenClawAgentIds].sort((left, right) => {
+      const leftIsDefault = isDefaultAgentId(left);
+      const rightIsDefault = isDefaultAgentId(right);
+      if (leftIsDefault && !rightIsDefault) {
+        return -1;
+      }
+      if (!leftIsDefault && rightIsDefault) {
+        return 1;
+      }
+      return left.localeCompare(right);
+    })) {
       if (agentId === OPENCLAW_DEFAULT_AGENT_ID) {
         continue;
       }
@@ -456,12 +464,12 @@ export class OpenGoatService {
         paths,
         {
           id: DEFAULT_AGENT_ID,
-          displayName: "CEO",
+          displayName: "Goat",
         },
         {
           type: "manager",
           reportsTo: null,
-          role: "CEO",
+          role: "Goat",
         },
       );
     }
@@ -470,7 +478,7 @@ export class OpenGoatService {
       await this.syncOpenClawRoleSkills(paths, DEFAULT_AGENT_ID);
     } catch (error) {
       warnings.push(
-        `OpenClaw role skill assignment sync for "ceo" failed: ${toErrorMessage(
+        `OpenClaw role skill assignment sync for "goat" failed: ${toErrorMessage(
           error,
         )}`,
       );
@@ -2739,7 +2747,7 @@ export class OpenGoatService {
         continue;
       }
       if (
-        notificationTarget === "ceo-only" &&
+        notificationTarget === "goat-only" &&
         managerAgentId !== defaultAgentId
       ) {
         continue;

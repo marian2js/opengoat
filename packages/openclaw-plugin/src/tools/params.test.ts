@@ -34,7 +34,7 @@ describe("tool params helpers", () => {
   it("resolves normalized agent ids with fallback", () => {
     expect(resolveAgentId(" CTO ", undefined)).toBe("cto");
     expect(resolveAgentId(undefined, " Eng Lead ")).toBe("eng-lead");
-    expect(resolveAgentId(undefined, undefined)).toBe("ceo");
+    expect(resolveAgentId(undefined, undefined)).toBe("goat");
   });
 
   it("normalizes nullable manager ids", () => {

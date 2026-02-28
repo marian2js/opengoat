@@ -43,11 +43,11 @@ export function renderAgentsIndex(
 }
 
 export function renderCeoRoleMarkdown(): string {
-  return readMarkdownTemplate("ceo/ROLE.md");
+  return readMarkdownTemplate("goat/ROLE.md");
 }
 
 export function renderCeoBootstrapMarkdown(): string {
-  return readMarkdownTemplate("ceo/BOOTSTRAP.md");
+  return readMarkdownTemplate("goat/BOOTSTRAP.md");
 }
 
 export function renderBoardsSkillMarkdown(
@@ -156,7 +156,7 @@ export function resolveAgentRole(
   }
 
   if (isDefaultAgentId(agentId)) {
-    return "CEO";
+    return "Goat";
   }
 
   return type === "manager" ? "Manager" : "Team Member";

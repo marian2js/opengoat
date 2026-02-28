@@ -1,4 +1,4 @@
-export const DEFAULT_AGENT_ID = "ceo";
+export const DEFAULT_AGENT_ID = "goat";
 export const DEFAULT_TASK_CHECK_FREQUENCY_MINUTES = 1;
 export const DEFAULT_MAX_INACTIVITY_MINUTES = 30;
 export const DEFAULT_TOP_DOWN_OPEN_TASKS_THRESHOLD = 5;

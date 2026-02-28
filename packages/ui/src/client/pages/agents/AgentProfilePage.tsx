@@ -22,7 +22,7 @@ import { PackagePlus, RotateCcw, Save } from "lucide-react";
 import { type ReactElement, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-const DEFAULT_AGENT_ID = "ceo";
+const DEFAULT_AGENT_ID = "goat";
 const OPENCLAW_PROVIDER_ID = "openclaw";
 
 export interface AgentProfile {
@@ -177,7 +177,7 @@ export function AgentProfilePage({
     if (!options.some((agent) => agent.id === DEFAULT_AGENT_ID)) {
       options.unshift({
         id: DEFAULT_AGENT_ID,
-        displayName: "CEO",
+        displayName: "Goat",
         reportsTo: null,
         providerId: OPENCLAW_PROVIDER_ID,
         supportsReportees: true,

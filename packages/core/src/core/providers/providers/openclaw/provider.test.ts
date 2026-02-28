@@ -57,14 +57,14 @@ describe("openclaw provider", () => {
     expect(defaultInvocation.args).toEqual(["onboard"]);
 
     const passthroughInvocation = provider.buildAuthInvocation({
-      passthroughArgs: ["--provider", "ceo-model"],
+      passthroughArgs: ["--provider", "goat-model"],
     });
     expect(passthroughInvocation.args).toEqual([
       "models",
       "auth",
       "login",
       "--provider",
-      "ceo-model",
+      "goat-model",
     ]);
   });
 
@@ -88,13 +88,13 @@ describe("openclaw provider", () => {
     const provider = new OpenClawProvider();
     const invocation = provider.buildInvocation({
       message: "continue",
-      agent: "ceo",
-      providerSessionId: "agent:ceo:custom-key",
+      agent: "goat",
+      providerSessionId: "agent:goat:custom-key",
     });
 
     const params = readGatewayParams(invocation.args);
     expect(params).toMatchObject({
-      sessionKey: "agent:ceo:custom-key",
+      sessionKey: "agent:goat:custom-key",
     });
   });
 
@@ -131,7 +131,7 @@ describe("openclaw provider", () => {
       workspaceDir: "/tmp/workspaces/research-analyst",
       internalConfigDir: "/tmp/agents/research-analyst",
       env: {
-        OPENGOAT_OPENCLAW_MODEL: "ceo-model",
+        OPENGOAT_OPENCLAW_MODEL: "goat-model",
       },
     });
 
@@ -145,7 +145,7 @@ describe("openclaw provider", () => {
       "/tmp/agents/research-analyst",
       "--non-interactive",
       "--model",
-      "ceo-model",
+      "goat-model",
     ]);
   });
 

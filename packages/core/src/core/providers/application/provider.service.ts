@@ -1,5 +1,5 @@
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
-import { normalizeAgentId } from "../../domain/agent-id.js";
+import { isDefaultAgentId, normalizeAgentId } from "../../domain/agent-id.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
@@ -286,10 +286,10 @@ export class ProviderService {
     await this.assertProviderExists(normalizedProviderId);
 
     if (
-      normalizedAgentId === "ceo" &&
+      isDefaultAgentId(normalizedAgentId) &&
       normalizedProviderId !== OPENCLAW_PROVIDER_ID
     ) {
-      throw new Error("ceo provider is fixed to \"openclaw\".");
+      throw new Error(`${normalizedAgentId} provider is fixed to "openclaw".`);
     }
 
     const configPath = this.pathPort.join(
@@ -1051,7 +1051,7 @@ export class ProviderService {
     paths: OpenGoatPaths,
     agentId: string,
   ): Promise<string> {
-    if (agentId === "ceo") {
+    if (isDefaultAgentId(agentId)) {
       return OPENCLAW_PROVIDER_ID;
     }
 

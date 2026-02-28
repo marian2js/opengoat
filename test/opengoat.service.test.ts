@@ -46,7 +46,7 @@ afterEach(async () => {
 });
 
 describe("OpenGoatService", () => {
-  it("exposes home path and bootstraps ceo as default agent", async () => {
+  it("exposes home path and bootstraps goat as default agent", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -54,14 +54,14 @@ describe("OpenGoatService", () => {
     expect(service.getHomeDir()).toBe(root);
 
     const result = await service.initialize();
-    expect(result.defaultAgent).toBe("ceo");
+    expect(result.defaultAgent).toBe("goat");
 
     const config = JSON.parse(
       await readFile(path.join(root, "config.json"), "utf-8"),
     ) as {
       defaultAgent: string;
     };
-    expect(config.defaultAgent).toBe("ceo");
+    expect(config.defaultAgent).toBe("goat");
   });
 
   it("updates and resolves default agent from config", async () => {
@@ -72,11 +72,11 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Stone", {
       type: "manager",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
     const updated = await service.setDefaultAgent("stone");
-    expect(updated.previousDefaultAgent).toBe("ceo");
+    expect(updated.previousDefaultAgent).toBe("goat");
     expect(updated.defaultAgent).toBe("stone");
 
     const config = JSON.parse(
@@ -98,7 +98,7 @@ describe("OpenGoatService", () => {
       await service.initialize();
       await service.createAgent("Stone", {
         type: "manager",
-        reportsTo: "ceo",
+        reportsTo: "goat",
       });
       process.env.OPENGOAT_DEFAULT_AGENT = "stone";
 
@@ -120,7 +120,7 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Stone", {
       type: "manager",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
     await service.setDefaultAgent("stone");
 
@@ -151,7 +151,7 @@ describe("OpenGoatService", () => {
 
     const created = await service.createAgent("Research Analyst", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
       skills: ["research"],
       role: "Developer",
     });
@@ -184,7 +184,7 @@ describe("OpenGoatService", () => {
     const ceoReporteeLink = path.join(
       root,
       "workspaces",
-      "ceo",
+      "goat",
       "reportees",
       "research-analyst",
     );
@@ -195,10 +195,10 @@ describe("OpenGoatService", () => {
 
     const agents = await service.listAgents();
     expect(agents.map((agent) => agent.id)).toEqual([
-      "ceo",
+      "goat",
       "research-analyst",
     ]);
-    expect(agents.find((agent) => agent.id === "ceo")?.role).toBe("CEO");
+    expect(agents.find((agent) => agent.id === "goat")?.role).toBe("Goat");
     expect(agents.find((agent) => agent.id === "research-analyst")?.role).toBe(
       "Developer",
     );
@@ -231,7 +231,7 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
     const roleMarkdown = await readFile(
@@ -248,8 +248,8 @@ describe("OpenGoatService", () => {
 
     const { service } = createService(root);
     await service.initialize();
-    await service.createAgent("CTO", { type: "manager", reportsTo: "ceo" });
-    await service.createAgent("QA", { type: "individual", reportsTo: "ceo" });
+    await service.createAgent("CTO", { type: "manager", reportsTo: "goat" });
+    await service.createAgent("QA", { type: "individual", reportsTo: "goat" });
     await service.createAgent("Engineer", {
       type: "individual",
       reportsTo: "cto",
@@ -259,10 +259,10 @@ describe("OpenGoatService", () => {
       reportsTo: "engineer",
     });
 
-    const direct = await service.listDirectReportees("ceo");
+    const direct = await service.listDirectReportees("goat");
     expect(direct).toEqual(["cto", "qa"]);
 
-    const all = await service.listAllReportees("ceo");
+    const all = await service.listAllReportees("goat");
     expect(all).toEqual(["cto", "engineer", "intern", "qa"]);
 
     await expect(service.listDirectReportees("missing")).rejects.toThrow(
@@ -281,12 +281,12 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("CTO", {
       type: "manager",
-      reportsTo: "ceo",
+      reportsTo: "goat",
       role: "Chief Technology Officer",
     });
     await service.createAgent("QA", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
       role: "QA Engineer",
     });
     await service.createAgent("Engineer", {
@@ -295,10 +295,10 @@ describe("OpenGoatService", () => {
       role: "Software Engineer",
     });
 
-    const info = await service.getAgentInfo("ceo");
-    expect(info.id).toBe("ceo");
-    expect(info.name).toBe("CEO");
-    expect(info.role).toBe("CEO");
+    const info = await service.getAgentInfo("goat");
+    expect(info.id).toBe("goat");
+    expect(info.name).toBe("Goat");
+    expect(info.role).toBe("Goat");
     expect(info.totalReportees).toBe(3);
     expect(info.directReportees).toEqual([
       {
@@ -322,13 +322,13 @@ describe("OpenGoatService", () => {
 
     const { service } = createService(root);
     await service.initialize();
-    await service.createAgent("CTO", { type: "manager", reportsTo: "ceo" });
+    await service.createAgent("CTO", { type: "manager", reportsTo: "goat" });
     await service.createAgent("Engineer", {
       type: "individual",
       reportsTo: "cto",
     });
 
-    const task = await service.createTask("ceo", {
+    const task = await service.createTask("goat", {
       title: "Ship core endpoint",
       description: "Implement and test endpoint",
       assignedTo: "engineer",
@@ -336,7 +336,7 @@ describe("OpenGoatService", () => {
     expect(task.assignedTo).toBe("engineer");
   });
 
-  it("repairs stale OpenClaw ceo workspace mapping during initialize", async () => {
+  it("repairs stale OpenClaw goat workspace mapping during initialize", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -365,9 +365,9 @@ describe("OpenGoatService", () => {
           code: 0,
           stdout: JSON.stringify([
             {
-              id: "ceo",
-              workspace: path.join(root, "stale", "workspaces", "ceo"),
-              agentDir: path.join(root, "stale", "agents", "ceo"),
+              id: "goat",
+              workspace: path.join(root, "stale", "workspaces", "goat"),
+              agentDir: path.join(root, "stale", "agents", "goat"),
             },
           ]),
           stderr: "",
@@ -389,10 +389,10 @@ describe("OpenGoatService", () => {
     await service.initialize();
 
     expect(
-      provider.deletedAgents.some((entry) => entry.agentId === "ceo"),
+      provider.deletedAgents.some((entry) => entry.agentId === "goat"),
     ).toBe(true);
     expect(
-      provider.createdAgents.filter((entry) => entry.agentId === "ceo").length,
+      provider.createdAgents.filter((entry) => entry.agentId === "goat").length,
     ).toBeGreaterThanOrEqual(2);
   });
 
@@ -436,7 +436,7 @@ describe("OpenGoatService", () => {
 
     const { service } = createService(root);
     await service.initialize();
-    await service.createAgent("CTO", { type: "manager", reportsTo: "ceo" });
+    await service.createAgent("CTO", { type: "manager", reportsTo: "goat" });
 
     const staleManagerSkillDir = path.join(
       root,
@@ -565,7 +565,7 @@ describe("OpenGoatService", () => {
       commandRunner,
     );
     await service.initialize();
-    await service.createAgent("CTO", { type: "manager", reportsTo: "ceo" });
+    await service.createAgent("CTO", { type: "manager", reportsTo: "goat" });
 
     await expect(
       access(
@@ -668,9 +668,9 @@ describe("OpenGoatService", () => {
       .spyOn(providerService, "listOpenClawAgentsViaGateway")
       .mockResolvedValue([
         {
-          id: "ceo",
-          workspace: path.join(root, "workspaces", "ceo"),
-          agentDir: path.join(root, "agents", "ceo"),
+          id: "goat",
+          workspace: path.join(root, "workspaces", "goat"),
+          agentDir: path.join(root, "agents", "goat"),
         },
       ]);
     const policiesFallbackSpy = vi
@@ -680,7 +680,7 @@ describe("OpenGoatService", () => {
     await service.initialize();
     const created = await service.createAgent("Marcos", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
     expect(created.agent.id).toBe("marcos");
@@ -693,7 +693,7 @@ describe("OpenGoatService", () => {
     );
   });
 
-  it("repairs stale OpenClaw ceo workspace mapping to OPENGOAT_HOME", async () => {
+  it("repairs stale OpenClaw goat workspace mapping to OPENGOAT_HOME", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -722,9 +722,9 @@ describe("OpenGoatService", () => {
           code: 0,
           stdout: JSON.stringify([
             {
-              id: "ceo",
-              workspace: path.join(root, "stale", "workspaces", "ceo"),
-              agentDir: path.join(root, "stale", "agents", "ceo"),
+              id: "goat",
+              workspace: path.join(root, "stale", "workspaces", "goat"),
+              agentDir: path.join(root, "stale", "agents", "goat"),
             },
           ]),
           stderr: "",
@@ -747,10 +747,10 @@ describe("OpenGoatService", () => {
     const result = await service.syncRuntimeDefaults();
     expect(result.ceoSynced).toBe(true);
     expect(
-      provider.deletedAgents.some((entry) => entry.agentId === "ceo"),
+      provider.deletedAgents.some((entry) => entry.agentId === "goat"),
     ).toBe(true);
     expect(
-      provider.createdAgents.filter((entry) => entry.agentId === "ceo")
+      provider.createdAgents.filter((entry) => entry.agentId === "goat")
         .length,
     ).toBeGreaterThanOrEqual(2);
   });
@@ -789,7 +789,7 @@ describe("OpenGoatService", () => {
 
     const agents = await service.listAgents();
     expect(agents.map((agent) => agent.id)).toEqual([
-      "ceo",
+      "goat",
       "research-analyst",
     ]);
   });
@@ -836,7 +836,7 @@ describe("OpenGoatService", () => {
     );
 
     const agents = await service.listAgents();
-    expect(agents.map((agent) => agent.id)).toEqual(["ceo"]);
+    expect(agents.map((agent) => agent.id)).toEqual(["goat"]);
   });
 
   it("deletes local and OpenClaw runtime agents", async () => {
@@ -851,7 +851,7 @@ describe("OpenGoatService", () => {
         path.join(
           root,
           "workspaces",
-          "ceo",
+          "goat",
           "reportees",
           "research-analyst",
         ),
@@ -871,7 +871,7 @@ describe("OpenGoatService", () => {
         path.join(
           root,
           "workspaces",
-          "ceo",
+          "goat",
           "reportees",
           "research-analyst",
         ),
@@ -900,7 +900,7 @@ describe("OpenGoatService", () => {
     expect(forced.existed).toBe(true);
   });
 
-  it("syncs runtime defaults with ceo", async () => {
+  it("syncs runtime defaults with goat", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -911,7 +911,7 @@ describe("OpenGoatService", () => {
 
     expect(result.ceoSynced).toBe(true);
     expect(
-      provider.createdAgents.some((entry) => entry.agentId === "ceo"),
+      provider.createdAgents.some((entry) => entry.agentId === "goat"),
     ).toBe(true);
     expect(provider.deletedAgents).toHaveLength(0);
   });
@@ -924,10 +924,10 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
-    const ceoOrganizationLink = path.join(root, "workspaces", "ceo", "organization");
+    const ceoOrganizationLink = path.join(root, "workspaces", "goat", "organization");
     const engineerOrganizationLink = path.join(
       root,
       "workspaces",
@@ -937,7 +937,7 @@ describe("OpenGoatService", () => {
     const ceoEngineerReporteeLink = path.join(
       root,
       "workspaces",
-      "ceo",
+      "goat",
       "reportees",
       "engineer",
     );
@@ -1028,7 +1028,7 @@ describe("OpenGoatService", () => {
     }
   });
 
-  it("does not recreate OpenClaw agent when ceo is already registered with matching paths", async () => {
+  it("does not recreate OpenClaw agent when goat is already registered with matching paths", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -1043,7 +1043,7 @@ describe("OpenGoatService", () => {
 
     expect(result.ceoSynced).toBe(true);
     expect(
-      provider.createdAgents.some((entry) => entry.agentId === "ceo"),
+      provider.createdAgents.some((entry) => entry.agentId === "goat"),
     ).toBe(false);
   });
 
@@ -1076,9 +1076,9 @@ describe("OpenGoatService", () => {
           code: 0,
           stdout: JSON.stringify([
             {
-              id: "ceo",
-              workspace: path.join(root, "workspaces", "ceo"),
-              agentDir: path.join(root, "agents", "ceo"),
+              id: "goat",
+              workspace: path.join(root, "workspaces", "goat"),
+              agentDir: path.join(root, "agents", "goat"),
             },
           ]),
           stderr: "",
@@ -1093,9 +1093,9 @@ describe("OpenGoatService", () => {
           code: 0,
           stdout: JSON.stringify([
             {
-              id: "ceo",
-              workspace: path.join(root, "workspaces", "ceo"),
-              agentDir: path.join(root, "agents", "ceo"),
+              id: "goat",
+              workspace: path.join(root, "workspaces", "goat"),
+              agentDir: path.join(root, "agents", "goat"),
             },
           ]),
           stderr: "",
@@ -1194,9 +1194,9 @@ describe("OpenGoatService", () => {
           code: 0,
           stdout: JSON.stringify([
             {
-              id: "ceo",
-              workspace: path.join(root, "workspaces", "ceo"),
-              agentDir: path.join(root, "agents", "ceo"),
+              id: "goat",
+              workspace: path.join(root, "workspaces", "goat"),
+              agentDir: path.join(root, "agents", "goat"),
             },
           ]),
           stderr: "",
@@ -1211,9 +1211,9 @@ describe("OpenGoatService", () => {
           code: 0,
           stdout: JSON.stringify([
             {
-              id: "ceo",
-              workspace: path.join(root, "workspaces", "ceo"),
-              agentDir: path.join(root, "agents", "ceo"),
+              id: "goat",
+              workspace: path.join(root, "workspaces", "goat"),
+              agentDir: path.join(root, "agents", "goat"),
             },
           ]),
           stderr: "",
@@ -1724,14 +1724,14 @@ describe("OpenGoatService", () => {
     ).toBe(true);
   });
 
-  it("does not rewrite ceo bootstrap files during runtime sync", async () => {
+  it("does not rewrite goat bootstrap files during runtime sync", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
     const { service } = createService(root);
     await service.initialize();
 
-    const ceoWorkspace = path.join(root, "workspaces", "ceo");
+    const ceoWorkspace = path.join(root, "workspaces", "goat");
     const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
     const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
     const rolePath = path.join(ceoWorkspace, "ROLE.md");
@@ -1756,7 +1756,7 @@ describe("OpenGoatService", () => {
     );
     await writeFile(
       soulPath,
-      ["# SOUL.md - Legacy CEO", "", "Legacy body"].join("\n"),
+      ["# SOUL.md - Legacy Goat", "", "Legacy body"].join("\n"),
       "utf-8",
     );
 
@@ -1779,12 +1779,12 @@ describe("OpenGoatService", () => {
     expect(agentsMarkdown).toContain("## Another section");
     expect(agentsMarkdown).toContain("baz");
     expect(soulMarkdown).toBe(
-      ["# SOUL.md - Legacy CEO", "", "Legacy body"].join("\n"),
+      ["# SOUL.md - Legacy Goat", "", "Legacy body"].join("\n"),
     );
     expect(bootstrapMarkdown.trimEnd()).toBe("# legacy bootstrap");
     expect(boardSkillMarkdown).toContain("name: og-board-manager");
     expect(boardSkillMarkdown).toContain(
-      'opengoat_agent_info({ "agentId": "ceo" })',
+      'opengoat_agent_info({ "agentId": "goat" })',
     );
     expect(boardSkillMarkdown).not.toContain("<me>");
     await expect(
@@ -1795,15 +1795,15 @@ describe("OpenGoatService", () => {
     ).rejects.toBeTruthy();
   });
 
-  it("does not recreate ceo BOOTSTRAP.md when ceo create is re-run", async () => {
+  it("does not recreate goat BOOTSTRAP.md when goat create is re-run", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
     const { service } = createService(root);
     await service.initialize();
 
-    const bootstrapPath = path.join(root, "workspaces", "ceo", "BOOTSTRAP.md");
-    const agentsPath = path.join(root, "workspaces", "ceo", "AGENTS.md");
+    const bootstrapPath = path.join(root, "workspaces", "goat", "BOOTSTRAP.md");
+    const agentsPath = path.join(root, "workspaces", "goat", "AGENTS.md");
     await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
     await rm(bootstrapPath);
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
@@ -1821,7 +1821,7 @@ describe("OpenGoatService", () => {
       "utf-8",
     );
 
-    const recreated = await service.createAgent("CEO");
+    const recreated = await service.createAgent("Goat");
     expect(recreated.alreadyExisted).toBe(true);
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
@@ -1830,17 +1830,17 @@ describe("OpenGoatService", () => {
     expect(agentsMarkdown).toContain("keep me");
   });
 
-  it("does not mutate ceo bootstrap artifacts after the first ceo session", async () => {
+  it("does not mutate goat bootstrap artifacts after the first goat session", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
     const { service } = createService(root);
     await service.initialize();
-    await service.runAgent("ceo", {
-      message: "First CEO message",
+    await service.runAgent("goat", {
+      message: "First Goat message",
     });
 
-    const ceoWorkspace = path.join(root, "workspaces", "ceo");
+    const ceoWorkspace = path.join(root, "workspaces", "goat");
     const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
     const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
     await writeFile(bootstrapPath, "# BOOTSTRAP.md\n", "utf-8");
@@ -1872,7 +1872,7 @@ describe("OpenGoatService", () => {
     expect(agentsMarkdown).toContain("## Every Session");
   });
 
-  it("parses noisy OpenClaw JSON list output without re-registering ceo", async () => {
+  it("parses noisy OpenClaw JSON list output without re-registering goat", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -1909,9 +1909,9 @@ describe("OpenGoatService", () => {
               "OpenClaw inventory start",
               JSON.stringify([
                 {
-                  id: "ceo",
-                  workspace: path.join(root, "workspaces", "ceo"),
-                  agentDir: path.join(root, "agents", "ceo"),
+                  id: "goat",
+                  workspace: path.join(root, "workspaces", "goat"),
+                  agentDir: path.join(root, "agents", "goat"),
                 },
               ]),
               "OpenClaw inventory end",
@@ -1937,11 +1937,11 @@ describe("OpenGoatService", () => {
         warning.includes("OpenClaw agents list returned non-JSON output"),
       ),
     ).toBe(false);
-    expect(provider.createdAgents.filter((entry) => entry.agentId === "ceo"))
+    expect(provider.createdAgents.filter((entry) => entry.agentId === "goat"))
       .toHaveLength(0);
   });
 
-  it("does not re-register ceo when OpenClaw inventory is unavailable", async () => {
+  it("does not re-register goat when OpenClaw inventory is unavailable", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -1975,19 +1975,19 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer");
 
-    const ceoWorkspace = path.join(root, "workspaces", "ceo");
+    const ceoWorkspace = path.join(root, "workspaces", "goat");
     const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
     await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
     await rm(bootstrapPath);
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
 
     const ceoCreateCallsBefore = provider.createdAgents.filter(
-      (entry) => entry.agentId === "ceo",
+      (entry) => entry.agentId === "goat",
     ).length;
     emitInvalidAgentList = true;
     const sync = await service.syncRuntimeDefaults();
     const ceoCreateCallsAfter = provider.createdAgents.filter(
-      (entry) => entry.agentId === "ceo",
+      (entry) => entry.agentId === "goat",
     ).length;
 
     expect(
@@ -2012,21 +2012,21 @@ describe("OpenGoatService", () => {
 
     const { service } = createService(root);
     await service.initialize();
-    await service.createAgent("CTO", { type: "manager", reportsTo: "ceo" });
+    await service.createAgent("CTO", { type: "manager", reportsTo: "goat" });
     await service.createAgent("Engineer");
     await expect(
       access(
-        path.join(root, "workspaces", "ceo", "reportees", "engineer"),
+        path.join(root, "workspaces", "goat", "reportees", "engineer"),
         constants.F_OK,
       ),
     ).resolves.toBeUndefined();
 
     const updated = await service.setAgentManager("engineer", "cto");
-    expect(updated.previousReportsTo).toBe("ceo");
+    expect(updated.previousReportsTo).toBe("goat");
     expect(updated.reportsTo).toBe("cto");
     await expect(
       access(
-        path.join(root, "workspaces", "ceo", "reportees", "engineer"),
+        path.join(root, "workspaces", "goat", "reportees", "engineer"),
         constants.F_OK,
       ),
     ).rejects.toBeTruthy();
@@ -2044,7 +2044,7 @@ describe("OpenGoatService", () => {
 
     const { service } = createService(root);
     await service.initialize();
-    await service.createAgent("Lead", { type: "individual", reportsTo: "ceo" });
+    await service.createAgent("Lead", { type: "individual", reportsTo: "goat" });
     await service.createAgent("Engineer");
     await service.setAgentProvider("lead", "codex");
 
@@ -2059,10 +2059,10 @@ describe("OpenGoatService", () => {
 
     const { service } = createService(root);
     await service.initialize();
-    await service.createAgent("Lead", { type: "individual", reportsTo: "ceo" });
+    await service.createAgent("Lead", { type: "individual", reportsTo: "goat" });
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
     await service.setAgentManager("engineer", "lead");
@@ -2079,7 +2079,7 @@ describe("OpenGoatService", () => {
       ),
     ).rejects.toBeTruthy();
 
-    await service.setAgentManager("engineer", "ceo");
+    await service.setAgentManager("engineer", "goat");
     await expect(
       access(
         path.join(root, "workspaces", "lead", "skills", "og-board-individual"),
@@ -2102,7 +2102,7 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
     await service.setAgentProvider("engineer", "codex");
@@ -2145,7 +2145,7 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
     await service.setAgentProvider("engineer", "codex");
 
@@ -2203,7 +2203,7 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
     await service.setAgentProvider("engineer", "codex");
 
@@ -2215,13 +2215,13 @@ describe("OpenGoatService", () => {
     });
 
     expect(installResult.scope).toBe("global");
-    expect(installResult.assignedAgentIds).toEqual(["ceo", "engineer"]);
+    expect(installResult.assignedAgentIds).toEqual(["goat", "engineer"]);
     await expect(
       access(
         path.join(
           root,
           "workspaces",
-          "ceo",
+          "goat",
           "skills",
           "qa-checklist",
           "SKILL.md",
@@ -2266,7 +2266,7 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
     await service.setAgentProvider("engineer", "codex");
     await service.installSkill({
@@ -2329,7 +2329,7 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
     await service.setAgentProvider("engineer", "codex");
     await service.installSkill({
@@ -2346,7 +2346,7 @@ describe("OpenGoatService", () => {
 
     expect(removeResult.scope).toBe("global");
     expect(removeResult.removedFromGlobal).toBe(true);
-    expect(removeResult.removedFromAgentIds).toEqual(["ceo", "engineer"]);
+    expect(removeResult.removedFromAgentIds).toEqual(["goat", "engineer"]);
     await expect(
       access(path.join(root, "skills", "qa-checklist"), constants.F_OK),
     ).rejects.toBeTruthy();
@@ -2355,7 +2355,7 @@ describe("OpenGoatService", () => {
         path.join(
           root,
           "workspaces",
-          "ceo",
+          "goat",
           "skills",
           "qa-checklist",
         ),
@@ -2377,7 +2377,7 @@ describe("OpenGoatService", () => {
     ).rejects.toBeTruthy();
 
     const ceoConfig = JSON.parse(
-      await readFile(path.join(root, "agents", "ceo", "config.json"), "utf-8"),
+      await readFile(path.join(root, "agents", "goat", "config.json"), "utf-8"),
     ) as {
       runtime?: {
         skills?: {
@@ -2411,7 +2411,7 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("CTO", {
       type: "manager",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
     await service.createAgent("Engineer", {
       type: "individual",
@@ -2419,7 +2419,7 @@ describe("OpenGoatService", () => {
     });
     await service.createAgent("QA", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
     await expect(
@@ -2439,11 +2439,11 @@ describe("OpenGoatService", () => {
 
     const { service } = createService(root);
     await service.initialize();
-    await service.runAgent("ceo", { message: "hello" });
+    await service.runAgent("goat", { message: "hello" });
 
-    const result = await service.getAgentLastAction("ceo");
+    const result = await service.getAgentLastAction("goat");
     expect(result).not.toBeNull();
-    expect(result?.agentId).toBe("ceo");
+    expect(result?.agentId).toBe("goat");
     expect(typeof result?.timestamp).toBe("number");
   });
 
@@ -2478,9 +2478,9 @@ describe("OpenGoatService", () => {
           code: 0,
           stdout: JSON.stringify([
             {
-              id: "ceo",
-              workspace: path.join(root, "workspaces", "ceo"),
-              agentDir: path.join(root, "agents", "ceo"),
+              id: "goat",
+              workspace: path.join(root, "workspaces", "goat"),
+              agentDir: path.join(root, "agents", "goat"),
             },
             {
               id: "orphan",
@@ -2509,7 +2509,7 @@ describe("OpenGoatService", () => {
       commandRunner,
     );
     await service.initialize();
-    await service.createAgent("CTO", { type: "manager", reportsTo: "ceo" });
+    await service.createAgent("CTO", { type: "manager", reportsTo: "goat" });
     await new NodeFileSystem().ensureDir(path.join(managedSkillsDir, "og-board-manager"));
     await new NodeFileSystem().ensureDir(path.join(managedSkillsDir, "og-boards"));
     await new NodeFileSystem().ensureDir(path.join(managedSkillsDir, "manager"));
@@ -2534,7 +2534,7 @@ describe("OpenGoatService", () => {
     expect(result.homeDir).toBe(root);
     expect(result.homeRemoved).toBe(true);
     expect(result.failedOpenClawAgents).toHaveLength(0);
-    expect(result.deletedOpenClawAgents).toEqual(["ceo", "cto", "orphan"]);
+    expect(result.deletedOpenClawAgents).toEqual(["goat", "cto", "orphan"]);
     expect(result.removedOpenClawManagedSkillDirs).toEqual([
       path.join(managedSkillsDir, "og-boards"),
       path.join(managedSkillsDir, "og-board-manager"),
@@ -2542,7 +2542,7 @@ describe("OpenGoatService", () => {
     ]);
     expect(
       provider.deletedAgents.map((entry) => entry.agentId).sort(),
-    ).toEqual(["ceo", "cto", "orphan"]);
+    ).toEqual(["cto", "goat", "orphan"]);
     await expect(access(root, constants.F_OK)).rejects.toBeTruthy();
   });
 
@@ -2601,17 +2601,17 @@ describe("OpenGoatService", () => {
     const { service, provider } = createService(root);
     await service.initialize();
 
-    const prepared = await service.prepareSession("ceo", {
+    const prepared = await service.prepareSession("goat", {
       sessionRef: "workspace:desktop-project",
       forceNew: true,
     });
 
-    expect(prepared.agentId).toBe("ceo");
+    expect(prepared.agentId).toBe("goat");
     expect(prepared.sessionKey).toBe("workspace:desktop-project");
     expect(prepared.isNewSession).toBe(true);
     expect(provider.invocations).toHaveLength(0);
 
-    const sessions = await service.listSessions("ceo");
+    const sessions = await service.listSessions("goat");
     expect(
       sessions.some(
         (session) => session.sessionKey === "workspace:desktop-project",
@@ -2627,16 +2627,16 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
-    const todoTask = await service.createTask("ceo", {
+    const todoTask = await service.createTask("goat", {
       title: "Implement endpoint",
       description: "Build endpoint and tests",
       assignedTo: "engineer",
       status: "todo",
     });
-    const blockedTask = await service.createTask("ceo", {
+    const blockedTask = await service.createTask("goat", {
       title: "Prepare release",
       description: "Finalize release notes",
       assignedTo: "engineer",
@@ -2666,7 +2666,7 @@ describe("OpenGoatService", () => {
       expect.arrayContaining([
         expect.objectContaining({
           kind: "topdown",
-          targetAgentId: "ceo",
+          targetAgentId: "goat",
           message: expect.stringContaining("Top-Down threshold"),
         }),
         expect.objectContaining({
@@ -2676,12 +2676,12 @@ describe("OpenGoatService", () => {
         }),
         expect.objectContaining({
           kind: "blocked",
-          targetAgentId: "ceo",
+          targetAgentId: "goat",
           message: expect.stringContaining(`Task ID: ${blockedTask.taskId}`),
         }),
         expect.objectContaining({
           kind: "inactive",
-          targetAgentId: "ceo",
+          targetAgentId: "goat",
           subjectAgentId: "engineer",
           message: expect.stringContaining(
             'Your reportee "@engineer" (Engineer) has no activity',
@@ -2701,7 +2701,7 @@ describe("OpenGoatService", () => {
 
     const blockedInvocation = provider.invocations.find(
       (entry) =>
-        entry.agent === "ceo" &&
+        entry.agent === "goat" &&
         entry.message.includes(`Task #${blockedTask.taskId}`),
     );
     expect(blockedInvocation?.message).toContain(
@@ -2716,7 +2716,7 @@ describe("OpenGoatService", () => {
 
     const inactivityInvocation = provider.invocations.find(
       (entry) =>
-        entry.agent === "ceo" &&
+        entry.agent === "goat" &&
         entry.message.includes('Your reportee "@engineer"'),
     );
     expect(inactivityInvocation?.message).toContain(
@@ -2732,8 +2732,8 @@ describe("OpenGoatService", () => {
 
     const topDownInvocation = provider.invocations.find(
       (entry) =>
-        entry.agent === "ceo" &&
-        entry.message.includes("CEO guidance for creating next tasks"),
+        entry.agent === "goat" &&
+        entry.message.includes("Goat guidance for creating next tasks"),
     );
     expect(topDownInvocation?.message).toContain(
       "decompose work and pass it down",
@@ -2761,8 +2761,8 @@ describe("OpenGoatService", () => {
       ),
     ).toBe(false);
 
-    const ceoSessions = await service.listSessions("ceo");
-    const ceoNotificationSessionKey = "agent:ceo:agent_ceo_notifications";
+    const ceoSessions = await service.listSessions("goat");
+    const ceoNotificationSessionKey = "agent:goat:agent_goat_notifications";
     expect(
       ceoSessions.some((entry) => entry.sessionKey === ceoNotificationSessionKey),
     ).toBe(true);
@@ -2772,11 +2772,11 @@ describe("OpenGoatService", () => {
       ),
     ).toHaveLength(1);
     expect(
-      ceoSessions.some((entry) => entry.sessionKey.includes("agent_ceo_task_")),
+      ceoSessions.some((entry) => entry.sessionKey.includes("agent_goat_task_")),
     ).toBe(false);
     expect(
       ceoSessions.some((entry) =>
-        entry.sessionKey.includes("agent_ceo_inactive_"),
+        entry.sessionKey.includes("agent_goat_inactive_"),
       ),
     ).toBe(false);
   });
@@ -2788,10 +2788,10 @@ describe("OpenGoatService", () => {
     const { service } = createService(root);
     await service.initialize();
 
-    const blockedTask = await service.createTask("ceo", {
+    const blockedTask = await service.createTask("goat", {
       title: "Unblock deployment",
       description: "Resolve release blocker",
-      assignedTo: "ceo",
+      assignedTo: "goat",
       status: "blocked",
     });
 
@@ -2816,7 +2816,7 @@ describe("OpenGoatService", () => {
     );
     expect(topDownDispatch).toMatchObject({
       kind: "topdown",
-      targetAgentId: "ceo",
+      targetAgentId: "goat",
       ok: true,
     });
     expect(topDownDispatch?.message).toContain("Open tasks are at 0");
@@ -2831,11 +2831,11 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer One", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
     await service.createAgent("Engineer Two", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
     const cycle = await service.runTaskCronCycle({
@@ -2857,8 +2857,8 @@ describe("OpenGoatService", () => {
     expect(inactiveDispatches).toHaveLength(1);
     expect(inactiveDispatches[0]).toMatchObject({
       kind: "inactive",
-      targetAgentId: "ceo",
-      sessionRef: "agent:ceo:agent_ceo_notifications",
+      targetAgentId: "goat",
+      sessionRef: "agent:goat:agent_goat_notifications",
       ok: true,
     });
     expect(inactiveDispatches[0]?.subjectAgentId).toBeUndefined();
@@ -2874,7 +2874,7 @@ describe("OpenGoatService", () => {
 
     const ceoInactivityInvocations = provider.invocations.filter(
       (entry) =>
-        entry.agent === "ceo" && entry.message.includes("Inactive reportees:"),
+        entry.agent === "goat" && entry.message.includes("Inactive reportees:"),
     );
     expect(ceoInactivityInvocations).toHaveLength(1);
     expect(ceoInactivityInvocations[0]?.message).toContain(
@@ -2897,10 +2897,10 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
-    const task = await service.createTask("ceo", {
+    const task = await service.createTask("goat", {
       title: "Finish integration",
       description: "Complete the pending integration work",
       assignedTo: "engineer",
@@ -2963,10 +2963,10 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
-    const task = await service.createTask("ceo", {
+    const task = await service.createTask("goat", {
       title: "Prepare QA handoff",
       description: "Collect all QA handoff artifacts",
       assignedTo: "engineer",
@@ -3012,10 +3012,10 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
-    const task = await service.createTask("ceo", {
+    const task = await service.createTask("goat", {
       title: "Implement streaming retries",
       description: "Finish reliability work for streaming retries",
       assignedTo: "engineer",
@@ -3100,9 +3100,9 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
-    await service.createTask("ceo", {
+    await service.createTask("goat", {
       title: "Stabilize parser",
       description: "Harden parser edge cases",
       assignedTo: "engineer",
@@ -3136,7 +3136,7 @@ describe("OpenGoatService", () => {
     expect(invokeSpy).toHaveBeenCalledTimes(2);
   });
 
-  it("supports notifying only ceo for inactive direct reports", async () => {
+  it("supports notifying only goat for inactive direct reports", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -3144,7 +3144,7 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("CTO", {
       type: "manager",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
     await service.createAgent("Engineer", {
       type: "individual",
@@ -3153,7 +3153,7 @@ describe("OpenGoatService", () => {
 
     const cycle = await service.runTaskCronCycle({
       inactiveMinutes: 30,
-      notificationTarget: "ceo-only",
+      notificationTarget: "goat-only",
       delegationStrategies: {
         bottomUp: {
           enabled: true,
@@ -3166,13 +3166,13 @@ describe("OpenGoatService", () => {
 
     expect(cycle.inactiveAgents).toBe(1);
     expect(cycle.dispatches).toHaveLength(1);
-    expect(cycle.dispatches[0]?.targetAgentId).toBe("ceo");
+    expect(cycle.dispatches[0]?.targetAgentId).toBe("goat");
     expect(cycle.dispatches[0]?.subjectAgentId).toBe("cto");
 
     expect(
       provider.invocations.some(
         (entry) =>
-          entry.agent === "ceo" &&
+          entry.agent === "goat" &&
           entry.message.includes('Your reportee "@cto"') &&
           entry.message.includes("CTO has 1 direct and 0 indirect reportees."),
       ),
@@ -3192,16 +3192,16 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
-    const todoTask = await service.createTask("ceo", {
+    const todoTask = await service.createTask("goat", {
       title: "Review API",
       description: "Review API task status",
       assignedTo: "engineer",
       status: "todo",
     });
-    const blockedTask = await service.createTask("ceo", {
+    const blockedTask = await service.createTask("goat", {
       title: "Release prep",
       description: "Prepare release checklist",
       assignedTo: "engineer",
@@ -3236,7 +3236,7 @@ describe("OpenGoatService", () => {
     expect(
       provider.invocations.some(
         (entry) =>
-          entry.agent === "ceo" &&
+          entry.agent === "goat" &&
           entry.message.includes(`Task #${blockedTask.taskId}`),
       ),
     ).toBe(true);
@@ -3264,24 +3264,24 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
-    const firstTask = await service.createTask("ceo", {
+    const firstTask = await service.createTask("goat", {
       title: "First task",
       description: "Oldest todo task",
       assignedTo: "engineer",
       status: "todo",
     });
     nowMs += 60_000;
-    const secondTask = await service.createTask("ceo", {
+    const secondTask = await service.createTask("goat", {
       title: "Second task",
       description: "Middle todo task",
       assignedTo: "engineer",
       status: "todo",
     });
     nowMs += 60_000;
-    const thirdTask = await service.createTask("ceo", {
+    const thirdTask = await service.createTask("goat", {
       title: "Third task",
       description: "Newest todo task",
       assignedTo: "engineer",
@@ -3331,19 +3331,19 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer One", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
     await service.createAgent("Engineer Two", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
     await service.createAgent("Engineer Three", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
     await service.createAgent("Engineer Four", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
     for (const assignee of [
@@ -3352,7 +3352,7 @@ describe("OpenGoatService", () => {
       "engineer-three",
       "engineer-four",
     ]) {
-      await service.createTask("ceo", {
+      await service.createTask("goat", {
         title: `Deliver for ${assignee}`,
         description: "Complete the assigned task",
         assignedTo: assignee,
@@ -3401,21 +3401,21 @@ describe("OpenGoatService", () => {
     await service.initialize();
     await service.createAgent("Engineer One", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
     await service.createAgent("Engineer Two", {
       type: "individual",
-      reportsTo: "ceo",
+      reportsTo: "goat",
     });
 
     for (let index = 0; index < 3; index += 1) {
-      await service.createTask("ceo", {
+      await service.createTask("goat", {
         title: `Engineer one task ${index + 1}`,
         description: "Complete the assigned task",
         assignedTo: "engineer-one",
         status: "todo",
       });
-      await service.createTask("ceo", {
+      await service.createTask("goat", {
         title: `Engineer two task ${index + 1}`,
         description: "Complete the assigned task",
         assignedTo: "engineer-two",
@@ -3507,9 +3507,9 @@ function createRuntimeDefaultsCommandRunner(
         code: 0,
         stdout: JSON.stringify([
           {
-            id: "ceo",
-            workspace: path.join(root, "workspaces", "ceo"),
-            agentDir: path.join(root, "agents", "ceo"),
+            id: "goat",
+            workspace: path.join(root, "workspaces", "goat"),
+            agentDir: path.join(root, "agents", "goat"),
           },
         ]),
         stderr: "",
@@ -3525,9 +3525,9 @@ function createRuntimeDefaultsCommandRunner(
         code: 0,
         stdout: JSON.stringify([
           {
-            id: "ceo",
-            workspace: path.join(root, "workspaces", "ceo"),
-            agentDir: path.join(root, "agents", "ceo"),
+            id: "goat",
+            workspace: path.join(root, "workspaces", "goat"),
+            agentDir: path.join(root, "agents", "goat"),
           },
         ]),
         stderr: "",
@@ -3693,7 +3693,7 @@ class FakeOpenClawProvider extends BaseProvider {
         "utf-8",
       );
     }
-    if (this.seedBootstrapOnCreate && options.agentId === "ceo") {
+    if (this.seedBootstrapOnCreate && options.agentId === "goat") {
       await writeFile(
         path.join(options.workspaceDir, "BOOTSTRAP.md"),
         "# BOOTSTRAP.md\n",

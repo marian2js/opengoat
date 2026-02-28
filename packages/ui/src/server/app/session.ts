@@ -1254,7 +1254,7 @@ function resolveDefaultAgentRole(
   type: "manager" | "individual",
 ): string {
   if (agentId === DEFAULT_AGENT_ID) {
-    return "CEO";
+    return "Goat";
   }
   return type === "manager" ? "Manager" : "Team Member";
 }

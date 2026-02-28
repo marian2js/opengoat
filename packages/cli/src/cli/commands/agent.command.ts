@@ -171,7 +171,7 @@ function printHelp(output: NodeJS.WritableStream): void {
   output.write("                [--model <model>] [--no-stream] [-- <runtime-args>]\n");
   output.write("\n");
   output.write("Defaults:\n");
-  output.write("  agent-id defaults to config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo\n");
+  output.write("  agent-id defaults to config defaultAgent / OPENGOAT_DEFAULT_AGENT / goat\n");
   output.write("\n");
   output.write("Subcommands:\n");
   output.write("  agent create        Create an OpenClaw-backed agent.\n");

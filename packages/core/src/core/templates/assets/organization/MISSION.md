@@ -70,4 +70,4 @@ _Last updated: <YYYY-MM-DD>_
 
 ---
 
-_This file is for the CEO and executives to evolve._
+_This file is for the Goat and executives to evolve._

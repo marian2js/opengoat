@@ -37,7 +37,7 @@ describe("CLI full e2e smoke", () => {
 
     await expectOk(
       await runBinary(["init"], opengoatHome, env),
-      "Default agent: ceo",
+      "Default agent: goat",
     );
     await expectOk(
       await runBinary(
@@ -95,11 +95,11 @@ describe("CLI full e2e smoke", () => {
     );
     await expectOk(
       await runBinary(
-        ["agent", "set-manager", "developer", "ceo"],
+        ["agent", "set-manager", "developer", "goat"],
         opengoatHome,
         env,
       ),
-      "Current reports-to: ceo",
+      "Current reports-to: goat",
     );
 
     await expectOk(
@@ -211,7 +211,7 @@ describe("CLI full e2e smoke", () => {
           "install",
           "helper",
           "--agent",
-          "ceo",
+          "goat",
           "--from",
           skillSourcePath,
         ],
@@ -221,7 +221,7 @@ describe("CLI full e2e smoke", () => {
       "Installed skill: helper",
     );
     await expectOk(
-      await runBinary(["skill", "list", "--agent", "ceo"], opengoatHome, env),
+      await runBinary(["skill", "list", "--agent", "goat"], opengoatHome, env),
       "helper",
     );
     await expectOk(
@@ -238,16 +238,16 @@ describe("CLI full e2e smoke", () => {
       "openclaw",
     );
     await expectOk(
-      await runBinary(["agent", "provider", "get", "ceo"], opengoatHome, env),
-      "ceo: openclaw",
+      await runBinary(["agent", "provider", "get", "goat"], opengoatHome, env),
+      "goat: openclaw",
     );
     await expectOk(
       await runBinary(
-        ["agent", "provider", "set", "ceo", "openclaw"],
+        ["agent", "provider", "set", "goat", "openclaw"],
         opengoatHome,
         env,
       ),
-      "ceo: openclaw",
+      "goat: openclaw",
     );
 
     await expectOk(
@@ -265,7 +265,7 @@ describe("CLI full e2e smoke", () => {
     );
     await expectOk(
       await runBinary(["agent", "list"], opengoatHome, env),
-      "ceo",
+      "goat",
     );
 
     const calls = await readStubCalls(stubLogPath);
@@ -323,15 +323,15 @@ async function writeScenarioFixture(root: string): Promise<string> {
       {
         name: "scripted-smoke",
         message: "Confirm scripted scenario execution.",
-        entryAgentId: "ceo",
+        entryAgentId: "goat",
         scripted: {
           agentReplies: {
-            ceo: "Scripted response from ceo.",
+            goat: "Scripted response from goat.",
           },
         },
         assertions: {
           mustSucceed: true,
-          stdoutIncludes: ["Scripted response from ceo"],
+          stdoutIncludes: ["Scripted response from goat"],
         },
       },
       null,

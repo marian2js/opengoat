@@ -75,7 +75,7 @@ afterEach(async () => {
 
 describe.runIf(LIVE_E2E_ENABLED)("live tool registration e2e", () => {
   it(
-    "case 1: npm global install + opengoat start registers tools and exposes them to ceo",
+    "case 1: npm global install + opengoat start registers tools and exposes them to goat",
     async () => {
       const runtime = await createLiveRuntime();
       await buildCli(runtime.env);
@@ -132,7 +132,7 @@ describe.runIf(LIVE_E2E_ENABLED)("live tool registration e2e", () => {
   );
 
   it(
-    "case 2: plugin install + opengoat start registers tools and exposes them to ceo",
+    "case 2: plugin install + opengoat start registers tools and exposes them to goat",
     async () => {
       const runtime = await createLiveRuntime();
       await buildCli(runtime.env);
@@ -308,7 +308,7 @@ async function waitForToolAvailability(
       const response = await invokeGatewayTool(runtime, {
         tool: toolName,
         args: {},
-        sessionKey: "agent:ceo:main",
+        sessionKey: "agent:goat:main",
       });
 
       if (response.status === 401 || response.status === 403) {
@@ -316,7 +316,7 @@ async function waitForToolAvailability(
       }
 
       if (response.status === 404 && response.message.includes("Tool not available")) {
-        lastFailure = `Tool is unavailable to ceo: ${toolName}. Response: ${response.raw}`;
+        lastFailure = `Tool is unavailable to goat: ${toolName}. Response: ${response.raw}`;
         await wait(1000);
         continue;
       }

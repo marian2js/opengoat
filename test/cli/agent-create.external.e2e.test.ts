@@ -66,7 +66,7 @@ describe("agent create OpenClaw sync e2e", () => {
     const { stubPath, stubLogPath } = await createOpenClawStub(root);
 
     const result = await runBinary(
-      ["agent", "create", "OpenClaw Writer", "--specialist", "--reports-to", "ceo", "--skill", "writing"],
+      ["agent", "create", "OpenClaw Writer", "--specialist", "--reports-to", "goat", "--skill", "writing"],
       opengoatHome,
       {
         OPENCLAW_CMD: stubPath,
@@ -234,7 +234,7 @@ describe("agent create OpenClaw sync e2e", () => {
     );
   });
 
-  it("does not recreate ceo BOOTSTRAP.md when ceo create is re-run", async () => {
+  it("does not recreate goat BOOTSTRAP.md when goat create is re-run", async () => {
     const root = await createTempDir("opengoat-agent-create-e2e-");
     roots.push(root);
 
@@ -252,13 +252,13 @@ describe("agent create OpenClaw sync e2e", () => {
     );
     expect(initResult.code).toBe(0);
 
-    const bootstrapPath = path.join(opengoatHome, "workspaces", "ceo", "BOOTSTRAP.md");
+    const bootstrapPath = path.join(opengoatHome, "workspaces", "goat", "BOOTSTRAP.md");
     await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
     await rm(bootstrapPath);
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
 
     const recreateCeo = await runBinary(
-      ["agent", "create", "CEO"],
+      ["agent", "create", "Goat"],
       opengoatHome,
       {
         OPENCLAW_CMD: stubPath,

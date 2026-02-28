@@ -28,7 +28,7 @@ function createHarness(overrides: Partial<ReturnType<typeof createDefaultService
 }
 
 describe("OpenGoatAcpAgent", () => {
-  it("creates a session with mode metadata and defaults to ceo", async () => {
+  it("creates a session with mode metadata and defaults to goat", async () => {
     const { agent } = createHarness();
 
     const response = (await agent.newSession({
@@ -37,8 +37,8 @@ describe("OpenGoatAcpAgent", () => {
     })) as NewSessionResponse;
 
     expect(response.sessionId).toBeTruthy();
-    expect(response.modes?.currentModeId).toBe("ceo");
-    expect(response.modes?.availableModes.map((entry) => entry.id)).toEqual(["ceo", "developer"]);
+    expect(response.modes?.currentModeId).toBe("goat");
+    expect(response.modes?.availableModes.map((entry) => entry.id)).toEqual(["goat", "developer"]);
   });
 
   it("runs prompt through OpenGoat and emits assistant chunk", async () => {
@@ -47,8 +47,8 @@ describe("OpenGoatAcpAgent", () => {
       stdout: "hello from OpenGoat",
       stderr: "",
       providerId: "openclaw",
-      agentId: "ceo",
-      entryAgentId: "ceo",
+      agentId: "goat",
+      entryAgentId: "goat",
       tracePath: "/tmp/trace.json"
     }));
     const { agent, sessionUpdate } = createHarness({ runAgent });
@@ -61,17 +61,17 @@ describe("OpenGoatAcpAgent", () => {
       sessionId: session.sessionId,
       prompt: [{ type: "text", text: "ping" }],
       _meta: {
-        agentId: "ceo",
-        sessionKey: "agent:ceo:main"
+        agentId: "goat",
+        sessionKey: "agent:goat:main"
       }
     })) as PromptResponse;
 
     expect(response.stopReason).toBe("end_turn");
     expect(runAgent).toHaveBeenCalledWith(
-      "ceo",
+      "goat",
       expect.objectContaining({
         message: "ping",
-        sessionRef: "agent:ceo:main"
+        sessionRef: "agent:goat:main"
       })
     );
     expect(sessionUpdate).toHaveBeenCalledWith(
@@ -115,8 +115,8 @@ describe("OpenGoatAcpAgent", () => {
       stdout: "late answer",
       stderr: "",
       providerId: "openclaw",
-      agentId: "ceo",
-      entryAgentId: "ceo",
+      agentId: "goat",
+      entryAgentId: "goat",
       tracePath: "/tmp/trace.json"
     });
   });
@@ -172,9 +172,9 @@ describe("OpenGoatAcpAgent", () => {
 
 function createDefaultService() {
   return {
-    initialize: vi.fn(async () => ({ defaultAgent: "ceo" })),
+    initialize: vi.fn(async () => ({ defaultAgent: "goat" })),
     listAgents: vi.fn(async () => [
-      { id: "ceo", displayName: "CEO" },
+      { id: "goat", displayName: "Goat" },
       { id: "developer", displayName: "Developer" }
     ]),
     runAgent: vi.fn(async () => ({
@@ -182,8 +182,8 @@ function createDefaultService() {
       stdout: "ok",
       stderr: "",
       providerId: "openclaw",
-      agentId: "ceo",
-      entryAgentId: "ceo",
+      agentId: "goat",
+      entryAgentId: "goat",
       tracePath: "/tmp/trace.json"
     })),
     listSessions: vi.fn(async () => []),

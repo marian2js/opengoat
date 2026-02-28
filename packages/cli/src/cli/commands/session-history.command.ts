@@ -143,5 +143,5 @@ function printHelp(output: NodeJS.WritableStream): void {
     "  opengoat session history [--agent <id>] [--session <key|id>] [--limit <n>] [--include-compaction] [--json]\n"
   );
   output.write("\n");
-  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / ceo, session=main\n");
+  output.write("Defaults: agent-id=config defaultAgent / OPENGOAT_DEFAULT_AGENT / goat, session=main\n");
 }

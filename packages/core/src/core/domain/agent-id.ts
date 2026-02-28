@@ -1,4 +1,4 @@
-export const DEFAULT_AGENT_ID = "ceo";
+export const DEFAULT_AGENT_ID = "goat";
 
 export function normalizeAgentId(value: string): string {
   return value

@@ -10,7 +10,7 @@ describe("agent image options", () => {
       code: 0,
       stdout: "ok\n",
       stderr: "",
-      agentId: "ceo",
+      agentId: "goat",
       providerId: "openclaw"
     }));
 
@@ -21,7 +21,7 @@ describe("agent image options", () => {
 
     expect(exitCode).toBe(0);
     expect(runAgent).toHaveBeenCalledWith(
-      "ceo",
+      "goat",
       expect.objectContaining({
         message: "describe image",
         images: [{ path: "./diagram.png" }, { path: "./chart.jpg" }]

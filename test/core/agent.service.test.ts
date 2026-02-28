@@ -48,12 +48,12 @@ describe("AgentService", () => {
     const { service, paths } = await createAgentServiceWithPaths();
 
     const result = await service.ensureAgent(paths, {
-      id: "ceo",
-      displayName: "CEO",
+      id: "goat",
+      displayName: "Goat",
     });
 
     expect(result.agent.workspaceDir).toBe(
-      path.join(paths.workspacesDir, "ceo"),
+      path.join(paths.workspacesDir, "goat"),
     );
     expect(result.createdPaths.length).toBeGreaterThan(0);
 
@@ -67,24 +67,24 @@ describe("AgentService", () => {
       runtime?: { provider?: { id?: string } };
       organization?: { type?: string; reportsTo?: string | null };
     };
-    expect(config.role).toBe("CEO");
+    expect(config.role).toBe("Goat");
     expect(config.runtime?.provider?.id).toBe("openclaw");
     expect(config.organization?.type).toBe("manager");
     expect(config.organization?.reportsTo).toBeNull();
-    expect(result.agent.role).toBe("CEO");
+    expect(result.agent.role).toBe("Goat");
 
     const index = JSON.parse(
       await readFile(paths.agentsIndexJsonPath, "utf-8"),
     ) as {
       agents: string[];
     };
-    expect(index.agents).toEqual(["ceo"]);
+    expect(index.agents).toEqual(["goat"]);
     expect(result.createdPaths).not.toContain(
       path.join(result.agent.workspaceDir, "AGENTS.md"),
     );
   });
 
-  it("defaults non-ceo reportsTo to ceo when omitted", async () => {
+  it("defaults non-goat reportsTo to goat when omitted", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
 
     const result = await service.ensureAgent(paths, {
@@ -100,7 +100,7 @@ describe("AgentService", () => {
     ) as {
       organization?: { reportsTo?: string | null };
     };
-    expect(config.organization?.reportsTo).toBe("ceo");
+    expect(config.organization?.reportsTo).toBe("goat");
   });
 
   it("supports explicit reportsTo manager when creating an agent", async () => {
@@ -172,11 +172,11 @@ describe("AgentService", () => {
     ).toBe(false);
   });
 
-  it("keeps CEO First Run, replaces Every Session, preserves SOUL.md, and writes ROLE/BOOTSTRAP", async () => {
+  it("keeps Goat First Run, replaces Every Session, preserves SOUL.md, and writes ROLE/BOOTSTRAP", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
-    const ceoWorkspace = path.join(paths.workspacesDir, "ceo");
+    const ceoWorkspace = path.join(paths.workspacesDir, "goat");
     const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
     const rolePath = path.join(ceoWorkspace, "ROLE.md");
     const soulPath = path.join(ceoWorkspace, "SOUL.md");
@@ -237,13 +237,13 @@ describe("AgentService", () => {
       "# ROLE.md - Your position in the organization",
     );
     expect(roleMarkdown).toContain(
-      "You are the CEO of an organization fully run by AI agents.",
+      "You are Goat, the AI co-founder of an organization fully run by AI agents.",
     );
-    expect(roleMarkdown).toContain("- Your id: ceo (agent id)");
-    expect(roleMarkdown).toContain("- Your name: CEO");
-    expect(roleMarkdown).toContain("- Role: CEO");
+    expect(roleMarkdown).toContain("- Your id: goat (agent id)");
+    expect(roleMarkdown).toContain("- Your name: Goat");
+    expect(roleMarkdown).toContain("- Role: Goat");
     expect(roleMarkdown).toContain(
-      '- For info about your reportees, see folder `reportees` or call tool `opengoat_agent_info` with `{"agentId":"ceo"}`.',
+      '- For info about your reportees, see folder `reportees` or call tool `opengoat_agent_info` with `{"agentId":"goat"}`.',
     );
     expect(roleMarkdown).toContain(
       "- Use OpenGoat tools directly (`opengoat_*`), not shell CLI commands.",
@@ -259,11 +259,11 @@ describe("AgentService", () => {
     expect(await fileSystem.exists(userPath)).toBe(false);
   });
 
-  it("removes CEO First Run and BOOTSTRAP.md once bootstrap mode is finalized", async () => {
+  it("removes Goat First Run and BOOTSTRAP.md once bootstrap mode is finalized", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
-    const ceoWorkspace = path.join(paths.workspacesDir, "ceo");
+    const ceoWorkspace = path.join(paths.workspacesDir, "goat");
     const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
     const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
     await fileSystem.ensureDir(ceoWorkspace);
@@ -303,11 +303,11 @@ describe("AgentService", () => {
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
   });
 
-  it("does not duplicate The Organization section after repeated CEO bootstrap normalization", async () => {
+  it("does not duplicate The Organization section after repeated Goat bootstrap normalization", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
-    const ceoWorkspace = path.join(paths.workspacesDir, "ceo");
+    const ceoWorkspace = path.join(paths.workspacesDir, "goat");
     const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
     await fileSystem.ensureDir(ceoWorkspace);
     await writeFile(
@@ -354,11 +354,11 @@ describe("AgentService", () => {
     expect(agentsMarkdown).toContain("baz");
   });
 
-  it("does not rewrite CEO AGENTS.md when The Organization is already present", async () => {
+  it("does not rewrite Goat AGENTS.md when The Organization is already present", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
-    const ceoWorkspace = path.join(paths.workspacesDir, "ceo");
+    const ceoWorkspace = path.join(paths.workspacesDir, "goat");
     const agentsPath = path.join(ceoWorkspace, "AGENTS.md");
     await fileSystem.ensureDir(ceoWorkspace);
 
@@ -389,7 +389,7 @@ describe("AgentService", () => {
     expect(agentsMarkdown).toBe(source);
   });
 
-  it("removes First Run and replaces Every Session for non-ceo AGENTS.md", async () => {
+  it("removes First Run and replaces Every Session for non-goat AGENTS.md", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "engineer", displayName: "Avery" });
 
@@ -435,7 +435,7 @@ describe("AgentService", () => {
     expect(agentsMarkdown).toContain("## The Organization");
   });
 
-  it("writes ROLE.md for non-ceo agents with id/name/role details", async () => {
+  it("writes ROLE.md for non-goat agents with id/name/role details", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
 
     await service.ensureAgent(paths, { id: "engineer", displayName: "Avery" });
@@ -491,16 +491,16 @@ describe("AgentService", () => {
 
   it("syncs manager reportees folders with direct-report symlinks", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
     await service.ensureAgent(
       paths,
       { id: "cto", displayName: "CTO" },
-      { type: "manager", reportsTo: "ceo" },
+      { type: "manager", reportsTo: "goat" },
     );
     await service.ensureAgent(
       paths,
       { id: "qa", displayName: "QA" },
-      { reportsTo: "ceo" },
+      { reportsTo: "goat" },
     );
     await service.ensureAgent(
       paths,
@@ -510,7 +510,7 @@ describe("AgentService", () => {
 
     await service.syncWorkspaceReporteeLinks(paths);
 
-    const ceoReporteesDir = path.join(paths.workspacesDir, "ceo", "reportees");
+    const ceoReporteesDir = path.join(paths.workspacesDir, "goat", "reportees");
     const ctoReporteesDir = path.join(paths.workspacesDir, "cto", "reportees");
     expect(await fileSystem.exists(ceoReporteesDir)).toBe(true);
     expect(await fileSystem.exists(ctoReporteesDir)).toBe(true);
@@ -518,7 +518,7 @@ describe("AgentService", () => {
     const ceoCtoLink = path.join(ceoReporteesDir, "cto");
     const ceoQaLink = path.join(ceoReporteesDir, "qa");
     const ctoEngineerLink = path.join(ctoReporteesDir, "engineer");
-    const ceoManagerLink = path.join(paths.workspacesDir, "ceo", "manager");
+    const ceoManagerLink = path.join(paths.workspacesDir, "goat", "manager");
     const ctoManagerLink = path.join(paths.workspacesDir, "cto", "manager");
     const qaManagerLink = path.join(paths.workspacesDir, "qa", "manager");
     const engineerManagerLink = path.join(
@@ -547,10 +547,10 @@ describe("AgentService", () => {
     ).toBe(path.resolve(paths.workspacesDir, "engineer"));
     expect(
       path.resolve(path.dirname(ctoManagerLink), await readlink(ctoManagerLink)),
-    ).toBe(path.resolve(paths.workspacesDir, "ceo"));
+    ).toBe(path.resolve(paths.workspacesDir, "goat"));
     expect(
       path.resolve(path.dirname(qaManagerLink), await readlink(qaManagerLink)),
-    ).toBe(path.resolve(paths.workspacesDir, "ceo"));
+    ).toBe(path.resolve(paths.workspacesDir, "goat"));
     expect(
       path.resolve(
         path.dirname(engineerManagerLink),
@@ -558,7 +558,7 @@ describe("AgentService", () => {
       ),
     ).toBe(path.resolve(paths.workspacesDir, "cto"));
 
-    await service.setAgentManager(paths, "engineer", "ceo");
+    await service.setAgentManager(paths, "engineer", "goat");
     await service.removeAgent(paths, "qa");
     await service.syncWorkspaceReporteeLinks(paths);
 
@@ -576,7 +576,7 @@ describe("AgentService", () => {
         path.dirname(engineerManagerLink),
         await readlink(engineerManagerLink),
       ),
-    ).toBe(path.resolve(paths.workspacesDir, "ceo"));
+    ).toBe(path.resolve(paths.workspacesDir, "goat"));
 
     const idempotentSync = await service.syncWorkspaceReporteeLinks(paths);
     expect(idempotentSync.createdPaths).toHaveLength(0);
@@ -591,7 +591,7 @@ describe("AgentService", () => {
       JSON.stringify(
         {
           schemaVersion: 1,
-          defaultAgent: "ceo",
+          defaultAgent: "goat",
           createdAt: "2026-02-01T00:00:00.000Z",
           updatedAt: "2026-02-01T00:00:00.000Z",
         },
@@ -613,7 +613,7 @@ describe("AgentService", () => {
       updatedAt: string;
     };
 
-    expect(config.defaultAgent).toBe("ceo");
+    expect(config.defaultAgent).toBe("goat");
     expect(config.createdAt).toBe("2026-02-01T00:00:00.000Z");
     expect(config.updatedAt).toBe("2026-02-01T00:00:00.000Z");
   });
@@ -673,31 +673,31 @@ describe("AgentService", () => {
   it("is idempotent and does not overwrite existing config.json", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
 
-    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
-    const configPath = path.join(paths.agentsDir, "ceo", "config.json");
+    const configPath = path.join(paths.agentsDir, "goat", "config.json");
     await fileSystem.writeFile(
       configPath,
-      JSON.stringify({ displayName: "Custom CEO" }, null, 2) + "\n",
+      JSON.stringify({ displayName: "Custom Goat" }, null, 2) + "\n",
     );
 
     const second = await service.ensureAgent(paths, {
-      id: "ceo",
-      displayName: "CEO",
+      id: "goat",
+      displayName: "Goat",
     });
 
     expect(second.createdPaths).toEqual([]);
     expect(second.skippedPaths.length).toBeGreaterThan(0);
-    expect(await readFile(configPath, "utf-8")).toContain("Custom CEO");
+    expect(await readFile(configPath, "utf-8")).toContain("Custom Goat");
   });
 
   it("updates manager relationship in config.json", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
     await service.ensureAgent(
       paths,
       { id: "cto", displayName: "CTO" },
-      { type: "manager", reportsTo: "ceo" },
+      { type: "manager", reportsTo: "goat" },
     );
     await service.ensureAgent(paths, {
       id: "engineer",
@@ -707,7 +707,7 @@ describe("AgentService", () => {
     const result = await service.setAgentManager(paths, "engineer", "cto");
 
     expect(result.agentId).toBe("engineer");
-    expect(result.previousReportsTo).toBe("ceo");
+    expect(result.previousReportsTo).toBe("goat");
     expect(result.reportsTo).toBe("cto");
 
     const config = JSON.parse(
@@ -726,11 +726,11 @@ describe("AgentService", () => {
 
   it("rejects manager reassignment that would create a cycle", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
     await service.ensureAgent(
       paths,
       { id: "cto", displayName: "CTO" },
-      { type: "manager", reportsTo: "ceo" },
+      { type: "manager", reportsTo: "goat" },
     );
     await service.ensureAgent(
       paths,
@@ -765,12 +765,12 @@ describe("AgentService", () => {
     ).toBe(false);
   });
 
-  it("prevents deleting ceo", async () => {
+  it("prevents deleting goat", async () => {
     const { service, paths } = await createAgentServiceWithPaths();
-    await service.ensureAgent(paths, { id: "ceo", displayName: "CEO" });
+    await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
-    await expect(service.removeAgent(paths, "ceo")).rejects.toThrow(
-      "Cannot delete ceo",
+    await expect(service.removeAgent(paths, "goat")).rejects.toThrow(
+      "Cannot delete goat",
     );
   });
 });
