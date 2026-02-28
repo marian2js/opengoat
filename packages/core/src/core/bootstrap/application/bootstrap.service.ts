@@ -107,6 +107,14 @@ export class BootstrapService {
       : await this.agentService.ensureCeoWorkspaceBootstrap(paths, {
           syncBootstrapMarkdown: !globalConfigExisted,
         });
+    const goatWorkspaceTemplateSync =
+      await this.agentService.syncAgentWorkspaceTemplateAssets(
+        paths,
+        DEFAULT_AGENT_ID,
+        {
+          includeBootstrapMarkdown: !globalConfigExisted,
+        },
+      );
     const productManagerResult = await this.agentService.ensureAgent(
       paths,
       DEFAULT_PRODUCT_MANAGER_AGENT,
@@ -136,6 +144,11 @@ export class BootstrapService {
               syncBootstrapMarkdown: false,
             },
           );
+    const productManagerWorkspaceTemplateSync =
+      await this.agentService.syncAgentWorkspaceTemplateAssets(
+        paths,
+        DEFAULT_PRODUCT_MANAGER_AGENT.id,
+      );
     const productManagerRoleSkillSync =
       await this.agentService.ensureAgentWorkspaceRoleSkills(
         paths,
@@ -149,6 +162,8 @@ export class BootstrapService {
     createdPaths.push(...goatWorkspaceBootstrapResult.createdPaths);
     skippedPaths.push(...goatWorkspaceBootstrapResult.skippedPaths);
     skippedPaths.push(...goatWorkspaceBootstrapResult.removedPaths);
+    createdPaths.push(...goatWorkspaceTemplateSync.createdPaths);
+    skippedPaths.push(...goatWorkspaceTemplateSync.skippedPaths);
     createdPaths.push(...productManagerResult.createdPaths);
     skippedPaths.push(...productManagerResult.skippedPaths);
     createdPaths.push(...productManagerConfigRepairResult.updatedPaths);
@@ -156,6 +171,8 @@ export class BootstrapService {
     createdPaths.push(...productManagerWorkspaceBootstrapResult.createdPaths);
     skippedPaths.push(...productManagerWorkspaceBootstrapResult.skippedPaths);
     skippedPaths.push(...productManagerWorkspaceBootstrapResult.removedPaths);
+    createdPaths.push(...productManagerWorkspaceTemplateSync.createdPaths);
+    skippedPaths.push(...productManagerWorkspaceTemplateSync.skippedPaths);
     createdPaths.push(...productManagerRoleSkillSync.createdPaths);
     skippedPaths.push(...productManagerRoleSkillSync.skippedPaths);
     skippedPaths.push(...productManagerRoleSkillSync.removedPaths);

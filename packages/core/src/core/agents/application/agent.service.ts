@@ -23,12 +23,13 @@ import type {
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import {
+  listAgentWorkspaceTemplates,
   renderAgentsIndex,
   renderBoardsSkillMarkdown,
   renderCeoBootstrapMarkdown,
-  renderCeoRoleMarkdown,
   renderInternalAgentConfig,
   resolveAgentRole,
+  type AgentWorkspaceTemplate,
   type AgentTemplateOptions,
 } from "../../templates/default-templates.js";
 
@@ -103,6 +104,15 @@ interface RoleAssignmentSyncResult {
 export interface WorkspaceCommandShimSyncResult {
   createdPaths: string[];
   skippedPaths: string[];
+}
+
+export interface WorkspaceTemplateAssetsSyncResult {
+  createdPaths: string[];
+  skippedPaths: string[];
+}
+
+export interface WorkspaceTemplateAssetsSyncOptions {
+  includeBootstrapMarkdown?: boolean;
 }
 
 export interface WorkspaceReporteeLinksSyncResult {
@@ -274,6 +284,17 @@ export class AgentService {
       skippedPaths,
       removedPaths,
     );
+    await this.syncWorkspaceTemplateAssets(
+      workspaceDir,
+      normalizedAgentId,
+      createdPaths,
+      skippedPaths,
+      {
+        includeBootstrapMarkdown:
+          !isDefaultAgentId(normalizedAgentId) ||
+          Boolean(options.syncBootstrapMarkdown),
+      },
+    );
 
     await this.rewriteAgentsMarkdown(
       agentsPath,
@@ -359,6 +380,33 @@ export class AgentService {
       paths.organizationDir,
       createdPaths,
       skippedPaths,
+    );
+    return {
+      createdPaths,
+      skippedPaths,
+    };
+  }
+
+  public async syncAgentWorkspaceTemplateAssets(
+    paths: OpenGoatPaths,
+    rawAgentId: string,
+    options: WorkspaceTemplateAssetsSyncOptions = {},
+  ): Promise<WorkspaceTemplateAssetsSyncResult> {
+    const agentId = normalizeAgentId(rawAgentId);
+    if (!agentId) {
+      throw new Error("Agent id cannot be empty.");
+    }
+
+    const workspaceDir = this.pathPort.join(paths.workspacesDir, agentId);
+    const createdPaths: string[] = [];
+    const skippedPaths: string[] = [];
+    await this.ensureDirectory(workspaceDir, createdPaths, skippedPaths);
+    await this.syncWorkspaceTemplateAssets(
+      workspaceDir,
+      agentId,
+      createdPaths,
+      skippedPaths,
+      options,
     );
     return {
       createdPaths,
@@ -868,7 +916,7 @@ export class AgentService {
       renderRoleMarkdown(profile),
       createdPaths,
       skippedPaths,
-      { overwrite: true },
+      { overwrite: false },
     );
   }
 
@@ -898,6 +946,61 @@ export class AgentService {
       createdPaths,
       skippedPaths,
       { overwrite: true },
+    );
+  }
+
+  private async syncWorkspaceTemplateAssets(
+    workspaceDir: string,
+    agentId: string,
+    createdPaths: string[],
+    skippedPaths: string[],
+    options: WorkspaceTemplateAssetsSyncOptions = {},
+  ): Promise<void> {
+    const includeBootstrapMarkdown =
+      options.includeBootstrapMarkdown ?? true;
+    const templates = listAgentWorkspaceTemplates(agentId);
+    for (const template of templates) {
+      if (
+        !includeBootstrapMarkdown &&
+        normalizeTemplateRelativePath(template.fileName).toLowerCase() ===
+          "bootstrap.md"
+      ) {
+        continue;
+      }
+      await this.writeWorkspaceTemplateFile(
+        workspaceDir,
+        template,
+        createdPaths,
+        skippedPaths,
+      );
+    }
+  }
+
+  private async writeWorkspaceTemplateFile(
+    workspaceDir: string,
+    template: AgentWorkspaceTemplate,
+    createdPaths: string[],
+    skippedPaths: string[],
+  ): Promise<void> {
+    const relativePath = normalizeTemplateRelativePath(template.fileName);
+    if (!relativePath) {
+      return;
+    }
+
+    const segments = relativePath.split("/");
+    const parentSegments = segments.slice(0, -1);
+    if (parentSegments.length > 0) {
+      await this.ensureDirectory(
+        this.pathPort.join(workspaceDir, ...parentSegments),
+        createdPaths,
+        skippedPaths,
+      );
+    }
+    await this.writeMarkdown(
+      this.pathPort.join(workspaceDir, ...segments),
+      template.content,
+      createdPaths,
+      skippedPaths,
     );
   }
 
@@ -1401,10 +1504,6 @@ function renderRoleMarkdown(profile: {
   displayName: string;
   role: string;
 }): string {
-  if (isDefaultAgentId(profile.agentId)) {
-    return renderCeoRoleMarkdown();
-  }
-
   return [
     "# ROLE.md - Your position in the organization",
     "",
@@ -1424,6 +1523,15 @@ function renderRoleMarkdown(profile: {
     "",
     "_This file is yours to evolve. Update it as you learn your role and responsibilities in the organization._",
   ].join("\n");
+}
+
+function normalizeTemplateRelativePath(fileName: string): string {
+  return fileName
+    .replace(/\\/g, "/")
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment !== "" && segment !== "." && segment !== "..")
+    .join("/");
 }
 
 function renderOpenGoatWorkspaceShim(): string {
