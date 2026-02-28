@@ -14,6 +14,11 @@ import {
   renderGlobalConfig,
 } from "../../templates/default-templates.js";
 
+const DEFAULT_PRODUCT_MANAGER_AGENT: AgentIdentity = {
+  id: "sage",
+  displayName: "Sage",
+};
+
 interface BootstrapServiceDeps {
   fileSystem: FileSystemPort;
   pathPort: PathPort;
@@ -75,17 +80,15 @@ export class BootstrapService {
       skippedPaths,
     );
 
-    const goat: AgentIdentity = {
+    const goatResult = await this.agentService.ensureAgent(paths, {
       id: DEFAULT_AGENT_ID,
       displayName: "Goat",
-    };
-
-    const agentResult = await this.agentService.ensureAgent(paths, goat, {
+    }, {
       type: "manager",
       reportsTo: null,
       role: "co-founder",
     });
-    const workspaceBootstrapResult = agentResult.alreadyExisted
+    const goatWorkspaceBootstrapResult = goatResult.alreadyExisted
       ? {
           createdPaths: [],
           skippedPaths: [],
@@ -94,14 +97,46 @@ export class BootstrapService {
       : await this.agentService.ensureCeoWorkspaceBootstrap(paths, {
           syncBootstrapMarkdown: !globalConfigExisted,
         });
+    const productManagerResult = await this.agentService.ensureAgent(
+      paths,
+      DEFAULT_PRODUCT_MANAGER_AGENT,
+      {
+        type: "individual",
+        reportsTo: DEFAULT_AGENT_ID,
+        role: "Product Manager",
+      },
+    );
+    const productManagerWorkspaceBootstrapResult =
+      productManagerResult.alreadyExisted
+        ? {
+            createdPaths: [],
+            skippedPaths: [],
+            removedPaths: [],
+          }
+        : await this.agentService.ensureAgentWorkspaceBootstrap(
+            paths,
+            {
+              agentId: DEFAULT_PRODUCT_MANAGER_AGENT.id,
+              displayName: DEFAULT_PRODUCT_MANAGER_AGENT.displayName,
+              role: "Product Manager",
+            },
+            {
+              syncBootstrapMarkdown: false,
+            },
+          );
     const workspaceReporteesSync =
       await this.agentService.syncWorkspaceReporteeLinks(paths);
 
-    createdPaths.push(...agentResult.createdPaths);
-    skippedPaths.push(...agentResult.skippedPaths);
-    createdPaths.push(...workspaceBootstrapResult.createdPaths);
-    skippedPaths.push(...workspaceBootstrapResult.skippedPaths);
-    skippedPaths.push(...workspaceBootstrapResult.removedPaths);
+    createdPaths.push(...goatResult.createdPaths);
+    skippedPaths.push(...goatResult.skippedPaths);
+    createdPaths.push(...goatWorkspaceBootstrapResult.createdPaths);
+    skippedPaths.push(...goatWorkspaceBootstrapResult.skippedPaths);
+    skippedPaths.push(...goatWorkspaceBootstrapResult.removedPaths);
+    createdPaths.push(...productManagerResult.createdPaths);
+    skippedPaths.push(...productManagerResult.skippedPaths);
+    createdPaths.push(...productManagerWorkspaceBootstrapResult.createdPaths);
+    skippedPaths.push(...productManagerWorkspaceBootstrapResult.skippedPaths);
+    skippedPaths.push(...productManagerWorkspaceBootstrapResult.removedPaths);
     createdPaths.push(...workspaceReporteesSync.createdPaths);
     skippedPaths.push(...workspaceReporteesSync.skippedPaths);
     skippedPaths.push(...workspaceReporteesSync.removedPaths);
@@ -188,7 +223,7 @@ export class BootstrapService {
       await this.fileSystem.writeFile(
         agentsIndexJsonPath,
         `${JSON.stringify(
-          renderAgentsIndex(now, [DEFAULT_AGENT_ID]),
+          renderAgentsIndex(now, [DEFAULT_AGENT_ID, DEFAULT_PRODUCT_MANAGER_AGENT.id]),
           null,
           2,
         )}\n`,
@@ -200,7 +235,11 @@ export class BootstrapService {
     const current = await this.readJsonIfPresent<{ agents?: string[] }>(
       agentsIndexJsonPath,
     );
-    const mergedAgents = dedupe([...(current?.agents ?? []), DEFAULT_AGENT_ID]);
+    const mergedAgents = dedupe([
+      ...(current?.agents ?? []),
+      DEFAULT_AGENT_ID,
+      DEFAULT_PRODUCT_MANAGER_AGENT.id,
+    ]);
     await this.fileSystem.writeFile(
       agentsIndexJsonPath,
       `${JSON.stringify(renderAgentsIndex(now, mergedAgents), null, 2)}\n`,

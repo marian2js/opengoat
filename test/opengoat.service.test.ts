@@ -194,6 +194,7 @@ describe("OpenGoatService", () => {
     expect(agents.map((agent) => agent.id)).toEqual([
       "goat",
       "research-analyst",
+      "sage",
     ]);
     expect(agents.find((agent) => agent.id === "goat")?.role).toBe(
       "co-founder",
@@ -259,10 +260,10 @@ describe("OpenGoatService", () => {
     });
 
     const direct = await service.listDirectReportees("goat");
-    expect(direct).toEqual(["cto", "qa"]);
+    expect(direct).toEqual(["cto", "qa", "sage"]);
 
     const all = await service.listAllReportees("goat");
-    expect(all).toEqual(["cto", "engineer", "intern", "qa"]);
+    expect(all).toEqual(["cto", "engineer", "intern", "qa", "sage"]);
 
     await expect(service.listDirectReportees("missing")).rejects.toThrow(
       'Agent "missing" does not exist.',
@@ -298,7 +299,7 @@ describe("OpenGoatService", () => {
     expect(info.id).toBe("goat");
     expect(info.name).toBe("Goat");
     expect(info.role).toBe("co-founder");
-    expect(info.totalReportees).toBe(3);
+    expect(info.totalReportees).toBe(4);
     expect(info.directReportees).toEqual([
       {
         id: "cto",
@@ -310,6 +311,12 @@ describe("OpenGoatService", () => {
         id: "qa",
         name: "QA",
         role: "QA Engineer",
+        totalReportees: 0,
+      },
+      {
+        id: "sage",
+        name: "Sage",
+        role: "Product Manager",
         totalReportees: 0,
       },
     ]);
@@ -790,6 +797,7 @@ describe("OpenGoatService", () => {
     expect(agents.map((agent) => agent.id)).toEqual([
       "goat",
       "research-analyst",
+      "sage",
     ]);
   });
 
@@ -835,7 +843,7 @@ describe("OpenGoatService", () => {
     );
 
     const agents = await service.listAgents();
-    expect(agents.map((agent) => agent.id)).toEqual(["goat"]);
+    expect(agents.map((agent) => agent.id)).toEqual(["goat", "sage"]);
   });
 
   it("deletes local and OpenClaw runtime agents", async () => {
@@ -1625,7 +1633,7 @@ describe("OpenGoatService", () => {
     });
 
     expect(installResult.scope).toBe("global");
-    expect(installResult.assignedAgentIds).toEqual(["goat", "engineer"]);
+    expect(installResult.assignedAgentIds).toEqual(["goat", "engineer", "sage"]);
     await expect(
       access(
         path.join(
@@ -1756,7 +1764,7 @@ describe("OpenGoatService", () => {
 
     expect(removeResult.scope).toBe("global");
     expect(removeResult.removedFromGlobal).toBe(true);
-    expect(removeResult.removedFromAgentIds).toEqual(["goat", "engineer"]);
+    expect(removeResult.removedFromAgentIds).toEqual(["goat", "engineer", "sage"]);
     await expect(
       access(path.join(root, "skills", "qa-checklist"), constants.F_OK),
     ).rejects.toBeTruthy();
@@ -1944,7 +1952,7 @@ describe("OpenGoatService", () => {
     expect(result.homeDir).toBe(root);
     expect(result.homeRemoved).toBe(true);
     expect(result.failedOpenClawAgents).toHaveLength(0);
-    expect(result.deletedOpenClawAgents).toEqual(["goat", "cto", "orphan"]);
+    expect(result.deletedOpenClawAgents).toEqual(["goat", "cto", "orphan", "sage"]);
     expect(result.removedOpenClawManagedSkillDirs).toEqual([
       path.join(managedSkillsDir, "og-boards"),
       path.join(managedSkillsDir, "og-board-manager"),
@@ -1952,7 +1960,7 @@ describe("OpenGoatService", () => {
     ]);
     expect(
       provider.deletedAgents.map((entry) => entry.agentId).sort(),
-    ).toEqual(["cto", "goat", "orphan"]);
+    ).toEqual(["cto", "goat", "orphan", "sage"]);
     await expect(access(root, constants.F_OK)).rejects.toBeTruthy();
   });
 
