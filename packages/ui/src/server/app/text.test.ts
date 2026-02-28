@@ -42,8 +42,8 @@ describe("sanitizeConversationText", () => {
   it("removes stale OpenClaw plugin warning blocks", () => {
     const input = [
       "◇ Config warnings",
-      "│ - plugins.entries.opengoat-plugin: plugin not found: opengoat-plugin (stale config entry ignored; remove it from plugins config)",
-      "│ - plugins.entries.openclaw-plugin-pack: plugin not found: openclaw-plugin-pack (stale config entry ignored; remove it from plugins config)",
+      "│ - plugins.entries.legacy-tools: plugin not found: legacy-tools (stale config entry ignored; remove it from plugins config)",
+      "│ - plugins.entries.legacy-pack: plugin not found: legacy-pack (stale config entry ignored; remove it from plugins config)",
       "└────────────────────────────────────────────",
       "## Proposed Roadmap",
       "Ship MVP in 7 days.",
@@ -65,7 +65,7 @@ describe("sanitizeConversationText", () => {
       "│",
       "◇  Config warnings ────────────────────────────────────────────────────────╮",
       "│                                                                          │",
-      "│  - plugins.entries.opengoat-plugin: plugin not found: opengoat-plugin    │",
+      "│  - plugins.entries.legacy-tools: plugin not found: legacy-tools          │",
       "│    (stale config entry ignored; remove it from plugins config)           │",
       "│                                                                          │",
       "├──────────────────────────────────────────────────────────────────────────╯",
@@ -82,7 +82,7 @@ describe("sanitizeConversationText", () => {
 describe("sanitizeRuntimeProgressChunk", () => {
   it("filters stale OpenClaw warning lines from runtime chunks", () => {
     const input =
-      "Config warnings:\n- plugins.entries.opengoat-plugin: plugin not found: opengoat-plugin (stale config entry ignored; remove it from plugins config)\nStarting @goat.";
+      "Config warnings:\n- plugins.entries.legacy-tools: plugin not found: legacy-tools (stale config entry ignored; remove it from plugins config)\nStarting @goat.";
     expect(sanitizeRuntimeProgressChunk(input)).toBe("Starting @goat.");
   });
 });
