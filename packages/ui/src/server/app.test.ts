@@ -305,11 +305,6 @@ describe("OpenGoat UI server API", () => {
             enabled: true,
             openTasksThreshold: 5,
           },
-          bottomUp: {
-            enabled: false,
-            maxInactivityMinutes: 30,
-            inactiveAgentNotificationTarget: "all-managers",
-          },
         },
         ceoBootstrapPending: false,
       },
@@ -325,11 +320,6 @@ describe("OpenGoat UI server API", () => {
             enabled: true,
             openTasksThreshold: 5,
           },
-          bottomUp: {
-            enabled: false,
-            maxInactivityMinutes: 45,
-            inactiveAgentNotificationTarget: "goat-only",
-          },
         },
         maxParallelFlows: 6,
       },
@@ -340,10 +330,9 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: false,
         maxParallelFlows: 6,
         taskDelegationStrategies: {
-          bottomUp: {
-            enabled: false,
-            maxInactivityMinutes: 45,
-            inactiveAgentNotificationTarget: "goat-only",
+          topDown: {
+            enabled: true,
+            openTasksThreshold: 5,
           },
         },
         ceoBootstrapPending: false,
@@ -360,11 +349,6 @@ describe("OpenGoat UI server API", () => {
             enabled: true,
             openTasksThreshold: 5,
           },
-          bottomUp: {
-            enabled: false,
-            maxInactivityMinutes: 45,
-            inactiveAgentNotificationTarget: "goat-only",
-          },
         },
         maxParallelFlows: 6,
       },
@@ -378,11 +362,6 @@ describe("OpenGoat UI server API", () => {
           topDown: {
             enabled: true,
             openTasksThreshold: 5,
-          },
-          bottomUp: {
-            enabled: false,
-            maxInactivityMinutes: 45,
-            inactiveAgentNotificationTarget: "goat-only",
           },
         },
         ceoBootstrapPending: false,
@@ -399,10 +378,9 @@ describe("OpenGoat UI server API", () => {
         taskCronEnabled: true,
         maxParallelFlows: 6,
         taskDelegationStrategies: {
-          bottomUp: {
-            enabled: false,
-            maxInactivityMinutes: 45,
-            inactiveAgentNotificationTarget: "goat-only",
+          topDown: {
+            enabled: true,
+            openTasksThreshold: 5,
           },
         },
         ceoBootstrapPending: false,
@@ -847,13 +825,6 @@ describe("OpenGoat UI server API", () => {
         `${uniqueHomeDir}/ui-settings.json`,
         `${JSON.stringify({
           taskCronEnabled: false,
-          taskDelegationStrategies: {
-            bottomUp: {
-              enabled: false,
-              maxInactivityMinutes: 30,
-              inactiveAgentNotificationTarget: "goat-only",
-            },
-          },
           maxParallelFlows: 4,
         }, null, 2)}\n`,
         "utf8"
@@ -877,17 +848,17 @@ describe("OpenGoat UI server API", () => {
           todoTasks: 0,
           doingTasks: 0,
           blockedTasks: 0,
-          inactiveAgents: 1,
+          inactiveAgents: 0,
           sent: 1,
           failed: 0,
           dispatches: [
             {
-              kind: "inactive",
+              kind: "blocked",
               targetAgentId: "goat",
-              sessionRef: "agent:goat:agent_goat_inactive_engineer",
-              subjectAgentId: "engineer",
+              sessionRef: "agent:goat:agent_goat_notifications",
+              taskId: "task-1",
               message:
-                'Your reportee "@engineer" (Engineer) has no activity in the last 30 minutes.',
+                "Task #task-1 assigned to your reportee is blocked.",
               ok: true,
             },
           ],
@@ -925,13 +896,13 @@ describe("OpenGoat UI server API", () => {
           .filter(Boolean) ?? [];
       expect(
         messages.some((entry) =>
-          entry.includes("[task-cron] Agent @goat received inactive message."),
+          entry.includes("[task-cron] Agent @goat received blocked message."),
         ),
       ).toBe(true);
       expect(
         messages.some((entry) =>
           entry.includes(
-            "message=\"Your reportee '@engineer' (Engineer) has no activity in the last 30 minutes.\"",
+            "message=\"Task #task-1 assigned to your reportee is blocked.\"",
           ),
         ),
       ).toBe(true);
@@ -1032,11 +1003,6 @@ describe("OpenGoat UI server API", () => {
           topDown: {
             enabled: true,
             openTasksThreshold: 5,
-          },
-          bottomUp: {
-            enabled: false,
-            maxInactivityMinutes: 30,
-            inactiveAgentNotificationTarget: "all-managers",
           },
         },
       },

@@ -61,10 +61,7 @@ import {
   type SidebarVersionInfo,
 } from "@/pages/dashboard/components/SidebarVersionStatus";
 import { LogsPage } from "@/pages/logs/LogsPage";
-import {
-  SettingsPage,
-  type InactiveAgentNotificationTarget,
-} from "@/pages/settings/SettingsPage";
+import { SettingsPage } from "@/pages/settings/SettingsPage";
 import { SkillInstallDialog } from "@/pages/skills/SkillInstallDialog";
 import { SkillsPage } from "@/pages/skills/SkillsPage";
 import type {
@@ -259,12 +256,6 @@ interface UiSettings {
   ceoBootstrapPending: boolean;
 }
 
-interface UiBottomUpTaskDelegationStrategy {
-  enabled: boolean;
-  maxInactivityMinutes: number;
-  inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
-}
-
 interface UiTopDownTaskDelegationStrategy {
   enabled: boolean;
   openTasksThreshold: number;
@@ -272,7 +263,6 @@ interface UiTopDownTaskDelegationStrategy {
 
 interface UiTaskDelegationStrategies {
   topDown: UiTopDownTaskDelegationStrategy;
-  bottomUp: UiBottomUpTaskDelegationStrategy;
 }
 
 interface UiAuthenticationSettings {
@@ -518,14 +508,11 @@ const NODE_WIDTH = 260;
 const NODE_HEIGHT = 108;
 const DEFAULT_AGENT_ID = "goat";
 const DEFAULT_TOP_DOWN_OPEN_TASKS_THRESHOLD = 5;
-const DEFAULT_MAX_INACTIVITY_MINUTES = 30;
 const DEFAULT_MAX_IN_PROGRESS_MINUTES = 4 * 60;
 const DEFAULT_MAX_PARALLEL_FLOWS = 3;
 const TASK_CRON_INTERVAL_MINUTES = 1;
 const MIN_TOP_DOWN_OPEN_TASKS_THRESHOLD = 0;
 const MAX_TOP_DOWN_OPEN_TASKS_THRESHOLD = 10_000;
-const MIN_MAX_INACTIVITY_MINUTES = 1;
-const MAX_MAX_INACTIVITY_MINUTES = 10_080;
 const MIN_MAX_IN_PROGRESS_MINUTES = 1;
 const MAX_MAX_IN_PROGRESS_MINUTES = 10_080;
 const MIN_MAX_PARALLEL_FLOWS = 1;
@@ -577,11 +564,6 @@ function defaultTaskDelegationStrategies(): UiTaskDelegationStrategies {
       enabled: true,
       openTasksThreshold: DEFAULT_TOP_DOWN_OPEN_TASKS_THRESHOLD,
     },
-    bottomUp: {
-      enabled: false,
-      maxInactivityMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
-      inactiveAgentNotificationTarget: "all-managers",
-    },
   };
 }
 
@@ -600,25 +582,6 @@ function resolveTopDownOpenTasksThresholdValue(value: unknown): number {
   }
   if (parsed > MAX_TOP_DOWN_OPEN_TASKS_THRESHOLD) {
     return MAX_TOP_DOWN_OPEN_TASKS_THRESHOLD;
-  }
-  return parsed;
-}
-
-function resolveMaxInactivityMinutesValue(value: unknown): number {
-  const parsed =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-      ? Number.parseInt(value, 10)
-      : Number.NaN;
-  if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
-    return DEFAULT_MAX_INACTIVITY_MINUTES;
-  }
-  if (parsed < MIN_MAX_INACTIVITY_MINUTES) {
-    return MIN_MAX_INACTIVITY_MINUTES;
-  }
-  if (parsed > MAX_MAX_INACTIVITY_MINUTES) {
-    return MAX_MAX_INACTIVITY_MINUTES;
   }
   return parsed;
 }
@@ -661,19 +624,6 @@ function resolveMaxInProgressMinutesValue(value: unknown): number {
   return parsed;
 }
 
-function resolveInactiveAgentNotificationTarget(
-  value: unknown,
-): InactiveAgentNotificationTarget {
-  if (value === "all-managers" || value === "goat-only") {
-    return value;
-  }
-  if (value === "ceo-only") {
-    return "goat-only";
-  }
-  return defaultTaskDelegationStrategies().bottomUp
-    .inactiveAgentNotificationTarget;
-}
-
 function normalizeAuthenticationSettings(
   value: unknown,
 ): UiAuthenticationSettings {
@@ -698,18 +648,10 @@ function normalizeUiSettings(
 ): UiSettings {
   const defaults = defaultUiSettings();
   const raw = (settings ?? {}) as Partial<UiSettings> & {
-    notifyManagersOfInactiveAgents?: unknown;
-    maxInactivityMinutes?: unknown;
-    inactiveAgentNotificationTarget?: unknown;
     taskDelegationStrategies?: {
       topDown?: {
         enabled?: unknown;
         openTasksThreshold?: unknown;
-      };
-      bottomUp?: {
-        enabled?: unknown;
-        maxInactivityMinutes?: unknown;
-        inactiveAgentNotificationTarget?: unknown;
       };
     };
   };
@@ -718,35 +660,11 @@ function normalizeUiSettings(
   const rawTopDownEnabled =
     typeof rawTopDown?.enabled === "boolean" ? rawTopDown.enabled : undefined;
   const rawTopDownOpenTasksThreshold = rawTopDown?.openTasksThreshold;
-  const rawBottomUp = raw.taskDelegationStrategies?.bottomUp;
-  const rawBottomUpEnabled =
-    typeof rawBottomUp?.enabled === "boolean" ? rawBottomUp.enabled : undefined;
-  const rawBottomUpMaxInactivityMinutes = rawBottomUp?.maxInactivityMinutes;
-  const rawBottomUpNotificationTarget =
-    rawBottomUp?.inactiveAgentNotificationTarget;
-  const legacyBottomUpEnabled =
-    typeof raw.notifyManagersOfInactiveAgents === "boolean"
-      ? raw.notifyManagersOfInactiveAgents
-      : undefined;
-  const legacyBottomUpMaxInactivityMinutes = raw.maxInactivityMinutes;
-  const legacyBottomUpNotificationTarget = raw.inactiveAgentNotificationTarget;
-
-  const bottomUpEnabled =
-    rawBottomUpEnabled ??
-    legacyBottomUpEnabled ??
-    defaults.taskDelegationStrategies.bottomUp.enabled;
   const topDownEnabled =
     rawTopDownEnabled ?? defaults.taskDelegationStrategies.topDown.enabled;
   const topDownOpenTasksThreshold = resolveTopDownOpenTasksThresholdValue(
     rawTopDownOpenTasksThreshold,
   );
-  const bottomUpMaxInactivityMinutes = resolveMaxInactivityMinutesValue(
-    rawBottomUpMaxInactivityMinutes ?? legacyBottomUpMaxInactivityMinutes,
-  );
-  const bottomUpInactiveAgentNotificationTarget =
-    resolveInactiveAgentNotificationTarget(
-      rawBottomUpNotificationTarget ?? legacyBottomUpNotificationTarget,
-    );
 
   return {
     taskCronEnabled:
@@ -761,12 +679,6 @@ function normalizeUiSettings(
       topDown: {
         enabled: topDownEnabled,
         openTasksThreshold: topDownOpenTasksThreshold,
-      },
-      bottomUp: {
-        enabled: bottomUpEnabled,
-        maxInactivityMinutes: bottomUpMaxInactivityMinutes,
-        inactiveAgentNotificationTarget:
-          bottomUpInactiveAgentNotificationTarget,
       },
     },
     authentication: normalizeAuthenticationSettings(raw.authentication),
@@ -954,9 +866,6 @@ export function DashboardPage(): ReactElement {
   const [createTaskDialogError, setCreateTaskDialogError] = useState<
     string | null
   >(null);
-  const [maxInactivityMinutesInput, setMaxInactivityMinutesInput] = useState(
-    String(DEFAULT_MAX_INACTIVITY_MINUTES),
-  );
   const [topDownOpenTasksThresholdInput, setTopDownOpenTasksThresholdInput] =
     useState(String(DEFAULT_TOP_DOWN_OPEN_TASKS_THRESHOLD));
   const [maxInProgressMinutesInput, setMaxInProgressMinutesInput] = useState(
@@ -970,14 +879,6 @@ export function DashboardPage(): ReactElement {
     topDownTaskDelegationEnabledInput,
     setTopDownTaskDelegationEnabledInput,
   ] = useState(true);
-  const [
-    bottomUpTaskDelegationEnabledInput,
-    setBottomUpTaskDelegationEnabledInput,
-  ] = useState(false);
-  const [
-    inactiveAgentNotificationTargetInput,
-    setInactiveAgentNotificationTargetInput,
-  ] = useState<InactiveAgentNotificationTarget>("all-managers");
   const [uiAuthenticationEnabledInput, setUiAuthenticationEnabledInput] =
     useState(false);
   const [uiAuthenticationUsernameInput, setUiAuthenticationUsernameInput] =
@@ -1209,23 +1110,10 @@ export function DashboardPage(): ReactElement {
             .openTasksThreshold,
         ),
       );
-      setMaxInactivityMinutesInput(
-        String(
-          normalizedSettings.taskDelegationStrategies.bottomUp
-            .maxInactivityMinutes,
-        ),
-      );
       setMaxInProgressMinutesInput(
         String(normalizedSettings.maxInProgressMinutes),
       );
       setMaxParallelFlowsInput(String(normalizedSettings.maxParallelFlows));
-      setBottomUpTaskDelegationEnabledInput(
-        normalizedSettings.taskDelegationStrategies.bottomUp.enabled,
-      );
-      setInactiveAgentNotificationTargetInput(
-        normalizedSettings.taskDelegationStrategies.bottomUp
-          .inactiveAgentNotificationTarget,
-      );
       setUiAuthenticationEnabledInput(
         normalizedSettings.authentication.enabled,
       );
@@ -2963,10 +2851,6 @@ export function DashboardPage(): ReactElement {
       return;
     }
 
-    const parsedMaxInactivityMinutes = Number.parseInt(
-      maxInactivityMinutesInput.trim(),
-      10,
-    );
     const parsedTopDownOpenTasksThreshold = Number.parseInt(
       topDownOpenTasksThresholdInput.trim(),
       10,
@@ -2979,10 +2863,6 @@ export function DashboardPage(): ReactElement {
       maxParallelFlowsInput.trim(),
       10,
     );
-    const isMaxInactivityValid =
-      Number.isFinite(parsedMaxInactivityMinutes) &&
-      parsedMaxInactivityMinutes >= MIN_MAX_INACTIVITY_MINUTES &&
-      parsedMaxInactivityMinutes <= MAX_MAX_INACTIVITY_MINUTES;
     const isTopDownOpenTasksThresholdValid =
       Number.isFinite(parsedTopDownOpenTasksThreshold) &&
       parsedTopDownOpenTasksThreshold >= MIN_TOP_DOWN_OPEN_TASKS_THRESHOLD &&
@@ -3005,16 +2885,6 @@ export function DashboardPage(): ReactElement {
       );
       return;
     }
-    if (
-      taskCronEnabledInput &&
-      bottomUpTaskDelegationEnabledInput &&
-      !isMaxInactivityValid
-    ) {
-      toast.error(
-        `Max inactivity time must be an integer between ${MIN_MAX_INACTIVITY_MINUTES} and ${MAX_MAX_INACTIVITY_MINUTES} minutes.`,
-      );
-      return;
-    }
     if (taskCronEnabledInput && !isMaxParallelFlowsValid) {
       toast.error(
         `Max parallel flows must be an integer between ${MIN_MAX_PARALLEL_FLOWS} and ${MAX_MAX_PARALLEL_FLOWS}.`,
@@ -3027,9 +2897,6 @@ export function DashboardPage(): ReactElement {
       );
       return;
     }
-    const fallbackMaxInactivityMinutes =
-      state?.settings.taskDelegationStrategies.bottomUp.maxInactivityMinutes ??
-      DEFAULT_MAX_INACTIVITY_MINUTES;
     const fallbackTopDownOpenTasksThreshold =
       state?.settings.taskDelegationStrategies.topDown.openTasksThreshold ??
       DEFAULT_TOP_DOWN_OPEN_TASKS_THRESHOLD;
@@ -3037,9 +2904,6 @@ export function DashboardPage(): ReactElement {
       state?.settings.maxInProgressMinutes ?? DEFAULT_MAX_IN_PROGRESS_MINUTES;
     const fallbackMaxParallelFlows =
       state?.settings.maxParallelFlows ?? DEFAULT_MAX_PARALLEL_FLOWS;
-    const resolvedMaxInactivityMinutes = isMaxInactivityValid
-      ? parsedMaxInactivityMinutes
-      : fallbackMaxInactivityMinutes;
     const resolvedTopDownOpenTasksThreshold = isTopDownOpenTasksThresholdValid
       ? parsedTopDownOpenTasksThreshold
       : fallbackTopDownOpenTasksThreshold;
@@ -3061,11 +2925,6 @@ export function DashboardPage(): ReactElement {
             enabled: boolean;
             openTasksThreshold: number;
           };
-          bottomUp: {
-            enabled: boolean;
-            maxInactivityMinutes: number;
-            inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
-          };
         };
         authentication?: {
           enabled: boolean;
@@ -3081,12 +2940,6 @@ export function DashboardPage(): ReactElement {
           topDown: {
             enabled: topDownTaskDelegationEnabledInput,
             openTasksThreshold: resolvedTopDownOpenTasksThreshold,
-          },
-          bottomUp: {
-            enabled: bottomUpTaskDelegationEnabledInput,
-            maxInactivityMinutes: resolvedMaxInactivityMinutes,
-            inactiveAgentNotificationTarget:
-              inactiveAgentNotificationTargetInput,
           },
         },
       };
@@ -3126,10 +2979,6 @@ export function DashboardPage(): ReactElement {
             topDownTaskDelegationEnabledInput
               ? `enabled (threshold ${resolvedTopDownOpenTasksThreshold})`
               : "disabled"
-          }; Bottom-Up ${
-            bottomUpTaskDelegationEnabledInput
-              ? `enabled (${resolvedMaxInactivityMinutes} minutes)`
-              : "disabled"
           }.`;
       toast.success(response.message ?? statusMessage);
       await refreshAuthenticationStatus();
@@ -3152,11 +3001,6 @@ export function DashboardPage(): ReactElement {
       topDown: {
         enabled: boolean;
         openTasksThreshold: number;
-      };
-      bottomUp: {
-        enabled: boolean;
-        maxInactivityMinutes: number;
-        inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
       };
     };
     authentication?: {
@@ -3199,23 +3043,10 @@ export function DashboardPage(): ReactElement {
         normalizedSettings.taskDelegationStrategies.topDown.openTasksThreshold,
       ),
     );
-    setMaxInactivityMinutesInput(
-      String(
-        normalizedSettings.taskDelegationStrategies.bottomUp
-          .maxInactivityMinutes,
-      ),
-    );
     setMaxInProgressMinutesInput(
       String(normalizedSettings.maxInProgressMinutes),
     );
     setMaxParallelFlowsInput(String(normalizedSettings.maxParallelFlows));
-    setBottomUpTaskDelegationEnabledInput(
-      normalizedSettings.taskDelegationStrategies.bottomUp.enabled,
-    );
-    setInactiveAgentNotificationTargetInput(
-      normalizedSettings.taskDelegationStrategies.bottomUp
-        .inactiveAgentNotificationTarget,
-    );
     setUiAuthenticationEnabledInput(normalizedSettings.authentication.enabled);
     setUiAuthenticationUsernameInput(
       normalizedSettings.authentication.username,
@@ -5767,27 +5598,18 @@ export function DashboardPage(): ReactElement {
                     topDownOpenTasksThresholdInput={
                       topDownOpenTasksThresholdInput
                     }
-                    bottomUpTaskDelegationEnabledInput={
-                      bottomUpTaskDelegationEnabledInput
-                    }
                     minTopDownOpenTasksThreshold={
                       MIN_TOP_DOWN_OPEN_TASKS_THRESHOLD
                     }
                     maxTopDownOpenTasksThreshold={
                       MAX_TOP_DOWN_OPEN_TASKS_THRESHOLD
                     }
-                    maxInactivityMinutesInput={maxInactivityMinutesInput}
                     maxInProgressMinutesInput={maxInProgressMinutesInput}
-                    minMaxInactivityMinutes={MIN_MAX_INACTIVITY_MINUTES}
-                    maxMaxInactivityMinutes={MAX_MAX_INACTIVITY_MINUTES}
                     minMaxInProgressMinutes={MIN_MAX_IN_PROGRESS_MINUTES}
                     maxMaxInProgressMinutes={MAX_MAX_IN_PROGRESS_MINUTES}
                     maxParallelFlowsInput={maxParallelFlowsInput}
                     minMaxParallelFlows={MIN_MAX_PARALLEL_FLOWS}
                     maxMaxParallelFlows={MAX_MAX_PARALLEL_FLOWS}
-                    inactiveAgentNotificationTargetInput={
-                      inactiveAgentNotificationTargetInput
-                    }
                     uiAuthenticationEnabledInput={uiAuthenticationEnabledInput}
                     uiAuthenticationUsernameInput={
                       uiAuthenticationUsernameInput
@@ -5830,19 +5652,8 @@ export function DashboardPage(): ReactElement {
                     onTopDownOpenTasksThresholdInputChange={(value) => {
                       setTopDownOpenTasksThresholdInput(value);
                     }}
-                    onBottomUpTaskDelegationEnabledChange={(checked) => {
-                      setBottomUpTaskDelegationEnabledInput(checked);
-                    }}
-                    onMaxInactivityMinutesInputChange={(value) => {
-                      setMaxInactivityMinutesInput(value);
-                    }}
                     onMaxInProgressMinutesInputChange={(value) => {
                       setMaxInProgressMinutesInput(value);
-                    }}
-                    onInactiveAgentNotificationTargetInputChange={(
-                      nextValue,
-                    ) => {
-                      setInactiveAgentNotificationTargetInput(nextValue);
                     }}
                     onUiAuthenticationEnabledChange={(checked) => {
                       setUiAuthenticationEnabledInput(checked);

@@ -193,23 +193,15 @@ export interface OrganizationAgentProfileUpdateInput {
   skills?: string[];
 }
 
-export type InactiveAgentNotificationTarget = "all-managers" | "goat-only";
-export type TaskDelegationStrategyId = "top-down" | "bottom-up";
+export type TaskDelegationStrategyId = "top-down";
 
 export interface TopDownTaskDelegationCronOptions {
   enabled?: boolean;
   openTasksThreshold?: number;
 }
 
-export interface BottomUpTaskDelegationCronOptions {
-  enabled?: boolean;
-  inactiveMinutes?: number;
-  notificationTarget?: InactiveAgentNotificationTarget;
-}
-
 export interface TaskDelegationStrategiesCronOptions {
   topDown?: TopDownTaskDelegationCronOptions;
-  bottomUp?: BottomUpTaskDelegationCronOptions;
 }
 
 export interface OpenClawUiService {
@@ -264,8 +256,6 @@ export interface OpenClawUiService {
   runTaskCronCycle?: (options?: {
     inactiveMinutes?: number;
     inProgressMinutes?: number;
-    notificationTarget?: InactiveAgentNotificationTarget;
-    notifyInactiveAgents?: boolean;
     delegationStrategies?: TaskDelegationStrategiesCronOptions;
     maxParallelFlows?: number;
   }) => Promise<TaskCronRunResult>;
@@ -356,11 +346,10 @@ export interface TaskCronRunResult {
 }
 
 export interface TaskCronDispatchResult {
-  kind: "todo" | "doing" | "pending" | "blocked" | "inactive" | "topdown";
+  kind: "todo" | "doing" | "pending" | "blocked" | "topdown";
   targetAgentId: string;
   sessionRef: string;
   taskId?: string;
-  subjectAgentId?: string;
   message?: string;
   ok: boolean;
   error?: string;
@@ -374,12 +363,6 @@ export interface UiServerSettings {
   authentication: UiServerAuthenticationSettings;
 }
 
-export interface UiBottomUpTaskDelegationStrategySettings {
-  enabled: boolean;
-  maxInactivityMinutes: number;
-  inactiveAgentNotificationTarget: InactiveAgentNotificationTarget;
-}
-
 export interface UiTopDownTaskDelegationStrategySettings {
   enabled: boolean;
   openTasksThreshold: number;
@@ -387,7 +370,6 @@ export interface UiTopDownTaskDelegationStrategySettings {
 
 export interface UiTaskDelegationStrategiesSettings {
   topDown: UiTopDownTaskDelegationStrategySettings;
-  bottomUp: UiBottomUpTaskDelegationStrategySettings;
 }
 
 export interface UiServerAuthenticationSettings {

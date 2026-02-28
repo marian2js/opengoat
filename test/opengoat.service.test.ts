@@ -130,9 +130,6 @@ describe("OpenGoatService", () => {
           enabled: true,
           openTasksThreshold: 100,
         },
-        bottomUp: {
-          enabled: false,
-        },
       },
     });
 
@@ -2032,7 +2029,7 @@ describe("OpenGoatService", () => {
     ).toBe(true);
   });
 
-  it("runs task cron cycle and routes todo/blocked/inactive notifications", async () => {
+  it("runs task cron cycle and routes top-down/todo/blocked notifications", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -2063,18 +2060,13 @@ describe("OpenGoatService", () => {
 
     const cycle = await service.runTaskCronCycle({
       inactiveMinutes: 30,
-      delegationStrategies: {
-        bottomUp: {
-          enabled: true,
-        },
-      },
     });
 
     expect(cycle.todoTasks).toBe(1);
     expect(cycle.blockedTasks).toBe(1);
-    expect(cycle.inactiveAgents).toBe(1);
+    expect(cycle.inactiveAgents).toBe(0);
     expect(cycle.failed).toBe(0);
-    expect(cycle.dispatches.length).toBe(4);
+    expect(cycle.dispatches.length).toBe(3);
     expect(cycle.dispatches).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -2091,14 +2083,6 @@ describe("OpenGoatService", () => {
           kind: "blocked",
           targetAgentId: "goat",
           message: expect.stringContaining(`Task ID: ${blockedTask.taskId}`),
-        }),
-        expect.objectContaining({
-          kind: "inactive",
-          targetAgentId: "goat",
-          subjectAgentId: "engineer",
-          message: expect.stringContaining(
-            'Your reportee "@engineer" (Engineer) has no activity',
-          ),
         }),
       ]),
     );
@@ -2126,22 +2110,6 @@ describe("OpenGoatService", () => {
     expect(blockedInvocation?.message).toContain(
       `Notification timestamp: ${cycle.ranAt}`,
     );
-
-    const inactivityInvocation = provider.invocations.find(
-      (entry) =>
-        entry.agent === "goat" &&
-        entry.message.includes('Your reportee "@engineer"'),
-    );
-    expect(inactivityInvocation?.message).toContain(
-      "no activity in the last 30 minutes",
-    );
-    expect(inactivityInvocation?.message).toContain(
-      "Engineer has 0 direct and 0 indirect reportees.",
-    );
-    expect(inactivityInvocation?.message).toContain(
-      `Notification timestamp: ${cycle.ranAt}`,
-    );
-    expect(inactivityInvocation?.cwd).toBeUndefined();
 
     const topDownInvocation = provider.invocations.find(
       (entry) =>
@@ -2209,14 +2177,10 @@ describe("OpenGoatService", () => {
     });
 
     const cycle = await service.runTaskCronCycle({
-      notifyInactiveAgents: false,
       delegationStrategies: {
         topDown: {
           enabled: true,
           openTasksThreshold: 0,
-        },
-        bottomUp: {
-          enabled: false,
         },
       },
     });
@@ -2234,68 +2198,6 @@ describe("OpenGoatService", () => {
     });
     expect(topDownDispatch?.message).toContain("Open tasks are at 0");
     expect(topDownDispatch?.message).not.toContain(blockedTask.taskId);
-  });
-
-  it("sends one inactive notification per manager when multiple reportees are inactive", async () => {
-    const root = await createTempDir("opengoat-service-");
-    roots.push(root);
-
-    const { service, provider } = createService(root);
-    await service.initialize();
-    await service.createAgent("Engineer One", {
-      type: "individual",
-      reportsTo: "goat",
-    });
-    await service.createAgent("Engineer Two", {
-      type: "individual",
-      reportsTo: "goat",
-    });
-
-    const cycle = await service.runTaskCronCycle({
-      inactiveMinutes: 30,
-      delegationStrategies: {
-        bottomUp: {
-          enabled: true,
-        },
-        topDown: {
-          enabled: false,
-        },
-      },
-    });
-    const inactiveDispatches = cycle.dispatches.filter(
-      (dispatch) => dispatch.kind === "inactive",
-    );
-
-    expect(cycle.inactiveAgents).toBe(2);
-    expect(inactiveDispatches).toHaveLength(1);
-    expect(inactiveDispatches[0]).toMatchObject({
-      kind: "inactive",
-      targetAgentId: "goat",
-      sessionRef: "agent:goat:agent_goat_notifications",
-      ok: true,
-    });
-    expect(inactiveDispatches[0]?.subjectAgentId).toBeUndefined();
-    expect(inactiveDispatches[0]?.message).toContain(
-      "You have 2 reportees with no activity in the last 30 minutes.",
-    );
-    expect(inactiveDispatches[0]?.message).toContain(
-      '"@engineer-one" (Engineer One)',
-    );
-    expect(inactiveDispatches[0]?.message).toContain(
-      '"@engineer-two" (Engineer Two)',
-    );
-
-    const ceoInactivityInvocations = provider.invocations.filter(
-      (entry) =>
-        entry.agent === "goat" && entry.message.includes("Inactive reportees:"),
-    );
-    expect(ceoInactivityInvocations).toHaveLength(1);
-    expect(ceoInactivityInvocations[0]?.message).toContain(
-      '"@engineer-one" (Engineer One)',
-    );
-    expect(ceoInactivityInvocations[0]?.message).toContain(
-      '"@engineer-two" (Engineer Two)',
-    );
   });
 
   it("notifies assignees when pending tasks exceed the inactivity threshold", async () => {
@@ -2329,7 +2231,6 @@ describe("OpenGoatService", () => {
     nowMs += 31 * 60_000;
     const cycle = await service.runTaskCronCycle({
       inactiveMinutes: 30,
-      notifyInactiveAgents: false,
       delegationStrategies: {
         topDown: {
           enabled: false,
@@ -2395,7 +2296,6 @@ describe("OpenGoatService", () => {
     nowMs += 29 * 60_000;
     const cycle = await service.runTaskCronCycle({
       inactiveMinutes: 30,
-      notifyInactiveAgents: false,
       delegationStrategies: {
         topDown: {
           enabled: false,
@@ -2438,7 +2338,6 @@ describe("OpenGoatService", () => {
     nowMs += 241 * 60_000;
     const firstCycle = await service.runTaskCronCycle({
       inProgressMinutes: 240,
-      notifyInactiveAgents: false,
       delegationStrategies: {
         topDown: {
           enabled: false,
@@ -2469,7 +2368,6 @@ describe("OpenGoatService", () => {
 
     const secondCycle = await service.runTaskCronCycle({
       inProgressMinutes: 240,
-      notifyInactiveAgents: false,
       delegationStrategies: {
         topDown: {
           enabled: false,
@@ -2482,7 +2380,6 @@ describe("OpenGoatService", () => {
     nowMs += 241 * 60_000;
     const thirdCycle = await service.runTaskCronCycle({
       inProgressMinutes: 240,
-      notifyInactiveAgents: false,
       delegationStrategies: {
         topDown: {
           enabled: false,
@@ -2525,7 +2422,6 @@ describe("OpenGoatService", () => {
     nowMs += 241 * 60_000;
     const firstCycle = await service.runTaskCronCycle({
       inProgressMinutes: 240,
-      notifyInactiveAgents: false,
       delegationStrategies: {
         topDown: {
           enabled: false,
@@ -2537,7 +2433,6 @@ describe("OpenGoatService", () => {
 
     const secondCycle = await service.runTaskCronCycle({
       inProgressMinutes: 240,
-      notifyInactiveAgents: false,
       delegationStrategies: {
         topDown: {
           enabled: false,
@@ -2549,55 +2444,7 @@ describe("OpenGoatService", () => {
     expect(invokeSpy).toHaveBeenCalledTimes(2);
   });
 
-  it("supports notifying only goat for inactive direct reports", async () => {
-    const root = await createTempDir("opengoat-service-");
-    roots.push(root);
-
-    const { service, provider } = createService(root);
-    await service.initialize();
-    await service.createAgent("CTO", {
-      type: "manager",
-      reportsTo: "goat",
-    });
-    await service.createAgent("Engineer", {
-      type: "individual",
-      reportsTo: "cto",
-    });
-
-    const cycle = await service.runTaskCronCycle({
-      inactiveMinutes: 30,
-      notificationTarget: "goat-only",
-      delegationStrategies: {
-        bottomUp: {
-          enabled: true,
-        },
-        topDown: {
-          enabled: false,
-        },
-      },
-    });
-
-    expect(cycle.inactiveAgents).toBe(1);
-    expect(cycle.dispatches).toHaveLength(1);
-    expect(cycle.dispatches[0]?.targetAgentId).toBe("goat");
-    expect(cycle.dispatches[0]?.subjectAgentId).toBe("cto");
-
-    expect(
-      provider.invocations.some(
-        (entry) =>
-          entry.agent === "goat" &&
-          entry.message.includes('Your reportee "@cto"') &&
-          entry.message.includes("CTO has 1 direct and 0 indirect reportees."),
-      ),
-    ).toBe(true);
-    expect(
-      provider.invocations.some((entry) =>
-        entry.message.includes('Your reportee "@engineer"'),
-      ),
-    ).toBe(false);
-  });
-
-  it("runs todo and blocked checks even when inactivity notifications are disabled", async () => {
+  it("runs todo and blocked checks when top-down delegation is disabled", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -2628,7 +2475,6 @@ describe("OpenGoatService", () => {
 
     const cycle = await service.runTaskCronCycle({
       inactiveMinutes: 30,
-      notifyInactiveAgents: false,
       delegationStrategies: {
         topDown: {
           enabled: false,
@@ -2640,9 +2486,7 @@ describe("OpenGoatService", () => {
     expect(cycle.blockedTasks).toBe(1);
     expect(cycle.inactiveAgents).toBe(0);
     expect(cycle.dispatches).toHaveLength(2);
-    expect(cycle.dispatches.every((entry) => entry.kind !== "inactive")).toBe(
-      true,
-    );
+    expect(cycle.dispatches.every((entry) => entry.kind !== "topdown")).toBe(true);
     expect(
       provider.invocations.some((entry) => entry.agent === "engineer"),
     ).toBe(true);
@@ -2702,7 +2546,6 @@ describe("OpenGoatService", () => {
     });
 
     const cycle = await service.runTaskCronCycle({
-      notifyInactiveAgents: false,
       delegationStrategies: {
         topDown: {
           enabled: false,
@@ -2791,7 +2634,6 @@ describe("OpenGoatService", () => {
     });
 
     const cycle = await service.runTaskCronCycle({
-      notifyInactiveAgents: false,
       maxParallelFlows: 2,
       delegationStrategies: {
         topDown: {
@@ -2866,7 +2708,6 @@ describe("OpenGoatService", () => {
     });
 
     const cycle = await service.runTaskCronCycle({
-      notifyInactiveAgents: false,
       maxParallelFlows: 4,
       delegationStrategies: {
         topDown: {

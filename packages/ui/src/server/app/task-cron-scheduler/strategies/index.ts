@@ -3,12 +3,6 @@ import type {
   UiTaskDelegationStrategiesSettings,
 } from "../../types.js";
 import {
-  describeBottomUpTaskDelegationStrategy,
-  isSameBottomUpTaskDelegationStrategy,
-  normalizeBottomUpTaskDelegationStrategy,
-  toBottomUpTaskDelegationRuntimeStrategy,
-} from "./bottom-up.js";
-import {
   describeTopDownTaskDelegationStrategy,
   isSameTopDownTaskDelegationStrategy,
   normalizeTopDownTaskDelegationStrategy,
@@ -24,10 +18,6 @@ export function normalizeTaskDelegationStrategies(
       value?.topDown,
       fallback.topDown,
     ),
-    bottomUp: normalizeBottomUpTaskDelegationStrategy(
-      value?.bottomUp,
-      fallback.bottomUp,
-    ),
   };
 }
 
@@ -35,10 +25,7 @@ export function isSameTaskDelegationStrategies(
   left: UiTaskDelegationStrategiesSettings,
   right: UiTaskDelegationStrategiesSettings,
 ): boolean {
-  return (
-    isSameTopDownTaskDelegationStrategy(left.topDown, right.topDown) &&
-    isSameBottomUpTaskDelegationStrategy(left.bottomUp, right.bottomUp)
-  );
+  return isSameTopDownTaskDelegationStrategy(left.topDown, right.topDown);
 }
 
 export function toTaskDelegationRuntimeStrategies(
@@ -46,15 +33,11 @@ export function toTaskDelegationRuntimeStrategies(
 ): TaskDelegationStrategiesCronOptions {
   return {
     topDown: toTopDownTaskDelegationRuntimeStrategy(value.topDown),
-    bottomUp: toBottomUpTaskDelegationRuntimeStrategy(value.bottomUp),
   };
 }
 
 export function describeTaskDelegationStrategies(
   value: UiTaskDelegationStrategiesSettings,
 ): string {
-  return [
-    describeTopDownTaskDelegationStrategy(value.topDown),
-    describeBottomUpTaskDelegationStrategy(value.bottomUp),
-  ].join("; ");
+  return describeTopDownTaskDelegationStrategy(value.topDown);
 }

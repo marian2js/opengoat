@@ -1,18 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import type { ReactElement } from "react";
-
-export type InactiveAgentNotificationTarget = "all-managers" | "goat-only";
 
 interface SettingsPageProps {
   ceoBootstrapPending: boolean;
@@ -21,19 +12,14 @@ interface SettingsPageProps {
   taskCronEnabledInput: boolean;
   topDownTaskDelegationEnabledInput: boolean;
   topDownOpenTasksThresholdInput: string;
-  bottomUpTaskDelegationEnabledInput: boolean;
   minTopDownOpenTasksThreshold: number;
   maxTopDownOpenTasksThreshold: number;
-  maxInactivityMinutesInput: string;
   maxInProgressMinutesInput: string;
-  minMaxInactivityMinutes: number;
-  maxMaxInactivityMinutes: number;
   minMaxInProgressMinutes: number;
   maxMaxInProgressMinutes: number;
   maxParallelFlowsInput: string;
   minMaxParallelFlows: number;
   maxMaxParallelFlows: number;
-  inactiveAgentNotificationTargetInput: InactiveAgentNotificationTarget;
   uiAuthenticationEnabledInput: boolean;
   uiAuthenticationUsernameInput: string;
   uiAuthenticationHasPassword: boolean;
@@ -52,12 +38,7 @@ interface SettingsPageProps {
   onMaxParallelFlowsInputChange: (value: string) => void;
   onTopDownTaskDelegationEnabledChange: (checked: boolean) => void;
   onTopDownOpenTasksThresholdInputChange: (value: string) => void;
-  onBottomUpTaskDelegationEnabledChange: (checked: boolean) => void;
-  onMaxInactivityMinutesInputChange: (value: string) => void;
   onMaxInProgressMinutesInputChange: (value: string) => void;
-  onInactiveAgentNotificationTargetInputChange: (
-    nextValue: InactiveAgentNotificationTarget,
-  ) => void;
   onUiAuthenticationEnabledChange: (checked: boolean) => void;
   onUiAuthenticationUsernameInputChange: (value: string) => void;
   onOpenPasswordEditor: () => void;
@@ -76,19 +57,14 @@ export function SettingsPage({
   taskCronEnabledInput,
   topDownTaskDelegationEnabledInput,
   topDownOpenTasksThresholdInput,
-  bottomUpTaskDelegationEnabledInput,
   minTopDownOpenTasksThreshold,
   maxTopDownOpenTasksThreshold,
-  maxInactivityMinutesInput,
   maxInProgressMinutesInput,
-  minMaxInactivityMinutes,
-  maxMaxInactivityMinutes,
   minMaxInProgressMinutes,
   maxMaxInProgressMinutes,
   maxParallelFlowsInput,
   minMaxParallelFlows,
   maxMaxParallelFlows,
-  inactiveAgentNotificationTargetInput,
   uiAuthenticationEnabledInput,
   uiAuthenticationUsernameInput,
   uiAuthenticationHasPassword,
@@ -107,10 +83,7 @@ export function SettingsPage({
   onMaxParallelFlowsInputChange,
   onTopDownTaskDelegationEnabledChange,
   onTopDownOpenTasksThresholdInputChange,
-  onBottomUpTaskDelegationEnabledChange,
-  onMaxInactivityMinutesInputChange,
   onMaxInProgressMinutesInputChange,
-  onInactiveAgentNotificationTargetInputChange,
   onUiAuthenticationEnabledChange,
   onUiAuthenticationUsernameInputChange,
   onOpenPasswordEditor,
@@ -276,7 +249,7 @@ export function SettingsPage({
               for agents to work on.
             </p>
             <p className="text-xs text-muted-foreground">
-              Multiple strategies can be enabled at the same time.
+              Top-Down is the only delegation strategy available.
             </p>
           </div>
         </div>
@@ -352,117 +325,6 @@ export function SettingsPage({
           ) : (
             <p className="text-xs text-muted-foreground">
               Top-Down task delegation is paused.
-            </p>
-          )}
-
-          <Separator className="bg-border/50" />
-
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="space-y-1">
-              <h3 className="text-sm font-semibold text-foreground">
-                Bottom-Up Task Delegation
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Detects inactive agents and creates manager-facing follow-up
-                tasks so delegation starts from team-level activity signals.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={bottomUpTaskDelegationEnabledInput}
-                disabled={!taskCronEnabledInput || isMutating || isLoading}
-                onCheckedChange={onBottomUpTaskDelegationEnabledChange}
-                aria-label="Toggle bottom-up task delegation"
-              />
-              <span
-                className={cn(
-                  "text-xs font-medium",
-                  bottomUpTaskDelegationEnabledInput && taskCronEnabledInput
-                    ? "text-success"
-                    : "text-muted-foreground",
-                )}
-              >
-                {bottomUpTaskDelegationEnabledInput && taskCronEnabledInput
-                  ? "Enabled"
-                  : "Disabled"}
-              </span>
-            </div>
-          </div>
-
-          {bottomUpTaskDelegationEnabledInput ? (
-            <>
-              <Separator className="bg-border/50" />
-
-              <div className="space-y-3">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="maxInactivityMinutes"
-                >
-                  Max Inactivity Time
-                </label>
-                <div className="flex max-w-sm items-center gap-3">
-                  <Input
-                    id="maxInactivityMinutes"
-                    type="number"
-                    min={minMaxInactivityMinutes}
-                    max={maxMaxInactivityMinutes}
-                    step={1}
-                    value={maxInactivityMinutesInput}
-                    disabled={!taskCronEnabledInput || isMutating || isLoading}
-                    onChange={(event) => {
-                      onMaxInactivityMinutesInputChange(event.target.value);
-                    }}
-                  />
-                  <span className="text-sm text-muted-foreground">minutes</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Bottom-Up delegation checks inactivity with this threshold
-                  before generating follow-up tasks.
-                </p>
-              </div>
-
-              <Separator className="bg-border/50" />
-
-              <div className="space-y-2">
-                <label
-                  className="text-sm font-medium text-foreground"
-                  htmlFor="inactiveAgentNotificationTarget"
-                >
-                  Notify Goat only
-                </label>
-                <Select
-                  value={inactiveAgentNotificationTargetInput}
-                  onValueChange={(nextValue) => {
-                    onInactiveAgentNotificationTargetInputChange(
-                      nextValue as InactiveAgentNotificationTarget,
-                    );
-                  }}
-                  disabled={!taskCronEnabledInput || isMutating || isLoading}
-                >
-                  <SelectTrigger
-                    id="inactiveAgentNotificationTarget"
-                    className="max-w-sm"
-                  >
-                    <SelectValue placeholder="Select who gets inactivity notifications" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all-managers">
-                      Notify all managers
-                    </SelectItem>
-                    <SelectItem value="goat-only">Notify only Goat</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {inactiveAgentNotificationTargetInput === "goat-only"
-                    ? "Only the Goat receives inactivity alerts, and only for agents that report directly to the Goat."
-                    : "Every manager receives inactivity alerts for their own direct reports."}
-                </p>
-              </div>
-            </>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Bottom-Up task delegation is paused. Task automation can still run
-              other enabled strategies and follow-up checks.
             </p>
           )}
         </div>
@@ -646,18 +508,9 @@ export function SettingsPage({
               ? "Waiting for first Goat message to start checks"
               : !taskCronEnabledInput
                 ? "Background checks paused"
-                : topDownTaskDelegationEnabledInput &&
-                    bottomUpTaskDelegationEnabledInput
-                  ? inactiveAgentNotificationTargetInput === "goat-only"
-                    ? "Background checks active (Top-Down + Bottom-Up, Goat-only inactivity routing)"
-                    : "Background checks active (Top-Down + Bottom-Up)"
-                  : topDownTaskDelegationEnabledInput
-                    ? "Background checks active (Top-Down only)"
-                    : bottomUpTaskDelegationEnabledInput
-                      ? inactiveAgentNotificationTargetInput === "goat-only"
-                        ? "Background checks active (Bottom-Up only, Goat-only inactivity routing)"
-                        : "Background checks active (Bottom-Up only)"
-                      : "Background checks active (task delegation strategies paused)"}
+                : topDownTaskDelegationEnabledInput
+                  ? "Background checks active (Top-Down)"
+                  : "Background checks active (task delegation strategy paused)"}
           </span>
         </p>
         <div className="flex items-center gap-2">

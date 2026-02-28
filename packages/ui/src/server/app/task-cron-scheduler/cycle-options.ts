@@ -2,6 +2,7 @@ import type {
   OpenClawUiService,
   UiTaskDelegationStrategiesSettings,
 } from "../types.js";
+import { DEFAULT_MAX_INACTIVITY_MINUTES } from "../constants.js";
 import { toTaskDelegationRuntimeStrategies } from "./strategies/index.js";
 
 type TaskCronCycleOptions = NonNullable<
@@ -13,13 +14,9 @@ export function buildTaskCronCycleOptions(options: {
   maxInProgressMinutes: number;
   maxParallelFlows: number;
 }): TaskCronCycleOptions {
-  const bottomUpStrategy = options.taskDelegationStrategies.bottomUp;
-
   return {
-    inactiveMinutes: bottomUpStrategy.maxInactivityMinutes,
+    inactiveMinutes: DEFAULT_MAX_INACTIVITY_MINUTES,
     inProgressMinutes: options.maxInProgressMinutes,
-    notificationTarget: bottomUpStrategy.inactiveAgentNotificationTarget,
-    notifyInactiveAgents: bottomUpStrategy.enabled,
     delegationStrategies: toTaskDelegationRuntimeStrategies(
       options.taskDelegationStrategies,
     ),
