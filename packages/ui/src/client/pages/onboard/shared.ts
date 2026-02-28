@@ -158,21 +158,27 @@ export function createMessageId(prefix: string): string {
   return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function buildOnboardingSummaryForUser(input: OnboardingPayload): string {
-  if (input.buildMode === "existing") {
-    return [
-      "Onboarding completed for an existing app.",
-      `Project: ${input.projectSummary}`,
-      `Repository: ${input.githubRepoUrl}`,
-      `7-day priority: ${input.sevenDayGoal}`,
-    ].join("\n");
-  }
+export function buildOnboardingSummaryForUser(
+  input: OnboardingPayload,
+): string {
+  const projectName =
+    input.buildMode === "existing"
+      ? input.projectSummary
+      : input.appName || input.projectSummary;
 
   return [
-    "Onboarding completed for a new app.",
-    `Project: ${input.projectSummary}`,
-    `App name: ${input.appName}`,
-    `MVP feature: ${input.mvpFeature}`,
+    `✅ Onboarding complete!`,
+    ``,
+    `Project: ${projectName}`,
+    input.buildMode === "existing"
+      ? `Repository: ${input.githubRepoUrl}`
+      : `New app: ${input.appName}`,
+    ``,
+    input.buildMode === "existing"
+      ? `Short-term focus: ${input.sevenDayGoal}`
+      : `MVP focus: ${input.mvpFeature}`,
+    ``,
+    `I'm now generating your initial roadmap based on everything you told me...`,
   ].join("\n");
 }
 
@@ -180,38 +186,32 @@ export function buildInitialRoadmapPrompt(input: OnboardingPayload): string {
   const modeDetails =
     input.buildMode === "existing"
       ? [
-          "- App type: Existing application",
-          `- GitHub URL: ${input.githubRepoUrl}`,
-          `- 7-day priority: ${input.sevenDayGoal}`,
+          `- App type: Existing application`,
+          `- GitHub repository: ${input.githubRepoUrl}`,
+          `- Next priorities: ${input.sevenDayGoal}`,
         ].join("\n")
       : [
-          "- App type: New application",
+          `- App type: New application`,
           `- Proposed app name: ${input.appName}`,
-          `- First-version focus feature: ${input.mvpFeature}`,
+          `- First-version focus: ${input.mvpFeature}`,
         ].join("\n");
 
   return [
-    "You are Goat, the AI Co-Founder.",
-    "Read organization/ROADMAP.md and define an updated 7-day roadmap based on this onboarding context.",
-    "",
-    "User onboarding context:",
+    `You are Goat, the AI Co-Founder of this product.`,
+    `You are visionary, strategic, warm, and decisive.`,
+    ``,
+    `Read organization/ROADMAP.md file and update it based on this data:`,
+    ``,
     `- Product summary: ${input.projectSummary}`,
     modeDetails,
-    "",
-    "Requirements:",
-    "1. Keep the roadmap concrete, short-term, and execution-focused.",
-    "2. Include specific milestones for the next 7 days.",
-    "3. Include assumptions and risks that could block delivery.",
-    "4. Include measurable success criteria for the week.",
-    "5. End by asking: \"Is this roadmap okay, or should I revise anything?\"",
-    "",
-    "Output format:",
-    "## Proposed Roadmap",
-    "### Product Context",
-    "### 7-Day Plan",
-    "### Risks and Assumptions",
-    "### Success Criteria",
-    "### Confirmation",
+    ``,
+    `Rules for the roadmap:`,
+    `- Use **phases**, never time-based horizons. You can create any number of phases. Each phase has N initiatives`,
+    `- Every initiative must be high-level (epic/story only — never small tasks or tickets)`,
+    `- Every initiative needs a clear, measurable outcome`,
+    `- Be ambitious but realistic`,
+    `- Strongly align with the long-term vision and short-term goals the user gave`,
+    `- Phase 1 must deliver real user value quickly`,
   ].join("\n");
 }
 
@@ -224,7 +224,8 @@ export function normalizeRunError(message: string): string {
     return "OpenClaw gateway auth failed for this device. Run `openclaw onboard`, then retry.";
   }
   if (
-    (lower.includes("plugins.entries.") && lower.includes("plugin not found")) ||
+    (lower.includes("plugins.entries.") &&
+      lower.includes("plugin not found")) ||
     lower.includes("stale config entry ignored")
   ) {
     return "OpenClaw has stale plugin config warnings. Run `openclaw onboard` to refresh plugin config, then retry.";
@@ -243,7 +244,10 @@ export async function sendSessionMessageStream(
     signal?: AbortSignal;
   },
 ): Promise<SessionSendMessageResponse> {
-  const routes = ["/api/sessions/message/stream", "/api/session/message/stream"];
+  const routes = [
+    "/api/sessions/message/stream",
+    "/api/session/message/stream",
+  ];
   let lastError: unknown;
 
   for (const routePath of routes) {
@@ -396,7 +400,10 @@ async function readResponseError(response: Response): Promise<string> {
     return fallback;
   }
   try {
-    const parsed = JSON.parse(normalized) as { error?: unknown; message?: unknown };
+    const parsed = JSON.parse(normalized) as {
+      error?: unknown;
+      message?: unknown;
+    };
     if (typeof parsed.error === "string" && parsed.error.trim()) {
       return parsed.error.trim();
     }
