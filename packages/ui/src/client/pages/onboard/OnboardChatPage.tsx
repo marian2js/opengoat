@@ -49,8 +49,14 @@ export function OnboardChatPage(): ReactElement {
     null,
   );
   const abortControllerRef = useRef<AbortController | null>(null);
+  const initialRoadmapStartedRef = useRef(false);
+  const streamTimeoutRef = useRef<number | null>(null);
 
   const hasMessages = chatState.messages.length > 0;
+  const hasAssistantReply = useMemo(
+    () => chatState.messages.some((message) => message.role === "assistant"),
+    [chatState.messages],
+  );
 
   const setAndPersistChatState = useCallback(
     (updater: (current: OnboardingChatState) => OnboardingChatState): void => {
@@ -105,19 +111,32 @@ export function OnboardChatPage(): ReactElement {
   );
 
   const runAssistantTurn = useCallback(
-    async (input: { userText: string; agentText: string }): Promise<void> => {
+    async (input: {
+      userText: string;
+      agentText: string;
+      appendUserMessage?: boolean;
+    }): Promise<void> => {
       setError(null);
       setRuntimeStatusLine(null);
       setChatStatus("streaming");
 
-      appendMessage({
-        id: createMessageId("user"),
-        role: "user",
-        content: input.userText,
-      });
+      if (input.appendUserMessage !== false) {
+        appendMessage({
+          id: createMessageId("user"),
+          role: "user",
+          content: input.userText,
+        });
+      }
 
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
+      let streamTimedOut = false;
+      streamTimeoutRef.current = window.setTimeout(() => {
+        streamTimedOut = true;
+        if (!abortController.signal.aborted) {
+          abortController.abort();
+        }
+      }, 180000);
 
       try {
         const sessionInfo = await ensureSession();
@@ -140,18 +159,12 @@ export function OnboardChatPage(): ReactElement {
           },
         );
 
-        const assistantOutput =
-          response.output.trim() || "Goat returned no output.";
-        appendMessage({
-          id: createMessageId("assistant"),
-          role: "assistant",
-          content: assistantOutput,
-        });
-
+        const assistantOutput = response.output.trim();
         if (response.result.code !== 0) {
           setError(
             normalizeRunError(
               assistantOutput ||
+                response.result.stderr.trim() ||
                 `Goat completed with code ${response.result.code}.`,
             ),
           );
@@ -159,9 +172,21 @@ export function OnboardChatPage(): ReactElement {
           return;
         }
 
+        appendMessage({
+          id: createMessageId("assistant"),
+          role: "assistant",
+          content: assistantOutput || "Goat returned no output.",
+        });
         setChatStatus("ready");
       } catch (requestError) {
         if (isAbortError(requestError)) {
+          if (streamTimedOut) {
+            setError(
+              "Goat is taking longer than expected. Please retry, or run `openclaw onboard` and try again.",
+            );
+            setChatStatus("error");
+            return;
+          }
           setChatStatus("ready");
           return;
         }
@@ -175,6 +200,11 @@ export function OnboardChatPage(): ReactElement {
       } finally {
         if (abortControllerRef.current === abortController) {
           abortControllerRef.current = null;
+        }
+        const timeoutHandle = streamTimeoutRef.current;
+        if (timeoutHandle !== null) {
+          window.clearTimeout(timeoutHandle);
+          streamTimeoutRef.current = null;
         }
       }
     },
@@ -190,17 +220,31 @@ export function OnboardChatPage(): ReactElement {
       return;
     }
 
-    setAndPersistChatState((current) => ({
-      ...current,
-      hasInitialRoadmapRequest: true,
-    }));
+    const onboardingSummary = buildOnboardingSummaryForUser(payload);
+    const persistedState = loadOnboardingChatState();
+    if (!persistedState.hasInitialRoadmapRequest) {
+      const nextState: OnboardingChatState = {
+        ...persistedState,
+        hasInitialRoadmapRequest: true,
+      };
+      saveOnboardingChatState(nextState);
+      setChatState(nextState);
+    } else {
+      setChatState(persistedState);
+    }
+
+    const hasSummaryUserMessage = persistedState.messages.some(
+      (message) =>
+        message.role === "user" && message.content.trim() === onboardingSummary,
+    );
 
     await runAssistantTurn({
-      userText: buildOnboardingSummaryForUser(payload),
+      userText: onboardingSummary,
       agentText: buildInitialRoadmapPrompt(payload),
+      appendUserMessage: !hasSummaryUserMessage,
     });
     setInitializing(false);
-  }, [payload, runAssistantTurn, setAndPersistChatState]);
+  }, [payload, runAssistantTurn]);
 
   useEffect(() => {
     if (!payload) {
@@ -209,19 +253,34 @@ export function OnboardChatPage(): ReactElement {
       return;
     }
 
-    if (chatState.hasInitialRoadmapRequest) {
+    if (chatState.hasInitialRoadmapRequest && hasAssistantReply) {
+      initialRoadmapStartedRef.current = true;
       setInitializing(false);
       return;
     }
 
+    if (initialRoadmapStartedRef.current) {
+      return;
+    }
+    initialRoadmapStartedRef.current = true;
     void runInitialRoadmapTurn();
-  }, [payload, chatState.hasInitialRoadmapRequest, runInitialRoadmapTurn]);
+  }, [
+    payload,
+    chatState.hasInitialRoadmapRequest,
+    hasAssistantReply,
+    runInitialRoadmapTurn,
+  ]);
 
   useEffect(() => {
     return () => {
       const controller = abortControllerRef.current;
       if (controller && !controller.signal.aborted) {
         controller.abort();
+      }
+      const timeoutHandle = streamTimeoutRef.current;
+      if (timeoutHandle !== null) {
+        window.clearTimeout(timeoutHandle);
+        streamTimeoutRef.current = null;
       }
     };
   }, []);
@@ -335,19 +394,31 @@ export function OnboardChatPage(): ReactElement {
                     }
                   />
                 ) : (
-                  chatState.messages.map((message) => (
-                    <Message key={message.id} from={message.role}>
-                      <MessageContent>
-                        {message.role === "assistant" ? (
-                          <MessageResponse>{message.content}</MessageResponse>
-                        ) : (
-                          <p className="whitespace-pre-wrap break-words text-sm">
-                            {message.content}
-                          </p>
-                        )}
-                      </MessageContent>
-                    </Message>
-                  ))
+                  <>
+                    {chatState.messages.map((message) => (
+                      <Message key={message.id} from={message.role}>
+                        <MessageContent>
+                          {message.role === "assistant" ? (
+                            <MessageResponse>{message.content}</MessageResponse>
+                          ) : (
+                            <p className="whitespace-pre-wrap break-words text-sm">
+                              {message.content}
+                            </p>
+                          )}
+                        </MessageContent>
+                      </Message>
+                    ))}
+                    {chatStatus === "streaming" ? (
+                      <Message from="assistant">
+                        <MessageContent className="w-fit rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-muted-foreground text-sm">
+                          <span className="inline-flex items-center gap-2">
+                            <Spinner className="size-3" />
+                            Goat is thinking...
+                          </span>
+                        </MessageContent>
+                      </Message>
+                    ) : null}
+                  </>
                 )}
               </ConversationContent>
               <ConversationScrollButton />

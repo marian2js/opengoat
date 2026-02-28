@@ -22,15 +22,17 @@ export function sanitizeConversationText(value: string): string {
     .replace(/\[(?:\d{1,3};)*\d{1,3}m/g, "")
     .replace(/(?:^|\s)(?:\d{1,3};)*\d{1,3}m(?=\s|$)/g, " ")
     .replace(/\r\n?/g, "\n");
+  const withoutOpenClawStaleWarnings =
+    stripOpenClawStalePluginWarnings(withoutAnsi);
 
-  const withoutPrefix = withoutAnsi
+  const withoutPrefix = withoutOpenClawStaleWarnings
     .replace(/^\s*\[agents\/[^\]\n]+\]\s*/iu, "")
     .replace(/^\s*inherited\s+[^\n]*?\s+from\s+main\s+agent\s*/iu, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  return withoutPrefix || trimmed;
+  return withoutPrefix;
 }
 
 export function stripAnsiCodes(value: string): string {
@@ -41,10 +43,10 @@ export function stripAnsiCodes(value: string): string {
 }
 
 export function sanitizeRuntimeProgressChunk(value: string): string {
-  return stripAnsiCodes(value)
+  const withoutAnsi = stripAnsiCodes(value)
     .replace(/\r\n?/g, "\n")
-    .replace(/[ \t]+\n/g, "\n")
-    .trim();
+    .replace(/[ \t]+\n/g, "\n");
+  return stripOpenClawStalePluginWarnings(withoutAnsi).trim();
 }
 
 export function truncateProgressLine(value: string): string {
@@ -138,3 +140,109 @@ const KNOWN_PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   opencode: "OpenCode",
   openclaw: "OpenClaw",
 };
+
+function stripOpenClawStalePluginWarnings(value: string): string {
+  const withoutLeadingWarningBlock = removeLeadingOpenClawWarningBlock(value);
+  const lines = withoutLeadingWarningBlock.split("\n");
+  const filtered = lines.filter((line) => {
+    const normalized = normalizeOpenClawWarningLine(line);
+    if (!normalized) {
+      return true;
+    }
+    if (isOpenClawDecorativeWarningLine(normalized)) {
+      return false;
+    }
+    return !isOpenClawStalePluginWarningLine(normalized);
+  });
+
+  return filtered
+    .join("\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function removeLeadingOpenClawWarningBlock(value: string): string {
+  const lines = value.split("\n");
+  let index = 0;
+
+  while (
+    index < lines.length &&
+    !normalizeOpenClawWarningLine(lines[index] ?? "")
+  ) {
+    index += 1;
+  }
+  if (index >= lines.length) {
+    return value;
+  }
+
+  const firstMeaningful = normalizeOpenClawWarningLine(lines[index] ?? "");
+  if (!firstMeaningful.includes("config warnings")) {
+    return value;
+  }
+
+  let cursor = index;
+  while (cursor < lines.length) {
+    const raw = lines[cursor] ?? "";
+    const normalized = normalizeOpenClawWarningLine(raw);
+    if (!normalized) {
+      cursor += 1;
+      continue;
+    }
+    if (isOpenClawWarningBlockLine(raw, normalized)) {
+      cursor += 1;
+      continue;
+    }
+    break;
+  }
+
+  const remaining = lines.slice(cursor).join("\n").trim();
+  return remaining;
+}
+
+function normalizeOpenClawWarningLine(line: string): string {
+  return stripAnsiCodes(line)
+    .replace(/[|│┃║]+/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function isOpenClawDecorativeWarningLine(line: string): boolean {
+  return /^[┌┐└┘├┤┬┴┼─━═\-\s]+$/u.test(line);
+}
+
+function isOpenClawStalePluginWarningLine(line: string): boolean {
+  if (line.includes("config warnings")) {
+    return true;
+  }
+  if (line.includes("stale config entry ignored")) {
+    return true;
+  }
+  if (line.includes("remove it from plugins config")) {
+    return true;
+  }
+  return line.includes("plugins.entries.") && line.includes("plugin not found");
+}
+
+function isOpenClawWarningBlockLine(raw: string, normalized: string): boolean {
+  if (isOpenClawDecorativeWarningLine(raw)) {
+    return true;
+  }
+  if (/[│┃║┌┐└┘├┤┬┴┼╭╮╰╯]/u.test(raw)) {
+    return true;
+  }
+  if (isOpenClawStalePluginWarningLine(normalized)) {
+    return true;
+  }
+  if (normalized.startsWith("- ")) {
+    return true;
+  }
+  if (normalized.includes("plugins config")) {
+    return true;
+  }
+  if (normalized.includes("plugin not found")) {
+    return true;
+  }
+  return false;
+}
