@@ -507,6 +507,9 @@ function ExecutionAgentReadinessPanel({
   }
 
   if (selectedReadiness.installed) {
+    const executionAgentCliLabel = formatExecutionAgentCliLabel(
+      selectedExecutionAgent.displayName,
+    );
     const checkedAtLabel = !Number.isNaN(Date.parse(selectedReadiness.checkedAt))
       ? new Date(selectedReadiness.checkedAt).toLocaleTimeString()
       : null;
@@ -516,7 +519,7 @@ function ExecutionAgentReadinessPanel({
           <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
           <div>
             <p className="font-medium text-sm">
-              {selectedExecutionAgent.displayName} CLI detected
+              {executionAgentCliLabel} detected
             </p>
             <p className="text-xs text-success-foreground/85">
               Command: <code>{selectedReadiness.checkedCommand ?? "Detected"}</code>
@@ -536,13 +539,16 @@ function ExecutionAgentReadinessPanel({
     );
   }
 
+  const executionAgentCliLabel = formatExecutionAgentCliLabel(
+    selectedExecutionAgent.displayName,
+  );
   return (
     <div className="space-y-2 rounded-xl border border-amber-500/45 bg-amber-500/10 px-3 py-3 text-amber-100">
       <div className="flex items-start gap-2">
         <Cpu className="mt-0.5 size-4 shrink-0" />
         <div>
           <p className="font-medium text-sm">
-            {selectedExecutionAgent.displayName} CLI not detected
+            {executionAgentCliLabel} not detected
           </p>
           <p className="text-xs text-amber-100/90">
             {selectedReadiness.diagnostics ||
@@ -626,4 +632,17 @@ function resolveGatewayStatusSummary(
   }
   const versionLabel = status.version ? ` (v${status.version})` : "";
   return `OpenClaw${versionLabel} is installed and the local gateway is running.`;
+}
+
+function formatExecutionAgentCliLabel(displayName: string): string {
+  const normalized = displayName.trim();
+  if (!normalized) {
+    return "CLI";
+  }
+
+  if (/\bcli$/iu.test(normalized)) {
+    return normalized;
+  }
+
+  return `${normalized} CLI`;
 }
