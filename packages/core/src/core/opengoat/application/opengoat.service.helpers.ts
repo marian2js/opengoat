@@ -81,20 +81,6 @@ export function resolveMaxParallelFlows(value: number | undefined): number {
   return normalized;
 }
 
-export function resolveInactiveAgentNotificationTarget(
-  value: "all-managers" | "goat-only" | "ceo-only" | undefined,
-): "all-managers" | "goat-only" {
-  return value === "goat-only" || value === "ceo-only"
-    ? "goat-only"
-    : "all-managers";
-}
-
-export interface BottomUpTaskDelegationStrategyConfig {
-  enabled?: boolean;
-  inactiveMinutes?: number;
-  notificationTarget?: "all-managers" | "goat-only" | "ceo-only";
-}
-
 export interface TopDownTaskDelegationStrategyConfig {
   enabled?: boolean;
   openTasksThreshold?: number;
@@ -102,18 +88,11 @@ export interface TopDownTaskDelegationStrategyConfig {
 
 export interface TaskDelegationStrategiesConfig {
   topDown?: TopDownTaskDelegationStrategyConfig;
-  bottomUp?: BottomUpTaskDelegationStrategyConfig;
 }
 
 export interface ResolvedTopDownTaskDelegationStrategy {
   enabled: boolean;
   openTasksThreshold: number;
-}
-
-export interface ResolvedBottomUpTaskDelegationStrategy {
-  enabled: boolean;
-  inactiveMinutes: number;
-  notificationTarget: "all-managers" | "goat-only";
 }
 
 export function resolveTopDownOpenTasksThreshold(value: number | undefined): number {
@@ -142,31 +121,6 @@ export function resolveTopDownTaskDelegationStrategy(options: {
     enabled,
     openTasksThreshold: resolveTopDownOpenTasksThreshold(
       topDownConfig?.openTasksThreshold,
-    ),
-  };
-}
-
-export function resolveBottomUpTaskDelegationStrategy(options: {
-  inactiveMinutes?: number;
-  notificationTarget?: "all-managers" | "goat-only" | "ceo-only";
-  notifyInactiveAgents?: boolean;
-  delegationStrategies?: TaskDelegationStrategiesConfig;
-}): ResolvedBottomUpTaskDelegationStrategy {
-  const bottomUpConfig = options.delegationStrategies?.bottomUp;
-  const bottomUpEnabled = bottomUpConfig?.enabled;
-  const enabled = typeof bottomUpEnabled === "boolean"
-    ? bottomUpEnabled
-    : typeof options.notifyInactiveAgents === "boolean"
-      ? options.notifyInactiveAgents
-      : false;
-
-  return {
-    enabled,
-    inactiveMinutes: resolveInactiveMinutes(
-      bottomUpConfig?.inactiveMinutes ?? options.inactiveMinutes,
-    ),
-    notificationTarget: resolveInactiveAgentNotificationTarget(
-      bottomUpConfig?.notificationTarget ?? options.notificationTarget,
     ),
   };
 }
@@ -272,13 +226,6 @@ function normalizePathForCompare(value: string): string {
 
 export function buildTaskSessionRef(agentId: string, _taskId: string): string {
   return buildNotificationSessionRef(agentId);
-}
-
-export function buildInactiveSessionRef(
-  managerAgentId: string,
-  _subjectAgentId: string,
-): string {
-  return buildNotificationSessionRef(managerAgentId);
 }
 
 export function buildNotificationSessionRef(agentId: string): string {
@@ -558,105 +505,6 @@ export function buildTopDownTaskDelegationMessage(params: {
     "Create and assign the next set of practical, high-impact tasks now.",
   ];
 
-  return lines.join("\n");
-}
-
-export function buildInactiveAgentMessage(params: {
-  managerAgentId: string;
-  subjectAgentId: string;
-  subjectName: string;
-  role: string;
-  directReporteesCount: number;
-  indirectReporteesCount: number;
-  inactiveMinutes: number;
-  notificationTimestamp?: string;
-  lastActionTimestamp?: number;
-}): string {
-  return buildInactiveAgentsMessage({
-    inactiveMinutes: params.inactiveMinutes,
-    notificationTimestamp: params.notificationTimestamp,
-    candidates: [
-      {
-        subjectAgentId: params.subjectAgentId,
-        subjectName: params.subjectName,
-        role: params.role,
-        directReporteesCount: params.directReporteesCount,
-        indirectReporteesCount: params.indirectReporteesCount,
-        lastActionTimestamp: params.lastActionTimestamp,
-      },
-    ],
-  });
-}
-
-export function buildInactiveAgentsMessage(params: {
-  inactiveMinutes: number;
-  notificationTimestamp?: string;
-  candidates: Array<{
-    subjectAgentId: string;
-    subjectName: string;
-    role: string;
-    directReporteesCount: number;
-    indirectReporteesCount: number;
-    lastActionTimestamp?: number;
-  }>;
-}): string {
-  const notificationTimestamp = resolveNotificationTimestamp(
-    params.notificationTimestamp,
-  );
-  const candidates = [...params.candidates].sort((left, right) =>
-    left.subjectAgentId.localeCompare(right.subjectAgentId),
-  );
-  if (candidates.length === 0) {
-    return [
-      `No inactive reportees were found in the last ${params.inactiveMinutes} minutes.`,
-      ...(notificationTimestamp
-        ? [`Notification timestamp: ${notificationTimestamp}`]
-        : []),
-    ].join("\n");
-  }
-
-  if (candidates.length === 1) {
-    const candidate = candidates[0]!;
-    const subjectName = candidate.subjectName || `@${candidate.subjectAgentId}`;
-    const lastAction =
-      typeof candidate.lastActionTimestamp === "number" &&
-      Number.isFinite(candidate.lastActionTimestamp)
-        ? new Date(candidate.lastActionTimestamp).toISOString()
-        : null;
-
-    return [
-      `Your reportee "@${candidate.subjectAgentId}" (${candidate.subjectName}) has no activity in the last ${params.inactiveMinutes} minutes.`,
-      ...(notificationTimestamp
-        ? [`Notification timestamp: ${notificationTimestamp}`]
-        : []),
-      ...(candidate.role ? [`Role: ${candidate.role}`] : []),
-      `${subjectName} has ${candidate.directReporteesCount} direct and ${candidate.indirectReporteesCount} indirect reportees.`,
-      ...(lastAction ? [`Last action: ${lastAction}`] : []),
-      "Please check in and unblock progress.",
-    ].join("\n");
-  }
-
-  const lines = [
-    `You have ${candidates.length} reportees with no activity in the last ${params.inactiveMinutes} minutes.`,
-    ...(notificationTimestamp
-      ? [`Notification timestamp: ${notificationTimestamp}`]
-      : []),
-    "Inactive reportees:",
-  ];
-  for (const candidate of candidates) {
-    const lastAction =
-      typeof candidate.lastActionTimestamp === "number" &&
-      Number.isFinite(candidate.lastActionTimestamp)
-        ? new Date(candidate.lastActionTimestamp).toISOString()
-        : "none recorded";
-    const role = candidate.role?.trim()
-      ? candidate.role.trim()
-      : "unspecified";
-    lines.push(
-      `- "@${candidate.subjectAgentId}" (${candidate.subjectName || "Unnamed"}) | Role: ${role} | Reportees: ${candidate.directReporteesCount} direct, ${candidate.indirectReporteesCount} indirect | Last action: ${lastAction}`,
-    );
-  }
-  lines.push("Please check in and unblock progress.");
   return lines.join("\n");
 }
 

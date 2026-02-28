@@ -57,7 +57,7 @@ export const taskCommand: CliCommand = {
           );
           for (const dispatch of result.dispatches) {
             const state = dispatch.ok ? "ok" : "error";
-            const subject = dispatch.taskId ? ` task=${dispatch.taskId}` : dispatch.subjectAgentId ? ` agent=${dispatch.subjectAgentId}` : "";
+            const subject = dispatch.taskId ? ` task=${dispatch.taskId}` : "";
             const error = dispatch.error ? ` error=${dispatch.error}` : "";
             context.stdout.write(
               `[task-cron] ${state} kind=${dispatch.kind} target=${dispatch.targetAgentId}${subject} session=${dispatch.sessionRef}${error}\n`

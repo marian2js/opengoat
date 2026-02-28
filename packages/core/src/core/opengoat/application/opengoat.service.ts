@@ -76,7 +76,6 @@ import {
   assertAgentExists,
   buildBlockedTaskMessage,
   buildDoingTaskMessage,
-  buildInactiveAgentsMessage,
   buildNotificationSessionRef,
   buildPendingTaskMessage,
   buildReporteeStats,
@@ -92,8 +91,8 @@ import {
   pathIsWithin,
   pathMatches,
   prepareOpenClawCommandEnv,
+  resolveInactiveMinutes,
   resolveInProgressTimeoutMinutes,
-  resolveBottomUpTaskDelegationStrategy,
   resolveTopDownTaskDelegationStrategy,
   resolveMaxParallelFlows,
   toErrorMessage,
@@ -136,11 +135,10 @@ export interface DefaultAgentUpdateResult {
 }
 
 export interface TaskCronDispatchResult {
-  kind: "todo" | "doing" | "pending" | "blocked" | "inactive" | "topdown";
+  kind: "todo" | "doing" | "pending" | "blocked" | "topdown";
   targetAgentId: string;
   sessionRef: string;
   taskId?: string;
-  subjectAgentId?: string;
   message?: string;
   ok: boolean;
   error?: string;
@@ -156,18 +154,6 @@ export interface TaskCronRunResult {
   sent: number;
   failed: number;
   dispatches: TaskCronDispatchResult[];
-}
-
-export type InactiveAgentNotificationTarget = "all-managers" | "goat-only";
-
-interface InactiveAgentCandidate {
-  managerAgentId: string;
-  subjectAgentId: string;
-  subjectName: string;
-  role: string;
-  directReporteesCount: number;
-  indirectReporteesCount: number;
-  lastActionTimestamp?: number;
 }
 
 interface TaskStatusDispatchSummary {
@@ -1077,8 +1063,6 @@ export class OpenGoatService {
     options: {
       inactiveMinutes?: number;
       inProgressMinutes?: number;
-      notificationTarget?: InactiveAgentNotificationTarget;
-      notifyInactiveAgents?: boolean;
       delegationStrategies?: TaskDelegationStrategiesConfig;
       maxParallelFlows?: number;
     } = {},
@@ -1092,18 +1076,9 @@ export class OpenGoatService {
     const inProgressMinutes = resolveInProgressTimeoutMinutes(
       options.inProgressMinutes,
     );
+    const pendingMinutes = resolveInactiveMinutes(options.inactiveMinutes);
     const topDownStrategy = resolveTopDownTaskDelegationStrategy(options);
-    const bottomUpStrategy = resolveBottomUpTaskDelegationStrategy(options);
     const maxParallelFlows = resolveMaxParallelFlows(options.maxParallelFlows);
-    const inactiveCandidates = bottomUpStrategy.enabled
-      ? await this.collectInactiveAgents(
-          paths,
-          manifests,
-          bottomUpStrategy.inactiveMinutes,
-          bottomUpStrategy.notificationTarget,
-          defaultAgentId,
-        )
-      : [];
 
     const tasks = await this.boardService.listTasks(paths, { limit: 10_000 });
     const topDownDispatches = topDownStrategy.enabled
@@ -1120,7 +1095,7 @@ export class OpenGoatService {
     const pendingTaskIds = new Set(
       await this.boardService.listPendingTaskIdsOlderThan(
         paths,
-        bottomUpStrategy.inactiveMinutes,
+        pendingMinutes,
       ),
     );
     const doingTaskIds = new Set(
@@ -1136,15 +1111,7 @@ export class OpenGoatService {
       doingTaskIds,
       pendingTaskIds,
       inProgressMinutes,
-      bottomUpStrategy.inactiveMinutes,
-      ranAt,
-      defaultAgentId,
-      maxParallelFlows,
-    );
-    const inactiveDispatches = await this.dispatchInactiveAgentAutomations(
-      paths,
-      inactiveCandidates,
-      bottomUpStrategy.inactiveMinutes,
+      pendingMinutes,
       ranAt,
       defaultAgentId,
       maxParallelFlows,
@@ -1152,7 +1119,6 @@ export class OpenGoatService {
     const dispatches = [
       ...topDownDispatches,
       ...taskStatusDispatch.dispatches,
-      ...inactiveDispatches,
     ];
 
     const failed = dispatches.filter((entry) => !entry.ok).length;
@@ -1162,7 +1128,7 @@ export class OpenGoatService {
       todoTasks: taskStatusDispatch.todoTasks,
       doingTasks: taskStatusDispatch.doingTasks,
       blockedTasks: taskStatusDispatch.blockedTasks,
-      inactiveAgents: inactiveCandidates.length,
+      inactiveAgents: 0,
       sent: dispatches.length - failed,
       failed,
       dispatches,
@@ -1405,71 +1371,6 @@ export class OpenGoatService {
       pendingTasks,
       blockedTasks,
     };
-  }
-
-  private async dispatchInactiveAgentAutomations(
-    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
-    inactiveCandidates: InactiveAgentCandidate[],
-    inactiveMinutes: number,
-    notificationTimestamp: string,
-    defaultAgentId: string,
-    maxParallelFlows = 1,
-  ): Promise<TaskCronDispatchResult[]> {
-    const groupedCandidatesByManager = new Map<string, InactiveAgentCandidate[]>();
-    for (const candidate of inactiveCandidates) {
-      const managerAgentId =
-        normalizeAgentId(candidate.managerAgentId) || defaultAgentId;
-      const bucket = groupedCandidatesByManager.get(managerAgentId) ?? [];
-      bucket.push(candidate);
-      groupedCandidatesByManager.set(managerAgentId, bucket);
-    }
-
-    const requests = [...groupedCandidatesByManager.entries()]
-      .sort(([leftManagerId], [rightManagerId]) =>
-        leftManagerId.localeCompare(rightManagerId),
-      )
-      .map(([managerAgentId, candidates]) => {
-        const orderedCandidates = [...candidates].sort((left, right) =>
-          left.subjectAgentId.localeCompare(right.subjectAgentId),
-        );
-        return {
-          managerAgentId,
-          candidates: orderedCandidates,
-          sessionRef: buildNotificationSessionRef(managerAgentId),
-          message: buildInactiveAgentsMessage({
-            inactiveMinutes,
-            notificationTimestamp,
-            candidates: orderedCandidates,
-          }),
-          subjectAgentId:
-            orderedCandidates.length === 1
-              ? orderedCandidates[0]?.subjectAgentId
-              : undefined,
-        };
-      });
-
-    return runWithConcurrencyByKey(
-      requests,
-      maxParallelFlows,
-      (request) => request.managerAgentId,
-      async (request) => {
-        const result = await this.dispatchAutomationMessage(
-          paths,
-          request.managerAgentId,
-          request.sessionRef,
-          request.message,
-        );
-        return {
-          kind: "inactive",
-          targetAgentId: request.managerAgentId,
-          sessionRef: request.sessionRef,
-          subjectAgentId: request.subjectAgentId,
-          message: request.message,
-          ok: result.ok,
-          error: result.error,
-        };
-      },
-    );
   }
 
   public async listSkills(agentId?: string): Promise<ResolvedSkill[]> {
@@ -1931,10 +1832,6 @@ export class OpenGoatService {
       ...initialization,
       defaultAgent,
     };
-  }
-
-  private resolveNowMs(): number {
-    return Date.now();
   }
 
   private async syncOpenClawRoleSkills(
@@ -2502,62 +2399,6 @@ export class OpenGoatService {
       ...(providerConfig?.env ?? {}),
       ...process.env,
     };
-  }
-
-  private async collectInactiveAgents(
-    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
-    manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
-    inactiveMinutes: number,
-    notificationTarget: InactiveAgentNotificationTarget,
-    defaultAgentId: string,
-  ): Promise<InactiveAgentCandidate[]> {
-    const nowMs = this.resolveNowMs();
-    const inactiveCutoffMs = nowMs - inactiveMinutes * 60_000;
-    const reporteeStats = buildReporteeStats(manifests);
-    const inactive: InactiveAgentCandidate[] = [];
-
-    for (const manifest of manifests) {
-      const managerAgentId = normalizeAgentId(
-        manifest.metadata.reportsTo ?? "",
-      );
-      if (!managerAgentId) {
-        continue;
-      }
-      if (
-        notificationTarget === "goat-only" &&
-        managerAgentId !== defaultAgentId
-      ) {
-        continue;
-      }
-
-      const lastAction = await this.sessionService.getLastAgentAction(
-        paths,
-        manifest.agentId,
-      );
-      if (lastAction && lastAction.timestamp >= inactiveCutoffMs) {
-        continue;
-      }
-      const directReporteesCount =
-        reporteeStats.directByManager.get(manifest.agentId) ?? 0;
-      const totalReporteesCount =
-        reporteeStats.totalByManager.get(manifest.agentId) ?? 0;
-      const indirectReporteesCount = Math.max(
-        0,
-        totalReporteesCount - directReporteesCount,
-      );
-
-      inactive.push({
-        managerAgentId,
-        subjectAgentId: manifest.agentId,
-        subjectName: manifest.metadata.name,
-        role: manifest.metadata.description,
-        directReporteesCount,
-        indirectReporteesCount,
-        lastActionTimestamp: lastAction?.timestamp,
-      });
-    }
-
-    return inactive;
   }
 
 }
