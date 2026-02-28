@@ -47,7 +47,7 @@ Canonical fields:
 Defaults:
 
 - `goat`: `type=manager`, `reportsTo=null`, assigned `og-board-manager` role skill
-- `sage`: `type=individual`, `reportsTo=goat`, role `Product Manager`, assigned `og-board-individual` role skill
+- `sage`: `type=manager`, `reportsTo=goat`, role `Product Manager`, assigned `og-board-manager` role skill
 - other agents: `type=individual`, `reportsTo=goat`
 
 ## 4) Manager Runtime Model

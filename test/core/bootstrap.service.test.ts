@@ -60,10 +60,11 @@ describe("BootstrapService", () => {
       await readFile(path.join(paths.agentsDir, "sage", "config.json"), "utf-8"),
     ) as {
       role?: string;
-      organization?: { reportsTo?: string | null };
+      organization?: { type?: string; reportsTo?: string | null };
       runtime?: { provider?: { id?: string } };
     };
     expect(sageConfig.role).toBe("Product Manager");
+    expect(sageConfig.organization?.type).toBe("manager");
     expect(sageConfig.organization?.reportsTo).toBe("goat");
     expect(sageConfig.runtime?.provider?.id).toBe("openclaw");
 
@@ -255,6 +256,46 @@ describe("BootstrapService", () => {
       agents: string[];
     };
     expect(index.agents).toEqual(["goat", "research", "sage"]);
+  });
+
+  it("repairs pre-existing Sage config to manager reporting to Goat", async () => {
+    const { service, paths, fileSystem } = await createBootstrapService();
+
+    await fileSystem.ensureDir(path.join(paths.agentsDir, "sage"));
+    await fileSystem.writeFile(
+      path.join(paths.agentsDir, "sage", "config.json"),
+      `${JSON.stringify(
+        {
+          schemaVersion: 2,
+          id: "sage",
+          displayName: "Sage",
+          role: "",
+          organization: {
+            type: "individual",
+            reportsTo: "goat",
+          },
+          runtime: {
+            provider: {
+              id: "openclaw",
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    await service.initialize();
+
+    const sageConfig = JSON.parse(
+      await readFile(path.join(paths.agentsDir, "sage", "config.json"), "utf-8"),
+    ) as {
+      role?: string;
+      organization?: { type?: string; reportsTo?: string | null };
+    };
+    expect(sageConfig.role).toBe("Product Manager");
+    expect(sageConfig.organization?.type).toBe("manager");
+    expect(sageConfig.organization?.reportsTo).toBe("goat");
   });
 });
 

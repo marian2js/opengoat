@@ -116,6 +116,7 @@ const OPENCLAW_AGENT_SANDBOX_MODE = "off";
 const OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON = "[\"*\"]";
 const OPENCLAW_AGENT_SKIP_BOOTSTRAP = true;
 const OPENGOAT_DEFAULT_AGENT_ENV = "OPENGOAT_DEFAULT_AGENT";
+const TOP_DOWN_TASK_DELEGATION_AGENT_ID = "sage";
 const NOTIFICATION_SESSION_COMPACTION_COMMAND = [
   "/compact",
   "Keep only the last 3 notification exchanges plus active task ids, statuses, blockers, and explicit next actions.",
@@ -1088,7 +1089,6 @@ export class OpenGoatService {
           manifests,
           topDownStrategy.openTasksThreshold,
           ranAt,
-          defaultAgentId,
           maxParallelFlows,
         )
       : [];
@@ -1141,7 +1141,6 @@ export class OpenGoatService {
     manifests: Awaited<ReturnType<AgentManifestService["listManifests"]>>,
     openTasksThreshold: number,
     notificationTimestamp: string,
-    defaultAgentId: string,
     maxParallelFlows = 1,
   ): Promise<TaskCronDispatchResult[]> {
     const openTasks = tasks
@@ -1167,17 +1166,20 @@ export class OpenGoatService {
     const managerAgents = manifests.filter(
       (manifest) => manifest.metadata.type === "manager",
     ).length;
-    const ceoDirectReportees = manifests.filter(
+    const sageDirectReportees = manifests.filter(
       (manifest) =>
-        normalizeAgentId(manifest.metadata.reportsTo ?? "") === defaultAgentId,
+        normalizeAgentId(manifest.metadata.reportsTo ?? "") ===
+        TOP_DOWN_TASK_DELEGATION_AGENT_ID,
     ).length;
-    const sessionRef = buildNotificationSessionRef(defaultAgentId);
+    const sessionRef = buildNotificationSessionRef(
+      TOP_DOWN_TASK_DELEGATION_AGENT_ID,
+    );
     const message = buildTopDownTaskDelegationMessage({
       openTasksThreshold,
       openTasksCount: openTasks.length,
       totalAgents: manifests.length,
       managerAgents,
-      ceoDirectReportees,
+      sageDirectReportees,
       openTasks: openTasks.map((task) => ({
         taskId: task.taskId,
         title: task.title,
@@ -1189,7 +1191,7 @@ export class OpenGoatService {
 
     const requests = [
       {
-        targetAgentId: defaultAgentId,
+        targetAgentId: TOP_DOWN_TASK_DELEGATION_AGENT_ID,
         sessionRef,
         message,
       },

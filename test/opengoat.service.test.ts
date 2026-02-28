@@ -112,7 +112,7 @@ describe("OpenGoatService", () => {
     }
   });
 
-  it("routes top-down task cron notifications to configured default agent", async () => {
+  it("routes top-down task cron notifications to Sage", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -136,7 +136,7 @@ describe("OpenGoatService", () => {
     const topDownDispatch = cycle.dispatches.find(
       (entry) => entry.kind === "topdown",
     );
-    expect(topDownDispatch?.targetAgentId).toBe("stone");
+    expect(topDownDispatch?.targetAgentId).toBe("sage");
   });
 
   it("creates and lists agents through the facade", async () => {
@@ -2079,7 +2079,7 @@ describe("OpenGoatService", () => {
       expect.arrayContaining([
         expect.objectContaining({
           kind: "topdown",
-          targetAgentId: "goat",
+          targetAgentId: "sage",
           message: expect.stringContaining("Top-Down threshold"),
         }),
         expect.objectContaining({
@@ -2121,11 +2121,14 @@ describe("OpenGoatService", () => {
 
     const topDownInvocation = provider.invocations.find(
       (entry) =>
-        entry.agent === "goat" &&
-        entry.message.includes("Goat guidance for creating next tasks"),
+        entry.agent === "sage" &&
+        entry.message.includes("Sage playbook for top-down delegation"),
     );
     expect(topDownInvocation?.message).toContain(
-      "decompose work and pass it down",
+      "organization/ROADMAP.md",
+    );
+    expect(topDownInvocation?.message).toContain(
+      "what we need",
     );
     expect(topDownInvocation?.message).toContain(
       `Notification timestamp: ${cycle.ranAt}`,
@@ -2168,6 +2171,14 @@ describe("OpenGoatService", () => {
         entry.sessionKey.includes("agent_goat_inactive_"),
       ),
     ).toBe(false);
+
+    const sageSessions = await service.listSessions("sage");
+    const sageNotificationSessionKey = "agent:sage:agent_sage_notifications";
+    expect(
+      sageSessions.some(
+        (entry) => entry.sessionKey === sageNotificationSessionKey,
+      ),
+    ).toBe(true);
   });
 
   it("excludes blocked tasks from top-down open task threshold checks", async () => {
@@ -2201,7 +2212,7 @@ describe("OpenGoatService", () => {
     );
     expect(topDownDispatch).toMatchObject({
       kind: "topdown",
-      targetAgentId: "goat",
+      targetAgentId: "sage",
       ok: true,
     });
     expect(topDownDispatch?.message).toContain("Open tasks are at 0");
