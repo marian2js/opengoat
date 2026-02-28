@@ -4254,6 +4254,7 @@ export function DashboardPage(): ReactElement {
                     ({ agent, sessions, visibleLimit }) => {
                       const isAgentActive = activeSidebarAgentId === agent.id;
                       const isExpanded = expandedAgentSessionIds.has(agent.id);
+                      const roleLabel = resolveSidebarAgentRoleLabel(agent);
                       const hasHiddenSessions = sessions.length > visibleLimit;
                       const visibleSessions = isExpanded
                         ? sessions
@@ -4317,16 +4318,28 @@ export function DashboardPage(): ReactElement {
                                 displayName={agent.displayName}
                                 size="xs"
                               />
-                              <span
-                                className={cn(
-                                  "ml-2 truncate text-[13px] font-medium",
-                                  isAgentActive
-                                    ? "text-foreground"
-                                    : "text-muted-foreground",
-                                )}
-                              >
-                                {agent.displayName}
-                              </span>
+                              <div className="ml-2 min-w-0">
+                                <p
+                                  className={cn(
+                                    "truncate text-[13px] font-semibold leading-tight",
+                                    isAgentActive
+                                      ? "text-foreground"
+                                      : "text-foreground/95",
+                                  )}
+                                >
+                                  {agent.displayName}
+                                </p>
+                                <p
+                                  className={cn(
+                                    "mt-0.5 truncate text-[11px] font-normal leading-tight",
+                                    isAgentActive
+                                      ? "text-muted-foreground"
+                                      : "text-muted-foreground/90",
+                                  )}
+                                >
+                                  {roleLabel}
+                                </p>
+                              </div>
                             </button>
                             <button
                               type="button"
@@ -6383,6 +6396,23 @@ function resolveAgentRoleLabel(agent: Agent | undefined): string | undefined {
     return explicitRole;
   }
   return undefined;
+}
+
+function resolveSidebarAgentRoleLabel(agent: Agent): string {
+  const explicitRole = resolveAgentRoleLabel(agent);
+  if (explicitRole) {
+    return explicitRole;
+  }
+  if (agent.id === DEFAULT_AGENT_ID) {
+    return "Co-Founder";
+  }
+  if (agent.type === "manager") {
+    return "Manager";
+  }
+  if (agent.type === "individual") {
+    return "Team Member";
+  }
+  return "Agent";
 }
 
 function validateAuthenticationPasswordStrength(
