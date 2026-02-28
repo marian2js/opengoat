@@ -2878,7 +2878,7 @@ export function DashboardPage(): ReactElement {
       !isTopDownOpenTasksThresholdValid
     ) {
       toast.error(
-        `Top-Down open task threshold must be an integer between ${MIN_TOP_DOWN_OPEN_TASKS_THRESHOLD} and ${MAX_TOP_DOWN_OPEN_TASKS_THRESHOLD}.`,
+        `Open task refill threshold must be an integer between ${MIN_TOP_DOWN_OPEN_TASKS_THRESHOLD} and ${MAX_TOP_DOWN_OPEN_TASKS_THRESHOLD}.`,
       );
       return;
     }
@@ -2972,7 +2972,7 @@ export function DashboardPage(): ReactElement {
         ? "Task automation checks disabled."
         : response.settings.ceoBootstrapPending
         ? "Task automation checks are waiting for the first Goat message."
-        : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; in-progress timeout set to ${resolvedMaxInProgressMinutes} minutes; Top-Down ${
+        : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; in-progress timeout set to ${resolvedMaxInProgressMinutes} minutes; Product Manager task refill ${
             topDownTaskDelegationEnabledInput
               ? `enabled (threshold ${resolvedTopDownOpenTasksThreshold})`
               : "disabled"

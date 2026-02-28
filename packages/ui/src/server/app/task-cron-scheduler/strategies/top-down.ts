@@ -44,7 +44,7 @@ export function toTopDownTaskDelegationRuntimeStrategy(
 export function describeTopDownTaskDelegationStrategy(
   value: TopDownTaskDelegationSettings,
 ): string {
-  return `top-down task delegation ${
+  return `product manager task refill ${
     value.enabled ? "enabled" : "disabled"
   } (open task threshold ${value.openTasksThreshold})`;
 }
