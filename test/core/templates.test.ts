@@ -40,7 +40,7 @@ describe("default templates", () => {
         skills: { assigned: string[] };
       };
     };
-    expect(internalConfig.role).toBe("Goat");
+    expect(internalConfig.role).toBe("co-founder");
     expect(internalConfig.organization.type).toBe("manager");
     expect(internalConfig.organization.reportsTo).toBeNull();
     expect(internalConfig.runtime.provider.id).toBe("openclaw");

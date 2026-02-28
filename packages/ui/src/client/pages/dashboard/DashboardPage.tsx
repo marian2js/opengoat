@@ -5904,7 +5904,7 @@ function OrganizationGetStartedPanel({
 }): ReactElement {
   const ceoName =
     ceoAgent?.displayName?.trim() || DEFAULT_AGENT_ID.toUpperCase();
-  const ceoRole = ceoAgent?.role?.trim() || "Organization Goat";
+  const ceoRole = ceoAgent?.role?.trim() || "Organization co-founder";
 
   return (
     <Card className="border-border/70 bg-card/70">

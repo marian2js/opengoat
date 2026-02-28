@@ -234,7 +234,7 @@ describe("CLI commands", () => {
     const getAgentInfo = vi.fn(async () => ({
       id: "goat",
       name: "Goat",
-      role: "Goat",
+      role: "co-founder",
       totalReportees: 3,
       directReportees: [
         {
@@ -257,7 +257,7 @@ describe("CLI commands", () => {
     expect(getAgentInfo).toHaveBeenCalledWith("goat");
     expect(valid.stdout.output()).toContain("id: goat");
     expect(valid.stdout.output()).toContain("name: Goat");
-    expect(valid.stdout.output()).toContain("role: Goat");
+    expect(valid.stdout.output()).toContain("role: co-founder");
     expect(valid.stdout.output()).toContain("total reportees: 3");
     expect(valid.stdout.output()).toContain(
       'direct reportees:\n- {id: "cto", name: "CTO"',
@@ -311,7 +311,7 @@ describe("CLI commands", () => {
       .fn()
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
-        { id: "goat", displayName: "Goat", role: "Goat" },
+        { id: "goat", displayName: "Goat", role: "co-founder" },
         { id: "research", displayName: "research", role: "Developer" },
       ]);
 
@@ -325,7 +325,7 @@ describe("CLI commands", () => {
     const second = createContext({ listAgents });
     const secondCode = await agentListCommand.run([], second.context);
     expect(secondCode).toBe(0);
-    expect(second.stdout.output()).toContain("goat [Goat]\n");
+    expect(second.stdout.output()).toContain("goat [co-founder]\n");
     expect(second.stdout.output()).toContain("research [Developer]\n");
   });
 

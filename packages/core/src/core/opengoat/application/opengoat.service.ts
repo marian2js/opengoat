@@ -469,7 +469,7 @@ export class OpenGoatService {
         {
           type: "manager",
           reportsTo: null,
-          role: "Goat",
+          role: "co-founder",
         },
       );
     }

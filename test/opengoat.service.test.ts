@@ -198,7 +198,9 @@ describe("OpenGoatService", () => {
       "goat",
       "research-analyst",
     ]);
-    expect(agents.find((agent) => agent.id === "goat")?.role).toBe("Goat");
+    expect(agents.find((agent) => agent.id === "goat")?.role).toBe(
+      "co-founder",
+    );
     expect(agents.find((agent) => agent.id === "research-analyst")?.role).toBe(
       "Developer",
     );
@@ -298,7 +300,7 @@ describe("OpenGoatService", () => {
     const info = await service.getAgentInfo("goat");
     expect(info.id).toBe("goat");
     expect(info.name).toBe("Goat");
-    expect(info.role).toBe("Goat");
+    expect(info.role).toBe("co-founder");
     expect(info.totalReportees).toBe(3);
     expect(info.directReportees).toEqual([
       {
