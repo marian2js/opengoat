@@ -96,17 +96,17 @@ export class BootstrapService {
     }, {
       type: "manager",
       reportsTo: null,
-      role: "co-founder",
+      role: "Co-Founder",
     });
     const goatWorkspaceBootstrapResult = goatResult.alreadyExisted
       ? {
-          createdPaths: [],
-          skippedPaths: [],
-          removedPaths: [],
-        }
+        createdPaths: [],
+        skippedPaths: [],
+        removedPaths: [],
+      }
       : await this.agentService.ensureCeoWorkspaceBootstrap(paths, {
-          syncBootstrapMarkdown: !globalConfigExisted,
-        });
+        syncBootstrapMarkdown: !globalConfigExisted,
+      });
     const goatWorkspaceTemplateSync =
       await this.agentService.syncAgentWorkspaceTemplateAssets(
         paths,
@@ -129,21 +129,21 @@ export class BootstrapService {
     const productManagerWorkspaceBootstrapResult =
       productManagerResult.alreadyExisted
         ? {
-            createdPaths: [],
-            skippedPaths: [],
-            removedPaths: [],
-          }
+          createdPaths: [],
+          skippedPaths: [],
+          removedPaths: [],
+        }
         : await this.agentService.ensureAgentWorkspaceBootstrap(
-            paths,
-            {
-              agentId: DEFAULT_PRODUCT_MANAGER_AGENT.id,
-              displayName: DEFAULT_PRODUCT_MANAGER_AGENT.displayName,
-              role: DEFAULT_PRODUCT_MANAGER_ROLE,
-            },
-            {
-              syncBootstrapMarkdown: false,
-            },
-          );
+          paths,
+          {
+            agentId: DEFAULT_PRODUCT_MANAGER_AGENT.id,
+            displayName: DEFAULT_PRODUCT_MANAGER_AGENT.displayName,
+            role: DEFAULT_PRODUCT_MANAGER_ROLE,
+          },
+          {
+            syncBootstrapMarkdown: false,
+          },
+        );
     const productManagerWorkspaceTemplateSync =
       await this.agentService.syncAgentWorkspaceTemplateAssets(
         paths,
