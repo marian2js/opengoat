@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import path from "node:path";
-import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 import type { TaskRecord } from "../../boards/index.js";
+import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
 
 export type OpenClawAgentPathEntry = {
   id: string;
@@ -95,7 +95,9 @@ export interface ResolvedTopDownTaskDelegationStrategy {
   openTasksThreshold: number;
 }
 
-export function resolveTopDownOpenTasksThreshold(value: number | undefined): number {
+export function resolveTopDownOpenTasksThreshold(
+  value: number | undefined,
+): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return DEFAULT_TOP_DOWN_OPEN_TASKS_THRESHOLD;
   }
@@ -139,7 +141,9 @@ export function extractManagedSkillsDir(payload: unknown): string | null {
   return managedSkillsDir || null;
 }
 
-export function extractOpenClawAgents(payload: unknown): OpenClawAgentPathEntry[] {
+export function extractOpenClawAgents(
+  payload: unknown,
+): OpenClawAgentPathEntry[] {
   if (!Array.isArray(payload)) {
     return [];
   }
@@ -199,7 +203,10 @@ export function pathMatches(left: string, right: string): boolean {
   return leftNormalized === rightNormalized;
 }
 
-export function pathIsWithin(containerPath: string, candidatePath: string): boolean {
+export function pathIsWithin(
+  containerPath: string,
+  candidatePath: string,
+): boolean {
   const normalizedContainer = normalizePathForCompare(containerPath);
   const normalizedCandidate = normalizePathForCompare(candidatePath);
   if (!normalizedContainer || !normalizedCandidate) {
@@ -444,7 +451,7 @@ export function buildBlockedTaskMessage(params: {
   ].join("\n");
 }
 
-export function buildTopDownTaskDelegationMessage(params: {
+export function buildSageTaskDelegationMessage(params: {
   openTasksThreshold: number;
   openTasksCount: number;
   totalAgents: number;
@@ -476,19 +483,19 @@ export function buildTopDownTaskDelegationMessage(params: {
           .join(", ");
 
   const lines = [
-    `Open tasks are at ${params.openTasksCount}, which is at or below the Top-Down threshold (${params.openTasksThreshold}).`,
+    `Open tasks are at ${params.openTasksCount}, which is at or below the threshold (${params.openTasksThreshold}).`,
     ...(notificationTimestamp
       ? [`Notification timestamp: ${notificationTimestamp}`]
       : []),
-    `Organization context: ${params.totalAgents} total agents, ${params.managerAgents} managers, ${params.sageDirectReportees} direct Sage reportees.`,
+    `Team context: You have ${params.sageDirectReportees} direct reportees.`,
     `Open task status distribution: ${statusSummary}.`,
     "",
-    "Sage playbook for top-down delegation:",
+    "Sage playbook for delegation:",
     "1. Review organization/ROADMAP.md and identify the active initiative.",
     "2. If the active initiative is complete, mark it completed in the roadmap and move to the next initiative.",
-    "3. Break the active initiative into the next practical tasks for your reportees.",
+    "3. Break the active initiative into the next tasks for the developers. Tasks should be achievable in a week if taken by a human developer.",
     "4. For each created task, include a concise PRD that defines outcomes and requirements (what we need), not implementation details (how to do it).",
-    "5. Delegate tasks to the right reportees and keep scope realistic for current capacity.",
+    "5. Delegate tasks to the right developer using the skill og-board-manager.",
     "6. Keep decisions aligned with MISSION, VISION, and STRATEGY.",
     "",
     "Open tasks snapshot:",
@@ -576,10 +583,7 @@ function buildTotalReporteeCountByManager(
 
   const totalByManager = new Map<string, number>();
   for (const managerAgentId of graph.keys()) {
-    totalByManager.set(
-      managerAgentId,
-      resolveDescendants(managerAgentId).size,
-    );
+    totalByManager.set(managerAgentId, resolveDescendants(managerAgentId).size);
   }
   return totalByManager;
 }
@@ -633,7 +637,9 @@ export function collectAllReportees(
   return [...visited].sort((left, right) => left.localeCompare(right));
 }
 
-export function prepareOpenClawCommandEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+export function prepareOpenClawCommandEnv(
+  env: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
   const mergedPath = dedupePathEntries([
     ...resolvePreferredOpenClawCommandPaths(env),
     ...(env.PATH?.split(path.delimiter) ?? []),

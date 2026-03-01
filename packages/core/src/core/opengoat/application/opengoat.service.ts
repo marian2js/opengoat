@@ -1,6 +1,6 @@
-import path from "node:path";
-import { homedir } from "node:os";
 import * as JSON5 from "json5";
+import { homedir } from "node:os";
+import path from "node:path";
 import { AgentManifestService } from "../../agents/application/agent-manifest.service.js";
 import { AgentService } from "../../agents/application/agent.service.js";
 import {
@@ -91,22 +91,21 @@ import {
   buildNotificationSessionRef,
   buildPendingTaskMessage,
   buildReporteeStats,
-  buildTopDownTaskDelegationMessage,
+  buildSageTaskDelegationMessage,
   buildTodoTaskMessage,
   collectAllReportees,
   containsAgentNotFoundMessage,
   containsAlreadyExistsMessage,
   extractManagedSkillsDir,
-  extractOpenClawAgentEntry,
   extractOpenClawAgents,
   isSpawnPermissionOrMissing,
   pathIsWithin,
   pathMatches,
   prepareOpenClawCommandEnv,
-  resolveInactiveMinutes,
   resolveInProgressTimeoutMinutes,
-  resolveTopDownTaskDelegationStrategy,
+  resolveInactiveMinutes,
   resolveMaxParallelFlows,
+  resolveTopDownTaskDelegationStrategy,
   toErrorMessage,
   type OpenClawAgentPathEntry,
   type TaskDelegationStrategiesConfig,
@@ -125,7 +124,7 @@ interface OpenGoatServiceDeps {
 const OPENCLAW_PROVIDER_ID = "openclaw";
 const OPENCLAW_DEFAULT_AGENT_ID = "main";
 const OPENCLAW_AGENT_SANDBOX_MODE = "off";
-const OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON = "[\"*\"]";
+const OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON = '["*"]';
 const OPENCLAW_AGENT_SKIP_BOOTSTRAP = true;
 const OPENGOAT_DEFAULT_AGENT_ENV = "OPENGOAT_DEFAULT_AGENT";
 const TOP_DOWN_TASK_DELEGATION_AGENT_ID = "sage";
@@ -484,7 +483,10 @@ export class OpenGoatService {
     let openClawInventoryAvailable = false;
     try {
       openClawAgentEntriesById = new Map(
-        (await this.listOpenClawAgents(paths)).map((entry) => [entry.id, entry]),
+        (await this.listOpenClawAgents(paths)).map((entry) => [
+          entry.id,
+          entry,
+        ]),
       );
       openClawInventoryAvailable = true;
     } catch (error) {
@@ -514,9 +516,7 @@ export class OpenGoatService {
         }
       }
     } catch (error) {
-      warnings.push(
-        `OpenClaw startup sync failed: ${toErrorMessage(error)}`,
-      );
+      warnings.push(`OpenClaw startup sync failed: ${toErrorMessage(error)}`);
     }
 
     let openClawPluginConfigChanged = false;
@@ -679,13 +679,17 @@ export class OpenGoatService {
     if (!created.alreadyExisted) {
       try {
         const workspaceBootstrap =
-          await this.agentService.ensureAgentWorkspaceBootstrap(paths, {
-            agentId: created.agent.id,
-            displayName: created.agent.displayName,
-            role: options.role?.trim() ?? "",
-          }, {
-            syncBootstrapMarkdown: false,
-          });
+          await this.agentService.ensureAgentWorkspaceBootstrap(
+            paths,
+            {
+              agentId: created.agent.id,
+              displayName: created.agent.displayName,
+              role: options.role?.trim() ?? "",
+            },
+            {
+              syncBootstrapMarkdown: false,
+            },
+          );
         created.createdPaths.push(...workspaceBootstrap.createdPaths);
         created.skippedPaths.push(...workspaceBootstrap.skippedPaths);
         created.skippedPaths.push(...workspaceBootstrap.removedPaths);
@@ -1157,10 +1161,7 @@ export class OpenGoatService {
       defaultAgentId,
       maxParallelFlows,
     );
-    const dispatches = [
-      ...topDownDispatches,
-      ...taskStatusDispatch.dispatches,
-    ];
+    const dispatches = [...topDownDispatches, ...taskStatusDispatch.dispatches];
 
     const failed = dispatches.filter((entry) => !entry.ok).length;
     return {
@@ -1215,7 +1216,7 @@ export class OpenGoatService {
     const sessionRef = buildNotificationSessionRef(
       TOP_DOWN_TASK_DELEGATION_AGENT_ID,
     );
-    const message = buildTopDownTaskDelegationMessage({
+    const message = buildSageTaskDelegationMessage({
       openTasksThreshold,
       openTasksCount: openTasks.length,
       totalAgents: manifests.length,
@@ -1473,12 +1474,13 @@ export class OpenGoatService {
         paths,
         agent.id,
       );
-      const installedPaths = await this.skillService.assignInstalledSkillToAgent(
-        paths,
-        agent.id,
-        globalResult.skillId,
-        installOptions,
-      );
+      const installedPaths =
+        await this.skillService.assignInstalledSkillToAgent(
+          paths,
+          agent.id,
+          globalResult.skillId,
+          installOptions,
+        );
       workspaceInstallPaths.push(...installedPaths);
       assignedAgentIds.push(agent.id);
       await this.syncOpenClawRoleSkills(paths, agent.id);
@@ -1538,7 +1540,10 @@ export class OpenGoatService {
         globalResult.skillId,
         installOptions,
       );
-      if (removed.removedFromConfig || removed.removedWorkspacePaths.length > 0) {
+      if (
+        removed.removedFromConfig ||
+        removed.removedWorkspacePaths.length > 0
+      ) {
         removedFromAgentIds.push(agent.id);
       }
       removedWorkspacePaths.push(...removed.removedWorkspacePaths);
@@ -1564,7 +1569,10 @@ export class OpenGoatService {
       agentId,
     );
     return {
-      workspaceDir: this.pathPort.join(paths.workspacesDir, runtimeProfile.agentId),
+      workspaceDir: this.pathPort.join(
+        paths.workspacesDir,
+        runtimeProfile.agentId,
+      ),
       workspaceSkillDirectories: runtimeProfile.roleSkillDirectories,
     };
   }
@@ -1710,7 +1718,11 @@ export class OpenGoatService {
   ): Promise<SessionRemoveResult> {
     const paths = this.pathsProvider.getPaths();
     const resolvedAgentId = await this.resolveInputAgentId(paths, agentId);
-    return this.sessionService.removeSession(paths, resolvedAgentId, sessionRef);
+    return this.sessionService.removeSession(
+      paths,
+      resolvedAgentId,
+      sessionRef,
+    );
   }
 
   public getHomeDir(): string {
@@ -1759,7 +1771,10 @@ export class OpenGoatService {
         return { ok: true };
       }
 
-      const binding = await this.providerService.getAgentProvider(paths, agentId);
+      const binding = await this.providerService.getAgentProvider(
+        paths,
+        agentId,
+      );
       if (
         binding.providerId === OPENCLAW_PROVIDER_ID &&
         !message.trim().startsWith("/")
@@ -1842,7 +1857,9 @@ export class OpenGoatService {
   private async readGlobalConfig(
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
   ): Promise<OpenGoatConfig | null> {
-    return this.readJsonFileIfPresent<OpenGoatConfig>(paths.globalConfigJsonPath);
+    return this.readJsonFileIfPresent<OpenGoatConfig>(
+      paths.globalConfigJsonPath,
+    );
   }
 
   private async readJsonFileIfPresent<T>(filePath: string): Promise<T | null> {
@@ -1868,9 +1885,12 @@ export class OpenGoatService {
         // Startup remains functional even if OpenClaw CLI/runtime is unavailable.
       }
     }
-    const defaultAgent = await this.resolveDefaultAgentId(initialization.paths, {
-      requireExisting: true,
-    });
+    const defaultAgent = await this.resolveDefaultAgentId(
+      initialization.paths,
+      {
+        requireExisting: true,
+      },
+    );
     return {
       ...initialization,
       defaultAgent,
@@ -1886,7 +1906,10 @@ export class OpenGoatService {
       "plugins",
       MANAGED_OPENCLAW_PLUGIN_DIR_NAME,
     );
-    const pluginManifestPath = this.pathPort.join(pluginDir, "openclaw.plugin.json");
+    const pluginManifestPath = this.pathPort.join(
+      pluginDir,
+      "openclaw.plugin.json",
+    );
     const pluginEntrypointPath = this.pathPort.join(pluginDir, "index.js");
 
     await this.fileSystem.ensureDir(pluginDir);
@@ -2204,10 +2227,8 @@ export class OpenGoatService {
       }
     }
 
-    const skillsStatus = await this.providerService.getOpenClawSkillsStatusViaGateway(
-      paths,
-      env,
-    );
+    const skillsStatus =
+      await this.providerService.getOpenClawSkillsStatusViaGateway(paths, env);
     const managedSkillsDir = extractManagedSkillsDir(skillsStatus);
     this.openClawManagedSkillsDirCache = managedSkillsDir;
     return managedSkillsDir;
@@ -2298,8 +2319,14 @@ export class OpenGoatService {
 
     if (
       params.existingEntry &&
-      pathMatches(params.existingEntry.workspace, params.descriptor.workspaceDir) &&
-      pathMatches(params.existingEntry.agentDir, params.descriptor.internalConfigDir)
+      pathMatches(
+        params.existingEntry.workspace,
+        params.descriptor.workspaceDir,
+      ) &&
+      pathMatches(
+        params.existingEntry.agentDir,
+        params.descriptor.internalConfigDir,
+      )
     ) {
       return {
         synced: true,
@@ -2479,7 +2506,9 @@ export class OpenGoatService {
 
       if (listResult.code !== 0) {
         warnings.push(
-          `OpenClaw config read failed (agents.list, code ${listResult.code}). ${
+          `OpenClaw config read failed (agents.list, code ${
+            listResult.code
+          }). ${
             listResult.stderr.trim() || listResult.stdout.trim() || ""
           }`.trim(),
         );
@@ -2553,12 +2582,19 @@ export class OpenGoatService {
       const entry = asRecord(entries[index]);
       if (readAgentSandboxMode(entry) !== OPENCLAW_AGENT_SANDBOX_MODE) {
         const sandboxSet = await this.runOpenClaw(
-          ["config", "set", `agents.list[${index}].sandbox.mode`, OPENCLAW_AGENT_SANDBOX_MODE],
+          [
+            "config",
+            "set",
+            `agents.list[${index}].sandbox.mode`,
+            OPENCLAW_AGENT_SANDBOX_MODE,
+          ],
           { env },
         );
         if (sandboxSet.code !== 0) {
           warnings.push(
-            `OpenClaw sandbox policy sync failed for "${agentId}" (code ${sandboxSet.code}). ${
+            `OpenClaw sandbox policy sync failed for "${agentId}" (code ${
+              sandboxSet.code
+            }). ${
               sandboxSet.stderr.trim() || sandboxSet.stdout.trim() || ""
             }`.trim(),
           );
@@ -2567,12 +2603,19 @@ export class OpenGoatService {
 
       if (!hasAgentToolsAllowAll(entry)) {
         const toolsSet = await this.runOpenClaw(
-          ["config", "set", `agents.list[${index}].tools.allow`, OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON],
+          [
+            "config",
+            "set",
+            `agents.list[${index}].tools.allow`,
+            OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON,
+          ],
           { env },
         );
         if (toolsSet.code !== 0) {
           warnings.push(
-            `OpenClaw tools policy sync failed for "${agentId}" (code ${toolsSet.code}). ${
+            `OpenClaw tools policy sync failed for "${agentId}" (code ${
+              toolsSet.code
+            }). ${
               toolsSet.stderr.trim() || toolsSet.stdout.trim() || ""
             }`.trim(),
           );
@@ -2592,9 +2635,9 @@ export class OpenGoatService {
         );
         if (denySet.code !== 0) {
           warnings.push(
-            `OpenClaw tools deny sync failed for "${agentId}" (code ${denySet.code}). ${
-              denySet.stderr.trim() || denySet.stdout.trim() || ""
-            }`.trim(),
+            `OpenClaw tools deny sync failed for "${agentId}" (code ${
+              denySet.code
+            }). ${denySet.stderr.trim() || denySet.stdout.trim() || ""}`.trim(),
           );
         }
       }
@@ -2606,7 +2649,9 @@ export class OpenGoatService {
         );
         if (bootstrapSet.code !== 0) {
           warnings.push(
-            `OpenClaw bootstrap policy sync failed for "${agentId}" (code ${bootstrapSet.code}). ${
+            `OpenClaw bootstrap policy sync failed for "${agentId}" (code ${
+              bootstrapSet.code
+            }). ${
               bootstrapSet.stderr.trim() || bootstrapSet.stdout.trim() || ""
             }`.trim(),
           );
@@ -2633,7 +2678,9 @@ export class OpenGoatService {
       return [...warnings, ...gatewayWarnings];
     } catch (error) {
       warnings.push(
-        `OpenClaw gateway policy sync fallback failed: ${toErrorMessage(error)}`,
+        `OpenClaw gateway policy sync fallback failed: ${toErrorMessage(
+          error,
+        )}`,
       );
       return warnings;
     }
@@ -2651,7 +2698,6 @@ export class OpenGoatService {
       ...process.env,
     };
   }
-
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -2670,7 +2716,9 @@ function normalizeAgentConfigEntryId(value: unknown): string | undefined {
   return normalizeAgentId(id);
 }
 
-function readAgentSandboxMode(entry: Record<string, unknown>): string | undefined {
+function readAgentSandboxMode(
+  entry: Record<string, unknown>,
+): string | undefined {
   const sandbox = asRecord(entry.sandbox);
   const mode = sandbox.mode;
   if (typeof mode !== "string") {
@@ -2902,13 +2950,13 @@ function extractBalancedJsonCandidate(
         escaping = false;
       } else if (char === "\\") {
         escaping = true;
-      } else if (char === "\"") {
+      } else if (char === '"') {
         inString = false;
       }
       continue;
     }
 
-    if (char === "\"") {
+    if (char === '"') {
       inString = true;
       continue;
     }

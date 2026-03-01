@@ -4,7 +4,7 @@ import {
   buildBlockedTaskMessage,
   buildNotificationSessionRef,
   buildPendingTaskMessage,
-  buildTopDownTaskDelegationMessage,
+  buildSageTaskDelegationMessage,
   buildTaskSessionRef,
   buildTodoTaskMessage,
   resolveTopDownTaskDelegationStrategy,
@@ -81,7 +81,7 @@ describe("opengoat task cron notification helpers", () => {
   });
 
   it("builds a concise top-down task delegation message for Sage", () => {
-    const message = buildTopDownTaskDelegationMessage({
+    const message = buildSageTaskDelegationMessage({
       openTasksThreshold: 5,
       openTasksCount: 2,
       totalAgents: 4,
@@ -104,14 +104,18 @@ describe("opengoat task cron notification helpers", () => {
       notificationTimestamp: "2026-02-16T11:30:00-05:00",
     });
 
-    expect(message).toContain("Top-Down threshold (5)");
-    expect(message).toContain("Organization context: 4 total agents");
-    expect(message).toContain("Sage playbook for top-down delegation");
+    expect(message).toContain(
+      "Open tasks are at 2, which is at or below the threshold (5).",
+    );
+    expect(message).toContain("Team context: You have 2 direct reportees.");
+    expect(message).toContain("Sage playbook for delegation:");
     expect(message).toContain("organization/ROADMAP.md");
     expect(message).toContain("what we need");
     expect(message).toContain("not implementation details");
     expect(message).toContain("task-1 [todo] @cto");
-    expect(message).toContain("Notification timestamp: 2026-02-16T16:30:00.000Z");
+    expect(message).toContain(
+      "Notification timestamp: 2026-02-16T16:30:00.000Z",
+    );
   });
 });
 

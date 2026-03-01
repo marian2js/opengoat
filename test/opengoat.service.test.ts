@@ -2,7 +2,6 @@ import { constants } from "node:fs";
 import {
   access,
   lstat,
-  mkdir,
   readFile,
   readlink,
   rm,
@@ -11,21 +10,21 @@ import {
 import { homedir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  BaseProvider,
-  OpenGoatService,
-  ProviderRegistry,
-  type ProviderModule,
-  type ProviderCreateAgentOptions,
-  type ProviderDeleteAgentOptions,
-  type ProviderExecutionResult,
-  type ProviderInvokeOptions,
-} from "../packages/core/src/index.js";
 import type {
   CommandRunRequest,
   CommandRunResult,
   CommandRunnerPort,
 } from "../packages/core/src/core/ports/command-runner.port.js";
+import {
+  BaseProvider,
+  OpenGoatService,
+  ProviderRegistry,
+  type ProviderCreateAgentOptions,
+  type ProviderDeleteAgentOptions,
+  type ProviderExecutionResult,
+  type ProviderInvokeOptions,
+  type ProviderModule,
+} from "../packages/core/src/index.js";
 import { NodeFileSystem } from "../packages/core/src/platform/node/node-file-system.js";
 import { NodePathPort } from "../packages/core/src/platform/node/node-path.port.js";
 import {
@@ -187,7 +186,10 @@ describe("OpenGoatService", () => {
     );
     expect((await lstat(ceoReporteeLink)).isSymbolicLink()).toBe(true);
     expect(
-      path.resolve(path.dirname(ceoReporteeLink), await readlink(ceoReporteeLink)),
+      path.resolve(
+        path.dirname(ceoReporteeLink),
+        await readlink(ceoReporteeLink),
+      ),
     ).toBe(path.resolve(root, "workspaces", "research-analyst"));
 
     const agents = await service.listAgents();
@@ -499,7 +501,10 @@ describe("OpenGoatService", () => {
     roots.push(root);
 
     const managedSkillsDir = path.join(root, "openclaw-managed-skills");
-    const staleBoardManagerSkillDir = path.join(managedSkillsDir, "og-board-manager");
+    const staleBoardManagerSkillDir = path.join(
+      managedSkillsDir,
+      "og-board-manager",
+    );
     const staleBoardsSkillDir = path.join(managedSkillsDir, "og-boards");
     const staleBoardIndividualSkillDir = path.join(
       managedSkillsDir,
@@ -574,16 +579,10 @@ describe("OpenGoatService", () => {
     await service.createAgent("CTO", { type: "manager", reportsTo: "goat" });
 
     await expect(
-      access(
-        path.join(managedSkillsDir, "og-board-manager"),
-        constants.F_OK,
-      ),
+      access(path.join(managedSkillsDir, "og-board-manager"), constants.F_OK),
     ).rejects.toBeTruthy();
     await expect(
-      access(
-        path.join(managedSkillsDir, "og-boards"),
-        constants.F_OK,
-      ),
+      access(path.join(managedSkillsDir, "og-boards"), constants.F_OK),
     ).rejects.toBeTruthy();
     await expect(
       access(
@@ -756,8 +755,7 @@ describe("OpenGoatService", () => {
       provider.deletedAgents.some((entry) => entry.agentId === "goat"),
     ).toBe(true);
     expect(
-      provider.createdAgents.filter((entry) => entry.agentId === "goat")
-        .length,
+      provider.createdAgents.filter((entry) => entry.agentId === "goat").length,
     ).toBeGreaterThanOrEqual(2);
   });
 
@@ -855,13 +853,7 @@ describe("OpenGoatService", () => {
     await service.createAgent("Research Analyst");
     await expect(
       access(
-        path.join(
-          root,
-          "workspaces",
-          "goat",
-          "reportees",
-          "research-analyst",
-        ),
+        path.join(root, "workspaces", "goat", "reportees", "research-analyst"),
         constants.F_OK,
       ),
     ).resolves.toBeUndefined();
@@ -875,13 +867,7 @@ describe("OpenGoatService", () => {
     );
     await expect(
       access(
-        path.join(
-          root,
-          "workspaces",
-          "goat",
-          "reportees",
-          "research-analyst",
-        ),
+        path.join(root, "workspaces", "goat", "reportees", "research-analyst"),
         constants.F_OK,
       ),
     ).rejects.toBeTruthy();
@@ -934,7 +920,12 @@ describe("OpenGoatService", () => {
       reportsTo: "goat",
     });
 
-    const ceoOrganizationLink = path.join(root, "workspaces", "goat", "organization");
+    const ceoOrganizationLink = path.join(
+      root,
+      "workspaces",
+      "goat",
+      "organization",
+    );
     const engineerOrganizationLink = path.join(
       root,
       "workspaces",
@@ -954,11 +945,12 @@ describe("OpenGoatService", () => {
     await service.syncRuntimeDefaults();
 
     expect((await lstat(ceoOrganizationLink)).isSymbolicLink()).toBe(true);
-    expect((await lstat(engineerOrganizationLink)).isSymbolicLink()).toBe(
-      true,
-    );
+    expect((await lstat(engineerOrganizationLink)).isSymbolicLink()).toBe(true);
     expect(
-      path.resolve(path.dirname(ceoOrganizationLink), await readlink(ceoOrganizationLink)),
+      path.resolve(
+        path.dirname(ceoOrganizationLink),
+        await readlink(ceoOrganizationLink),
+      ),
     ).toBe(path.resolve(root, "organization"));
     expect(
       path.resolve(
@@ -1089,10 +1081,7 @@ describe("OpenGoatService", () => {
           stderr: "",
         };
       }
-      if (
-        request.args[0] === "config" &&
-        request.args[1] === "set"
-      ) {
+      if (request.args[0] === "config" && request.args[1] === "set") {
         return {
           code: 0,
           stdout: "",
@@ -1128,7 +1117,7 @@ describe("OpenGoatService", () => {
           request.args[0] === "config" &&
           request.args[1] === "set" &&
           request.args[2] === "agents.list[0].tools.allow" &&
-          request.args[3] === "[\"*\"]",
+          request.args[3] === '["*"]',
       ),
     ).toBe(true);
     expect(
@@ -1181,7 +1170,9 @@ describe("OpenGoatService", () => {
     const result = await service.syncRuntimeDefaults();
 
     expect(result.ceoSynced).toBe(true);
-    await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
+    await expect(
+      access(bootstrapPath, constants.F_OK),
+    ).resolves.toBeUndefined();
 
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
     const soulMarkdown = await readFile(soulPath, "utf-8");
@@ -1222,7 +1213,9 @@ describe("OpenGoatService", () => {
 
     const bootstrapPath = path.join(root, "workspaces", "goat", "BOOTSTRAP.md");
     const agentsPath = path.join(root, "workspaces", "goat", "AGENTS.md");
-    await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
+    await expect(
+      access(bootstrapPath, constants.F_OK),
+    ).resolves.toBeUndefined();
     await rm(bootstrapPath);
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
     await writeFile(
@@ -1282,7 +1275,9 @@ describe("OpenGoatService", () => {
 
     await service.syncRuntimeDefaults();
 
-    await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
+    await expect(
+      access(bootstrapPath, constants.F_OK),
+    ).resolves.toBeUndefined();
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
     expect(agentsMarkdown).toContain("## First Run");
     expect(agentsMarkdown).toContain("first-run-content");
@@ -1355,8 +1350,9 @@ describe("OpenGoatService", () => {
         warning.includes("OpenClaw agents list returned non-JSON output"),
       ),
     ).toBe(false);
-    expect(provider.createdAgents.filter((entry) => entry.agentId === "goat"))
-      .toHaveLength(0);
+    expect(
+      provider.createdAgents.filter((entry) => entry.agentId === "goat"),
+    ).toHaveLength(0);
   });
 
   it("does not re-register goat when OpenClaw inventory is unavailable", async () => {
@@ -1395,7 +1391,9 @@ describe("OpenGoatService", () => {
 
     const ceoWorkspace = path.join(root, "workspaces", "goat");
     const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
-    await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
+    await expect(
+      access(bootstrapPath, constants.F_OK),
+    ).resolves.toBeUndefined();
     await rm(bootstrapPath);
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
 
@@ -1462,7 +1460,10 @@ describe("OpenGoatService", () => {
 
     const { service } = createService(root);
     await service.initialize();
-    await service.createAgent("Lead", { type: "individual", reportsTo: "goat" });
+    await service.createAgent("Lead", {
+      type: "individual",
+      reportsTo: "goat",
+    });
     await service.createAgent("Engineer");
     await service.setAgentProvider("lead", "codex");
 
@@ -1477,7 +1478,10 @@ describe("OpenGoatService", () => {
 
     const { service } = createService(root);
     await service.initialize();
-    await service.createAgent("Lead", { type: "individual", reportsTo: "goat" });
+    await service.createAgent("Lead", {
+      type: "individual",
+      reportsTo: "goat",
+    });
     await service.createAgent("Engineer", {
       type: "individual",
       reportsTo: "goat",
@@ -1549,7 +1553,13 @@ describe("OpenGoatService", () => {
     ).rejects.toBeTruthy();
     await expect(
       access(
-        path.join(root, "workspaces", "engineer", "skills", "og-board-individual"),
+        path.join(
+          root,
+          "workspaces",
+          "engineer",
+          "skills",
+          "og-board-individual",
+        ),
         constants.F_OK,
       ),
     ).rejects.toBeTruthy();
@@ -1633,7 +1643,11 @@ describe("OpenGoatService", () => {
     });
 
     expect(installResult.scope).toBe("global");
-    expect(installResult.assignedAgentIds).toEqual(["goat", "engineer", "sage"]);
+    expect(installResult.assignedAgentIds).toEqual([
+      "goat",
+      "engineer",
+      "sage",
+    ]);
     await expect(
       access(
         path.join(
@@ -1764,19 +1778,17 @@ describe("OpenGoatService", () => {
 
     expect(removeResult.scope).toBe("global");
     expect(removeResult.removedFromGlobal).toBe(true);
-    expect(removeResult.removedFromAgentIds).toEqual(["goat", "engineer", "sage"]);
+    expect(removeResult.removedFromAgentIds).toEqual([
+      "goat",
+      "engineer",
+      "sage",
+    ]);
     await expect(
       access(path.join(root, "skills", "qa-checklist"), constants.F_OK),
     ).rejects.toBeTruthy();
     await expect(
       access(
-        path.join(
-          root,
-          "workspaces",
-          "goat",
-          "skills",
-          "qa-checklist",
-        ),
+        path.join(root, "workspaces", "goat", "skills", "qa-checklist"),
         constants.F_OK,
       ),
     ).rejects.toBeTruthy();
@@ -1928,9 +1940,15 @@ describe("OpenGoatService", () => {
     );
     await service.initialize();
     await service.createAgent("CTO", { type: "manager", reportsTo: "goat" });
-    await new NodeFileSystem().ensureDir(path.join(managedSkillsDir, "og-board-manager"));
-    await new NodeFileSystem().ensureDir(path.join(managedSkillsDir, "og-boards"));
-    await new NodeFileSystem().ensureDir(path.join(managedSkillsDir, "manager"));
+    await new NodeFileSystem().ensureDir(
+      path.join(managedSkillsDir, "og-board-manager"),
+    );
+    await new NodeFileSystem().ensureDir(
+      path.join(managedSkillsDir, "og-boards"),
+    );
+    await new NodeFileSystem().ensureDir(
+      path.join(managedSkillsDir, "manager"),
+    );
     await writeFile(
       path.join(managedSkillsDir, "og-board-manager", "SKILL.md"),
       "# stale og-board-manager\n",
@@ -1952,15 +1970,20 @@ describe("OpenGoatService", () => {
     expect(result.homeDir).toBe(root);
     expect(result.homeRemoved).toBe(true);
     expect(result.failedOpenClawAgents).toHaveLength(0);
-    expect(result.deletedOpenClawAgents).toEqual(["goat", "cto", "orphan", "sage"]);
+    expect(result.deletedOpenClawAgents).toEqual([
+      "goat",
+      "cto",
+      "orphan",
+      "sage",
+    ]);
     expect(result.removedOpenClawManagedSkillDirs).toEqual([
       path.join(managedSkillsDir, "og-boards"),
       path.join(managedSkillsDir, "og-board-manager"),
       path.join(managedSkillsDir, "manager"),
     ]);
-    expect(
-      provider.deletedAgents.map((entry) => entry.agentId).sort(),
-    ).toEqual(["cto", "goat", "orphan", "sage"]);
+    expect(provider.deletedAgents.map((entry) => entry.agentId).sort()).toEqual(
+      ["cto", "goat", "orphan", "sage"],
+    );
     await expect(access(root, constants.F_OK)).rejects.toBeTruthy();
   });
 
@@ -2006,7 +2029,11 @@ describe("OpenGoatService", () => {
 
     expect(result.homeRemoved).toBe(true);
     expect(result.failedOpenClawAgents).toHaveLength(0);
-    expect(result.warnings.some((warning) => warning.includes("OpenClaw agent discovery failed"))).toBe(true);
+    expect(
+      result.warnings.some((warning) =>
+        warning.includes("OpenClaw agent discovery failed"),
+      ),
+    ).toBe(true);
     expect(
       provider.deletedAgents.some((entry) => entry.agentId === "cto"),
     ).toBe(true);
@@ -2080,7 +2107,7 @@ describe("OpenGoatService", () => {
         expect.objectContaining({
           kind: "topdown",
           targetAgentId: "sage",
-          message: expect.stringContaining("Top-Down threshold"),
+          message: expect.stringContaining("Open tasks are at "),
         }),
         expect.objectContaining({
           kind: "todo",
@@ -2122,14 +2149,10 @@ describe("OpenGoatService", () => {
     const topDownInvocation = provider.invocations.find(
       (entry) =>
         entry.agent === "sage" &&
-        entry.message.includes("Sage playbook for top-down delegation"),
+        entry.message.includes("Sage playbook for delegation"),
     );
-    expect(topDownInvocation?.message).toContain(
-      "organization/ROADMAP.md",
-    );
-    expect(topDownInvocation?.message).toContain(
-      "what we need",
-    );
+    expect(topDownInvocation?.message).toContain("organization/ROADMAP.md");
+    expect(topDownInvocation?.message).toContain("what we need");
     expect(topDownInvocation?.message).toContain(
       `Notification timestamp: ${cycle.ranAt}`,
     );
@@ -2156,7 +2179,9 @@ describe("OpenGoatService", () => {
     const ceoSessions = await service.listSessions("goat");
     const ceoNotificationSessionKey = "agent:goat:agent_goat_notifications";
     expect(
-      ceoSessions.some((entry) => entry.sessionKey === ceoNotificationSessionKey),
+      ceoSessions.some(
+        (entry) => entry.sessionKey === ceoNotificationSessionKey,
+      ),
     ).toBe(true);
     expect(
       ceoSessions.filter(
@@ -2164,7 +2189,9 @@ describe("OpenGoatService", () => {
       ),
     ).toHaveLength(1);
     expect(
-      ceoSessions.some((entry) => entry.sessionKey.includes("agent_goat_task_")),
+      ceoSessions.some((entry) =>
+        entry.sessionKey.includes("agent_goat_task_"),
+      ),
     ).toBe(false);
     expect(
       ceoSessions.some((entry) =>
@@ -2505,7 +2532,9 @@ describe("OpenGoatService", () => {
     expect(cycle.blockedTasks).toBe(1);
     expect(cycle.inactiveAgents).toBe(0);
     expect(cycle.dispatches).toHaveLength(2);
-    expect(cycle.dispatches.every((entry) => entry.kind !== "topdown")).toBe(true);
+    expect(cycle.dispatches.every((entry) => entry.kind !== "topdown")).toBe(
+      true,
+    );
     expect(
       provider.invocations.some((entry) => entry.agent === "engineer"),
     ).toBe(true);
@@ -2703,7 +2732,8 @@ describe("OpenGoatService", () => {
     const peakByAgent = new Map<string, number>();
     vi.spyOn(provider, "invoke").mockImplementation(async (options) => {
       const targetAgentId = (options.agent ?? "").trim() || "unknown";
-      const currentAgentConcurrency = (concurrentByAgent.get(targetAgentId) ?? 0) + 1;
+      const currentAgentConcurrency =
+        (concurrentByAgent.get(targetAgentId) ?? 0) + 1;
       concurrentByAgent.set(targetAgentId, currentAgentConcurrency);
       peakByAgent.set(
         targetAgentId,
@@ -2807,10 +2837,7 @@ function createRuntimeDefaultsCommandRunner(
       };
     }
 
-    if (
-      request.args[0] === "config" &&
-      request.args[1] === "set"
-    ) {
+    if (request.args[0] === "config" && request.args[1] === "set") {
       return {
         code: 0,
         stdout: "",
