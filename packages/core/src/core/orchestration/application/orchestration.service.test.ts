@@ -356,7 +356,8 @@ describe("OrchestrationService manager runtime", () => {
         stderr: "",
         agentId: "goat",
         providerId: "openclaw"
-      }))
+      })),
+      syncOpenClawAgentExecutionPoliciesViaGateway: vi.fn(async () => []),
     };
 
     const sessionService = {
@@ -404,6 +405,9 @@ describe("OrchestrationService manager runtime", () => {
         internalConfigDir: path.join(paths.agentsDir, "goat")
       })
     );
+    expect(
+      providerService.syncOpenClawAgentExecutionPoliciesViaGateway,
+    ).toHaveBeenCalledWith(paths, ["goat"], undefined);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("Recovered after repair");
     expect(sessionService.recordAssistantReply).toHaveBeenCalledWith(
@@ -451,7 +455,8 @@ describe("OrchestrationService manager runtime", () => {
         agentId: "goat",
         providerId: "openclaw"
       })),
-      restartLocalGateway: vi.fn(async () => true)
+      restartLocalGateway: vi.fn(async () => true),
+      syncOpenClawAgentExecutionPoliciesViaGateway: vi.fn(async () => []),
     };
 
     const sessionService = {
@@ -490,10 +495,91 @@ describe("OrchestrationService manager runtime", () => {
     });
 
     expect(providerService.createProviderAgent).toHaveBeenCalledTimes(1);
+    expect(
+      providerService.syncOpenClawAgentExecutionPoliciesViaGateway,
+    ).toHaveBeenCalledWith(paths, ["goat"], undefined);
     expect(providerService.restartLocalGateway).toHaveBeenCalledTimes(1);
     expect(providerService.invokeAgent).toHaveBeenCalledTimes(3);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("Recovered after gateway restart");
+  });
+
+  it("continues missing-agent retry when policy sync fails", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-manager-repair-policy-sync-failure-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(tempDir);
+
+    const providerService = {
+      invokeAgent: vi
+        .fn()
+        .mockResolvedValueOnce({
+          code: 1,
+          stdout: "",
+          stderr: 'invalid agent params: unknown agent id "goat"',
+          agentId: "goat",
+          providerId: "openclaw"
+        })
+        .mockResolvedValueOnce({
+          code: 0,
+          stdout: "Recovered despite policy sync failure\n",
+          stderr: "",
+          agentId: "goat",
+          providerId: "openclaw"
+        }),
+      createProviderAgent: vi.fn(async () => ({
+        code: 0,
+        stdout: "",
+        stderr: "",
+        agentId: "goat",
+        providerId: "openclaw"
+      })),
+      syncOpenClawAgentExecutionPoliciesViaGateway: vi.fn(async () => {
+        throw new Error("gateway unavailable");
+      }),
+    };
+
+    const sessionService = {
+      prepareRunSession: vi.fn(async () => ({
+        enabled: true,
+        info: {
+          agentId: "goat",
+          sessionKey: "agent:goat:main",
+          sessionId: "session-repair-policy-sync-failure",
+          transcriptPath: path.join(paths.sessionsDir, "goat", "session-repair-policy-sync-failure.jsonl"),
+          workspacePath: path.join(paths.workspacesDir, "goat"),
+          isNewSession: true
+        },
+        compactionApplied: false
+      })),
+      recordAssistantReply: vi.fn(async () => ({
+        sessionKey: "agent:goat:main",
+        sessionId: "session-repair-policy-sync-failure",
+        transcriptPath: path.join(paths.sessionsDir, "goat", "session-repair-policy-sync-failure.jsonl"),
+        applied: false,
+        compactedMessages: 0
+      }))
+    };
+
+    const service = new OrchestrationService({
+      providerService: providerService as unknown as ProviderService,
+      agentManifestService: createManifestServiceStub(["goat"], paths.workspacesDir) as unknown as AgentManifestService,
+      sessionService: sessionService as unknown as SessionService,
+      fileSystem: new NodeFileSystem(),
+      pathPort: new NodePathPort(),
+      nowIso: () => "2026-02-10T10:00:00.000Z"
+    });
+
+    const result = await service.runAgent(paths, "goat", {
+      message: "hello"
+    });
+
+    expect(providerService.createProviderAgent).toHaveBeenCalledTimes(1);
+    expect(
+      providerService.syncOpenClawAgentExecutionPoliciesViaGateway,
+    ).toHaveBeenCalledWith(paths, ["goat"], undefined);
+    expect(providerService.invokeAgent).toHaveBeenCalledTimes(2);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("Recovered despite policy sync failure");
   });
 
   it("does not trigger missing-agent repair for generic not-found runtime errors", async () => {

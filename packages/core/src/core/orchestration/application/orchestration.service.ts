@@ -345,6 +345,32 @@ export class OrchestrationService {
       code: repair.code
     });
 
+    try {
+      const policyWarnings =
+        await this.providerService.syncOpenClawAgentExecutionPoliciesViaGateway(
+          params.paths,
+          [manifest.agentId],
+          params.invokeOptions.env,
+        );
+      if (policyWarnings.length > 0) {
+        this.logger.warn(
+          "OpenClaw missing-agent auto-repair policy sync reported warnings.",
+          {
+            agentId: manifest.agentId,
+            warnings: policyWarnings,
+          },
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        "OpenClaw missing-agent auto-repair policy sync failed; continuing with invocation retry.",
+        {
+          agentId: manifest.agentId,
+          error: toErrorMessage(error),
+        },
+      );
+    }
+
     const retried = await this.providerService.invokeAgent(params.paths, params.agentId, params.invokeOptions, {
       runId: params.runId,
       step: params.step,
