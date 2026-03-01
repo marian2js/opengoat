@@ -51,10 +51,6 @@ import {
 import { AgentsPage } from "@/pages/agents/AgentsPage";
 import { CreateAgentDialog } from "@/pages/agents/CreateAgentDialog";
 import { useCreateAgentDialog } from "@/pages/agents/useCreateAgentDialog";
-import {
-  FirstRunOnboardingDialog,
-  type OpenClawOnboardingGatewayStatus,
-} from "@/pages/dashboard/components/FirstRunOnboardingDialog";
 import { DashboardSidebar } from "@/pages/dashboard/components/DashboardSidebar";
 import type { SidebarVersionInfo } from "@/pages/dashboard/components/SidebarVersionStatus";
 import { LogsPage } from "@/pages/logs/LogsPage";
@@ -247,6 +243,7 @@ interface UiSettings {
   taskDelegationStrategies: UiTaskDelegationStrategies;
   authentication: UiAuthenticationSettings;
   ceoBootstrapPending: boolean;
+  onboarding: UiOnboardingSettings;
 }
 
 interface UiTopDownTaskDelegationStrategy {
@@ -264,19 +261,16 @@ interface UiAuthenticationSettings {
   hasPassword: boolean;
 }
 
+interface UiOnboardingSettings {
+  completed: boolean;
+  completedAt?: string;
+  executionProviderId?: string;
+}
+
 interface UiAuthenticationStatusResponse {
   authentication: {
     enabled: boolean;
     authenticated: boolean;
-  };
-}
-
-interface OpenClawOnboardingResponse {
-  onboarding: {
-    shouldShow: boolean;
-    hasCeoAgent: boolean;
-    ceoBootstrapPending: boolean;
-    gateway: OpenClawOnboardingGatewayStatus;
   };
 }
 
@@ -522,8 +516,6 @@ const MAX_SESSION_MESSAGE_IMAGE_COUNT = 8;
 const MAX_SESSION_MESSAGE_IMAGE_BYTES = 10 * 1024 * 1024;
 const SIDEBAR_AGENT_ORDER_STORAGE_KEY =
   "opengoat:dashboard:sidebar-agent-order";
-const FIRST_RUN_ONBOARDING_DISMISSED_STORAGE_KEY_PREFIX =
-  "opengoat:dashboard:first-run-onboarding:dismissed:";
 const TASK_STATUS_OPTIONS = [
   { value: "todo", label: "To do" },
   { value: "doing", label: "In progress" },
@@ -548,6 +540,11 @@ function defaultUiSettings(): UiSettings {
     taskDelegationStrategies: defaultTaskDelegationStrategies(),
     authentication: defaultAuthenticationSettings(),
     ceoBootstrapPending: false,
+    onboarding: {
+      completed: true,
+      completedAt: undefined,
+      executionProviderId: undefined,
+    },
   };
 }
 
@@ -679,6 +676,35 @@ function normalizeUiSettings(
       typeof raw.ceoBootstrapPending === "boolean"
         ? raw.ceoBootstrapPending
         : defaults.ceoBootstrapPending,
+    onboarding: normalizeOnboardingSettings(raw.onboarding),
+  };
+}
+
+function normalizeOnboardingSettings(value: unknown): UiOnboardingSettings {
+  if (!value || typeof value !== "object") {
+    return {
+      completed: true,
+      completedAt: undefined,
+      executionProviderId: undefined,
+    };
+  }
+
+  const raw = value as {
+    completed?: unknown;
+    completedAt?: unknown;
+    executionProviderId?: unknown;
+  };
+  return {
+    completed: raw.completed === true,
+    completedAt:
+      typeof raw.completedAt === "string" && raw.completedAt.trim()
+        ? raw.completedAt.trim()
+        : undefined,
+    executionProviderId:
+      typeof raw.executionProviderId === "string" &&
+      raw.executionProviderId.trim()
+        ? raw.executionProviderId.trim().toLowerCase()
+        : undefined,
   };
 }
 
@@ -911,15 +937,6 @@ export function DashboardPage(): ReactElement {
   >("connecting");
   const [logsError, setLogsError] = useState<string | null>(null);
   const [logsAutoScrollEnabled, setLogsAutoScrollEnabled] = useState(true);
-  const [onboardingDialogOpen, setOnboardingDialogOpen] = useState(false);
-  const [onboardingStatus, setOnboardingStatus] =
-    useState<OpenClawOnboardingGatewayStatus | null>(null);
-  const [onboardingShouldShow, setOnboardingShouldShow] = useState(false);
-  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
-  const [onboardingStatusLoading, setOnboardingStatusLoading] = useState(false);
-  const [onboardingStatusError, setOnboardingStatusError] = useState<
-    string | null
-  >(null);
   const logsViewportRef = useRef<HTMLDivElement | null>(null);
   const pendingUiLogsRef = useRef<UiLogEntry[]>([]);
   const logsFlushTimerRef = useRef<number | null>(null);
@@ -1394,30 +1411,6 @@ export function DashboardPage(): ReactElement {
     }
   }, []);
 
-  const refreshOnboardingStatus = useCallback(async (): Promise<void> => {
-    setOnboardingStatusLoading(true);
-    setOnboardingStatusError(null);
-    try {
-      const payload = await fetchJson<OpenClawOnboardingResponse>(
-        "/api/openclaw/onboarding",
-      );
-      setOnboardingShouldShow(payload.onboarding.shouldShow);
-      setOnboardingStatus(payload.onboarding.gateway);
-      if (!payload.onboarding.shouldShow) {
-        setOnboardingDialogOpen(false);
-      }
-    } catch (requestError) {
-      const message =
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to check OpenClaw setup status.";
-      setOnboardingStatusError(message);
-      setOnboardingStatus(null);
-    } finally {
-      setOnboardingStatusLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     void refreshAuthenticationStatus().catch(() => {
       // handled in refreshAuthenticationStatus
@@ -1446,38 +1439,14 @@ export function DashboardPage(): ReactElement {
 
   const agents = state?.overview.agents ?? [];
   const providers = state?.overview.providers ?? [];
-  const onboardingStorageKey = useMemo(() => {
-    const homeDir = state?.health.homeDir?.trim();
-    return homeDir
-      ? `${FIRST_RUN_ONBOARDING_DISMISSED_STORAGE_KEY_PREFIX}${homeDir}`
-      : null;
-  }, [state?.health.homeDir]);
-  const hasLocalCeoAgent = agents.some((agent) => agent.id === DEFAULT_AGENT_ID);
-  const shouldShowOnboardingFromLocalState = state
-    ? state.settings.ceoBootstrapPending || !hasLocalCeoAgent
-    : false;
-  const shouldShowOnboardingDialog =
-    (onboardingShouldShow || shouldShowOnboardingFromLocalState) &&
-    !onboardingDismissed;
+  const isOnboardingComplete = state?.settings.onboarding.completed ?? true;
 
   useEffect(() => {
-    if (!onboardingStorageKey) {
-      setOnboardingDismissed(false);
+    if (!state || isOnboardingComplete) {
       return;
     }
-    setOnboardingDismissed(loadOnboardingDismissed(onboardingStorageKey));
-  }, [onboardingStorageKey]);
-
-  useEffect(() => {
-    if (!state?.health.homeDir) {
-      return;
-    }
-    void refreshOnboardingStatus();
-  }, [state?.health.homeDir, state?.settings.ceoBootstrapPending, refreshOnboardingStatus]);
-
-  useEffect(() => {
-    setOnboardingDialogOpen(shouldShowOnboardingDialog);
-  }, [shouldShowOnboardingDialog]);
+    window.location.assign("/onboard");
+  }, [isOnboardingComplete, state]);
 
   useEffect(() => {
     if (agents.length === 0) {
@@ -1509,10 +1478,6 @@ export function DashboardPage(): ReactElement {
       setLoading(false);
       setVersionLoading(false);
       setAuthLoginPassword("");
-      setOnboardingDialogOpen(false);
-      setOnboardingShouldShow(false);
-      setOnboardingStatus(null);
-      setOnboardingStatusError(null);
     };
     window.addEventListener("opengoat:auth-required", onAuthRequired);
     return () => {
@@ -1559,13 +1524,6 @@ export function DashboardPage(): ReactElement {
     createAgent: createAgentRequest,
     onCreated: refreshOverview,
   });
-  const dismissOnboardingDialog = useCallback(() => {
-    setOnboardingDialogOpen(false);
-    setOnboardingDismissed(true);
-    if (onboardingStorageKey) {
-      persistOnboardingDismissed(onboardingStorageKey, true);
-    }
-  }, [onboardingStorageKey]);
   const hasLoadedState = state !== null;
   const ceoBootstrapPending = state?.settings.ceoBootstrapPending ?? false;
   const taskCronRunning =
@@ -4128,6 +4086,17 @@ export function DashboardPage(): ReactElement {
     );
   }
 
+  if (state && !isOnboardingComplete) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        <Toaster />
+        <div className="rounded-xl border border-border/70 bg-card/70 px-6 py-5 text-sm text-muted-foreground">
+          Redirecting to onboarding...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen bg-background text-[14px] text-foreground">
       <Toaster />
@@ -4421,17 +4390,6 @@ export function DashboardPage(): ReactElement {
                 open,
               }));
             }}
-          />
-
-          <FirstRunOnboardingDialog
-            open={onboardingDialogOpen}
-            status={onboardingStatus}
-            isLoading={onboardingStatusLoading}
-            error={onboardingStatusError}
-            onRefresh={() => {
-              void refreshOnboardingStatus();
-            }}
-            onDismiss={dismissOnboardingDialog}
           />
 
           {selectedTaskWorkspace ? (
@@ -6605,32 +6563,6 @@ function persistSidebarAgentOrder(agentIds: string[]): void {
     );
   } catch {
     // Non-fatal: sidebar order will fall back to default sorting.
-  }
-}
-
-function loadOnboardingDismissed(storageKey: string): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  try {
-    return window.localStorage.getItem(storageKey) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function persistOnboardingDismissed(storageKey: string, dismissed: boolean): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  try {
-    if (dismissed) {
-      window.localStorage.setItem(storageKey, "1");
-      return;
-    }
-    window.localStorage.removeItem(storageKey);
-  } catch {
-    // Non-fatal: onboarding may appear again if persistence fails.
   }
 }
 
