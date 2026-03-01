@@ -20,6 +20,34 @@ const DEFAULT_PRODUCT_MANAGER_AGENT: AgentIdentity = {
 };
 const DEFAULT_PRODUCT_MANAGER_ROLE = "Product Manager";
 const DEFAULT_PRODUCT_MANAGER_TYPE = "manager";
+const DEFAULT_DEVELOPER_AGENT: AgentIdentity = {
+  id: "alex",
+  displayName: "Alex",
+};
+const DEFAULT_DEVELOPER_ROLE = "Developer";
+const DEFAULT_DEVELOPER_TYPE = "individual";
+
+interface ManagedDefaultAgent {
+  identity: AgentIdentity;
+  role: string;
+  type: "manager" | "individual";
+  reportsTo: string | null;
+}
+
+const MANAGED_DEFAULT_AGENTS: ManagedDefaultAgent[] = [
+  {
+    identity: DEFAULT_PRODUCT_MANAGER_AGENT,
+    role: DEFAULT_PRODUCT_MANAGER_ROLE,
+    type: DEFAULT_PRODUCT_MANAGER_TYPE,
+    reportsTo: DEFAULT_AGENT_ID,
+  },
+  {
+    identity: DEFAULT_DEVELOPER_AGENT,
+    role: DEFAULT_DEVELOPER_ROLE,
+    type: DEFAULT_DEVELOPER_TYPE,
+    reportsTo: DEFAULT_PRODUCT_MANAGER_AGENT.id,
+  },
+];
 
 interface AgentConfigShape {
   role?: unknown;
@@ -115,45 +143,72 @@ export class BootstrapService {
           includeBootstrapMarkdown: !globalConfigExisted,
         },
       );
-    const productManagerResult = await this.agentService.ensureAgent(
-      paths,
-      DEFAULT_PRODUCT_MANAGER_AGENT,
-      {
-        type: DEFAULT_PRODUCT_MANAGER_TYPE,
-        reportsTo: DEFAULT_AGENT_ID,
-        role: DEFAULT_PRODUCT_MANAGER_ROLE,
-      },
-    );
-    const productManagerConfigRepairResult =
-      await this.repairProductManagerAgentConfig(paths);
-    const productManagerWorkspaceBootstrapResult =
-      productManagerResult.alreadyExisted
+    const managedDefaultAgentResults: Array<{
+      ensureResult: Awaited<ReturnType<AgentService["ensureAgent"]>>;
+      configRepairResult: Awaited<
+        ReturnType<BootstrapService["repairManagedDefaultAgentConfig"]>
+      >;
+      workspaceBootstrapResult: Awaited<
+        ReturnType<AgentService["ensureAgentWorkspaceBootstrap"]>
+      >;
+      workspaceTemplateSyncResult: Awaited<
+        ReturnType<AgentService["syncAgentWorkspaceTemplateAssets"]>
+      >;
+      roleSkillSyncResult: Awaited<
+        ReturnType<AgentService["ensureAgentWorkspaceRoleSkills"]>
+      >;
+    }> = [];
+
+    for (const managedAgent of MANAGED_DEFAULT_AGENTS) {
+      const ensureResult = await this.agentService.ensureAgent(
+        paths,
+        managedAgent.identity,
+        {
+          type: managedAgent.type,
+          reportsTo: managedAgent.reportsTo,
+          role: managedAgent.role,
+        },
+      );
+      const configRepairResult = await this.repairManagedDefaultAgentConfig(
+        paths,
+        managedAgent,
+      );
+      const workspaceBootstrapResult = ensureResult.alreadyExisted
         ? {
-          createdPaths: [],
-          skippedPaths: [],
-          removedPaths: [],
-        }
+            createdPaths: [],
+            skippedPaths: [],
+            removedPaths: [],
+          }
         : await this.agentService.ensureAgentWorkspaceBootstrap(
+            paths,
+            {
+              agentId: managedAgent.identity.id,
+              displayName: managedAgent.identity.displayName,
+              role: managedAgent.role,
+            },
+            {
+              syncBootstrapMarkdown: false,
+            },
+          );
+      const workspaceTemplateSyncResult =
+        await this.agentService.syncAgentWorkspaceTemplateAssets(
           paths,
-          {
-            agentId: DEFAULT_PRODUCT_MANAGER_AGENT.id,
-            displayName: DEFAULT_PRODUCT_MANAGER_AGENT.displayName,
-            role: DEFAULT_PRODUCT_MANAGER_ROLE,
-          },
-          {
-            syncBootstrapMarkdown: false,
-          },
+          managedAgent.identity.id,
         );
-    const productManagerWorkspaceTemplateSync =
-      await this.agentService.syncAgentWorkspaceTemplateAssets(
-        paths,
-        DEFAULT_PRODUCT_MANAGER_AGENT.id,
-      );
-    const productManagerRoleSkillSync =
-      await this.agentService.ensureAgentWorkspaceRoleSkills(
-        paths,
-        DEFAULT_PRODUCT_MANAGER_AGENT.id,
-      );
+      const roleSkillSyncResult =
+        await this.agentService.ensureAgentWorkspaceRoleSkills(
+          paths,
+          managedAgent.identity.id,
+        );
+
+      managedDefaultAgentResults.push({
+        ensureResult,
+        configRepairResult,
+        workspaceBootstrapResult,
+        workspaceTemplateSyncResult,
+        roleSkillSyncResult,
+      });
+    }
     const workspaceReporteesSync =
       await this.agentService.syncWorkspaceReporteeLinks(paths);
 
@@ -164,18 +219,20 @@ export class BootstrapService {
     skippedPaths.push(...goatWorkspaceBootstrapResult.removedPaths);
     createdPaths.push(...goatWorkspaceTemplateSync.createdPaths);
     skippedPaths.push(...goatWorkspaceTemplateSync.skippedPaths);
-    createdPaths.push(...productManagerResult.createdPaths);
-    skippedPaths.push(...productManagerResult.skippedPaths);
-    createdPaths.push(...productManagerConfigRepairResult.updatedPaths);
-    skippedPaths.push(...productManagerConfigRepairResult.skippedPaths);
-    createdPaths.push(...productManagerWorkspaceBootstrapResult.createdPaths);
-    skippedPaths.push(...productManagerWorkspaceBootstrapResult.skippedPaths);
-    skippedPaths.push(...productManagerWorkspaceBootstrapResult.removedPaths);
-    createdPaths.push(...productManagerWorkspaceTemplateSync.createdPaths);
-    skippedPaths.push(...productManagerWorkspaceTemplateSync.skippedPaths);
-    createdPaths.push(...productManagerRoleSkillSync.createdPaths);
-    skippedPaths.push(...productManagerRoleSkillSync.skippedPaths);
-    skippedPaths.push(...productManagerRoleSkillSync.removedPaths);
+    for (const managedResult of managedDefaultAgentResults) {
+      createdPaths.push(...managedResult.ensureResult.createdPaths);
+      skippedPaths.push(...managedResult.ensureResult.skippedPaths);
+      createdPaths.push(...managedResult.configRepairResult.updatedPaths);
+      skippedPaths.push(...managedResult.configRepairResult.skippedPaths);
+      createdPaths.push(...managedResult.workspaceBootstrapResult.createdPaths);
+      skippedPaths.push(...managedResult.workspaceBootstrapResult.skippedPaths);
+      skippedPaths.push(...managedResult.workspaceBootstrapResult.removedPaths);
+      createdPaths.push(...managedResult.workspaceTemplateSyncResult.createdPaths);
+      skippedPaths.push(...managedResult.workspaceTemplateSyncResult.skippedPaths);
+      createdPaths.push(...managedResult.roleSkillSyncResult.createdPaths);
+      skippedPaths.push(...managedResult.roleSkillSyncResult.skippedPaths);
+      skippedPaths.push(...managedResult.roleSkillSyncResult.removedPaths);
+    }
     createdPaths.push(...workspaceReporteesSync.createdPaths);
     skippedPaths.push(...workspaceReporteesSync.skippedPaths);
     skippedPaths.push(...workspaceReporteesSync.removedPaths);
@@ -258,11 +315,15 @@ export class BootstrapService {
     skippedPaths: string[],
   ): Promise<void> {
     const exists = await this.fileSystem.exists(agentsIndexJsonPath);
+    const defaultAgentIds = [
+      DEFAULT_AGENT_ID,
+      ...MANAGED_DEFAULT_AGENTS.map((agent) => agent.identity.id),
+    ];
     if (!exists) {
       await this.fileSystem.writeFile(
         agentsIndexJsonPath,
         `${JSON.stringify(
-          renderAgentsIndex(now, [DEFAULT_AGENT_ID, DEFAULT_PRODUCT_MANAGER_AGENT.id]),
+          renderAgentsIndex(now, defaultAgentIds),
           null,
           2,
         )}\n`,
@@ -276,8 +337,7 @@ export class BootstrapService {
     );
     const mergedAgents = dedupe([
       ...(current?.agents ?? []),
-      DEFAULT_AGENT_ID,
-      DEFAULT_PRODUCT_MANAGER_AGENT.id,
+      ...defaultAgentIds,
     ]);
     await this.fileSystem.writeFile(
       agentsIndexJsonPath,
@@ -330,12 +390,23 @@ export class BootstrapService {
     }
   }
 
-  private async repairProductManagerAgentConfig(paths: {
-    agentsDir: string;
-  }): Promise<{ updatedPaths: string[]; skippedPaths: string[] }> {
+  private async repairManagedDefaultAgentConfig(
+    paths: {
+      agentsDir: string;
+    },
+    managedAgent: ManagedDefaultAgent,
+  ): Promise<{ updatedPaths: string[]; skippedPaths: string[] }> {
+    const normalizedReportsTo =
+      typeof managedAgent.reportsTo === "string"
+        ? normalizeAgentId(managedAgent.reportsTo)
+        : null;
+    const expectedReportsTo =
+      normalizedReportsTo && normalizedReportsTo.length > 0
+        ? normalizedReportsTo
+        : null;
     const configPath = this.pathPort.join(
       paths.agentsDir,
-      DEFAULT_PRODUCT_MANAGER_AGENT.id,
+      managedAgent.identity.id,
       "config.json",
     );
     const config = await this.readJsonIfPresent<AgentConfigShape>(configPath);
@@ -359,8 +430,8 @@ export class BootstrapService {
     const currentRole =
       typeof config.role === "string" ? config.role.trim() : "";
     const requiresUpdate =
-      currentType !== DEFAULT_PRODUCT_MANAGER_TYPE ||
-      currentReportsTo !== DEFAULT_AGENT_ID ||
+      currentType !== managedAgent.type ||
+      currentReportsTo !== expectedReportsTo ||
       !currentRole;
     if (!requiresUpdate) {
       return {
@@ -371,11 +442,11 @@ export class BootstrapService {
 
     const nextConfig: AgentConfigShape = {
       ...config,
-      role: currentRole || DEFAULT_PRODUCT_MANAGER_ROLE,
+      role: currentRole || managedAgent.role,
       organization: {
         ...organization,
-        type: DEFAULT_PRODUCT_MANAGER_TYPE,
-        reportsTo: DEFAULT_AGENT_ID,
+        type: managedAgent.type,
+        reportsTo: expectedReportsTo,
       },
     };
     await this.fileSystem.writeFile(

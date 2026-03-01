@@ -92,6 +92,11 @@ import type {
   UiLogStreamEvent,
 } from "./types.js";
 
+const DEFAULT_PRODUCT_MANAGER_AGENT_ID = "sage";
+const DEFAULT_EXECUTION_AGENT_ID = "alex";
+const DEFAULT_EXECUTION_AGENT_NAME = "Alex";
+const DEFAULT_EXECUTION_AGENT_ROLE = "Developer";
+
 export function registerApiRoutes(
   app: FastifyInstance,
   service: OpenClawUiService,
@@ -815,6 +820,67 @@ export function registerApiRoutes(
           await resolveExecutionAgentReadiness(selectedExecutionAgent);
         return {
           readiness,
+        };
+      });
+    },
+  );
+
+  app.post<{ Body: { providerId?: string } }>(
+    "/api/openclaw/onboarding/execution-agent",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const rawProviderId = request.body?.providerId;
+        if (typeof rawProviderId !== "string") {
+          reply.code(400);
+          return {
+            error: "providerId is required.",
+          };
+        }
+
+        const providerId = rawProviderId.trim().toLowerCase();
+        if (!providerId) {
+          reply.code(400);
+          return {
+            error: "providerId is required.",
+          };
+        }
+        if (providerId === "openclaw") {
+          reply.code(400);
+          return {
+            error: 'providerId must be a non-openclaw execution provider.',
+          };
+        }
+
+        const providers = await resolveUiProviders(service);
+        const executionAgents = resolveExecutionAgentOptions(providers);
+        if (!executionAgents.some((agent) => agent.id === providerId)) {
+          reply.code(404);
+          return {
+            error: `Execution agent "${providerId}" is not available.`,
+          };
+        }
+
+        const created = await service.createAgent(DEFAULT_EXECUTION_AGENT_NAME, {
+          type: "individual",
+          reportsTo: DEFAULT_PRODUCT_MANAGER_AGENT_ID,
+          role: DEFAULT_EXECUTION_AGENT_ROLE,
+        });
+
+        if (typeof service.setAgentProvider !== "function") {
+          throw new Error(
+            "Agent provider assignment is unavailable. Restart the UI server after updating dependencies.",
+          );
+        }
+
+        const binding = await service.setAgentProvider(
+          created.agent.id || DEFAULT_EXECUTION_AGENT_ID,
+          providerId,
+        );
+
+        return {
+          agentId: binding.agentId,
+          providerId: binding.providerId,
+          message: `Execution provider "${binding.providerId}" assigned to @${binding.agentId}.`,
         };
       });
     },

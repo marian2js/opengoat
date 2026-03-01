@@ -59,6 +59,12 @@ interface ExecutionAgentReadinessResponse {
   readiness: ExecutionAgentReadiness;
 }
 
+interface OnboardingExecutionAgentAssignmentResponse {
+  agentId: string;
+  providerId: string;
+  message?: string;
+}
+
 export function OnboardConnectPage(): ReactElement {
   const [payload, setPayload] = useState<OnboardingPayload | null>(() =>
     loadOnboardingPayload(),
@@ -84,6 +90,8 @@ export function OnboardConnectPage(): ReactElement {
     string | null
   >(null);
   const [readinessError, setReadinessError] = useState<string | null>(null);
+  const [continueLoading, setContinueLoading] = useState(false);
+  const [continueError, setContinueError] = useState<string | null>(null);
 
   const refreshGatewayStatus = useCallback(async (): Promise<void> => {
     setGatewayLoading(true);
@@ -205,10 +213,41 @@ export function OnboardConnectPage(): ReactElement {
   const isGatewayReady =
     gatewayStatus?.installed === true && gatewayStatus.gatewayRunning === true;
   const canContinue =
-    isGatewayReady && selectedReadiness?.installed === true && !gatewayLoading;
+    isGatewayReady &&
+    selectedReadiness?.installed === true &&
+    !gatewayLoading &&
+    !continueLoading;
 
-  function handleContinueToChat(): void {
+  async function handleContinueToChat(): Promise<void> {
     if (!canContinue) {
+      return;
+    }
+    if (!selectedExecutionAgentId.trim()) {
+      setContinueError("Select a code execution agent before continuing.");
+      return;
+    }
+    setContinueLoading(true);
+    setContinueError(null);
+    try {
+      await fetchJson<OnboardingExecutionAgentAssignmentResponse>(
+        "/api/openclaw/onboarding/execution-agent",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            providerId: selectedExecutionAgentId,
+          }),
+        },
+      );
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to save the selected execution agent.";
+      setContinueError(message);
+      setContinueLoading(false);
       return;
     }
     window.location.assign("/onboard/chat");
@@ -216,6 +255,7 @@ export function OnboardConnectPage(): ReactElement {
 
   function handleSelectExecutionAgent(providerId: string): void {
     setSelectedExecutionAgentId(providerId);
+    setContinueError(null);
   }
 
   return (
@@ -361,14 +401,28 @@ export function OnboardConnectPage(): ReactElement {
               Back
             </Button>
             <Button
-              onClick={handleContinueToChat}
+              onClick={() => {
+                void handleContinueToChat();
+              }}
               disabled={!canContinue}
               className="h-11 rounded-xl border border-sky-300/35 bg-[linear-gradient(90deg,#53b5ff_0%,#4b9eff_45%,#5ecdd5_100%)] font-semibold text-[#021228] hover:brightness-110"
             >
-              Continue to roadmap chat
+              {continueLoading ? (
+                <>
+                  <Spinner className="size-4" />
+                  Saving setup…
+                </>
+              ) : (
+                "Continue to roadmap chat"
+              )}
               <ArrowRight className="size-4" />
             </Button>
           </div>
+          {continueError ? (
+            <div className="col-span-full rounded-xl border border-danger/45 bg-danger/10 px-3 py-2 text-red-100 text-sm">
+              {continueError}
+            </div>
+          ) : null}
         </section>
       </div>
     </main>

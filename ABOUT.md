@@ -48,6 +48,7 @@ Defaults:
 
 - `goat`: `type=manager`, `reportsTo=null`, assigned `og-board-manager` role skill
 - `sage`: `type=manager`, `reportsTo=goat`, role `Product Manager`, assigned `og-board-manager` role skill
+- `alex`: `type=individual`, `reportsTo=sage`, role `Developer`
 - other agents: `type=individual`, `reportsTo=goat`
 
 ## 4) Manager Runtime Model
@@ -100,6 +101,9 @@ Onboarding (`opengoat onboard`) only configures OpenClaw gateway mode:
 
 - `local`
 - `external` (+ URL + token)
+
+UI onboarding additionally selects a non-OpenClaw execution provider and binds it
+to default developer agent `alex`.
 
 ## 7) Provider Commands
 
@@ -174,7 +178,6 @@ Optional UI extension module:
 - plugin system
 - OpenGoat-side multi-provider runtime implementations
 - internal AI planner/delegation loop
-- onboarding provider selection flow
 
 ## 12) Rebuild Checklist
 
@@ -185,9 +188,10 @@ If rebuilding from scratch, preserve these behaviors:
 3. `agent delete` syncs OpenClaw delete and removes local state.
 4. `goat` is undeletable.
 5. onboarding only configures OpenClaw local/external gateway.
-6. sessions preserve continuity by agent + session key/id.
-7. session ids map 1:1 to OpenClaw session keys (`agent:<agent-id>:<session-id>`) during runs.
-8. run traces are persisted under `runs/`.
+6. UI onboarding binds the selected non-OpenClaw execution provider to default developer `alex`.
+7. sessions preserve continuity by agent + session key/id.
+8. session ids map 1:1 to OpenClaw session keys (`agent:<agent-id>:<session-id>`) during runs.
+9. run traces are persisted under `runs/`.
 
 ## 13) Extensibility
 
