@@ -234,7 +234,7 @@ describe("BootstrapService", () => {
     expect(config.defaultAgent).toBe("goat");
   });
 
-  it("ensures agents index always includes goat and sage", async () => {
+  it("ensures agents index always includes default organization agents", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     await fileSystem.ensureDir(paths.homeDir);
@@ -260,7 +260,7 @@ describe("BootstrapService", () => {
     ) as {
       agents: string[];
     };
-    expect(index.agents).toEqual(["goat", "research", "sage"]);
+    expect(index.agents).toEqual(["alex", "goat", "research", "sage"]);
   });
 
   it("repairs pre-existing Sage config to manager reporting to Goat", async () => {

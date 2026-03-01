@@ -329,6 +329,109 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("assigns the selected onboarding execution provider to Alex", async () => {
+    const createAgent = vi.fn<
+      OpenClawUiService["createAgent"]
+    >(async (_name, _options) => {
+      return {
+        agent: {
+          id: "alex",
+          displayName: "Alex",
+          workspaceDir: "/tmp/workspace",
+          internalConfigDir: "/tmp/internal",
+        },
+        createdPaths: [],
+        skippedPaths: [],
+      };
+    });
+    const setAgentProvider = vi.fn<
+      NonNullable<OpenClawUiService["setAgentProvider"]>
+    >(async (agentId, providerId) => {
+      return {
+        agentId,
+        providerId,
+      };
+    });
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        createAgent,
+        setAgentProvider,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/openclaw/onboarding/execution-agent",
+      payload: {
+        providerId: "codex",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(createAgent).toHaveBeenCalledWith("Alex", {
+      type: "individual",
+      reportsTo: "sage",
+      role: "Developer",
+    });
+    expect(setAgentProvider).toHaveBeenCalledWith("alex", "codex");
+    expect(response.json()).toMatchObject({
+      agentId: "alex",
+      providerId: "codex",
+    });
+  });
+
+  it("rejects assigning openclaw as onboarding execution provider", async () => {
+    const createAgent = vi.fn<
+      OpenClawUiService["createAgent"]
+    >(async (_name, _options) => {
+      return {
+        agent: {
+          id: "alex",
+          displayName: "Alex",
+          workspaceDir: "/tmp/workspace",
+          internalConfigDir: "/tmp/internal",
+        },
+        createdPaths: [],
+        skippedPaths: [],
+      };
+    });
+    const setAgentProvider = vi.fn<
+      NonNullable<OpenClawUiService["setAgentProvider"]>
+    >(async (agentId, providerId) => {
+      return {
+        agentId,
+        providerId,
+      };
+    });
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService(),
+        createAgent,
+        setAgentProvider,
+      },
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/openclaw/onboarding/execution-agent",
+      payload: {
+        providerId: "openclaw",
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: "providerId must be a non-openclaw execution provider.",
+    });
+    expect(createAgent).not.toHaveBeenCalled();
+    expect(setAgentProvider).not.toHaveBeenCalled();
+  });
+
   it("returns a logs snapshot through the stream api", async () => {
     activeServer = await createOpenGoatUiServer({
       logger: false,
