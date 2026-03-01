@@ -37,7 +37,9 @@ export const onboardCommand: CliCommand = {
       return 1;
     }
 
-    await context.service.initialize();
+    await context.service.initialize({
+      syncRuntimeDefaults: false,
+    });
 
     const prompter = createCliPrompter({
       stdin: process.stdin,
@@ -103,7 +105,12 @@ export const onboardCommand: CliCommand = {
               gatewayToken
             })
           : await context.service.setOpenClawGatewayConfig({ mode: "local" });
-      const runtimeSync = await context.service.syncRuntimeDefaults?.();
+      // Keep non-interactive onboarding fast/predictable for automation and tests.
+      // Runtime defaults will be synced on the next regular initialize path.
+      const runtimeSync =
+        !parsed.nonInteractive && resolvedMode === "local"
+          ? await context.service.syncRuntimeDefaults?.()
+          : undefined;
 
       if (!parsed.nonInteractive) {
         await prompter.outro("OpenClaw onboarding complete.");

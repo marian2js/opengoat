@@ -1,4 +1,4 @@
-import * as JSON5 from "json5";
+import JSON5 from "json5";
 import { homedir } from "node:os";
 import path from "node:path";
 import { AgentManifestService } from "../../agents/application/agent-manifest.service.js";
@@ -125,7 +125,6 @@ const OPENCLAW_PROVIDER_ID = "openclaw";
 const OPENCLAW_DEFAULT_AGENT_ID = "main";
 const OPENCLAW_AGENT_SANDBOX_MODE = "off";
 const OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON = '["*"]';
-const OPENCLAW_AGENT_SKIP_BOOTSTRAP = true;
 const OPENGOAT_DEFAULT_AGENT_ENV = "OPENGOAT_DEFAULT_AGENT";
 const TOP_DOWN_TASK_DELEGATION_AGENT_ID = "sage";
 const NOTIFICATION_SESSION_COMPACTION_COMMAND = [
@@ -2642,21 +2641,6 @@ export class OpenGoatService {
         }
       }
 
-      if (readAgentSkipBootstrap(entry) !== OPENCLAW_AGENT_SKIP_BOOTSTRAP) {
-        const bootstrapSet = await this.runOpenClaw(
-          ["config", "set", `agents.list[${index}].skipBootstrap`, "true"],
-          { env },
-        );
-        if (bootstrapSet.code !== 0) {
-          warnings.push(
-            `OpenClaw bootstrap policy sync failed for "${agentId}" (code ${
-              bootstrapSet.code
-            }). ${
-              bootstrapSet.stderr.trim() || bootstrapSet.stdout.trim() || ""
-            }`.trim(),
-          );
-        }
-      }
     }
 
     return warnings;
@@ -2738,25 +2722,6 @@ function hasAgentToolsAllowAll(entry: Record<string, unknown>): boolean {
   return allow.some(
     (value) => typeof value === "string" && value.trim() === "*",
   );
-}
-
-function readAgentSkipBootstrap(
-  entry: Record<string, unknown>,
-): boolean | undefined {
-  const value = entry.skipBootstrap;
-  if (typeof value === "boolean") {
-    return value;
-  }
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "true") {
-      return true;
-    }
-    if (normalized === "false") {
-      return false;
-    }
-  }
-  return undefined;
 }
 
 function readStringArray(value: unknown): string[] {
