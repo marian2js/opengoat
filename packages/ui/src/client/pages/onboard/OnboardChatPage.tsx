@@ -37,6 +37,15 @@ import {
   type WorkspaceSessionResponse,
 } from "./shared";
 
+interface OnboardingCompletionResponse {
+  onboarding: {
+    completed: boolean;
+    completedAt?: string;
+    executionProviderId?: string;
+  };
+  message?: string;
+}
+
 export function OnboardChatPage(): ReactElement {
   const [payload] = useState<OnboardingPayload | null>(() =>
     loadOnboardingPayload(),
@@ -198,6 +207,28 @@ export function OnboardChatPage(): ReactElement {
             parsedOutput.shouldRedirectToDashboard &&
             !redirectTriggeredRef.current
           ) {
+            try {
+              await fetchJson<OnboardingCompletionResponse>(
+                "/api/openclaw/onboarding/complete",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    executionProviderId: payload?.executionProviderId,
+                  }),
+                },
+              );
+            } catch (completionError) {
+              const completionMessage =
+                completionError instanceof Error
+                  ? completionError.message
+                  : "Unable to mark onboarding as completed.";
+              setError(completionMessage);
+              setChatStatus("error");
+              return;
+            }
             redirectTriggeredRef.current = true;
             clearOnboardingPayload();
             clearOnboardingChatState();
@@ -252,7 +283,7 @@ export function OnboardChatPage(): ReactElement {
         }
       }
     },
-    [appendMessage, ensureSession],
+    [appendMessage, ensureSession, payload?.executionProviderId],
   );
 
   const runInitialRoadmapTurn = useCallback(async (): Promise<void> => {

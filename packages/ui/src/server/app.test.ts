@@ -252,6 +252,104 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
+  it("uses onboarding completion state instead of bootstrap file presence", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    await mkdir(path.resolve(uniqueHomeDir, "workspaces", "goat"), {
+      recursive: true,
+    });
+    await writeFile(
+      path.resolve(uniqueHomeDir, "workspaces", "goat", "BOOTSTRAP.md"),
+      "# bootstrap pending\n",
+      "utf8",
+    );
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+        agents: [
+          {
+            id: "goat",
+            displayName: "Goat",
+            workspaceDir: path.resolve(uniqueHomeDir, "workspaces", "goat"),
+            internalConfigDir: path.resolve(uniqueHomeDir, "agents", "goat"),
+          },
+        ],
+      }),
+    });
+
+    const before = await activeServer.inject({
+      method: "GET",
+      url: "/api/openclaw/onboarding",
+    });
+    expect(before.statusCode).toBe(200);
+    expect(before.json()).toMatchObject({
+      onboarding: {
+        shouldShow: true,
+        completed: false,
+        hasCeoAgent: true,
+        ceoBootstrapPending: true,
+      },
+    });
+
+    const complete = await activeServer.inject({
+      method: "POST",
+      url: "/api/openclaw/onboarding/complete",
+      payload: {
+        executionProviderId: "codex",
+      },
+    });
+    expect(complete.statusCode).toBe(200);
+    expect(complete.json()).toMatchObject({
+      onboarding: {
+        completed: true,
+        executionProviderId: "codex",
+      },
+    });
+
+    const after = await activeServer.inject({
+      method: "GET",
+      url: "/api/openclaw/onboarding",
+    });
+    expect(after.statusCode).toBe(200);
+    expect(after.json()).toMatchObject({
+      onboarding: {
+        shouldShow: false,
+        completed: true,
+        hasCeoAgent: true,
+        ceoBootstrapPending: true,
+      },
+    });
+  });
+
+  it("migrates legacy homes without bootstrap to completed onboarding", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    await mkdir(path.resolve(uniqueHomeDir, "workspaces", "goat"), {
+      recursive: true,
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const settingsResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/settings",
+    });
+    expect(settingsResponse.statusCode).toBe(200);
+    expect(settingsResponse.json()).toMatchObject({
+      settings: {
+        onboarding: {
+          completed: true,
+        },
+      },
+    });
+  });
+
   it("lists execution-agent provider options for onboarding connect", async () => {
     activeServer = await createOpenGoatUiServer({
       logger: false,

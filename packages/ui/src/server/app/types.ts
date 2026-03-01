@@ -361,6 +361,7 @@ export interface UiServerSettings {
   maxParallelFlows: number;
   taskDelegationStrategies: UiTaskDelegationStrategiesSettings;
   authentication: UiServerAuthenticationSettings;
+  onboarding: UiOnboardingSettings;
 }
 
 export interface UiTopDownTaskDelegationStrategySettings {
@@ -376,6 +377,12 @@ export interface UiServerAuthenticationSettings {
   enabled: boolean;
   username?: string;
   passwordHash?: string;
+}
+
+export interface UiOnboardingSettings {
+  completed: boolean;
+  completedAt?: string;
+  executionProviderId?: string;
 }
 
 export interface UiAuthenticationStatus {
@@ -396,6 +403,7 @@ export interface UiServerSettingsResponse {
   taskDelegationStrategies: UiTaskDelegationStrategiesSettings;
   authentication: UiAuthenticationSettingsResponse;
   ceoBootstrapPending: boolean;
+  onboarding: UiOnboardingSettings;
 }
 
 export type UiVersionSource = "npm" | "github-release" | "github-tag";

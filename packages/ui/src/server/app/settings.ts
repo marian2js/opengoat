@@ -22,6 +22,7 @@ import {
 import { DEFAULT_AGENT_ID } from "./constants.js";
 import type {
   UiAuthenticationSettingsResponse,
+  UiOnboardingSettings,
   UiServerSettings,
   UiServerSettingsResponse,
   UiTopDownTaskDelegationStrategySettings,
@@ -38,6 +39,11 @@ export function defaultUiServerSettings(): UiServerSettings {
       enabled: false,
       username: undefined,
       passwordHash: undefined,
+    },
+    onboarding: {
+      completed: false,
+      completedAt: undefined,
+      executionProviderId: undefined,
     },
   };
 }
@@ -168,8 +174,13 @@ export function parseTopDownOpenTasksThreshold(
 
 export async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> {
   const settingsPath = path.resolve(homeDir, UI_SETTINGS_FILENAME);
+  const defaults = defaultUiServerSettings();
+  const legacyDefaultOnboarding = resolveLegacyOnboardingDefault(homeDir);
   if (!existsSync(settingsPath)) {
-    return defaultUiServerSettings();
+    return {
+      ...defaults,
+      onboarding: legacyDefaultOnboarding,
+    };
   }
 
   try {
@@ -189,6 +200,11 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
         username?: unknown;
         passwordHash?: unknown;
       };
+      onboarding?: {
+        completed?: unknown;
+        completedAt?: unknown;
+        executionProviderId?: unknown;
+      };
     };
     const taskCronEnabled = parseTaskCronEnabled(parsed?.taskCronEnabled);
     const maxInProgressMinutes = parseMaxInProgressMinutes(
@@ -202,7 +218,6 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
     const authPasswordHash = normalizeUiAuthenticationPasswordHash(
       parsed.authentication?.passwordHash,
     );
-    const defaults = defaultUiServerSettings();
     const parsedTopDown = parsed.taskDelegationStrategies?.topDown;
     const parsedTopDownEnabled = parseBooleanSetting(parsedTopDown?.enabled);
     const parsedTopDownOpenTasksThreshold = parseTopDownOpenTasksThreshold(
@@ -230,9 +245,16 @@ export async function readUiServerSettings(homeDir: string): Promise<UiServerSet
         username: authUsername,
         passwordHash: authPasswordHash,
       },
+      onboarding: normalizeUiOnboardingSettings(
+        parsed.onboarding,
+        legacyDefaultOnboarding,
+      ),
     };
   } catch {
-    return defaultUiServerSettings();
+    return {
+      ...defaults,
+      onboarding: legacyDefaultOnboarding,
+    };
   }
 }
 
@@ -265,5 +287,48 @@ export function toPublicUiServerSettings(
     taskDelegationStrategies: settings.taskDelegationStrategies,
     authentication,
     ceoBootstrapPending: options.ceoBootstrapPending ?? false,
+    onboarding: {
+      completed: settings.onboarding.completed,
+      completedAt: settings.onboarding.completedAt,
+      executionProviderId: settings.onboarding.executionProviderId,
+    },
+  };
+}
+
+function resolveLegacyOnboardingDefault(homeDir: string): UiOnboardingSettings {
+  const legacyCompleted = !isCeoBootstrapPending(homeDir);
+  return {
+    completed: legacyCompleted,
+    completedAt: undefined,
+    executionProviderId: undefined,
+  };
+}
+
+function normalizeUiOnboardingSettings(
+  value: {
+    completed?: unknown;
+    completedAt?: unknown;
+    executionProviderId?: unknown;
+  } | undefined,
+  defaults: UiOnboardingSettings,
+): UiOnboardingSettings {
+  const completed =
+    typeof value?.completed === "boolean"
+      ? value.completed
+      : defaults.completed;
+  const completedAt =
+    typeof value?.completedAt === "string" && value.completedAt.trim()
+      ? value.completedAt.trim()
+      : defaults.completedAt;
+  const executionProviderId =
+    typeof value?.executionProviderId === "string" &&
+    value.executionProviderId.trim()
+      ? value.executionProviderId.trim().toLowerCase()
+      : defaults.executionProviderId;
+
+  return {
+    completed,
+    completedAt,
+    executionProviderId,
   };
 }

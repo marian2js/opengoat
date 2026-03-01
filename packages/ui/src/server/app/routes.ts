@@ -597,6 +597,7 @@ export function registerApiRoutes(
           },
         },
         authentication: nextAuthentication,
+        onboarding: currentSettings.onboarding,
       };
       await deps.updateSettings(nextSettings);
 
@@ -771,17 +772,49 @@ export function registerApiRoutes(
       ]);
       const hasCeoAgent = agents.some((agent) => agent.id === DEFAULT_AGENT_ID);
       const ceoBootstrapPending = isCeoBootstrapPending(service.getHomeDir());
+      const onboardingCompleted = deps.getSettings().onboarding.completed;
 
       return {
         onboarding: {
-          shouldShow: !hasCeoAgent || ceoBootstrapPending,
+          shouldShow: !hasCeoAgent || !onboardingCompleted,
           hasCeoAgent,
           ceoBootstrapPending,
+          completed: onboardingCompleted,
           gateway,
         },
       };
     });
   });
+
+  app.post<{ Body: { executionProviderId?: string } }>(
+    "/api/openclaw/onboarding/complete",
+    async (request, reply) => {
+      return safeReply(reply, async () => {
+        const currentSettings = deps.getSettings();
+        const executionProviderId =
+          typeof request.body?.executionProviderId === "string" &&
+          request.body.executionProviderId.trim()
+            ? request.body.executionProviderId.trim().toLowerCase()
+            : currentSettings.onboarding.executionProviderId;
+        const completedAt = new Date().toISOString();
+        const nextSettings: UiServerSettings = {
+          ...currentSettings,
+          onboarding: {
+            completed: true,
+            completedAt,
+            executionProviderId,
+          },
+        };
+
+        await deps.updateSettings(nextSettings);
+
+        return {
+          onboarding: nextSettings.onboarding,
+          message: "Onboarding marked as completed.",
+        };
+      });
+    },
+  );
 
   app.get("/api/openclaw/execution-agents", async (_request, reply) => {
     return safeReply(reply, async () => {
