@@ -1127,10 +1127,9 @@ describe("OpenGoatService", () => {
         (request) =>
           request.args[0] === "config" &&
           request.args[1] === "set" &&
-          request.args[2] === "agents.list[0].skipBootstrap" &&
-          request.args[3] === "true",
+          request.args[2] === "agents.list[0].skipBootstrap",
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("does not rewrite goat bootstrap files during runtime sync", async () => {
