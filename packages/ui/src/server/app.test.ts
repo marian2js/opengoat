@@ -262,6 +262,14 @@ describe("OpenGoat UI server API", () => {
       "# bootstrap pending\n",
       "utf8",
     );
+    await mkdir(path.resolve(uniqueHomeDir, "organization"), {
+      recursive: true,
+    });
+    await writeFile(
+      path.resolve(uniqueHomeDir, "organization", "ROADMAP.md"),
+      "# roadmap\n",
+      "utf8",
+    );
     activeServer = await createOpenGoatUiServer({
       logger: false,
       attachFrontend: false,
@@ -346,6 +354,71 @@ describe("OpenGoat UI server API", () => {
         onboarding: {
           completed: true,
         },
+      },
+    });
+  });
+
+  it("requires an existing roadmap before onboarding can be completed", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    await mkdir(path.resolve(uniqueHomeDir, "workspaces", "goat"), {
+      recursive: true,
+    });
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const response = await activeServer.inject({
+      method: "POST",
+      url: "/api/openclaw/onboarding/complete",
+      payload: {
+        executionProviderId: "codex",
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      error:
+        "Roadmap is not ready yet. Generate and save organization/ROADMAP.md before completing onboarding.",
+      roadmap: {
+        exists: false,
+      },
+    });
+  });
+
+  it("returns roadmap status for onboarding chat", async () => {
+    const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    await mkdir(path.resolve(uniqueHomeDir, "organization"), {
+      recursive: true,
+    });
+    await writeFile(
+      path.resolve(uniqueHomeDir, "organization", "ROADMAP.md"),
+      "# roadmap\n",
+      "utf8",
+    );
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const response = await activeServer.inject({
+      method: "GET",
+      url: "/api/openclaw/onboarding/roadmap-status",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      roadmap: {
+        exists: true,
+        path: path.resolve(uniqueHomeDir, "organization", "ROADMAP.md"),
       },
     });
   });

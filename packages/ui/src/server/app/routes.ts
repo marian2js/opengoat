@@ -1,4 +1,5 @@
 import path from "node:path";
+import { stat } from "node:fs/promises";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import {
   DEFAULT_AGENT_ID,
@@ -766,9 +767,10 @@ export function registerApiRoutes(
 
   app.get("/api/openclaw/onboarding", async (_request, reply) => {
     return safeReply(reply, async () => {
-      const [agents, gateway] = await Promise.all([
+      const [agents, gateway, roadmap] = await Promise.all([
         resolveOrganizationAgents(service),
         resolveOpenClawOnboardingGatewayStatus(service),
+        resolveOnboardingRoadmapStatus(service.getHomeDir()),
       ]);
       const hasCeoAgent = agents.some((agent) => agent.id === DEFAULT_AGENT_ID);
       const ceoBootstrapPending = isCeoBootstrapPending(service.getHomeDir());
@@ -781,7 +783,16 @@ export function registerApiRoutes(
           ceoBootstrapPending,
           completed: onboardingCompleted,
           gateway,
+          roadmap,
         },
+      };
+    });
+  });
+
+  app.get("/api/openclaw/onboarding/roadmap-status", async (_request, reply) => {
+    return safeReply(reply, async () => {
+      return {
+        roadmap: await resolveOnboardingRoadmapStatus(service.getHomeDir()),
       };
     });
   });
@@ -790,6 +801,16 @@ export function registerApiRoutes(
     "/api/openclaw/onboarding/complete",
     async (request, reply) => {
       return safeReply(reply, async () => {
+        const roadmap = await resolveOnboardingRoadmapStatus(service.getHomeDir());
+        if (!roadmap.exists) {
+          reply.code(409);
+          return {
+            error:
+              "Roadmap is not ready yet. Generate and save organization/ROADMAP.md before completing onboarding.",
+            roadmap,
+          };
+        }
+
         const currentSettings = deps.getSettings();
         const executionProviderId =
           typeof request.body?.executionProviderId === "string" &&
@@ -2033,6 +2054,35 @@ export function registerApiRoutes(
     handleSessionMessageStream
   );
 
+}
+
+async function resolveOnboardingRoadmapStatus(homeDir: string): Promise<{
+  exists: boolean;
+  path: string;
+  updatedAt?: string;
+  bytes?: number;
+}> {
+  const roadmapPath = path.resolve(homeDir, "organization", "ROADMAP.md");
+  try {
+    const stats = await stat(roadmapPath);
+    if (!stats.isFile()) {
+      return {
+        exists: false,
+        path: roadmapPath,
+      };
+    }
+    return {
+      exists: true,
+      path: roadmapPath,
+      updatedAt: stats.mtime.toISOString(),
+      bytes: stats.size,
+    };
+  } catch {
+    return {
+      exists: false,
+      path: roadmapPath,
+    };
+  }
 }
 
 function resolveAssistantOutput(result: {

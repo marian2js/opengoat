@@ -92,8 +92,6 @@ type SessionMessageStreamEvent =
 
 const ONBOARDING_PAYLOAD_KEY = "opengoat:onboard:payload";
 const ONBOARDING_CHAT_STATE_KEY = "opengoat:onboard:chat-state";
-export const ONBOARDING_START_MARKER = "{{START}}";
-const ONBOARDING_START_MARKER_REGEX = /(?:^|\n)\s*\{\{START\}\}\s*$/u;
 
 export const DEFAULT_AGENT_ID = "goat";
 export const ONBOARDING_WORKSPACE_NAME = "Onboarding Roadmap";
@@ -233,7 +231,7 @@ export function buildInitialRoadmapPrompt(input: OnboardingPayload): string {
     `- Strongly align with the long-term vision and short-term goals the user gave`,
     `- Phase 1 must deliver real user value quickly`,
     ``,
-    ...buildOnboardingStartMarkerProtocolLines(),
+    ...buildOnboardingRoadmapProtocolLines(),
   ].join("\n");
 }
 
@@ -242,34 +240,21 @@ export function buildOnboardingFollowUpPrompt(userMessage: string): string {
   return [
     normalizedMessage,
     ``,
-    ...buildOnboardingStartMarkerProtocolLines(),
+    ...buildOnboardingRoadmapProtocolLines(),
   ].join("\n");
 }
 
 export function parseOnboardingAssistantOutput(output: string): {
   cleanedContent: string;
-  shouldRedirectToDashboard: boolean;
 } {
   const trimmedOutput = output.trim();
   if (!trimmedOutput) {
     return {
       cleanedContent: "",
-      shouldRedirectToDashboard: false,
     };
   }
-
-  if (!ONBOARDING_START_MARKER_REGEX.test(trimmedOutput)) {
-    return {
-      cleanedContent: trimmedOutput,
-      shouldRedirectToDashboard: false,
-    };
-  }
-
   return {
-    cleanedContent: trimmedOutput
-      .replace(ONBOARDING_START_MARKER_REGEX, "")
-      .trim(),
-    shouldRedirectToDashboard: true,
+    cleanedContent: trimmedOutput,
   };
 }
 
@@ -475,10 +460,11 @@ async function readResponseError(response: Response): Promise<string> {
   return normalized;
 }
 
-function buildOnboardingStartMarkerProtocolLines(): string[] {
+function buildOnboardingRoadmapProtocolLines(): string[] {
   return [
     `Conversation protocol:`,
-    `- When the user explicitly approves the roadmap and wants to begin execution, end your response with ${ONBOARDING_START_MARKER} on its own final line.`,
-    `- Never output ${ONBOARDING_START_MARKER} unless the user is clearly approving and ready to start.`,
+    `- On every iteration, update organization/ROADMAP.md before replying (including revisions after user feedback).`,
+    `- After saving the file, summarize what changed and ask whether the user wants more edits or wants to approve.`,
+    `- Do not output control flags, markers, or redirect instructions. Approval is handled by the UI.`,
   ];
 }
