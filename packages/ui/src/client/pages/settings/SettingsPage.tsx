@@ -6,8 +6,6 @@ import { cn } from "@/lib/utils";
 import type { ReactElement } from "react";
 
 interface SettingsPageProps {
-  ceoBootstrapPending: boolean;
-  defaultAgentId: string;
   taskCronIntervalMinutes: number;
   taskCronEnabledInput: boolean;
   topDownTaskDelegationEnabledInput: boolean;
@@ -33,7 +31,6 @@ interface SettingsPageProps {
   isAuthenticated: boolean;
   isMutating: boolean;
   isLoading: boolean;
-  onOpenCeoChat: (agentId: string) => void;
   onTaskCronEnabledChange: (checked: boolean) => void;
   onMaxParallelFlowsInputChange: (value: string) => void;
   onTopDownTaskDelegationEnabledChange: (checked: boolean) => void;
@@ -51,8 +48,6 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({
-  ceoBootstrapPending,
-  defaultAgentId,
   taskCronIntervalMinutes,
   taskCronEnabledInput,
   topDownTaskDelegationEnabledInput,
@@ -78,7 +73,6 @@ export function SettingsPage({
   isAuthenticated,
   isMutating,
   isLoading,
-  onOpenCeoChat,
   onTaskCronEnabledChange,
   onMaxParallelFlowsInputChange,
   onTopDownTaskDelegationEnabledChange,
@@ -102,26 +96,6 @@ export function SettingsPage({
           controls.
         </p>
       </div>
-
-      {ceoBootstrapPending ? (
-        <section className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-amber-100">
-              Send your first message to the Goat to finish setup and start
-              background automation.
-            </p>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                onOpenCeoChat(defaultAgentId);
-              }}
-            >
-              Open Goat chat
-            </Button>
-          </div>
-        </section>
-      ) : null}
 
       <section className="overflow-hidden rounded-xl border border-border/70 bg-background/40">
         <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
@@ -224,12 +198,7 @@ export function SettingsPage({
             </p>
           </div>
 
-          {ceoBootstrapPending ? (
-            <p className="text-xs text-muted-foreground">
-              Background checks stay paused until the first Goat message removes
-              bootstrap mode.
-            </p>
-          ) : !taskCronEnabledInput ? (
+          {!taskCronEnabledInput ? (
             <p className="text-xs text-muted-foreground">
               Background checks are paused. Enable task automation above to
               resume task follow-up and delegation checks.
@@ -523,13 +492,11 @@ export function SettingsPage({
         <p className="text-xs text-muted-foreground">
           Status:{" "}
           <span className="font-medium text-foreground">
-            {ceoBootstrapPending
-              ? "Waiting for first Goat message to start checks"
-                : !taskCronEnabledInput
-                  ? "Background checks paused"
-                  : topDownTaskDelegationEnabledInput
-                  ? "Background checks active (task refill on)"
-                  : "Background checks active (task refill paused)"}
+            {!taskCronEnabledInput
+              ? "Background checks paused"
+              : topDownTaskDelegationEnabledInput
+                ? "Background checks active (task refill on)"
+                : "Background checks active (task refill paused)"}
           </span>
         </p>
         <div className="flex items-center gap-2">

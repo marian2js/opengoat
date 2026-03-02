@@ -3,7 +3,6 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentService } from "../../packages/core/src/core/agents/index.js";
 import type { OpenGoatPaths } from "../../packages/core/src/core/domain/opengoat-paths.js";
-import { renderCeoBootstrapMarkdown } from "../../packages/core/src/core/templates/default-templates.js";
 import { NodeFileSystem } from "../../packages/core/src/platform/node/node-file-system.js";
 import { NodePathPort } from "../../packages/core/src/platform/node/node-path.port.js";
 import { createTempDir, removeTempDir } from "../helpers/temp-opengoat.js";
@@ -188,7 +187,7 @@ describe("AgentService", () => {
     expect(roleMarkdown).toBe("# custom role\n");
   });
 
-  it("keeps Goat First Run, replaces Every Session, preserves SOUL.md, and writes ROLE/BOOTSTRAP", async () => {
+  it("keeps Goat First Run, replaces Every Session, preserves SOUL.md, and removes BOOTSTRAP", async () => {
     const { service, paths, fileSystem } = await createAgentServiceWithPaths();
     await service.ensureAgent(paths, { id: "goat", displayName: "Goat" });
 
@@ -229,7 +228,6 @@ describe("AgentService", () => {
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
     const roleMarkdown = await readFile(rolePath, "utf-8");
     const soulMarkdown = await readFile(soulPath, "utf-8");
-    const bootstrapMarkdown = await readFile(bootstrapPath, "utf-8");
     expect(agentsMarkdown).toContain("foo");
     expect(agentsMarkdown).toContain("## First Run");
     expect(agentsMarkdown).toContain("bar");
@@ -270,8 +268,7 @@ describe("AgentService", () => {
     expect(soulMarkdown).toBe(
       ["# SOUL.md - Custom", "", "Legacy body"].join("\n"),
     );
-    expect(bootstrapMarkdown.trimEnd()).toBe(renderCeoBootstrapMarkdown());
-    expect(bootstrapMarkdown).not.toContain("# bootstrap");
+    expect(await fileSystem.exists(bootstrapPath)).toBe(false);
     expect(await fileSystem.exists(userPath)).toBe(false);
   });
 
@@ -303,9 +300,7 @@ describe("AgentService", () => {
     await writeFile(bootstrapPath, "# bootstrap\n", "utf-8");
 
     await service.ensureCeoWorkspaceBootstrap(paths, {
-      syncBootstrapMarkdown: false,
       keepFirstRunSection: false,
-      removeBootstrapMarkdownWhenDisabled: true,
     });
 
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
@@ -348,12 +343,8 @@ describe("AgentService", () => {
     );
 
     await service.ensureCeoWorkspaceBootstrap(paths, {
-      syncBootstrapMarkdown: false,
-      removeBootstrapMarkdownWhenDisabled: true,
     });
     await service.ensureCeoWorkspaceBootstrap(paths, {
-      syncBootstrapMarkdown: false,
-      removeBootstrapMarkdownWhenDisabled: true,
     });
 
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
@@ -397,8 +388,6 @@ describe("AgentService", () => {
     await writeFile(agentsPath, source, "utf-8");
 
     await service.ensureCeoWorkspaceBootstrap(paths, {
-      syncBootstrapMarkdown: false,
-      removeBootstrapMarkdownWhenDisabled: true,
     });
 
     const agentsMarkdown = await readFile(agentsPath, "utf-8");

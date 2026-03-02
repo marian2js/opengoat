@@ -1525,10 +1525,8 @@ export function DashboardPage(): ReactElement {
     onCreated: refreshOverview,
   });
   const hasLoadedState = state !== null;
-  const ceoBootstrapPending = state?.settings.ceoBootstrapPending ?? false;
   const taskCronRunning =
-    (state?.settings.taskCronEnabled ?? taskCronEnabledInput) &&
-    !ceoBootstrapPending;
+    state?.settings.taskCronEnabled ?? taskCronEnabledInput;
   const sessions = state?.sessions.sessions ?? [];
   const sessionsById = useMemo(() => {
     const map = new Map<
@@ -2928,8 +2926,6 @@ export function DashboardPage(): ReactElement {
       setUiAuthenticationPasswordEditorOpen(false);
       const statusMessage = !taskCronEnabledInput
         ? "Task automation checks disabled."
-        : response.settings.ceoBootstrapPending
-        ? "Task automation checks are waiting for the first Goat message."
         : `Task automation checks enabled every ${TASK_CRON_INTERVAL_MINUTES} minute(s); max parallel flows set to ${resolvedMaxParallelFlows}; in-progress timeout set to ${resolvedMaxInProgressMinutes} minutes; Product Manager task refill ${
             topDownTaskDelegationEnabledInput
               ? `enabled (threshold ${resolvedTopDownOpenTasksThreshold})`
@@ -5228,8 +5224,6 @@ export function DashboardPage(): ReactElement {
 
                 {route.kind === "page" && route.view === "settings" ? (
                   <SettingsPage
-                    ceoBootstrapPending={ceoBootstrapPending}
-                    defaultAgentId={DEFAULT_AGENT_ID}
                     taskCronIntervalMinutes={TASK_CRON_INTERVAL_MINUTES}
                     taskCronEnabledInput={taskCronEnabledInput}
                     topDownTaskDelegationEnabledInput={
@@ -5277,9 +5271,6 @@ export function DashboardPage(): ReactElement {
                     isAuthenticated={isAuthenticated}
                     isMutating={isMutating}
                     isLoading={isLoading}
-                    onOpenCeoChat={(agentId) => {
-                      void handleSelectSidebarAgent(agentId);
-                    }}
                     onTaskCronEnabledChange={(checked) => {
                       setTaskCronEnabledInput(checked);
                     }}

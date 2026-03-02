@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
 import { execFile } from "node:child_process";
-import { access, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -234,7 +234,7 @@ describe("agent create OpenClaw sync e2e", () => {
     );
   });
 
-  it("does not recreate goat BOOTSTRAP.md when goat create is re-run", async () => {
+  it("does not create goat BOOTSTRAP.md when goat create is re-run", async () => {
     const root = await createTempDir("opengoat-agent-create-e2e-");
     roots.push(root);
 
@@ -253,8 +253,6 @@ describe("agent create OpenClaw sync e2e", () => {
     expect(initResult.code).toBe(0);
 
     const bootstrapPath = path.join(opengoatHome, "workspaces", "goat", "BOOTSTRAP.md");
-    await expect(access(bootstrapPath, constants.F_OK)).resolves.toBeUndefined();
-    await rm(bootstrapPath);
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
 
     const recreateCeo = await runBinary(

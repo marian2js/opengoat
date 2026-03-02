@@ -567,6 +567,7 @@ export class OpenGoatService {
           paths,
           agent.id,
         );
+        await this.removeLegacyWorkspaceBootstrapMarkdown(paths, agent.id);
       }
     } catch (error) {
       warnings.push(
@@ -684,9 +685,6 @@ export class OpenGoatService {
               agentId: created.agent.id,
               displayName: created.agent.displayName,
               role: options.role?.trim() ?? "",
-            },
-            {
-              syncBootstrapMarkdown: false,
             },
           );
         created.createdPaths.push(...workspaceBootstrap.createdPaths);
@@ -1894,6 +1892,25 @@ export class OpenGoatService {
       ...initialization,
       defaultAgent,
     };
+  }
+
+  private async removeLegacyWorkspaceBootstrapMarkdown(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    agentId: string,
+  ): Promise<void> {
+    const normalizedAgentId = normalizeAgentId(agentId);
+    if (!normalizedAgentId) {
+      return;
+    }
+    const bootstrapPath = this.pathPort.join(
+      paths.workspacesDir,
+      normalizedAgentId,
+      "BOOTSTRAP.md",
+    );
+    if (!(await this.fileSystem.exists(bootstrapPath))) {
+      return;
+    }
+    await this.fileSystem.removeDir(bootstrapPath);
   }
 
   private async syncManagedOpenClawPlugin(

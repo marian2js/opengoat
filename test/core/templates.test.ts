@@ -69,9 +69,6 @@ describe("default templates", () => {
     expect(goatTemplates.some((template) => template.fileName === "ROLE.md")).toBe(
       true,
     );
-    expect(
-      goatTemplates.some((template) => template.fileName === "BOOTSTRAP.md"),
-    ).toBe(true);
     expect(sageTemplates.some((template) => template.fileName === "ROLE.md")).toBe(
       true,
     );

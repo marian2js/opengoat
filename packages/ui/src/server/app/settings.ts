@@ -19,7 +19,6 @@ import {
   normalizeUiAuthenticationPasswordHash,
   normalizeUiAuthenticationUsername,
 } from "./auth.js";
-import { DEFAULT_AGENT_ID } from "./constants.js";
 import type {
   UiAuthenticationSettingsResponse,
   UiOnboardingSettings,
@@ -175,7 +174,7 @@ export function parseTopDownOpenTasksThreshold(
 export async function readUiServerSettings(homeDir: string): Promise<UiServerSettings> {
   const settingsPath = path.resolve(homeDir, UI_SETTINGS_FILENAME);
   const defaults = defaultUiServerSettings();
-  const legacyDefaultOnboarding = resolveLegacyOnboardingDefault(homeDir);
+  const legacyDefaultOnboarding = resolveLegacyOnboardingDefault();
   if (!existsSync(settingsPath)) {
     return {
       ...defaults,
@@ -267,18 +266,9 @@ export async function writeUiServerSettings(
   await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }
 
-export function resolveCeoBootstrapPath(homeDir: string): string {
-  return path.resolve(homeDir, "workspaces", DEFAULT_AGENT_ID, "BOOTSTRAP.md");
-}
-
-export function isCeoBootstrapPending(homeDir: string): boolean {
-  return existsSync(resolveCeoBootstrapPath(homeDir));
-}
-
 export function toPublicUiServerSettings(
   settings: UiServerSettings,
   authentication: UiAuthenticationSettingsResponse,
-  options: { ceoBootstrapPending?: boolean } = {},
 ): UiServerSettingsResponse {
   return {
     taskCronEnabled: settings.taskCronEnabled,
@@ -286,7 +276,7 @@ export function toPublicUiServerSettings(
     maxParallelFlows: settings.maxParallelFlows,
     taskDelegationStrategies: settings.taskDelegationStrategies,
     authentication,
-    ceoBootstrapPending: options.ceoBootstrapPending ?? false,
+    ceoBootstrapPending: false,
     onboarding: {
       completed: settings.onboarding.completed,
       completedAt: settings.onboarding.completedAt,
@@ -295,10 +285,9 @@ export function toPublicUiServerSettings(
   };
 }
 
-function resolveLegacyOnboardingDefault(homeDir: string): UiOnboardingSettings {
-  const legacyCompleted = !isCeoBootstrapPending(homeDir);
+function resolveLegacyOnboardingDefault(): UiOnboardingSettings {
   return {
-    completed: legacyCompleted,
+    completed: false,
     completedAt: undefined,
     executionProviderId: undefined,
   };

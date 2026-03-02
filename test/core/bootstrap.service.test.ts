@@ -134,7 +134,7 @@ describe("BootstrapService", () => {
       await fileSystem.exists(
         path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md"),
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(await fileSystem.exists(paths.skillsDir)).toBe(false);
   });
 
@@ -149,14 +149,11 @@ describe("BootstrapService", () => {
     expect(second.skippedPaths.length).toBeGreaterThan(0);
   });
 
-  it("does not recreate goat BOOTSTRAP.md after initial creation", async () => {
+  it("never creates goat BOOTSTRAP.md after initialization", async () => {
     const { service, paths, fileSystem } = await createBootstrapService();
 
     await service.initialize();
     const bootstrapPath = path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md");
-    expect(await fileSystem.exists(bootstrapPath)).toBe(true);
-
-    await fileSystem.removeDir(bootstrapPath);
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
 
     await service.initialize();
@@ -170,10 +167,9 @@ describe("BootstrapService", () => {
     await service.initialize();
     const bootstrapPath = path.join(paths.workspacesDir, "goat", "BOOTSTRAP.md");
     const ceoConfigDir = path.join(paths.agentsDir, "goat");
-    expect(await fileSystem.exists(bootstrapPath)).toBe(true);
+    expect(await fileSystem.exists(bootstrapPath)).toBe(false);
     expect(await fileSystem.exists(ceoConfigDir)).toBe(true);
 
-    await fileSystem.removeDir(bootstrapPath);
     await fileSystem.removeDir(ceoConfigDir);
     expect(await fileSystem.exists(bootstrapPath)).toBe(false);
     expect(await fileSystem.exists(ceoConfigDir)).toBe(false);

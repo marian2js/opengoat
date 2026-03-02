@@ -1132,7 +1132,7 @@ describe("OpenGoatService", () => {
     ).toBe(false);
   });
 
-  it("does not rewrite goat bootstrap files during runtime sync", async () => {
+  it("removes goat BOOTSTRAP.md during runtime sync", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -1173,11 +1173,10 @@ describe("OpenGoatService", () => {
     expect(result.ceoSynced).toBe(true);
     await expect(
       access(bootstrapPath, constants.F_OK),
-    ).resolves.toBeUndefined();
+    ).rejects.toBeTruthy();
 
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
     const soulMarkdown = await readFile(soulPath, "utf-8");
-    const bootstrapMarkdown = await readFile(bootstrapPath, "utf-8");
     const boardSkillMarkdown = await readFile(
       path.join(ceoWorkspace, "skills", "og-board-manager", "SKILL.md"),
       "utf-8",
@@ -1191,7 +1190,6 @@ describe("OpenGoatService", () => {
     expect(soulMarkdown).toBe(
       ["# SOUL.md - Legacy Goat", "", "Legacy body"].join("\n"),
     );
-    expect(bootstrapMarkdown.trimEnd()).toBe("# legacy bootstrap");
     expect(boardSkillMarkdown).toContain("name: og-board-manager");
     expect(boardSkillMarkdown).toContain(
       'opengoat_agent_info({ "agentId": "goat" })',
@@ -1214,10 +1212,6 @@ describe("OpenGoatService", () => {
 
     const bootstrapPath = path.join(root, "workspaces", "goat", "BOOTSTRAP.md");
     const agentsPath = path.join(root, "workspaces", "goat", "AGENTS.md");
-    await expect(
-      access(bootstrapPath, constants.F_OK),
-    ).resolves.toBeUndefined();
-    await rm(bootstrapPath);
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
     await writeFile(
       agentsPath,
@@ -1242,7 +1236,7 @@ describe("OpenGoatService", () => {
     expect(agentsMarkdown).toContain("keep me");
   });
 
-  it("does not mutate goat bootstrap artifacts after the first goat session", async () => {
+  it("removes stale goat BOOTSTRAP.md after the first goat session", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
 
@@ -1278,7 +1272,7 @@ describe("OpenGoatService", () => {
 
     await expect(
       access(bootstrapPath, constants.F_OK),
-    ).resolves.toBeUndefined();
+    ).rejects.toBeTruthy();
     const agentsMarkdown = await readFile(agentsPath, "utf-8");
     expect(agentsMarkdown).toContain("## First Run");
     expect(agentsMarkdown).toContain("first-run-content");
@@ -1392,10 +1386,6 @@ describe("OpenGoatService", () => {
 
     const ceoWorkspace = path.join(root, "workspaces", "goat");
     const bootstrapPath = path.join(ceoWorkspace, "BOOTSTRAP.md");
-    await expect(
-      access(bootstrapPath, constants.F_OK),
-    ).resolves.toBeUndefined();
-    await rm(bootstrapPath);
     await expect(access(bootstrapPath, constants.F_OK)).rejects.toBeTruthy();
 
     const ceoCreateCallsBefore = provider.createdAgents.filter(

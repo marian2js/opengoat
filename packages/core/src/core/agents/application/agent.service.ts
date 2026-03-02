@@ -26,7 +26,6 @@ import {
   listAgentWorkspaceTemplates,
   renderAgentsIndex,
   renderBoardsSkillMarkdown,
-  renderCeoBootstrapMarkdown,
   renderInternalAgentConfig,
   resolveAgentRole,
   type AgentWorkspaceTemplate,
@@ -69,9 +68,7 @@ export interface AgentWorkspaceBootstrapInput {
 }
 
 export interface AgentWorkspaceBootstrapOptions {
-  syncBootstrapMarkdown?: boolean;
   keepFirstRunSection?: boolean;
-  removeBootstrapMarkdownWhenDisabled?: boolean;
   roleSkillDirectories?: string[];
   managedRoleSkillDirectories?: string[];
   roleSkillIdsByType?: RoleSkillIdsByType;
@@ -109,10 +106,6 @@ export interface WorkspaceCommandShimSyncResult {
 export interface WorkspaceTemplateAssetsSyncResult {
   createdPaths: string[];
   skippedPaths: string[];
-}
-
-export interface WorkspaceTemplateAssetsSyncOptions {
-  includeBootstrapMarkdown?: boolean;
 }
 
 export interface WorkspaceReporteeLinksSyncResult {
@@ -230,9 +223,7 @@ export class AgentService {
 
   public async ensureCeoWorkspaceBootstrap(
     paths: OpenGoatPaths,
-    options: AgentWorkspaceBootstrapOptions = {
-      syncBootstrapMarkdown: true,
-    },
+    options: AgentWorkspaceBootstrapOptions = {},
   ): Promise<CeoWorkspaceBootstrapResult> {
     const displayName = await this.readAgentDisplayName(
       paths,
@@ -289,11 +280,6 @@ export class AgentService {
       normalizedAgentId,
       createdPaths,
       skippedPaths,
-      {
-        includeBootstrapMarkdown:
-          !isDefaultAgentId(normalizedAgentId) ||
-          Boolean(options.syncBootstrapMarkdown),
-      },
     );
 
     await this.rewriteAgentsMarkdown(
@@ -329,25 +315,7 @@ export class AgentService {
     skippedPaths.push(...workspaceSkillSync.skippedPaths);
     removedPaths.push(...workspaceSkillSync.removedPaths);
 
-    if (isDefaultAgentId(normalizedAgentId) && options.syncBootstrapMarkdown) {
-      await this.writeBootstrapMarkdown(
-        bootstrapPath,
-        createdPaths,
-        skippedPaths,
-      );
-    } else if (isDefaultAgentId(normalizedAgentId)) {
-      if (options.removeBootstrapMarkdownWhenDisabled) {
-        await this.removePathIfExists(
-          bootstrapPath,
-          removedPaths,
-          skippedPaths,
-        );
-      } else {
-        skippedPaths.push(bootstrapPath);
-      }
-    } else {
-      await this.removePathIfExists(bootstrapPath, removedPaths, skippedPaths);
-    }
+    await this.removePathIfExists(bootstrapPath, removedPaths, skippedPaths);
     await this.removePathIfExists(userPath, removedPaths, skippedPaths);
 
     return {
@@ -390,7 +358,6 @@ export class AgentService {
   public async syncAgentWorkspaceTemplateAssets(
     paths: OpenGoatPaths,
     rawAgentId: string,
-    options: WorkspaceTemplateAssetsSyncOptions = {},
   ): Promise<WorkspaceTemplateAssetsSyncResult> {
     const agentId = normalizeAgentId(rawAgentId);
     if (!agentId) {
@@ -406,7 +373,6 @@ export class AgentService {
       agentId,
       createdPaths,
       skippedPaths,
-      options,
     );
     return {
       createdPaths,
@@ -920,20 +886,6 @@ export class AgentService {
     );
   }
 
-  private async writeBootstrapMarkdown(
-    filePath: string,
-    createdPaths: string[],
-    skippedPaths: string[],
-  ): Promise<void> {
-    await this.writeMarkdown(
-      filePath,
-      renderCeoBootstrapMarkdown(),
-      createdPaths,
-      skippedPaths,
-      { overwrite: true },
-    );
-  }
-
   private async writeOpenGoatWorkspaceShim(
     workspaceDir: string,
     createdPaths: string[],
@@ -954,19 +906,9 @@ export class AgentService {
     agentId: string,
     createdPaths: string[],
     skippedPaths: string[],
-    options: WorkspaceTemplateAssetsSyncOptions = {},
   ): Promise<void> {
-    const includeBootstrapMarkdown =
-      options.includeBootstrapMarkdown ?? true;
     const templates = listAgentWorkspaceTemplates(agentId);
     for (const template of templates) {
-      if (
-        !includeBootstrapMarkdown &&
-        normalizeTemplateRelativePath(template.fileName).toLowerCase() ===
-          "bootstrap.md"
-      ) {
-        continue;
-      }
       await this.writeWorkspaceTemplateFile(
         workspaceDir,
         template,

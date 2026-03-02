@@ -252,7 +252,7 @@ describe("OpenGoat UI server API", () => {
     });
   });
 
-  it("uses onboarding completion state instead of bootstrap file presence", async () => {
+  it("ignores bootstrap file presence when resolving onboarding state", async () => {
     const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     await mkdir(path.resolve(uniqueHomeDir, "workspaces", "goat"), {
       recursive: true,
@@ -296,7 +296,7 @@ describe("OpenGoat UI server API", () => {
         shouldShow: true,
         completed: false,
         hasCeoAgent: true,
-        ceoBootstrapPending: true,
+        ceoBootstrapPending: false,
       },
     });
 
@@ -325,12 +325,12 @@ describe("OpenGoat UI server API", () => {
         shouldShow: false,
         completed: true,
         hasCeoAgent: true,
-        ceoBootstrapPending: true,
+        ceoBootstrapPending: false,
       },
     });
   });
 
-  it("migrates legacy homes without bootstrap to completed onboarding", async () => {
+  it("defaults legacy homes without ui settings to incomplete onboarding", async () => {
     const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
     await mkdir(path.resolve(uniqueHomeDir, "workspaces", "goat"), {
       recursive: true,
@@ -352,7 +352,7 @@ describe("OpenGoat UI server API", () => {
     expect(settingsResponse.json()).toMatchObject({
       settings: {
         onboarding: {
-          completed: true,
+          completed: false,
         },
       },
     });
@@ -1262,7 +1262,7 @@ describe("OpenGoat UI server API", () => {
     }
   });
 
-  it("keeps scheduler paused while goat bootstrap is pending", async () => {
+  it("keeps scheduler running even if goat BOOTSTRAP.md exists", async () => {
     vi.useFakeTimers();
     try {
       const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -1306,12 +1306,12 @@ describe("OpenGoat UI server API", () => {
       expect(settingsResponse.statusCode).toBe(200);
       expect(settingsResponse.json()).toMatchObject({
         settings: {
-          ceoBootstrapPending: true,
+          ceoBootstrapPending: false,
         },
       });
 
       await vi.advanceTimersByTimeAsync(60_000);
-      expect(runTaskCronCycle).toHaveBeenCalledTimes(0);
+      expect(runTaskCronCycle).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }

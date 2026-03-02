@@ -51,10 +51,6 @@ export function renderCeoRoleMarkdown(): string {
   return readTemplateContent("agents/goat/ROLE.md");
 }
 
-export function renderCeoBootstrapMarkdown(): string {
-  return readTemplateContent("agents/goat/BOOTSTRAP.md");
-}
-
 export function renderBoardsSkillMarkdown(
   skillId: string,
   agentId: string,

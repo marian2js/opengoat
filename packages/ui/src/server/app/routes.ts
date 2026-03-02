@@ -27,7 +27,6 @@ import {
   resolveExecutionAgentReadiness,
 } from "./execution-agents.js";
 import {
-  isCeoBootstrapPending,
   parseBooleanSetting,
   parseMaxInProgressMinutes,
   parseMaxParallelFlows,
@@ -308,14 +307,10 @@ export function registerApiRoutes(
 
   app.get("/api/settings", async (_request, reply) => {
     return safeReply(reply, async () => {
-      const ceoBootstrapPending = isCeoBootstrapPending(service.getHomeDir());
       return {
         settings: toPublicUiServerSettings(
           deps.getSettings(),
           deps.auth.getSettingsResponse(),
-          {
-            ceoBootstrapPending,
-          },
         ),
       };
     });
@@ -662,17 +657,12 @@ export function registerApiRoutes(
         source: "opengoat",
         message: `UI settings updated: taskCronEnabled=${nextSettings.taskCronEnabled} topDownTaskDelegationEnabled=${nextSettings.taskDelegationStrategies.topDown.enabled} topDownOpenTasksThreshold=${nextSettings.taskDelegationStrategies.topDown.openTasksThreshold} maxInProgressMinutes=${nextSettings.maxInProgressMinutes} maxParallelFlows=${nextSettings.maxParallelFlows} authEnabled=${nextSettings.authentication.enabled}`,
       });
-      const ceoBootstrapPending = isCeoBootstrapPending(service.getHomeDir());
       const taskAutomationMessage = !nextSettings.taskCronEnabled
         ? "disabled"
-        : ceoBootstrapPending
-          ? "enabled, waiting for the first Goat message before checks start"
-          : "enabled";
+        : "enabled";
       const topDownStrategy = nextSettings.taskDelegationStrategies.topDown;
       return {
-        settings: toPublicUiServerSettings(nextSettings, nextAuthResponse, {
-          ceoBootstrapPending,
-        }),
+        settings: toPublicUiServerSettings(nextSettings, nextAuthResponse),
         message: `Task automation checks ${taskAutomationMessage} (runs every ${DEFAULT_TASK_CHECK_FREQUENCY_MINUTES} minute(s)). Product Manager task refill ${
           topDownStrategy.enabled
             ? "enabled"
@@ -773,14 +763,13 @@ export function registerApiRoutes(
         resolveOnboardingRoadmapStatus(service.getHomeDir()),
       ]);
       const hasCeoAgent = agents.some((agent) => agent.id === DEFAULT_AGENT_ID);
-      const ceoBootstrapPending = isCeoBootstrapPending(service.getHomeDir());
       const onboardingCompleted = deps.getSettings().onboarding.completed;
 
       return {
         onboarding: {
           shouldShow: !hasCeoAgent || !onboardingCompleted,
           hasCeoAgent,
-          ceoBootstrapPending,
+          ceoBootstrapPending: false,
           completed: onboardingCompleted,
           gateway,
           roadmap,
