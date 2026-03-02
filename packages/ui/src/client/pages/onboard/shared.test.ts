@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  ONBOARDING_START_MARKER,
   buildInitialRoadmapPrompt,
   buildOnboardingFollowUpPrompt,
   parseOnboardingAssistantOutput,
@@ -17,35 +16,24 @@ describe("onboarding chat protocol helpers", () => {
     mvpFeature: "Daily autonomous roadmap updates",
   };
 
-  it("includes start marker protocol in the initial roadmap prompt", () => {
+  it("includes roadmap-save protocol in the initial roadmap prompt", () => {
     const prompt = buildInitialRoadmapPrompt(onboardingPayload);
     expect(prompt).toContain("Conversation protocol:");
-    expect(prompt).toContain(ONBOARDING_START_MARKER);
+    expect(prompt).toContain("update organization/ROADMAP.md before replying");
   });
 
-  it("includes start marker protocol in follow-up prompts", () => {
+  it("includes roadmap-save protocol in follow-up prompts", () => {
     const prompt = buildOnboardingFollowUpPrompt(
       "Everything is approved. Let's start.",
     );
     expect(prompt).toContain("Everything is approved. Let's start.");
-    expect(prompt).toContain(ONBOARDING_START_MARKER);
+    expect(prompt).toContain("Approval is handled by the UI.");
   });
 
-  it("returns redirect=true and strips marker when marker is the final line", () => {
+  it("keeps assistant output unchanged", () => {
     const result = parseOnboardingAssistantOutput(
-      `All set. I've updated the roadmap.\n\n${ONBOARDING_START_MARKER}`,
+      "All set. I've updated the roadmap.",
     );
-    expect(result.shouldRedirectToDashboard).toBe(true);
     expect(result.cleanedContent).toBe("All set. I've updated the roadmap.");
-  });
-
-  it("does not trigger redirect when marker is not the final line", () => {
-    const result = parseOnboardingAssistantOutput(
-      `${ONBOARDING_START_MARKER}\nAll set. I've updated the roadmap.`,
-    );
-    expect(result.shouldRedirectToDashboard).toBe(false);
-    expect(result.cleanedContent).toBe(
-      `${ONBOARDING_START_MARKER}\nAll set. I've updated the roadmap.`,
-    );
   });
 });

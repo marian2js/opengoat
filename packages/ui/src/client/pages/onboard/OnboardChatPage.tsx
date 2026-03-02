@@ -1,5 +1,14 @@
-import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from "@/components/ai-elements/conversation";
-import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
 import {
   PromptInput,
   PromptInputBody,
@@ -10,9 +19,16 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { ArrowLeft, MessageSquare } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import type { ChatStatus } from "ai";
+import { ArrowLeft, MessageSquare } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 import opengoatLogo from "../../../../../../assets/opengoat.png";
 import {
   DEFAULT_AGENT_ID,
@@ -46,6 +62,17 @@ interface OnboardingCompletionResponse {
   message?: string;
 }
 
+interface OnboardingRoadmapStatus {
+  exists: boolean;
+  path: string;
+  updatedAt?: string;
+  bytes?: number;
+}
+
+interface OnboardingRoadmapStatusResponse {
+  roadmap: OnboardingRoadmapStatus;
+}
+
 export function OnboardChatPage(): ReactElement {
   const [payload] = useState<OnboardingPayload | null>(() =>
     loadOnboardingPayload(),
@@ -59,6 +86,9 @@ export function OnboardChatPage(): ReactElement {
   const [runtimeStatusLine, setRuntimeStatusLine] = useState<string | null>(
     null,
   );
+  const [roadmapStatus, setRoadmapStatus] =
+    useState<OnboardingRoadmapStatus | null>(null);
+  const [approvingRoadmap, setApprovingRoadmap] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const initialRoadmapStartedRef = useRef(false);
   const streamTimeoutRef = useRef<number | null>(null);
@@ -83,36 +113,48 @@ export function OnboardChatPage(): ReactElement {
     [],
   );
 
-  const ensureSession = useCallback(async (): Promise<OnboardingSessionInfo> => {
-    if (chatState.sessionInfo) {
-      return chatState.sessionInfo;
+  const refreshRoadmapStatus = useCallback(async (): Promise<void> => {
+    try {
+      const response = await fetchJson<OnboardingRoadmapStatusResponse>(
+        "/api/openclaw/onboarding/roadmap-status",
+      );
+      setRoadmapStatus(response.roadmap);
+    } catch {
+      setRoadmapStatus(null);
     }
+  }, []);
 
-    const response = await fetchJson<WorkspaceSessionResponse>(
-      "/api/workspaces/session",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+  const ensureSession =
+    useCallback(async (): Promise<OnboardingSessionInfo> => {
+      if (chatState.sessionInfo) {
+        return chatState.sessionInfo;
+      }
+
+      const response = await fetchJson<WorkspaceSessionResponse>(
+        "/api/workspaces/session",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            agentId: DEFAULT_AGENT_ID,
+            workspaceName: ONBOARDING_WORKSPACE_NAME,
+          }),
         },
-        body: JSON.stringify({
-          agentId: DEFAULT_AGENT_ID,
-          workspaceName: ONBOARDING_WORKSPACE_NAME,
-        }),
-      },
-    );
+      );
 
-    const sessionInfo: OnboardingSessionInfo = {
-      agentId: response.agentId || DEFAULT_AGENT_ID,
-      sessionRef: response.session.sessionKey,
-      sessionId: response.session.sessionId,
-    };
-    setAndPersistChatState((current) => ({
-      ...current,
-      sessionInfo,
-    }));
-    return sessionInfo;
-  }, [chatState.sessionInfo, setAndPersistChatState]);
+      const sessionInfo: OnboardingSessionInfo = {
+        agentId: response.agentId || DEFAULT_AGENT_ID,
+        sessionRef: response.session.sessionKey,
+        sessionId: response.session.sessionId,
+      };
+      setAndPersistChatState((current) => ({
+        ...current,
+        sessionInfo,
+      }));
+      return sessionInfo;
+    }, [chatState.sessionInfo, setAndPersistChatState]);
 
   const appendMessage = useCallback(
     (message: OnboardingChatMessage): void => {
@@ -192,51 +234,15 @@ export function OnboardChatPage(): ReactElement {
 
           const parsedOutput = parseOnboardingAssistantOutput(assistantOutput);
           const assistantMessageContent =
-            parsedOutput.cleanedContent ||
-            (parsedOutput.shouldRedirectToDashboard
-              ? "Roadmap approved. Opening your dashboard..."
-              : "Goat returned no output.");
+            parsedOutput.cleanedContent || "Goat returned no output.";
 
           appendMessage({
             id: createMessageId("assistant"),
             role: "assistant",
             content: assistantMessageContent,
           });
+          await refreshRoadmapStatus();
           setChatStatus("ready");
-          if (
-            parsedOutput.shouldRedirectToDashboard &&
-            !redirectTriggeredRef.current
-          ) {
-            try {
-              await fetchJson<OnboardingCompletionResponse>(
-                "/api/openclaw/onboarding/complete",
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    executionProviderId: payload?.executionProviderId,
-                  }),
-                },
-              );
-            } catch (completionError) {
-              const completionMessage =
-                completionError instanceof Error
-                  ? completionError.message
-                  : "Unable to mark onboarding as completed.";
-              setError(completionMessage);
-              setChatStatus("error");
-              return;
-            }
-            redirectTriggeredRef.current = true;
-            clearOnboardingPayload();
-            clearOnboardingChatState();
-            setRuntimeStatusLine("Approved. Taking you to the dashboard...");
-            redirectTimeoutRef.current = window.setTimeout(() => {
-              window.location.assign("/dashboard");
-            }, 150);
-          }
           return;
         } catch (requestError) {
           if (isAbortError(requestError)) {
@@ -283,7 +289,7 @@ export function OnboardChatPage(): ReactElement {
         }
       }
     },
-    [appendMessage, ensureSession, payload?.executionProviderId],
+    [appendMessage, ensureSession, refreshRoadmapStatus],
   );
 
   const runInitialRoadmapTurn = useCallback(async (): Promise<void> => {
@@ -348,6 +354,10 @@ export function OnboardChatPage(): ReactElement {
   ]);
 
   useEffect(() => {
+    void refreshRoadmapStatus();
+  }, [refreshRoadmapStatus]);
+
+  useEffect(() => {
     return () => {
       const controller = abortControllerRef.current;
       if (controller && !controller.signal.aborted) {
@@ -380,6 +390,45 @@ export function OnboardChatPage(): ReactElement {
     [payload, runAssistantTurn],
   );
 
+  const handleApproveRoadmap = useCallback(async (): Promise<void> => {
+    if (!payload || approvingRoadmap || redirectTriggeredRef.current) {
+      return;
+    }
+    setError(null);
+    setApprovingRoadmap(true);
+    try {
+      await fetchJson<OnboardingCompletionResponse>(
+        "/api/openclaw/onboarding/complete",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            executionProviderId: payload.executionProviderId,
+          }),
+        },
+      );
+      redirectTriggeredRef.current = true;
+      clearOnboardingPayload();
+      clearOnboardingChatState();
+      setRuntimeStatusLine("Roadmap approved. Taking you to the dashboard...");
+      redirectTimeoutRef.current = window.setTimeout(() => {
+        window.location.assign("/dashboard");
+      }, 150);
+    } catch (completionError) {
+      const completionMessage =
+        completionError instanceof Error
+          ? completionError.message
+          : "Unable to mark onboarding as completed.";
+      setError(completionMessage);
+      setChatStatus("error");
+      await refreshRoadmapStatus();
+    } finally {
+      setApprovingRoadmap(false);
+    }
+  }, [approvingRoadmap, payload, refreshRoadmapStatus]);
+
   const handleStop = useCallback(() => {
     const controller = abortControllerRef.current;
     if (!controller || controller.signal.aborted) {
@@ -395,6 +444,28 @@ export function OnboardChatPage(): ReactElement {
     }
     return `Session: ${chatState.sessionInfo.sessionRef}`;
   }, [chatState.sessionInfo]);
+
+  const roadmapSavedLabel = useMemo(() => {
+    if (!roadmapStatus?.exists) {
+      return "Roadmap is not saved yet.";
+    }
+    if (!roadmapStatus.updatedAt) {
+      return "Roadmap saved.";
+    }
+    const date = new Date(roadmapStatus.updatedAt);
+    if (Number.isNaN(date.getTime())) {
+      return "Roadmap saved.";
+    }
+    return `Roadmap saved at ${date.toLocaleTimeString()}.`;
+  }, [roadmapStatus]);
+
+  const canApproveRoadmap =
+    Boolean(payload) &&
+    hasAssistantReply &&
+    roadmapStatus?.exists === true &&
+    chatStatus !== "streaming" &&
+    !initializing &&
+    !approvingRoadmap;
 
   return (
     <main
@@ -418,10 +489,11 @@ export function OnboardChatPage(): ReactElement {
               />
               <div className="min-w-0">
                 <h1 className="truncate font-semibold text-2xl text-white sm:text-3xl">
-                  Chat with Goat
+                  Chat with your Co-Founder
                 </h1>
                 <p className="truncate text-muted-foreground text-sm">
-                  {sessionLabel}
+                  Goat is your AI Co-Founder. Let's start with the initial
+                  roadmap.
                 </p>
               </div>
             </div>
@@ -468,6 +540,28 @@ export function OnboardChatPage(): ReactElement {
               )}
             </div>
           ) : null}
+
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+            <div className="min-w-0">
+              <p className="font-medium text-sm text-white">Roadmap approval</p>
+              <p className="truncate text-muted-foreground text-xs">
+                {roadmapSavedLabel}
+              </p>
+              <p className="truncate text-muted-foreground/80 text-[11px]">
+                {sessionLabel}
+              </p>
+            </div>
+            <Button
+              disabled={!canApproveRoadmap}
+              onClick={() => {
+                void handleApproveRoadmap();
+              }}
+              type="button"
+            >
+              {approvingRoadmap ? <Spinner className="size-3" /> : null}
+              Approve roadmap
+            </Button>
+          </div>
 
           <div className="min-h-0 flex-1">
             <Conversation className="min-h-0 flex-1 rounded-xl border border-white/10 bg-black/20">
