@@ -87,6 +87,7 @@ describe("opengoat task cron notification helpers", () => {
       totalAgents: 4,
       managerAgents: 2,
       sageDirectReportees: 2,
+      sageDirectReporteeIds: ["alex", "blake"],
       openTasks: [
         {
           taskId: "task-1",
@@ -108,8 +109,12 @@ describe("opengoat task cron notification helpers", () => {
       "Open tasks are at 2, which is at or below the threshold (5).",
     );
     expect(message).toContain("Team context: You have 2 direct reportees.");
+    expect(message).toContain("Direct reportee ids: @alex, @blake.");
     expect(message).toContain("Sage playbook for delegation:");
     expect(message).toContain("organization/ROADMAP.md");
+    expect(message).toContain(
+      "Do not ask for confirmation, assignee selection, or follow-up questions",
+    );
     expect(message).toContain("what we need");
     expect(message).toContain("not implementation details");
     expect(message).toContain("task-1 [todo] @cto");

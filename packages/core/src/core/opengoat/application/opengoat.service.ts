@@ -1205,11 +1205,14 @@ export class OpenGoatService {
     const managerAgents = manifests.filter(
       (manifest) => manifest.metadata.type === "manager",
     ).length;
-    const sageDirectReportees = manifests.filter(
-      (manifest) =>
-        normalizeAgentId(manifest.metadata.reportsTo ?? "") ===
-        TOP_DOWN_TASK_DELEGATION_AGENT_ID,
-    ).length;
+    const sageDirectReporteeIds = manifests
+      .filter(
+        (manifest) =>
+          normalizeAgentId(manifest.metadata.reportsTo ?? "") ===
+          TOP_DOWN_TASK_DELEGATION_AGENT_ID,
+      )
+      .map((manifest) => manifest.agentId);
+    const sageDirectReportees = sageDirectReporteeIds.length;
     const sessionRef = buildNotificationSessionRef(
       TOP_DOWN_TASK_DELEGATION_AGENT_ID,
     );
@@ -1219,6 +1222,7 @@ export class OpenGoatService {
       totalAgents: manifests.length,
       managerAgents,
       sageDirectReportees,
+      sageDirectReporteeIds,
       openTasks: openTasks.map((task) => ({
         taskId: task.taskId,
         title: task.title,

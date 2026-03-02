@@ -136,6 +136,10 @@ describe("OpenGoatService", () => {
       (entry) => entry.kind === "topdown",
     );
     expect(topDownDispatch?.targetAgentId).toBe("sage");
+    expect(topDownDispatch?.message).toContain(
+      "Do not ask for confirmation, assignee selection, or follow-up questions",
+    );
+    expect(topDownDispatch?.message).toContain("Direct reportee ids: @alex.");
   });
 
   it("creates and lists agents through the facade", async () => {

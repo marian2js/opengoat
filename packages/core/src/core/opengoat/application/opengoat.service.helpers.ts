@@ -457,6 +457,7 @@ export function buildSageTaskDelegationMessage(params: {
   totalAgents: number;
   managerAgents: number;
   sageDirectReportees: number;
+  sageDirectReporteeIds: string[];
   openTasks: Array<{
     taskId: string;
     title: string;
@@ -481,6 +482,14 @@ export function buildSageTaskDelegationMessage(params: {
           .sort(([left], [right]) => left.localeCompare(right))
           .map(([status, count]) => `${status}:${count}`)
           .join(", ");
+  const reporteeIds = params.sageDirectReporteeIds
+    .map((agentId) => normalizeAgentId(agentId))
+    .filter((agentId): agentId is string => Boolean(agentId))
+    .sort((left, right) => left.localeCompare(right));
+  const reporteeSummary =
+    reporteeIds.length > 0
+      ? reporteeIds.map((agentId) => `@${agentId}`).join(", ")
+      : "none";
 
   const lines = [
     `Open tasks are at ${params.openTasksCount}, which is at or below the threshold (${params.openTasksThreshold}).`,
@@ -488,6 +497,7 @@ export function buildSageTaskDelegationMessage(params: {
       ? [`Notification timestamp: ${notificationTimestamp}`]
       : []),
     `Team context: You have ${params.sageDirectReportees} direct reportees.`,
+    `Direct reportee ids: ${reporteeSummary}.`,
     `Open task status distribution: ${statusSummary}.`,
     "",
     "Sage playbook for delegation:",
@@ -495,8 +505,11 @@ export function buildSageTaskDelegationMessage(params: {
     "2. If the active initiative is complete, mark it completed in the roadmap and move to the next initiative.",
     "3. Break the active initiative into the next tasks for the developers. Tasks should be achievable in a week if taken by a human developer.",
     "4. For each created task, include a concise PRD that defines outcomes and requirements (what we need), not implementation details (how to do it).",
-    "5. Delegate tasks to the right developer using the skill og-board-manager.",
-    "6. Keep decisions aligned with MISSION, VISION, and STRATEGY.",
+    "5. Create and assign tasks now using the skill og-board-manager.",
+    "6. Do not ask for confirmation, assignee selection, or follow-up questions in this automation session.",
+    "7. If direct reportees exist, assign to them immediately; if exactly one exists, assign all tasks to that reportee.",
+    "8. If no direct reportees exist, create the tasks assigned to yourself.",
+    "9. Keep decisions aligned with MISSION, VISION, and STRATEGY.",
     "",
     "Open tasks snapshot:",
     ...(openTasksPreview.length === 0
@@ -509,7 +522,7 @@ export function buildSageTaskDelegationMessage(params: {
       ? [`- ...and ${params.openTasks.length - openTasksPreview.length} more`]
       : []),
     "",
-    "Create and assign the next set of initiative-aligned tasks now.",
+    "Create and assign the next set of initiative-aligned tasks now. End with a concise summary listing created task IDs and assignees.",
   ];
 
   return lines.join("\n");
