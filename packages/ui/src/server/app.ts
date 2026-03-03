@@ -49,6 +49,7 @@ export async function createOpenGoatUiServer(
   const auth = createUiAuthController(app, () => uiSettings.authentication);
   const getVersionInfo = createVersionInfoProvider();
   const taskCronScheduler = createTaskCronScheduler(app, service, uiSettings, logs);
+  taskCronScheduler.setOnboardingCompleted(uiSettings.onboarding.completed);
 
   app.addHook("onClose", async () => {
     taskCronScheduler.stop();
@@ -100,6 +101,7 @@ export async function createOpenGoatUiServer(
       await writeUiServerSettings(service.getHomeDir(), uiSettings);
       auth.handleSettingsMutation(previousAuth, uiSettings.authentication);
       taskCronScheduler.setTaskCronEnabled(uiSettings.taskCronEnabled);
+      taskCronScheduler.setOnboardingCompleted(uiSettings.onboarding.completed);
       taskCronScheduler.setTaskDelegationStrategies(
         uiSettings.taskDelegationStrategies,
       );

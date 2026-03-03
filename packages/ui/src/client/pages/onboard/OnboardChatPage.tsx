@@ -43,6 +43,7 @@ import {
   loadOnboardingChatState,
   loadOnboardingPayload,
   normalizeRunError,
+  isTransientProviderFailureMessage,
   parseOnboardingAssistantOutput,
   saveOnboardingChatState,
   sendSessionMessageStream,
@@ -221,13 +222,36 @@ export function OnboardChatPage(): ReactElement {
 
           const assistantOutput = response.output.trim();
           if (response.result.code !== 0) {
+            const runtimeMessage =
+              assistantOutput ||
+              response.result.stderr.trim() ||
+              `Goat completed with code ${response.result.code}.`;
+            if (
+              attempt < maxAttempts &&
+              isTransientProviderFailureMessage(runtimeMessage)
+            ) {
+              setRuntimeStatusLine(
+                "Goat hit a transient provider issue. Retrying roadmap generation...",
+              );
+              continue;
+            }
             setError(
               normalizeRunError(
-                assistantOutput ||
-                  response.result.stderr.trim() ||
-                  `Goat completed with code ${response.result.code}.`,
+                runtimeMessage,
               ),
             );
+            setChatStatus("error");
+            return;
+          }
+
+          if (isTransientProviderFailureMessage(assistantOutput)) {
+            if (attempt < maxAttempts) {
+              setRuntimeStatusLine(
+                "Goat hit a transient provider issue. Retrying roadmap generation...",
+              );
+              continue;
+            }
+            setError(normalizeRunError(assistantOutput));
             setChatStatus("error");
             return;
           }

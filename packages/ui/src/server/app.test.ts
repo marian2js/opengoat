@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -1146,7 +1146,9 @@ describe("OpenGoat UI server API", () => {
   it("honors persisted cron disable setting during scheduler cycles", async () => {
     vi.useFakeTimers();
     try {
-      const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      const uniqueHomeDir = await mkdtemp(
+        path.resolve("/tmp", "opengoat-home-"),
+      );
       const runTaskCronCycle = vi.fn<NonNullable<OpenClawUiService["runTaskCronCycle"]>>(async () => {
         return {
           ranAt: new Date().toISOString(),
@@ -1189,83 +1191,189 @@ describe("OpenGoat UI server API", () => {
   });
 
   it("logs per-dispatch task-cron delivery messages", async () => {
-    vi.useFakeTimers();
-    try {
-      const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-      const runTaskCronCycle = vi.fn<NonNullable<OpenClawUiService["runTaskCronCycle"]>>(async () => {
-        return {
-          ranAt: new Date().toISOString(),
-          scannedTasks: 1,
-          todoTasks: 0,
-          doingTasks: 0,
-          blockedTasks: 0,
-          inactiveAgents: 0,
-          sent: 1,
-          failed: 0,
-          dispatches: [
-            {
-              kind: "blocked",
-              targetAgentId: "goat",
-              sessionRef: "agent:goat:agent_goat_notifications",
-              taskId: "task-1",
-              message:
-                "Task #task-1 assigned to your reportee is blocked.",
-              ok: true,
-            },
-          ],
-        };
-      });
-
-      activeServer = await createOpenGoatUiServer({
-        logger: false,
-        attachFrontend: false,
-        service: {
-          ...createMockService({
-            homeDir: uniqueHomeDir,
-          }),
-          runTaskCronCycle,
+    const uniqueHomeDir = await mkdtemp(
+      path.resolve("/tmp", "opengoat-home-"),
+    );
+    await mkdir(uniqueHomeDir, { recursive: true });
+    await writeFile(
+      `${uniqueHomeDir}/ui-settings.json`,
+      `${JSON.stringify(
+        {
+          taskCronEnabled: true,
         },
-      });
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    await mkdir(path.resolve(uniqueHomeDir, "organization"), {
+      recursive: true,
+    });
+    await writeFile(
+      path.resolve(uniqueHomeDir, "organization", "ROADMAP.md"),
+      "# ROADMAP\n",
+      "utf8",
+    );
+    const runTaskCronCycle = vi.fn<NonNullable<OpenClawUiService["runTaskCronCycle"]>>(async () => {
+      return {
+        ranAt: new Date().toISOString(),
+        scannedTasks: 1,
+        todoTasks: 0,
+        doingTasks: 0,
+        blockedTasks: 0,
+        inactiveAgents: 0,
+        sent: 1,
+        failed: 0,
+        dispatches: [
+          {
+            kind: "blocked",
+            targetAgentId: "goat",
+            sessionRef: "agent:goat:agent_goat_notifications",
+            taskId: "task-1",
+            message:
+              "Task #task-1 assigned to your reportee is blocked.",
+            ok: true,
+          },
+        ],
+      };
+    });
 
-      await vi.advanceTimersByTimeAsync(60_000);
-      expect(runTaskCronCycle).toHaveBeenCalledTimes(1);
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: {
+        ...createMockService({
+          homeDir: uniqueHomeDir,
+        }),
+        runTaskCronCycle,
+      },
+    });
 
-      const logsResponse = await activeServer.inject({
-        method: "GET",
-        url: "/api/logs/stream?follow=false&limit=200",
+    const settingsSnapshotResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/settings",
+    });
+    expect(settingsSnapshotResponse.statusCode).toBe(200);
+    expect(settingsSnapshotResponse.json()).toMatchObject({
+      settings: {
+        taskCronEnabled: true,
+        onboarding: {
+          completed: false,
+        },
+      },
+    });
+
+    const completeResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/openclaw/onboarding/complete",
+    });
+    expect(completeResponse.statusCode).toBe(200);
+
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      if (runTaskCronCycle.mock.calls.length > 0) {
+        break;
+      }
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10);
       });
-      expect(logsResponse.statusCode).toBe(200);
-      const snapshotEvent = logsResponse.body
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as { type: string; entries?: Array<{ message?: string }> })
-        .find((event) => event.type === "snapshot");
-      const messages =
-        snapshotEvent?.entries
-          ?.map((entry) => entry.message ?? "")
-          .filter(Boolean) ?? [];
-      expect(
-        messages.some((entry) =>
-          entry.includes("[task-cron] Agent @goat received blocked message."),
-        ),
-      ).toBe(true);
-      expect(
-        messages.some((entry) =>
-          entry.includes(
-            "message=\"Task #task-1 assigned to your reportee is blocked.\"",
-          ),
-        ),
-      ).toBe(true);
-    } finally {
-      vi.useRealTimers();
     }
+    expect(runTaskCronCycle).toHaveBeenCalled();
+
+    const logsResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/logs/stream?follow=false&limit=200",
+    });
+    expect(logsResponse.statusCode).toBe(200);
+    const snapshotEvent = logsResponse.body
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { type: string; entries?: Array<{ message?: string }> })
+      .find((event) => event.type === "snapshot");
+    const messages =
+      snapshotEvent?.entries
+        ?.map((entry) => entry.message ?? "")
+        .filter(Boolean) ?? [];
+    expect(
+      messages.some((entry) =>
+        entry.includes("[task-cron] Agent @goat received blocked message."),
+      ),
+    ).toBe(true);
+    expect(
+      messages.some((entry) =>
+        entry.includes(
+          "message=\"Task #task-1 assigned to your reportee is blocked.\"",
+        ),
+      ),
+    ).toBe(true);
   });
 
-  it("keeps scheduler running even if goat BOOTSTRAP.md exists", async () => {
+  it("ignores goat BOOTSTRAP.md when resolving onboarding settings", async () => {
+    const uniqueHomeDir = await mkdtemp(
+      path.resolve("/tmp", "opengoat-home-"),
+    );
+
+    await mkdir(path.resolve(uniqueHomeDir, "workspaces", "goat"), {
+      recursive: true,
+    });
+    await writeFile(
+      path.resolve(uniqueHomeDir, "workspaces", "goat", "BOOTSTRAP.md"),
+      "# BOOTSTRAP.md\n",
+      "utf8",
+    );
+    await mkdir(path.resolve(uniqueHomeDir, "organization"), {
+      recursive: true,
+    });
+    await writeFile(
+      path.resolve(uniqueHomeDir, "organization", "ROADMAP.md"),
+      "# ROADMAP\n",
+      "utf8",
+    );
+
+    activeServer = await createOpenGoatUiServer({
+      logger: false,
+      attachFrontend: false,
+      service: createMockService({
+        homeDir: uniqueHomeDir,
+      }),
+    });
+
+    const settingsResponse = await activeServer.inject({
+      method: "GET",
+      url: "/api/settings",
+    });
+    expect(settingsResponse.statusCode).toBe(200);
+    expect(settingsResponse.json()).toMatchObject({
+      settings: {
+        onboarding: {
+          completed: false,
+        },
+        ceoBootstrapPending: false,
+      },
+    });
+
+    const completeResponse = await activeServer.inject({
+      method: "POST",
+      url: "/api/openclaw/onboarding/complete",
+    });
+    expect(completeResponse.statusCode).toBe(200);
+  });
+
+  it("keeps task cron paused until onboarding roadmap is approved", async () => {
     vi.useFakeTimers();
     try {
-      const uniqueHomeDir = `/tmp/opengoat-home-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      const uniqueHomeDir = await mkdtemp(
+        path.resolve("/tmp", "opengoat-home-"),
+      );
+      await mkdir(path.resolve(uniqueHomeDir, "organization"), {
+        recursive: true,
+      });
+      await writeFile(
+        path.resolve(uniqueHomeDir, "organization", "ROADMAP.md"),
+        "# ROADMAP\n",
+        "utf8",
+      );
+
       const runTaskCronCycle = vi.fn<NonNullable<OpenClawUiService["runTaskCronCycle"]>>(async () => {
         return {
           ranAt: new Date().toISOString(),
@@ -1279,15 +1387,6 @@ describe("OpenGoat UI server API", () => {
         };
       });
 
-      await mkdir(path.resolve(uniqueHomeDir, "workspaces", "goat"), {
-        recursive: true,
-      });
-      await writeFile(
-        path.resolve(uniqueHomeDir, "workspaces", "goat", "BOOTSTRAP.md"),
-        "# BOOTSTRAP.md\n",
-        "utf8",
-      );
-
       activeServer = await createOpenGoatUiServer({
         logger: false,
         attachFrontend: false,
@@ -1299,19 +1398,42 @@ describe("OpenGoat UI server API", () => {
         },
       });
 
-      const settingsResponse = await activeServer.inject({
+      const initialSettingsResponse = await activeServer.inject({
         method: "GET",
         url: "/api/settings",
       });
-      expect(settingsResponse.statusCode).toBe(200);
-      expect(settingsResponse.json()).toMatchObject({
+      expect(initialSettingsResponse.statusCode).toBe(200);
+      expect(initialSettingsResponse.json()).toMatchObject({
         settings: {
-          ceoBootstrapPending: false,
+          taskCronEnabled: true,
+          onboarding: {
+            completed: false,
+          },
         },
       });
 
-      await vi.advanceTimersByTimeAsync(60_000);
-      expect(runTaskCronCycle).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(180_000);
+      expect(runTaskCronCycle).toHaveBeenCalledTimes(0);
+
+      const completeResponse = await activeServer.inject({
+        method: "POST",
+        url: "/api/openclaw/onboarding/complete",
+      });
+      expect(completeResponse.statusCode).toBe(200);
+
+      const completedSettingsResponse = await activeServer.inject({
+        method: "GET",
+        url: "/api/settings",
+      });
+      expect(completedSettingsResponse.statusCode).toBe(200);
+      expect(completedSettingsResponse.json()).toMatchObject({
+        settings: {
+          taskCronEnabled: true,
+          onboarding: {
+            completed: true,
+          },
+        },
+      });
     } finally {
       vi.useRealTimers();
     }

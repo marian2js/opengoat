@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { DEFAULT_TASK_CHECK_FREQUENCY_MINUTES } from "./constants.js";
 import {
   defaultUiServerSettings,
+  parseBooleanSetting,
   parseMaxInProgressMinutes,
   parseMaxParallelFlows,
   parseTaskCronEnabled,
@@ -33,6 +34,9 @@ export function createTaskCronScheduler(
       setTaskCronEnabled: () => {
         // no-op when runtime task cron is unavailable.
       },
+      setOnboardingCompleted: () => {
+        // no-op when runtime task cron is unavailable.
+      },
       setTaskDelegationStrategies: () => {
         // no-op when runtime task cron is unavailable.
       },
@@ -51,6 +55,9 @@ export function createTaskCronScheduler(
   let taskCronEnabled =
     parseTaskCronEnabled(initialSettings.taskCronEnabled) ??
     defaultUiServerSettings().taskCronEnabled;
+  let onboardingCompleted =
+    parseBooleanSetting(initialSettings.onboarding.completed) ??
+    defaultUiServerSettings().onboarding.completed;
   let taskDelegationStrategies = normalizeTaskDelegationStrategies(
     initialSettings.taskDelegationStrategies,
     defaultUiServerSettings().taskDelegationStrategies,
@@ -74,6 +81,8 @@ export function createTaskCronScheduler(
 
     const persistedTaskCronEnabled =
       parseTaskCronEnabled(persisted.taskCronEnabled) ?? taskCronEnabled;
+    const persistedOnboardingCompleted =
+      parseBooleanSetting(persisted.onboarding.completed) ?? onboardingCompleted;
     const persistedTaskDelegationStrategies = normalizeTaskDelegationStrategies(
       persisted.taskDelegationStrategies,
       taskDelegationStrategies,
@@ -85,6 +94,8 @@ export function createTaskCronScheduler(
       parseMaxParallelFlows(persisted.maxParallelFlows) ?? maxParallelFlows;
 
     const hasTaskCronEnabledChange = persistedTaskCronEnabled !== taskCronEnabled;
+    const hasOnboardingCompletedChange =
+      persistedOnboardingCompleted !== onboardingCompleted;
     const hasTaskDelegationStrategiesChange = !isSameTaskDelegationStrategies(
       persistedTaskDelegationStrategies,
       taskDelegationStrategies,
@@ -95,6 +106,7 @@ export function createTaskCronScheduler(
       persistedMaxParallelFlows !== maxParallelFlows;
     if (
       !hasTaskCronEnabledChange &&
+      !hasOnboardingCompletedChange &&
       !hasTaskDelegationStrategiesChange &&
       !hasMaxInProgressChange &&
       !hasMaxParallelFlowsChange
@@ -103,15 +115,17 @@ export function createTaskCronScheduler(
     }
 
     taskCronEnabled = persistedTaskCronEnabled;
+    onboardingCompleted = persistedOnboardingCompleted;
     taskDelegationStrategies = persistedTaskDelegationStrategies;
     maxInProgressMinutes = persistedMaxInProgressMinutes;
     maxParallelFlows = persistedMaxParallelFlows;
-    if (hasTaskCronEnabledChange) {
+    if (hasTaskCronEnabledChange || hasOnboardingCompletedChange) {
       schedule();
     }
     app.log.info(
       {
         taskCronEnabled,
+        onboardingCompleted,
         taskDelegationStrategies,
         maxInProgressMinutes,
         maxParallelFlows,
@@ -194,9 +208,10 @@ export function createTaskCronScheduler(
       clearInterval(intervalHandle);
       intervalHandle = undefined;
     }
-    if (!taskCronEnabled) {
+    if (!taskCronEnabled || !onboardingCompleted) {
       return;
     }
+    void runCycle();
     intervalHandle = setInterval(() => {
       void runCycle();
     }, DEFAULT_TASK_CHECK_FREQUENCY_MINUTES * 60_000);
@@ -224,6 +239,26 @@ export function createTaskCronScheduler(
         level: "info",
         source: "opengoat",
         message: `[task-cron] automation checks ${taskCronEnabled ? "enabled" : "disabled"}.`,
+      });
+    },
+    setOnboardingCompleted: (nextCompleted: boolean) => {
+      const parsed = parseBooleanSetting(nextCompleted);
+      if (parsed === undefined || parsed === onboardingCompleted) {
+        return;
+      }
+      onboardingCompleted = parsed;
+      schedule();
+      app.log.info(
+        {
+          onboardingCompleted,
+        },
+        "[task-cron] onboarding completion gate updated",
+      );
+      logs.append({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "opengoat",
+        message: `[task-cron] onboarding is ${onboardingCompleted ? "complete" : "incomplete"}; automation checks ${onboardingCompleted ? "can run" : "paused until roadmap approval"}.`,
       });
     },
     setTaskDelegationStrategies: (nextStrategies: UiTaskDelegationStrategiesSettings) => {

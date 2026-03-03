@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildInitialRoadmapPrompt,
   buildOnboardingFollowUpPrompt,
+  isTransientProviderFailureMessage,
+  normalizeRunError,
   parseOnboardingAssistantOutput,
   type OnboardingPayload,
 } from "./shared";
@@ -35,5 +37,28 @@ describe("onboarding chat protocol helpers", () => {
       "All set. I've updated the roadmap.",
     );
     expect(result.cleanedContent).toBe("All set. I've updated the roadmap.");
+  });
+
+  it("detects OpenClaw transient provider failures", () => {
+    expect(
+      isTransientProviderFailureMessage("Unhandled stop reason: error"),
+    ).toBe(true);
+    expect(isTransientProviderFailureMessage("LLM request timed out.")).toBe(
+      true,
+    );
+    expect(
+      isTransientProviderFailureMessage(
+        "The AI service is temporarily overloaded. Please try again in a moment.",
+      ),
+    ).toBe(true);
+    expect(
+      isTransientProviderFailureMessage("Roadmap draft ready for review."),
+    ).toBe(false);
+  });
+
+  it("normalizes transient provider failures into actionable onboarding errors", () => {
+    expect(normalizeRunError("Unhandled stop reason: error")).toBe(
+      "Goat hit a temporary AI provider issue in OpenClaw. Please retry.",
+    );
   });
 });

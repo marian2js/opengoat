@@ -125,14 +125,59 @@ export class OpenClawProvider extends BaseCliProvider {
     const result = await super.invoke(options);
     const parsed = parseGatewayAgentResponse(result.stdout);
     const normalizedStdout = parsed?.assistantText || result.stdout;
+    const normalizedResult = normalizeOpenClawExecutionResult({
+      ...result,
+      stdout: normalizedStdout,
+    });
     return attachProviderSessionId(
-      {
-        ...result,
-        stdout: normalizedStdout,
-      },
+      normalizedResult,
       sessionKey ?? parsed?.providerSessionId
     );
   }
+}
+
+const OPENCLAW_SOFT_FAILURE_PATTERNS: readonly RegExp[] = [
+  /^unhandled stop reason:\s*\S+/i,
+  /^llm request timed out\.?$/i,
+  /^request timed out\.?$/i,
+  /^the ai service is temporarily overloaded\b/i,
+  /^503 sorry, the upstream model provider is currently experiencing high demand\b/i,
+];
+
+export function normalizeOpenClawExecutionResult(
+  result: ProviderExecutionResult,
+): ProviderExecutionResult {
+  if (result.code !== 0) {
+    return result;
+  }
+
+  const softFailureMessage =
+    detectOpenClawSoftFailureMessage(result.stderr) ??
+    detectOpenClawSoftFailureMessage(result.stdout);
+  if (!softFailureMessage) {
+    return result;
+  }
+
+  return {
+    ...result,
+    code: 1,
+    stderr: result.stderr.trim() ? result.stderr : softFailureMessage,
+  };
+}
+
+function detectOpenClawSoftFailureMessage(value: string): string | undefined {
+  const normalized = value.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  for (const pattern of OPENCLAW_SOFT_FAILURE_PATTERNS) {
+    if (pattern.test(normalized)) {
+      return normalized;
+    }
+  }
+
+  return undefined;
 }
 
 function buildOpenClawSessionKey(

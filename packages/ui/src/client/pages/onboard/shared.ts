@@ -273,7 +273,27 @@ export function normalizeRunError(message: string): string {
   ) {
     return "OpenClaw has stale plugin config warnings. Run `openclaw onboard` to refresh plugin config, then retry.";
   }
+  if (isTransientProviderFailureMessage(message)) {
+    return "Goat hit a temporary AI provider issue in OpenClaw. Please retry.";
+  }
   return message;
+}
+
+export function isTransientProviderFailureMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  return (
+    normalized === "llm request timed out." ||
+    normalized === "request timed out." ||
+    normalized.startsWith("unhandled stop reason:") ||
+    normalized.startsWith("the ai service is temporarily overloaded") ||
+    normalized.startsWith(
+      "503 sorry, the upstream model provider is currently experiencing high demand",
+    )
+  );
 }
 
 export async function sendSessionMessageStream(
