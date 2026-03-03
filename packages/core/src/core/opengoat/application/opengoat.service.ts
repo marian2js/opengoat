@@ -5,18 +5,9 @@ import { AgentManifestService } from "../../agents/application/agent-manifest.se
 import { AgentService } from "../../agents/application/agent.service.js";
 import {
   BoardService,
-  type BoardListRecord,
-  type BoardRecord,
-  type CreateBoardListOptions,
-  type CreateBoardOptions,
   type CreateTaskOptions,
-  type ListBoardsOptions,
   type ListTasksOptions,
-  type ReorderTasksOptions,
   type TaskRecord,
-  type UpdateBoardListOptions,
-  type UpdateBoardOptions,
-  type UpdateTaskOptions,
 } from "../../boards/index.js";
 import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
 import {
@@ -997,104 +988,6 @@ export class OpenGoatService {
     return this.orchestrationService.runAgent(paths, agentId, options);
   }
 
-  public async createBoard(
-    actorId: string,
-    options: CreateBoardOptions,
-  ): Promise<BoardRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.createBoard(paths, actorId, options);
-  }
-
-  public async listBoards(
-    options: ListBoardsOptions = {},
-  ): Promise<BoardRecord[]> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.listBoards(paths, options);
-  }
-
-  public async listBoardsPage(
-    options: ListBoardsOptions = {},
-  ): Promise<{
-    boards: BoardRecord[];
-    total: number;
-    limit: number;
-    offset: number;
-  }> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.listBoardsPage(paths, options);
-  }
-
-  public async getBoard(boardId: string): Promise<BoardRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.getBoard(paths, boardId);
-  }
-
-  public async updateBoard(
-    actorId: string,
-    boardId: string,
-    options: UpdateBoardOptions,
-  ): Promise<BoardRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.updateBoard(paths, actorId, boardId, options);
-  }
-
-  public async deleteBoard(
-    actorId: string,
-    boardId: string,
-  ): Promise<{ deletedBoardId: string; deletedCount: number }> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.deleteBoard(paths, actorId, boardId);
-  }
-
-  public async createBoardList(
-    actorId: string,
-    boardId: string,
-    options: CreateBoardListOptions,
-  ): Promise<BoardListRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.createBoardList(paths, actorId, boardId, options);
-  }
-
-  public async listBoardLists(
-    boardId: string,
-  ): Promise<BoardListRecord[]> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.listBoardLists(paths, boardId);
-  }
-
-  public async getBoardList(
-    boardId: string,
-    listId: string,
-  ): Promise<BoardListRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.getBoardList(paths, boardId, listId);
-  }
-
-  public async updateBoardList(
-    actorId: string,
-    boardId: string,
-    listId: string,
-    options: UpdateBoardListOptions,
-  ): Promise<BoardListRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.updateBoardList(
-      paths,
-      actorId,
-      boardId,
-      listId,
-      options,
-    );
-  }
-
-  public async deleteBoardList(
-    actorId: string,
-    boardId: string,
-    listId: string,
-  ): Promise<{ deletedListId: string; deletedCount: number }> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.deleteBoardList(paths, actorId, boardId, listId);
-  }
-
   public async createTask(
     actorId: string,
     options: CreateTaskOptions,
@@ -1156,23 +1049,6 @@ export class OpenGoatService {
       status,
       reason,
     );
-  }
-
-  public async updateTask(
-    actorId: string,
-    taskId: string,
-    options: UpdateTaskOptions,
-  ): Promise<TaskRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.updateTask(paths, actorId, taskId, options);
-  }
-
-  public async reorderTasks(
-    actorId: string,
-    options: ReorderTasksOptions,
-  ): Promise<TaskRecord[]> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.reorderTasks(paths, actorId, options);
   }
 
   public async addTaskBlocker(
