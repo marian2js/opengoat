@@ -5,18 +5,18 @@ import { AgentManifestService } from "../../agents/application/agent-manifest.se
 import { AgentService } from "../../agents/application/agent.service.js";
 import {
   BoardService,
-  type BoardListRecord,
-  type BoardRecord,
-  type CreateBoardListOptions,
-  type CreateBoardOptions,
   type CreateTaskOptions,
-  type ListBoardsOptions,
+  type ListTaskActivityOptions,
+  type ListTaskAttachmentsOptions,
+  type ListTaskCommentsOptions,
   type ListTasksOptions,
-  type ReorderTasksOptions,
+  type TaskActivityRecord,
+  type TaskAttachmentCreateOptions,
+  type TaskAttachmentRecord,
+  type TaskCommentRecord,
+  type TaskSavedQueryFilters,
+  type TaskSavedQueryRecord,
   type TaskRecord,
-  type UpdateBoardListOptions,
-  type UpdateBoardOptions,
-  type UpdateTaskOptions,
 } from "../../boards/index.js";
 import { BootstrapService } from "../../bootstrap/application/bootstrap.service.js";
 import {
@@ -997,104 +997,6 @@ export class OpenGoatService {
     return this.orchestrationService.runAgent(paths, agentId, options);
   }
 
-  public async createBoard(
-    actorId: string,
-    options: CreateBoardOptions,
-  ): Promise<BoardRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.createBoard(paths, actorId, options);
-  }
-
-  public async listBoards(
-    options: ListBoardsOptions = {},
-  ): Promise<BoardRecord[]> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.listBoards(paths, options);
-  }
-
-  public async listBoardsPage(
-    options: ListBoardsOptions = {},
-  ): Promise<{
-    boards: BoardRecord[];
-    total: number;
-    limit: number;
-    offset: number;
-  }> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.listBoardsPage(paths, options);
-  }
-
-  public async getBoard(boardId: string): Promise<BoardRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.getBoard(paths, boardId);
-  }
-
-  public async updateBoard(
-    actorId: string,
-    boardId: string,
-    options: UpdateBoardOptions,
-  ): Promise<BoardRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.updateBoard(paths, actorId, boardId, options);
-  }
-
-  public async deleteBoard(
-    actorId: string,
-    boardId: string,
-  ): Promise<{ deletedBoardId: string; deletedCount: number }> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.deleteBoard(paths, actorId, boardId);
-  }
-
-  public async createBoardList(
-    actorId: string,
-    boardId: string,
-    options: CreateBoardListOptions,
-  ): Promise<BoardListRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.createBoardList(paths, actorId, boardId, options);
-  }
-
-  public async listBoardLists(
-    boardId: string,
-  ): Promise<BoardListRecord[]> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.listBoardLists(paths, boardId);
-  }
-
-  public async getBoardList(
-    boardId: string,
-    listId: string,
-  ): Promise<BoardListRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.getBoardList(paths, boardId, listId);
-  }
-
-  public async updateBoardList(
-    actorId: string,
-    boardId: string,
-    listId: string,
-    options: UpdateBoardListOptions,
-  ): Promise<BoardListRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.updateBoardList(
-      paths,
-      actorId,
-      boardId,
-      listId,
-      options,
-    );
-  }
-
-  public async deleteBoardList(
-    actorId: string,
-    boardId: string,
-    listId: string,
-  ): Promise<{ deletedListId: string; deletedCount: number }> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.deleteBoardList(paths, actorId, boardId, listId);
-  }
-
   public async createTask(
     actorId: string,
     options: CreateTaskOptions,
@@ -1111,14 +1013,20 @@ export class OpenGoatService {
   }
 
   public async listLatestTasks(
-    options: ListTasksOptions = {},
+    options: { assignee?: string; limit?: number } = {},
   ): Promise<TaskRecord[]> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.listLatestTasks(paths, options);
   }
 
   public async listLatestTasksPage(
-    options: ListTasksOptions = {},
+    options: {
+      assignee?: string;
+      owner?: string;
+      status?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
   ): Promise<{
     tasks: TaskRecord[];
     total: number;
@@ -1129,9 +1037,83 @@ export class OpenGoatService {
     return this.boardService.listLatestTasksPage(paths, options);
   }
 
+  public async createTaskSavedQuery(
+    actorId: string,
+    options: {
+      name: string;
+      filters?: TaskSavedQueryFilters;
+    },
+  ): Promise<TaskSavedQueryRecord> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.createTaskSavedQuery(paths, actorId, options);
+  }
+
+  public async listTaskSavedQueriesPage(
+    actorId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): Promise<{
+    queries: TaskSavedQueryRecord[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.listTaskSavedQueriesPage(paths, actorId, options);
+  }
+
+  public async deleteTaskSavedQuery(
+    actorId: string,
+    queryId: string,
+  ): Promise<{ deletedQueryId: string; deletedCount: number }> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.deleteTaskSavedQuery(paths, actorId, queryId);
+  }
+
   public async getTask(taskId: string): Promise<TaskRecord> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.getTask(paths, taskId);
+  }
+
+  public async listTaskCommentsPage(
+    taskId: string,
+    options: ListTaskCommentsOptions = {},
+  ): Promise<{
+    comments: TaskCommentRecord[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.listTaskCommentsPage(paths, taskId, options);
+  }
+
+  public async listTaskActivityPage(
+    taskId: string,
+    options: ListTaskActivityOptions = {},
+  ): Promise<{
+    activity: TaskActivityRecord[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.listTaskActivityPage(paths, taskId, options);
+  }
+
+  public async listTaskAttachmentsPage(
+    taskId: string,
+    options: ListTaskAttachmentsOptions = {},
+  ): Promise<{
+    attachments: TaskAttachmentRecord[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.listTaskAttachmentsPage(paths, taskId, options);
   }
 
   public async deleteTasks(
@@ -1156,23 +1138,6 @@ export class OpenGoatService {
       status,
       reason,
     );
-  }
-
-  public async updateTask(
-    actorId: string,
-    taskId: string,
-    options: UpdateTaskOptions,
-  ): Promise<TaskRecord> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.updateTask(paths, actorId, taskId, options);
-  }
-
-  public async reorderTasks(
-    actorId: string,
-    options: ReorderTasksOptions,
-  ): Promise<TaskRecord[]> {
-    const paths = this.pathsProvider.getPaths();
-    return this.boardService.reorderTasks(paths, actorId, options);
   }
 
   public async addTaskBlocker(
@@ -1200,6 +1165,47 @@ export class OpenGoatService {
   ): Promise<TaskRecord> {
     const paths = this.pathsProvider.getPaths();
     return this.boardService.addTaskWorklog(paths, actorId, taskId, content);
+  }
+
+  public async addTaskComment(
+    actorId: string,
+    taskId: string,
+    body: string,
+  ): Promise<TaskCommentRecord> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.addTaskComment(paths, actorId, taskId, body);
+  }
+
+  public async deleteTaskComment(
+    actorId: string,
+    taskId: string,
+    commentId: string,
+  ): Promise<{ deletedCommentId: string; deletedCount: number }> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.deleteTaskComment(paths, actorId, taskId, commentId);
+  }
+
+  public async addTaskAttachment(
+    actorId: string,
+    taskId: string,
+    options: TaskAttachmentCreateOptions,
+  ): Promise<TaskAttachmentRecord> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.addTaskAttachment(paths, actorId, taskId, options);
+  }
+
+  public async deleteTaskAttachment(
+    actorId: string,
+    taskId: string,
+    attachmentId: string,
+  ): Promise<{ deletedAttachmentId: string; deletedCount: number }> {
+    const paths = this.pathsProvider.getPaths();
+    return this.boardService.deleteTaskAttachment(
+      paths,
+      actorId,
+      taskId,
+      attachmentId,
+    );
   }
 
   private async assertManagerSupportsReportees(
