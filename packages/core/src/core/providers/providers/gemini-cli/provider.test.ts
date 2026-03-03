@@ -24,9 +24,7 @@ describe("gemini-cli provider", () => {
       "--model",
       "gemini-2.5-pro",
       "--debug",
-      "--yolo",
-      "--approval-mode",
-      "yolo",
+      "--approval-mode=yolo",
       "--sandbox",
       "false",
     ]);
@@ -49,9 +47,7 @@ describe("gemini-cli provider", () => {
       "f0363b08-ec9b-4d66-be43-d9730994616c",
       "--model",
       "gemini-2.5-flash",
-      "--yolo",
-      "--approval-mode",
-      "yolo",
+      "--approval-mode=yolo",
       "--sandbox",
       "false",
     ]);

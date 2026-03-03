@@ -6,9 +6,7 @@ import type {
 } from "../../types.js";
 
 const GEMINI_AUTONOMY_FLAGS = [
-  "--yolo",
-  "--approval-mode",
-  "yolo",
+  "--approval-mode=yolo",
   "--sandbox",
   "false",
 ] as const;
