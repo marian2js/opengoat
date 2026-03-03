@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { OpenClawProvider, parseGatewayAgentResponse } from "./provider.js";
+import {
+  normalizeOpenClawExecutionResult,
+  OpenClawProvider,
+  parseGatewayAgentResponse,
+} from "./provider.js";
 import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 
@@ -272,6 +276,48 @@ describe("openclaw provider", () => {
     );
 
     expect(parsed?.assistantText).toBe("Roadmap draft ready.");
+  });
+
+  it("converts unhandled stop reason output into a failed invocation", () => {
+    const normalized = normalizeOpenClawExecutionResult({
+      code: 0,
+      stdout: "Unhandled stop reason: error",
+      stderr: "",
+    });
+
+    expect(normalized).toEqual({
+      code: 1,
+      stdout: "Unhandled stop reason: error",
+      stderr: "Unhandled stop reason: error",
+    });
+  });
+
+  it("converts timeout output into a failed invocation", () => {
+    const normalized = normalizeOpenClawExecutionResult({
+      code: 0,
+      stdout: "LLM request timed out.",
+      stderr: "",
+    });
+
+    expect(normalized).toEqual({
+      code: 1,
+      stdout: "LLM request timed out.",
+      stderr: "LLM request timed out.",
+    });
+  });
+
+  it("does not alter non-zero exit codes", () => {
+    const normalized = normalizeOpenClawExecutionResult({
+      code: 2,
+      stdout: "Unhandled stop reason: error",
+      stderr: "runtime failed",
+    });
+
+    expect(normalized).toEqual({
+      code: 2,
+      stdout: "Unhandled stop reason: error",
+      stderr: "runtime failed",
+    });
   });
 });
 

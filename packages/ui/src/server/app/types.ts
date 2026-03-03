@@ -579,6 +579,7 @@ export interface RuntimeLogExtractionResult {
 
 export interface TaskCronScheduler {
   setTaskCronEnabled: (enabled: boolean) => void;
+  setOnboardingCompleted: (completed: boolean) => void;
   setTaskDelegationStrategies: (
     strategies: UiTaskDelegationStrategiesSettings,
   ) => void;
