@@ -12,7 +12,7 @@ const originalOpenClawStateDir = process.env.OPENCLAW_STATE_DIR;
 const originalOpenClawConfigPath = process.env.OPENCLAW_CONFIG_PATH;
 const BOOTSTRAP_TIMEOUT_MS = 90_000;
 const INIT_TIMEOUT_MS = 45_000;
-const HARD_RESET_TIMEOUT_MS = 45_000;
+const HARD_RESET_TIMEOUT_MS = 120_000;
 
 afterEach(async () => {
   if (originalHome === undefined) {

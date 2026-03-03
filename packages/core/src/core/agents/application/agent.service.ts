@@ -4,6 +4,7 @@ import {
   isAbsolute,
   resolve as resolvePath,
 } from "node:path";
+import { existsSync } from "node:fs";
 import {
   DEFAULT_AGENT_ID,
   isDefaultAgentId,
@@ -1477,8 +1478,8 @@ function normalizeTemplateRelativePath(fileName: string): string {
 }
 
 function renderOpenGoatWorkspaceShim(): string {
-  const cliEntrypoint = resolveOpenGoatCliEntrypoint();
-  if (!cliEntrypoint) {
+  const cliLauncher = resolveOpenGoatCliLauncher();
+  if (!cliLauncher) {
     return ["#!/usr/bin/env sh", "set -eu", "", 'exec opengoat "$@"'].join(
       "\n",
     );
@@ -1489,28 +1490,51 @@ function renderOpenGoatWorkspaceShim(): string {
     "set -eu",
     "",
     `exec ${quoteForShell(process.execPath)} ${quoteForShell(
-      cliEntrypoint,
+      cliLauncher,
     )} "$@"`,
   ].join("\n");
 }
 
-function resolveOpenGoatCliEntrypoint(): string | undefined {
+function resolveOpenGoatCliLauncher(): string | undefined {
   const explicit = process.env.OPENGOAT_CLI_ENTRYPOINT?.trim();
   if (explicit) {
-    return normalizeEntrypointPath(explicit);
+    const normalized = normalizeEntrypointPath(explicit);
+    if (existsSync(normalized)) {
+      return normalized;
+    }
   }
 
   const argvEntrypoint = process.argv[1]?.trim();
-  if (!argvEntrypoint) {
-    return undefined;
+  if (argvEntrypoint) {
+    const normalizedArgvEntrypoint = normalizeEntrypointPath(argvEntrypoint);
+    const normalizedBasename = basename(normalizedArgvEntrypoint).toLowerCase();
+    if (
+      isLikelyOpenGoatEntrypointName(normalizedBasename) &&
+      existsSync(normalizedArgvEntrypoint)
+    ) {
+      return normalizedArgvEntrypoint;
+    }
+
+    const fallbackLauncherFromArgv = resolvePath(
+      dirname(dirname(normalizedArgvEntrypoint)),
+      "bin",
+      "opengoat",
+    );
+    if (
+      isLikelyOpenGoatCliIndexEntrypoint(normalizedBasename) &&
+      existsSync(fallbackLauncherFromArgv)
+    ) {
+      return fallbackLauncherFromArgv;
+    }
   }
 
-  const normalizedBasename = basename(argvEntrypoint).toLowerCase();
-  if (!isLikelyOpenGoatEntrypointName(normalizedBasename)) {
-    return undefined;
+  for (const candidate of listCwdLauncherCandidates()) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
   }
 
-  return normalizeEntrypointPath(argvEntrypoint);
+  return undefined;
 }
 
 function normalizeEntrypointPath(value: string): string {
@@ -1524,6 +1548,25 @@ function isLikelyOpenGoatEntrypointName(value: string): boolean {
   return (
     value === "opengoat" || value === "opengoat.js" || value === "opengoat.mjs"
   );
+}
+
+function isLikelyOpenGoatCliIndexEntrypoint(value: string): boolean {
+  return value === "index.js" || value === "index.ts" || value === "index.mjs";
+}
+
+function listCwdLauncherCandidates(): string[] {
+  const candidates = new Set<string>();
+  let probe = resolvePath(process.cwd());
+  while (true) {
+    candidates.add(resolvePath(probe, "bin", "opengoat"));
+    candidates.add(resolvePath(probe, "packages", "cli", "bin", "opengoat"));
+    const parent = dirname(probe);
+    if (parent === probe) {
+      break;
+    }
+    probe = parent;
+  }
+  return [...candidates];
 }
 
 function quoteForShell(value: string): string {
