@@ -181,6 +181,12 @@ describe("OpenGoatService", () => {
         constants.F_OK,
       ),
     ).resolves.toBeUndefined();
+    await expect(
+      access(
+        path.join(root, "workspaces", "research-analyst", "opengoat"),
+        constants.F_OK,
+      ),
+    ).resolves.toBeUndefined();
     const ceoReporteeLink = path.join(
       root,
       "workspaces",

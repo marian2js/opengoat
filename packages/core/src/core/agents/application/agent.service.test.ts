@@ -9,8 +9,10 @@ import { AgentService } from "./agent.service.js";
 
 describe("AgentService workspace role skills", () => {
   const tempDirs: string[] = [];
+  const originalCwd = process.cwd();
 
   afterEach(async () => {
+    process.chdir(originalCwd);
     while (tempDirs.length > 0) {
       const tempDir = tempDirs.pop();
       if (tempDir) {
@@ -114,6 +116,61 @@ describe("AgentService workspace role skills", () => {
       ),
     ).toBe(false);
   });
+
+  it("writes workspace shim with absolute launcher path when a local bin/opengoat is discoverable", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-agent-service-shim-"));
+    tempDirs.push(tempDir);
+    const paths = createPaths(path.join(tempDir, "home"));
+    const service = createService();
+    const binDir = path.join(tempDir, "bin");
+    const launcherPath = path.join(binDir, "opengoat");
+    await rm(binDir, { recursive: true, force: true });
+    await new NodeFileSystem().ensureDir(binDir);
+    await new NodeFileSystem().writeFile(
+      launcherPath,
+      "#!/usr/bin/env node\nconsole.log('shim');\n",
+    );
+
+    process.chdir(tempDir);
+    await service.ensureAgent(
+      paths,
+      { id: "sage", displayName: "Sage" },
+      { type: "manager", reportsTo: "goat" },
+    );
+    await service.ensureAgentWorkspaceCommandShim(paths, "sage");
+
+    const shimContent = await readFile(
+      path.join(paths.workspacesDir, "sage", "opengoat"),
+      "utf-8",
+    );
+    expect(shimContent).toContain(
+      `exec ${quoteForShellTest(process.execPath)} `,
+    );
+    expect(shimContent).toContain("/bin/opengoat' \"$@\"");
+  });
+
+  it("falls back to PATH-based opengoat shim when no local launcher is found", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "opengoat-agent-service-shim-fallback-"));
+    tempDirs.push(tempDir);
+    const homeDir = path.join(tempDir, "home");
+    const paths = createPaths(homeDir);
+    const service = createService();
+    await new NodeFileSystem().ensureDir(homeDir);
+
+    process.chdir(homeDir);
+    await service.ensureAgent(
+      paths,
+      { id: "alex", displayName: "Alex" },
+      { type: "individual", reportsTo: "sage" },
+    );
+    await service.ensureAgentWorkspaceCommandShim(paths, "alex");
+
+    const shimContent = await readFile(
+      path.join(paths.workspacesDir, "alex", "opengoat"),
+      "utf-8",
+    );
+    expect(shimContent).toContain('exec opengoat "$@"');
+  });
 });
 
 function createService(): AgentService {
@@ -147,4 +204,8 @@ async function pathExists(targetPath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function quoteForShellTest(value: string): string {
+  return `'${value.replace(/'/g, "'\"'\"'")}'`;
 }
