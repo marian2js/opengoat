@@ -28,7 +28,7 @@ import {
   type ProviderOnboardingSpec,
   type ProviderInvokeOptions,
   type ProviderSummary,
-  type ProviderRegistry
+  type ProviderRegistry,
 } from "../index.js";
 
 interface ProviderServiceDeps {
@@ -115,7 +115,9 @@ export class ProviderService {
     this.pathPort = deps.pathPort;
     this.providerRegistryInput = deps.providerRegistry;
     this.nowIso = deps.nowIso;
-    this.logger = (deps.logger ?? createNoopLogger()).child({ scope: "provider-service" });
+    this.logger = (deps.logger ?? createNoopLogger()).child({
+      scope: "provider-service",
+    });
   }
 
   public async listProviders(): Promise<ProviderSummary[]> {
@@ -124,11 +126,13 @@ export class ProviderService {
       id: provider.id,
       displayName: provider.displayName,
       kind: provider.kind,
-      capabilities: provider.capabilities
+      capabilities: provider.capabilities,
     }));
   }
 
-  public async getProviderOnboarding(providerId: string): Promise<ProviderOnboardingSpec | undefined> {
+  public async getProviderOnboarding(
+    providerId: string,
+  ): Promise<ProviderOnboardingSpec | undefined> {
     const normalizedProviderId = normalizeProviderId(providerId);
     const registry = await this.getProviderRegistry();
     return registry.getProviderOnboarding(normalizedProviderId);
@@ -137,28 +141,34 @@ export class ProviderService {
   public async invokeProviderAuth(
     paths: OpenGoatPaths,
     providerId: string,
-    options: ProviderAuthOptions = {}
+    options: ProviderAuthOptions = {},
   ): Promise<ProviderExecutionResult> {
     const normalizedProviderId = normalizeProviderId(providerId);
     const registry = await this.getProviderRegistry();
     const provider = registry.create(normalizedProviderId);
-    const env = await this.resolveProviderEnv(paths, normalizedProviderId, options.env);
+    const env = await this.resolveProviderEnv(
+      paths,
+      normalizedProviderId,
+      options.env,
+    );
     this.logger.info("Invoking provider auth.", {
-      providerId: provider.id
+      providerId: provider.id,
     });
-    return provider.invokeAuth?.({
-      ...options,
-      env
-    }) ?? {
-      code: 1,
-      stdout: "",
-      stderr: `${provider.id} does not support auth\n`
-    };
+    return (
+      provider.invokeAuth?.({
+        ...options,
+        env,
+      }) ?? {
+        code: 1,
+        stdout: "",
+        stderr: `${provider.id} does not support auth\n`,
+      }
+    );
   }
 
   public async getProviderConfig(
     paths: OpenGoatPaths,
-    providerId: string
+    providerId: string,
   ): Promise<ProviderStoredConfig | null> {
     const normalizedProviderId = normalizeProviderId(providerId);
     const configPath = this.getProviderConfigPath(paths, normalizedProviderId);
@@ -176,7 +186,11 @@ export class ProviderService {
     }
 
     if (!isProviderStoredConfig(parsed)) {
-      throw new InvalidProviderConfigError(normalizedProviderId, configPath, "schema mismatch");
+      throw new InvalidProviderConfigError(
+        normalizedProviderId,
+        configPath,
+        "schema mismatch",
+      );
     }
 
     if (parsed.providerId.trim().toLowerCase() !== normalizedProviderId) {
@@ -196,54 +210,70 @@ export class ProviderService {
     env: Record<string, string>,
     options: {
       replace?: boolean;
-    } = {}
+    } = {},
   ): Promise<ProviderStoredConfig> {
     const normalizedProviderId = normalizeProviderId(providerId);
-    const providerDir = this.pathPort.join(paths.providersDir, normalizedProviderId);
+    const providerDir = this.pathPort.join(
+      paths.providersDir,
+      normalizedProviderId,
+    );
     const configPath = this.getProviderConfigPath(paths, normalizedProviderId);
     const existing = await this.getProviderConfig(paths, normalizedProviderId);
     const replace = options.replace ?? false;
 
     const mergedEnv = sanitizeEnvMap({
       ...(replace ? {} : (existing?.env ?? {})),
-      ...env
+      ...env,
     });
 
     const next: ProviderStoredConfig = {
       schemaVersion: 1,
       providerId: normalizedProviderId,
       env: mergedEnv,
-      updatedAt: this.nowIso()
+      updatedAt: this.nowIso(),
     };
 
     await this.fileSystem.ensureDir(providerDir);
-    await this.fileSystem.writeFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
+    await this.fileSystem.writeFile(
+      configPath,
+      `${JSON.stringify(next, null, 2)}\n`,
+    );
     return next;
   }
 
   public async getOpenClawGatewayConfig(
     paths: OpenGoatPaths,
-    inputEnv?: NodeJS.ProcessEnv
+    inputEnv?: NodeJS.ProcessEnv,
   ): Promise<OpenClawGatewayConfig> {
-    const env = await this.resolveProviderEnv(paths, OPENCLAW_PROVIDER_ID, inputEnv);
-    const explicitMode = env.OPENGOAT_OPENCLAW_GATEWAY_MODE?.trim().toLowerCase();
+    const env = await this.resolveProviderEnv(
+      paths,
+      OPENCLAW_PROVIDER_ID,
+      inputEnv,
+    );
+    const explicitMode =
+      env.OPENGOAT_OPENCLAW_GATEWAY_MODE?.trim().toLowerCase();
     const parsedArgs = parseOpenClawArguments(env.OPENCLAW_ARGUMENTS ?? "");
 
     const mode: "local" | "external" =
-      explicitMode === "external" || parsedArgs.remoteUrl || parsedArgs.token ? "external" : "local";
+      explicitMode === "external" || parsedArgs.remoteUrl || parsedArgs.token
+        ? "external"
+        : "local";
 
     return {
       mode,
       gatewayUrl: env.OPENCLAW_GATEWAY_URL?.trim() || parsedArgs.remoteUrl,
       gatewayToken: env.OPENCLAW_GATEWAY_PASSWORD?.trim() || parsedArgs.token,
-      command: env.OPENCLAW_CMD?.trim() || "openclaw"
+      command: env.OPENCLAW_CMD?.trim() || "openclaw",
     };
   }
 
-  public async setOpenClawGatewayConfig(paths: OpenGoatPaths, config: OpenClawGatewayConfig): Promise<OpenClawGatewayConfig> {
+  public async setOpenClawGatewayConfig(
+    paths: OpenGoatPaths,
+    config: OpenClawGatewayConfig,
+  ): Promise<OpenClawGatewayConfig> {
     const current = await this.getProviderConfig(paths, OPENCLAW_PROVIDER_ID);
     const nextEnv: Record<string, string> = {
-      ...(current?.env ?? {})
+      ...(current?.env ?? {}),
     };
 
     delete nextEnv.OPENCLAW_ARGUMENTS;
@@ -254,7 +284,9 @@ export class ProviderService {
       const gatewayUrl = config.gatewayUrl?.trim();
       const gatewayToken = config.gatewayToken?.trim();
       if (!gatewayUrl || !gatewayToken) {
-        throw new Error("External gateway mode requires gatewayUrl and gatewayToken.");
+        throw new Error(
+          "External gateway mode requires gatewayUrl and gatewayToken.",
+        );
       }
       nextEnv.OPENGOAT_OPENCLAW_GATEWAY_MODE = "external";
       nextEnv.OPENCLAW_GATEWAY_URL = gatewayUrl;
@@ -264,7 +296,9 @@ export class ProviderService {
       nextEnv.OPENGOAT_OPENCLAW_GATEWAY_MODE = "local";
     }
 
-    await this.setProviderConfig(paths, OPENCLAW_PROVIDER_ID, nextEnv, { replace: true });
+    await this.setProviderConfig(paths, OPENCLAW_PROVIDER_ID, nextEnv, {
+      replace: true,
+    });
     return this.getOpenClawGatewayConfig(paths);
   }
 
@@ -273,7 +307,10 @@ export class ProviderService {
     agentId: string,
   ): Promise<AgentProviderBinding> {
     const normalizedAgentId = normalizeAgentIdentity(agentId);
-    const providerId = await this.resolveAgentProviderId(paths, normalizedAgentId);
+    const providerId = await this.resolveAgentProviderId(
+      paths,
+      normalizedAgentId,
+    );
     return {
       agentId: normalizedAgentId,
       providerId,
@@ -312,7 +349,10 @@ export class ProviderService {
       delete runtime.adapter;
     }
     config.runtime = runtime;
-    await this.fileSystem.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
+    await this.fileSystem.writeFile(
+      configPath,
+      `${JSON.stringify(config, null, 2)}\n`,
+    );
 
     return {
       agentId: normalizedAgentId,
@@ -324,14 +364,23 @@ export class ProviderService {
     paths: OpenGoatPaths,
     agentId: string,
     options: ProviderInvokeOptions,
-    runtimeContext: ProviderInvokeRuntimeContext = {}
+    runtimeContext: ProviderInvokeRuntimeContext = {},
   ): Promise<ProviderExecutionResult & AgentProviderBinding> {
     const normalizedAgentId = normalizeAgentIdentity(agentId);
     const binding = await this.getAgentProvider(paths, normalizedAgentId);
     const registry = await this.getProviderRegistry();
     const provider = registry.create(binding.providerId);
     const mergedSystemPrompt = options.systemPrompt?.trim();
-    const env = await this.resolveProviderEnv(paths, provider.id, options.env);
+    const agentEnvOverrides = await this.readAgentProviderEnvOverrides(
+      paths,
+      normalizedAgentId,
+    );
+    const env = await this.resolveProviderEnv(
+      paths,
+      provider.id,
+      options.env,
+      agentEnvOverrides,
+    );
     const providerSessionAlias = options.providerSessionId?.trim();
     const mappedProviderSessionId = await this.resolveProviderSessionIdAlias(
       paths,
@@ -348,13 +397,13 @@ export class ProviderService {
       providerSessionId: mappedProviderSessionId,
       agent: provider.capabilities.agent
         ? options.agent || normalizedAgentId
-        : options.agent
+        : options.agent,
     };
 
     this.logger.info("Invoking provider for agent.", {
       agentId: normalizedAgentId,
       providerId: provider.id,
-      cwd: invokeOptions.cwd
+      cwd: invokeOptions.cwd,
     });
 
     runtimeContext.hooks?.onInvocationStarted?.({
@@ -362,7 +411,7 @@ export class ProviderService {
       timestamp: this.nowIso(),
       step: runtimeContext.step,
       agentId: normalizedAgentId,
-      providerId: provider.id
+      providerId: provider.id,
     });
 
     let result: ProviderExecutionResult;
@@ -390,7 +439,11 @@ export class ProviderService {
         error instanceof ProviderCommandNotFoundError &&
         provider.id === OPENCLAW_PROVIDER_ID
       ) {
-        result = await this.invokeAgentViaGateway(normalizedAgentId, invokeOptions, env);
+        result = await this.invokeAgentViaGateway(
+          normalizedAgentId,
+          invokeOptions,
+          env,
+        );
       } else {
         throw error;
       }
@@ -409,20 +462,22 @@ export class ProviderService {
       step: runtimeContext.step,
       agentId: normalizedAgentId,
       providerId: provider.id,
-      code: result.code
+      code: result.code,
     });
 
     return {
       ...result,
       agentId: normalizedAgentId,
-      providerId: provider.id
+      providerId: provider.id,
     };
   }
 
   public async createProviderAgent(
     paths: OpenGoatPaths,
     agentId: string,
-    options: Omit<ProviderCreateAgentOptions, "agentId"> & { providerId?: string }
+    options: Omit<ProviderCreateAgentOptions, "agentId"> & {
+      providerId?: string;
+    },
   ): Promise<ProviderExecutionResult & AgentProviderBinding> {
     const normalizedAgentId = normalizeAgentIdentity(agentId);
     const requestedProviderId = options.providerId?.trim()
@@ -445,7 +500,7 @@ export class ProviderService {
         cwd: options.cwd,
         env,
         onStdout: options.onStdout,
-        onStderr: options.onStderr
+        onStderr: options.onStderr,
       });
     } catch (error) {
       if (
@@ -466,14 +521,16 @@ export class ProviderService {
     return {
       ...result,
       agentId: normalizedAgentId,
-      providerId: provider.id
+      providerId: provider.id,
     };
   }
 
   public async deleteProviderAgent(
     paths: OpenGoatPaths,
     agentId: string,
-    options: Omit<ProviderDeleteAgentOptions, "agentId"> & { providerId?: string }
+    options: Omit<ProviderDeleteAgentOptions, "agentId"> & {
+      providerId?: string;
+    },
   ): Promise<ProviderExecutionResult & AgentProviderBinding> {
     const normalizedAgentId = normalizeAgentIdentity(agentId);
     const requestedProviderId = options.providerId?.trim()
@@ -493,14 +550,17 @@ export class ProviderService {
         cwd: options.cwd,
         env,
         onStdout: options.onStdout,
-        onStderr: options.onStderr
+        onStderr: options.onStderr,
       });
     } catch (error) {
       if (
         error instanceof ProviderCommandNotFoundError &&
         provider.id === OPENCLAW_PROVIDER_ID
       ) {
-        result = await this.deleteProviderAgentViaGateway(normalizedAgentId, env);
+        result = await this.deleteProviderAgentViaGateway(
+          normalizedAgentId,
+          env,
+        );
       } else {
         throw error;
       }
@@ -509,7 +569,7 @@ export class ProviderService {
     return {
       ...result,
       agentId: normalizedAgentId,
-      providerId: provider.id
+      providerId: provider.id,
     };
   }
 
@@ -517,7 +577,11 @@ export class ProviderService {
     paths: OpenGoatPaths,
     inputEnv?: NodeJS.ProcessEnv,
   ): Promise<OpenClawAgentConfigEntry[]> {
-    const env = await this.resolveProviderEnv(paths, OPENCLAW_PROVIDER_ID, inputEnv);
+    const env = await this.resolveProviderEnv(
+      paths,
+      OPENCLAW_PROVIDER_ID,
+      inputEnv,
+    );
     const payload = await this.callGatewayMethod(env, "config.get", {});
     const parsed = parseGatewayConfigPayload(payload);
     if (!parsed) {
@@ -531,7 +595,11 @@ export class ProviderService {
     paths: OpenGoatPaths,
     inputEnv?: NodeJS.ProcessEnv,
   ): Promise<Record<string, unknown>> {
-    const env = await this.resolveProviderEnv(paths, OPENCLAW_PROVIDER_ID, inputEnv);
+    const env = await this.resolveProviderEnv(
+      paths,
+      OPENCLAW_PROVIDER_ID,
+      inputEnv,
+    );
     const payload = await this.callGatewayMethod(env, "skills.status", {});
     return asRecord(payload);
   }
@@ -541,7 +609,11 @@ export class ProviderService {
     rawAgentIds: string[],
     inputEnv?: NodeJS.ProcessEnv,
   ): Promise<string[]> {
-    const env = await this.resolveProviderEnv(paths, OPENCLAW_PROVIDER_ID, inputEnv);
+    const env = await this.resolveProviderEnv(
+      paths,
+      OPENCLAW_PROVIDER_ID,
+      inputEnv,
+    );
     const warnings: string[] = [];
     const normalizedAgentIds = [
       ...new Set(
@@ -632,9 +704,15 @@ export class ProviderService {
     return warnings;
   }
 
-  public async getAgentRuntimeProfile(paths: OpenGoatPaths, agentId: string): Promise<AgentRuntimeProfile> {
+  public async getAgentRuntimeProfile(
+    paths: OpenGoatPaths,
+    agentId: string,
+  ): Promise<AgentRuntimeProfile> {
     const normalizedAgentId = normalizeAgentIdentity(agentId);
-    const providerId = await this.resolveAgentProviderId(paths, normalizedAgentId);
+    const providerId = await this.resolveAgentProviderId(
+      paths,
+      normalizedAgentId,
+    );
     const registry = await this.getProviderRegistry();
     const provider = registry.create(providerId);
     const runtimePolicy = registry.getProviderRuntimePolicy(provider.id);
@@ -688,9 +766,13 @@ export class ProviderService {
 
   public async restartLocalGateway(
     paths: OpenGoatPaths,
-    inputEnv?: NodeJS.ProcessEnv
+    inputEnv?: NodeJS.ProcessEnv,
   ): Promise<boolean> {
-    const env = await this.resolveProviderEnv(paths, OPENCLAW_PROVIDER_ID, inputEnv);
+    const env = await this.resolveProviderEnv(
+      paths,
+      OPENCLAW_PROVIDER_ID,
+      inputEnv,
+    );
     const gatewayConfig = await this.getOpenClawGatewayConfig(paths, env);
     if (gatewayConfig.mode !== "local") {
       return false;
@@ -701,19 +783,19 @@ export class ProviderService {
       ...extractOpenClawGlobalArgs(env.OPENCLAW_ARGUMENTS),
       "gateway",
       "restart",
-      "--json"
+      "--json",
     ];
     const restartResult = await executeCommand({
       command,
       args,
       cwd: paths.homeDir,
-      env
+      env,
     });
     if (restartResult.code !== 0) {
       this.logger.warn("OpenClaw gateway restart failed.", {
         code: restartResult.code,
         stderr: restartResult.stderr.trim() || undefined,
-        stdout: restartResult.stdout.trim() || undefined
+        stdout: restartResult.stdout.trim() || undefined,
       });
       return false;
     }
@@ -759,7 +841,8 @@ export class ProviderService {
   ): Promise<ProviderExecutionResult> {
     const agentId = (invokeOptions.agent || fallbackAgentId).trim();
     const idempotencyKey =
-      invokeOptions.idempotencyKey?.trim() || `opengoat-${Date.now()}-${Math.random()}`;
+      invokeOptions.idempotencyKey?.trim() ||
+      `opengoat-${Date.now()}-${Math.random()}`;
     const providerSessionId =
       invokeOptions.providerSessionId?.trim() || idempotencyKey;
     const sessionKey = buildOpenClawSessionKey(agentId, providerSessionId);
@@ -784,13 +867,15 @@ export class ProviderService {
       },
     );
 
-    const commandResponse = await this.awaitOpenClawProgrammaticCommandResponse({
-      env,
-      sessionKey,
-      knownSignatures,
-      timeoutMs: OPENCLAW_COMMAND_RESPONSE_TIMEOUT_MS,
-      pollIntervalMs: OPENCLAW_COMMAND_RESPONSE_POLL_MS,
-    });
+    const commandResponse = await this.awaitOpenClawProgrammaticCommandResponse(
+      {
+        env,
+        sessionKey,
+        knownSignatures,
+        timeoutMs: OPENCLAW_COMMAND_RESPONSE_TIMEOUT_MS,
+        pollIntervalMs: OPENCLAW_COMMAND_RESPONSE_POLL_MS,
+      },
+    );
 
     return {
       code: 0,
@@ -804,7 +889,10 @@ export class ProviderService {
     env: NodeJS.ProcessEnv,
     sessionKey: string,
   ): Promise<Set<string>> {
-    const messages = await this.readOpenClawChatHistoryMessages(env, sessionKey);
+    const messages = await this.readOpenClawChatHistoryMessages(
+      env,
+      sessionKey,
+    );
     const signatures = new Set<string>();
     for (const message of messages) {
       const signature = buildGatewayChatMessageSignature(message);
@@ -850,7 +938,10 @@ export class ProviderService {
         params.env,
         params.sessionKey,
       );
-      const nextText = findNewProgrammaticAssistantText(messages, params.knownSignatures);
+      const nextText = findNewProgrammaticAssistantText(
+        messages,
+        params.knownSignatures,
+      );
       if (nextText) {
         return nextText;
       }
@@ -1015,7 +1106,11 @@ export class ProviderService {
     paths: OpenGoatPaths,
     inputEnv?: NodeJS.ProcessEnv,
   ): Promise<OpenClawGatewayConfigSnapshot> {
-    const env = await this.resolveProviderEnv(paths, OPENCLAW_PROVIDER_ID, inputEnv);
+    const env = await this.resolveProviderEnv(
+      paths,
+      OPENCLAW_PROVIDER_ID,
+      inputEnv,
+    );
     const payload = await this.callGatewayMethod(env, "config.get", {});
     const record = asRecord(payload);
     const config = parseGatewayConfigPayload(record);
@@ -1038,7 +1133,11 @@ export class ProviderService {
     baseHash?: string,
     inputEnv?: NodeJS.ProcessEnv,
   ): Promise<void> {
-    const env = await this.resolveProviderEnv(paths, OPENCLAW_PROVIDER_ID, inputEnv);
+    const env = await this.resolveProviderEnv(
+      paths,
+      OPENCLAW_PROVIDER_ID,
+      inputEnv,
+    );
     const params: Record<string, unknown> = {
       raw: `${JSON.stringify(config, null, 2)}\n`,
     };
@@ -1048,20 +1147,61 @@ export class ProviderService {
     await this.callGatewayMethod(env, "config.apply", params);
   }
 
-  private getProviderConfigPath(paths: OpenGoatPaths, providerId: string): string {
+  private getProviderConfigPath(
+    paths: OpenGoatPaths,
+    providerId: string,
+  ): string {
     return this.pathPort.join(paths.providersDir, providerId, "config.json");
   }
 
   private async resolveProviderEnv(
     paths: OpenGoatPaths,
     providerId: string,
-    inputEnv: NodeJS.ProcessEnv | undefined
+    inputEnv: NodeJS.ProcessEnv | undefined,
+    agentEnvOverrides?: Record<string, string>,
   ): Promise<NodeJS.ProcessEnv> {
     const config = await this.getProviderConfig(paths, providerId);
     return {
       ...(config?.env ?? {}),
-      ...(inputEnv ?? process.env)
+      ...(agentEnvOverrides ?? {}),
+      ...(inputEnv ?? process.env),
     };
+  }
+
+  /**
+   * Read per-agent provider env overrides from agent config.json.
+   * Supports `runtime.provider.env` map for per-agent gateway routing.
+   */
+  private async readAgentProviderEnvOverrides(
+    paths: OpenGoatPaths,
+    agentId: string,
+  ): Promise<Record<string, string> | undefined> {
+    if (isDefaultAgentId(agentId)) {
+      return undefined;
+    }
+    const configPath = this.pathPort.join(
+      paths.agentsDir,
+      agentId,
+      AGENT_CONFIG_FILE_NAME,
+    );
+    try {
+      const config = await this.readAgentConfig(configPath, agentId);
+      const runtime = asRecord(config.runtime);
+      const provider = asRecord(runtime.provider);
+      const envRaw = provider.env;
+      if (envRaw && typeof envRaw === "object" && !Array.isArray(envRaw)) {
+        const env: Record<string, string> = {};
+        for (const [key, value] of Object.entries(envRaw)) {
+          if (typeof value === "string") {
+            env[key] = value;
+          }
+        }
+        return Object.keys(env).length > 0 ? env : undefined;
+      }
+    } catch {
+      // Agent config not found or invalid — skip overrides
+    }
+    return undefined;
   }
 
   private async resolveAgentProviderId(
@@ -1138,7 +1278,11 @@ export class ProviderService {
       return alias;
     }
 
-    const bindings = await this.readProviderSessionBindings(paths, providerId, agentId);
+    const bindings = await this.readProviderSessionBindings(
+      paths,
+      providerId,
+      agentId,
+    );
     const mapped = bindings.bindings[alias]?.trim();
     return mapped || undefined;
   }
@@ -1160,14 +1304,23 @@ export class ProviderService {
       return;
     }
 
-    const bindings = await this.readProviderSessionBindings(paths, providerId, agentId);
+    const bindings = await this.readProviderSessionBindings(
+      paths,
+      providerId,
+      agentId,
+    );
     if (bindings.bindings[alias] === resolvedProviderSessionId) {
       return;
     }
 
     bindings.bindings[alias] = resolvedProviderSessionId;
     bindings.updatedAt = this.nowIso();
-    await this.writeProviderSessionBindings(paths, providerId, agentId, bindings);
+    await this.writeProviderSessionBindings(
+      paths,
+      providerId,
+      agentId,
+      bindings,
+    );
   }
 
   private async readProviderSessionBindings(
@@ -1193,7 +1346,9 @@ export class ProviderService {
 
     let parsed: unknown;
     try {
-      parsed = JSON.parse(await this.fileSystem.readFile(bindingsPath)) as unknown;
+      parsed = JSON.parse(
+        await this.fileSystem.readFile(bindingsPath),
+      ) as unknown;
     } catch {
       return createProviderSessionBindingsShape({
         providerId: normalizedProviderId,
@@ -1202,7 +1357,13 @@ export class ProviderService {
       });
     }
 
-    if (!isProviderSessionBindingsShape(parsed, normalizedProviderId, normalizedAgentId)) {
+    if (
+      !isProviderSessionBindingsShape(
+        parsed,
+        normalizedProviderId,
+        normalizedAgentId,
+      )
+    ) {
       return createProviderSessionBindingsShape({
         providerId: normalizedProviderId,
         agentId: normalizedAgentId,
@@ -1219,16 +1380,27 @@ export class ProviderService {
     agentId: string,
     bindings: ProviderSessionBindingsShape,
   ): Promise<void> {
-    const bindingsDir = this.pathPort.join(paths.providersDir, providerId, "sessions");
-    const bindingsPath = this.getProviderSessionBindingsPath(paths, providerId, agentId);
+    const bindingsDir = this.pathPort.join(
+      paths.providersDir,
+      providerId,
+      "sessions",
+    );
+    const bindingsPath = this.getProviderSessionBindingsPath(
+      paths,
+      providerId,
+      agentId,
+    );
     await this.fileSystem.ensureDir(bindingsDir);
-    await this.fileSystem.writeFile(bindingsPath, `${JSON.stringify(bindings, null, 2)}\n`);
+    await this.fileSystem.writeFile(
+      bindingsPath,
+      `${JSON.stringify(bindings, null, 2)}\n`,
+    );
   }
 
   private async invokeOpenClawProviderWithRecovery(
     paths: OpenGoatPaths,
     provider: Provider,
-    invokeOptions: ProviderInvokeOptions
+    invokeOptions: ProviderInvokeOptions,
   ): Promise<ProviderExecutionResult> {
     const invocationEnv = invokeOptions.env ?? process.env;
 
@@ -1242,7 +1414,7 @@ export class ProviderService {
           paths,
           provider,
           invokeOptions,
-          result
+          result,
         );
       } catch (error) {
         if (
@@ -1268,16 +1440,24 @@ export class ProviderService {
           await sleep(delayMs);
           continue;
         }
-        if (!isGatewayRetryableLockFailureError(error) || attempt >= OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS) {
+        if (
+          !isGatewayRetryableLockFailureError(error) ||
+          attempt >= OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS
+        ) {
           throw error;
         }
         const delayMs = resolveOpenClawRetryDelayMs(attempt);
-        this.logger.warn("OpenClaw invocation failed in locked/in-flight state; retrying.", {
-          attempt,
-          maxAttempts: OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS,
-          delayMs,
-          error: summarizeRetryFailureOutput(error instanceof Error ? error.message : String(error))
-        });
+        this.logger.warn(
+          "OpenClaw invocation failed in locked/in-flight state; retrying.",
+          {
+            attempt,
+            maxAttempts: OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS,
+            delayMs,
+            error: summarizeRetryFailureOutput(
+              error instanceof Error ? error.message : String(error),
+            ),
+          },
+        );
         await sleep(delayMs);
         continue;
       }
@@ -1306,19 +1486,25 @@ export class ProviderService {
         continue;
       }
 
-      if (!isGatewayRetryableLockFailureResult(result) || attempt >= OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS) {
+      if (
+        !isGatewayRetryableLockFailureResult(result) ||
+        attempt >= OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS
+      ) {
         return result;
       }
 
       const delayMs = resolveOpenClawRetryDelayMs(attempt);
-      this.logger.warn("OpenClaw invocation returned locked/in-flight result; retrying.", {
-        attempt,
-        maxAttempts: OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS,
-        delayMs,
-        code: result.code,
-        stderr: summarizeRetryFailureOutput(result.stderr),
-        stdout: summarizeRetryFailureOutput(result.stdout)
-      });
+      this.logger.warn(
+        "OpenClaw invocation returned locked/in-flight result; retrying.",
+        {
+          attempt,
+          maxAttempts: OPENCLAW_RETRYABLE_FAILURE_MAX_ATTEMPTS,
+          delayMs,
+          code: result.code,
+          stderr: summarizeRetryFailureOutput(result.stderr),
+          stdout: summarizeRetryFailureOutput(result.stdout),
+        },
+      );
       await sleep(delayMs);
     }
 
@@ -1385,14 +1571,19 @@ export class ProviderService {
     providerId: string,
     agentId: string,
   ): string {
-    return this.pathPort.join(paths.providersDir, providerId, "sessions", `${agentId}.json`);
+    return this.pathPort.join(
+      paths.providersDir,
+      providerId,
+      "sessions",
+      `${agentId}.json`,
+    );
   }
 
   private async retryGatewayInvocationOnUvCwdFailure(
     paths: OpenGoatPaths,
     provider: Provider,
     invokeOptions: ProviderInvokeOptions,
-    result: ProviderExecutionResult
+    result: ProviderExecutionResult,
   ): Promise<ProviderExecutionResult> {
     if (!isGatewayUvCwdFailure(result)) {
       return result;
@@ -1403,13 +1594,17 @@ export class ProviderService {
       return result;
     }
 
-    this.logger.warn("OpenClaw gateway restarted after uv_cwd error; retrying provider invocation.");
+    this.logger.warn(
+      "OpenClaw gateway restarted after uv_cwd error; retrying provider invocation.",
+    );
     return provider.invoke(invokeOptions);
   }
 
   private getProviderRegistry(): Promise<ProviderRegistry> {
     if (!this.providerRegistryPromise) {
-      this.providerRegistryPromise = this.resolveProviderRegistry(this.providerRegistryInput);
+      this.providerRegistryPromise = this.resolveProviderRegistry(
+        this.providerRegistryInput,
+      );
     }
 
     return this.providerRegistryPromise;
@@ -1419,7 +1614,7 @@ export class ProviderService {
     input:
       | Promise<ProviderRegistry>
       | ProviderRegistry
-      | (() => Promise<ProviderRegistry> | ProviderRegistry)
+      | (() => Promise<ProviderRegistry> | ProviderRegistry),
   ): Promise<ProviderRegistry> {
     if (typeof input === "function") {
       return Promise.resolve(input());
@@ -1473,7 +1668,10 @@ function sanitizeEnvMap(input: Record<string, string>): Record<string, string> {
   return sanitized;
 }
 
-function parseOpenClawArguments(raw: string): { remoteUrl?: string; token?: string } {
+function parseOpenClawArguments(raw: string): {
+  remoteUrl?: string;
+  token?: string;
+} {
   const parts = raw
     .split(/\s+/)
     .map((part) => part.trim())
@@ -1484,7 +1682,7 @@ function parseOpenClawArguments(raw: string): { remoteUrl?: string; token?: stri
 
   return {
     remoteUrl: remoteIndex >= 0 ? parts[remoteIndex + 1] : undefined,
-    token: tokenIndex >= 0 ? parts[tokenIndex + 1] : undefined
+    token: tokenIndex >= 0 ? parts[tokenIndex + 1] : undefined,
   };
 }
 
@@ -1531,7 +1729,11 @@ function normalizeGatewayWsUrl(rawGatewayUrl: string): string {
 
 function isLoopbackHost(hostname: string): boolean {
   const normalized = hostname.trim().toLowerCase();
-  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1"
+  );
 }
 
 function isGatewayRetryableDeviceTokenMismatchResult(
@@ -1569,11 +1771,15 @@ function isGatewayUvCwdFailure(result: ProviderExecutionResult): boolean {
   return details.includes("process.cwd failed") && details.includes("uv_cwd");
 }
 
-function isGatewayRetryableLockFailureResult(result: ProviderExecutionResult): boolean {
+function isGatewayRetryableLockFailureResult(
+  result: ProviderExecutionResult,
+): boolean {
   if (result.code === 0) {
     return false;
   }
-  return isGatewayRetryableLockFailureText(`${result.stderr}\n${result.stdout}`);
+  return isGatewayRetryableLockFailureText(
+    `${result.stderr}\n${result.stdout}`,
+  );
 }
 
 function isGatewayRetryableLockFailureError(error: unknown): boolean {
@@ -1599,7 +1805,7 @@ function isGatewayRetryableLockFailureText(value: string): boolean {
 
 function resolveOpenClawRetryDelayMs(attempt: number): number {
   const exponent = Math.max(0, attempt - 1);
-  const next = OPENCLAW_RETRY_BACKOFF_BASE_MS * (2 ** exponent);
+  const next = OPENCLAW_RETRY_BACKOFF_BASE_MS * 2 ** exponent;
   return Math.min(OPENCLAW_RETRY_BACKOFF_MAX_MS, next);
 }
 
@@ -1720,9 +1926,12 @@ function normalizeGatewayAgentPayload(payload: unknown): {
   };
 }
 
-function buildGatewayChatMessageSignature(message: Record<string, unknown>): string | undefined {
+function buildGatewayChatMessageSignature(
+  message: Record<string, unknown>,
+): string | undefined {
   const role = readOptionalString(message.role);
-  const timestamp = typeof message.timestamp === "number" ? String(message.timestamp) : "";
+  const timestamp =
+    typeof message.timestamp === "number" ? String(message.timestamp) : "";
   const text = extractGatewayChatText(message);
   if (!role || !timestamp || !text) {
     return undefined;
@@ -1753,7 +1962,9 @@ function findNewProgrammaticAssistantText(
   return undefined;
 }
 
-function isProgrammaticGatewayAssistantMessage(message: Record<string, unknown>): boolean {
+function isProgrammaticGatewayAssistantMessage(
+  message: Record<string, unknown>,
+): boolean {
   if (readOptionalString(message.role) !== "assistant") {
     return false;
   }
@@ -1824,17 +2035,17 @@ function readGatewayAgentsList(
         typeof record.name === "string" && record.name.trim().length > 0
           ? record.name.trim()
           : undefined,
-      workspace:
-        typeof record.workspace === "string" ? record.workspace : "",
-      agentDir:
-        typeof record.agentDir === "string" ? record.agentDir : "",
+      workspace: typeof record.workspace === "string" ? record.workspace : "",
+      agentDir: typeof record.agentDir === "string" ? record.agentDir : "",
     });
   }
 
   return entries;
 }
 
-function readAgentSandboxMode(entry: Record<string, unknown>): string | undefined {
+function readAgentSandboxMode(
+  entry: Record<string, unknown>,
+): string | undefined {
   const sandbox = asRecord(entry.sandbox);
   const mode = sandbox.mode;
   if (typeof mode !== "string") {
@@ -1948,7 +2159,11 @@ function isProviderSessionBindingsShape(
   if (typeof record.updatedAt !== "string" || !record.updatedAt.trim()) {
     return false;
   }
-  if (!record.bindings || typeof record.bindings !== "object" || Array.isArray(record.bindings)) {
+  if (
+    !record.bindings ||
+    typeof record.bindings !== "object" ||
+    Array.isArray(record.bindings)
+  ) {
     return false;
   }
 
