@@ -137,6 +137,7 @@ Main structure:
 - `config.json`
 - `agents.json`
 - `workspaces/` (OpenClaw workspace paths)
+- `projects/` (project metadata plus project-scoped special agents like `cmo/`)
 - `organization/` (organization-level markdown defaults copied from templates on startup)
 - `agents/`
 - `skills/` (optional compatibility store; created on first `opengoat skill install`)
@@ -144,6 +145,12 @@ Main structure:
 - `runs/`
 
 OpenClaw owns workspace bootstrap markdown semantics.
+
+Project-backed special agents live under `projects/`:
+
+- `projects/<project-id>/project.json`
+- `projects/<project-id>/cmo/` (workspace path for the project CMO agent)
+- `projects/<project-id>/agents/cmo/` (OpenClaw/OpenGoat-managed agent dir)
 
 OpenGoat pre-seeds agent workspace template files from
 `packages/core/src/core/templates/assets/agents/<agent-id>/`.

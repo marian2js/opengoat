@@ -1,6 +1,7 @@
 export interface OpenGoatPaths {
   homeDir: string;
   workspacesDir: string;
+  projectsDir: string;
   organizationDir: string;
   agentsDir: string;
   skillsDir: string;

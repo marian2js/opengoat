@@ -30,6 +30,7 @@ describe("NodeOpenGoatPathsProvider", () => {
 
     expect(paths.homeDir).toBe(path.join(os.homedir(), ".opengoat"));
     expect(paths.workspacesDir).toBe(path.join(paths.homeDir, "workspaces"));
+    expect(paths.projectsDir).toBe(path.join(paths.homeDir, "projects"));
     expect(paths.organizationDir).toBe(path.join(paths.homeDir, "organization"));
   });
 

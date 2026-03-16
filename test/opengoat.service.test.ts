@@ -217,6 +217,128 @@ describe("OpenGoatService", () => {
     );
   });
 
+  it("creates a project-backed CMO OpenClaw agent from a URL", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service, provider } = createService(root);
+
+    const created = await service.createProject("myproject.com");
+
+    expect(created.project.id).toBe("my-project");
+    expect(created.project.displayName).toBe("My Project");
+    expect(created.project.sourceUrl).toBe("https://myproject.com/");
+    expect(created.project.cmoAgent.id).toBe("my-project-cmo");
+    expect(created.project.cmoAgent.workspaceDir).toBe(
+      path.join(root, "projects", "my-project", "cmo"),
+    );
+    expect(created.project.cmoAgent.internalConfigDir).toBe(
+      path.join(root, "projects", "my-project", "agents", "cmo"),
+    );
+    expect(provider.createdAgents.some((agent) => agent.agentId === "my-project-cmo")).toBe(true);
+
+    const projectConfig = JSON.parse(
+      await readFile(
+        path.join(root, "projects", "my-project", "project.json"),
+        "utf-8",
+      ),
+    ) as {
+      id: string;
+      agents: {
+        cmo: {
+          agentId: string;
+        };
+      };
+    };
+    expect(projectConfig.id).toBe("my-project");
+    expect(projectConfig.agents.cmo.agentId).toBe("my-project-cmo");
+  });
+
+  it("repairs stale OpenClaw project CMO workspace mapping during initialize", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const commandRunner = new FakeCommandRunner(async (request) => {
+      if (
+        request.args[0] === "skills" &&
+        request.args[1] === "list" &&
+        request.args.includes("--json")
+      ) {
+        return {
+          code: 0,
+          stdout: JSON.stringify({
+            workspaceDir: path.join(root, "openclaw-workspace"),
+            managedSkillsDir: path.join(root, "openclaw-managed-skills"),
+            skills: [],
+          }),
+          stderr: "",
+        };
+      }
+      if (
+        request.args[0] === "agents" &&
+        request.args[1] === "list" &&
+        request.args.includes("--json")
+      ) {
+        return {
+          code: 0,
+          stdout: JSON.stringify([
+            {
+              id: "goat",
+              workspace: path.join(root, "workspaces", "goat"),
+              agentDir: path.join(root, "agents", "goat"),
+            },
+            {
+              id: "my-project-cmo",
+              workspace: path.join(root, "stale", "projects", "my-project", "cmo"),
+              agentDir: path.join(root, "stale", "projects", "my-project", "agents", "cmo"),
+            },
+          ]),
+          stderr: "",
+        };
+      }
+      return {
+        code: 0,
+        stdout: "",
+        stderr: "",
+      };
+    });
+
+    const { service, provider } = createService(
+      root,
+      new FakeOpenClawProvider(),
+      commandRunner,
+    );
+    await service.setOpenClawGatewayConfig({ mode: "local" });
+    await service.createProject("myproject.com");
+    provider.createdAgents.length = 0;
+    provider.deletedAgents.length = 0;
+
+    await service.initialize();
+
+    expect(
+      provider.deletedAgents.some((entry) => entry.agentId === "my-project-cmo"),
+    ).toBe(true);
+    expect(
+      provider.createdAgents.some((entry) => entry.agentId === "my-project-cmo"),
+    ).toBe(true);
+  });
+
+  it("includes project CMO agents in hard reset cleanup", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+
+    const { service, provider } = createService(root);
+    await service.initialize();
+    await service.createProject("myproject.com");
+
+    const result = await service.hardReset();
+
+    expect(result.deletedOpenClawAgents).toContain("my-project-cmo");
+    expect(
+      provider.deletedAgents.some((entry) => entry.agentId === "my-project-cmo"),
+    ).toBe(true);
+  });
+
   it("removes OpenClaw USER.md after agent runtime setup", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);

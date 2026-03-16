@@ -34,6 +34,7 @@ describe("BootstrapService", () => {
     expect(result.defaultAgent).toBe("goat");
     expect(result.createdPaths.length).toBeGreaterThan(0);
     expect(await fileSystem.exists(paths.organizationDir)).toBe(true);
+    expect(await fileSystem.exists(paths.projectsDir)).toBe(true);
     const organizationTemplates = listOrganizationMarkdownTemplates();
     expect(organizationTemplates.length).toBeGreaterThan(0);
     for (const template of organizationTemplates) {

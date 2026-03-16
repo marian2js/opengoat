@@ -8,6 +8,7 @@ export * from "./core/agents/index.js";
 export * from "./core/bootstrap/index.js";
 export * from "./core/boards/index.js";
 export * from "./core/providers/index.js";
+export * from "./core/projects/index.js";
 export * from "./core/opengoat/index.js";
 export * from "./core/orchestration/index.js";
 export * from "./core/sessions/index.js";

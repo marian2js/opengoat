@@ -87,6 +87,7 @@ export class BootstrapService {
 
     await this.ensureDirectory(paths.homeDir, createdPaths, skippedPaths);
     await this.ensureDirectory(paths.workspacesDir, createdPaths, skippedPaths);
+    await this.ensureDirectory(paths.projectsDir, createdPaths, skippedPaths);
     await this.ensureDirectory(
       paths.organizationDir,
       createdPaths,

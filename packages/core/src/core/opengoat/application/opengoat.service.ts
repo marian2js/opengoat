@@ -68,6 +68,10 @@ import {
   createDefaultProviderRegistry,
 } from "../../providers/index.js";
 import {
+  ProjectService,
+  type ProjectCreationResult,
+} from "../../projects/index.js";
+import {
   SessionService,
   type AgentLastAction,
   type SessionCompactionResult,
@@ -457,6 +461,7 @@ export class OpenGoatService {
   private readonly agentManifestService: AgentManifestService;
   private readonly bootstrapService: BootstrapService;
   private readonly providerService: ProviderService;
+  private readonly projectService: ProjectService;
   private readonly skillService: SkillService;
   private readonly sessionService: SessionService;
   private readonly orchestrationService: OrchestrationService;
@@ -492,6 +497,11 @@ export class OpenGoatService {
       pathPort: deps.pathPort,
       pathsProvider: deps.pathsProvider,
       agentService: this.agentService,
+      nowIso,
+    });
+    this.projectService = new ProjectService({
+      fileSystem: deps.fileSystem,
+      pathPort: deps.pathPort,
       nowIso,
     });
     this.skillService = new SkillService({
@@ -603,6 +613,11 @@ export class OpenGoatService {
       }
       candidateOpenClawAgentIds.add(agent.id);
     }
+    await this.addProjectAgentCandidates(
+      paths,
+      candidateOpenClawAgentIds,
+      warnings,
+    );
     await this.addWorkspaceAgentCandidates(
       paths,
       candidateOpenClawAgentIds,
@@ -709,6 +724,7 @@ export class OpenGoatService {
     let ceoSynced = false;
     let ceoSyncCode: number | undefined;
     let localAgents: AgentDescriptor[] = [];
+    let projectAgents: AgentDescriptor[] = [];
 
     const ceoExists = (await this.agentService.listAgents(paths)).some(
       (agent) => agent.id === DEFAULT_AGENT_ID,
@@ -758,6 +774,7 @@ export class OpenGoatService {
 
     try {
       localAgents = await this.agentService.listAgents(paths);
+      projectAgents = await this.projectService.listProjectAgents(paths);
       if (!openClawInventoryAvailable) {
         warnings.push(
           "OpenClaw startup registration sync skipped because agent inventory is unavailable.",
@@ -774,6 +791,13 @@ export class OpenGoatService {
             ceoSynced = sync.synced;
             ceoSyncCode = sync.code;
           }
+        }
+        for (const agent of projectAgents) {
+          const sync = await this.syncOpenClawAgentRegistration(paths, {
+            descriptor: agent,
+            existingEntry: openClawAgentEntriesById?.get(agent.id),
+          });
+          warnings.push(...sync.warnings);
         }
       }
     } catch (error) {
@@ -813,7 +837,7 @@ export class OpenGoatService {
       warnings.push(
         ...(await this.syncOpenClawAgentExecutionPolicies(
           paths,
-          localAgents.map((agent) => agent.id),
+          [...localAgents, ...projectAgents].map((agent) => agent.id),
         )),
       );
     } catch (error) {
@@ -995,6 +1019,71 @@ export class OpenGoatService {
         }". ${toErrorMessage(error)}`,
       );
     }
+    return {
+      ...created,
+      runtimeSync: {
+        runtimeId: runtimeSync.providerId,
+        code: runtimeSync.code,
+        stdout: runtimeSync.stdout,
+        stderr: runtimeSync.stderr,
+      },
+    };
+  }
+
+  public async createProject(rawUrl: string): Promise<ProjectCreationResult> {
+    const paths = this.pathsProvider.getPaths();
+    await this.bootstrapService.initialize();
+    const created = await this.projectService.ensureProject(paths, rawUrl);
+
+    const runtimeSync = await this.providerService.createProviderAgent(
+      paths,
+      created.project.cmoAgent.id,
+      {
+        providerId: OPENCLAW_PROVIDER_ID,
+        displayName: created.project.cmoAgent.displayName,
+        workspaceDir: created.project.cmoAgent.workspaceDir,
+        internalConfigDir: created.project.cmoAgent.internalConfigDir,
+      },
+    );
+
+    if (
+      runtimeSync.code !== 0 &&
+      !containsAlreadyExistsMessage(runtimeSync.stdout, runtimeSync.stderr)
+    ) {
+      if (!created.alreadyExisted) {
+        await this.fileSystem.removeDir(created.project.rootDir);
+      }
+      throw new Error(
+        `OpenClaw project agent creation failed for "${
+          created.project.cmoAgent.id
+        }" (exit ${runtimeSync.code}). ${
+          runtimeSync.stderr.trim() || runtimeSync.stdout.trim() || ""
+        }`.trim(),
+      );
+    }
+
+    try {
+      await this.ensureOpenClawAgentLocation(paths, {
+        agentId: created.project.cmoAgent.id,
+        displayName: created.project.cmoAgent.displayName,
+        workspaceDir: created.project.cmoAgent.workspaceDir,
+        internalConfigDir: created.project.cmoAgent.internalConfigDir,
+      });
+    } catch (error) {
+      if (!created.alreadyExisted) {
+        await this.fileSystem.removeDir(created.project.rootDir);
+      }
+      throw new Error(
+        `OpenClaw project agent location sync failed for "${
+          created.project.cmoAgent.id
+        }". ${toErrorMessage(error)}`,
+      );
+    }
+
+    await this.syncOpenClawAgentExecutionPolicies(paths, [
+      created.project.cmoAgent.id,
+    ]);
+
     return {
       ...created,
       runtimeSync: {
@@ -2860,6 +2949,25 @@ export class OpenGoatService {
     } catch (error) {
       warnings.push(
         `Workspace fallback discovery failed: ${toErrorMessage(error)}`,
+      );
+    }
+  }
+
+  private async addProjectAgentCandidates(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    candidates: Set<string>,
+    warnings: string[],
+  ): Promise<void> {
+    try {
+      const projectAgents = await this.projectService.listProjectAgents(paths);
+      for (const agent of projectAgents) {
+        if (agent.id !== OPENCLAW_DEFAULT_AGENT_ID) {
+          candidates.add(agent.id);
+        }
+      }
+    } catch (error) {
+      warnings.push(
+        `Project fallback discovery failed: ${toErrorMessage(error)}`,
       );
     }
   }

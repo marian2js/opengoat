@@ -23,6 +23,8 @@ import { initCommand } from "./commands/init.command.js";
 import { onboardCommand } from "./commands/onboard.command.js";
 import { providerCommand } from "./commands/provider.command.js";
 import { providerListCommand } from "./commands/provider-list.command.js";
+import { projectCommand } from "./commands/project.command.js";
+import { projectCreateCommand } from "./commands/project-create.command.js";
 import { restartCommand } from "./commands/restart.command.js";
 import { routeCommand } from "./commands/route.command.js";
 import { scenarioCommand } from "./commands/scenario.command.js";
@@ -74,6 +76,8 @@ export async function runCli(argv: string[]): Promise<number> {
       scenarioRunCommand,
       providerCommand,
       providerListCommand,
+      projectCommand,
+      projectCreateCommand,
       skillCommand,
       skillListCommand,
       skillInstallCommand,

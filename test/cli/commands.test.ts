@@ -10,6 +10,8 @@ import { agentSetManagerCommand } from "../../packages/cli/src/cli/commands/agen
 import { agentSetDefaultCommand } from "../../packages/cli/src/cli/commands/agent-set-default.command.js";
 import { agentCommand } from "../../packages/cli/src/cli/commands/agent.command.js";
 import { initCommand } from "../../packages/cli/src/cli/commands/init.command.js";
+import { projectCommand } from "../../packages/cli/src/cli/commands/project.command.js";
+import { projectCreateCommand } from "../../packages/cli/src/cli/commands/project-create.command.js";
 import { createStreamCapture } from "../helpers/stream-capture.js";
 
 function createContext(service: unknown) {
@@ -148,6 +150,68 @@ describe("CLI commands", () => {
       "Local agent already existed; OpenClaw sync was still attempted.",
     );
     expect(stdout.output()).toContain("OpenClaw sync: openclaw (code 0)");
+  });
+
+  it("project command prints help", async () => {
+    const { context, stdout } = createContext({});
+
+    const code = await projectCommand.run(["--help"], context);
+
+    expect(code).toBe(0);
+    expect(stdout.output()).toContain("opengoat project create <url>");
+  });
+
+  it("project create validates usage", async () => {
+    const createProject = vi.fn();
+    const { context, stderr } = createContext({ createProject });
+
+    const code = await projectCreateCommand.run([], context);
+
+    expect(code).toBe(1);
+    expect(createProject).not.toHaveBeenCalled();
+    expect(stderr.output()).toContain("Usage: opengoat project create");
+  });
+
+  it("project create provisions a project-backed CMO agent", async () => {
+    const createProject = vi.fn(async () => ({
+      project: {
+        id: "my-project",
+        displayName: "My Project",
+        sourceUrl: "https://myproject.com/",
+        sourceHost: "myproject.com",
+        rootDir: "/tmp/opengoat/projects/my-project",
+        configPath: "/tmp/opengoat/projects/my-project/project.json",
+        cmoAgent: {
+          id: "my-project-cmo",
+          displayName: "My Project CMO",
+          role: "CMO",
+          roleId: "cmo",
+          providerId: "openclaw",
+          workspaceDir: "/tmp/opengoat/projects/my-project/cmo",
+          internalConfigDir: "/tmp/opengoat/projects/my-project/agents/cmo",
+        },
+      },
+      createdPaths: [],
+      skippedPaths: [],
+      alreadyExisted: false,
+      runtimeSync: {
+        runtimeId: "openclaw",
+        code: 0,
+        stdout: "",
+        stderr: "",
+      },
+    }));
+    const { context, stdout } = createContext({ createProject });
+
+    const code = await projectCreateCommand.run(["myproject.com"], context);
+
+    expect(code).toBe(0);
+    expect(createProject).toHaveBeenCalledWith("myproject.com");
+    expect(stdout.output()).toContain("Project ready: My Project (my-project)");
+    expect(stdout.output()).toContain("CMO agent: my-project-cmo");
+    expect(stdout.output()).toContain(
+      "Workspace: /tmp/opengoat/projects/my-project/cmo",
+    );
   });
 
   it("agent delete validates usage", async () => {
