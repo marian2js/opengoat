@@ -270,6 +270,101 @@ describe("OpenGoatService", () => {
         constants.F_OK,
       ),
     ).resolves.toBeUndefined();
+
+    expect(provider.invocations).toHaveLength(1);
+    expect(provider.invocations[0]?.message).toContain(
+      "You are the CMO for the project at https://myproject.com/.",
+    );
+    expect(provider.invocations[0]?.message).not.toContain("{{URL}}");
+    expect(provider.invocations[0]?.providerSessionId).toBeTruthy();
+
+    const publicSessions = await service.listSessions("my-project-cmo");
+    expect(publicSessions).toHaveLength(0);
+
+    const sessionStore = JSON.parse(
+      await readFile(
+        path.join(
+          root,
+          "projects",
+          "my-project",
+          "agents",
+          "cmo",
+          "sessions",
+          "sessions.json",
+        ),
+        "utf-8",
+      ),
+    ) as {
+      sessions: Record<
+        string,
+        {
+          transcriptFile?: string;
+        }
+      >;
+    };
+    const bootstrapEntry =
+      sessionStore.sessions["session:internal:project-cmo-bootstrap"];
+    expect(bootstrapEntry?.transcriptFile).toBeTruthy();
+
+    const transcript = await readFile(bootstrapEntry!.transcriptFile!, "utf-8");
+    expect(transcript).toContain('"sessionKey":"session:internal:project-cmo-bootstrap"');
+    expect(transcript).toContain(
+      '"workspacePath":"' +
+        path.join(root, "projects", "my-project", "cmo").replaceAll("\\", "\\\\") +
+        '"',
+    );
+    expect(transcript).toContain(
+      "You are the CMO for the project at https://myproject.com/.",
+    );
+    expect(transcript).toContain('"role":"assistant","content":"ok"');
+  });
+
+  it("does not rerun project CMO bootstrap after the internal bootstrap session completes", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+    const sourceRepositoryRoot = await createTempDir("opengoat-skill-repo-");
+    roots.push(sourceRepositoryRoot);
+    await writeAgentBrowserSkillRepository(sourceRepositoryRoot);
+    const commandRunner = createProjectSkillCommandRunner(sourceRepositoryRoot);
+
+    const { service, provider } = createService(
+      root,
+      new FakeOpenClawProvider(),
+      commandRunner,
+    );
+
+    await service.createProject("myproject.com");
+    expect(provider.invocations).toHaveLength(1);
+
+    await service.createProject("myproject.com");
+    expect(provider.invocations).toHaveLength(1);
+  });
+
+  it("rolls back a newly created project when CMO bootstrap fails", async () => {
+    const root = await createTempDir("opengoat-service-");
+    roots.push(root);
+    const sourceRepositoryRoot = await createTempDir("opengoat-skill-repo-");
+    roots.push(sourceRepositoryRoot);
+    await writeAgentBrowserSkillRepository(sourceRepositoryRoot);
+    const provider = new FakeOpenClawProvider();
+    provider.failInvoke = true;
+    provider.invokeFailureStderr = "bootstrap failed";
+
+    const { service } = createService(
+      root,
+      provider,
+      createProjectSkillCommandRunner(sourceRepositoryRoot),
+    );
+
+    await expect(service.createProject("myproject.com")).rejects.toThrow(
+      'Failed to bootstrap project CMO for "my-project-cmo". Bootstrap run failed (exit 1). bootstrap failed',
+    );
+    await expect(
+      access(path.join(root, "projects", "my-project"), constants.F_OK),
+    ).rejects.toBeTruthy();
+    expect(
+      provider.deletedAgents.some((entry) => entry.agentId === "my-project-cmo"),
+    ).toBe(true);
   });
 
   it("repairs stale OpenClaw project CMO workspace mapping during initialize", async () => {
@@ -3169,6 +3264,8 @@ class FakeOpenClawProvider extends BaseProvider {
   public createFailureStderr = "create failed";
   public createAlreadyExists = false;
   public failDelete = false;
+  public failInvoke = false;
+  public invokeFailureStderr = "invoke failed";
   public seedUserMarkdownOnCreate = false;
   public seedBootstrapOnCreate = false;
 
@@ -3193,6 +3290,13 @@ class FakeOpenClawProvider extends BaseProvider {
     options: ProviderInvokeOptions,
   ): Promise<ProviderExecutionResult> {
     this.invocations.push(options);
+    if (this.failInvoke) {
+      return {
+        code: 1,
+        stdout: "",
+        stderr: this.invokeFailureStderr,
+      };
+    }
     return {
       code: 0,
       stdout: "ok\n",

@@ -328,6 +328,28 @@ export class ProviderService {
   ): Promise<ProviderExecutionResult & AgentProviderBinding> {
     const normalizedAgentId = normalizeAgentIdentity(agentId);
     const binding = await this.getAgentProvider(paths, normalizedAgentId);
+    return this.invokeProviderAgent(
+      paths,
+      normalizedAgentId,
+      binding.providerId,
+      options,
+      runtimeContext,
+    );
+  }
+
+  public async invokeProviderAgent(
+    paths: OpenGoatPaths,
+    agentId: string,
+    providerId: string,
+    options: ProviderInvokeOptions,
+    runtimeContext: ProviderInvokeRuntimeContext = {}
+  ): Promise<ProviderExecutionResult & AgentProviderBinding> {
+    const normalizedAgentId = normalizeAgentIdentity(agentId);
+    const normalizedProviderId = normalizeProviderId(providerId);
+    const binding: AgentProviderBinding = {
+      agentId: normalizedAgentId,
+      providerId: normalizedProviderId,
+    };
     const registry = await this.getProviderRegistry();
     const provider = registry.create(binding.providerId);
     const mergedSystemPrompt = options.systemPrompt?.trim();

@@ -72,8 +72,13 @@ import {
   type ProjectCreationResult,
 } from "../../projects/index.js";
 import {
+  buildProjectCmoBootstrapSessionRef,
+  renderProjectCmoBootstrapPrompt,
+} from "../../projects/application/project-cmo-bootstrap.js";
+import {
   SessionService,
   type AgentLastAction,
+  type SessionHistoryItem,
   type SessionCompactionResult,
   type SessionHistoryResult,
   type SessionRemoveResult,
@@ -1100,6 +1105,24 @@ export class OpenGoatService {
       }
       throw new Error(
         `Failed to install default skills for "${
+          created.project.cmoAgent.id
+        }". ${toErrorMessage(error)}`,
+      );
+    }
+
+    try {
+      await this.bootstrapProjectCmo(paths, created.project);
+    } catch (error) {
+      if (!created.alreadyExisted) {
+        await this.providerService.deleteProviderAgent(
+          paths,
+          created.project.cmoAgent.id,
+          { providerId: OPENCLAW_PROVIDER_ID },
+        );
+        await this.fileSystem.removeDir(created.project.rootDir);
+      }
+      throw new Error(
+        `Failed to bootstrap project CMO for "${
           created.project.cmoAgent.id
         }". ${toErrorMessage(error)}`,
       );
@@ -3013,6 +3036,81 @@ export class OpenGoatService {
     );
   }
 
+  private async bootstrapProjectCmo(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    project: ProjectCreationResult["project"],
+  ): Promise<void> {
+    const sessionRef = buildProjectCmoBootstrapSessionRef();
+    const projectSessionPaths = {
+      ...paths,
+      agentsDir: this.pathPort.join(project.rootDir, "agents"),
+      workspacesDir: project.rootDir,
+    };
+    const sessionAgentId = project.cmoAgent.roleId;
+    const bootstrapHistory = await this.sessionService.getSessionHistory(
+      projectSessionPaths,
+      sessionAgentId,
+      {
+        sessionRef,
+      },
+    );
+    if (hasAssistantMessage(bootstrapHistory.messages)) {
+      return;
+    }
+
+    const bootstrapMessage = renderProjectCmoBootstrapPrompt(project.sourceUrl);
+    const prepared = await this.sessionService.prepareRunSession(
+      projectSessionPaths,
+      sessionAgentId,
+      {
+        sessionRef,
+        userMessage: bootstrapMessage,
+      },
+    );
+    if (!prepared.enabled) {
+      throw new Error("Project CMO bootstrap session was unexpectedly disabled.");
+    }
+
+    let execution: ProviderExecutionResult;
+    try {
+      execution = await this.providerService.invokeProviderAgent(
+        paths,
+        project.cmoAgent.id,
+        OPENCLAW_PROVIDER_ID,
+        {
+          message: bootstrapMessage,
+          providerSessionId: prepared.info.sessionId,
+        },
+      );
+    } catch (error) {
+      await this.sessionService.recordAssistantReply(
+        projectSessionPaths,
+        prepared.info,
+        `[Runtime error] ${toErrorMessage(error)}`,
+      );
+      throw error;
+    }
+
+    const assistantContent =
+      execution.stdout.trim() ||
+      (execution.stderr.trim()
+        ? `[Runtime error code ${execution.code}] ${execution.stderr.trim()}`
+        : `[Runtime exited with code ${execution.code}]`);
+    await this.sessionService.recordAssistantReply(
+      projectSessionPaths,
+      prepared.info,
+      assistantContent,
+    );
+
+    if (execution.code !== 0) {
+      throw new Error(
+        `Bootstrap run failed (exit ${execution.code}). ${
+          execution.stderr.trim() || execution.stdout.trim() || ""
+        }`.trim(),
+      );
+    }
+  }
+
   private async syncOpenClawAgentRegistration(
     paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
     params: {
@@ -3689,6 +3787,12 @@ function dedupeStrings(values: Array<string | undefined>): string[] {
     deduped.push(trimmed);
   }
   return deduped;
+}
+
+function hasAssistantMessage(messages: SessionHistoryItem[]): boolean {
+  return messages.some(
+    (entry) => entry.type === "message" && entry.role === "assistant",
+  );
 }
 
 function isNotificationSessionRef(sessionRef: string): boolean {

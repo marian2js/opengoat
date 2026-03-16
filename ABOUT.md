@@ -119,6 +119,8 @@ Session invariants:
 
 - session binds to agent + session key/id
 - OpenGoat derives OpenClaw session key `agent:<agent-id>:<opengoat-session-id>` for every run in the session
+- OpenGoat reserves hidden internal named sessions under `session:internal:*`
+  for system workflows; these must not be listed in normal CLI/UI session views
 - runtime invocation policy is provider-driven:
   - `openclaw`: provider-default invocation (OpenGoat does not override cwd/path)
   - non-`openclaw` providers: use the agent workspace path
@@ -151,6 +153,8 @@ Project-backed special agents live under `projects/`:
 - `projects/<project-id>/project.json`
 - `projects/<project-id>/cmo/` (workspace path for the project CMO agent)
 - `projects/<project-id>/agents/cmo/` (OpenClaw/OpenGoat-managed agent dir)
+- project creation bootstraps the CMO through one hidden internal session using
+  a reusable markdown prompt template rendered with the project URL
 
 OpenGoat pre-seeds agent workspace template files from
 `packages/core/src/core/templates/assets/agents/<agent-id>/`.
