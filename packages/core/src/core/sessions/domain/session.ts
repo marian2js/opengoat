@@ -85,6 +85,11 @@ export interface SessionRemoveResult {
 
 export const SESSION_STORE_SCHEMA_VERSION = 1 as const;
 export const SESSION_TRANSCRIPT_SCHEMA_VERSION = 1 as const;
+export const INTERNAL_SESSION_PREFIX = "session:internal:";
+
+export function isInternalSessionKey(sessionKey: string): boolean {
+  return sessionKey.trim().toLowerCase().startsWith(INTERNAL_SESSION_PREFIX);
+}
 
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
   mainKey: "main",

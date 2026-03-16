@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import type { TaskRecord } from "../../boards/index.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../domain/agent-id.js";
+import { INTERNAL_SESSION_PREFIX } from "../../sessions/index.js";
 
 export type OpenClawAgentPathEntry = {
   id: string;
@@ -237,7 +238,7 @@ export function buildTaskSessionRef(agentId: string, _taskId: string): string {
 
 export function buildNotificationSessionRef(agentId: string): string {
   const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
-  return `agent:${normalizedAgentId}:agent_${normalizedAgentId}_notifications`;
+  return `${INTERNAL_SESSION_PREFIX}agent-${normalizedAgentId}-notifications`;
 }
 
 export function buildTodoTaskMessage(params: {

@@ -16,7 +16,7 @@ describe("opengoat task cron notification helpers", () => {
     const taskRefA = buildTaskSessionRef("Engineer", "task-a");
     const taskRefB = buildTaskSessionRef("Engineer", "task-b");
 
-    expect(notificationRef).toBe("agent:engineer:agent_engineer_notifications");
+    expect(notificationRef).toBe("session:internal:agent-engineer-notifications");
     expect(taskRefA).toBe(notificationRef);
     expect(taskRefB).toBe(notificationRef);
   });

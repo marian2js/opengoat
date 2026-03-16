@@ -19,7 +19,13 @@ export type {
   SessionStoreShape,
   SessionSummary
 } from "./domain/session.js";
-export { DEFAULT_SESSION_CONFIG, SESSION_STORE_SCHEMA_VERSION, SESSION_TRANSCRIPT_SCHEMA_VERSION } from "./domain/session.js";
+export {
+  DEFAULT_SESSION_CONFIG,
+  INTERNAL_SESSION_PREFIX,
+  SESSION_STORE_SCHEMA_VERSION,
+  SESSION_TRANSCRIPT_SCHEMA_VERSION,
+  isInternalSessionKey
+} from "./domain/session.js";
 export type {
   SessionTranscriptCompaction,
   SessionTranscriptHeader,

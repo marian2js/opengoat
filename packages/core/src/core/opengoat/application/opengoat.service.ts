@@ -2268,7 +2268,7 @@ export class OpenGoatService {
 
   public async listSessions(
     agentId?: string,
-    options: { activeMinutes?: number } = {},
+    options: { activeMinutes?: number; includeInternal?: boolean } = {},
   ): Promise<SessionSummary[]> {
     const paths = this.pathsProvider.getPaths();
     const resolvedAgentId = await this.resolveInputAgentId(paths, agentId);

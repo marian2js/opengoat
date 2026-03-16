@@ -254,6 +254,41 @@ describe("SessionService", () => {
     expect(remaining).toHaveLength(0);
   });
 
+  it("hides internal sessions from public listings by default", async () => {
+    const root = await createTempDir("opengoat-session-");
+    roots.push(root);
+
+    const { fileSystem, paths } = await createPaths(root);
+    await seedAgentConfig(fileSystem, paths, "goat", {});
+
+    const now = { value: Date.parse("2026-02-07T00:00:00.000Z") };
+    const service = createService(now);
+
+    const prepared = await service.prepareRunSession(paths, "goat", {
+      sessionRef: "session:internal:agent-goat-notifications",
+      userMessage: "internal reminder",
+    });
+    if (!prepared.enabled) {
+      throw new Error("Expected session-enabled run.");
+    }
+
+    const publicSessions = await service.listSessions(paths, "goat");
+    expect(publicSessions).toHaveLength(0);
+
+    const allSessions = await service.listSessions(paths, "goat", {
+      includeInternal: true,
+    });
+    expect(allSessions).toHaveLength(1);
+    expect(allSessions[0]?.sessionKey).toBe(
+      "session:internal:agent-goat-notifications",
+    );
+
+    const history = await service.getSessionHistory(paths, "goat", {
+      sessionRef: "session:internal:agent-goat-notifications",
+    });
+    expect(history.messages).toHaveLength(1);
+  });
+
   it("does not run git commands during session setup", async () => {
     const root = await createTempDir("opengoat-session-");
     roots.push(root);

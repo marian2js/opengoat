@@ -52,7 +52,10 @@ interface OpenGoatAcpService {
   initialize(): Promise<unknown>;
   listAgents(): Promise<AgentDescriptor[]>;
   runAgent(agentId: string, options: ProviderInvokeOptions): Promise<OrchestrationRunResult>;
-  listSessions(agentId?: string, options?: { activeMinutes?: number }): Promise<SessionSummary[]>;
+  listSessions(
+    agentId?: string,
+    options?: { activeMinutes?: number; includeInternal?: boolean }
+  ): Promise<SessionSummary[]>;
   getSessionHistory(
     agentId?: string,
     options?: { sessionRef?: string; limit?: number; includeCompaction?: boolean }

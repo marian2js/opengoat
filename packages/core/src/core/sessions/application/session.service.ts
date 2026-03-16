@@ -7,6 +7,7 @@ import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import {
   DEFAULT_SESSION_CONFIG,
+  isInternalSessionKey,
   SESSION_STORE_SCHEMA_VERSION,
   SESSION_TRANSCRIPT_SCHEMA_VERSION,
   type SessionConfig,
@@ -210,7 +211,7 @@ export class SessionService {
   public async listSessions(
     paths: OpenGoatPaths,
     agentId: string,
-    options: { activeMinutes?: number } = {}
+    options: { activeMinutes?: number; includeInternal?: boolean } = {}
   ): Promise<SessionSummary[]> {
     const normalizedAgentId = normalizeAgentId(agentId) || DEFAULT_AGENT_ID;
     const store = await this.readStore(paths, normalizedAgentId);
@@ -230,6 +231,7 @@ export class SessionService {
           entry
         })
       )
+      .filter((entry) => options.includeInternal || !isInternalSessionKey(entry.sessionKey))
       .filter((entry) => {
         if (!activeWindowMs) {
           return true;

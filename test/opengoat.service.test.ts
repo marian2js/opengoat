@@ -2340,35 +2340,30 @@ describe("OpenGoatService", () => {
 
     const engineerSessions = await service.listSessions("engineer");
     const engineerNotificationSessionKey =
-      "agent:engineer:agent_engineer_notifications";
+      "session:internal:agent-engineer-notifications";
     expect(
       engineerSessions.some(
         (entry) => entry.sessionKey === engineerNotificationSessionKey,
       ),
-    ).toBe(true);
-    expect(
-      engineerSessions.filter(
-        (entry) => entry.sessionKey === engineerNotificationSessionKey,
-      ),
-    ).toHaveLength(1);
+    ).toBe(false);
     expect(
       engineerSessions.some((entry) =>
         entry.sessionKey.includes("agent_engineer_task_"),
       ),
     ).toBe(false);
+    const engineerNotificationHistory = await service.getSessionHistory(
+      "engineer",
+      { sessionRef: engineerNotificationSessionKey },
+    );
+    expect(engineerNotificationHistory.messages.length).toBeGreaterThan(0);
 
     const ceoSessions = await service.listSessions("goat");
-    const ceoNotificationSessionKey = "agent:goat:agent_goat_notifications";
+    const ceoNotificationSessionKey = "session:internal:agent-goat-notifications";
     expect(
       ceoSessions.some(
         (entry) => entry.sessionKey === ceoNotificationSessionKey,
       ),
-    ).toBe(true);
-    expect(
-      ceoSessions.filter(
-        (entry) => entry.sessionKey === ceoNotificationSessionKey,
-      ),
-    ).toHaveLength(1);
+    ).toBe(false);
     expect(
       ceoSessions.some((entry) =>
         entry.sessionKey.includes("agent_goat_task_"),
@@ -2379,14 +2374,22 @@ describe("OpenGoatService", () => {
         entry.sessionKey.includes("agent_goat_inactive_"),
       ),
     ).toBe(false);
+    const ceoNotificationHistory = await service.getSessionHistory("goat", {
+      sessionRef: ceoNotificationSessionKey,
+    });
+    expect(ceoNotificationHistory.messages.length).toBeGreaterThan(0);
 
     const sageSessions = await service.listSessions("sage");
-    const sageNotificationSessionKey = "agent:sage:agent_sage_notifications";
+    const sageNotificationSessionKey = "session:internal:agent-sage-notifications";
     expect(
       sageSessions.some(
         (entry) => entry.sessionKey === sageNotificationSessionKey,
       ),
-    ).toBe(true);
+    ).toBe(false);
+    const sageNotificationHistory = await service.getSessionHistory("sage", {
+      sessionRef: sageNotificationSessionKey,
+    });
+    expect(sageNotificationHistory.messages.length).toBeGreaterThan(0);
   });
 
   it("excludes blocked tasks from top-down open task threshold checks", async () => {
