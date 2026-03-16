@@ -220,8 +220,12 @@ describe("OpenGoatService", () => {
   it("creates a project-backed CMO OpenClaw agent from a URL", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
+    const sourceRepositoryRoot = await createTempDir("opengoat-skill-repo-");
+    roots.push(sourceRepositoryRoot);
+    await writeAgentBrowserSkillRepository(sourceRepositoryRoot);
+    const commandRunner = createProjectSkillCommandRunner(sourceRepositoryRoot);
 
-    const { service, provider } = createService(root);
+    const { service, provider } = createService(root, new FakeOpenClawProvider(), commandRunner);
 
     const created = await service.createProject("myproject.com");
 
@@ -252,13 +256,52 @@ describe("OpenGoatService", () => {
     };
     expect(projectConfig.id).toBe("my-project");
     expect(projectConfig.agents.cmo.agentId).toBe("my-project-cmo");
+    await expect(
+      access(
+        path.join(
+          root,
+          "projects",
+          "my-project",
+          "cmo",
+          "skills",
+          "agent-browser",
+          "SKILL.md",
+        ),
+        constants.F_OK,
+      ),
+    ).resolves.toBeUndefined();
   });
 
   it("repairs stale OpenClaw project CMO workspace mapping during initialize", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
+    const sourceRepositoryRoot = await createTempDir("opengoat-skill-repo-");
+    roots.push(sourceRepositoryRoot);
+    await writeAgentBrowserSkillRepository(sourceRepositoryRoot);
 
+    let returnStaleProjectAgent = false;
     const commandRunner = new FakeCommandRunner(async (request) => {
+      if (
+        request.command === "git" &&
+        request.args[0] === "clone" &&
+        request.args[1] === "--depth" &&
+        request.args[2] === "1"
+      ) {
+        const destinationDir = request.args[4];
+        if (!destinationDir) {
+          return {
+            code: 1,
+            stdout: "",
+            stderr: "Missing destination dir",
+          };
+        }
+        await new NodeFileSystem().copyDir(sourceRepositoryRoot, destinationDir);
+        return {
+          code: 0,
+          stdout: "",
+          stderr: "",
+        };
+      }
       if (
         request.args[0] === "skills" &&
         request.args[1] === "list" &&
@@ -281,18 +324,22 @@ describe("OpenGoatService", () => {
       ) {
         return {
           code: 0,
-          stdout: JSON.stringify([
-            {
-              id: "goat",
-              workspace: path.join(root, "workspaces", "goat"),
-              agentDir: path.join(root, "agents", "goat"),
-            },
-            {
-              id: "my-project-cmo",
-              workspace: path.join(root, "stale", "projects", "my-project", "cmo"),
-              agentDir: path.join(root, "stale", "projects", "my-project", "agents", "cmo"),
-            },
-          ]),
+          stdout: JSON.stringify(
+            returnStaleProjectAgent
+              ? [
+                  {
+                    id: "goat",
+                    workspace: path.join(root, "workspaces", "goat"),
+                    agentDir: path.join(root, "agents", "goat"),
+                  },
+                  {
+                    id: "my-project-cmo",
+                    workspace: path.join(root, "stale", "projects", "my-project", "cmo"),
+                    agentDir: path.join(root, "stale", "projects", "my-project", "agents", "cmo"),
+                  },
+                ]
+              : [],
+          ),
           stderr: "",
         };
       }
@@ -312,6 +359,7 @@ describe("OpenGoatService", () => {
     await service.createProject("myproject.com");
     provider.createdAgents.length = 0;
     provider.deletedAgents.length = 0;
+    returnStaleProjectAgent = true;
 
     await service.initialize();
 
@@ -326,8 +374,15 @@ describe("OpenGoatService", () => {
   it("includes project CMO agents in hard reset cleanup", async () => {
     const root = await createTempDir("opengoat-service-");
     roots.push(root);
+    const sourceRepositoryRoot = await createTempDir("opengoat-skill-repo-");
+    roots.push(sourceRepositoryRoot);
+    await writeAgentBrowserSkillRepository(sourceRepositoryRoot);
 
-    const { service, provider } = createService(root);
+    const { service, provider } = createService(
+      root,
+      new FakeOpenClawProvider(),
+      createProjectSkillCommandRunner(sourceRepositoryRoot),
+    );
     await service.initialize();
     await service.createProject("myproject.com");
 
@@ -3041,6 +3096,66 @@ function createService(
 function extractTaskIdFromTaskMessage(message: string): string | undefined {
   const match = message.match(/^Task ID: (\S+)$/m);
   return match?.[1];
+}
+
+async function writeAgentBrowserSkillRepository(root: string): Promise<void> {
+  const sourceSkillDir = path.join(root, "agent-browser");
+  await new NodeFileSystem().ensureDir(sourceSkillDir);
+  await new NodeFileSystem().writeFile(
+    path.join(sourceSkillDir, "SKILL.md"),
+    [
+      "---",
+      "name: agent-browser",
+      "description: Browser automation workflow",
+      "---",
+      "",
+      "# Agent Browser",
+    ].join("\n"),
+  );
+}
+
+function createProjectSkillCommandRunner(
+  sourceRepositoryRoot: string,
+): CommandRunnerPort {
+  return new FakeCommandRunner(async (request) => {
+    if (
+      request.command === "git" &&
+      request.args[0] === "clone" &&
+      request.args[1] === "--depth" &&
+      request.args[2] === "1"
+    ) {
+      const destinationDir = request.args[4];
+      if (!destinationDir) {
+        return {
+          code: 1,
+          stdout: "",
+          stderr: "Missing destination dir",
+        };
+      }
+      await new NodeFileSystem().copyDir(sourceRepositoryRoot, destinationDir);
+      return {
+        code: 0,
+        stdout: "",
+        stderr: "",
+      };
+    }
+    if (
+      request.args[0] === "agents" &&
+      request.args[1] === "list" &&
+      request.args.includes("--json")
+    ) {
+      return {
+        code: 0,
+        stdout: JSON.stringify([]),
+        stderr: "",
+      };
+    }
+    return {
+      code: 0,
+      stdout: "",
+      stderr: "",
+    };
+  });
 }
 
 class FakeOpenClawProvider extends BaseProvider {

@@ -105,7 +105,8 @@ opengoat project create https://myproject.com
 ```
 
 This provisions a project-scoped CMO agent workspace at
-`~/.opengoat/projects/<project>/cmo`.
+`~/.opengoat/projects/<project>/cmo` and installs the `agent-browser` skill by
+default.
 
 ### Build the organization
 

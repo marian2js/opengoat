@@ -131,6 +131,9 @@ const OPENCLAW_AGENT_SANDBOX_MODE = "off";
 const OPENCLAW_AGENT_TOOLS_ALLOW_ALL_JSON = '["*"]';
 const OPENGOAT_DEFAULT_AGENT_ENV = "OPENGOAT_DEFAULT_AGENT";
 const TOP_DOWN_TASK_DELEGATION_AGENT_ID = "sage";
+const DEFAULT_PROJECT_CMO_SKILL_ID = "agent-browser";
+const DEFAULT_PROJECT_CMO_SKILL_SOURCE_URL =
+  "https://github.com/vercel-labs/agent-browser";
 const NOTIFICATION_SESSION_COMPACTION_COMMAND = [
   "/compact",
   "Keep only the last 3 notification exchanges plus active task ids, statuses, blockers, and explicit next actions.",
@@ -1083,6 +1086,24 @@ export class OpenGoatService {
     await this.syncOpenClawAgentExecutionPolicies(paths, [
       created.project.cmoAgent.id,
     ]);
+
+    try {
+      await this.installDefaultProjectCmoSkills(paths, created.project.cmoAgent);
+    } catch (error) {
+      if (!created.alreadyExisted) {
+        await this.providerService.deleteProviderAgent(
+          paths,
+          created.project.cmoAgent.id,
+          { providerId: OPENCLAW_PROVIDER_ID },
+        );
+        await this.fileSystem.removeDir(created.project.rootDir);
+      }
+      throw new Error(
+        `Failed to install default skills for "${
+          created.project.cmoAgent.id
+        }". ${toErrorMessage(error)}`,
+      );
+    }
 
     return {
       ...created,
@@ -2970,6 +2991,26 @@ export class OpenGoatService {
         `Project fallback discovery failed: ${toErrorMessage(error)}`,
       );
     }
+  }
+
+  private async installDefaultProjectCmoSkills(
+    paths: ReturnType<OpenGoatPathsProvider["getPaths"]>,
+    agent: ProjectCreationResult["project"]["cmoAgent"],
+  ): Promise<void> {
+    await this.skillService.installSkill(
+      paths,
+      {
+        agentId: agent.id,
+        scope: "agent",
+        skillName: DEFAULT_PROJECT_CMO_SKILL_ID,
+        sourceUrl: DEFAULT_PROJECT_CMO_SKILL_SOURCE_URL,
+        sourceSkillName: DEFAULT_PROJECT_CMO_SKILL_ID,
+      },
+      {
+        workspaceDir: agent.workspaceDir,
+        workspaceSkillDirectories: ["skills"],
+      },
+    );
   }
 
   private async syncOpenClawAgentRegistration(
