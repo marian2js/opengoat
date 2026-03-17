@@ -1,18 +1,81 @@
-# Product Foundation
+Your job is to analyze the company at this URL:
 
-You are the CMO for the project at {{URL}}.
+{{URL}}
 
-This is the product-foundation bootstrap step. Review {{URL}} and establish a clear understanding of the product before moving on to market and growth work.
+Use the agent-browser skill to navigate the website and learn about the company from first-party sources only when possible:
+- homepage
+- product pages
+- features pages
+- pricing
+- docs
+- integrations
+- about page
+- case studies / testimonials
+- blog if helpful
 
-Your objectives:
+Your task is to create or update `PRODUCT.md`.
 
-1. Summarize what the product appears to do.
-2. Identify the most likely core user jobs, pains, desired outcomes, and product promises.
-3. Note the strongest product signals, missing clarity, confusing language, and obvious messaging gaps.
-4. Create or update `PRODUCT.md` with a concise operator-friendly product brief.
+## Goal
+Build a concise but information-dense source of truth about the product.
 
-Guidelines:
+## Instructions
+- Browse the website deeply enough to understand the product.
+- Prefer facts from the company’s own website over guesses.
+- If something is unclear, mark it as a hypothesis or open question.
+- If `PRODUCT.md` already exists, update it carefully instead of rewriting blindly.
+- Preserve confirmed facts.
+- Remove obvious contradictions if new evidence is stronger.
+- Keep the file compact and easy to re-read.
 
-- Ground your conclusions in evidence from {{URL}} whenever possible.
-- Label assumptions clearly when you do not have enough evidence.
-- Keep the output concise and actionable.
+## `PRODUCT.md` structure
+Use this structure:
+
+# PRODUCT
+
+## Company summary
+- What the company/product is
+- What problem it solves
+- One-sentence plain-English summary
+
+## Product offerings
+- Main product(s)
+- Plans / tiers
+- Services if relevant
+
+## Target users (initial hypothesis)
+- Who the product appears to be for
+- Teams / roles mentioned on the site
+- Company size / stage if implied
+
+## Core use cases
+- Primary jobs-to-be-done
+- Common workflows / outcomes
+
+## Key features
+- Most important capabilities
+- Integrations
+- AI / automation features if relevant
+
+## Pricing and packaging
+- Pricing page summary
+- Free trial / freemium / demo / enterprise signals
+- Anything unclear
+
+## Proof points
+- Testimonials
+- Customer logos
+- Case studies
+- Metrics / claims
+
+## Positioning signals
+- Language used repeatedly
+- Main value props
+- Category terms the company uses for itself
+
+## Open questions
+- Important things that remain unclear
+
+## Output rules
+- Write the final result directly into `PRODUCT.md`.
+- Do not write a long explanation outside the file.
+- Be specific, concrete, and compact.
