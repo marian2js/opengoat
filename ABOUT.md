@@ -153,8 +153,8 @@ Project-backed special agents live under `projects/`:
 - `projects/<project-id>/project.json`
 - `projects/<project-id>/cmo/` (workspace path for the project CMO agent)
 - `projects/<project-id>/agents/cmo/` (OpenClaw/OpenGoat-managed agent dir)
-- project creation bootstraps the CMO through one hidden internal session using
-  a reusable markdown prompt template rendered with the project URL
+- project creation bootstraps the CMO through an ordered hidden internal prompt
+  sequence rendered from reusable markdown prompt templates with the project URL
 
 OpenGoat pre-seeds agent workspace template files from
 `packages/core/src/core/templates/assets/agents/<agent-id>/`.

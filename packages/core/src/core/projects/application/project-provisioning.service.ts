@@ -8,8 +8,8 @@ import { SkillService } from "../../skills/index.js";
 import { type ProjectCreationResult, type ProjectDescriptor } from "../domain/project.js";
 import { ProjectService } from "./project.service.js";
 import {
-  buildProjectCmoBootstrapSessionRef,
-  renderProjectCmoBootstrapPrompt,
+  listProjectCmoBootstrapPrompts,
+  type ProjectCmoBootstrapPrompt,
 } from "./project-cmo-bootstrap.js";
 
 const OPENCLAW_PROVIDER_ID = "openclaw";
@@ -175,35 +175,89 @@ export class ProjectProvisioningService {
     paths: OpenGoatPaths,
     project: ProjectDescriptor,
   ): Promise<void> {
-    const sessionRef = buildProjectCmoBootstrapSessionRef();
     const projectSessionPaths: OpenGoatPaths = {
       ...paths,
       agentsDir: this.pathPort.join(project.rootDir, "agents"),
       workspacesDir: project.rootDir,
     };
     const sessionAgentId = project.cmoAgent.roleId;
-    const bootstrapHistory = await this.sessionService.getSessionHistory(
+    const prompts = listProjectCmoBootstrapPrompts(project.sourceUrl);
+
+    for (const prompt of prompts) {
+      if (
+        await this.hasCompletedBootstrapPrompt(
+          projectSessionPaths,
+          sessionAgentId,
+          prompt,
+        )
+      ) {
+        continue;
+      }
+      await this.runBootstrapPrompt(
+        paths,
+        projectSessionPaths,
+        sessionAgentId,
+        project,
+        prompt,
+      );
+    }
+  }
+
+  private async rollbackCreatedProject(
+    paths: OpenGoatPaths,
+    created: ProjectCreationResult,
+    options: { deleteProviderAgent?: boolean } = {},
+  ): Promise<void> {
+    if (options.deleteProviderAgent && !created.alreadyExisted) {
+      await this.providerService.deleteProviderAgent(
+        paths,
+        created.project.cmoAgent.id,
+        { providerId: OPENCLAW_PROVIDER_ID },
+      );
+    }
+    if (!created.alreadyExisted) {
+      await this.fileSystem.removeDir(created.project.rootDir);
+    }
+  }
+
+  private async hasCompletedBootstrapPrompt(
+    projectSessionPaths: OpenGoatPaths,
+    sessionAgentId: string,
+    prompt: ProjectCmoBootstrapPrompt,
+  ): Promise<boolean> {
+    const history = await this.sessionService.getSessionHistory(
       projectSessionPaths,
       sessionAgentId,
       {
-        sessionRef,
+        sessionRef: prompt.sessionRef,
       },
     );
-    if (hasAssistantMessage(bootstrapHistory.messages)) {
-      return;
+    const lastAssistantMessage = findLastAssistantMessage(history.messages);
+    if (!lastAssistantMessage) {
+      return false;
     }
+    return !isBootstrapRuntimeErrorMessage(lastAssistantMessage.content);
+  }
 
-    const bootstrapMessage = renderProjectCmoBootstrapPrompt(project.sourceUrl);
+  private async runBootstrapPrompt(
+    paths: OpenGoatPaths,
+    projectSessionPaths: OpenGoatPaths,
+    sessionAgentId: string,
+    project: ProjectDescriptor,
+    prompt: ProjectCmoBootstrapPrompt,
+  ): Promise<void> {
     const prepared = await this.sessionService.prepareRunSession(
       projectSessionPaths,
       sessionAgentId,
       {
-        sessionRef,
-        userMessage: bootstrapMessage,
+        sessionRef: prompt.sessionRef,
+        userMessage: prompt.message,
       },
     );
     if (!prepared.enabled) {
-      throw new Error("Project CMO bootstrap session was unexpectedly disabled.");
+      throw new Error(
+        `Project CMO bootstrap session was unexpectedly disabled for "${prompt.name}".`,
+      );
     }
 
     let execution: ProviderExecutionResult;
@@ -213,7 +267,7 @@ export class ProjectProvisioningService {
         project.cmoAgent.id,
         OPENCLAW_PROVIDER_ID,
         {
-          message: bootstrapMessage,
+          message: prompt.message,
           providerSessionId: prepared.info.sessionId,
         },
       );
@@ -239,35 +293,32 @@ export class ProjectProvisioningService {
 
     if (execution.code !== 0) {
       throw new Error(
-        `Bootstrap run failed (exit ${execution.code}). ${
+        `Bootstrap prompt "${prompt.name}" failed (exit ${execution.code}). ${
           execution.stderr.trim() || execution.stdout.trim() || ""
         }`.trim(),
       );
     }
   }
-
-  private async rollbackCreatedProject(
-    paths: OpenGoatPaths,
-    created: ProjectCreationResult,
-    options: { deleteProviderAgent?: boolean } = {},
-  ): Promise<void> {
-    if (options.deleteProviderAgent && !created.alreadyExisted) {
-      await this.providerService.deleteProviderAgent(
-        paths,
-        created.project.cmoAgent.id,
-        { providerId: OPENCLAW_PROVIDER_ID },
-      );
-    }
-    if (!created.alreadyExisted) {
-      await this.fileSystem.removeDir(created.project.rootDir);
-    }
-  }
 }
 
-function hasAssistantMessage(
-  messages: Array<{ type: string; role?: string }>,
-): boolean {
-  return messages.some(
-    (entry) => entry.type === "message" && entry.role === "assistant",
+function findLastAssistantMessage(
+  messages: Array<{ type: string; role?: string; content?: string }>,
+): { content: string } | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const entry = messages[index];
+    if (
+      entry?.type === "message" &&
+      entry.role === "assistant" &&
+      typeof entry.content === "string"
+    ) {
+      return { content: entry.content };
+    }
+  }
+  return null;
+}
+
+function isBootstrapRuntimeErrorMessage(content: string): boolean {
+  return /^\[(?:Runtime error|Runtime error code \d+|Runtime exited with code )/.test(
+    content,
   );
 }

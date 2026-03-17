@@ -1,34 +1,71 @@
 import { readFileSync } from "node:fs";
 import { INTERNAL_SESSION_PREFIX } from "../../sessions/index.js";
 
-const PROJECT_CMO_BOOTSTRAP_SESSION_REF = `${INTERNAL_SESSION_PREFIX}project-cmo-bootstrap`;
-const PROJECT_CMO_BOOTSTRAP_PROMPT_TEMPLATE_URL = new URL(
-  "../../templates/assets/projects/cmo-bootstrap-prompt.md",
-  import.meta.url,
-);
-
-let cachedProjectCmoBootstrapPromptTemplate: string | undefined;
-
-export function buildProjectCmoBootstrapSessionRef(): string {
-  return PROJECT_CMO_BOOTSTRAP_SESSION_REF;
+export interface ProjectCmoBootstrapPrompt {
+  id: string;
+  name: string;
+  sessionRef: string;
+  message: string;
 }
 
-export function renderProjectCmoBootstrapPrompt(projectUrl: string): string {
+const PROJECT_CMO_BOOTSTRAP_PROMPT_DEFINITIONS = [
+  {
+    id: "product",
+    name: "cmo-bootstrap-product-prompt",
+    templateUrl: new URL(
+      "../../templates/assets/projects/cmo-bootstrap-product-prompt.md",
+      import.meta.url,
+    ),
+  },
+  {
+    id: "market",
+    name: "cmo-bootstrap-market-prompt",
+    templateUrl: new URL(
+      "../../templates/assets/projects/cmo-bootstrap-market-prompt.md",
+      import.meta.url,
+    ),
+  },
+  {
+    id: "growth",
+    name: "cmo-bootstrap-growth-prompt",
+    templateUrl: new URL(
+      "../../templates/assets/projects/cmo-bootstrap-growth-prompt.md",
+      import.meta.url,
+    ),
+  },
+] as const;
+
+const cachedProjectCmoBootstrapPromptTemplates = new Map<string, string>();
+
+export function listProjectCmoBootstrapPrompts(
+  projectUrl: string,
+): ProjectCmoBootstrapPrompt[] {
   const normalizedProjectUrl = projectUrl.trim();
-  return readProjectCmoBootstrapPromptTemplate().replaceAll(
-    "{{URL}}",
-    normalizedProjectUrl,
-  );
+  return PROJECT_CMO_BOOTSTRAP_PROMPT_DEFINITIONS.map((definition) => ({
+    id: definition.id,
+    name: definition.name,
+    sessionRef: buildProjectCmoBootstrapSessionRef(definition.name),
+    message: readProjectCmoBootstrapPromptTemplate(definition).replaceAll(
+      "{{URL}}",
+      normalizedProjectUrl,
+    ),
+  }));
 }
 
-function readProjectCmoBootstrapPromptTemplate(): string {
-  if (cachedProjectCmoBootstrapPromptTemplate !== undefined) {
-    return cachedProjectCmoBootstrapPromptTemplate;
+function buildProjectCmoBootstrapSessionRef(promptName: string): string {
+  return `${INTERNAL_SESSION_PREFIX}${promptName}`;
+}
+
+function readProjectCmoBootstrapPromptTemplate(definition: {
+  name: string;
+  templateUrl: URL;
+}): string {
+  const cached = cachedProjectCmoBootstrapPromptTemplates.get(definition.name);
+  if (cached !== undefined) {
+    return cached;
   }
 
-  cachedProjectCmoBootstrapPromptTemplate = readFileSync(
-    PROJECT_CMO_BOOTSTRAP_PROMPT_TEMPLATE_URL,
-    "utf8",
-  );
-  return cachedProjectCmoBootstrapPromptTemplate;
+  const template = readFileSync(definition.templateUrl, "utf8");
+  cachedProjectCmoBootstrapPromptTemplates.set(definition.name, template);
+  return template;
 }

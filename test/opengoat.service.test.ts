@@ -271,12 +271,18 @@ describe("OpenGoatService", () => {
       ),
     ).resolves.toBeUndefined();
 
-    expect(provider.invocations).toHaveLength(1);
+    expect(provider.invocations).toHaveLength(3);
     expect(provider.invocations[0]?.message).toContain(
-      "You are the CMO for the project at https://myproject.com/.",
+      "# Product Foundation",
     );
-    expect(provider.invocations[0]?.message).not.toContain("{{URL}}");
-    expect(provider.invocations[0]?.providerSessionId).toBeTruthy();
+    expect(provider.invocations[1]?.message).toContain(
+      "# Market Foundation",
+    );
+    expect(provider.invocations[2]?.message).toContain(
+      "# Growth Foundation",
+    );
+    expect(provider.invocations.every((entry) => !entry.message.includes("{{URL}}"))).toBe(true);
+    expect(provider.invocations.every((entry) => Boolean(entry.providerSessionId))).toBe(true);
 
     const publicSessions = await service.listSessions("my-project-cmo");
     expect(publicSessions).toHaveLength(0);
@@ -302,21 +308,24 @@ describe("OpenGoatService", () => {
         }
       >;
     };
-    const bootstrapEntry =
-      sessionStore.sessions["session:internal:project-cmo-bootstrap"];
-    expect(bootstrapEntry?.transcriptFile).toBeTruthy();
+    expect(Object.keys(sessionStore.sessions).sort()).toEqual([
+      "session:internal:cmo-bootstrap-growth-prompt",
+      "session:internal:cmo-bootstrap-market-prompt",
+      "session:internal:cmo-bootstrap-product-prompt",
+    ]);
 
-    const transcript = await readFile(bootstrapEntry!.transcriptFile!, "utf-8");
-    expect(transcript).toContain('"sessionKey":"session:internal:project-cmo-bootstrap"');
-    expect(transcript).toContain(
+    const productTranscript = await readFile(
+      sessionStore.sessions["session:internal:cmo-bootstrap-product-prompt"]!
+        .transcriptFile!,
+      "utf-8",
+    );
+    expect(productTranscript).toContain(
       '"workspacePath":"' +
         path.join(root, "projects", "my-project", "cmo").replaceAll("\\", "\\\\") +
         '"',
     );
-    expect(transcript).toContain(
-      "You are the CMO for the project at https://myproject.com/.",
-    );
-    expect(transcript).toContain('"role":"assistant","content":"ok"');
+    expect(productTranscript).toContain("# Product Foundation");
+    expect(productTranscript).toContain('"role":"assistant","content":"ok"');
   });
 
   it("does not rerun project CMO bootstrap after the internal bootstrap session completes", async () => {
@@ -334,10 +343,10 @@ describe("OpenGoatService", () => {
     );
 
     await service.createProject("myproject.com");
-    expect(provider.invocations).toHaveLength(1);
+    expect(provider.invocations).toHaveLength(3);
 
     await service.createProject("myproject.com");
-    expect(provider.invocations).toHaveLength(1);
+    expect(provider.invocations).toHaveLength(3);
   });
 
   it("rolls back a newly created project when CMO bootstrap fails", async () => {
@@ -357,7 +366,7 @@ describe("OpenGoatService", () => {
     );
 
     await expect(service.createProject("myproject.com")).rejects.toThrow(
-      'Failed to bootstrap project CMO for "my-project-cmo". Bootstrap run failed (exit 1). bootstrap failed',
+      'Failed to bootstrap project CMO for "my-project-cmo". Bootstrap prompt "cmo-bootstrap-product-prompt" failed (exit 1). bootstrap failed',
     );
     await expect(
       access(path.join(root, "projects", "my-project"), constants.F_OK),
