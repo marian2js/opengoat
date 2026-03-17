@@ -273,13 +273,13 @@ describe("OpenGoatService", () => {
 
     expect(provider.invocations).toHaveLength(3);
     expect(provider.invocations[0]?.message).toContain(
-      "# Product Foundation",
+      "create or update `PRODUCT.md`",
     );
     expect(provider.invocations[1]?.message).toContain(
-      "# Market Foundation",
+      "create or update `MARKET.md`",
     );
     expect(provider.invocations[2]?.message).toContain(
-      "# Growth Foundation",
+      "create or update `GROWTH.md`",
     );
     expect(provider.invocations.every((entry) => !entry.message.includes("{{URL}}"))).toBe(true);
     expect(provider.invocations.every((entry) => Boolean(entry.providerSessionId))).toBe(true);
@@ -324,7 +324,7 @@ describe("OpenGoatService", () => {
         path.join(root, "projects", "my-project", "cmo").replaceAll("\\", "\\\\") +
         '"',
     );
-    expect(productTranscript).toContain("# Product Foundation");
+    expect(productTranscript).toContain("create or update `PRODUCT.md`");
     expect(productTranscript).toContain('"role":"assistant","content":"ok"');
   });
 
