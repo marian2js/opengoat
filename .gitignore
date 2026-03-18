@@ -4,6 +4,10 @@ packages/*/node_modules
 coverage
 dist
 packages/*/dist
+apps/*/dist
+apps/desktop/src-tauri/target
+target
+packages/sidecar/.bundle
 .DS_Store
 *.log
 .env

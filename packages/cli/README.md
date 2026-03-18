@@ -71,6 +71,7 @@ Runtime: Node `>=20.11`.
 npm i -g openclaw opengoat
 openclaw onboard
 opengoat init
+opengoat project create https://myproject.com
 opengoat agent --message "Set up a CTO and two engineers for this project."
 ```
 
@@ -96,6 +97,17 @@ opengoat onboard --external \
 ```
 
 ## Typical Workflows
+
+### Create a project CMO
+
+```bash
+opengoat project create https://myproject.com
+```
+
+This provisions a project-scoped CMO agent workspace at
+`~/.opengoat/projects/<project>/cmo`, installs the `agent-browser` skill by
+default, and bootstraps the CMO with an internal first-run prompt sequence
+derived from the project URL.
 
 ### Build the organization
 

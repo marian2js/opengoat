@@ -11,7 +11,18 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./agents": {
+      "types": "./dist/agents/index.d.ts",
+      "default": "./dist/agents/index.js"
+    },
+    "./config-paths": {
+      "types": "./dist/config-paths.d.ts",
+      "default": "./dist/config-paths.js"
+    }
   },
   "files": [
     "dist",
@@ -28,6 +39,7 @@
     "node": ">=20.11.0"
   },
   "dependencies": {
+    "@opengoat/contracts": "workspace:*",
     "@agentclientprotocol/sdk": "^0.14.1",
     "json5": "^2.2.3",
     "sql.js": "^1.13.0",

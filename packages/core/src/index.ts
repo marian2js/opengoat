@@ -1,3 +1,5 @@
+export * from "./app.js";
+export * from "./config-paths.js";
 export * from "./core/domain/agent.js";
 export * from "./core/domain/agent-id.js";
 export * from "./core/domain/opengoat-paths.js";
@@ -17,6 +19,7 @@ export * from "./core/skills/index.js";
 export * from "./core/acp/index.js";
 export * from "./core/logging/index.js";
 export * from "./apps/runtime/create-opengoat-runtime.js";
+export * from "./agents/index.js";
 export * from "./platform/node/node-file-system.js";
 export * from "./platform/node/node-logger.js";
 export * from "./platform/node/node-path.port.js";

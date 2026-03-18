@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "desktop-frontend",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@opengoat/desktop", "dev"],
+      "port": 1430
+    },
+    {
+      "name": "sidecar",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "packages/sidecar/src/cli.ts", "--hostname", "127.0.0.1", "--port", "19110", "--password", "opengoat-dev-password", "--username", "opengoat"],
+      "port": 19110
+    },
+    {
+      "name": "ui-server",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@opengoat/ui", "dev"],
+      "port": 19123
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "productName": "OpenGoat",
+  "workspaceLayout": [
+    {
+      "path": "apps/desktop",
+      "responsibility": "React desktop shell, dashboard surfaces, and local sidecar client integration"
+    },
+    {
+      "path": "apps/desktop/src-tauri",
+      "responsibility": "Native bootstrap, sidecar supervision, and platform-specific capabilities"
+    },
+    {
+      "path": "packages/contracts",
+      "responsibility": "Shared transport schemas and cross-language manifest contract"
+    },
+    {
+      "path": "packages/core",
+      "responsibility": "Shared Node application core consumed by the sidecar and CLI"
+    },
+    {
+      "path": "packages/cli",
+      "responsibility": "Operational Node CLI built on the shared application core"
+    },
+    {
+      "path": "packages/sidecar",
+      "responsibility": "Node sidecar API, local orchestration boundary, and streaming transport"
+    },
+    {
+      "path": "packages/ui",
+      "responsibility": "Existing OpenGoat web UI and server bundle kept alongside the new desktop app"
+    },
+    {
+      "path": "docs",
+      "responsibility": "Architecture records, conventions, and operational guidance"
+    }
+  ]
+}
