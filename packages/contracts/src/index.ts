@@ -204,6 +204,22 @@ export const deleteAgentSessionResponseSchema = z.object({
   sessionId: z.string().min(1),
 });
 
+export const bootstrapPromptSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  sessionRef: z.string().min(1),
+  expectedFile: z.string().min(1),
+  message: z.string().min(1),
+});
+
+export const bootstrapPromptListSchema = z.object({
+  prompts: z.array(bootstrapPromptSchema),
+});
+
+export const workspaceFileCheckSchema = z.object({
+  exists: z.boolean(),
+});
+
 export const chatTranscriptMessageSchema = z.object({
   id: z.string().min(1),
   role: z.enum(["assistant", "system", "user"]),
@@ -339,6 +355,9 @@ export type ChatTranscriptMessage = z.infer<typeof chatTranscriptMessageSchema>;
 export type ChatBootstrap = z.infer<typeof chatBootstrapSchema>;
 export type ChatActivityStatus = z.infer<typeof chatActivityStatusSchema>;
 export type ChatActivity = z.infer<typeof chatActivitySchema>;
+export type BootstrapPrompt = z.infer<typeof bootstrapPromptSchema>;
+export type BootstrapPromptList = z.infer<typeof bootstrapPromptListSchema>;
+export type WorkspaceFileCheck = z.infer<typeof workspaceFileCheckSchema>;
 
 export const appManifest = appManifestSchema.parse(appManifestJson);
 

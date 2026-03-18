@@ -5,6 +5,7 @@ import { AppSidebar } from "@/app/shell/AppSidebar";
 import { AgentsWorkspace } from "@/features/agents/components/AgentsWorkspace";
 import { ChatWorkspace, evictChatSession } from "@/features/chat/components/ChatWorkspace";
 import { ConnectionsWorkspace } from "@/features/connections/components/ConnectionsWorkspace";
+import { BootstrapProgress } from "@/features/onboarding/components/BootstrapProgress";
 import { ConnectionCenter } from "@/features/onboarding/components/ConnectionCenter";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { initializeSidecarConnection } from "@/lib/runtime/connection";
@@ -30,6 +31,10 @@ export function App() {
   const [createAgentToken, setCreateAgentToken] = useState(0);
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>(undefined);
+  const [bootstrapContext, setBootstrapContext] = useState<{
+    agentId: string;
+    projectUrl: string;
+  } | null>(null);
 
   const activeAgentId = resolveActiveAgentId(agentCatalog);
 
@@ -184,9 +189,13 @@ export function App() {
         onContinue={async (projectUrl) => {
           if (projectUrl && client) {
             try {
-              await client.createProjectAgent(projectUrl);
+              const agent = await client.createProjectAgent(projectUrl);
               // Re-hydrate to pick up the new agent
               setRetryToken((current) => current + 1);
+              // Start bootstrap in the main app layout
+              setBootstrapContext({ agentId: agent.id, projectUrl });
+              window.location.hash = "#chat";
+              return;
             } catch (error) {
               console.error("Failed to create project agent", error);
             }
@@ -239,14 +248,26 @@ export function App() {
         />
         <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" ? "" : "gap-4 p-4 lg:p-5"}`}>
           {currentView === "chat" ? (
-            <ChatWorkspace
-              agentId={activeAgentId}
-              authOverview={authOverview}
-              client={client}
-              onBootstrap={handleBootstrap}
-              onSessionLabelUpdate={handleSessionLabelUpdate}
-              sessionId={activeSessionId}
-            />
+            bootstrapContext && client ? (
+              <BootstrapProgress
+                agentId={bootstrapContext.agentId}
+                client={client}
+                projectUrl={bootstrapContext.projectUrl}
+                onComplete={() => {
+                  setBootstrapContext(null);
+                  void refreshSessions();
+                }}
+              />
+            ) : (
+              <ChatWorkspace
+                agentId={activeAgentId}
+                authOverview={authOverview}
+                client={client}
+                onBootstrap={handleBootstrap}
+                onSessionLabelUpdate={handleSessionLabelUpdate}
+                sessionId={activeSessionId}
+              />
+            )
           ) : currentView === "connections" ? (
             <ConnectionsWorkspace
               authOverview={authOverview}

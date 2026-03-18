@@ -5,6 +5,7 @@ import {
   agentSessionSchema,
   authSessionSchema,
   authOverviewSchema,
+  bootstrapPromptListSchema,
   chatBootstrapSchema,
   connectProviderSecretRequestSchema,
   createAgentRequestSchema,
@@ -21,18 +22,21 @@ import {
   sidecarConnectionSchema,
   sidecarHealthSchema,
   startAuthSessionRequestSchema,
+  workspaceFileCheckSchema,
   type AgentSession,
   type AgentSessionList,
   type AuthOverview,
   type Agent,
   type AgentCatalog,
   type AuthSession,
+  type BootstrapPromptList,
   type ChatBootstrap,
   type ProviderModelCatalog,
   type SavedConnection,
   type SidecarBootstrap,
   type SidecarConnection,
   type SidecarHealth,
+  type WorkspaceFileCheck,
 } from "@opengoat/contracts";
 
 export class SidecarClient {
@@ -79,6 +83,48 @@ export class SidecarClient {
     );
   }
 
+  async getBootstrapPrompts(agentId: string, projectUrl: string): Promise<BootstrapPromptList> {
+    const params = new URLSearchParams({ projectUrl });
+    return bootstrapPromptListSchema.parse(
+      await this.request(
+        `/agents/${encodeURIComponent(agentId)}/bootstrap-prompts?${params.toString()}`,
+      ),
+    );
+  }
+
+  async checkWorkspaceFile(agentId: string, filename: string): Promise<WorkspaceFileCheck> {
+    return workspaceFileCheckSchema.parse(
+      await this.request(
+        `/agents/${encodeURIComponent(agentId)}/workspace/files/${encodeURIComponent(filename)}`,
+      ),
+    );
+  }
+
+  /**
+   * Sends a chat message and returns the raw streaming Response.
+   * Use this for bootstrap prompts where you need to read the stream directly.
+   */
+  async sendChatMessage(
+    payload: { agentId: string; message: string; sessionId: string },
+    signal?: AbortSignal,
+  ): Promise<Response> {
+    const headers = this.createAuthHeaders();
+    headers.set("Content-Type", "application/json");
+
+    const response = await fetch(new URL("/chat", this.connection.url), {
+      body: JSON.stringify(payload),
+      headers,
+      method: "POST",
+      signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Chat request failed with status ${String(response.status)}.`);
+    }
+
+    return response;
+  }
+
   async authOverview(): Promise<AuthOverview> {
     return authOverviewSchema.parse(await this.request("/auth/overview"));
   }
@@ -104,6 +150,7 @@ export class SidecarClient {
 
   async createSession(payload: {
     agentId: string;
+    internal?: boolean;
     label?: string;
   }): Promise<AgentSession> {
     return agentSessionSchema.parse(

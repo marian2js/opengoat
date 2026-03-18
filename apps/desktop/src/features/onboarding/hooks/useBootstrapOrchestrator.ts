@@ -1,0 +1,317 @@
+import { useCallback, useRef, useState } from "react";
+import type { BootstrapPrompt } from "@opengoat/contracts";
+import type { SidecarClient } from "@/lib/sidecar/client";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type BootstrapStepStatus =
+  | "pending"
+  | "streaming"
+  | "verifying"
+  | "completed"
+  | "error";
+
+export interface BootstrapStep {
+  id: string;
+  label: string;
+  expectedFile: string;
+  status: BootstrapStepStatus;
+  streamedText: string;
+  error?: string;
+}
+
+export type BootstrapOverallStatus =
+  | "idle"
+  | "loading-prompts"
+  | "running"
+  | "completed"
+  | "error";
+
+export interface BootstrapState {
+  status: BootstrapOverallStatus;
+  steps: BootstrapStep[];
+  currentStepIndex: number;
+  error?: string;
+}
+
+export interface UseBootstrapOrchestratorReturn {
+  state: BootstrapState;
+  start: (agentId: string, projectUrl: string) => Promise<void>;
+  retry: () => Promise<void>;
+  cancel: () => void;
+}
+
+// ---------------------------------------------------------------------------
+// Step labels (user-facing)
+// ---------------------------------------------------------------------------
+
+const STEP_LABELS: Record<string, string> = {
+  product: "Analyzing your product",
+  market: "Researching the market",
+  growth: "Building growth strategy",
+};
+
+// ---------------------------------------------------------------------------
+// Stream parsing
+// ---------------------------------------------------------------------------
+
+/**
+ * Reads the AI SDK data stream response and extracts text deltas.
+ *
+ * The AI SDK wire format uses newline-delimited frames:
+ *   `0:"text chunk"\n`  — text delta (type 0)
+ *   `e:{"finishReason":"stop",...}\n` — finish event
+ *   `d:{"finishReason":"stop",...}\n` — done event
+ *
+ * We only care about type-0 frames (text deltas) for display.
+ */
+async function readStreamTextDeltas(
+  response: Response,
+  onDelta: (text: string) => void,
+  signal: AbortSignal,
+): Promise<void> {
+  const body = response.body;
+  if (!body) {
+    return;
+  }
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (!signal.aborted) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete lines
+      let newlineIndex: number;
+      while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, newlineIndex);
+        buffer = buffer.slice(newlineIndex + 1);
+
+        // Type 0 = text delta: `0:"escaped text"`
+        if (line.startsWith("0:")) {
+          try {
+            const text = JSON.parse(line.slice(2)) as string;
+            onDelta(text);
+          } catch {
+            // Malformed frame — skip
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
+
+const MAX_RETRIES_PER_STEP = 1;
+
+function createInitialState(): BootstrapState {
+  return {
+    status: "idle",
+    steps: [],
+    currentStepIndex: 0,
+  };
+}
+
+function promptToStep(prompt: BootstrapPrompt): BootstrapStep {
+  return {
+    id: prompt.id,
+    label: STEP_LABELS[prompt.id] ?? prompt.name,
+    expectedFile: prompt.expectedFile,
+    status: "pending",
+    streamedText: "",
+  };
+}
+
+export function useBootstrapOrchestrator(
+  client: SidecarClient | null,
+): UseBootstrapOrchestratorReturn {
+  const [state, setState] = useState<BootstrapState>(createInitialState);
+  const abortRef = useRef<AbortController | null>(null);
+  const contextRef = useRef<{ agentId: string; projectUrl: string; prompts: BootstrapPrompt[] } | null>(null);
+
+  const updateStep = useCallback(
+    (index: number, patch: Partial<BootstrapStep>) => {
+      setState((prev) => ({
+        ...prev,
+        steps: prev.steps.map((step, i) => (i === index ? { ...step, ...patch } : step)),
+      }));
+    },
+    [],
+  );
+
+  const runStep = useCallback(
+    async (
+      sidecar: SidecarClient,
+      agentId: string,
+      prompt: BootstrapPrompt,
+      stepIndex: number,
+      signal: AbortSignal,
+    ): Promise<boolean> => {
+      // Create an internal session for this bootstrap prompt
+      const session = await sidecar.createSession({
+        agentId,
+        internal: true,
+        label: prompt.name,
+      });
+
+      // Update UI to streaming state
+      setState((prev) => ({
+        ...prev,
+        currentStepIndex: stepIndex,
+      }));
+      updateStep(stepIndex, { status: "streaming", streamedText: "", error: undefined });
+
+      // Send the prompt and stream the response
+      const response = await sidecar.sendChatMessage(
+        { agentId, message: prompt.message, sessionId: session.id },
+        signal,
+      );
+
+      await readStreamTextDeltas(
+        response,
+        (delta) => {
+          updateStep(stepIndex, {
+            streamedText: undefined as unknown as string, // handled below
+          });
+          // Use functional setState to safely append to streamedText
+          setState((prev) => ({
+            ...prev,
+            steps: prev.steps.map((step, i) =>
+              i === stepIndex ? { ...step, streamedText: step.streamedText + delta } : step,
+            ),
+          }));
+        },
+        signal,
+      );
+
+      // Verify file was created
+      updateStep(stepIndex, { status: "verifying" });
+      const check = await sidecar.checkWorkspaceFile(agentId, prompt.expectedFile);
+      return check.exists;
+    },
+    [updateStep],
+  );
+
+  const runBootstrap = useCallback(
+    async (startFromIndex = 0) => {
+      const sidecar = client;
+      const ctx = contextRef.current;
+      if (!sidecar || !ctx) {
+        return;
+      }
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      setState((prev) => ({ ...prev, status: "running", error: undefined }));
+
+      try {
+        for (let i = startFromIndex; i < ctx.prompts.length; i++) {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          const prompt = ctx.prompts[i]!;
+          let success = await runStep(sidecar, ctx.agentId, prompt, i, controller.signal);
+
+          // Retry once if file was not created
+          if (!success) {
+            success = await runStep(sidecar, ctx.agentId, prompt, i, controller.signal);
+          }
+
+          if (!success) {
+            updateStep(i, {
+              status: "error",
+              error: `Expected file ${prompt.expectedFile} was not created after two attempts.`,
+            });
+            setState((prev) => ({
+              ...prev,
+              status: "error",
+              error: `Failed to create ${prompt.expectedFile}. You can retry to continue.`,
+            }));
+            return;
+          }
+
+          updateStep(i, { status: "completed" });
+        }
+
+        setState((prev) => ({ ...prev, status: "completed" }));
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : "An unexpected error occurred.";
+        setState((prev) => ({
+          ...prev,
+          status: "error",
+          error: message,
+        }));
+      }
+    },
+    [client, runStep, updateStep],
+  );
+
+  const start = useCallback(
+    async (agentId: string, projectUrl: string) => {
+      if (!client) {
+        return;
+      }
+
+      setState((prev) => ({ ...prev, status: "loading-prompts" }));
+
+      try {
+        const { prompts } = await client.getBootstrapPrompts(agentId, projectUrl);
+        const steps = prompts.map(promptToStep);
+
+        contextRef.current = { agentId, projectUrl, prompts };
+        setState({
+          status: "running",
+          steps,
+          currentStepIndex: 0,
+        });
+
+        await runBootstrap(0);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to load bootstrap prompts.";
+        setState((prev) => ({
+          ...prev,
+          status: "error",
+          error: message,
+        }));
+      }
+    },
+    [client, runBootstrap],
+  );
+
+  const retry = useCallback(async () => {
+    const steps = state.steps;
+    const firstIncomplete = steps.findIndex((s) => s.status !== "completed");
+    if (firstIncomplete === -1) {
+      return;
+    }
+
+    await runBootstrap(firstIncomplete);
+  }, [state.steps, runBootstrap]);
+
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
+  return { state, start, retry, cancel };
+}

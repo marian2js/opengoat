@@ -1,9 +1,11 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   agentCatalogSchema,
   agentSchema,
   agentSessionListSchema,
   agentSessionSchema,
+  bootstrapPromptListSchema,
   createAgentRequestSchema,
   createAgentSessionRequestSchema,
   createProjectAgentRequestSchema,
@@ -11,14 +13,25 @@ import {
   deleteAgentSessionResponseSchema,
   updateAgentRequestSchema,
   updateAgentSessionRequestSchema,
+  workspaceFileCheckSchema,
 } from "@opengoat/contracts";
-import { deriveUniqueProjectId, projectUrlToProjectId } from "@opengoat/core";
+import {
+  deriveUniqueProjectId,
+  listProjectCmoBootstrapPrompts,
+  projectUrlToProjectId,
+} from "@opengoat/core";
 import { Hono } from "hono";
 import type {
   CreateAgentRequest,
   UpdateAgentRequest,
 } from "../types.ts";
 import type { SidecarRuntime } from "../context.ts";
+
+const BOOTSTRAP_EXPECTED_FILES: Record<string, string> = {
+  product: "PRODUCT.md",
+  market: "MARKET.md",
+  growth: "GROWTH.md",
+};
 
 export function createAgentRoutes(runtime: SidecarRuntime): Hono {
   const app = new Hono();
@@ -56,6 +69,35 @@ export function createAgentRoutes(runtime: SidecarRuntime): Hono {
     } as CreateAgentRequest);
 
     return context.json(agentSchema.parse(agent), 201);
+  });
+
+  app.get("/:agentId/bootstrap-prompts", async (context) => {
+    const projectUrl = context.req.query("projectUrl")?.trim();
+    if (!projectUrl) {
+      return context.json({ error: "projectUrl query parameter is required." }, 400);
+    }
+
+    const prompts = listProjectCmoBootstrapPrompts(projectUrl).map((prompt) => ({
+      ...prompt,
+      expectedFile: BOOTSTRAP_EXPECTED_FILES[prompt.id] ?? `${prompt.id.toUpperCase()}.md`,
+    }));
+
+    return context.json(bootstrapPromptListSchema.parse({ prompts }));
+  });
+
+  app.get("/:agentId/workspace/files/:filename", async (context) => {
+    const agentId = context.req.param("agentId");
+    const filename = context.req.param("filename");
+
+    if (filename.includes("/") || filename.includes("..")) {
+      return context.json({ error: "Invalid filename." }, 400);
+    }
+
+    const agent = await runtime.embeddedGateway.getAgent(agentId);
+    const filePath = join(agent.workspaceDir, filename);
+    const exists = existsSync(filePath);
+
+    return context.json(workspaceFileCheckSchema.parse({ exists }));
   });
 
   app.patch("/:agentId", async (context) => {
