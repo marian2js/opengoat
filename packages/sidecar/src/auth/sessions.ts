@@ -33,10 +33,15 @@ interface AuthSessionRecord {
 
 export class RuntimeAuthSessionManager {
   readonly #createAuthService: () => RuntimeProviderAuthService;
+  readonly #onAuthComplete?: () => void;
   readonly #sessions = new Map<string, AuthSessionRecord>();
 
-  constructor(createAuthService: () => RuntimeProviderAuthService) {
+  constructor(
+    createAuthService: () => RuntimeProviderAuthService,
+    options?: { onAuthComplete?: () => void },
+  ) {
     this.#createAuthService = createAuthService;
+    this.#onAuthComplete = options?.onAuthComplete;
   }
 
   get(sessionId: string): AuthSession | undefined {
@@ -155,6 +160,12 @@ export class RuntimeAuthSessionManager {
           type: "completed",
         },
       };
+
+      try {
+        this.#onAuthComplete?.();
+      } catch {
+        // Non-critical — auth sync failures should not block the session.
+      }
     } catch (error) {
       const message = getErrorMessage(error);
       record.snapshot = {

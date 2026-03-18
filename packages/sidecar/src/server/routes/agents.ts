@@ -25,6 +25,7 @@ import type {
   CreateAgentRequest,
   UpdateAgentRequest,
 } from "../types.ts";
+import { syncAuthProfilesToAgent } from "../../auth/sync.ts";
 import type { SidecarRuntime } from "../context.ts";
 
 const BOOTSTRAP_EXPECTED_FILES: Record<string, string> = {
@@ -67,6 +68,11 @@ export function createAgentRoutes(runtime: SidecarRuntime): Hono {
       setAsDefault: true,
       workspaceDir,
     } as CreateAgentRequest);
+
+    // Sync auth profiles from the default agent directory to the new agent.
+    // The auth service writes credentials to the DEFAULT_AGENT_ID agent dir,
+    // but OpenClaw looks for auth-profiles.json per agent dir.
+    syncAuthProfilesToAgent(runtime.gatewaySupervisor.paths, agentId);
 
     return context.json(agentSchema.parse(agent), 201);
   });

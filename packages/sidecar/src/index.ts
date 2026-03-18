@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import packageJson from "../package.json" with { type: "json" };
 import { RuntimeProviderAuthService } from "./auth/service.ts";
 import { RuntimeAuthSessionManager } from "./auth/sessions.ts";
+import { syncAuthProfilesToAllAgents } from "./auth/sync.ts";
 import { loadSidecarConfig, type SidecarConfig } from "./config.ts";
 import { EmbeddedGatewayClient } from "./internal-gateway/gateway-client.ts";
 import { AgentMetadataStoreService } from "./internal-gateway/metadata-store.ts";
@@ -23,6 +24,7 @@ export {
 export { EmbeddedGatewaySupervisor } from "./internal-gateway/supervisor.ts";
 export { AgentMetadataStoreService } from "./internal-gateway/metadata-store.ts";
 export { EmbeddedGatewayClient } from "./internal-gateway/gateway-client.ts";
+export { syncAuthProfilesToAgent } from "./auth/sync.ts";
 
 export async function startSidecarServer(
   config: SidecarConfig = loadSidecarConfig(),
@@ -42,7 +44,11 @@ export async function startSidecarServer(
   });
   const runtime = {
     authService,
-    authSessions: new RuntimeAuthSessionManager(() => authService),
+    authSessions: new RuntimeAuthSessionManager(() => authService, {
+      onAuthComplete: () => {
+        void syncAuthProfilesToAllAgents(metadataStore, gatewaySupervisor.paths);
+      },
+    }),
     config,
     embeddedGateway,
     gatewaySupervisor,
@@ -72,3 +78,4 @@ export async function startSidecarServer(
     },
   };
 }
+
