@@ -41,7 +41,7 @@ interface ConnectionCenterProps {
   isLoading: boolean;
   onClose?: () => void;
   onAuthOverviewChange: (nextOverview: AuthOverview) => void;
-  onContinue: (projectUrl?: string) => void;
+  onContinue: (projectUrl?: string) => void | Promise<void>;
   onRetry: () => void;
   runtimeError: string | null;
 }
@@ -90,6 +90,7 @@ export function ConnectionCenter({
   const [isBusy, setIsBusy] = useState(false);
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [websiteUrlError, setWebsiteUrlError] = useState<string | null>(null);
+  const [isSubmittingProject, setIsSubmittingProject] = useState(false);
   const openedAuthLinkRef = useRef<string | null>(null);
   const handledCompletedSessionRef = useRef<string | null>(null);
 
@@ -707,6 +708,7 @@ export function ConnectionCenter({
             <WebsiteUrlStep
               url={websiteUrl}
               error={websiteUrlError}
+              isSubmitting={isSubmittingProject}
               onUrlChange={(value) => {
                 setWebsiteUrl(value);
                 if (websiteUrlError) {
@@ -720,7 +722,12 @@ export function ConnectionCenter({
                   return;
                 }
                 setWebsiteUrlError(null);
-                onContinue(result.normalized);
+                setIsSubmittingProject(true);
+                void Promise.resolve(onContinue(result.normalized)).catch((error) => {
+                  console.error("Failed to set up project", error);
+                  setWebsiteUrlError("Failed to set up your project. Please try again.");
+                  setIsSubmittingProject(false);
+                });
               }}
               onBack={() => {
                 setStep("configure");
@@ -1004,12 +1011,14 @@ function validateWebsiteUrl(
 function WebsiteUrlStep({
   url,
   error,
+  isSubmitting,
   onUrlChange,
   onSubmit,
   onBack,
 }: {
   url: string;
   error: string | null;
+  isSubmitting?: boolean;
   onUrlChange: (value: string) => void;
   onSubmit: () => void;
   onBack: () => void;
@@ -1050,7 +1059,7 @@ function WebsiteUrlStep({
                 onUrlChange(event.target.value);
               }}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && url.trim()) {
+                if (event.key === "Enter" && url.trim() && !isSubmitting) {
                   onSubmit();
                 }
               }}
@@ -1082,11 +1091,20 @@ function WebsiteUrlStep({
           type="button"
           size="sm"
           className="h-9 rounded-md px-4 text-[13px]"
-          disabled={!url.trim()}
+          disabled={!url.trim() || isSubmitting}
           onClick={onSubmit}
         >
-          Get started
-          <ArrowRightIcon className="size-3.5" />
+          {isSubmitting ? (
+            <>
+              <LoaderCircleIcon className="size-3.5 animate-spin" />
+              Setting up...
+            </>
+          ) : (
+            <>
+              Get started
+              <ArrowRightIcon className="size-3.5" />
+            </>
+          )}
         </Button>
       </div>
     </section>

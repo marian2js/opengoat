@@ -174,8 +174,9 @@ export function App() {
     [activeSessionId, client],
   );
 
-  // Show onboarding if no provider selected, no agents exist, or user navigated to add connection
-  const needsOnboarding = !authOverview?.selectedProviderId || !activeAgentId;
+  // Show onboarding if no provider selected, no agents exist, or user navigated to add connection.
+  // Skip if bootstrap is already in progress (agent was just created, hydration may still be running).
+  const needsOnboarding = !bootstrapContext && (!authOverview?.selectedProviderId || !activeAgentId);
   if (needsOnboarding || hashView === "connections-add") {
     const isReusableConnectionFlow = Boolean(authOverview?.selectedProviderId) && Boolean(activeAgentId);
 
