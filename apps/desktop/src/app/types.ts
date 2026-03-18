@@ -1,0 +1,17 @@
+export type {
+  AuthSession,
+  Agent,
+  AgentCatalog,
+  AuthOverview,
+  AppManifest as AppMetadata,
+  ChatBootstrap,
+  ChatTranscriptMessage,
+  ProviderDefinition,
+  ProviderModelCatalog,
+  ProviderMethod,
+  SavedConnection,
+  SidecarBootstrap,
+  SidecarConnection,
+  SidecarHealth,
+  WorkspaceArea,
+} from "@opengoat/contracts";
