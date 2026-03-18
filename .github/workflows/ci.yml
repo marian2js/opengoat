@@ -37,15 +37,17 @@ jobs:
       - name: Pack tarballs
         run: |
           mkdir -p /tmp/npm-smoke
+          pnpm -C packages/contracts pack --pack-destination /tmp/npm-smoke
           pnpm -C packages/core pack --pack-destination /tmp/npm-smoke
           pnpm -C packages/cli pack --pack-destination /tmp/npm-smoke
 
       - name: Smoke test packed CLI
         run: |
           VERSION="$(node -p "require('./packages/cli/package.json').version")"
+          CONTRACTS_TGZ="/tmp/npm-smoke/opengoat-contracts-${VERSION}.tgz"
           CORE_TGZ="/tmp/npm-smoke/opengoat-core-${VERSION}.tgz"
           CLI_TGZ="/tmp/npm-smoke/opengoat-${VERSION}.tgz"
-          ./scripts/smoke-packed-cli.sh "$CORE_TGZ" "$CLI_TGZ"
+          ./scripts/smoke-packed-cli.sh "$CONTRACTS_TGZ" "$CORE_TGZ" "$CLI_TGZ"
 
       - name: Test
         run: pnpm test

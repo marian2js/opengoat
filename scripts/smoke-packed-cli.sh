@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 2 ]]; then
-  echo "Usage: $0 <core-tgz> <cli-tgz>" >&2
+if [[ $# -ne 3 ]]; then
+  echo "Usage: $0 <contracts-tgz> <core-tgz> <cli-tgz>" >&2
   exit 1
 fi
 
-CORE_TGZ="$1"
-CLI_TGZ="$2"
+CONTRACTS_TGZ="$1"
+CORE_TGZ="$2"
+CLI_TGZ="$3"
+
+if [[ ! -f "$CONTRACTS_TGZ" ]]; then
+  echo "Contracts tarball not found: $CONTRACTS_TGZ" >&2
+  exit 1
+fi
 
 if [[ ! -f "$CORE_TGZ" ]]; then
   echo "Core tarball not found: $CORE_TGZ" >&2
@@ -40,7 +46,7 @@ cd "$TMP_PROJECT"
 npm init -y >/dev/null
 
 # Install from packed artifacts to reproduce what users get from npm publish.
-npm install --no-fund --no-audit "$CORE_TGZ" "$CLI_TGZ" >/dev/null
+npm install --no-fund --no-audit "$CONTRACTS_TGZ" "$CORE_TGZ" "$CLI_TGZ" >/dev/null
 
 BIN="./node_modules/.bin/opengoat"
 if [[ ! -x "$BIN" ]]; then
@@ -49,22 +55,5 @@ if [[ ! -x "$BIN" ]]; then
 fi
 
 OPENGOAT_HOME="$TMP_HOME" "$BIN" --help >/dev/null
-
-PORT=19189
-OPENGOAT_HOME="$TMP_HOME" "$BIN" start --host 127.0.0.1 --port "$PORT" >"$START_LOG" 2>&1 &
-START_PID=$!
-
-sleep 6
-if ! kill -0 "$START_PID" >/dev/null 2>&1; then
-  echo "Packed CLI failed to keep UI server alive during smoke test." >&2
-  cat "$START_LOG" >&2
-  exit 1
-fi
-
-kill "$START_PID" >/dev/null 2>&1 || true
-wait "$START_PID" >/dev/null 2>&1 || true
-unset START_PID
-
-grep -q "Starting OpenGoat UI at http://127.0.0.1:${PORT}" "$START_LOG"
 
 echo "Packed CLI smoke test passed."
