@@ -78,11 +78,16 @@ function shouldPipeGatewayLogs(env: NodeJS.ProcessEnv): boolean {
   return env.OPENGOAT_VERBOSE_GATEWAY?.trim() === "1";
 }
 
+const MAX_RESTART_ATTEMPTS = 5;
+const RESTART_COOLDOWN_MS = 2_000;
+
 export class EmbeddedGatewaySupervisor {
   readonly #env: NodeJS.ProcessEnv;
   readonly #paths: EmbeddedGatewayPaths;
   #processState: EmbeddedGatewayProcessState | null = null;
   #stopping = false;
+  #restartAttempts = 0;
+  #lastRestartAt = 0;
 
   constructor(env: NodeJS.ProcessEnv = process.env) {
     this.#env = env;
@@ -151,11 +156,60 @@ export class EmbeddedGatewaySupervisor {
     });
 
     await Promise.race([waitForReady(port), exitPromise]);
+
+    // Replace the startup-only exit handler with a persistent auto-restart handler.
+    child.removeAllListeners("exit");
+    child.on("exit", (code, signal) => {
+      if (this.#stopping) {
+        return;
+      }
+      console.error(
+        `[sidecar] gateway exited unexpectedly (code=${String(code)} signal=${String(signal)}); scheduling restart`,
+      );
+      this.#processState = null;
+      void this.#scheduleRestart();
+    });
+
     this.#processState = {
       child,
       port,
       token,
     };
+    this.#restartAttempts = 0;
+  }
+
+  async #scheduleRestart(): Promise<void> {
+    const now = Date.now();
+    if (now - this.#lastRestartAt > 60_000) {
+      this.#restartAttempts = 0;
+    }
+
+    this.#restartAttempts++;
+    if (this.#restartAttempts > MAX_RESTART_ATTEMPTS) {
+      console.error(
+        `[sidecar] gateway exceeded ${String(MAX_RESTART_ATTEMPTS)} restart attempts; giving up`,
+      );
+      return;
+    }
+
+    const backoff = RESTART_COOLDOWN_MS * this.#restartAttempts;
+    console.error(
+      `[sidecar] restarting gateway in ${String(backoff)}ms (attempt ${String(this.#restartAttempts)}/${String(MAX_RESTART_ATTEMPTS)})`,
+    );
+    await delay(backoff);
+
+    if (this.#stopping || this.#processState) {
+      return;
+    }
+
+    try {
+      this.#lastRestartAt = Date.now();
+      await this.start();
+      console.error("[sidecar] gateway restarted successfully");
+    } catch (error) {
+      console.error("[sidecar] gateway restart failed", error);
+      void this.#scheduleRestart();
+    }
   }
 
   async stop(): Promise<void> {
