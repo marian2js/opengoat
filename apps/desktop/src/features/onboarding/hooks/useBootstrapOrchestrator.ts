@@ -165,7 +165,6 @@ export function useBootstrapOrchestrator(
       const session = await sidecar.createSession({
         agentId,
         internal: true,
-        label: prompt.name,
       });
 
       // Update UI to streaming state
