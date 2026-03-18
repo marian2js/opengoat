@@ -641,11 +641,11 @@ export class EmbeddedGatewayClient {
   async createAgent(payload: CreateAgentRequest): Promise<Agent> {
     const metadata = await this.#metadataStore.createAgent(payload);
     const result = await this.request<{ agentId: string }>("agents.create", {
-      name: metadata.name,
+      name: metadata.id,
       workspace: metadata.workspaceDir,
     });
 
-    if (result.agentId !== metadata.id) {
+    if (normalizeAgentId(result.agentId) !== metadata.id) {
       throw new Error(
         `Embedded runtime created agent ${result.agentId}, but ${metadata.id} was expected.`,
       );
