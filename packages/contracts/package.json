@@ -1,12 +1,12 @@
 {
   "name": "@opengoat/contracts",
   "private": false,
-  "version": "0.1.0",
+  "version": "2026.2.23",
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
   "files": [
