@@ -9,8 +9,8 @@
     },
     {
       "name": "sidecar",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["tsx", "packages/sidecar/src/cli.ts", "--hostname", "127.0.0.1", "--port", "19110", "--password", "opengoat-dev-password", "--username", "opengoat"],
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@opengoat/sidecar", "exec", "tsx", "src/cli.ts", "--hostname", "127.0.0.1", "--port", "19110", "--password", "opengoat-dev-password", "--username", "opengoat"],
       "port": 19110
     }
   ]
