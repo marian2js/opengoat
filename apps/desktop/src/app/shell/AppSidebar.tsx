@@ -1,23 +1,26 @@
-import type { AgentSession } from "@opengoat/contracts";
+import type { AgentCatalog, AgentSession } from "@opengoat/contracts";
 import {
+  CheckIcon,
+  ChevronsUpDownIcon,
+  GlobeIcon,
   MessageSquareIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
   TrashIcon,
   Wallet2Icon,
-  ZapIcon,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import {
   primaryNavigation,
   secondaryNavigation,
 } from "@/app/config/navigation";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -38,10 +41,14 @@ import {
 import type { AuthOverview } from "@/app/types";
 
 interface AppSidebarProps {
+  activeAgentId?: string;
   activeSessionId?: string;
-  activeView: "connections" | "chat" | "agents";
+  activeView: "connections" | "chat" | "agents" | "settings";
+  agentCatalog: AgentCatalog | null;
   authOverview: AuthOverview | null;
+  onAddProject?: () => void;
   onNewChat?: () => void;
+  onProjectSwitch?: (agentId: string) => void;
   onSessionDelete?: (sessionId: string) => void;
   onSessionRename?: (sessionId: string, label: string) => void;
   onSessionSelect?: (sessionId: string) => void;
@@ -53,17 +60,22 @@ function formatSessionLabel(session: AgentSession): string {
 }
 
 export function AppSidebar({
+  activeAgentId,
   activeSessionId,
   activeView,
+  agentCatalog,
   authOverview,
+  onAddProject,
   onNewChat,
+  onProjectSwitch,
   onSessionDelete,
   onSessionRename,
   onSessionSelect,
   sessions,
 }: AppSidebarProps) {
-  const connectedProviderCount = authOverview?.connections.length ?? 0;
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const projects = resolveAllProjects(agentCatalog, activeAgentId);
+  const activeProject = projects.find((p) => p.isActive) ?? projects[0];
 
   return (
     <Sidebar collapsible="icon" variant="inset">
@@ -151,7 +163,11 @@ export function AppSidebar({
             <SidebarMenu>
               {secondaryNavigation.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild tooltip={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={item.title}
+                    isActive={item.href === "#settings" && activeView === "settings"}
+                  >
                     <a href={item.href}>
                       <item.icon />
                       <span>{item.title}</span>
@@ -165,33 +181,177 @@ export function AppSidebar({
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="flex items-center gap-2.5 rounded-lg p-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1">
-          <Avatar className="size-7 rounded-md">
-            <AvatarFallback className="rounded-md bg-primary/12 text-[10px] font-semibold text-primary">
-              CF
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-            <p className="truncate text-[12px] font-medium text-sidebar-foreground">
-              Primary household
-            </p>
-            <p className="truncate text-[11px] text-sidebar-foreground/45">
-              {connectedProviderCount > 0
-                ? `${String(connectedProviderCount)} connected`
-                : "Setup pending"}
-            </p>
-          </div>
-          {connectedProviderCount > 0 ? (
-            <div className="hidden text-success group-data-[collapsible=icon]:hidden lg:block">
-              <ZapIcon className="size-3" />
-            </div>
-          ) : null}
-        </div>
+        {activeProject ? (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton
+                    size="lg"
+                    className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  >
+                    <ProjectIcon
+                      domain={activeProject.domain}
+                      faviconSources={activeProject.faviconSources}
+                    />
+                    <div className="grid flex-1 text-left leading-tight">
+                      <span className="truncate text-[12px] font-medium">
+                        {activeProject.domain}
+                      </span>
+                      <span className="truncate text-[11px] text-sidebar-foreground/45">
+                        {projects.length} {projects.length === 1 ? "project" : "projects"}
+                      </span>
+                    </div>
+                    <ChevronsUpDownIcon className="ml-auto size-4 text-sidebar-foreground/30" />
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  side="top"
+                  align="start"
+                  className="w-[--radix-dropdown-menu-trigger-width] min-w-56"
+                >
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    Projects
+                  </DropdownMenuLabel>
+                  {projects.map((project) => (
+                    <DropdownMenuItem
+                      key={project.agentId}
+                      onClick={() => onProjectSwitch?.(project.agentId)}
+                      className="gap-2"
+                    >
+                      <ProjectIcon
+                        domain={project.domain}
+                        faviconSources={project.faviconSources}
+                      />
+                      <span className="flex-1 truncate text-[13px]">
+                        {project.domain}
+                      </span>
+                      {project.isActive ? (
+                        <CheckIcon className="size-3.5 text-primary" />
+                      ) : null}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => onAddProject?.()}
+                    className="gap-2"
+                  >
+                    <div className="flex size-5 items-center justify-center rounded-sm border border-dashed border-muted-foreground/30">
+                      <PlusIcon className="size-3 text-muted-foreground" />
+                    </div>
+                    <span className="text-[13px]">Add project</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        ) : null}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Project helpers
+// ---------------------------------------------------------------------------
+
+interface ProjectInfo {
+  agentId: string;
+  domain: string;
+  faviconSources: string[];
+  isActive: boolean;
+}
+
+/**
+ * Derive a display domain from an agent's description (project URL) or ID.
+ * Returns the hostname without `www.` prefix.
+ */
+function resolveDomain(agent: { id: string; name: string; description?: string }): string {
+  const rawUrl = agent.description?.trim();
+  if (rawUrl) {
+    try {
+      const url = new URL(rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`);
+      return url.hostname.replace(/^www\./, "");
+    } catch {
+      return rawUrl;
+    }
+  }
+
+  // Fallback: derive domain from agent ID (e.g. "bullaware-main" → "bullaware.com")
+  const projectId = agent.id.replace(/-main$/, "");
+  if (projectId && projectId !== agent.id) {
+    return `${projectId}.com`;
+  }
+
+  return agent.name;
+}
+
+/**
+ * Build an ordered list of favicon URLs to try for a given domain.
+ * Each source is attempted in order; the component falls back on error.
+ */
+function buildFaviconSources(domain: string): string[] {
+  const encoded = encodeURIComponent(domain);
+  return [
+    `https://${domain}/favicon.ico`,
+    `https://www.google.com/s2/favicons?domain=${encoded}&sz=32`,
+    `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+  ];
+}
+
+function resolveAllProjects(
+  catalog: AgentCatalog | null,
+  activeAgentId?: string,
+): ProjectInfo[] {
+  if (!catalog) {
+    return [];
+  }
+
+  return catalog.agents
+    .filter((a) => a.id.endsWith("-main"))
+    .map((agent) => {
+      const domain = resolveDomain(agent);
+      const faviconSources = buildFaviconSources(domain);
+
+      return {
+        agentId: agent.id,
+        domain,
+        faviconSources,
+        isActive: agent.id === activeAgentId,
+      };
+    });
+}
+
+function ProjectIcon({
+  domain,
+  faviconSources,
+}: {
+  domain: string;
+  faviconSources: string[];
+}) {
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const allFailed = sourceIndex >= faviconSources.length;
+
+  return (
+    <div className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-sidebar-accent">
+      {!allFailed && faviconSources.length > 0 ? (
+        <img
+          alt={domain}
+          className="size-3.5 rounded-sm"
+          src={faviconSources[sourceIndex]}
+          onError={() => setSourceIndex((prev) => prev + 1)}
+        />
+      ) : (
+        <GlobeIcon className="size-3 text-sidebar-foreground/50" />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Session item
+// ---------------------------------------------------------------------------
 
 function SessionItem({
   isActive,

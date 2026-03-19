@@ -10,6 +10,7 @@ import {
   connectProviderSecretRequestSchema,
   createAgentRequestSchema,
   createAgentSessionRequestSchema,
+  deleteAgentResponseSchema,
   updateAgentRequestSchema,
   updateAgentSessionRequestSchema,
   providerModelCatalogSchema,
@@ -214,6 +215,16 @@ export class SidecarClient {
       await this.request(`/agents/${encodeURIComponent(agentId)}`, {
         body: JSON.stringify(updateAgentRequestSchema.parse(payload)),
         method: "PATCH",
+      }),
+    );
+  }
+
+  async deleteAgent(
+    agentId: string,
+  ): Promise<{ agentId: string; deletedSessions: number; removedPaths: string[] }> {
+    return deleteAgentResponseSchema.parse(
+      await this.request(`/agents/${encodeURIComponent(agentId)}`, {
+        method: "DELETE",
       }),
     );
   }

@@ -1,20 +1,30 @@
 import { type AgentCatalog, type AgentSession, type AuthOverview } from "@opengoat/contracts";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/app/shell/AppHeader";
 import { AppSidebar } from "@/app/shell/AppSidebar";
 import { AgentsWorkspace } from "@/features/agents/components/AgentsWorkspace";
 import { ChatWorkspace, evictChatSession } from "@/features/chat/components/ChatWorkspace";
 import { ConnectionsWorkspace } from "@/features/connections/components/ConnectionsWorkspace";
+import { AddProjectDialog } from "@/features/onboarding/components/AddProjectDialog";
 import { BootstrapProgress } from "@/features/onboarding/components/BootstrapProgress";
 import { ConnectionCenter } from "@/features/onboarding/components/ConnectionCenter";
+import { ProjectSettings } from "@/features/settings/components/ProjectSettings";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { initializeSidecarConnection } from "@/lib/runtime/connection";
 import { SidecarClient } from "@/lib/sidecar/client";
-type AppView = "connections" | "connections-add" | "chat" | "agents";
+type AppView = "connections" | "connections-add" | "chat" | "agents" | "settings";
 
-function resolveActiveAgentId(catalog: AgentCatalog | null): string | undefined {
+const ACTIVE_AGENT_KEY = "opengoat:activeAgentId";
+
+function resolveActiveAgentId(
+  catalog: AgentCatalog | null,
+  preferredId?: string,
+): string | undefined {
   if (!catalog || catalog.agents.length === 0) {
     return undefined;
+  }
+  if (preferredId && catalog.agents.some((a) => a.id === preferredId)) {
+    return preferredId;
   }
   const defaultAgent = catalog.agents.find((a) => a.isDefault);
   return defaultAgent?.id ?? catalog.agents[0]?.id;
@@ -31,12 +41,42 @@ export function App() {
   const [createAgentToken, setCreateAgentToken] = useState(0);
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>(undefined);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(
+    () => localStorage.getItem(ACTIVE_AGENT_KEY) ?? undefined,
+  );
   const [bootstrapContext, setBootstrapContext] = useState<{
     agentId: string;
     projectUrl: string;
   } | null>(null);
+  const [showAddProject, setShowAddProject] = useState(false);
+  const [returnFromConnectionsHash, setReturnFromConnectionsHash] = useState("#chat");
 
-  const activeAgentId = resolveActiveAgentId(agentCatalog);
+  const activeAgentId = resolveActiveAgentId(agentCatalog, selectedAgentId);
+  const activeAgent = agentCatalog?.agents.find((a) => a.id === activeAgentId);
+
+  // Persist active agent to localStorage
+  useEffect(() => {
+    if (activeAgentId) {
+      localStorage.setItem(ACTIVE_AGENT_KEY, activeAgentId);
+    }
+  }, [activeAgentId]);
+
+  // Track previous agent to detect switches
+  const prevAgentIdRef = useRef(activeAgentId);
+  useEffect(() => {
+    const prevId = prevAgentIdRef.current;
+    prevAgentIdRef.current = activeAgentId;
+
+    if (prevId && activeAgentId && prevId !== activeAgentId && client) {
+      // Agent switched — clear stale sessions and reload
+      setSessions([]);
+      setActiveSessionId(undefined);
+      void client.listSessions(activeAgentId).then(
+        (result) => setSessions(result.sessions),
+        () => {},
+      );
+    }
+  }, [activeAgentId, client]);
 
   useEffect(() => {
     let isMounted = true;
@@ -55,7 +95,7 @@ export function App() {
           client.agentCatalog(),
         ]);
 
-        const agentId = resolveActiveAgentId(catalog);
+        const agentId = resolveActiveAgentId(catalog, selectedAgentId);
         const sessionList = agentId
           ? await client.listSessions(agentId).catch(() => ({ sessions: [] }))
           : { sessions: [] };
@@ -87,7 +127,7 @@ export function App() {
     return () => {
       isMounted = false;
     };
-  }, [retryToken]);
+  }, [retryToken, selectedAgentId]);
 
   useEffect(() => {
     const onHashChange = (): void => {
@@ -174,6 +214,24 @@ export function App() {
     [activeSessionId, client],
   );
 
+  const handleProjectSwitch = useCallback((agentId: string) => {
+    setSelectedAgentId(agentId);
+    setBootstrapContext(null);
+    setActiveSessionId(undefined);
+    window.location.hash = "#chat";
+  }, []);
+
+  const handleProjectCreated = useCallback(
+    (agent: { id: string }, projectUrl: string) => {
+      setShowAddProject(false);
+      setSelectedAgentId(agent.id);
+      setRetryToken((current) => current + 1);
+      setBootstrapContext({ agentId: agent.id, projectUrl });
+      window.location.hash = "#chat";
+    },
+    [],
+  );
+
   // Show onboarding if no provider selected, no agents exist, or user navigated to add connection.
   // Skip if bootstrap is already in progress (agent was just created, hydration may still be running).
   const needsOnboarding = !bootstrapContext && (!authOverview?.selectedProviderId || !activeAgentId);
@@ -191,10 +249,9 @@ export function App() {
           if (projectUrl && client) {
             try {
               const agent = await client.createProjectAgent(projectUrl);
-              // Re-hydrate to pick up the new agent
               setRetryToken((current) => current + 1);
-              // Start bootstrap in the main app layout
               setBootstrapContext({ agentId: agent.id, projectUrl });
+              setSelectedAgentId(agent.id);
               window.location.hash = "#chat";
               return;
             } catch (error) {
@@ -209,7 +266,8 @@ export function App() {
         {...(isReusableConnectionFlow
           ? {
               onClose: () => {
-                window.location.hash = "#connections";
+                window.location.hash = returnFromConnectionsHash;
+                setReturnFromConnectionsHash("#chat");
               },
             }
           : {})}
@@ -222,12 +280,16 @@ export function App() {
   return (
     <SidebarProvider defaultOpen={true} className="!min-h-0 h-svh overflow-hidden">
       <AppSidebar
+        activeAgentId={activeAgentId}
         activeSessionId={activeSessionId}
         activeView={currentView}
+        agentCatalog={agentCatalog}
         authOverview={authOverview}
+        onAddProject={() => setShowAddProject(true)}
         onNewChat={() => {
           void handleNewChat();
         }}
+        onProjectSwitch={handleProjectSwitch}
         onSessionDelete={(id) => {
           void handleSessionDelete(id);
         }}
@@ -241,13 +303,14 @@ export function App() {
         <AppHeader
           currentView={currentView}
           onAddConnection={() => {
+            setReturnFromConnectionsHash(`#${currentView}`);
             window.location.hash = "#connections/add";
           }}
           onCreateAgent={() => {
             setCreateAgentToken((current) => current + 1);
           }}
         />
-        <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" ? "" : "gap-4 p-4 lg:p-5"}`}>
+        <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" ? "" : "gap-4 overflow-y-auto p-4 lg:p-5"}`}>
           {currentView === "chat" ? (
             bootstrapContext && client ? (
               <BootstrapProgress
@@ -275,6 +338,24 @@ export function App() {
               client={client}
               onAuthOverviewChange={setAuthOverview}
             />
+          ) : currentView === "settings" && activeAgent && client ? (
+            <ProjectSettings
+              agent={activeAgent}
+              authOverview={authOverview}
+              client={client}
+              onAddConnection={() => {
+                setReturnFromConnectionsHash("#settings");
+                window.location.hash = "#connections/add";
+              }}
+              onAgentUpdated={() => {
+                setRetryToken((t) => t + 1);
+              }}
+              onProjectDeleted={() => {
+                setSelectedAgentId(undefined);
+                setRetryToken((t) => t + 1);
+                window.location.hash = "#chat";
+              }}
+            />
           ) : (
             <AgentsWorkspace
               authOverview={authOverview}
@@ -284,6 +365,15 @@ export function App() {
           )}
         </div>
       </SidebarInset>
+
+      {client ? (
+        <AddProjectDialog
+          client={client}
+          open={showAddProject}
+          onOpenChange={setShowAddProject}
+          onProjectCreated={handleProjectCreated}
+        />
+      ) : null}
     </SidebarProvider>
   );
 }
@@ -299,6 +389,10 @@ function readViewFromHash(): AppView {
 
   if (window.location.hash === "#agents") {
     return "agents";
+  }
+
+  if (window.location.hash === "#settings") {
+    return "settings";
   }
 
   return "chat";

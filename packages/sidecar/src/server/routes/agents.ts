@@ -63,6 +63,7 @@ export function createAgentRoutes(runtime: SidecarRuntime): Hono {
 
     const agent = await runtime.embeddedGateway.createAgent({
       id: agentId,
+      description: projectUrl,
       instructions: "You are a helpful assistant.",
       name: displayName,
       setAsDefault: true,
