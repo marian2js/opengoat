@@ -80,9 +80,10 @@ export function App() {
 
   useEffect(() => {
     let isMounted = true;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
-    async function hydrateFromSidecar(): Promise<void> {
-      if (isMounted) {
+    async function hydrateFromSidecar(attempt = 0): Promise<void> {
+      if (isMounted && attempt === 0) {
         setIsLoading(true);
         setRuntimeError(null);
       }
@@ -106,17 +107,19 @@ export function App() {
           setClient(client);
           setSessions(sessionList.sessions);
           setRuntimeError(null);
+          setIsLoading(false);
         }
       } catch (error) {
         console.error("Failed to initialize desktop runtime", error);
-        if (isMounted) {
+        const maxRetries = 5;
+        if (isMounted && attempt < maxRetries) {
+          const delay = Math.min(1000 * 2 ** attempt, 8000);
+          retryTimer = setTimeout(() => void hydrateFromSidecar(attempt + 1), delay);
+        } else if (isMounted) {
           setAuthOverview(null);
           setAgentCatalog(null);
           setClient(null);
           setRuntimeError(error instanceof Error ? error.message : "Load failed");
-        }
-      } finally {
-        if (isMounted) {
           setIsLoading(false);
         }
       }
@@ -126,6 +129,7 @@ export function App() {
 
     return () => {
       isMounted = false;
+      clearTimeout(retryTimer);
     };
   }, [retryToken, selectedAgentId]);
 
