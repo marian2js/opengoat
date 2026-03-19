@@ -573,7 +573,7 @@ export function resolveCompatibleAgentModelRef(params: {
   addModelCandidate(candidates, defaultModelForProvider(effectiveProviderId));
   addModelCandidate(candidates, params.providerCatalog.models[0]?.modelRef);
 
-  return candidates.find((candidate) => allowedModelRefs.has(candidate)) ?? candidates[0];
+  return candidates.find((candidate) => allowedModelRefs.has(candidate));
 }
 
 export class EmbeddedGatewayClient {
