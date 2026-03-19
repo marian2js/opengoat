@@ -3,6 +3,35 @@ import type { BootstrapPrompt } from "@opengoat/contracts";
 import type { SidecarClient } from "@/lib/sidecar/client";
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const AGENT_READY_POLL_MS = 1_500;
+const AGENT_READY_MAX_ATTEMPTS = 8;
+
+/**
+ * Poll the sidecar until the gateway has fully registered the agent.
+ * A newly created agent may take a moment to propagate to the embedded
+ * gateway; without this check the first chat request would fail with 500.
+ */
+async function waitForAgentReady(
+  client: SidecarClient,
+  agentId: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < AGENT_READY_MAX_ATTEMPTS; attempt++) {
+    try {
+      // A lightweight probe: creating an internal session verifies the
+      // gateway knows about the agent and can allocate resources for it.
+      await client.createSession({ agentId, internal: true });
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, AGENT_READY_POLL_MS));
+    }
+  }
+  // Give up waiting — the orchestrator will surface any downstream errors.
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -274,6 +303,11 @@ export function useBootstrapOrchestrator(
       setState((prev) => ({ ...prev, status: "loading-prompts" }));
 
       try {
+        // Wait briefly for the gateway to fully register the new agent.
+        // Without this, the first chat request can fail with a 500 because
+        // the gateway hasn't synced the agent's workspace yet.
+        await waitForAgentReady(client, agentId);
+
         const { prompts } = await client.getBootstrapPrompts(agentId, projectUrl);
         const steps = prompts.map(promptToStep);
 

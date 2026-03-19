@@ -76,9 +76,9 @@ interface ChatWorkspaceProps {
 }
 
 const STARTER_PROMPTS = [
-  "Review my current portfolio risk and call out the biggest concerns.",
-  "Build me a weekly cash flow and investing routine.",
-  "What should I prepare before harvesting tax losses?",
+  "What are the top 3 growth opportunities for my product right now?",
+  "Draft a content calendar for the next two weeks.",
+  "Analyze my competitors and find positioning gaps.",
 ];
 
 export function ChatWorkspace({
@@ -322,7 +322,7 @@ function ChatSessionView({
                   Start a conversation
                 </h1>
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Ask {bootstrap.agent.name} about planning, analysis, and finance decisions.
+                  Ask {bootstrap.agent.name} about marketing strategy, growth, and content.
                 </p>
               </div>
             </div>
