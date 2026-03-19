@@ -742,7 +742,7 @@ export class EmbeddedGatewayClient {
       authOverview,
     });
     const sessionKey = payload.internal
-      ? `session:internal:${agent.id}:${randomUUID()}`
+      ? `agent:${agent.id}:session:internal:${randomUUID()}`
       : `agent:${agent.id}:session:${randomUUID()}`;
     const patch = await this.request<GatewaySessionsPatchResult>("sessions.patch", {
       key: sessionKey,

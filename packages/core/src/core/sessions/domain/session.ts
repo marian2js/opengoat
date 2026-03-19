@@ -88,7 +88,11 @@ export const SESSION_TRANSCRIPT_SCHEMA_VERSION = 1 as const;
 export const INTERNAL_SESSION_PREFIX = "session:internal:";
 
 export function isInternalSessionKey(sessionKey: string): boolean {
-  return sessionKey.trim().toLowerCase().startsWith(INTERNAL_SESSION_PREFIX);
+  const normalized = sessionKey.trim().toLowerCase();
+  // Match both the legacy prefix format ("session:internal:...")
+  // and the agent-scoped format ("agent:{id}:session:internal:...").
+  return normalized.startsWith(INTERNAL_SESSION_PREFIX)
+    || normalized.includes(":session:internal:");
 }
 
 export const DEFAULT_SESSION_CONFIG: SessionConfig = {
