@@ -76,7 +76,9 @@ export function ConnectionCenter({
   runtimeError,
 }: ConnectionCenterProps) {
   const providers = useMemo(() => authOverview?.providers ?? [], [authOverview?.providers]);
-  const [step, setStep] = useState<SetupStep>("providers");
+  const [step, setStep] = useState<SetupStep>(
+    authOverview?.selectedProviderId ? "website" : "providers",
+  );
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
   const [secret, setSecret] = useState("");
@@ -99,6 +101,15 @@ export function ConnectionCenter({
     [authOverview],
   );
   const canContinue = Boolean(authOverview?.selectedProviderId);
+
+  // Skip straight to the website step when a provider is already connected
+  const didAutoSkipRef = useRef(false);
+  useEffect(() => {
+    if (!didAutoSkipRef.current && authOverview?.selectedProviderId && !onClose) {
+      didAutoSkipRef.current = true;
+      setStep("website");
+    }
+  }, [authOverview?.selectedProviderId, onClose]);
 
   useEffect(() => {
     if (providers.length === 0) {
