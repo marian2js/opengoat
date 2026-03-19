@@ -573,7 +573,18 @@ export function resolveCompatibleAgentModelRef(params: {
   addModelCandidate(candidates, defaultModelForProvider(effectiveProviderId));
   addModelCandidate(candidates, params.providerCatalog.models[0]?.modelRef);
 
-  return candidates.find((candidate) => allowedModelRefs.has(candidate));
+  // For aggregator providers (e.g. OpenRouter) whose model IDs contain a
+  // sub-provider namespace (e.g. "openrouter/free"), the gateway ref
+  // ("openrouter/free") won't match the catalog's fully-qualified ref
+  // ("openrouter/openrouter/free"). Expand candidates to cover this.
+  const expandedCandidates = candidates.flatMap((candidate) => {
+    const prefixed = `${effectiveProviderId}/${candidate}`;
+    return allowedModelRefs.has(prefixed) && !allowedModelRefs.has(candidate)
+      ? [candidate, prefixed]
+      : [candidate];
+  });
+
+  return expandedCandidates.find((candidate) => allowedModelRefs.has(candidate));
 }
 
 export class EmbeddedGatewayClient {

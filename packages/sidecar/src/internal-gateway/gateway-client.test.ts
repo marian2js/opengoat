@@ -97,3 +97,35 @@ void test("resolveCompatibleAgentModelRef preserves valid explicit agent models"
 
   assert.equal(result, "github-copilot/gpt-4o");
 });
+
+void test("resolveCompatibleAgentModelRef resolves aggregator provider models with nested namespaces", () => {
+  const result = resolveCompatibleAgentModelRef({
+    agent: baseAgent,
+    authOverview: {
+      selectedModelId: "free",
+      selectedProviderId: "openrouter",
+    },
+    providerCatalog: {
+      currentModelRef: "openrouter/openrouter/free",
+      models: [
+        {
+          isSelected: true,
+          label: "Free Models Router",
+          modelId: "openrouter/free",
+          modelRef: "openrouter/openrouter/free",
+          providerId: "openrouter",
+        },
+        {
+          isSelected: false,
+          label: "Anthropic: Claude 3.5 Sonnet",
+          modelId: "anthropic/claude-3.5-sonnet",
+          modelRef: "openrouter/anthropic/claude-3.5-sonnet",
+          providerId: "openrouter",
+        },
+      ],
+      providerId: "openrouter",
+    },
+  });
+
+  assert.equal(result, "openrouter/openrouter/free");
+});
