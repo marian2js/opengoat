@@ -1127,12 +1127,22 @@ export class EmbeddedGatewayClient {
     fallbackModelRef?: string;
   }): Promise<AgentSession> {
     if (params.requestedSessionId) {
-      const sessions = await this.listSessions(params.agent.id);
-      const existing = sessions.sessions.find(
-        (candidate) => candidate.id === params.requestedSessionId,
+      // Search ALL sessions (including internal) so callers that target an
+      // internal session (e.g. bootstrap orchestrator) actually hit it.
+      // Without this, the lookup silently fails and the message leaks into a
+      // user-visible session.
+      const raw = await this.request<GatewaySessionsListResult>("sessions.list", {
+        includeDerivedTitles: false,
+        limit: 200,
+      });
+      const existing = raw.sessions.find(
+        (row) => row.sessionId === params.requestedSessionId,
       );
       if (existing) {
-        return await this.syncConversationSession(existing, params.fallbackModelRef);
+        return await this.syncConversationSession(
+          toAgentSession({ agent: params.agent, paths: this.#paths, row: existing }),
+          params.fallbackModelRef,
+        );
       }
     }
 
