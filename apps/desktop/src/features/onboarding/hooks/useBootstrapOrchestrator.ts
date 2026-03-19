@@ -254,27 +254,70 @@ export function useBootstrapOrchestrator(
           }
 
           const prompt = ctx.prompts[i]!;
-          let success = await runStep(sidecar, ctx.agentId, prompt, i, controller.signal);
+          let success = false;
 
-          // Retry once if file was not created
-          if (!success) {
-            success = await runStep(sidecar, ctx.agentId, prompt, i, controller.signal);
+          for (let attempt = 0; attempt <= MAX_RETRIES_PER_STEP; attempt++) {
+            if (controller.signal.aborted) {
+              return;
+            }
+
+            try {
+              success = await runStep(sidecar, ctx.agentId, prompt, i, controller.signal);
+            } catch (stepError) {
+              // Treat exceptions (500s, network errors) the same as a
+              // failed file check — log and fall through to the retry /
+              // error path instead of aborting the entire bootstrap.
+              console.error(
+                `Bootstrap step "${prompt.id}" attempt ${String(attempt + 1)} failed:`,
+                stepError,
+              );
+              const errorMsg =
+                stepError instanceof Error ? stepError.message : "Unexpected error";
+              updateStep(i, { error: errorMsg });
+              success = false;
+            }
+
+            if (success) {
+              break;
+            }
           }
 
           if (!success) {
             updateStep(i, {
               status: "error",
-              error: `Expected file ${prompt.expectedFile} was not created after two attempts.`,
+              error: `Failed to create ${prompt.expectedFile} after ${String(MAX_RETRIES_PER_STEP + 1)} attempts. `
+                + "This can happen with smaller or free-tier models that struggle with complex instructions. "
+                + "Try again, or switch to a more capable model.",
             });
             setState((prev) => ({
               ...prev,
               status: "error",
-              error: `Failed to create ${prompt.expectedFile}. You can retry to continue.`,
+              error: `Failed to create ${prompt.expectedFile}. You can retry or switch to a more capable model.`,
             }));
             return;
           }
 
           updateStep(i, { status: "completed" });
+        }
+
+        // Final gate: independently verify that ALL expected files exist
+        // before declaring success. This catches edge cases where individual
+        // step checks passed but files were later removed or never flushed.
+        for (let i = 0; i < ctx.prompts.length; i++) {
+          const prompt = ctx.prompts[i]!;
+          const check = await sidecar.checkWorkspaceFile(ctx.agentId, prompt.expectedFile);
+          if (!check.exists) {
+            updateStep(i, {
+              status: "error",
+              error: `${prompt.expectedFile} was not found during final verification.`,
+            });
+            setState((prev) => ({
+              ...prev,
+              status: "error",
+              error: `${prompt.expectedFile} is missing. Please retry setup.`,
+            }));
+            return;
+          }
         }
 
         setState((prev) => ({ ...prev, status: "completed" }));
