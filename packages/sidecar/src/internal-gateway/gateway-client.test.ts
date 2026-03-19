@@ -129,3 +129,56 @@ void test("resolveCompatibleAgentModelRef resolves aggregator provider models wi
 
   assert.equal(result, "openrouter/openrouter/free");
 });
+
+void test("resolveCompatibleAgentModelRef resolves aggregator sub-provider model with nested namespace", () => {
+  const result = resolveCompatibleAgentModelRef({
+    agent: {
+      ...baseAgent,
+      modelId: "anthropic/claude-3.5-sonnet",
+      providerId: "openrouter",
+    },
+    authOverview: {
+      selectedModelId: "free",
+      selectedProviderId: "openrouter",
+    },
+    providerCatalog: {
+      currentModelRef: "openrouter/openrouter/free",
+      models: [
+        {
+          isSelected: true,
+          label: "Free Models Router",
+          modelId: "openrouter/free",
+          modelRef: "openrouter/openrouter/free",
+          providerId: "openrouter",
+        },
+        {
+          isSelected: false,
+          label: "Anthropic: Claude 3.5 Sonnet",
+          modelId: "anthropic/claude-3.5-sonnet",
+          modelRef: "openrouter/anthropic/claude-3.5-sonnet",
+          providerId: "openrouter",
+        },
+      ],
+      providerId: "openrouter",
+    },
+  });
+
+  // Agent has explicit providerId + modelId with nested namespace — should resolve to catalog ref
+  assert.equal(result, "openrouter/anthropic/claude-3.5-sonnet");
+});
+
+void test("resolveCompatibleAgentModelRef falls back to default when no catalog is available", () => {
+  const result = resolveCompatibleAgentModelRef({
+    agent: baseAgent,
+    authOverview: {
+      selectedModelId: "gpt-5-mini",
+      selectedProviderId: "github-copilot",
+    },
+    providerCatalog: undefined,
+  });
+
+  // Without a catalog there's no allowlist to validate against;
+  // the function should still produce a usable model ref.
+  assert.ok(result);
+  assert.ok(result.includes("github-copilot"));
+});

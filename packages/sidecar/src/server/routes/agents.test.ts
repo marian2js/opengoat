@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createAgentRoutes } from "./agents.ts";
@@ -211,4 +211,178 @@ void test("agent routes manage agents and create sessions", async (context) => {
   assert.ok(createdSession);
   assert.equal(createdSession.agentId, "research");
   assert.equal(createdSession.label, "Market open");
+});
+
+// ---------------------------------------------------------------------------
+// Workspace file check endpoint — used by bootstrap final gate
+// ---------------------------------------------------------------------------
+
+void test("workspace file check returns exists: true when file is present", async (context) => {
+  const workspaceDir = await mkdtemp(join(tmpdir(), "opengoat-ws-check-"));
+  context.after(async () => {
+    await rm(workspaceDir, { force: true, recursive: true });
+  });
+
+  await writeFile(join(workspaceDir, "PRODUCT.md"), "# Product");
+
+  const app = createAgentRoutes({
+    authSessions: {} as never,
+    authService: {} as never,
+    config: {
+      hostname: "127.0.0.1",
+      password: "password",
+      port: 3000,
+      username: "opengoat",
+    },
+    embeddedGateway: {
+      getAgent() {
+        return Promise.resolve({
+          agentDir: workspaceDir,
+          createdAt: new Date().toISOString(),
+          id: "test-agent",
+          instructions: "",
+          isDefault: true,
+          name: "Test",
+          updatedAt: new Date().toISOString(),
+          workspaceDir,
+        });
+      },
+    } as never,
+    gatewaySupervisor: {} as never,
+    startedAt: Date.now(),
+    version: "0.1.0-test",
+  } as never);
+
+  const response = await app.request("/test-agent/workspace/files/PRODUCT.md");
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as { exists: boolean };
+  assert.equal(data.exists, true);
+});
+
+void test("workspace file check returns exists: false when file is missing", async (context) => {
+  const workspaceDir = await mkdtemp(join(tmpdir(), "opengoat-ws-check-"));
+  context.after(async () => {
+    await rm(workspaceDir, { force: true, recursive: true });
+  });
+
+  const app = createAgentRoutes({
+    authSessions: {} as never,
+    authService: {} as never,
+    config: {
+      hostname: "127.0.0.1",
+      password: "password",
+      port: 3000,
+      username: "opengoat",
+    },
+    embeddedGateway: {
+      getAgent() {
+        return Promise.resolve({
+          agentDir: workspaceDir,
+          createdAt: new Date().toISOString(),
+          id: "test-agent",
+          instructions: "",
+          isDefault: true,
+          name: "Test",
+          updatedAt: new Date().toISOString(),
+          workspaceDir,
+        });
+      },
+    } as never,
+    gatewaySupervisor: {} as never,
+    startedAt: Date.now(),
+    version: "0.1.0-test",
+  } as never);
+
+  const response = await app.request("/test-agent/workspace/files/PRODUCT.md");
+  assert.equal(response.status, 200);
+  const data = (await response.json()) as { exists: boolean };
+  assert.equal(data.exists, false);
+});
+
+void test("workspace file check rejects path traversal attempts", async () => {
+  const app = createAgentRoutes({
+    authSessions: {} as never,
+    authService: {} as never,
+    config: {
+      hostname: "127.0.0.1",
+      password: "password",
+      port: 3000,
+      username: "opengoat",
+    },
+    embeddedGateway: {
+      getAgent() {
+        return Promise.resolve({
+          agentDir: "/tmp/test",
+          createdAt: new Date().toISOString(),
+          id: "test-agent",
+          instructions: "",
+          isDefault: true,
+          name: "Test",
+          updatedAt: new Date().toISOString(),
+          workspaceDir: "/tmp/test",
+        });
+      },
+    } as never,
+    gatewaySupervisor: {} as never,
+    startedAt: Date.now(),
+    version: "0.1.0-test",
+  } as never);
+
+  const response = await app.request(
+    "/test-agent/workspace/files/..%2F..%2Fetc%2Fpasswd",
+  );
+  assert.equal(response.status, 400);
+});
+
+void test("workspace file check verifies each bootstrap file independently", async (context) => {
+  const workspaceDir = await mkdtemp(join(tmpdir(), "opengoat-ws-gate-"));
+  context.after(async () => {
+    await rm(workspaceDir, { force: true, recursive: true });
+  });
+
+  // Only create PRODUCT.md and MARKET.md — GROWTH.md is missing
+  await writeFile(join(workspaceDir, "PRODUCT.md"), "# Product");
+  await writeFile(join(workspaceDir, "MARKET.md"), "# Market");
+
+  const app = createAgentRoutes({
+    authSessions: {} as never,
+    authService: {} as never,
+    config: {
+      hostname: "127.0.0.1",
+      password: "password",
+      port: 3000,
+      username: "opengoat",
+    },
+    embeddedGateway: {
+      getAgent() {
+        return Promise.resolve({
+          agentDir: workspaceDir,
+          createdAt: new Date().toISOString(),
+          id: "test-agent",
+          instructions: "",
+          isDefault: true,
+          name: "Test",
+          updatedAt: new Date().toISOString(),
+          workspaceDir,
+        });
+      },
+    } as never,
+    gatewaySupervisor: {} as never,
+    startedAt: Date.now(),
+    version: "0.1.0-test",
+  } as never);
+
+  const bootstrapFiles = ["PRODUCT.md", "MARKET.md", "GROWTH.md"];
+  const results: boolean[] = [];
+
+  for (const file of bootstrapFiles) {
+    const response = await app.request(
+      `/test-agent/workspace/files/${file}`,
+    );
+    assert.equal(response.status, 200);
+    const data = (await response.json()) as { exists: boolean };
+    results.push(data.exists);
+  }
+
+  assert.deepEqual(results, [true, true, false]);
 });
