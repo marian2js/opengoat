@@ -101,11 +101,34 @@ export function App() {
           ? await client.listSessions(agentId).catch(() => ({ sessions: [] }))
           : { sessions: [] };
 
+        // Check whether the active agent's bootstrap files exist.
+        // If any are missing the project setup never completed and we
+        // must re-enter bootstrap instead of showing the chat workspace.
+        let pendingBootstrap: { agentId: string; projectUrl: string } | null = null;
+        if (agentId) {
+          const agent = catalog.agents.find((a) => a.id === agentId);
+          const projectUrl = agent?.description?.trim();
+          if (projectUrl) {
+            const requiredFiles = ["PRODUCT.md", "MARKET.md", "GROWTH.md"];
+            const checks = await Promise.all(
+              requiredFiles.map((file) =>
+                client.checkWorkspaceFile(agentId, file).catch(() => ({ exists: false })),
+              ),
+            );
+            if (checks.some((c) => !c.exists)) {
+              pendingBootstrap = { agentId, projectUrl };
+            }
+          }
+        }
+
         if (isMounted) {
           setAuthOverview(overview);
           setAgentCatalog(catalog);
           setClient(client);
           setSessions(sessionList.sessions);
+          if (pendingBootstrap) {
+            setBootstrapContext(pendingBootstrap);
+          }
           setRuntimeError(null);
           setIsLoading(false);
         }
