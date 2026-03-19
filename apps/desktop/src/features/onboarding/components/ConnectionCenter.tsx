@@ -226,6 +226,11 @@ export function ConnectionCenter({
           );
           setSessionInputValue("");
           setSessionSelections([]);
+          if (onClose) {
+            onContinue();
+          } else {
+            setStep("website");
+          }
         }
 
         if (nextSession.state === "error") {
@@ -274,6 +279,11 @@ export function ConnectionCenter({
         setSecret("");
       });
       setFeedback(`Connected ${connection.providerName}.`);
+      if (onClose) {
+        onContinue();
+      } else {
+        setStep("website");
+      }
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
