@@ -71,7 +71,9 @@ interface ChatWorkspaceProps {
   authOverview: AuthOverview | null;
   client: SidecarClient | null;
   onBootstrap?: ((sessionId: string) => void) | undefined;
+  onPendingPromptConsumed?: (() => void) | undefined;
   onSessionLabelUpdate?: ((sessionId: string, label: string) => void) | undefined;
+  pendingActionPrompt?: string | null | undefined;
   sessionId?: string | undefined;
 }
 
@@ -86,7 +88,9 @@ export function ChatWorkspace({
   authOverview,
   client,
   onBootstrap,
+  onPendingPromptConsumed,
   onSessionLabelUpdate,
+  pendingActionPrompt,
   sessionId,
 }: ChatWorkspaceProps) {
   const [bootstrap, setBootstrap] = useState<ChatBootstrap | null>(null);
@@ -184,7 +188,9 @@ export function ChatWorkspace({
       authOverview={authOverview}
       bootstrap={bootstrap}
       client={client}
+      onPendingPromptConsumed={onPendingPromptConsumed}
       onSessionLabelUpdate={onSessionLabelUpdate}
+      pendingActionPrompt={pendingActionPrompt}
     />
   );
 }
@@ -201,16 +207,22 @@ function ChatSessionView({
   authOverview,
   bootstrap,
   client,
+  onPendingPromptConsumed,
   onSessionLabelUpdate,
+  pendingActionPrompt,
 }: {
   authOverview: AuthOverview | null;
   bootstrap: ChatBootstrap;
   client: SidecarClient | null;
+  onPendingPromptConsumed?: (() => void) | undefined;
   onSessionLabelUpdate?: ((sessionId: string, label: string) => void) | undefined;
+  pendingActionPrompt?: string | null | undefined;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const hasCustomLabelRef = useRef(bootstrap.messages.length > 0);
   const didMountRef = useRef(false);
+  const pendingPromptSentRef = useRef(false);
+  const [hiddenPromptId, setHiddenPromptId] = useState<string | null>(null);
 
   // Re-use existing Chat instance if one exists (preserves streaming state)
   const chat = useMemo(() => {
@@ -242,6 +254,30 @@ function ChatSessionView({
     stop,
   } = useChat<ChatUIMessage>({ chat });
 
+  // Auto-send hidden prompt for action card execution
+  useEffect(() => {
+    if (!pendingActionPrompt || pendingPromptSentRef.current) {
+      return;
+    }
+    pendingPromptSentRef.current = true;
+    hasCustomLabelRef.current = true; // Session already has a label from action title
+
+    void sendMessage({ text: pendingActionPrompt });
+    onPendingPromptConsumed?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingActionPrompt]);
+
+  // Track the hidden prompt message ID — it's the first user message when action-initiated
+  useEffect(() => {
+    if (!pendingPromptSentRef.current || hiddenPromptId) {
+      return;
+    }
+    const firstUserMessage = messages.find((m) => m.role === "user");
+    if (firstUserMessage) {
+      setHiddenPromptId(firstUserMessage.id);
+    }
+  }, [messages, hiddenPromptId]);
+
   useEffect(() => {
     const list = listRef.current;
     if (!list) {
@@ -254,6 +290,11 @@ function ChatSessionView({
     });
     didMountRef.current = true;
   }, [messages, status]);
+
+  // Filter out the hidden prompt message from the visible list
+  const visibleMessages = hiddenPromptId
+    ? messages.filter((m) => m.id !== hiddenPromptId)
+    : messages;
 
   const isStreaming = status === "streaming" || status === "submitted";
   const latestMessage = messages[messages.length - 1];
@@ -311,7 +352,7 @@ function ChatSessionView({
         ref={listRef}
         className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 lg:px-6"
       >
-        {messages.length === 0 ? (
+        {visibleMessages.length === 0 && !hiddenPromptId ? (
           <div className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-8 py-8 text-center">
             <div className="space-y-3">
               <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -343,7 +384,7 @@ function ChatSessionView({
             </div>
           </div>
         ) : (
-          messages.map((message) => (
+          visibleMessages.map((message) => (
             <ChatMessage
               key={message.id}
               isStreaming={isStreaming && latestMessage?.id === message.id}

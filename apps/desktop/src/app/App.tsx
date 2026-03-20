@@ -53,6 +53,9 @@ export function App() {
   } | null>(null);
   const [showAddProject, setShowAddProject] = useState(false);
   const [returnFromConnectionsHash, setReturnFromConnectionsHash] = useState("#chat");
+  const [pendingActionPrompt, setPendingActionPrompt] = useState<string | null>(null);
+  const [actionSessionId, setActionSessionId] = useState<string | null>(null);
+  const [isActionLoading, setIsActionLoading] = useState(false);
 
   const activeAgentId = resolveActiveAgentId(agentCatalog, selectedAgentId);
   const activeAgent = agentCatalog?.agents.find((a) => a.id === activeAgentId);
@@ -196,6 +199,28 @@ export function App() {
       console.error("Failed to create new chat session", error);
     }
   }, [client, activeAgentId]);
+
+  const handleActionClick = useCallback(
+    async (_actionId: string, prompt: string, label: string) => {
+      if (!client || !activeAgentId || isActionLoading) {
+        return;
+      }
+      setIsActionLoading(true);
+      try {
+        const session = await client.createSession({ agentId: activeAgentId, label });
+        setSessions((prev) => [session, ...prev]);
+        setActiveSessionId(session.id);
+        setPendingActionPrompt(prompt);
+        setActionSessionId(session.id);
+        window.location.hash = "#chat";
+      } catch (error) {
+        console.error("Failed to create action session", error);
+      } finally {
+        setIsActionLoading(false);
+      }
+    },
+    [client, activeAgentId, isActionLoading],
+  );
 
   const handleSessionSelect = useCallback((sessionId: string) => {
     setActiveSessionId(sessionId);
@@ -357,6 +382,9 @@ export function App() {
               <DashboardWorkspace
                 agentId={activeAgentId}
                 client={client}
+                onActionClick={(id, prompt, label) => {
+                  void handleActionClick(id, prompt, label);
+                }}
               />
             )
           ) : currentView === "chat" ? (
@@ -365,7 +393,12 @@ export function App() {
                 authOverview={authOverview}
                 client={client}
                 onBootstrap={handleBootstrap}
+                onPendingPromptConsumed={() => {
+                  setPendingActionPrompt(null);
+                  setActionSessionId(null);
+                }}
                 onSessionLabelUpdate={handleSessionLabelUpdate}
+                pendingActionPrompt={activeSessionId === actionSessionId ? pendingActionPrompt : null}
                 sessionId={activeSessionId}
               />
           ) : currentView === "brain" ? (
