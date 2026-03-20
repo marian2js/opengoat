@@ -2,6 +2,8 @@ import { parseArgs } from "node:util";
 
 const DEFAULT_HOSTNAME = "127.0.0.1";
 const DEFAULT_USERNAME = "opengoat";
+const DEV_DEFAULT_PASSWORD = "opengoat-dev-password";
+const DEV_DEFAULT_PORT = 19749;
 
 export interface SidecarConfig {
   hostname: string;
@@ -25,12 +27,20 @@ export function loadSidecarConfig(
     strict: true,
   });
 
+  const isDev = process.env.NODE_ENV !== "production";
+
   const hostname =
     values.hostname ?? process.env.OPENGOAT_SERVER_HOSTNAME ?? DEFAULT_HOSTNAME;
   const username =
     values.username ?? process.env.OPENGOAT_SERVER_USERNAME ?? DEFAULT_USERNAME;
-  const password = values.password ?? process.env.OPENGOAT_SERVER_PASSWORD;
-  const portCandidate = values.port ?? process.env.OPENGOAT_SERVER_PORT;
+  const password =
+    values.password ??
+    process.env.OPENGOAT_SERVER_PASSWORD ??
+    (isDev ? DEV_DEFAULT_PASSWORD : undefined);
+  const portCandidate =
+    values.port ??
+    process.env.OPENGOAT_SERVER_PORT ??
+    (isDev ? String(DEV_DEFAULT_PORT) : undefined);
 
   if (!password) {
     throw new Error(

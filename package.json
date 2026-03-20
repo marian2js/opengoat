@@ -8,7 +8,8 @@
   "scripts": {
     "build": "pnpm --filter @opengoat/contracts build && pnpm --filter @opengoat/core build && pnpm --filter opengoat build",
     "clean": "pnpm --filter @opengoat/contracts clean && pnpm --filter @opengoat/core clean && pnpm --filter opengoat clean && rm -rf coverage",
-    "dev": "pnpm --filter opengoat dev",
+    "dev": "node scripts/dev-browser.mjs",
+    "dev:cli": "pnpm --filter opengoat dev",
     "desktop:build": "pnpm --filter @opengoat/desktop tauri build",
     "desktop:dev": "pnpm --filter @opengoat/desktop tauri dev",
     "desktop:frontend:build": "pnpm --filter @opengoat/desktop build",

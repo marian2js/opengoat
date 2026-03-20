@@ -528,7 +528,7 @@ export function resolveCompatibleAgentModelRef(params: {
     currentModelRef?: string | undefined;
     models: ProviderModelCatalog["models"];
     providerId: string;
-  };
+  } | undefined;
 }): string | undefined {
   const effectiveProviderId =
     params.agent.providerId?.trim() ?? params.authOverview.selectedProviderId?.trim();
@@ -536,6 +536,13 @@ export function resolveCompatibleAgentModelRef(params: {
     return normalizeGatewayModelRef({
       modelId: params.agent.modelId,
       providerId: params.agent.providerId,
+    });
+  }
+
+  if (!params.providerCatalog) {
+    return normalizeGatewayModelRef({
+      modelId: params.authOverview.selectedModelId ?? params.agent.modelId,
+      providerId: effectiveProviderId,
     });
   }
 

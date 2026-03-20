@@ -68,15 +68,9 @@ void describe("writeEmbeddedGatewayConfig", () => {
       file: join(paths.logsDir, "gateway.log"),
       level: "info",
     });
-    assert.deepEqual(config.agents?.list, [
-      {
-        agentDir: join(paths.stateDir, "agents", "main", "agent"),
-        default: true,
-        id: "main",
-        name: "Main",
-        workspace: join(paths.workspacesDir, "main"),
-      },
-    ]);
+    // The config writer no longer manages the agents section;
+    // agent metadata is handled by the metadata store instead.
+    assert.equal(config.agents, undefined);
   });
 
   void it("preserves existing runtime config while ensuring the default agent entry", async () => {
@@ -139,16 +133,18 @@ void describe("writeEmbeddedGatewayConfig", () => {
     const raw = await readFile(paths.configPath, "utf8");
     const config = JSON.parse(raw) as TestGatewayConfig;
 
+    // The config writer preserves existing top-level keys it doesn't manage
+    // (agents, auth) via the spread of the existing payload.
     assert.ok(config.agents);
     assert.equal(config.agents.defaults?.model?.primary, "openai-codex/gpt-5.4");
     assert.deepEqual(config.auth?.order["openai-codex"], ["openai-codex:default"]);
+    // The agents list is preserved as-is from the existing config
     assert.deepEqual(config.agents.list, [
       {
-        agentDir: join(paths.stateDir, "agents", "main", "agent"),
         default: true,
         id: "main",
-        name: "Main",
-        workspace: join(paths.workspacesDir, "main"),
+        name: "Old Main",
+        workspace: "/tmp/legacy-main",
       },
       {
         id: "research",

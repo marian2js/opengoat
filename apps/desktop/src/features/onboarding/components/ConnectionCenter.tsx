@@ -10,6 +10,7 @@ import {
   XIcon,
 } from "lucide-react";
 import alibabaCloudLogo from "simple-icons/icons/alibabacloud.svg?raw";
+import baiduLogo from "simple-icons/icons/baidu.svg?raw";
 import anthropicLogo from "simple-icons/icons/anthropic.svg?raw";
 import bytedanceLogo from "simple-icons/icons/bytedance.svg?raw";
 import cloudflareLogo from "simple-icons/icons/cloudflare.svg?raw";
@@ -23,6 +24,22 @@ import openRouterLogo from "simple-icons/icons/openrouter.svg?raw";
 import vercelLogo from "simple-icons/icons/vercel.svg?raw";
 import xLogo from "simple-icons/icons/x.svg?raw";
 import xiaomiLogo from "simple-icons/icons/xiaomi.svg?raw";
+// Inline SVGs for providers not available in simple-icons
+const openaiLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M14.949 6.547a3.94 3.94 0 0 0-.348-3.273 4.11 4.11 0 0 0-4.4-1.934A4.1 4.1 0 0 0 8.423.2 4.15 4.15 0 0 0 6.305.086a4.1 4.1 0 0 0-1.891.948 4.04 4.04 0 0 0-1.158 1.753 4.1 4.1 0 0 0-1.563.679A4 4 0 0 0 .554 4.72a3.99 3.99 0 0 0 .502 4.731 3.94 3.94 0 0 0 .346 3.274 4.11 4.11 0 0 0 4.402 1.933c.382.425.852.764 1.377.995.526.231 1.095.35 1.67.346 1.78.002 3.358-1.132 3.901-2.804a4.1 4.1 0 0 0 1.563-.68 4 4 0 0 0 1.14-1.253 3.99 3.99 0 0 0-.506-4.716m-6.097 8.406a3.05 3.05 0 0 1-1.945-.694l.096-.054 3.23-1.838a.53.53 0 0 0 .265-.455v-4.49l1.366.778q.02.011.025.035v3.722c-.003 1.653-1.361 2.992-3.037 2.996m-6.53-2.75a2.95 2.95 0 0 1-.36-2.01l.095.057L5.29 12.09a.53.53 0 0 0 .527 0l3.949-2.246v1.555a.05.05 0 0 1-.022.041L6.473 13.3c-1.454.826-3.311.335-4.15-1.098m-.85-6.94A3.02 3.02 0 0 1 3.07 3.949v3.785a.51.51 0 0 0 .262.451l3.93 2.237-1.366.779a.05.05 0 0 1-.048 0L2.585 9.342a2.98 2.98 0 0 1-1.113-4.094zm11.216 2.571L8.747 5.576l1.362-.776a.05.05 0 0 1 .048 0l3.265 1.86a3 3 0 0 1 1.173 1.207 2.96 2.96 0 0 1-.27 3.2 3.05 3.05 0 0 1-1.36.997V8.279a.52.52 0 0 0-.276-.445m1.36-2.015-.097-.057-3.226-1.855a.53.53 0 0 0-.53 0L6.249 6.153V4.598a.04.04 0 0 1 .019-.04L9.533 2.7a3.07 3.07 0 0 1 3.257.139c.474.325.843.778 1.066 1.303.223.526.289 1.103.191 1.664zM5.503 8.575 4.139 7.8a.05.05 0 0 1-.026-.037V4.049c0-.57.166-1.127.476-1.607s.752-.864 1.275-1.105a3.08 3.08 0 0 1 3.234.41l-.096.054-3.23 1.838a.53.53 0 0 0-.265.455zm.742-1.577 1.758-1 1.762 1v2l-1.755 1-1.762-1z"/></svg>`;
+const chutesLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m-1.5 4h3v3.5L12 11l-1.5-1.5zm-3 3h3v3.5L9 14l-1.5-1.5zm6 0h3v3.5L15 14l-1.5-1.5zM7.5 12.5h3V16L9 17.5l-1.5-1.5zm6 0h3V16l-1.5 1.5-1.5-1.5z"/></svg>`;
+const moonshotLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m0 2a8 8 0 0 1 5.29 2C14.76 5.2 12 8.04 12 11.5c0 2.9 1.87 5.37 4.47 6.27A7.97 7.97 0 0 1 12 20a8 8 0 0 1 0-16"/></svg>`;
+const volcengineLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 4.5L18.5 20h-13L12 6.5z"/></svg>`;
+const kilocodeLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 4h4v16H4zm6 0h2v7.2L18 4h4l-7.2 8L22 20h-4l-6-7.2V20h-2z"/></svg>`;
+const qwenLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.73 0 3.36-.44 4.78-1.22l2.83 2.83 1.41-1.41-2.5-2.5A9.96 9.96 0 0 0 22 12c0-5.52-4.48-10-10-10m0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16m0-14a6 6 0 1 0 0 12 6 6 0 0 0 0-12"/></svg>`;
+const zaiLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 4h16v3H9.5L20 17v3H4v-3h10.5L4 7z"/></svg>`;
+const opencodeLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6z"/></svg>`;
+const syntheticLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`;
+const veniceLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2L2 12h4v8h12v-8h4L12 2zm0 3.5L18 12h-2v6H8v-6H6l6-6.5z"/></svg>`;
+const togetherLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 7a3 3 0 1 1 0-6 3 3 0 0 1 0 6m10 0a3 3 0 1 1 0-6 3 3 0 0 1 0 6M7 23a3 3 0 1 1 0-6 3 3 0 0 1 0 6m10 0a3 3 0 1 1 0-6 3 3 0 0 1 0 6M4 13.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5m16 0a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5m-8-2.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5"/></svg>`;
+const litellmLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 3v14h-2V3h2m5 4v10h-2V7h2M8 11v6H6v-6h2"/></svg>`;
+const customProviderLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19.14 12.94a7 7 0 0 0 .06-.94 7 7 0 0 0-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7 7 0 0 0-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54a7 7 0 0 0-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58a7 7 0 0 0-.06.94 7 7 0 0 0 .06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.04.7 1.62.94l.36 2.54c.05.24.26.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54a7 7 0 0 0 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2"/></svg>`;
+const sglangLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.5 7.2c-.4-1.6-1.8-2.7-3.5-2.7-1.3 0-2.4.7-3.1 1.7C9.2 6.1 7.5 7.6 7.5 9.5c0 .2 0 .3.1.5C6.1 10.3 5 11.5 5 13c0 1.8 1.5 3.2 3.3 3.2h8.4c1.5 0 2.8-1.2 2.8-2.8 0-1.3-.9-2.4-2.2-2.7l.1-.7c0-1.2-.7-2.3-1.7-2.8zM5 17.5h14v1H5z"/></svg>`;
+const vllmLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 4l5 16h2l3-10 3 10h2l5-16h-3l-3.5 12L14 4h-4l-2.5 12L4 4z"/></svg>`;
 import type {
   AuthOverview,
   AuthSession,
@@ -53,16 +70,33 @@ const providerLogos: Partial<Record<string, { color: string; darkColor?: string;
   "cloudflare-ai-gateway": { color: "#F38020", svg: cloudflareLogo },
   anthropic: { color: "#191919", darkColor: "#e8e8e8", svg: anthropicLogo },
   byteplus: { color: "#111111", darkColor: "#e0e0e0", svg: bytedanceLogo },
+  chutes: { color: "#111111", darkColor: "#e0e0e0", svg: chutesLogo },
   copilot: { color: "#171515", darkColor: "#e0e0e0", svg: githubCopilotLogo },
+  custom: { color: "#111111", darkColor: "#e0e0e0", svg: customProviderLogo },
   google: { color: "#4285F4", svg: googleGeminiLogo },
   huggingface: { color: "#FFD21E", svg: huggingFaceLogo },
+  kilocode: { color: "#111111", darkColor: "#e0e0e0", svg: kilocodeLogo },
+  litellm: { color: "#111111", darkColor: "#e0e0e0", svg: litellmLogo },
   minimax: { color: "#111111", darkColor: "#e0e0e0", svg: minimaxLogo },
   mistral: { color: "#FF7000", svg: mistralLogo },
   modelstudio: { color: "#FF6A00", svg: alibabaCloudLogo },
+  moonshot: { color: "#111111", darkColor: "#e0e0e0", svg: moonshotLogo },
   ollama: { color: "#111111", darkColor: "#e0e0e0", svg: ollamaLogo },
+  openai: { color: "#111111", darkColor: "#e0e0e0", svg: openaiLogo },
+  "openai-codex": { color: "#111111", darkColor: "#e0e0e0", svg: openaiLogo },
+  opencode: { color: "#111111", darkColor: "#e0e0e0", svg: opencodeLogo },
   openrouter: { color: "#111111", darkColor: "#e0e0e0", svg: openRouterLogo },
+  qianfan: { color: "#2932E1", svg: baiduLogo },
+  qwen: { color: "#6F3BF5", svg: qwenLogo },
+  sglang: { color: "#111111", darkColor: "#e0e0e0", svg: sglangLogo },
+  synthetic: { color: "#111111", darkColor: "#e0e0e0", svg: syntheticLogo },
+  together: { color: "#111111", darkColor: "#e0e0e0", svg: togetherLogo },
+  venice: { color: "#111111", darkColor: "#e0e0e0", svg: veniceLogo },
+  vllm: { color: "#111111", darkColor: "#e0e0e0", svg: vllmLogo },
+  volcengine: { color: "#111111", darkColor: "#e0e0e0", svg: volcengineLogo },
   xai: { color: "#111111", darkColor: "#e0e0e0", svg: xLogo },
   xiaomi: { color: "#FF6900", svg: xiaomiLogo },
+  zai: { color: "#111111", darkColor: "#e0e0e0", svg: zaiLogo },
 };
 
 export function ConnectionCenter({
