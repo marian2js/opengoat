@@ -24,6 +24,7 @@ import {
   sidecarHealthSchema,
   startAuthSessionRequestSchema,
   workspaceFileCheckSchema,
+  workspaceFileContentSchema,
   type AgentSession,
   type AgentSessionList,
   type AuthOverview,
@@ -38,6 +39,7 @@ import {
   type SidecarConnection,
   type SidecarHealth,
   type WorkspaceFileCheck,
+  type WorkspaceFileContent,
 } from "@opengoat/contracts";
 
 export class SidecarClient {
@@ -97,6 +99,26 @@ export class SidecarClient {
     return workspaceFileCheckSchema.parse(
       await this.request(
         `/agents/${encodeURIComponent(agentId)}/workspace/files/${encodeURIComponent(filename)}`,
+      ),
+    );
+  }
+
+  async readWorkspaceFile(agentId: string, filename: string): Promise<WorkspaceFileContent> {
+    return workspaceFileContentSchema.parse(
+      await this.request(
+        `/agents/${encodeURIComponent(agentId)}/workspace/files/${encodeURIComponent(filename)}/content`,
+      ),
+    );
+  }
+
+  async writeWorkspaceFile(agentId: string, filename: string, content: string): Promise<WorkspaceFileContent> {
+    return workspaceFileContentSchema.parse(
+      await this.request(
+        `/agents/${encodeURIComponent(agentId)}/workspace/files/${encodeURIComponent(filename)}/content`,
+        {
+          body: JSON.stringify({ content }),
+          method: "PUT",
+        },
       ),
     );
   }

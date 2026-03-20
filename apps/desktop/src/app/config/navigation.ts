@@ -1,9 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  BookOpenIcon,
   BotIcon,
+  BrainIcon,
   Link2Icon,
   MessageSquareIcon,
+  PackageIcon,
   Settings2Icon,
+  StoreIcon,
+  TrendingUpIcon,
 } from "lucide-react";
 
 export interface NavigationItem {
@@ -29,6 +34,14 @@ export const primaryNavigation: NavigationItem[] = [
     href: "#connections",
     icon: Link2Icon,
   },
+];
+
+export const brainNavigation: NavigationItem[] = [
+  { title: "Product", href: "#brain/product", icon: PackageIcon },
+  { title: "Market", href: "#brain/market", icon: StoreIcon },
+  { title: "Growth", href: "#brain/growth", icon: TrendingUpIcon },
+  { title: "Memory", href: "#brain/memory", icon: BrainIcon },
+  { title: "Knowledge", href: "#brain/knowledge", icon: BookOpenIcon },
 ];
 
 export const secondaryNavigation: NavigationItem[] = [

@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
 import {
   agentCatalogSchema,
   agentSchema,
@@ -14,6 +14,7 @@ import {
   updateAgentRequestSchema,
   updateAgentSessionRequestSchema,
   workspaceFileCheckSchema,
+  workspaceFileContentSchema,
 } from "@opengoat/contracts";
 import {
   deriveUniqueProjectId,
@@ -105,6 +106,41 @@ export function createAgentRoutes(runtime: SidecarRuntime): Hono {
     const exists = existsSync(filePath);
 
     return context.json(workspaceFileCheckSchema.parse({ exists }));
+  });
+
+  app.get("/:agentId/workspace/files/:filename/content", async (context) => {
+    const agentId = context.req.param("agentId");
+    const filename = context.req.param("filename");
+
+    if (filename.includes("/") || filename.includes("..")) {
+      return context.json({ error: "Invalid filename." }, 400);
+    }
+
+    const agent = await runtime.embeddedGateway.getAgent(agentId);
+    const filePath = join(agent.workspaceDir, filename);
+    const exists = existsSync(filePath);
+    const content = exists ? readFileSync(filePath, "utf8") : "";
+
+    return context.json(workspaceFileContentSchema.parse({ exists, content }));
+  });
+
+  app.put("/:agentId/workspace/files/:filename/content", async (context) => {
+    const agentId = context.req.param("agentId");
+    const filename = context.req.param("filename");
+
+    if (filename.includes("/") || filename.includes("..")) {
+      return context.json({ error: "Invalid filename." }, 400);
+    }
+
+    const body = await context.req.json();
+    const content = typeof body.content === "string" ? body.content : "";
+
+    const agent = await runtime.embeddedGateway.getAgent(agentId);
+    const filePath = join(agent.workspaceDir, filename);
+    mkdirSync(dirname(filePath), { recursive: true });
+    writeFileSync(filePath, content, "utf8");
+
+    return context.json(workspaceFileContentSchema.parse({ exists: true, content }));
   });
 
   app.patch("/:agentId", async (context) => {

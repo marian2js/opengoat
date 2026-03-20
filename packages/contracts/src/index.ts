@@ -220,6 +220,11 @@ export const workspaceFileCheckSchema = z.object({
   exists: z.boolean(),
 });
 
+export const workspaceFileContentSchema = z.object({
+  content: z.string(),
+  exists: z.boolean(),
+});
+
 export const chatTranscriptMessageSchema = z.object({
   id: z.string().min(1),
   role: z.enum(["assistant", "system", "user"]),
@@ -358,6 +363,7 @@ export type ChatActivity = z.infer<typeof chatActivitySchema>;
 export type BootstrapPrompt = z.infer<typeof bootstrapPromptSchema>;
 export type BootstrapPromptList = z.infer<typeof bootstrapPromptListSchema>;
 export type WorkspaceFileCheck = z.infer<typeof workspaceFileCheckSchema>;
+export type WorkspaceFileContent = z.infer<typeof workspaceFileContentSchema>;
 
 export const appManifest = appManifestSchema.parse(appManifestJson);
 

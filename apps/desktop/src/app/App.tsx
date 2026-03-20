@@ -8,11 +8,12 @@ import { ConnectionsWorkspace } from "@/features/connections/components/Connecti
 import { AddProjectDialog } from "@/features/onboarding/components/AddProjectDialog";
 import { BootstrapProgress } from "@/features/onboarding/components/BootstrapProgress";
 import { ConnectionCenter } from "@/features/onboarding/components/ConnectionCenter";
+import { BrainWorkspace } from "@/features/brain/components/BrainWorkspace";
 import { ProjectSettings } from "@/features/settings/components/ProjectSettings";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { initializeSidecarConnection } from "@/lib/runtime/connection";
 import { SidecarClient } from "@/lib/sidecar/client";
-type AppView = "connections" | "connections-add" | "chat" | "agents" | "settings";
+type AppView = "connections" | "connections-add" | "chat" | "brain" | "agents" | "settings";
 
 const ACTIVE_AGENT_KEY = "opengoat:activeAgentId";
 
@@ -37,6 +38,7 @@ export function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [hashView, setHashView] = useState<AppView>(readViewFromHash());
+  const [brainSection, setBrainSection] = useState<string>(readBrainSectionFromHash());
   const [retryToken, setRetryToken] = useState(0);
   const [createAgentToken, setCreateAgentToken] = useState(0);
   const [sessions, setSessions] = useState<AgentSession[]>([]);
@@ -159,6 +161,7 @@ export function App() {
   useEffect(() => {
     const onHashChange = (): void => {
       setHashView(readViewFromHash());
+      setBrainSection(readBrainSectionFromHash());
     };
 
     window.addEventListener("hashchange", onHashChange);
@@ -308,6 +311,7 @@ export function App() {
     <SidebarProvider defaultOpen={true} className="!min-h-0 h-svh overflow-hidden">
       <AppSidebar
         activeAgentId={activeAgentId}
+        activeBrainSection={brainSection}
         activeSessionId={activeSessionId}
         activeView={currentView}
         agentCatalog={agentCatalog}
@@ -337,7 +341,7 @@ export function App() {
             setCreateAgentToken((current) => current + 1);
           }}
         />
-        <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" ? "" : "gap-4 overflow-y-auto p-4 lg:p-5"}`}>
+        <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" || currentView === "brain" ? "" : "gap-4 overflow-y-auto p-4 lg:p-5"}`}>
           {currentView === "chat" ? (
             bootstrapContext && client ? (
               <BootstrapProgress
@@ -359,6 +363,12 @@ export function App() {
                 sessionId={activeSessionId}
               />
             )
+          ) : currentView === "brain" ? (
+            <BrainWorkspace
+              agentId={activeAgentId}
+              client={client}
+              sectionId={brainSection}
+            />
           ) : currentView === "connections" ? (
             <ConnectionsWorkspace
               authOverview={authOverview}
@@ -414,6 +424,10 @@ function readViewFromHash(): AppView {
     return "connections";
   }
 
+  if (window.location.hash.startsWith("#brain")) {
+    return "brain";
+  }
+
   if (window.location.hash === "#agents") {
     return "agents";
   }
@@ -423,4 +437,12 @@ function readViewFromHash(): AppView {
   }
 
   return "chat";
+}
+
+function readBrainSectionFromHash(): string {
+  const hash = window.location.hash;
+  if (hash.startsWith("#brain/")) {
+    return hash.slice("#brain/".length);
+  }
+  return "product";
 }

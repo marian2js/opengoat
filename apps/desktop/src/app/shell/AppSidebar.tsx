@@ -1,6 +1,8 @@
 import type { AgentCatalog, AgentSession } from "@opengoat/contracts";
 import {
+  BrainIcon,
   CheckIcon,
+  ChevronRightIcon,
   ChevronsUpDownIcon,
   GlobeIcon,
   MessageSquareIcon,
@@ -12,9 +14,15 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import {
+  brainNavigation,
   primaryNavigation,
   secondaryNavigation,
 } from "@/app/config/navigation";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,14 +44,18 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
 import type { AuthOverview } from "@/app/types";
 
 interface AppSidebarProps {
   activeAgentId?: string;
+  activeBrainSection?: string;
   activeSessionId?: string;
-  activeView: "connections" | "chat" | "agents" | "settings";
+  activeView: "connections" | "chat" | "brain" | "agents" | "settings";
   agentCatalog: AgentCatalog | null;
   authOverview: AuthOverview | null;
   onAddProject?: () => void;
@@ -61,6 +73,7 @@ function formatSessionLabel(session: AgentSession): string {
 
 export function AppSidebar({
   activeAgentId,
+  activeBrainSection,
   activeSessionId,
   activeView,
   agentCatalog,
@@ -106,7 +119,59 @@ export function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {primaryNavigation.map((item) => (
+              {/* Chat — always first */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip="Chat"
+                  isActive={activeView === "chat"}
+                >
+                  <a href="#chat">
+                    <MessageSquareIcon />
+                    <span>Chat</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* Brain — collapsible, right after Chat */}
+              <Collapsible
+                defaultOpen={activeView === "brain"}
+                asChild
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton tooltip="Brain" isActive={activeView === "brain"}>
+                      <BrainIcon />
+                      <span>Brain</span>
+                      <ChevronRightIcon className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {brainNavigation.map((item) => (
+                        <SidebarMenuSubItem key={item.title}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={
+                              activeView === "brain" &&
+                              item.href === `#brain/${activeBrainSection}`
+                            }
+                          >
+                            <a href={item.href}>
+                              <item.icon />
+                              <span>{item.title}</span>
+                            </a>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+
+              {/* Remaining nav items */}
+              {primaryNavigation.filter((item) => item.href !== "#chat").map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -114,7 +179,6 @@ export function AppSidebar({
                     isActive={
                       (item.href === "#connections" &&
                         activeView === "connections") ||
-                      (item.href === "#chat" && activeView === "chat") ||
                       (item.href === "#agents" && activeView === "agents")
                     }
                   >
