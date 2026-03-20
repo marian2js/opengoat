@@ -138,7 +138,7 @@ export class SidecarClient {
       body: JSON.stringify(payload),
       headers,
       method: "POST",
-      signal,
+      ...(signal ? { signal } : {}),
     });
 
     if (!response.ok) {

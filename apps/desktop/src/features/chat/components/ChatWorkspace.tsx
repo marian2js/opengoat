@@ -67,12 +67,12 @@ export function evictChatSession(sessionId: string): void {
 }
 
 interface ChatWorkspaceProps {
-  agentId: string;
+  agentId?: string | undefined;
   authOverview: AuthOverview | null;
   client: SidecarClient | null;
-  onBootstrap?: (sessionId: string) => void;
-  onSessionLabelUpdate?: (sessionId: string, label: string) => void;
-  sessionId?: string;
+  onBootstrap?: ((sessionId: string) => void) | undefined;
+  onSessionLabelUpdate?: ((sessionId: string, label: string) => void) | undefined;
+  sessionId?: string | undefined;
 }
 
 const STARTER_PROMPTS = [
@@ -206,7 +206,7 @@ function ChatSessionView({
   authOverview: AuthOverview | null;
   bootstrap: ChatBootstrap;
   client: SidecarClient | null;
-  onSessionLabelUpdate?: (sessionId: string, label: string) => void;
+  onSessionLabelUpdate?: ((sessionId: string, label: string) => void) | undefined;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const hasCustomLabelRef = useRef(bootstrap.messages.length > 0);

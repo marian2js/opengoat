@@ -49,22 +49,21 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import type { AuthOverview } from "@/app/types";
+
 
 interface AppSidebarProps {
-  activeAgentId?: string;
-  activeBrainSection?: string;
-  activeSessionId?: string;
+  activeAgentId?: string | undefined;
+  activeBrainSection?: string | undefined;
+  activeSessionId?: string | undefined;
   activeView: "dashboard" | "connections" | "chat" | "brain" | "agents" | "settings";
   agentCatalog: AgentCatalog | null;
-  authOverview: AuthOverview | null;
-  onAddProject?: () => void;
-  onNewChat?: () => void;
-  onProjectSwitch?: (agentId: string) => void;
-  onSessionDelete?: (sessionId: string) => void;
-  onSessionRename?: (sessionId: string, label: string) => void;
-  onSessionSelect?: (sessionId: string) => void;
-  sessions?: AgentSession[];
+  onAddProject?: (() => void) | undefined;
+  onNewChat?: (() => void) | undefined;
+  onProjectSwitch?: ((agentId: string) => void) | undefined;
+  onSessionDelete?: ((sessionId: string) => void) | undefined;
+  onSessionRename?: ((sessionId: string, label: string) => void) | undefined;
+  onSessionSelect?: ((sessionId: string) => void) | undefined;
+  sessions?: AgentSession[] | undefined;
 }
 
 function formatSessionLabel(session: AgentSession): string {
@@ -77,7 +76,6 @@ export function AppSidebar({
   activeSessionId,
   activeView,
   agentCatalog,
-  authOverview,
   onAddProject,
   onNewChat,
   onProjectSwitch,
@@ -315,7 +313,7 @@ interface ProjectInfo {
  * Derive a display domain from an agent's description (project URL) or ID.
  * Returns the hostname without `www.` prefix.
  */
-function resolveDomain(agent: { id: string; name: string; description?: string }): string {
+function resolveDomain(agent: { id: string; name: string; description?: string | undefined }): string {
   const rawUrl = agent.description?.trim();
   if (rawUrl) {
     try {
@@ -414,9 +412,9 @@ function SessionItem({
   isActive: boolean;
   isEditing: boolean;
   session: AgentSession;
-  onDelete?: (sessionId: string) => void;
-  onRename?: (sessionId: string, label: string) => void;
-  onSelect?: (sessionId: string) => void;
+  onDelete?: ((sessionId: string) => void) | undefined;
+  onRename?: ((sessionId: string, label: string) => void) | undefined;
+  onSelect?: ((sessionId: string) => void) | undefined;
   onStartEditing: () => void;
   onStopEditing: () => void;
 }) {

@@ -48,7 +48,7 @@ export interface BootstrapStep {
   expectedFile: string;
   status: BootstrapStepStatus;
   streamedText: string;
-  error?: string;
+  error?: string | undefined;
 }
 
 export type BootstrapOverallStatus =
@@ -62,7 +62,7 @@ export interface BootstrapState {
   status: BootstrapOverallStatus;
   steps: BootstrapStep[];
   currentStepIndex: number;
-  error?: string;
+  error?: string | undefined;
 }
 
 export interface UseBootstrapOrchestratorReturn {

@@ -123,8 +123,8 @@ Add domain-specific knowledge, documentation excerpts, API references, or any ot
   },
 ];
 
-interface BrainWorkspaceProps {
-  agentId?: string;
+export interface BrainWorkspaceProps {
+  agentId?: string | undefined;
   client: SidecarClient | null;
   sectionId: string;
 }
@@ -168,8 +168,8 @@ function BrainEditor({
   const [isEditing, setIsEditing] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [fileExists, setFileExists] = useState(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const savedTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 

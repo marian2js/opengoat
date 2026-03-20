@@ -1,16 +1,15 @@
 import { LayoutDashboardIcon } from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
 
-interface DashboardWorkspaceProps {
-  agentId?: string;
+export interface DashboardWorkspaceProps {
+  agentId?: string | undefined;
   client: SidecarClient | null;
-  onActionClick?: (actionId: string, prompt: string, label: string) => void;
+  onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
 }
 
 export function DashboardWorkspace({
   agentId,
   client,
-  onActionClick,
 }: DashboardWorkspaceProps) {
   if (!agentId || !client) {
     return (

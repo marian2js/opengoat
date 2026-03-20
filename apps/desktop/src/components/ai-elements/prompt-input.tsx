@@ -43,7 +43,6 @@ import { cn } from "@/lib/utils";
 import type { ChatStatus, FileUIPart, SourceDocumentUIPart } from "ai";
 import {
   CornerDownLeftIcon,
-  ImageIcon,
   Monitor,
   PaperclipIcon,
   PlusIcon,

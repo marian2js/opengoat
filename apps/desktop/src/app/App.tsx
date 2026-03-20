@@ -316,7 +316,6 @@ export function App() {
         activeSessionId={activeSessionId}
         activeView={currentView}
         agentCatalog={agentCatalog}
-        authOverview={authOverview}
         onAddProject={() => setShowAddProject(true)}
         onNewChat={() => {
           void handleNewChat();
