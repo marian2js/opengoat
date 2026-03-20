@@ -8,15 +8,19 @@ import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSumm
 export interface DashboardWorkspaceProps {
   agentId?: string | undefined;
   client: SidecarClient | null;
+  completedActions?: Set<string> | undefined;
   isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
+  onViewResults?: ((actionId: string) => void) | undefined;
 }
 
 export function DashboardWorkspace({
   agentId,
   client,
+  completedActions,
   isActionLoading,
   onActionClick,
+  onViewResults,
 }: DashboardWorkspaceProps) {
   if (!agentId || !client) {
     return (
@@ -33,8 +37,10 @@ export function DashboardWorkspace({
     <DashboardContent
       agentId={agentId}
       client={client}
+      completedActions={completedActions}
       isActionLoading={isActionLoading}
       onActionClick={onActionClick}
+      onViewResults={onViewResults}
     />
   );
 }
@@ -46,24 +52,35 @@ export function DashboardWorkspace({
 function DashboardContent({
   agentId,
   client,
+  completedActions,
   isActionLoading,
   onActionClick,
+  onViewResults,
 }: {
   agentId: string;
   client: SidecarClient;
+  completedActions?: Set<string> | undefined;
   isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
+  onViewResults?: ((actionId: string) => void) | undefined;
 }) {
   const { data, files, isLoading, error } = useWorkspaceSummary(agentId, client);
 
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 lg:p-6">
       <CompanySummary data={data} isLoading={isLoading} error={error} />
-      <ActionCardGrid isLoading={isActionLoading} onActionClick={onActionClick} />
+      <ActionCardGrid
+        completedActions={completedActions}
+        isLoading={isActionLoading}
+        onActionClick={onActionClick}
+        onViewResults={onViewResults}
+      />
       <OpportunitySection
+        completedActions={completedActions}
         files={files}
         isLoading={isLoading}
         onActionClick={onActionClick}
+        onViewResults={onViewResults}
       />
     </div>
   );

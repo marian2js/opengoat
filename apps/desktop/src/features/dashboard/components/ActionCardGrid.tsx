@@ -3,11 +3,13 @@ import { starterActions } from "@/features/dashboard/data/actions";
 import { ActionCardItem } from "@/features/dashboard/components/ActionCardItem";
 
 export interface ActionCardGridProps {
+  completedActions?: Set<string> | undefined;
   isLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
+  onViewResults?: ((actionId: string) => void) | undefined;
 }
 
-export function ActionCardGrid({ isLoading, onActionClick }: ActionCardGridProps) {
+export function ActionCardGrid({ completedActions, isLoading, onActionClick, onViewResults }: ActionCardGridProps) {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
@@ -23,8 +25,10 @@ export function ActionCardGrid({ isLoading, onActionClick }: ActionCardGridProps
           <ActionCardItem
             key={card.id}
             card={card}
+            isCompleted={completedActions?.has(card.id)}
             isLoading={isLoading}
             onClick={onActionClick}
+            onViewResults={onViewResults}
           />
         ))}
       </div>

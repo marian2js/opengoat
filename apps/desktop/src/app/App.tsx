@@ -17,6 +17,7 @@ import { initializeSidecarConnection } from "@/lib/runtime/connection";
 import { SidecarClient } from "@/lib/sidecar/client";
 import { toast } from "sonner";
 import { deduplicateLabel } from "@/lib/utils/deduplicate-label";
+import { getActionMapping, getCompletedActionIds, setActionMapping } from "@/lib/utils/action-map";
 type AppView = "dashboard" | "connections" | "connections-add" | "chat" | "brain" | "agents" | "settings";
 
 const ACTIVE_AGENT_KEY = "opengoat:activeAgentId";
@@ -59,6 +60,7 @@ export function App() {
   const [pendingActionPrompt, setPendingActionPrompt] = useState<string | null>(null);
   const [actionSessionId, setActionSessionId] = useState<string | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [completedActions, setCompletedActions] = useState<Set<string>>(() => getCompletedActionIds());
 
   const activeAgentId = resolveActiveAgentId(agentCatalog, selectedAgentId);
   const activeAgent = agentCatalog?.agents.find((a) => a.id === activeAgentId);
@@ -204,7 +206,7 @@ export function App() {
   }, [client, activeAgentId]);
 
   const handleActionClick = useCallback(
-    async (_actionId: string, prompt: string, label: string) => {
+    async (actionId: string, prompt: string, label: string) => {
       if (!client || !activeAgentId || isActionLoading) {
         return;
       }
@@ -213,6 +215,8 @@ export function App() {
         const uniqueLabel = deduplicateLabel(label, sessions);
         const session = await client.createSession({ agentId: activeAgentId, label: uniqueLabel });
         markActionSession(session.id);
+        setActionMapping(actionId, session.id);
+        setCompletedActions(getCompletedActionIds());
         setSessions((prev) => [session, ...prev]);
         setActiveSessionId(session.id);
         setPendingActionPrompt(prompt);
@@ -226,6 +230,17 @@ export function App() {
       }
     },
     [client, activeAgentId, isActionLoading, sessions],
+  );
+
+  const handleViewResults = useCallback(
+    (actionId: string) => {
+      const sessionId = getActionMapping(actionId);
+      if (sessionId) {
+        setActiveSessionId(sessionId);
+        window.location.hash = "#chat";
+      }
+    },
+    [],
   );
 
   const handleSessionSelect = useCallback((sessionId: string) => {
@@ -388,10 +403,12 @@ export function App() {
               <DashboardWorkspace
                 agentId={activeAgentId}
                 client={client}
+                completedActions={completedActions}
                 isActionLoading={isActionLoading}
                 onActionClick={(id, prompt, label) => {
                   void handleActionClick(id, prompt, label);
                 }}
+                onViewResults={handleViewResults}
               />
             )
           ) : currentView === "chat" ? (

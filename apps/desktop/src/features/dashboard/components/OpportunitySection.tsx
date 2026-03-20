@@ -8,9 +8,11 @@ import {
 import { OpportunityCard } from "@/features/dashboard/components/OpportunityCard";
 
 export interface OpportunitySectionProps {
+  completedActions?: Set<string> | undefined;
   files: WorkspaceFiles | null;
   isLoading: boolean;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
+  onViewResults?: ((actionId: string) => void) | undefined;
 }
 
 function OpportunitySkeleton() {
@@ -40,9 +42,11 @@ function OpportunitySkeleton() {
 }
 
 export function OpportunitySection({
+  completedActions,
   files,
   isLoading,
   onActionClick,
+  onViewResults,
 }: OpportunitySectionProps) {
   const opportunities = useMemo(
     () => (files ? extractOpportunities(files) : []),
@@ -69,8 +73,10 @@ export function OpportunitySection({
         {opportunities.map((opp) => (
           <OpportunityCard
             key={opp.id}
+            completedActions={completedActions}
             opportunity={opp}
             onActionClick={onActionClick}
+            onViewResults={onViewResults}
           />
         ))}
       </div>
