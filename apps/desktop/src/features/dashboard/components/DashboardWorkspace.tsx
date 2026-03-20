@@ -8,12 +8,14 @@ import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSumm
 export interface DashboardWorkspaceProps {
   agentId?: string | undefined;
   client: SidecarClient | null;
+  isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
 }
 
 export function DashboardWorkspace({
   agentId,
   client,
+  isActionLoading,
   onActionClick,
 }: DashboardWorkspaceProps) {
   if (!agentId || !client) {
@@ -31,6 +33,7 @@ export function DashboardWorkspace({
     <DashboardContent
       agentId={agentId}
       client={client}
+      isActionLoading={isActionLoading}
       onActionClick={onActionClick}
     />
   );
@@ -43,10 +46,12 @@ export function DashboardWorkspace({
 function DashboardContent({
   agentId,
   client,
+  isActionLoading,
   onActionClick,
 }: {
   agentId: string;
   client: SidecarClient;
+  isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
 }) {
   const { data, files, isLoading, error } = useWorkspaceSummary(agentId, client);
@@ -54,7 +59,7 @@ function DashboardContent({
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 lg:p-6">
       <CompanySummary data={data} isLoading={isLoading} error={error} />
-      <ActionCardGrid onActionClick={onActionClick} />
+      <ActionCardGrid isLoading={isActionLoading} onActionClick={onActionClick} />
       <OpportunitySection
         files={files}
         isLoading={isLoading}

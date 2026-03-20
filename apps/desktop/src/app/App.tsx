@@ -12,8 +12,10 @@ import { BrainWorkspace } from "@/features/brain/components/BrainWorkspace";
 import { DashboardWorkspace } from "@/features/dashboard/components/DashboardWorkspace";
 import { ProjectSettings } from "@/features/settings/components/ProjectSettings";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 import { initializeSidecarConnection } from "@/lib/runtime/connection";
 import { SidecarClient } from "@/lib/sidecar/client";
+import { toast } from "sonner";
 type AppView = "dashboard" | "connections" | "connections-add" | "chat" | "brain" | "agents" | "settings";
 
 const ACTIVE_AGENT_KEY = "opengoat:activeAgentId";
@@ -216,6 +218,7 @@ export function App() {
         window.location.hash = "#chat";
       } catch (error) {
         console.error("Failed to create action session", error);
+        toast.error("Something went wrong. Please try again.");
       } finally {
         setIsActionLoading(false);
       }
@@ -383,6 +386,7 @@ export function App() {
               <DashboardWorkspace
                 agentId={activeAgentId}
                 client={client}
+                isActionLoading={isActionLoading}
                 onActionClick={(id, prompt, label) => {
                   void handleActionClick(id, prompt, label);
                 }}
@@ -450,6 +454,7 @@ export function App() {
           onProjectCreated={handleProjectCreated}
         />
       ) : null}
+      <Toaster />
     </SidebarProvider>
   );
 }
