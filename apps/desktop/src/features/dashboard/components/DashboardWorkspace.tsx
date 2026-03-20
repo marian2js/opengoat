@@ -2,6 +2,7 @@ import { LayoutDashboardIcon } from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
+import { OpportunitySection } from "@/features/dashboard/components/OpportunitySection";
 import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSummary";
 
 export interface DashboardWorkspaceProps {
@@ -48,12 +49,17 @@ function DashboardContent({
   client: SidecarClient;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
 }) {
-  const { data, isLoading } = useWorkspaceSummary(agentId, client);
+  const { data, files, isLoading } = useWorkspaceSummary(agentId, client);
 
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 lg:p-6">
       <CompanySummary data={data} isLoading={isLoading} />
       <ActionCardGrid onActionClick={onActionClick} />
+      <OpportunitySection
+        files={files}
+        isLoading={isLoading}
+        onActionClick={onActionClick}
+      />
     </div>
   );
 }

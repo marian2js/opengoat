@@ -4,9 +4,11 @@ import {
   parseWorkspaceSummary,
   type CompanySummaryData,
 } from "@/features/dashboard/lib/parse-workspace-summary";
+import type { WorkspaceFiles } from "@/features/dashboard/data/opportunities";
 
 export interface UseWorkspaceSummaryResult {
   data: CompanySummaryData | null;
+  files: WorkspaceFiles | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -15,13 +17,14 @@ const WORKSPACE_FILES = ["PRODUCT.md", "MARKET.md", "GROWTH.md"] as const;
 
 /**
  * Fetches PRODUCT.md, MARKET.md, and GROWTH.md from the sidecar,
- * parses them, and returns the 5-point company summary.
+ * parses them, and returns the 5-point company summary plus raw file content.
  */
 export function useWorkspaceSummary(
   agentId: string,
   client: SidecarClient,
 ): UseWorkspaceSummaryResult {
   const [data, setData] = useState<CompanySummaryData | null>(null);
+  const [files, setFiles] = useState<WorkspaceFiles | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +42,13 @@ export function useWorkspaceSummary(
       ),
     ).then(([productMd, marketMd, growthMd]) => {
       if (cancelled) return;
+
+      const rawFiles: WorkspaceFiles = {
+        productMd: productMd ?? null,
+        marketMd: marketMd ?? null,
+        growthMd: growthMd ?? null,
+      };
+      setFiles(rawFiles);
 
       if (!productMd && !marketMd && !growthMd) {
         setData(null);
@@ -62,5 +72,5 @@ export function useWorkspaceSummary(
     return () => { cancelled = true; };
   }, [agentId, client]);
 
-  return { data, isLoading, error };
+  return { data, files, isLoading, error };
 }
