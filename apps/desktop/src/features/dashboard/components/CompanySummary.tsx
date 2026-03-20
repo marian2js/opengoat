@@ -101,6 +101,8 @@ export function CompanySummary({ data, isLoading, error }: CompanySummaryProps) 
     return null;
   }
 
+  if (!data) return null;
+
   return (
     <Card className="border border-border/70 bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
       <CardHeader>
