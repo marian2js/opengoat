@@ -1,6 +1,8 @@
 import { LayoutDashboardIcon } from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
+import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
+import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSummary";
 
 export interface DashboardWorkspaceProps {
   agentId?: string | undefined;
@@ -25,7 +27,32 @@ export function DashboardWorkspace({
   }
 
   return (
+    <DashboardContent
+      agentId={agentId}
+      client={client}
+      onActionClick={onActionClick}
+    />
+  );
+}
+
+/**
+ * Inner component that renders when agentId and client are available.
+ * Separated so hooks can be called unconditionally.
+ */
+function DashboardContent({
+  agentId,
+  client,
+  onActionClick,
+}: {
+  agentId: string;
+  client: SidecarClient;
+  onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
+}) {
+  const { data, isLoading } = useWorkspaceSummary(agentId, client);
+
+  return (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 lg:p-6">
+      <CompanySummary data={data} isLoading={isLoading} />
       <ActionCardGrid onActionClick={onActionClick} />
     </div>
   );
