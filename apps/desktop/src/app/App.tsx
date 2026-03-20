@@ -283,7 +283,7 @@ export function App() {
       setSelectedAgentId(agent.id);
       setRetryToken((current) => current + 1);
       setBootstrapContext({ agentId: agent.id, projectUrl });
-      window.location.hash = "#chat";
+      window.location.hash = "";
     },
     [],
   );
@@ -308,7 +308,7 @@ export function App() {
               setRetryToken((current) => current + 1);
               setBootstrapContext({ agentId: agent.id, projectUrl });
               setSelectedAgentId(agent.id);
-              window.location.hash = "#chat";
+              window.location.hash = "";
               return;
             } catch (error) {
               console.error("Failed to create project agent", error);
