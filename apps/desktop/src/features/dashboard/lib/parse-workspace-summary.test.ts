@@ -221,3 +221,91 @@ void test("parseWorkspaceSummary handles partial data (only growth)", () => {
   assert.ok(result.mainRisk);
   assert.ok(result.topOpportunity);
 });
+
+// ---------------------------------------------------------------------------
+// Edge cases: alternative heading names
+// ---------------------------------------------------------------------------
+
+void test("parseWorkspaceSummary matches 'Product summary' as fallback for 'Company summary'", () => {
+  const md = `# PRODUCT\n\n## Product summary\n- A scheduling tool for teams\n`;
+  const result = parseWorkspaceSummary(md, null, null);
+  assert.ok(result.productSummary, "should match 'Product summary' fallback heading");
+  assert.ok(result.productSummary.includes("scheduling"));
+});
+
+void test("parseWorkspaceSummary matches 'Target audience' as fallback for 'Target users'", () => {
+  const md = `# PRODUCT\n\n## Target audience\n- Sales teams and recruiters\n`;
+  const result = parseWorkspaceSummary(md, null, null);
+  assert.ok(result.targetAudience, "should match 'Target audience' fallback heading");
+  assert.ok(result.targetAudience.includes("Sales"));
+});
+
+void test("parseWorkspaceSummary matches 'Value proposition' as fallback for 'Positioning signals'", () => {
+  const md = `# PRODUCT\n\n## Value proposition\n- Fast, simple, async-first\n`;
+  const result = parseWorkspaceSummary(md, null, null);
+  assert.ok(result.valueProposition, "should match 'Value proposition' fallback heading");
+});
+
+void test("parseWorkspaceSummary matches 'Risks' as fallback for 'Risks and constraints'", () => {
+  const md = `# GROWTH\n\n## Risks\n- High competition from incumbents\n`;
+  const result = parseWorkspaceSummary(null, null, md);
+  assert.ok(result.mainRisk, "should match 'Risks' fallback heading");
+});
+
+void test("parseWorkspaceSummary matches 'Growth opportunities' as fallback for opportunity", () => {
+  const md = `# GROWTH\n\n## Growth opportunities\n- Viral loop potential\n`;
+  const result = parseWorkspaceSummary(null, null, md);
+  assert.ok(result.topOpportunity, "should match 'Growth opportunities' fallback heading");
+});
+
+// ---------------------------------------------------------------------------
+// Edge cases: CRLF line endings
+// ---------------------------------------------------------------------------
+
+void test("extractSection handles CRLF line endings", () => {
+  const md = "## Company summary\r\n- Acme does things\r\n- More info\r\n\r\n## Target users\r\n- Founders\r\n";
+  const result = extractSection(md, "Company summary");
+  assert.ok(result, "should extract content with CRLF endings");
+  assert.ok(result.includes("Acme does things"));
+});
+
+void test("parseWorkspaceSummary handles CRLF line endings end-to-end", () => {
+  const product = "# PRODUCT\r\n\r\n## Company summary\r\n- Acme Corp\r\n\r\n## Target users\r\n- Founders\r\n\r\n## Positioning signals\r\n- Fast and simple\r\n";
+  const growth = "# GROWTH\r\n\r\n## Risks and constraints\r\n- Competition\r\n\r\n## Experiment ideas\r\n- Test on Reddit\r\n";
+  const result = parseWorkspaceSummary(product, null, growth);
+  assert.ok(result.productSummary, "productSummary with CRLF");
+  assert.ok(result.targetAudience, "targetAudience with CRLF");
+  assert.ok(result.valueProposition, "valueProposition with CRLF");
+  assert.ok(result.mainRisk, "mainRisk with CRLF");
+  assert.ok(result.topOpportunity, "topOpportunity with CRLF");
+});
+
+// ---------------------------------------------------------------------------
+// Edge cases: BOM prefix
+// ---------------------------------------------------------------------------
+
+void test("extractSection handles BOM prefix at file start", () => {
+  const md = "\uFEFF# PRODUCT\n\n## Company summary\n- Acme does things\n";
+  const result = extractSection(md, "Company summary");
+  assert.ok(result, "should extract content even with BOM prefix");
+  assert.ok(result.includes("Acme does things"));
+});
+
+// ---------------------------------------------------------------------------
+// Edge cases: resilience
+// ---------------------------------------------------------------------------
+
+void test("parseWorkspaceSummary never throws on malformed input", () => {
+  // Completely empty strings
+  const r1 = parseWorkspaceSummary("", null, "");
+  assert.equal(r1.productSummary, null);
+
+  // Random non-markdown content
+  const r2 = parseWorkspaceSummary("just some random text", null, "no headings here");
+  assert.equal(r2.productSummary, null);
+  assert.equal(r2.mainRisk, null);
+
+  // Extremely nested markdown
+  const r3 = parseWorkspaceSummary("### Sub\n#### Deep\n##### Deeper", null, null);
+  assert.equal(r3.productSummary, null);
+});

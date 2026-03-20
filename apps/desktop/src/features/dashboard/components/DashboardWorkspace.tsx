@@ -49,11 +49,11 @@ function DashboardContent({
   client: SidecarClient;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
 }) {
-  const { data, files, isLoading } = useWorkspaceSummary(agentId, client);
+  const { data, files, isLoading, error } = useWorkspaceSummary(agentId, client);
 
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 lg:p-6">
-      <CompanySummary data={data} isLoading={isLoading} />
+      <CompanySummary data={data} isLoading={isLoading} error={error} />
       <ActionCardGrid onActionClick={onActionClick} />
       <OpportunitySection
         files={files}

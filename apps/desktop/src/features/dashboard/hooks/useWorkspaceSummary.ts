@@ -56,12 +56,21 @@ export function useWorkspaceSummary(
         return;
       }
 
-      const summary = parseWorkspaceSummary(
-        productMd ?? null,
-        marketMd ?? null,
-        growthMd ?? null,
-      );
-      setData(summary);
+      try {
+        const summary = parseWorkspaceSummary(
+          productMd ?? null,
+          marketMd ?? null,
+          growthMd ?? null,
+        );
+        setData(summary);
+      } catch (parseErr: unknown) {
+        console.error("parseWorkspaceSummary failed:", parseErr);
+        setError(
+          parseErr instanceof Error
+            ? parseErr.message
+            : "Failed to parse workspace summary",
+        );
+      }
       setIsLoading(false);
     }).catch((err: unknown) => {
       if (cancelled) return;

@@ -12,6 +12,7 @@ import type { CompanySummaryData } from "@/features/dashboard/lib/parse-workspac
 export interface CompanySummaryProps {
   data: CompanySummaryData | null;
   isLoading: boolean;
+  error?: string | null;
 }
 
 interface SummaryItemProps {
@@ -66,18 +67,39 @@ function SummarySkeleton() {
   );
 }
 
-export function CompanySummary({ data, isLoading }: CompanySummaryProps) {
+export function CompanySummary({ data, isLoading, error }: CompanySummaryProps) {
   if (isLoading) {
     return <SummarySkeleton />;
   }
 
-  if (!data) {
+  // Check if we have at least one data point to display
+  const hasAnyData = data ? Object.values(data).some(Boolean) : false;
+
+  if (!hasAnyData) {
+    // Show a subtle error/empty state instead of rendering nothing
+    if (error || !data) {
+      return (
+        <Card className="border border-border/70 bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="rounded-lg bg-primary/8 p-1.5 text-primary">
+                <BuildingIcon className="size-4" />
+              </div>
+              <CardTitle className="text-sm font-semibold tracking-tight">
+                Company overview
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Unable to load company overview. Try refreshing the page.
+            </p>
+          </CardContent>
+        </Card>
+      );
+    }
     return null;
   }
-
-  // Check if we have at least one data point to display
-  const hasAnyData = Object.values(data).some(Boolean);
-  if (!hasAnyData) return null;
 
   return (
     <Card className="border border-border/70 bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">

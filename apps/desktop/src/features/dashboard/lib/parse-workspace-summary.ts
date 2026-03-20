@@ -59,7 +59,19 @@ export function firstParagraphOrBullet(section: string): string | null {
 }
 
 /**
+ * Tries multiple heading variants and returns the first matching section content.
+ */
+function extractFirstMatch(markdown: string, headings: string[]): string | null {
+  for (const heading of headings) {
+    const section = extractSection(markdown, heading);
+    if (section) return section;
+  }
+  return null;
+}
+
+/**
  * Extracts the 5 company summary data points from raw markdown content.
+ * Resilient to heading variations in AI-generated markdown.
  */
 export function parseWorkspaceSummary(
   productMd: string | null,
@@ -74,38 +86,61 @@ export function parseWorkspaceSummary(
     topOpportunity: null,
   };
 
-  if (productMd) {
-    // Product summary from "## Company summary"
-    const companySummary = extractSection(productMd, "Company summary");
-    result.productSummary = companySummary
-      ? firstParagraphOrBullet(companySummary)
-      : null;
+  try {
+    if (productMd) {
+      const companySummary = extractFirstMatch(productMd, [
+        "Company summary",
+        "Product summary",
+        "Overview",
+        "About",
+      ]);
+      result.productSummary = companySummary
+        ? firstParagraphOrBullet(companySummary)
+        : null;
 
-    // Target audience from "## Target users"
-    const targetUsers = extractSection(productMd, "Target users");
-    result.targetAudience = targetUsers
-      ? firstParagraphOrBullet(targetUsers)
-      : null;
+      const targetUsers = extractFirstMatch(productMd, [
+        "Target users",
+        "Target audience",
+        "Ideal customer",
+        "ICP",
+      ]);
+      result.targetAudience = targetUsers
+        ? firstParagraphOrBullet(targetUsers)
+        : null;
 
-    // Value proposition from "## Positioning signals"
-    const positioning = extractSection(productMd, "Positioning signals");
-    result.valueProposition = positioning
-      ? firstParagraphOrBullet(positioning)
-      : null;
-  }
+      const positioning = extractFirstMatch(productMd, [
+        "Positioning signals",
+        "Value proposition",
+        "Positioning",
+        "Key differentiators",
+      ]);
+      result.valueProposition = positioning
+        ? firstParagraphOrBullet(positioning)
+        : null;
+    }
 
-  if (growthMd) {
-    // Main risk from "## Risks and constraints"
-    const risks = extractSection(growthMd, "Risks and constraints");
-    result.mainRisk = risks ? firstParagraphOrBullet(risks) : null;
+    if (growthMd) {
+      const risks = extractFirstMatch(growthMd, [
+        "Risks and constraints",
+        "Risks",
+        "Challenges",
+        "Threats",
+      ]);
+      result.mainRisk = risks ? firstParagraphOrBullet(risks) : null;
 
-    // Top opportunity from "## Experiment ideas" or "## Strategic summary"
-    const experiments = extractSection(growthMd, "Experiment ideas");
-    const strategic = extractSection(growthMd, "Strategic summary");
-    const opportunitySource = experiments ?? strategic;
-    result.topOpportunity = opportunitySource
-      ? firstParagraphOrBullet(opportunitySource)
-      : null;
+      const opportunity = extractFirstMatch(growthMd, [
+        "Experiment ideas",
+        "Strategic summary",
+        "Growth opportunities",
+        "Opportunities",
+        "Next steps",
+      ]);
+      result.topOpportunity = opportunity
+        ? firstParagraphOrBullet(opportunity)
+        : null;
+    }
+  } catch (err: unknown) {
+    console.error("parseWorkspaceSummary: unexpected error during parsing:", err);
   }
 
   return result;
