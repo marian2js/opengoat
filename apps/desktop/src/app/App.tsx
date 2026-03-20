@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/app/shell/AppHeader";
 import { AppSidebar } from "@/app/shell/AppSidebar";
 import { AgentsWorkspace } from "@/features/agents/components/AgentsWorkspace";
-import { ChatWorkspace, evictChatSession } from "@/features/chat/components/ChatWorkspace";
+import { ChatWorkspace, evictChatSession, markActionSession } from "@/features/chat/components/ChatWorkspace";
 import { ConnectionsWorkspace } from "@/features/connections/components/ConnectionsWorkspace";
 import { AddProjectDialog } from "@/features/onboarding/components/AddProjectDialog";
 import { BootstrapProgress } from "@/features/onboarding/components/BootstrapProgress";
@@ -208,6 +208,7 @@ export function App() {
       setIsActionLoading(true);
       try {
         const session = await client.createSession({ agentId: activeAgentId, label });
+        markActionSession(session.id);
         setSessions((prev) => [session, ...prev]);
         setActiveSessionId(session.id);
         setPendingActionPrompt(prompt);

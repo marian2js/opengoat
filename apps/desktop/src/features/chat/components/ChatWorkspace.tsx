@@ -66,6 +66,69 @@ export function evictChatSession(sessionId: string): void {
   chatCache.delete(sessionId);
 }
 
+/**
+ * Persistent tracking of action-initiated sessions.
+ * Module-level Set survives React re-mounts within the same page load.
+ * localStorage survives page refreshes.
+ */
+const ACTION_SESSIONS_KEY = "opengoat:actionSessions";
+const actionSessionIds = new Set<string>();
+
+// Hydrate from localStorage on module load
+try {
+  const stored = localStorage.getItem(ACTION_SESSIONS_KEY);
+  if (stored) {
+    const ids: unknown = JSON.parse(stored);
+    if (Array.isArray(ids)) {
+      for (const id of ids) {
+        if (typeof id === "string") {
+          actionSessionIds.add(id);
+        }
+      }
+    }
+  }
+} catch {
+  // Ignore corrupt localStorage
+}
+
+function persistActionSessions(): void {
+  try {
+    localStorage.setItem(
+      ACTION_SESSIONS_KEY,
+      JSON.stringify([...actionSessionIds]),
+    );
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/** Mark a session as action-initiated (call before any rendering). */
+export function markActionSession(sessionId: string): void {
+  actionSessionIds.add(sessionId);
+  persistActionSessions();
+}
+
+/** Check if a session was initiated by an action card. */
+export function isActionSession(sessionId: string): boolean {
+  if (actionSessionIds.has(sessionId)) {
+    return true;
+  }
+  // Cold-start fallback: check localStorage and hydrate
+  try {
+    const stored = localStorage.getItem(ACTION_SESSIONS_KEY);
+    if (stored) {
+      const ids: unknown = JSON.parse(stored);
+      if (Array.isArray(ids) && ids.includes(sessionId)) {
+        actionSessionIds.add(sessionId);
+        return true;
+      }
+    }
+  } catch {
+    // Ignore
+  }
+  return false;
+}
+
 interface ChatWorkspaceProps {
   agentId?: string | undefined;
   authOverview: AuthOverview | null;
@@ -222,7 +285,6 @@ function ChatSessionView({
   const hasCustomLabelRef = useRef(bootstrap.messages.length > 0);
   const didMountRef = useRef(false);
   const pendingPromptSentRef = useRef(false);
-  const [hiddenPromptId, setHiddenPromptId] = useState<string | null>(null);
 
   // Re-use existing Chat instance if one exists (preserves streaming state)
   const chat = useMemo(() => {
@@ -267,17 +329,6 @@ function ChatSessionView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingActionPrompt]);
 
-  // Track the hidden prompt message ID — it's the first user message when action-initiated
-  useEffect(() => {
-    if (!pendingPromptSentRef.current || hiddenPromptId) {
-      return;
-    }
-    const firstUserMessage = messages.find((m) => m.role === "user");
-    if (firstUserMessage) {
-      setHiddenPromptId(firstUserMessage.id);
-    }
-  }, [messages, hiddenPromptId]);
-
   useEffect(() => {
     const list = listRef.current;
     if (!list) {
@@ -291,10 +342,19 @@ function ChatSessionView({
     didMountRef.current = true;
   }, [messages, status]);
 
-  // Filter out the hidden prompt message from the visible list
-  const visibleMessages = hiddenPromptId
-    ? messages.filter((m) => m.id !== hiddenPromptId)
-    : messages;
+  // Synchronously filter out the first user message in action-initiated sessions.
+  // Uses the persistent isActionSession() check — works on re-mount and refresh.
+  const isAction = isActionSession(bootstrap.session.id);
+  const visibleMessages = useMemo(() => {
+    if (!isAction) {
+      return messages;
+    }
+    const firstUserIdx = messages.findIndex((m) => m.role === "user");
+    if (firstUserIdx === -1) {
+      return messages;
+    }
+    return messages.filter((_, i) => i !== firstUserIdx);
+  }, [isAction, messages]);
 
   const isStreaming = status === "streaming" || status === "submitted";
   const latestMessage = messages[messages.length - 1];
@@ -352,7 +412,21 @@ function ChatSessionView({
         ref={listRef}
         className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 lg:px-6"
       >
-        {visibleMessages.length === 0 && !hiddenPromptId ? (
+        {visibleMessages.length === 0 && isAction ? (
+          <div className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-6 py-8 text-center">
+            <div className="flex flex-col items-center gap-3">
+              <LoaderCircleIcon className="size-6 animate-spin text-primary/60" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  Working on: {bootstrap.session.label ?? "Action"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Generating response…
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : visibleMessages.length === 0 && !isAction ? (
           <div className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-8 py-8 text-center">
             <div className="space-y-3">
               <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -394,11 +468,13 @@ function ChatSessionView({
         )}
 
         {isStreaming && latestMessage?.role === "user" ? (
-          <Message from="assistant">
-            <Reasoning isStreaming>
-              <ReasoningTrigger />
-            </Reasoning>
-          </Message>
+          isAction && visibleMessages.length === 0 ? null : (
+            <Message from="assistant">
+              <Reasoning isStreaming>
+                <ReasoningTrigger />
+              </Reasoning>
+            </Message>
+          )
         ) : null}
 
         {error ? (
