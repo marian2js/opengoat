@@ -9,6 +9,7 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  Settings2Icon,
   TrashIcon,
   LayoutDashboardIcon,
 } from "lucide-react";
@@ -16,7 +17,6 @@ import { useRef, useState } from "react";
 import {
   brainNavigation,
   primaryNavigation,
-  secondaryNavigation,
 } from "@/app/config/navigation";
 import {
   Collapsible,
@@ -204,26 +204,6 @@ export function AppSidebar({
           </SidebarGroup>
         ) : null}
 
-        <SidebarGroup className="mt-auto">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {secondaryNavigation.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    tooltip={item.title}
-                    isActive={item.href.slice(1) === activeView}
-                  >
-                    <a href={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter>
@@ -289,6 +269,16 @@ export function AppSidebar({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <SidebarMenuAction asChild>
+                <a
+                  href="#settings"
+                  className="text-sidebar-foreground/50 hover:text-sidebar-foreground"
+                  title="Settings"
+                >
+                  <Settings2Icon className="size-4" />
+                  <span className="sr-only">Settings</span>
+                </a>
+              </SidebarMenuAction>
             </SidebarMenuItem>
           </SidebarMenu>
         ) : null}

@@ -1,5 +1,4 @@
-import { MonitorIcon, MoonIcon, PlusIcon, SunIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useTheme } from "@/hooks/theme-context";
@@ -13,8 +12,6 @@ interface AppHeaderProps {
 
 export function AppHeader({
   currentView,
-  onAddConnection,
-  onCreateAgent,
 }: AppHeaderProps) {
   const pageTitle =
     currentView === "dashboard"
@@ -46,30 +43,6 @@ export function AppHeader({
 
         <div className="flex items-center gap-1.5">
           <ThemeToggle />
-
-          {currentView === "connections" ? (
-            <Button
-              size="sm"
-              variant="outline"
-              className="ml-1 hidden h-7 rounded-md px-2.5 text-[12px] font-medium lg:inline-flex"
-              onClick={onAddConnection}
-            >
-              <PlusIcon className="size-3" />
-              Add
-            </Button>
-          ) : null}
-
-          {currentView === "agents" ? (
-            <Button
-              size="sm"
-              variant="outline"
-              className="ml-1 hidden h-7 rounded-md px-2.5 text-[12px] font-medium lg:inline-flex"
-              onClick={onCreateAgent}
-            >
-              <PlusIcon className="size-3" />
-              New agent
-            </Button>
-          ) : null}
         </div>
       </div>
     </header>
