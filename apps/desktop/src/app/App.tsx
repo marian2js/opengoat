@@ -16,6 +16,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { initializeSidecarConnection } from "@/lib/runtime/connection";
 import { SidecarClient } from "@/lib/sidecar/client";
 import { toast } from "sonner";
+import { deduplicateLabel } from "@/lib/utils/deduplicate-label";
 type AppView = "dashboard" | "connections" | "connections-add" | "chat" | "brain" | "agents" | "settings";
 
 const ACTIVE_AGENT_KEY = "opengoat:activeAgentId";
@@ -209,7 +210,8 @@ export function App() {
       }
       setIsActionLoading(true);
       try {
-        const session = await client.createSession({ agentId: activeAgentId, label });
+        const uniqueLabel = deduplicateLabel(label, sessions);
+        const session = await client.createSession({ agentId: activeAgentId, label: uniqueLabel });
         markActionSession(session.id);
         setSessions((prev) => [session, ...prev]);
         setActiveSessionId(session.id);
@@ -223,7 +225,7 @@ export function App() {
         setIsActionLoading(false);
       }
     },
-    [client, activeAgentId, isActionLoading],
+    [client, activeAgentId, isActionLoading, sessions],
   );
 
   const handleSessionSelect = useCallback((sessionId: string) => {
