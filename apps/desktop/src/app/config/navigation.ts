@@ -3,6 +3,7 @@ import {
   BookOpenIcon,
   BotIcon,
   BrainIcon,
+  LayoutDashboardIcon,
   Link2Icon,
   MessageSquareIcon,
   PackageIcon,
@@ -20,19 +21,14 @@ export interface NavigationItem {
 
 export const primaryNavigation: NavigationItem[] = [
   {
+    title: "Dashboard",
+    href: "#dashboard",
+    icon: LayoutDashboardIcon,
+  },
+  {
     title: "Chat",
     href: "#chat",
     icon: MessageSquareIcon,
-  },
-  {
-    title: "Agents",
-    href: "#agents",
-    icon: BotIcon,
-  },
-  {
-    title: "Connections",
-    href: "#connections",
-    icon: Link2Icon,
   },
 ];
 
@@ -45,6 +41,16 @@ export const brainNavigation: NavigationItem[] = [
 ];
 
 export const secondaryNavigation: NavigationItem[] = [
+  {
+    title: "Agents",
+    href: "#agents",
+    icon: BotIcon,
+  },
+  {
+    title: "Connections",
+    href: "#connections",
+    icon: Link2Icon,
+  },
   {
     title: "Settings",
     href: "#settings",

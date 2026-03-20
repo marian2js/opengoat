@@ -10,7 +10,7 @@ import {
   PencilIcon,
   PlusIcon,
   TrashIcon,
-  Wallet2Icon,
+  LayoutDashboardIcon,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import {
@@ -55,7 +55,7 @@ interface AppSidebarProps {
   activeAgentId?: string;
   activeBrainSection?: string;
   activeSessionId?: string;
-  activeView: "connections" | "chat" | "brain" | "agents" | "settings";
+  activeView: "dashboard" | "connections" | "chat" | "brain" | "agents" | "settings";
   agentCatalog: AgentCatalog | null;
   authOverview: AuthOverview | null;
   onAddProject?: () => void;
@@ -100,9 +100,9 @@ export function AppSidebar({
               size="lg"
               className="h-11 data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="#chat">
+              <a href="#dashboard">
                 <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Wallet2Icon className="size-4" />
+                  <LayoutDashboardIcon className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="text-[13px] font-semibold tracking-tight">
@@ -119,21 +119,23 @@ export function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {/* Chat — always first */}
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  tooltip="Chat"
-                  isActive={activeView === "chat"}
-                >
-                  <a href="#chat">
-                    <MessageSquareIcon />
-                    <span>Chat</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {/* Primary nav: Dashboard, Chat */}
+              {primaryNavigation.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={item.title}
+                    isActive={item.href.slice(1) === activeView}
+                  >
+                    <a href={item.href}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
 
-              {/* Brain — collapsible, right after Chat */}
+              {/* Brain — collapsible */}
               <Collapsible
                 defaultOpen={activeView === "brain"}
                 asChild
@@ -170,25 +172,7 @@ export function AppSidebar({
                 </SidebarMenuItem>
               </Collapsible>
 
-              {/* Remaining nav items */}
-              {primaryNavigation.filter((item) => item.href !== "#chat").map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    tooltip={item.title}
-                    isActive={
-                      (item.href === "#connections" &&
-                        activeView === "connections") ||
-                      (item.href === "#agents" && activeView === "agents")
-                    }
-                  >
-                    <a href={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -230,7 +214,7 @@ export function AppSidebar({
                   <SidebarMenuButton
                     asChild
                     tooltip={item.title}
-                    isActive={item.href === "#settings" && activeView === "settings"}
+                    isActive={item.href.slice(1) === activeView}
                   >
                     <a href={item.href}>
                       <item.icon />

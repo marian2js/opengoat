@@ -9,11 +9,12 @@ import { AddProjectDialog } from "@/features/onboarding/components/AddProjectDia
 import { BootstrapProgress } from "@/features/onboarding/components/BootstrapProgress";
 import { ConnectionCenter } from "@/features/onboarding/components/ConnectionCenter";
 import { BrainWorkspace } from "@/features/brain/components/BrainWorkspace";
+import { DashboardWorkspace } from "@/features/dashboard/components/DashboardWorkspace";
 import { ProjectSettings } from "@/features/settings/components/ProjectSettings";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { initializeSidecarConnection } from "@/lib/runtime/connection";
 import { SidecarClient } from "@/lib/sidecar/client";
-type AppView = "connections" | "connections-add" | "chat" | "brain" | "agents" | "settings";
+type AppView = "dashboard" | "connections" | "connections-add" | "chat" | "brain" | "agents" | "settings";
 
 const ACTIVE_AGENT_KEY = "opengoat:activeAgentId";
 
@@ -341,8 +342,8 @@ export function App() {
             setCreateAgentToken((current) => current + 1);
           }}
         />
-        <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" || currentView === "brain" ? "" : "gap-4 overflow-y-auto p-4 lg:p-5"}`}>
-          {currentView === "chat" ? (
+        <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" || currentView === "brain" || currentView === "dashboard" ? "" : "gap-4 overflow-y-auto p-4 lg:p-5"}`}>
+          {currentView === "dashboard" ? (
             bootstrapContext && client ? (
               <BootstrapProgress
                 agentId={bootstrapContext.agentId}
@@ -354,6 +355,12 @@ export function App() {
                 }}
               />
             ) : (
+              <DashboardWorkspace
+                agentId={activeAgentId}
+                client={client}
+              />
+            )
+          ) : currentView === "chat" ? (
               <ChatWorkspace
                 agentId={activeAgentId}
                 authOverview={authOverview}
@@ -362,7 +369,6 @@ export function App() {
                 onSessionLabelUpdate={handleSessionLabelUpdate}
                 sessionId={activeSessionId}
               />
-            )
           ) : currentView === "brain" ? (
             <BrainWorkspace
               agentId={activeAgentId}
@@ -436,7 +442,11 @@ function readViewFromHash(): AppView {
     return "settings";
   }
 
-  return "chat";
+  if (window.location.hash === "#chat") {
+    return "chat";
+  }
+
+  return "dashboard";
 }
 
 function readBrainSectionFromHash(): string {
