@@ -22,7 +22,7 @@ export function OpportunityCard({ completedActions, opportunity, onActionClick, 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-card/60 px-4 py-3">
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-sm font-medium leading-snug text-foreground/80">
+        <h3 className="text-sm font-semibold leading-snug text-foreground">
           {opportunity.title}
         </h3>
         <Badge
