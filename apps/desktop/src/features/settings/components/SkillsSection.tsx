@@ -192,11 +192,20 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
 
             {/* Empty state */}
             {skills.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-4">
-                <PuzzleIcon className="size-7 text-muted-foreground/40" />
-                <p className="text-center text-[13px] text-muted-foreground">
-                  No custom skills installed. Your AI CMO works out of the box with built-in capabilities.
-                </p>
+              <div className="rounded-lg border border-dashed border-border/40 p-6">
+                <div className="flex flex-col items-center gap-3 py-2">
+                  <div className="flex size-10 items-center justify-center rounded-full bg-muted/50">
+                    <PuzzleIcon className="size-5 text-muted-foreground/60" />
+                  </div>
+                  <div className="space-y-1 text-center">
+                    <p className="text-[13px] font-medium text-muted-foreground">
+                      No custom skills installed
+                    </p>
+                    <p className="text-[12px] leading-relaxed text-muted-foreground/70">
+                      Skills extend your AI CMO with additional capabilities — from content generation to analytics integrations.
+                    </p>
+                  </div>
+                </div>
               </div>
             ) : null}
 
@@ -242,7 +251,11 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
               </div>
               {installError ? (
                 <p className="text-[12px] text-destructive">{installError}</p>
-              ) : null}
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Paste a skill repository URL to install, e.g. github.com/user/skill-name
+                </p>
+              )}
             </div>
           </>
         )}
