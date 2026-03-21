@@ -401,6 +401,7 @@ export function App() {
               />
             ) : (
               <DashboardWorkspace
+                agent={activeAgent}
                 agentId={activeAgentId}
                 client={client}
                 completedActions={completedActions}

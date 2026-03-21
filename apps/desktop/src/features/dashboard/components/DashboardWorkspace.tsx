@@ -1,5 +1,6 @@
 import { LayoutDashboardIcon } from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
+import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
 import { OpportunitySection } from "@/features/dashboard/components/OpportunitySection";
@@ -8,6 +9,7 @@ import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSumm
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
 
 export interface DashboardWorkspaceProps {
+  agent?: { id: string; name: string; description?: string | undefined } | undefined;
   agentId?: string | undefined;
   client: SidecarClient | null;
   completedActions?: Set<string> | undefined;
@@ -17,6 +19,7 @@ export interface DashboardWorkspaceProps {
 }
 
 export function DashboardWorkspace({
+  agent,
   agentId,
   client,
   completedActions,
@@ -35,11 +38,16 @@ export function DashboardWorkspace({
     );
   }
 
+  const domain = agent ? resolveDomain(agent) : undefined;
+  const faviconSources = domain ? buildFaviconSources(domain) : undefined;
+
   return (
     <DashboardContent
       agentId={agentId}
       client={client}
       completedActions={completedActions}
+      domain={domain}
+      faviconSources={faviconSources}
       isActionLoading={isActionLoading}
       onActionClick={onActionClick}
       onViewResults={onViewResults}
@@ -55,6 +63,8 @@ function DashboardContent({
   agentId,
   client,
   completedActions,
+  domain,
+  faviconSources,
   isActionLoading,
   onActionClick,
   onViewResults,
@@ -62,6 +72,8 @@ function DashboardContent({
   agentId: string;
   client: SidecarClient;
   completedActions?: Set<string> | undefined;
+  domain?: string | undefined;
+  faviconSources?: string[] | undefined;
   isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
@@ -72,7 +84,13 @@ function DashboardContent({
 
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 lg:p-6">
-      <CompanySummary data={data} isLoading={isLoading} error={error} />
+      <CompanySummary
+        data={data}
+        domain={domain}
+        faviconSources={faviconSources}
+        isLoading={isLoading}
+        error={error}
+      />
       <ActionCardGrid
         completedActions={completedActions}
         isLoading={isActionLoading}
