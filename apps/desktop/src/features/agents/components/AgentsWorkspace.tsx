@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { cleanProviderName, formatAgentCount } from "@/features/agents/display-helpers";
 import { buildAgentModelUpdatePayload } from "@/features/agents/model-selection";
 import { cn } from "@/lib/utils";
 import { SidecarClient } from "@/lib/sidecar/client";
@@ -265,7 +266,7 @@ export function AgentsWorkspace({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
       {errorMessage ? (
         <div className="rounded-lg border border-warning/20 bg-warning/8 px-3.5 py-2.5 text-[13px] text-warning-foreground">
           {errorMessage}
@@ -392,7 +393,7 @@ export function AgentsWorkspace({
             <p className="mt-0.5 text-[12px] text-muted-foreground">
               {agents.length === 0
                 ? "No custom agents yet."
-                : `${String(agents.length)} agents available`}
+                : formatAgentCount(agents.length)}
             </p>
           </div>
           <Button
@@ -410,14 +411,14 @@ export function AgentsWorkspace({
 
         <div className="flex flex-col">
           {isLoading ? (
-            <div className="border-t border-border/60 px-4 py-8 lg:px-5">
+            <div className="border-t border-border/60 px-4 py-5 lg:px-5">
               <div className="flex items-center gap-2.5 text-[12px] text-muted-foreground">
                 <LoaderCircleIcon className="size-3.5 animate-spin" />
                 Loading agents...
               </div>
             </div>
           ) : agents.length === 0 ? (
-            <div className="border-t border-border/60 px-4 py-8 lg:px-5">
+            <div className="border-t border-border/60 px-4 py-5 lg:px-5">
               <div className="flex max-w-sm flex-col gap-2.5 rounded-lg border border-dashed border-border/60 bg-muted/20 p-5">
                 <BotIcon className="size-5 text-muted-foreground/40" />
                 <div>
@@ -548,10 +549,11 @@ function providerLabel(providerId: string | undefined, connectedProviders: Conne
     return "No provider connected";
   }
 
-  return (
+  const rawName =
     connectedProviders.find((provider) => provider.providerId === providerId)?.providerName ??
-    providerId
-  );
+    providerId;
+
+  return cleanProviderName(rawName);
 }
 
 async function updateAgentWithFallback(
