@@ -1343,7 +1343,7 @@ function sameStringArray(left: string[], right: string[]): boolean {
   return left.every((value, index) => value === right[index]);
 }
 
-function normalizeAgentsMarkdown(
+export function normalizeAgentsMarkdown(
   markdown: string,
   options: { keepFirstRunSection: boolean },
 ): string {
@@ -1353,11 +1353,12 @@ function normalizeAgentsMarkdown(
   return rewriteSecondLevelSection(
     withFirstRunApplied,
     /^##\s+every session\s*$/i,
-    EVERY_SESSION_SECTION_LINES,
+    [...EVERY_SESSION_SECTION_LINES, ...SKILL_CATALOG_LINES],
     {
       consumeFollowingHeadingPatterns: [
         /^##\s+the organization\s*$/i,
         /^##\s+repositories\s*$/i,
+        /^##\s+available marketing skills\s*$/i,
       ],
     },
   );
@@ -1450,6 +1451,31 @@ const EVERY_SESSION_SECTION_LINES = [
   "## Repositories",
   "",
   "If you need to use a repo, clone it or copy it into a new folder on your workspace `./<repo>`.",
+  "",
+];
+
+const SKILL_CATALOG_LINES = [
+  "## Available Marketing Skills",
+  "",
+  "You have 33 expert marketing skills at ./skills/marketing/ and 9 specialist",
+  "personas at ./skills/personas/. When a conversation topic matches a skill",
+  "domain, read the relevant SKILL.md before responding.",
+  "",
+  "| Domain | Skills |",
+  "|--------|--------|",
+  "| SEO | seo-audit, ai-seo, schema-markup, site-architecture, programmatic-seo |",
+  "| CRO | page-cro, signup-flow-cro, onboarding-cro, form-cro, popup-cro, paywall-upgrade-cro |",
+  "| Copy & Content | copywriting, copy-editing, content-strategy, social-content |",
+  "| Email | email-sequence, cold-email |",
+  "| Ads | paid-ads, ad-creative |",
+  "| Analytics | analytics-tracking, ab-test-setup |",
+  "| Growth | referral-program, free-tool-strategy, churn-prevention, lead-magnets |",
+  "| Strategy | launch-strategy, marketing-ideas, marketing-psychology, pricing-strategy |",
+  "| Sales | revops, sales-enablement, competitor-alternatives |",
+  "| Foundation | product-marketing-context |",
+  "",
+  "Personas: seo-specialist, growth-hacker, content-creator, reddit-community-builder,",
+  "social-media-strategist, brand-guardian, reality-checker, outbound-strategist, ux-researcher",
   "",
 ];
 

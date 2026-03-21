@@ -5,7 +5,71 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { NodeFileSystem } from "../../../platform/node/node-file-system.js";
 import { NodePathPort } from "../../../platform/node/node-path.port.js";
-import { AgentService } from "./agent.service.js";
+import { AgentService, normalizeAgentsMarkdown } from "./agent.service.js";
+
+describe("normalizeAgentsMarkdown", () => {
+  const INPUT_WITH_EVERY_SESSION = [
+    "# AGENTS.md",
+    "",
+    "## Every Session",
+    "",
+    "Old content that should be replaced.",
+    "",
+  ].join("\n");
+
+  it("includes the Available Marketing Skills section", () => {
+    const result = normalizeAgentsMarkdown(INPUT_WITH_EVERY_SESSION, {
+      keepFirstRunSection: false,
+    });
+    expect(result).toContain("## Available Marketing Skills");
+  });
+
+  it("includes all 10 domain rows in the skill table", () => {
+    const result = normalizeAgentsMarkdown(INPUT_WITH_EVERY_SESSION, {
+      keepFirstRunSection: false,
+    });
+    const expectedDomains = [
+      "SEO",
+      "CRO",
+      "Copy & Content",
+      "Email",
+      "Ads",
+      "Analytics",
+      "Growth",
+      "Strategy",
+      "Sales",
+      "Foundation",
+    ];
+    for (const domain of expectedDomains) {
+      expect(result).toContain(`| ${domain} |`);
+    }
+  });
+
+  it("includes correct skill paths", () => {
+    const result = normalizeAgentsMarkdown(INPUT_WITH_EVERY_SESSION, {
+      keepFirstRunSection: false,
+    });
+    expect(result).toContain("./skills/marketing/");
+    expect(result).toContain("./skills/personas/");
+  });
+
+  it("includes the discovery instruction", () => {
+    const result = normalizeAgentsMarkdown(INPUT_WITH_EVERY_SESSION, {
+      keepFirstRunSection: false,
+    });
+    expect(result).toContain(
+      "read the relevant SKILL.md before responding",
+    );
+  });
+
+  it("includes the personas line", () => {
+    const result = normalizeAgentsMarkdown(INPUT_WITH_EVERY_SESSION, {
+      keepFirstRunSection: false,
+    });
+    expect(result).toContain("Personas: seo-specialist");
+    expect(result).toContain("ux-researcher");
+  });
+});
 
 describe("AgentService workspace role skills", () => {
   const tempDirs: string[] = [];
