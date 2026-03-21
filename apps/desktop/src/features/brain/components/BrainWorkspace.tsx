@@ -1,14 +1,19 @@
 import {
   BookOpenIcon,
+  BookmarkIcon,
   BrainIcon,
   CheckIcon,
   FileUpIcon,
   FlameIcon,
-  LoaderCircleIcon,
+  LayersIcon,
   LightbulbIcon,
+  LoaderCircleIcon,
   PackageIcon,
   PencilIcon,
+  ScaleIcon,
+  SlidersHorizontalIcon,
   SparklesIcon,
+  StickyNoteIcon,
   StoreIcon,
   TrendingUpIcon,
 } from "lucide-react";
@@ -95,17 +100,17 @@ What self-reinforcing loops drive growth?`,
     label: "Memory",
     filename: "MEMORY.md",
     icon: BrainIcon,
-    description: "Persistent context and decisions the AI should remember",
+    description: "Strategic decisions, brand preferences, and product context",
     placeholder: `# Memory
 
 ## Key Decisions
-Important decisions and the reasoning behind them.
+Record strategic decisions and the reasoning behind them — positioning changes, campaign strategies, product pivots.
 
 ## Preferences
-Coding style, communication preferences, and conventions.
+Define brand voice, content tone, and communication conventions the AI should follow.
 
 ## Context
-Background information that helps the AI assist more effectively.`,
+Share product and market context that helps the AI provide more relevant assistance.`,
   },
   {
     id: "knowledge",
@@ -115,13 +120,13 @@ Background information that helps the AI assist more effectively.`,
     description: "Domain knowledge, documentation, and imported references",
     placeholder: `# Knowledge Base
 
-Add domain-specific knowledge, documentation excerpts, API references, or any other information that helps provide better context.
+Import product docs, competitor research, market data, or any reference material that helps the AI provide informed recommendations.
 
 ## References
--
+Add links to key documents, research reports, and external resources.
 
 ## Notes
-- `,
+Capture domain insights, meeting takeaways, and strategic observations.`,
   },
 ];
 
@@ -304,6 +309,12 @@ function BrainEditor({
 
   // Empty state — no file exists yet
   if (!content && !fileExists && !isEditing) {
+    const useTemplate = () => {
+      setContent(section.placeholder);
+      save(section.placeholder);
+    };
+    const writeFromScratch = () => setIsEditing(true);
+
     return (
       <div className="flex flex-1 flex-col overflow-y-auto">
         <SectionHeader section={section} saveState={saveState} fileExists={fileExists}>
@@ -312,40 +323,43 @@ function BrainEditor({
           ) : null}
         </SectionHeader>
         <div className="flex-1 px-5 pb-5 lg:px-6 lg:pb-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <LightbulbIcon className="size-4 text-amber-500/70" />
-              <span className="text-xs">
-                Start typing or use the template below. Changes auto-save.
-              </span>
-            </div>
+          {section.id === "memory" ? (
+            <MemoryEmptyState onUseTemplate={useTemplate} onWriteFromScratch={writeFromScratch} />
+          ) : section.id === "knowledge" ? (
+            <KnowledgeEmptyState onUseTemplate={useTemplate} onWriteFromScratch={writeFromScratch} onImport={handleImport} />
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <LightbulbIcon className="size-4 text-amber-500/70" />
+                <span className="text-xs">
+                  Start typing or use the template below. Changes auto-save.
+                </span>
+              </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setContent(section.placeholder);
-                save(section.placeholder);
-              }}
-              className="rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
-            >
-              <FlameIcon className="mb-2 size-4 text-orange-500/70" />
-              <div className="font-medium text-foreground/70">Use template</div>
-              <div className="mt-1 text-xs">
-                Start with a pre-filled template for {section.label.toLowerCase()}
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsEditing(true)}
-              className="rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
-            >
-              <PencilIcon className="mb-2 size-4" />
-              <div className="font-medium text-foreground/70">Write from scratch</div>
-              <div className="mt-1 text-xs">
-                Open the editor and start writing
-              </div>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={useTemplate}
+                className="rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
+              >
+                <FlameIcon className="mb-2 size-4 text-orange-500/70" />
+                <div className="font-medium text-foreground/70">Use template</div>
+                <div className="mt-1 text-xs">
+                  Start with a pre-filled template for {section.label.toLowerCase()}
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={writeFromScratch}
+                className="rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
+              >
+                <PencilIcon className="mb-2 size-4" />
+                <div className="font-medium text-foreground/70">Write from scratch</div>
+                <div className="mt-1 text-xs">
+                  Open the editor and start writing
+                </div>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -402,6 +416,177 @@ function BrainEditor({
             <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section-specific empty states
+// ---------------------------------------------------------------------------
+
+const memorySubsections = [
+  {
+    icon: ScaleIcon,
+    title: "Key Decisions",
+    description: "Record strategic decisions so the AI references them in future conversations. Product pivots, positioning changes, and campaign strategies will appear here.",
+  },
+  {
+    icon: SlidersHorizontalIcon,
+    title: "Preferences",
+    description: "Define brand voice, content tone, and communication conventions. The AI will follow these preferences across all interactions.",
+  },
+  {
+    icon: LayersIcon,
+    title: "Context",
+    description: "Share product and market context that helps the AI provide more relevant, informed assistance.",
+  },
+];
+
+const knowledgeSubsections = [
+  {
+    icon: BookmarkIcon,
+    title: "References",
+    description: "Import product docs, competitor analysis, market research, or API references. The AI uses these to ground its recommendations in real data.",
+  },
+  {
+    icon: StickyNoteIcon,
+    title: "Notes",
+    description: "Capture domain insights, meeting takeaways, and strategic observations that guide AI conversations.",
+  },
+];
+
+function MemoryEmptyState({
+  onUseTemplate,
+  onWriteFromScratch,
+}: {
+  onUseTemplate: () => void;
+  onWriteFromScratch: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <LightbulbIcon className="size-4 text-amber-500/70" />
+        <span className="text-xs">
+          Build your AI&apos;s memory. Add decisions, preferences, and context it should remember.
+        </span>
+      </div>
+
+      <div className="grid gap-3">
+        {memorySubsections.map((sub) => (
+          <div
+            key={sub.title}
+            className="memory-subsection rounded-lg border border-dashed border-border/40 p-5 transition-colors"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-accent/50">
+                <sub.icon className="size-4 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-foreground/80">{sub.title}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{sub.description}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <button
+          type="button"
+          onClick={onUseTemplate}
+          className="flex-1 rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
+        >
+          <FlameIcon className="mb-2 size-4 text-orange-500/70" />
+          <div className="font-medium text-foreground/70">Use template</div>
+          <div className="mt-1 text-xs">Start with a pre-filled template for memory</div>
+        </button>
+        <button
+          type="button"
+          onClick={onWriteFromScratch}
+          className="flex-1 rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
+        >
+          <PencilIcon className="mb-2 size-4" />
+          <div className="font-medium text-foreground/70">Write from scratch</div>
+          <div className="mt-1 text-xs">Open the editor and start writing</div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function KnowledgeEmptyState({
+  onUseTemplate,
+  onWriteFromScratch,
+  onImport,
+}: {
+  onUseTemplate: () => void;
+  onWriteFromScratch: () => void;
+  onImport: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <LightbulbIcon className="size-4 text-amber-500/70" />
+        <span className="text-xs">
+          Import docs, research, and references to give the AI deeper domain knowledge.
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={onImport}
+        className="knowledge-subsection flex items-center gap-4 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/10"
+      >
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+          <FileUpIcon className="size-5 text-primary" />
+        </div>
+        <div>
+          <div className="text-sm font-medium text-foreground/90">Import your first file</div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            Upload product docs, research reports, or reference materials (.md, .txt, .json, .csv)
+          </div>
+        </div>
+      </button>
+
+      <div className="grid gap-3">
+        {knowledgeSubsections.map((sub) => (
+          <div
+            key={sub.title}
+            className="knowledge-subsection rounded-lg border border-dashed border-border/40 p-5 transition-colors"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-accent/50">
+                <sub.icon className="size-4 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-foreground/80">{sub.title}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{sub.description}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <button
+          type="button"
+          onClick={onUseTemplate}
+          className="flex-1 rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
+        >
+          <FlameIcon className="mb-2 size-4 text-orange-500/70" />
+          <div className="font-medium text-foreground/70">Use template</div>
+          <div className="mt-1 text-xs">Start with a pre-filled template for knowledge</div>
+        </button>
+        <button
+          type="button"
+          onClick={onWriteFromScratch}
+          className="flex-1 rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
+        >
+          <PencilIcon className="mb-2 size-4" />
+          <div className="font-medium text-foreground/70">Write from scratch</div>
+          <div className="mt-1 text-xs">Open the editor and start writing</div>
+        </button>
       </div>
     </div>
   );
