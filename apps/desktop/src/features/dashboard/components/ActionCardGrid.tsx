@@ -16,7 +16,7 @@ export function ActionCardGrid({ completedActions, isLoading, onActionClick, onV
         <div className="rounded-lg bg-primary/8 p-1.5 text-primary">
           <SparklesIcon className="size-4" />
         </div>
-        <h2 className="text-sm font-semibold tracking-tight">
+        <h2 className="text-base font-semibold tracking-tight">
           What would you like to work on?
         </h2>
       </div>

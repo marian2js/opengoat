@@ -53,7 +53,7 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
             </span>
           ) : null}
         </div>
-        <CardTitle className="text-[13px] leading-snug group-hover/action:text-primary transition-colors">
+        <CardTitle className="text-sm leading-snug group-hover/action:text-primary transition-colors">
           {card.title}
         </CardTitle>
         <CardDescription className="text-xs line-clamp-2">

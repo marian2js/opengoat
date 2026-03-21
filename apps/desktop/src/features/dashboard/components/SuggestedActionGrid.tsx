@@ -41,7 +41,7 @@ export function SuggestedActionGrid({
         <div className="rounded-lg bg-violet-500/10 p-1.5 text-violet-600 dark:text-violet-400">
           <WandSparklesIcon className="size-4" />
         </div>
-        <h2 className="text-sm font-semibold tracking-tight">
+        <h2 className="text-base font-semibold tracking-tight">
           Suggested for you
         </h2>
         <span className="rounded-full border border-violet-500/20 bg-violet-500/8 px-2 py-0.5 text-[10px] font-medium text-violet-600 dark:text-violet-400">
