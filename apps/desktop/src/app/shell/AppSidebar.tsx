@@ -13,7 +13,7 @@ import {
   TrashIcon,
   LayoutDashboardIcon,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   brainNavigation,
   primaryNavigation,
@@ -22,6 +22,7 @@ import {
   resolveDomain as sharedResolveDomain,
   buildFaviconSources as sharedBuildFaviconSources,
 } from "@/lib/utils/favicon";
+import { groupSessionsByDate } from "@/lib/utils/group-sessions-by-date";
 import {
   Collapsible,
   CollapsibleContent,
@@ -89,6 +90,10 @@ export function AppSidebar({
   sessions,
 }: AppSidebarProps) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const sessionGroups = useMemo(
+    () => groupSessionsByDate(sessions ?? []),
+    [sessions],
+  );
   const projects = resolveAllProjects(agentCatalog, activeAgentId);
   const activeProject = projects.find((p) => p.isActive) ?? projects[0];
 
@@ -179,7 +184,7 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {activeView === "chat" && sessions && sessions.length > 0 ? (
+        {activeView === "chat" && sessionGroups.length > 0 ? (
           <SidebarGroup>
             <SidebarGroupLabel>Chats</SidebarGroupLabel>
             {onNewChat ? (
@@ -190,18 +195,29 @@ export function AppSidebar({
             ) : null}
             <SidebarGroupContent>
               <SidebarMenu>
-                {sessions.map((session) => (
-                  <SessionItem
-                    key={session.id}
-                    isActive={session.id === activeSessionId}
-                    isEditing={editingSessionId === session.id}
-                    session={session}
-                    onDelete={onSessionDelete}
-                    onRename={onSessionRename}
-                    onSelect={onSessionSelect}
-                    onStartEditing={() => setEditingSessionId(session.id)}
-                    onStopEditing={() => setEditingSessionId(null)}
-                  />
+                {sessionGroups.map((group) => (
+                  <li key={group.label} role="none">
+                    <div className="px-2 pt-4 pb-1">
+                      <span className="text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/40">
+                        {group.label}
+                      </span>
+                    </div>
+                    <ul role="group" className="flex flex-col">
+                      {group.sessions.map((session) => (
+                        <SessionItem
+                          key={session.id}
+                          isActive={session.id === activeSessionId}
+                          isEditing={editingSessionId === session.id}
+                          session={session}
+                          onDelete={onSessionDelete}
+                          onRename={onSessionRename}
+                          onSelect={onSessionSelect}
+                          onStartEditing={() => setEditingSessionId(session.id)}
+                          onStopEditing={() => setEditingSessionId(null)}
+                        />
+                      ))}
+                    </ul>
+                  </li>
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
