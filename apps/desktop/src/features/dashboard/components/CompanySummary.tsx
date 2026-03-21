@@ -146,12 +146,10 @@ export function CompanySummary({ data, domain, faviconSources, isLoading, error 
 
   return (
     <Card
-      className={`shrink-0 border border-border/70 bg-card/90 cursor-pointer transition-colors hover:border-border ${
-        expanded ? "" : ""
-      }`}
+      className="group/summary shrink-0 border border-border/70 bg-card/90 cursor-pointer transition-colors hover:border-border"
       onClick={() => setExpanded((v) => !v)}
     >
-      <CardHeader className={expanded ? "pb-2" : "pb-3"}>
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             {hasFavicon ? (
@@ -171,16 +169,11 @@ export function CompanySummary({ data, domain, faviconSources, isLoading, error 
               {domain ?? "Company overview"}
             </CardTitle>
           </div>
-          <ChevronDownIcon
-            className={`size-4 text-muted-foreground/40 transition-transform ${
-              expanded ? "rotate-180" : ""
-            }`}
-          />
         </div>
       </CardHeader>
 
       {!expanded ? (
-        <CardContent className="pt-0 pb-4">
+        <CardContent className="pt-0 pb-0">
           {data.productSummary ? (
             <p className="mb-3 text-sm leading-snug text-foreground/80 line-clamp-2">
               {data.productSummary}
@@ -212,9 +205,14 @@ export function CompanySummary({ data, domain, faviconSources, isLoading, error 
               colorClass="text-emerald-500"
             />
           </div>
+          {/* Expand strip */}
+          <div className="mt-3 flex items-center justify-center gap-1.5 border-t border-border/40 pt-2.5 pb-1 text-[11px] font-medium text-muted-foreground/50 transition-colors group-hover/summary:text-muted-foreground">
+            <span>Show more</span>
+            <ChevronDownIcon className="size-3" />
+          </div>
         </CardContent>
       ) : (
-        <CardContent className="pt-0 pb-4">
+        <CardContent className="pt-0 pb-0">
           <div className="grid gap-4 sm:grid-cols-2">
             <SummaryDetail
               icon={GlobeIcon}
@@ -250,6 +248,11 @@ export function CompanySummary({ data, domain, faviconSources, isLoading, error 
                 />
               </div>
             ) : null}
+          </div>
+          {/* Collapse strip */}
+          <div className="mt-3 flex items-center justify-center gap-1.5 border-t border-border/40 pt-2.5 pb-1 text-[11px] font-medium text-muted-foreground/50 transition-colors group-hover/summary:text-muted-foreground">
+            <span>Show less</span>
+            <ChevronDownIcon className="size-3 rotate-180" />
           </div>
         </CardContent>
       )}
