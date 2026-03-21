@@ -35,8 +35,20 @@ export function extractSection(markdown: string, heading: string): string | null
 }
 
 /**
+ * Returns true if a line looks like a label/heading rather than actual content.
+ * Labels are short lines without sentence-ending punctuation, often used
+ * in AI-generated markdown (e.g. "What the company/product is", "What problem it solves").
+ */
+function isLabelLine(line: string): boolean {
+  // Too short and no sentence punctuation → likely a label
+  if (line.length < 60 && !/[.!?:,;"]/.test(line)) return true;
+  return false;
+}
+
+/**
  * Gets the first meaningful paragraph or bullet point from a section.
- * Strips markdown bullet prefixes and keeps only the first logical block.
+ * Strips markdown bullet prefixes, skips label-like lines,
+ * and keeps only the first logical block.
  */
 export function firstParagraphOrBullet(section: string): string | null {
   if (!section) return null;
@@ -44,15 +56,26 @@ export function firstParagraphOrBullet(section: string): string | null {
   const lines = section.split("\n").map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) return null;
 
-  // Collect lines until we hit an empty conceptual gap or a new sub-heading
+  // Collect content lines, skipping label-like lines
   const result: string[] = [];
   for (const line of lines) {
     if (line.startsWith("###")) break;
     // Strip bullet prefix
     const cleaned = line.replace(/^[-*]\s+/, "");
+    // Skip label-like lines (e.g. "What the company/product is")
+    if (isLabelLine(cleaned)) continue;
     result.push(cleaned);
     // For a single paragraph-like answer, stop after first logical block
-    if (result.length >= 3) break;
+    if (result.length >= 2) break;
+  }
+
+  // Fallback: if all lines were skipped as labels, use the first non-heading line
+  if (result.length === 0) {
+    for (const line of lines) {
+      if (line.startsWith("###")) break;
+      const cleaned = line.replace(/^[-*]\s+/, "");
+      if (cleaned) return cleaned;
+    }
   }
 
   return result.join(" ").trim() || null;

@@ -1,6 +1,8 @@
+import { useState } from "react";
 import {
   BuildingIcon,
   AlertTriangleIcon,
+  ChevronDownIcon,
   LightbulbIcon,
   TargetIcon,
   ZapIcon,
@@ -15,18 +17,40 @@ export interface CompanySummaryProps {
   error?: string | null;
 }
 
-interface SummaryItemProps {
+interface SummaryChipProps {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string | null;
-  iconClassName?: string;
+  colorClass: string;
 }
 
-function SummaryItem({ icon: Icon, label, value, iconClassName }: SummaryItemProps) {
+function SummaryChip({ icon: Icon, label, value, colorClass }: SummaryChipProps) {
   if (!value) return null;
   return (
-    <div className="flex gap-3">
-      <div className={`mt-0.5 shrink-0 rounded-md bg-primary/8 p-1.5 ${iconClassName ?? "text-primary"}`}>
+    <div className="flex items-start gap-2 min-w-0">
+      <Icon className={`mt-0.5 size-3 shrink-0 ${colorClass}`} />
+      <div className="min-w-0">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+          {label}
+        </span>
+        <p className="text-xs leading-snug text-foreground/70 line-clamp-1">
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function SummaryDetail({
+  icon: Icon,
+  label,
+  value,
+  colorClass,
+}: SummaryChipProps) {
+  if (!value) return null;
+  return (
+    <div className="flex items-start gap-3">
+      <div className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-accent ${colorClass}`}>
         <Icon className="size-3.5" />
       </div>
       <div className="min-w-0">
@@ -43,42 +67,33 @@ function SummaryItem({ icon: Icon, label, value, iconClassName }: SummaryItemPro
 
 function SummarySkeleton() {
   return (
-    <Card className="shrink-0 border border-border/70 bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
-      <CardHeader>
+    <Card className="shrink-0 border border-border/70 bg-card/90">
+      <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Skeleton className="size-5 rounded" />
-          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-4 w-40" />
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex gap-3">
-              <Skeleton className="mt-0.5 size-7 shrink-0 rounded-md" />
-              <div className="flex-1 space-y-1.5">
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-4 w-full" />
-              </div>
-            </div>
-          ))}
-        </div>
+      <CardContent className="pt-0">
+        <Skeleton className="h-4 w-full" />
       </CardContent>
     </Card>
   );
 }
 
 export function CompanySummary({ data, isLoading, error }: CompanySummaryProps) {
+  const [expanded, setExpanded] = useState(false);
+
   if (isLoading) {
     return <SummarySkeleton />;
   }
 
-  // Check if we have at least one data point to display
   const hasAnyData = data ? Object.values(data).some(Boolean) : false;
 
   if (!hasAnyData || !data) {
     return (
-      <Card className="shrink-0 border border-border/70 bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
-        <CardHeader>
+      <Card className="shrink-0 border border-border/70 bg-card/90">
+        <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <div className="rounded-lg bg-primary/8 p-1.5 text-primary">
               <BuildingIcon className="size-4" />
@@ -88,7 +103,7 @@ export function CompanySummary({ data, isLoading, error }: CompanySummaryProps) 
             </CardTitle>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <p className="text-sm text-muted-foreground">
             {error
               ? `Unable to load company overview: ${error}`
@@ -100,55 +115,111 @@ export function CompanySummary({ data, isLoading, error }: CompanySummaryProps) 
   }
 
   return (
-    <Card className="shrink-0 border border-border/70 bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-primary/8 p-1.5 text-primary">
-            <BuildingIcon className="size-4" />
+    <Card className="shrink-0 border border-border/70 bg-card/90 transition-colors hover:border-border">
+      <button
+        type="button"
+        className="w-full cursor-pointer text-left"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <CardHeader className={expanded ? "pb-2" : "pb-3"}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="rounded-lg bg-primary/8 p-1.5 text-primary">
+                <BuildingIcon className="size-4" />
+              </div>
+              <CardTitle className="text-sm font-semibold tracking-tight">
+                Company overview
+              </CardTitle>
+              <span className="text-[10px] font-medium text-muted-foreground/40">
+                {expanded ? "click to collapse" : "click to expand"}
+              </span>
+            </div>
+            <ChevronDownIcon
+              className={`size-4 text-muted-foreground/50 transition-transform ${
+                expanded ? "rotate-180" : ""
+              }`}
+            />
           </div>
-          <CardTitle className="text-sm font-semibold tracking-tight">
-            Company overview
-          </CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <SummaryItem
-            icon={BuildingIcon}
-            label="Product"
-            value={data.productSummary}
-            iconClassName="text-blue-500"
-          />
-          <SummaryItem
-            icon={TargetIcon}
-            label="Target audience"
-            value={data.targetAudience}
-            iconClassName="text-violet-500"
-          />
-          <SummaryItem
-            icon={ZapIcon}
-            label="Value proposition"
-            value={data.valueProposition}
-            iconClassName="text-amber-500"
-          />
-          <SummaryItem
-            icon={AlertTriangleIcon}
-            label="Main risk"
-            value={data.mainRisk}
-            iconClassName="text-rose-500"
-          />
-          {data.topOpportunity ? (
-            <div className="sm:col-span-2">
-              <SummaryItem
+        </CardHeader>
+
+        {!expanded ? (
+          <CardContent className="pt-0 pb-4">
+            {/* Compact: one-line product description + inline chips */}
+            {data.productSummary ? (
+              <p className="mb-3 text-sm leading-snug text-foreground/80 line-clamp-2">
+                {data.productSummary}
+              </p>
+            ) : null}
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <SummaryChip
+                icon={TargetIcon}
+                label="Audience"
+                value={data.targetAudience}
+                colorClass="text-violet-500"
+              />
+              <SummaryChip
+                icon={ZapIcon}
+                label="Value prop"
+                value={data.valueProposition}
+                colorClass="text-amber-500"
+              />
+              <SummaryChip
+                icon={AlertTriangleIcon}
+                label="Risk"
+                value={data.mainRisk}
+                colorClass="text-rose-500"
+              />
+              <SummaryChip
                 icon={LightbulbIcon}
-                label="Top opportunity"
+                label="Opportunity"
                 value={data.topOpportunity}
-                iconClassName="text-emerald-500"
+                colorClass="text-emerald-500"
               />
             </div>
-          ) : null}
-        </div>
-      </CardContent>
+          </CardContent>
+        ) : null}
+      </button>
+
+      {expanded ? (
+        <CardContent className="pt-0 pb-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <SummaryDetail
+              icon={BuildingIcon}
+              label="Product"
+              value={data.productSummary}
+              colorClass="text-blue-500"
+            />
+            <SummaryDetail
+              icon={TargetIcon}
+              label="Target audience"
+              value={data.targetAudience}
+              colorClass="text-violet-500"
+            />
+            <SummaryDetail
+              icon={ZapIcon}
+              label="Value proposition"
+              value={data.valueProposition}
+              colorClass="text-amber-500"
+            />
+            <SummaryDetail
+              icon={AlertTriangleIcon}
+              label="Main risk"
+              value={data.mainRisk}
+              colorClass="text-rose-500"
+            />
+            {data.topOpportunity ? (
+              <div className="sm:col-span-2">
+                <SummaryDetail
+                  icon={LightbulbIcon}
+                  label="Top opportunity"
+                  value={data.topOpportunity}
+                  colorClass="text-emerald-500"
+                />
+              </div>
+            ) : null}
+          </div>
+        </CardContent>
+      ) : null}
     </Card>
   );
 }

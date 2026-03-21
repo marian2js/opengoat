@@ -211,6 +211,7 @@ void test("relatedActionId references valid starter action ids when present", ()
     "rewrite-homepage-hero",
     "analyze-competitor-messaging",
     "find-seo-quick-wins",
+    "generate-content-ideas",
   ];
   const opportunities = extractOpportunities(fullFiles);
   for (const opp of opportunities) {
@@ -220,6 +221,30 @@ void test("relatedActionId references valid starter action ids when present", ()
         `Opportunity ${opp.id} references unknown action: ${opp.relatedActionId}`,
       );
     }
+  }
+});
+
+void test("content-opportunity links to generate-content-ideas action", () => {
+  const opportunities = extractOpportunities(fullFiles);
+  const content = opportunities.find((o) => o.id === "content-opportunity");
+  assert.ok(content, "Should find content-opportunity");
+  assert.equal(content.relatedActionId, "generate-content-ideas");
+});
+
+void test("growth-experiments links to find-launch-communities action", () => {
+  const opportunities = extractOpportunities(fullFiles);
+  const growth = opportunities.find((o) => o.id === "growth-experiments");
+  assert.ok(growth, "Should find growth-experiments opportunity");
+  assert.equal(growth.relatedActionId, "find-launch-communities");
+});
+
+void test("all extracted opportunities have a relatedActionId", () => {
+  const opportunities = extractOpportunities(fullFiles);
+  for (const opp of opportunities) {
+    assert.ok(
+      opp.relatedActionId,
+      `Opportunity ${opp.id} should have a relatedActionId — no orphaned insights`,
+    );
   }
 });
 

@@ -24,12 +24,12 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
 
   return (
     <Card
-      className={`group/action border bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)] transition-all ${
+      className={`group/action border bg-card/90 transition-all ${
         isLoading
           ? "pointer-events-none border-border/70 opacity-60"
           : isCompleted
-            ? "cursor-pointer border-primary/20 hover:border-primary/30 hover:shadow-[0_20px_60px_-28px_rgba(15,23,42,0.45)]"
-            : "cursor-pointer border-border/70 hover:border-primary/30 hover:shadow-[0_20px_60px_-28px_rgba(15,23,42,0.45)]"
+            ? "cursor-pointer border-primary/20 hover:border-primary/30 hover:bg-accent/30"
+            : "cursor-pointer border-border/70 hover:border-primary/30 hover:bg-accent/30"
       }`}
       onClick={() => {
         if (!isLoading) {
@@ -43,7 +43,7 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
     >
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className={config.className}>
+          <Badge variant="outline" className={`text-[10px] ${config.className}`}>
             {config.label}
           </Badge>
           {isCompleted ? (
@@ -53,40 +53,40 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
             </span>
           ) : null}
         </div>
-        <CardTitle className="leading-snug group-hover/action:text-primary transition-colors">
+        <CardTitle className="text-[13px] leading-snug group-hover/action:text-primary transition-colors">
           {card.title}
         </CardTitle>
-        <CardDescription className="line-clamp-2">
+        <CardDescription className="text-xs line-clamp-2">
           {card.promise}
         </CardDescription>
         <CardAction>
-          <div className={`rounded-xl p-2.5 transition-all ${
+          <div className={`rounded-lg p-2 transition-all ${
             isCompleted
               ? "bg-emerald-500/10 text-emerald-600 group-hover/action:bg-emerald-500 group-hover/action:text-white dark:text-emerald-400"
               : "bg-primary/8 text-primary group-hover/action:bg-primary group-hover/action:text-primary-foreground"
           }`}>
             {isLoading ? (
-              <LoaderCircleIcon className="size-5 animate-spin" />
+              <LoaderCircleIcon className="size-4 animate-spin" />
             ) : isCompleted ? (
-              <CheckCircleIcon className="size-5" />
+              <CheckCircleIcon className="size-4" />
             ) : (
-              <Icon className="size-5" />
+              <Icon className="size-4" />
             )}
           </div>
         </CardAction>
       </CardHeader>
-      <div className="flex items-center gap-3 px-4 pb-1">
+      <div className="flex items-center gap-3 px-4 pb-3">
         {isLoading ? (
-          <span className="animate-pulse text-xs font-medium text-muted-foreground/70">Starting...</span>
+          <span className="animate-pulse text-[11px] font-medium text-muted-foreground/70">Starting...</span>
         ) : isCompleted ? (
           <>
-            <span className="flex items-center gap-1.5 text-xs font-medium text-primary/80 transition-colors group-hover/action:text-primary">
+            <span className="flex items-center gap-1 text-[11px] font-medium text-primary/80 transition-colors group-hover/action:text-primary">
               View results
               <ArrowRightIcon className="size-3 transition-transform group-hover/action:translate-x-0.5" />
             </span>
             <button
               type="button"
-              className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+              className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground/50 transition-colors hover:text-muted-foreground"
               onClick={(e) => {
                 e.stopPropagation();
                 onClick?.(card.id, card.prompt, card.title);
@@ -97,7 +97,7 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
             </button>
           </>
         ) : (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground/70 transition-colors group-hover/action:text-primary">
+          <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground/70 transition-colors group-hover/action:text-primary">
             Start
             <ArrowRightIcon className="size-3 transition-transform group-hover/action:translate-x-0.5" />
           </span>

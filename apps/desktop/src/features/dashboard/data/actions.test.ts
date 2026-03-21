@@ -117,6 +117,17 @@ void test("every prompt references workspace context files", () => {
   }
 });
 
+void test("generate-content-ideas action card exists with correct properties", () => {
+  const card = starterActions.find((c) => c.id === "generate-content-ideas");
+  assert.ok(card, "Should have a generate-content-ideas card");
+  assert.equal(card.category, "messaging");
+  assert.equal(card.title, "Generate content ideas");
+  assert.ok(
+    card.prompt.includes("content"),
+    "Prompt should reference content",
+  );
+});
+
 void test("categoryConfig has an entry for every ActionCategory", () => {
   const categories: ActionCategory[] = [
     "distribution",

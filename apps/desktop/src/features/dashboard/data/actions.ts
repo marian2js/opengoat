@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   GlobeIcon,
+  LightbulbIcon,
   RocketIcon,
   MessageSquareIcon,
   SearchIcon,
@@ -237,5 +238,32 @@ Analyze the website and identify the highest-impact SEO quick wins:
    - Strategic wins (worth planning for)
 
 Be specific to this product's market and audience. No generic SEO checklists.`,
+  },
+  {
+    id: "generate-content-ideas",
+    title: "Generate content ideas",
+    promise:
+      "Get blog, social, and content marketing ideas tailored to your audience",
+    description:
+      "Produces specific, ranked content ideas — blog topics, social post themes, and content angles — based on your ICP, positioning, and growth opportunities. Each idea includes a target channel, format suggestion, and impact reasoning.",
+    icon: LightbulbIcon,
+    category: "messaging",
+    prompt: `You are an expert content strategist for startups.
+
+Read the workspace context files — PRODUCT.md, MARKET.md, and GROWTH.md — to understand this product's value proposition, target audience, competitive landscape, and growth opportunities.
+
+Produce a prioritized list of 8–12 specific content ideas tailored to this product. For each idea:
+
+1. **Working title** — a concrete, ready-to-use title (not a vague topic)
+2. **Target channel** — where to publish (blog, LinkedIn, X/Twitter, Reddit, newsletter, YouTube, etc.)
+3. **Format** — long-form article, short post, thread, video script, infographic, or case study
+4. **Why it fits the ICP** — how this idea resonates with the target audience's pain points and interests
+5. **Expected impact** — high / medium / low, with brief reasoning
+
+Rank the ideas by expected impact (highest first).
+
+After the full list, call out 2–3 "low-effort, high-impact" quick wins the team can start with this week.
+
+Be specific to this product. No generic content marketing advice. Every idea should reference something concrete about the product, its market, or its audience.`,
   },
 ];

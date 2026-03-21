@@ -94,6 +94,7 @@ const templates: OpportunityTemplate[] = [
     file: "growth",
     headings: ["Content opportunities", "Content pillars"],
     category: "distribution",
+    relatedActionId: "generate-content-ideas",
   },
   {
     id: "channel-possibilities",
@@ -109,6 +110,7 @@ const templates: OpportunityTemplate[] = [
     file: "growth",
     headings: ["Experiment ideas", "Tactical growth ideas"],
     category: "distribution",
+    relatedActionId: "find-launch-communities",
   },
 ];
 
