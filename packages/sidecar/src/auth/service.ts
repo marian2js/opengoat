@@ -1,8 +1,8 @@
-/* eslint-disable @typescript-eslint/consistent-type-definitions, @typescript-eslint/no-dynamic-delete, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/unbound-method */
-
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+import { sidecarLogger } from "../logger.ts";
 import {
   type AuthOverview,
   type ProviderModelCatalog,
@@ -26,7 +26,22 @@ import {
   type WizardPrompterLike,
 } from "./runtime-modules.ts";
 
-type GatewayConfig = Record<string, any>;
+interface GatewayConfig {
+  agents?: {
+    defaults?: {
+      model?: string | { primary?: string; [key: string]: unknown };
+      models?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+  auth?: {
+    order?: Record<string, string[]>;
+    profiles?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
 
 type RuntimeAuthCredential =
   | {
@@ -216,11 +231,11 @@ async function pollForGitHubCopilotAccessToken(params: {
 
     const errorCode = "error" in payload ? payload.error : "unknown";
     if (errorCode === "authorization_pending") {
-      await new Promise((resolve) => setTimeout(resolve, params.intervalMs));
+      await delay(params.intervalMs);
       continue;
     }
     if (errorCode === "slow_down") {
-      await new Promise((resolve) => setTimeout(resolve, params.intervalMs + 2_000));
+      await delay(params.intervalMs + 2_000);
       continue;
     }
     if (errorCode === "expired_token") {
@@ -428,13 +443,8 @@ function resolveDefaultModelRef(config: GatewayConfig): string | undefined {
   if (typeof model === "string" && model.trim()) {
     return model.trim();
   }
-  if (
-    model &&
-    typeof model === "object" &&
-    typeof (model as { primary?: unknown }).primary === "string" &&
-    (model as { primary: string }).primary.trim()
-  ) {
-    return (model as { primary: string }).primary.trim();
+  if (model && typeof model === "object" && typeof model.primary === "string" && model.primary.trim()) {
+    return model.primary.trim();
   }
   return undefined;
 }
@@ -472,7 +482,7 @@ function resolveConfiguredModelForProvider(
 
   const models =
     config.agents?.defaults?.models && typeof config.agents.defaults.models === "object"
-      ? (config.agents.defaults.models as Record<string, unknown>)
+      ? config.agents.defaults.models
       : {};
   const match = Object.keys(models).find((modelRef) => splitModelRef(modelRef).providerId === providerId);
   return match ? splitModelRef(match).modelId : undefined;
@@ -582,7 +592,7 @@ function resolveCurrentModelRefForProvider(
 
   const models =
     config.agents?.defaults?.models && typeof config.agents.defaults.models === "object"
-      ? (config.agents.defaults.models as Record<string, unknown>)
+      ? config.agents.defaults.models
       : {};
   return Object.keys(models).find((modelRef) => {
     const parsed = splitModelRef(modelRef);
@@ -597,7 +607,7 @@ export function buildAllowlistWithProviderModel(params: {
 }): string[] {
   const existingModels =
     params.config.agents?.defaults?.models && typeof params.config.agents.defaults.models === "object"
-      ? Object.keys(params.config.agents.defaults.models as Record<string, unknown>)
+      ? Object.keys(params.config.agents.defaults.models)
       : [];
   const keep = existingModels.filter(
     (candidate) =>
@@ -632,16 +642,18 @@ function hasExistingSelection(config: GatewayConfig, store: RuntimeAuthStore): b
   return Boolean(resolveDefaultModelRef(config));
 }
 
+const authLogger = sidecarLogger.child("auth");
+
 function createRuntimeEnv(): RuntimeEnvLike {
   return {
     error: (...args) => {
-      console.error("[sidecar-auth]", ...args);
+      authLogger.error(args.map(String).join(" "));
     },
     exit: (code) => {
       throw new Error(`embedded runtime requested exit ${String(code)}`);
     },
     log: (...args) => {
-      console.log("[sidecar-auth]", ...args);
+      authLogger.info(args.map(String).join(" "));
     },
   };
 }
@@ -938,17 +950,20 @@ export class RuntimeProviderAuthService {
         delete config.auth.profiles;
       }
     }
-    if (config.auth?.order?.[credential.provider]) {
-      const nextOrder = config.auth.order[credential.provider].filter(
+    const providerOrder = config.auth?.order?.[credential.provider];
+    if (providerOrder) {
+      const nextOrder = providerOrder.filter(
         (candidate: string) => candidate !== profileId,
       );
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- narrowed by outer check
+      const order = config.auth!.order!;
       if (nextOrder.length > 0) {
-        config.auth.order[credential.provider] = nextOrder;
+        order[credential.provider] = nextOrder;
       } else {
-        delete config.auth.order[credential.provider];
+        delete order[credential.provider];
       }
-      if (Object.keys(config.auth.order).length === 0) {
-        delete config.auth.order;
+      if (Object.keys(order).length === 0) {
+        delete config.auth!.order;
       }
     }
 

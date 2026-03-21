@@ -15,6 +15,7 @@ import { EmbeddedGatewayClient } from "./internal-gateway/gateway-client.ts";
 import { AgentMetadataStoreService } from "./internal-gateway/metadata-store.ts";
 import { EmbeddedGatewaySupervisor } from "./internal-gateway/supervisor.ts";
 
+import { sidecarLogger } from "./logger.ts";
 import { createSidecarApp } from "./server/app.ts";
 
 export interface SidecarServerHandle {
@@ -80,9 +81,8 @@ export async function startSidecarServer(
       port: config.port,
     },
     (info) => {
-      const port = String(info.port);
-      console.error(
-        `[sidecar] listening on http://${info.address}:${port} as ${config.username}`,
+      sidecarLogger.info(
+        `listening on http://${info.address}:${String(info.port)} as ${config.username}`,
       );
     },
   );

@@ -1,10 +1,11 @@
 import { startSidecarServer } from "./index.ts";
+import { sidecarLogger } from "./logger.ts";
 
 async function main(): Promise<void> {
   const server = await startSidecarServer();
 
   const shutdown = () => {
-    console.error("[sidecar] shutting down");
+    sidecarLogger.info("shutting down");
     void server.close();
   };
 
@@ -13,6 +14,6 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  console.error("[sidecar] fatal", error);
+  sidecarLogger.error("fatal", error);
   process.exit(1);
 });

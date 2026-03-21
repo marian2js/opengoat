@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { normalizeAgentId, type TaskRecord } from "@opengoat/core";
 import type { CliCommand } from "../framework/command.js";
 import { resolveCliDefaultAgentId } from "./default-agent.js";
@@ -537,9 +538,7 @@ function toErrorMessage(error: unknown): string {
 }
 
 async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
+  await delay(ms);
 }
 
 function sortTasksByLatest(tasks: TaskRecord[]): TaskRecord[] {

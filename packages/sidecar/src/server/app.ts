@@ -2,6 +2,7 @@ import { createBasicAuthHeader } from "@opengoat/core";
 import type { HttpBindings } from "@hono/node-server";
 import { cors } from "hono/cors";
 import { Hono } from "hono";
+import { sidecarLogger } from "../logger.ts";
 import { createAgentRoutes } from "./routes/agents.ts";
 import { createAuthRoutes } from "./routes/auth.ts";
 import { createChatRoutes } from "./routes/chat.ts";
@@ -73,7 +74,7 @@ export function createSidecarApp(runtime: SidecarRuntime): Hono<{
 
   app.notFound((context) => context.json({ error: "Not Found" }, 404));
   app.onError((error, context) => {
-    console.error("[sidecar] unhandled error", error);
+    sidecarLogger.error("unhandled error", error);
     return context.json({ error: "Internal Server Error" }, 500);
   });
 

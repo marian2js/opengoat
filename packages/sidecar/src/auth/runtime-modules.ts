@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/array-type, @typescript-eslint/consistent-type-definitions */
-
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";

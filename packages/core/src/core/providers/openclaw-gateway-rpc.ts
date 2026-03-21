@@ -505,11 +505,23 @@ function parseFrame(raw: string): GatewayFrame | undefined {
     const parsed = JSON.parse(raw) as unknown;
     const record = asRecord(parsed);
     const type = record.type;
-    if (type === "event" || type === "res") {
+    if (type === "res") {
       return {
-        ...record,
         type,
-      } as unknown as GatewayFrame;
+        id: record.id,
+        ok: record.ok,
+        payload: record.payload,
+        error: record.error && typeof record.error === "object"
+          ? { message: (record.error as Record<string, unknown>).message }
+          : undefined,
+      };
+    }
+    if (type === "event") {
+      return {
+        type,
+        event: record.event,
+        payload: record.payload,
+      };
     }
   } catch {
     // Ignore malformed frames.

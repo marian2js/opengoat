@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
+import { sidecarLogger } from "../logger.ts";
 import { writeEmbeddedGatewayConfig } from "./config.ts";
 import { resolveGatewayCliEntrypoint } from "./package-paths.ts";
 import {
@@ -163,8 +164,8 @@ export class EmbeddedGatewaySupervisor {
       if (this.#stopping) {
         return;
       }
-      console.error(
-        `[sidecar] gateway exited unexpectedly (code=${String(code)} signal=${String(signal)}); scheduling restart`,
+      sidecarLogger.warn(
+        `gateway exited unexpectedly (code=${String(code)} signal=${String(signal)}); scheduling restart`,
       );
       this.#processState = null;
       void this.#scheduleRestart();
@@ -186,15 +187,15 @@ export class EmbeddedGatewaySupervisor {
 
     this.#restartAttempts++;
     if (this.#restartAttempts > MAX_RESTART_ATTEMPTS) {
-      console.error(
-        `[sidecar] gateway exceeded ${String(MAX_RESTART_ATTEMPTS)} restart attempts; giving up`,
+      sidecarLogger.error(
+        `gateway exceeded ${String(MAX_RESTART_ATTEMPTS)} restart attempts; giving up`,
       );
       return;
     }
 
     const backoff = RESTART_COOLDOWN_MS * this.#restartAttempts;
-    console.error(
-      `[sidecar] restarting gateway in ${String(backoff)}ms (attempt ${String(this.#restartAttempts)}/${String(MAX_RESTART_ATTEMPTS)})`,
+    sidecarLogger.info(
+      `restarting gateway in ${String(backoff)}ms (attempt ${String(this.#restartAttempts)}/${String(MAX_RESTART_ATTEMPTS)})`,
     );
     await delay(backoff);
 
@@ -205,9 +206,9 @@ export class EmbeddedGatewaySupervisor {
     try {
       this.#lastRestartAt = Date.now();
       await this.start();
-      console.error("[sidecar] gateway restarted successfully");
+      sidecarLogger.info("gateway restarted successfully");
     } catch (error) {
-      console.error("[sidecar] gateway restart failed", error);
+      sidecarLogger.error("gateway restart failed", error);
       void this.#scheduleRestart();
     }
   }

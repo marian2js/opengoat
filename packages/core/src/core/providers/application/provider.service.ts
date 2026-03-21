@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import type { OpenGoatPaths } from "../../domain/opengoat-paths.js";
 import { isDefaultAgentId, normalizeAgentId } from "../../domain/agent-id.js";
 import { createNoopLogger, type Logger } from "../../logging/index.js";
@@ -1637,7 +1638,7 @@ function summarizeRetryFailureOutput(value: string): string | undefined {
 }
 
 async function sleep(durationMs: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, Math.max(0, durationMs)));
+  await delay(Math.max(0, durationMs));
 }
 
 function extractOpenClawGlobalArgs(raw: string | undefined): string[] {

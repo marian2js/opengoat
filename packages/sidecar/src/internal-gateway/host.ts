@@ -1,4 +1,5 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { sidecarLogger } from "../logger.ts";
 import { resolveGatewayInternalImport } from "./package-paths.ts";
 
 interface ImportedGatewayServerModule {
@@ -70,7 +71,9 @@ async function main(): Promise<void> {
   });
 }
 
+const hostLogger = sidecarLogger.child("gateway-host");
+
 void main().catch((error: unknown) => {
-  console.error("[gateway-host] fatal", error);
+  hostLogger.error("fatal", error);
   process.exit(1);
 });
