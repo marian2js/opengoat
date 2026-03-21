@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import type { ActionCard } from "@/features/dashboard/data/actions";
 import { categoryConfig } from "@/features/dashboard/data/actions";
+import { buildActionPrompt } from "@/features/dashboard/data/prompt-builder";
 
 export interface ActionCardItemProps {
   card: ActionCard;
@@ -36,7 +37,7 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
           if (isCompleted) {
             onViewResults?.(card.id);
           } else {
-            onClick?.(card.id, card.prompt, card.title);
+            onClick?.(card.id, buildActionPrompt(card), card.title);
           }
         }
       }}
@@ -89,7 +90,7 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
               className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground/50 transition-colors hover:text-muted-foreground"
               onClick={(e) => {
                 e.stopPropagation();
-                onClick?.(card.id, card.prompt, card.title);
+                onClick?.(card.id, buildActionPrompt(card), card.title);
               }}
             >
               <RotateCwIcon className="size-2.5" />
