@@ -4,6 +4,7 @@ import {
   DownloadIcon,
   LoaderCircleIcon,
   PackageIcon,
+  PuzzleIcon,
   TrashIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -191,9 +192,12 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
 
             {/* Empty state */}
             {skills.length === 0 ? (
-              <p className="py-3 text-center text-[13px] text-muted-foreground">
-                No custom skills installed. Your AI CMO works out of the box with built-in capabilities.
-              </p>
+              <div className="flex flex-col items-center gap-2 py-4">
+                <PuzzleIcon className="size-7 text-muted-foreground/40" />
+                <p className="text-center text-[13px] text-muted-foreground">
+                  No custom skills installed. Your AI CMO works out of the box with built-in capabilities.
+                </p>
+              </div>
             ) : null}
 
             {/* Install form */}
