@@ -3,7 +3,9 @@ import type { SidecarClient } from "@/lib/sidecar/client";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
 import { OpportunitySection } from "@/features/dashboard/components/OpportunitySection";
+import { SuggestedActionGrid } from "@/features/dashboard/components/SuggestedActionGrid";
 import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSummary";
+import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
 
 export interface DashboardWorkspaceProps {
   agentId?: string | undefined;
@@ -65,6 +67,8 @@ function DashboardContent({
   onViewResults?: ((actionId: string) => void) | undefined;
 }) {
   const { data, files, isLoading, error } = useWorkspaceSummary(agentId, client);
+  const workspaceReady = !isLoading && files !== null;
+  const { suggestedActions, isLoading: isSuggestedLoading } = useSuggestedActions(agentId, client, workspaceReady);
 
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 lg:p-6">
@@ -72,6 +76,14 @@ function DashboardContent({
       <ActionCardGrid
         completedActions={completedActions}
         isLoading={isActionLoading}
+        onActionClick={onActionClick}
+        onViewResults={onViewResults}
+      />
+      <SuggestedActionGrid
+        actions={suggestedActions}
+        completedActions={completedActions}
+        isGenerating={isSuggestedLoading}
+        isActionLoading={isActionLoading}
         onActionClick={onActionClick}
         onViewResults={onViewResults}
       />
