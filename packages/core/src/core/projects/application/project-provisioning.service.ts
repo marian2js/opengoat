@@ -4,6 +4,7 @@ import type { PathPort } from "../../ports/path.port.js";
 import type { ProviderExecutionResult } from "../../providers/index.js";
 import { ProviderService } from "../../providers/index.js";
 import { SessionService } from "../../sessions/index.js";
+import type { BundledSkillProvisioner } from "../../skills/application/bundled-skill-provisioner.js";
 import { SkillService } from "../../skills/index.js";
 import { type ProjectCreationResult, type ProjectDescriptor } from "../domain/project.js";
 import { ProjectService } from "./project.service.js";
@@ -39,6 +40,7 @@ interface ProjectProvisioningServiceDeps {
     paths: OpenGoatPaths,
     agentIds: string[],
   ) => Promise<string[]>;
+  bundledSkillProvisioner?: BundledSkillProvisioner;
 }
 
 export class ProjectProvisioningService {
@@ -55,6 +57,7 @@ export class ProjectProvisioningService {
   private readonly toErrorMessage: (error: unknown) => string;
   private readonly ensureAgentLocation: ProjectProvisioningServiceDeps["ensureAgentLocation"];
   private readonly syncExecutionPolicies: ProjectProvisioningServiceDeps["syncExecutionPolicies"];
+  private readonly bundledSkillProvisioner?: BundledSkillProvisioner;
 
   public constructor(deps: ProjectProvisioningServiceDeps) {
     this.fileSystem = deps.fileSystem;
@@ -67,6 +70,7 @@ export class ProjectProvisioningService {
     this.toErrorMessage = deps.toErrorMessage;
     this.ensureAgentLocation = deps.ensureAgentLocation;
     this.syncExecutionPolicies = deps.syncExecutionPolicies;
+    this.bundledSkillProvisioner = deps.bundledSkillProvisioner;
   }
 
   public async createProject(
@@ -127,6 +131,21 @@ export class ProjectProvisioningService {
           created.project.cmoAgent.id
         }". ${this.toErrorMessage(error)}`,
       );
+    }
+
+    if (this.bundledSkillProvisioner) {
+      try {
+        await this.bundledSkillProvisioner.provisionBundledSkills(
+          created.project.cmoAgent.workspaceDir,
+        );
+      } catch (error) {
+        await this.rollbackCreatedProject(paths, created, { deleteProviderAgent: true });
+        throw new Error(
+          `Failed to provision bundled skills for "${
+            created.project.cmoAgent.id
+          }". ${this.toErrorMessage(error)}`,
+        );
+      }
     }
 
     try {

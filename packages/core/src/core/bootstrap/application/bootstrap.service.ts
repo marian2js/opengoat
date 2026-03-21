@@ -8,6 +8,7 @@ import type {
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
 import type { OpenGoatPathsProvider } from "../../ports/paths-provider.port.js";
+import type { BundledSkillProvisioner } from "../../skills/application/bundled-skill-provisioner.js";
 import {
   listOrganizationMarkdownTemplates,
   renderAgentsIndex,
@@ -63,6 +64,7 @@ interface BootstrapServiceDeps {
   pathsProvider: OpenGoatPathsProvider;
   agentService: AgentService;
   nowIso: () => string;
+  bundledSkillProvisioner?: BundledSkillProvisioner;
 }
 
 export class BootstrapService {
@@ -71,6 +73,7 @@ export class BootstrapService {
   private readonly pathsProvider: OpenGoatPathsProvider;
   private readonly agentService: AgentService;
   private readonly nowIso: () => string;
+  private readonly bundledSkillProvisioner?: BundledSkillProvisioner;
 
   public constructor(deps: BootstrapServiceDeps) {
     this.fileSystem = deps.fileSystem;
@@ -78,6 +81,7 @@ export class BootstrapService {
     this.pathsProvider = deps.pathsProvider;
     this.agentService = deps.agentService;
     this.nowIso = deps.nowIso;
+    this.bundledSkillProvisioner = deps.bundledSkillProvisioner;
   }
 
   public async initialize(): Promise<InitializationResult> {
@@ -131,6 +135,11 @@ export class BootstrapService {
         removedPaths: [],
       }
       : await this.agentService.ensureCeoWorkspaceBootstrap(paths);
+    const goatBundledSkillResult = this.bundledSkillProvisioner
+      ? await this.bundledSkillProvisioner.provisionBundledSkills(
+          this.pathPort.join(paths.workspacesDir, DEFAULT_AGENT_ID),
+        )
+      : { createdPaths: [], skippedPaths: [] };
     const goatWorkspaceTemplateSync =
       await this.agentService.syncAgentWorkspaceTemplateAssets(
         paths,
@@ -150,6 +159,7 @@ export class BootstrapService {
       roleSkillSyncResult: Awaited<
         ReturnType<AgentService["ensureAgentWorkspaceRoleSkills"]>
       >;
+      bundledSkillResult: { createdPaths: string[]; skippedPaths: string[] };
     }> = [];
 
     for (const managedAgent of MANAGED_DEFAULT_AGENTS) {
@@ -190,6 +200,11 @@ export class BootstrapService {
           paths,
           managedAgent.identity.id,
         );
+      const bundledSkillResult = this.bundledSkillProvisioner
+        ? await this.bundledSkillProvisioner.provisionBundledSkills(
+            this.pathPort.join(paths.workspacesDir, managedAgent.identity.id),
+          )
+        : { createdPaths: [], skippedPaths: [] };
 
       managedDefaultAgentResults.push({
         ensureResult,
@@ -197,6 +212,7 @@ export class BootstrapService {
         workspaceBootstrapResult,
         workspaceTemplateSyncResult,
         roleSkillSyncResult,
+        bundledSkillResult,
       });
     }
     const workspaceReporteesSync =
@@ -207,6 +223,8 @@ export class BootstrapService {
     createdPaths.push(...goatWorkspaceBootstrapResult.createdPaths);
     skippedPaths.push(...goatWorkspaceBootstrapResult.skippedPaths);
     skippedPaths.push(...goatWorkspaceBootstrapResult.removedPaths);
+    createdPaths.push(...goatBundledSkillResult.createdPaths);
+    skippedPaths.push(...goatBundledSkillResult.skippedPaths);
     createdPaths.push(...goatWorkspaceTemplateSync.createdPaths);
     skippedPaths.push(...goatWorkspaceTemplateSync.skippedPaths);
     for (const managedResult of managedDefaultAgentResults) {
@@ -222,6 +240,8 @@ export class BootstrapService {
       createdPaths.push(...managedResult.roleSkillSyncResult.createdPaths);
       skippedPaths.push(...managedResult.roleSkillSyncResult.skippedPaths);
       skippedPaths.push(...managedResult.roleSkillSyncResult.removedPaths);
+      createdPaths.push(...managedResult.bundledSkillResult.createdPaths);
+      skippedPaths.push(...managedResult.bundledSkillResult.skippedPaths);
     }
     createdPaths.push(...workspaceReporteesSync.createdPaths);
     skippedPaths.push(...workspaceReporteesSync.skippedPaths);

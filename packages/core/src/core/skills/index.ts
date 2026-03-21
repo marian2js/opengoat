@@ -1,3 +1,5 @@
+export { BundledSkillProvisioner } from "./application/bundled-skill-provisioner.js";
+export type { BundledSkillProvisionResult } from "./application/bundled-skill-provisioner.js";
 export { SkillService } from "./application/skill.service.js";
 export type {
   AgentSkillsConfig,

@@ -81,6 +81,7 @@ import {
   type SessionRunInfo,
   type SessionSummary,
 } from "../../sessions/index.js";
+import { BundledSkillProvisioner } from "../../skills/application/bundled-skill-provisioner.js";
 import {
   SkillService,
   type InstallSkillRequest,
@@ -485,10 +486,15 @@ export class OpenGoatService {
     this.pathPort = deps.pathPort;
     this.pathsProvider = deps.pathsProvider;
     this.nowIso = nowIso;
+    const bundledSkillProvisioner = new BundledSkillProvisioner({
+      fileSystem: deps.fileSystem,
+      pathPort: deps.pathPort,
+    });
     this.agentService = new AgentService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,
       nowIso,
+      bundledSkillProvisioner,
     });
     this.agentManifestService = new AgentManifestService({
       fileSystem: deps.fileSystem,
@@ -500,6 +506,7 @@ export class OpenGoatService {
       pathsProvider: deps.pathsProvider,
       agentService: this.agentService,
       nowIso,
+      bundledSkillProvisioner,
     });
     this.projectService = new ProjectService({
       fileSystem: deps.fileSystem,
@@ -538,6 +545,7 @@ export class OpenGoatService {
         this.ensureOpenClawAgentLocation(paths, agent),
       syncExecutionPolicies: (paths, agentIds) =>
         this.syncOpenClawAgentExecutionPolicies(paths, agentIds),
+      bundledSkillProvisioner,
     });
     this.commandRunner = deps.commandRunner;
     this.orchestrationService = new OrchestrationService({

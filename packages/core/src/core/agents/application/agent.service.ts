@@ -23,6 +23,7 @@ import type {
 } from "../../domain/opengoat-paths.js";
 import type { FileSystemPort } from "../../ports/file-system.port.js";
 import type { PathPort } from "../../ports/path.port.js";
+import type { BundledSkillProvisioner } from "../../skills/application/bundled-skill-provisioner.js";
 import {
   listAgentWorkspaceTemplates,
   renderAgentsIndex,
@@ -37,6 +38,7 @@ interface AgentServiceDeps {
   fileSystem: FileSystemPort;
   pathPort: PathPort;
   nowIso: () => string;
+  bundledSkillProvisioner?: BundledSkillProvisioner;
 }
 
 interface EnsureAgentOptions {
@@ -119,11 +121,13 @@ export class AgentService {
   private readonly fileSystem: FileSystemPort;
   private readonly pathPort: PathPort;
   private readonly nowIso: () => string;
+  private readonly bundledSkillProvisioner?: BundledSkillProvisioner;
 
   public constructor(deps: AgentServiceDeps) {
     this.fileSystem = deps.fileSystem;
     this.pathPort = deps.pathPort;
     this.nowIso = deps.nowIso;
+    this.bundledSkillProvisioner = deps.bundledSkillProvisioner;
   }
 
   public normalizeAgentName(rawName: string): AgentIdentity {
@@ -315,6 +319,13 @@ export class AgentService {
     createdPaths.push(...workspaceSkillSync.createdPaths);
     skippedPaths.push(...workspaceSkillSync.skippedPaths);
     removedPaths.push(...workspaceSkillSync.removedPaths);
+
+    if (this.bundledSkillProvisioner) {
+      const bundledResult =
+        await this.bundledSkillProvisioner.provisionBundledSkills(workspaceDir);
+      createdPaths.push(...bundledResult.createdPaths);
+      skippedPaths.push(...bundledResult.skippedPaths);
+    }
 
     await this.removePathIfExists(bootstrapPath, removedPaths, skippedPaths);
     await this.removePathIfExists(userPath, removedPaths, skippedPaths);
