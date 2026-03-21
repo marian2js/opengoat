@@ -99,7 +99,7 @@ function DashboardContent({
       <div className="border-b border-border/30" />
 
       {/* Section 2: Action cards (starter + suggested) — dominant area */}
-      <div className="flex flex-col gap-6 py-6">
+      <div className="flex flex-col gap-8 py-6">
         <ActionCardGrid
           completedActions={completedActions}
           isLoading={isActionLoading}
