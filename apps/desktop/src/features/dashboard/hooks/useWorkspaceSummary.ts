@@ -51,8 +51,12 @@ export function useWorkspaceSummary(
 
     Promise.all(
       WORKSPACE_FILES.map((filename) => fetchFile(client, agentId, filename)),
-    ).then(([productResult, marketResult, growthResult]) => {
+    ).then((results) => {
       if (cancelled) return;
+
+      const productResult = results[0]!;
+      const marketResult = results[1]!;
+      const growthResult = results[2]!;
 
       const productMd = productResult.content;
       const marketMd = marketResult.content;
@@ -67,7 +71,7 @@ export function useWorkspaceSummary(
 
       // If all files failed to load, report the first error
       const fileErrors = [productResult, marketResult, growthResult]
-        .map((r) => r.error)
+        .map((r: FileResult) => r.error)
         .filter(Boolean);
 
       if (!productMd && !marketMd && !growthMd) {

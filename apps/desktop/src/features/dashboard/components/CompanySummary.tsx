@@ -43,7 +43,7 @@ function SummaryItem({ icon: Icon, label, value, iconClassName }: SummaryItemPro
 
 function SummarySkeleton() {
   return (
-    <Card className="border border-border/70 bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
+    <Card className="shrink-0 border border-border/70 bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Skeleton className="size-5 rounded" />
@@ -75,9 +75,9 @@ export function CompanySummary({ data, isLoading, error }: CompanySummaryProps) 
   // Check if we have at least one data point to display
   const hasAnyData = data ? Object.values(data).some(Boolean) : false;
 
-  if (!hasAnyData) {
+  if (!hasAnyData || !data) {
     return (
-      <Card className="border border-border/70 bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
+      <Card className="shrink-0 border border-border/70 bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
         <CardHeader>
           <div className="flex items-center gap-2">
             <div className="rounded-lg bg-primary/8 p-1.5 text-primary">
@@ -100,7 +100,7 @@ export function CompanySummary({ data, isLoading, error }: CompanySummaryProps) 
   }
 
   return (
-    <Card className="border border-border/70 bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
+    <Card className="shrink-0 border border-border/70 bg-card/90 shadow-[0_20px_60px_-36px_rgba(15,23,42,0.35)]">
       <CardHeader>
         <div className="flex items-center gap-2">
           <div className="rounded-lg bg-primary/8 p-1.5 text-primary">

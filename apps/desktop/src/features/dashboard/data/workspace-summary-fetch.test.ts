@@ -14,12 +14,6 @@ interface FileResult {
   error: string | null;
 }
 
-interface WorkspaceFiles {
-  productMd: string | null;
-  marketMd: string | null;
-  growthMd: string | null;
-}
-
 /**
  * Mirrors the fetchFile logic from useWorkspaceSummary.
  * Calls readWorkspaceFile and transforms the result.
@@ -128,8 +122,6 @@ void test("CompanySummary contract: empty data shows error state, not null", () 
     mainRisk: null,
     topOpportunity: null,
   };
-  const error: string | null = null;
-
   const hasAnyData = data ? Object.values(data).some(Boolean) : false;
   assert.equal(hasAnyData, false, "No data points present");
 
@@ -141,7 +133,6 @@ void test("CompanySummary contract: empty data shows error state, not null", () 
 
 void test("CompanySummary contract: data=null also shows error state", () => {
   const data = null;
-  const error: string | null = null;
 
   const hasAnyData = data ? Object.values(data).some(Boolean) : false;
   assert.equal(hasAnyData, false);
