@@ -4,9 +4,11 @@ import {
 } from "../lib/parse-workspace-summary";
 
 export type OpportunityCategory =
-  | "messaging"
-  | "positioning"
+  | "conversion"
   | "distribution"
+  | "growth"
+  | "messaging"
+  | "research"
   | "seo";
 
 export interface Opportunity {
@@ -21,20 +23,30 @@ export const opportunityCategoryConfig: Record<
   OpportunityCategory,
   { label: string; className: string }
 > = {
-  messaging: {
-    label: "Messaging",
+  conversion: {
+    label: "Conversion",
     className:
-      "border-purple-500/30 text-purple-700 dark:text-purple-400",
-  },
-  positioning: {
-    label: "Positioning",
-    className:
-      "border-amber-500/30 text-amber-700 dark:text-amber-400",
+      "border-rose-500/30 text-rose-700 dark:text-rose-400",
   },
   distribution: {
     label: "Distribution",
     className:
       "border-blue-500/30 text-blue-700 dark:text-blue-400",
+  },
+  growth: {
+    label: "Growth",
+    className:
+      "border-teal-500/30 text-teal-700 dark:text-teal-400",
+  },
+  messaging: {
+    label: "Messaging",
+    className:
+      "border-purple-500/30 text-purple-700 dark:text-purple-400",
+  },
+  research: {
+    label: "Research",
+    className:
+      "border-amber-500/30 text-amber-700 dark:text-amber-400",
   },
   seo: {
     label: "SEO",
@@ -66,7 +78,7 @@ const templates: OpportunityTemplate[] = [
     title: "Differentiation opportunities exist",
     file: "market",
     headings: ["Differentiation hypotheses", "Competitor hypotheses"],
-    category: "positioning",
+    category: "research",
     relatedActionId: "analyze-competitor-messaging",
   },
   {
@@ -85,16 +97,16 @@ const templates: OpportunityTemplate[] = [
     title: "Website conversion issues found",
     file: "growth",
     headings: ["Website conversion issues", "Messaging risks"],
-    category: "seo",
-    relatedActionId: "find-seo-quick-wins",
+    category: "conversion",
+    relatedActionId: "audit-landing-page-conversions",
   },
   {
     id: "content-opportunity",
     title: "Content opportunities available",
     file: "growth",
     headings: ["Content opportunities", "Content pillars"],
-    category: "distribution",
-    relatedActionId: "generate-content-ideas",
+    category: "seo",
+    relatedActionId: "plan-content-strategy",
   },
   {
     id: "channel-possibilities",
@@ -109,8 +121,24 @@ const templates: OpportunityTemplate[] = [
     title: "Growth experiments worth testing",
     file: "growth",
     headings: ["Experiment ideas", "Tactical growth ideas"],
-    category: "distribution",
-    relatedActionId: "find-launch-communities",
+    category: "growth",
+    relatedActionId: "generate-content-ideas",
+  },
+  {
+    id: "landing-page-gaps",
+    title: "Landing page conversion gaps detected",
+    file: "growth",
+    headings: ["Landing page assessment", "Conversion funnel gaps"],
+    category: "conversion",
+    relatedActionId: "audit-landing-page-conversions",
+  },
+  {
+    id: "seo-growth-potential",
+    title: "SEO-driven growth potential identified",
+    file: "growth",
+    headings: ["SEO opportunities", "Organic growth potential"],
+    category: "growth",
+    relatedActionId: "generate-content-ideas",
   },
 ];
 

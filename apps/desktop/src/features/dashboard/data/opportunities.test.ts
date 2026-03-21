@@ -6,6 +6,7 @@ import {
   type OpportunityCategory,
   type WorkspaceFiles,
 } from "./opportunities";
+import { starterActions } from "./actions";
 
 // ---------------------------------------------------------------------------
 // Realistic markdown content matching bootstrap-generated structure
@@ -120,9 +121,11 @@ void test("all opportunity ids are unique", () => {
 
 void test("all opportunity categories are valid", () => {
   const validCategories: OpportunityCategory[] = [
-    "messaging",
-    "positioning",
+    "conversion",
     "distribution",
+    "growth",
+    "messaging",
+    "research",
     "seo",
   ];
   const opportunities = extractOpportunities(fullFiles);
@@ -157,11 +160,11 @@ void test("messaging-weakness opportunity is extracted from PRODUCT.md", () => {
   );
 });
 
-void test("differentiation-gap opportunity is extracted from MARKET.md", () => {
+void test("differentiation-gap opportunity is extracted from MARKET.md with research category", () => {
   const opportunities = extractOpportunities(fullFiles);
   const diff = opportunities.find((o) => o.id === "differentiation-gap");
   assert.ok(diff, "Should find differentiation-gap opportunity");
-  assert.equal(diff.category, "positioning");
+  assert.equal(diff.category, "research");
   assert.equal(diff.relatedActionId, "analyze-competitor-messaging");
 });
 
@@ -173,12 +176,28 @@ void test("community-opportunity is extracted from MARKET.md", () => {
   assert.equal(community.relatedActionId, "find-launch-communities");
 });
 
-void test("conversion-issues opportunity is extracted from GROWTH.md", () => {
+void test("conversion-issues opportunity is categorized as conversion with v2 action", () => {
   const opportunities = extractOpportunities(fullFiles);
   const conversion = opportunities.find((o) => o.id === "conversion-issues");
   assert.ok(conversion, "Should find conversion-issues opportunity");
-  assert.equal(conversion.category, "seo");
-  assert.equal(conversion.relatedActionId, "find-seo-quick-wins");
+  assert.equal(conversion.category, "conversion");
+  assert.equal(conversion.relatedActionId, "audit-landing-page-conversions");
+});
+
+void test("content-opportunity links to plan-content-strategy action", () => {
+  const opportunities = extractOpportunities(fullFiles);
+  const content = opportunities.find((o) => o.id === "content-opportunity");
+  assert.ok(content, "Should find content-opportunity");
+  assert.equal(content.category, "seo");
+  assert.equal(content.relatedActionId, "plan-content-strategy");
+});
+
+void test("growth-experiments maps to growth category with generate-content-ideas action", () => {
+  const opportunities = extractOpportunities(fullFiles);
+  const growth = opportunities.find((o) => o.id === "growth-experiments");
+  assert.ok(growth, "Should find growth-experiments opportunity");
+  assert.equal(growth.category, "growth");
+  assert.equal(growth.relatedActionId, "generate-content-ideas");
 });
 
 void test("returns empty array when all files are null", () => {
@@ -203,16 +222,8 @@ void test("returns partial results when only some files exist", () => {
   );
 });
 
-void test("relatedActionId references valid starter action ids when present", () => {
-  const validActionIds = [
-    "find-launch-communities",
-    "draft-product-hunt-launch",
-    "find-subreddits",
-    "rewrite-homepage-hero",
-    "analyze-competitor-messaging",
-    "find-seo-quick-wins",
-    "generate-content-ideas",
-  ];
+void test("relatedActionId references valid v2 starter action ids when present", () => {
+  const validActionIds = starterActions.map((a) => a.id);
   const opportunities = extractOpportunities(fullFiles);
   for (const opp of opportunities) {
     if (opp.relatedActionId) {
@@ -222,20 +233,6 @@ void test("relatedActionId references valid starter action ids when present", ()
       );
     }
   }
-});
-
-void test("content-opportunity links to generate-content-ideas action", () => {
-  const opportunities = extractOpportunities(fullFiles);
-  const content = opportunities.find((o) => o.id === "content-opportunity");
-  assert.ok(content, "Should find content-opportunity");
-  assert.equal(content.relatedActionId, "generate-content-ideas");
-});
-
-void test("growth-experiments links to find-launch-communities action", () => {
-  const opportunities = extractOpportunities(fullFiles);
-  const growth = opportunities.find((o) => o.id === "growth-experiments");
-  assert.ok(growth, "Should find growth-experiments opportunity");
-  assert.equal(growth.relatedActionId, "find-launch-communities");
 });
 
 void test("all extracted opportunities have a relatedActionId", () => {
@@ -250,9 +247,11 @@ void test("all extracted opportunities have a relatedActionId", () => {
 
 void test("opportunityCategoryConfig has an entry for every OpportunityCategory", () => {
   const categories: OpportunityCategory[] = [
-    "messaging",
-    "positioning",
+    "conversion",
     "distribution",
+    "growth",
+    "messaging",
+    "research",
     "seo",
   ];
   for (const cat of categories) {
@@ -260,4 +259,20 @@ void test("opportunityCategoryConfig has an entry for every OpportunityCategory"
     assert.ok(opportunityCategoryConfig[cat].label, `Missing label for: ${cat}`);
     assert.ok(opportunityCategoryConfig[cat].className, `Missing className for: ${cat}`);
   }
+});
+
+void test("opportunityCategoryConfig colors match action categoryConfig colors", () => {
+  // Verify the opportunity category colors are consistent with action category badges
+  assert.ok(
+    opportunityCategoryConfig.conversion.className.includes("rose"),
+    "Conversion should use rose colors",
+  );
+  assert.ok(
+    opportunityCategoryConfig.growth.className.includes("teal"),
+    "Growth should use teal colors",
+  );
+  assert.ok(
+    opportunityCategoryConfig.research.className.includes("amber"),
+    "Research should use amber colors",
+  );
 });

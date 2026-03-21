@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import type { Opportunity } from "@/features/dashboard/data/opportunities";
 import { opportunityCategoryConfig } from "@/features/dashboard/data/opportunities";
 import { starterActions } from "@/features/dashboard/data/actions";
+import { buildActionPrompt } from "@/features/dashboard/data/prompt-builder";
 
 export interface OpportunityCardProps {
   completedActions?: Set<string> | undefined;
@@ -49,7 +50,7 @@ export function OpportunityCard({ completedActions, opportunity, onActionClick, 
           type="button"
           className="group/link mt-0.5 flex w-fit items-center gap-1 text-[11px] font-medium text-primary/70 transition-colors hover:text-primary"
           onClick={() =>
-            onActionClick(relatedAction.id, relatedAction.prompt, relatedAction.title)
+            onActionClick(relatedAction.id, buildActionPrompt(relatedAction), relatedAction.title)
           }
         >
           <span>{relatedAction.title}</span>
