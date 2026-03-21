@@ -24,12 +24,12 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
 
   return (
     <Card
-      className={`group/action border bg-card/90 transition-all ${
+      className={`group/action border bg-card/90 transition-all duration-150 ${
         isLoading
           ? "pointer-events-none border-border/70 opacity-60"
           : isCompleted
-            ? "cursor-pointer border-primary/20 hover:border-primary/30 hover:bg-accent/30"
-            : "cursor-pointer border-border/70 hover:border-primary/30 hover:bg-accent/30"
+            ? "cursor-pointer border-primary/20 hover:border-primary/40 hover:bg-accent/40"
+            : "cursor-pointer border-border/70 hover:border-primary/40 hover:bg-accent/40"
       }`}
       onClick={() => {
         if (!isLoading) {
@@ -77,10 +77,10 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
       </CardHeader>
       <div className="flex items-center gap-3 px-4 pb-3">
         {isLoading ? (
-          <span className="animate-pulse text-[11px] font-medium text-muted-foreground/70">Starting...</span>
+          <span className="animate-pulse text-xs font-medium text-muted-foreground/70">Starting...</span>
         ) : isCompleted ? (
           <>
-            <span className="flex items-center gap-1 text-[11px] font-medium text-primary/80 transition-colors group-hover/action:text-primary">
+            <span className="flex items-center gap-1 text-xs font-medium text-primary/80 transition-colors group-hover/action:text-primary">
               View results
               <ArrowRightIcon className="size-3 transition-transform group-hover/action:translate-x-0.5" />
             </span>
@@ -97,7 +97,7 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
             </button>
           </>
         ) : (
-          <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground/70 transition-colors group-hover/action:text-primary">
+          <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground/70 transition-colors group-hover/action:text-primary">
             Start
             <ArrowRightIcon className="size-3 transition-transform group-hover/action:translate-x-0.5" />
           </span>
