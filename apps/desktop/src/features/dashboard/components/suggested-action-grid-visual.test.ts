@@ -62,3 +62,15 @@ void test("SuggestedActionGrid border works in both light and dark modes", () =>
     "Expected border color to use opacity or violet for light/dark mode support",
   );
 });
+
+void test("SuggestedActionGrid violet tint opacity is at least 4% for dark mode visibility", () => {
+  // At 2% opacity the violet tint is invisible in dark mode.
+  // Ensure opacity is >= 0.04 so the section boundary is perceptible.
+  const opacityMatch = src.match(/bg-violet-500\/\[0\.(\d+)\]/);
+  assert.ok(opacityMatch, "Expected bg-violet-500/[0.XX] opacity class");
+  const opacityValue = parseFloat(`0.${opacityMatch![1]}`);
+  assert.ok(
+    opacityValue >= 0.04,
+    `Expected violet tint opacity >= 0.04 for dark mode visibility, got ${opacityValue}`,
+  );
+});

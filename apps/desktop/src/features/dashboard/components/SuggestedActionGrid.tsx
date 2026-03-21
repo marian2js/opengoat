@@ -36,7 +36,7 @@ export function SuggestedActionGrid({
   if (actions.length === 0 && !isGenerating) return null;
 
   return (
-    <section className="flex flex-col gap-4 border-t border-border/20 pt-6 rounded-xl bg-violet-500/[0.02] p-4 -mx-2">
+    <section className="flex flex-col gap-4 border-t border-border/20 pt-6 rounded-xl bg-violet-500/[0.04] p-4 -mx-2">
       <div className="flex items-center gap-2">
         <div className="rounded-lg bg-violet-500/10 p-1.5 text-violet-600 dark:text-violet-400">
           <WandSparklesIcon className="size-4" />
