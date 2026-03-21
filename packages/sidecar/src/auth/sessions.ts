@@ -1,3 +1,4 @@
+import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import type { AuthSession, AuthSessionStep } from "@opengoat/contracts";
 import type { RuntimeProviderAuthService } from "./service.ts";
@@ -31,9 +32,71 @@ interface AuthSessionRecord {
   snapshot: AuthSession;
 }
 
+interface CallbackInterceptor {
+  close(): void;
+}
+
+/**
+ * Port used by the embedded runtime's OpenAI Codex OAuth callback server.
+ * We pre-bind this port so the runtime falls back to the text-prompt path,
+ * then auto-resolve the prompt when the browser callback arrives at our server.
+ */
+const OAUTH_CALLBACK_PORT = 1455;
+
+const CALLBACK_SUCCESS_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign-in complete</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #0a0a0a;
+      color: #e5e5e5;
+    }
+    .card {
+      text-align: center;
+      padding: 2.5rem;
+      border-radius: 12px;
+      border: 1px solid #262626;
+      background: #171717;
+      max-width: 380px;
+    }
+    .icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 1rem;
+      border-radius: 50%;
+      background: #166534;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon svg { width: 24px; height: 24px; stroke: #4ade80; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+    h1 { font-size: 1.125rem; font-weight: 600; margin: 0 0 0.5rem; }
+    p { font-size: 0.875rem; color: #a3a3a3; margin: 0; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <h1>Authentication successful</h1>
+    <p>You can close this tab and return to the app.</p>
+  </div>
+</body>
+</html>`;
+
 export class RuntimeAuthSessionManager {
   readonly #createAuthService: () => RuntimeProviderAuthService;
-  readonly #onAuthComplete?: () => void;
+  readonly #oauthCallbackCodes = new Map<string, string>();
+  readonly #oauthCallbackResolvers = new Map<string, (value: string) => void>();
+  readonly #onAuthComplete: (() => void) | undefined;
   readonly #sessions = new Map<string, AuthSessionRecord>();
 
   constructor(
@@ -112,6 +175,7 @@ export class RuntimeAuthSessionManager {
         message: "Continuing sign-in flow",
         type: "working",
       });
+      this.#cleanupOAuthCallback(sessionId);
       pending.resolve(nextValue);
       return record.snapshot;
     }
@@ -138,6 +202,10 @@ export class RuntimeAuthSessionManager {
   async #run(record: AuthSessionRecord): Promise<void> {
     const authService = this.#createAuthService();
 
+    // Pre-bind the OAuth callback port so the runtime falls back to its
+    // text-prompt path. Our server captures the browser redirect instead.
+    const interceptor = await this.#startCallbackInterceptor(record.snapshot.id);
+
     try {
       const result = await authService.applyAuthChoice({
         authChoice: record.snapshot.authChoice,
@@ -161,6 +229,8 @@ export class RuntimeAuthSessionManager {
         },
       };
 
+      this.#cleanupOAuthCallback(record.snapshot.id);
+
       try {
         this.#onAuthComplete?.();
       } catch {
@@ -181,7 +251,83 @@ export class RuntimeAuthSessionManager {
       if (record.pendingResponse) {
         delete record.pendingResponse;
       }
+      this.#cleanupOAuthCallback(record.snapshot.id);
+    } finally {
+      interceptor?.close();
     }
+  }
+
+  /**
+   * Starts a local HTTP server on the OAuth callback port (1455) to intercept
+   * the browser redirect. When the callback arrives, the authorization code
+   * is captured and used to auto-resolve the pending text prompt.
+   *
+   * If the port is already in use, returns null (manual paste still works).
+   */
+  async #startCallbackInterceptor(
+    sessionId: string,
+  ): Promise<CallbackInterceptor | null> {
+    return new Promise((resolve) => {
+      const server: Server = createServer((req, res) => {
+        try {
+          const url = new URL(req.url ?? "", "http://localhost");
+
+          if (url.pathname !== "/auth/callback") {
+            res.statusCode = 404;
+            res.end("Not found");
+            return;
+          }
+
+          const code = url.searchParams.get("code");
+          if (code) {
+            this.#receiveOAuthCallback(sessionId, code);
+          }
+
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.end(CALLBACK_SUCCESS_HTML);
+        } catch {
+          res.statusCode = 500;
+          res.end("Internal error");
+        }
+      });
+
+      server.listen(OAUTH_CALLBACK_PORT, "127.0.0.1", () => {
+        resolve({
+          close() {
+            try {
+              server.close();
+            } catch {
+              // Server already closed.
+            }
+          },
+        });
+      });
+
+      server.on("error", () => {
+        // Port already in use — fall back to manual paste.
+        resolve(null);
+      });
+    });
+  }
+
+  /**
+   * Called when the browser redirects to our callback interceptor with
+   * an authorization code.
+   */
+  #receiveOAuthCallback(sessionId: string, code: string): void {
+    // If the text prompt is already pending, resolve it directly.
+    const resolver = this.#oauthCallbackResolvers.get(sessionId);
+    if (resolver) {
+      this.#oauthCallbackResolvers.delete(sessionId);
+      // Call the resolver — it will clear pendingResponse and resolve the
+      // text prompt promise internally.
+      resolver(code);
+      return;
+    }
+
+    // Otherwise store it for when text() is called.
+    this.#oauthCallbackCodes.set(sessionId, code);
   }
 
   #createPrompter(record: AuthSessionRecord): WizardPrompterLike {
@@ -315,6 +461,18 @@ export class RuntimeAuthSessionManager {
         });
       },
       text: (params) => {
+        const sessionId = record.snapshot.id;
+
+        // If the OAuth callback already arrived, resolve immediately.
+        if (isOAuthCodePrompt(params.message)) {
+          const existingCode = this.#oauthCallbackCodes.get(sessionId);
+          if (existingCode) {
+            this.#oauthCallbackCodes.delete(sessionId);
+            this.#pushProgress(record, "Sign-in completed via redirect");
+            return Promise.resolve(existingCode);
+          }
+        }
+
         const step: Extract<AuthSessionStep, { type: "text_prompt" }> = {
           allowEmpty: false,
           message: params.message,
@@ -329,9 +487,28 @@ export class RuntimeAuthSessionManager {
             step,
             type: "string",
           };
+
+          // Also register for async OAuth callback resolution.
+          if (isOAuthCodePrompt(params.message)) {
+            this.#oauthCallbackResolvers.set(sessionId, (code) => {
+              if (record.pendingResponse) {
+                delete record.pendingResponse;
+                this.#setStep(record, {
+                  message: "Completing sign-in",
+                  type: "working",
+                });
+                resolve(code);
+              }
+            });
+          }
         });
       },
     };
+  }
+
+  #cleanupOAuthCallback(sessionId: string): void {
+    this.#oauthCallbackCodes.delete(sessionId);
+    this.#oauthCallbackResolvers.delete(sessionId);
   }
 
   #pushProgress(record: AuthSessionRecord, message: string): void {
@@ -351,6 +528,11 @@ export class RuntimeAuthSessionManager {
       step,
     };
   }
+}
+
+function isOAuthCodePrompt(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes("authorization code") || lower.includes("redirect url");
 }
 
 function isSecretPrompt(params: {

@@ -918,6 +918,20 @@ function AuthSessionPanel({
   }
 
   if (step.type === "text_prompt") {
+    const isOAuthCodeStep = (() => {
+      const lower = step.message.toLowerCase();
+      return lower.includes("authorization code") || lower.includes("redirect url");
+    })();
+
+    if (isOAuthCodeStep) {
+      return (
+        <div className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-card px-3.5 py-2.5 text-[13px] text-muted-foreground">
+          <LoaderCircleIcon className="size-3.5 animate-spin" />
+          Completing sign-in&hellip;
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-lg border border-border/60 bg-card px-3.5 py-3.5">
         <label className="block text-[13px] font-medium text-foreground">{step.message}</label>
