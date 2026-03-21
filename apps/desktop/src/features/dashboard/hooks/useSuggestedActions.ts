@@ -14,9 +14,17 @@ export interface UseSuggestedActionsResult {
 }
 
 /**
- * Reads the AI SDK data stream and collects the full text response.
+ * Reads the UI Message Stream (SSE) response and collects the full text.
+ *
+ * The sidecar streams using SSE format:
+ *   `data: {"type":"start","messageId":"..."}\n`
+ *   `data: {"type":"text-delta","delta":"chunk","id":"..."}\n`
+ *   `data: {"type":"text-end","id":"..."}\n`
+ *   `data: {"type":"finish","finishReason":"stop"}\n`
+ *
+ * We extract `delta` values from `text-delta` events and concatenate them.
  */
-async function collectStreamText(response: Response): Promise<string> {
+export async function collectStreamText(response: Response): Promise<string> {
   const body = response.body;
   if (!body) return "";
 
@@ -37,13 +45,15 @@ async function collectStreamText(response: Response): Promise<string> {
         const line = buffer.slice(0, newlineIndex);
         buffer = buffer.slice(newlineIndex + 1);
 
-        // Type 0 = text delta: `0:"escaped text"`
-        if (line.startsWith("0:")) {
+        // SSE data lines: `data: {...}`
+        if (line.startsWith("data: ")) {
           try {
-            const text = JSON.parse(line.slice(2)) as string;
-            result += text;
+            const payload = JSON.parse(line.slice(6)) as Record<string, unknown>;
+            if (payload.type === "text-delta" && typeof payload.delta === "string") {
+              result += payload.delta;
+            }
           } catch {
-            // Malformed frame — skip
+            // Malformed SSE event — skip
           }
         }
       }
