@@ -23,6 +23,15 @@ import remarkGfm from "remark-gfm";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { isRefinableSection } from "@/features/brain/lib/refine-context-prompt";
 
+/**
+ * Strip the leading h1 heading from markdown content.
+ * Brain pages already render a page header (h2 with icon and subtitle),
+ * so the markdown h1 (e.g. "# PRODUCT") is redundant.
+ */
+function stripLeadingH1(md: string): string {
+  return md.replace(/^#\s+.+\n*/, "");
+}
+
 interface BrainSection {
   id: string;
   label: string;
@@ -412,8 +421,8 @@ function BrainEditor({
             className="min-h-[500px] w-full resize-none rounded-lg border border-border/50 bg-transparent p-4 font-mono text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-ring focus:ring-1 focus:ring-ring/30"
           />
         ) : (
-          <div className="prose prose-sm prose-invert max-w-none [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-0 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mb-3 [&_h2]:mt-8 [&_h2]:pt-6 [&_h2]:border-t [&_h2]:border-border/20 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-foreground/80 [&_p]:mb-3 [&_ul]:text-sm [&_ul]:text-foreground/80 [&_ul]:mb-3 [&_ul]:ml-1 [&_ol]:text-sm [&_ol]:text-foreground/80 [&_ol]:mb-3 [&_li]:mb-1.5 [&_li]:leading-relaxed [&_strong]:text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_hr]:border-border/40 [&_hr]:my-6 [&_table]:w-full [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:pb-2 [&_th]:border-b [&_td]:text-sm [&_td]:py-1.5 [&_td]:border-b [&_td]:border-border/30 [&_blockquote]:border-l-2 [&_blockquote]:border-border/60 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground">
-            <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
+          <div className="prose prose-sm prose-invert max-w-none [&>h1:first-child]:hidden [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-0 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mb-3 [&_h2]:mt-8 [&_h2]:pt-6 [&_h2]:border-t [&_h2]:border-border/20 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-foreground/80 [&_p]:mb-3 [&_ul]:text-sm [&_ul]:text-foreground/80 [&_ul]:mb-3 [&_ul]:ml-1 [&_ol]:text-sm [&_ol]:text-foreground/80 [&_ol]:mb-3 [&_li]:mb-1.5 [&_li]:leading-relaxed [&_strong]:text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_hr]:border-border/40 [&_hr]:my-6 [&_table]:w-full [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:pb-2 [&_th]:border-b [&_td]:text-sm [&_td]:py-1.5 [&_td]:border-b [&_td]:border-border/30 [&_blockquote]:border-l-2 [&_blockquote]:border-border/60 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground">
+            <Markdown remarkPlugins={[remarkGfm]}>{stripLeadingH1(content)}</Markdown>
           </div>
         )}
       </div>
