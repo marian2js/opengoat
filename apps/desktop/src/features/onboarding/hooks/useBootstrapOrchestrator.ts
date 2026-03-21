@@ -87,16 +87,17 @@ const STEP_LABELS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 /**
- * Reads the AI SDK data stream response and extracts text deltas.
+ * Reads the UI Message Stream (SSE) response and extracts text deltas.
  *
- * The AI SDK wire format uses newline-delimited frames:
- *   `0:"text chunk"\n`  — text delta (type 0)
- *   `e:{"finishReason":"stop",...}\n` — finish event
- *   `d:{"finishReason":"stop",...}\n` — done event
+ * The sidecar streams using SSE format:
+ *   `data: {"type":"start","messageId":"..."}\n`
+ *   `data: {"type":"text-delta","delta":"chunk","id":"..."}\n`
+ *   `data: {"type":"text-end","id":"..."}\n`
+ *   `data: {"type":"finish","finishReason":"stop"}\n`
  *
- * We only care about type-0 frames (text deltas) for display.
+ * We extract `delta` values from `text-delta` events for display.
  */
-async function readStreamTextDeltas(
+export async function readStreamTextDeltas(
   response: Response,
   onDelta: (text: string) => void,
   signal: AbortSignal,
@@ -125,13 +126,15 @@ async function readStreamTextDeltas(
         const line = buffer.slice(0, newlineIndex);
         buffer = buffer.slice(newlineIndex + 1);
 
-        // Type 0 = text delta: `0:"escaped text"`
-        if (line.startsWith("0:")) {
+        // SSE data lines: `data: {...}`
+        if (line.startsWith("data: ")) {
           try {
-            const text = JSON.parse(line.slice(2)) as string;
-            onDelta(text);
+            const payload = JSON.parse(line.slice(6)) as Record<string, unknown>;
+            if (payload.type === "text-delta" && typeof payload.delta === "string") {
+              onDelta(payload.delta);
+            }
           } catch {
-            // Malformed frame — skip
+            // Malformed SSE event — skip
           }
         }
       }
