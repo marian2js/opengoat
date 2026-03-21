@@ -1,0 +1,14 @@
+{
+  "repos": [
+    {
+      "name": "marketingskills",
+      "url": "https://github.com/coreyhaines31/marketingskills",
+      "sha": "9d4d29a795113c492b22e01c9b48a8396e140b8d"
+    },
+    {
+      "name": "agency-agents",
+      "url": "https://github.com/msitarzewski/agency-agents",
+      "sha": "6254154899f510eb4a4de10561fecfc1f32ff17f"
+    }
+  ]
+}

@@ -28,7 +28,8 @@
     "changeset": "changeset",
     "version-packages": "node scripts/release.mjs",
     "release": "node scripts/release.mjs",
-    "prepare": "husky"
+    "prepare": "husky",
+    "vendor-skills": "npx tsx packages/core/src/core/skills/scripts/vendor-skills.ts"
   },
   "engines": {
     "node": ">=20.11.0"
