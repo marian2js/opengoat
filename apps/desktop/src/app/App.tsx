@@ -42,8 +42,8 @@ export function App() {
   const [client, setClient] = useState<SidecarClient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
-  const [hashView, setHashView] = useState<AppView>(readViewFromHash());
-  const [brainSection, setBrainSection] = useState<string>(readBrainSectionFromHash());
+  const [hashView, setHashView] = useState<AppView>(() => readViewFromHash());
+  const [brainSection, setBrainSection] = useState<string>(() => readBrainSectionFromHash());
   const [retryToken, setRetryToken] = useState(0);
   const [createAgentToken, setCreateAgentToken] = useState(0);
   const [sessions, setSessions] = useState<AgentSession[]>([]);

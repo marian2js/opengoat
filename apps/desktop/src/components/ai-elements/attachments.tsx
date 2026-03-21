@@ -241,23 +241,16 @@ export const AttachmentPreview = ({
   const { data, mediaCategory, variant } = useAttachmentContext();
 
   const iconSize = variant === "inline" ? "size-3" : "size-4";
+  const Icon = mediaCategoryIcons[mediaCategory];
 
-  const renderIcon = (Icon: typeof ImageIcon) => (
-    <Icon className={cn(iconSize, "text-muted-foreground")} />
-  );
-
-  const renderContent = () => {
-    if (mediaCategory === "image" && data.type === "file" && data.url) {
-      return renderAttachmentImage(data.url, data.filename, variant === "grid");
-    }
-
-    if (mediaCategory === "video" && data.type === "file" && data.url) {
-      return <video className="size-full object-cover" muted src={data.url} />;
-    }
-
-    const Icon = mediaCategoryIcons[mediaCategory];
-    return fallbackIcon ?? renderIcon(Icon);
-  };
+  let content: ReactNode;
+  if (mediaCategory === "image" && data.type === "file" && data.url) {
+    content = renderAttachmentImage(data.url, data.filename, variant === "grid");
+  } else if (mediaCategory === "video" && data.type === "file" && data.url) {
+    content = <video className="size-full object-cover" muted src={data.url} />;
+  } else {
+    content = fallbackIcon ?? <Icon className={cn(iconSize, "text-muted-foreground")} />;
+  }
 
   return (
     <div
@@ -270,7 +263,7 @@ export const AttachmentPreview = ({
       )}
       {...props}
     >
-      {renderContent()}
+      {content}
     </div>
   );
 };

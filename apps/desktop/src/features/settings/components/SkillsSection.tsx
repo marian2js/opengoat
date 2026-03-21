@@ -119,9 +119,9 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
             {/* Installed extra skills */}
             {extraSkills.length > 0 ? (
               <div className="space-y-2">
-                <label className="block text-[12px] font-medium text-muted-foreground">
+                <span className="block text-[12px] font-medium text-muted-foreground" role="heading" aria-level={3}>
                   Installed skills
-                </label>
+                </span>
                 <div className="divide-y divide-border rounded-md border">
                   {extraSkills.map((skill) => (
                     <div
@@ -162,9 +162,9 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
             {/* Built-in/managed skills (read-only) */}
             {managedSkills.length > 0 ? (
               <div className="space-y-2">
-                <label className="block text-[12px] font-medium text-muted-foreground">
+                <span className="block text-[12px] font-medium text-muted-foreground" role="heading" aria-level={3}>
                   Built-in skills
-                </label>
+                </span>
                 <div className="divide-y divide-border rounded-md border">
                   {managedSkills.map((skill) => (
                     <div
@@ -198,11 +198,12 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
 
             {/* Install form */}
             <div className="space-y-2">
-              <label className="block text-[12px] font-medium text-muted-foreground">
+              <label htmlFor="skill-install-input" className="block text-[12px] font-medium text-muted-foreground">
                 Install a skill
               </label>
               <div className="flex gap-2">
                 <Input
+                  id="skill-install-input"
                   className="h-9 flex-1 text-[13px]"
                   placeholder="Skill name or GitHub URL"
                   value={installInput}

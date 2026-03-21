@@ -611,10 +611,11 @@ export function ConnectionCenter({
 
                 {modelCatalog && modelCatalog.models.length > 0 ? (
                   <div className="max-w-md space-y-1.5">
-                    <label className="block text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground/60">
+                    <label htmlFor="connection-model-select" className="block text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground/60">
                       Model
                     </label>
                     <select
+                      id="connection-model-select"
                       className="h-10 w-full rounded-md border border-border bg-background px-3 text-[13px] text-foreground outline-none transition-colors focus:border-primary"
                       value={selectedModelRef}
                       onChange={(event) => {
@@ -1071,12 +1072,13 @@ function WebsiteUrlStep({
         </div>
 
         <div className="space-y-1.5">
-          <label className="block text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground/60">
+          <label htmlFor="onboarding-website-url" className="block text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground/60">
             Website URL
           </label>
           <div className="relative">
             <GlobeIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/40" />
             <Input
+              id="onboarding-website-url"
               type="url"
               className="h-10 rounded-md pl-9 text-[13px]"
               value={url}

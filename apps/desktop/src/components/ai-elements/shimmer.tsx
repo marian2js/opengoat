@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import type { MotionProps } from "motion/react";
-import { motion } from "motion/react";
+import { m, LazyMotion, domAnimation } from "motion/react";
 import type { ElementType, JSX } from "react";
 import { memo, useMemo } from "react";
 
@@ -17,7 +17,7 @@ const motionComponentCache = new Map<
 const getMotionComponent = (element: keyof JSX.IntrinsicElements) => {
   let component = motionComponentCache.get(element);
   if (!component) {
-    component = motion.create(element);
+    component = m.create(element);
     motionComponentCache.set(element, component);
   }
   return component;
@@ -48,6 +48,7 @@ const ShimmerComponent = ({
   );
 
   return (
+    <LazyMotion features={domAnimation}>
     <MotionComponent
       animate={{ backgroundPosition: "0% center" }}
       className={cn(
@@ -71,6 +72,7 @@ const ShimmerComponent = ({
     >
       {children}
     </MotionComponent>
+    </LazyMotion>
   );
 };
 

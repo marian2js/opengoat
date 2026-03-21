@@ -203,12 +203,13 @@ export function ProjectSettings({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-[12px] font-medium text-muted-foreground">
+            <label htmlFor="settings-website-url" className="block text-[12px] font-medium text-muted-foreground">
               Website URL
             </label>
             <div className="relative">
               <GlobeIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/40" />
               <Input
+                id="settings-website-url"
                 className="h-9 pl-9 text-[13px] text-muted-foreground"
                 readOnly
                 value={agent.description ?? domain}
@@ -257,10 +258,11 @@ export function ProjectSettings({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
-            <label className="block text-[12px] font-medium text-muted-foreground">
+            <label htmlFor="settings-provider" className="block text-[12px] font-medium text-muted-foreground">
               Provider
             </label>
             <select
+              id="settings-provider"
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-[13px] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={selectedProviderId ?? ""}
               onChange={(e) => {
@@ -287,7 +289,7 @@ export function ProjectSettings({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-[12px] font-medium text-muted-foreground">
+            <label htmlFor="settings-model" className="block text-[12px] font-medium text-muted-foreground">
               Model
             </label>
             {isLoadingModels ? (
@@ -297,6 +299,7 @@ export function ProjectSettings({
               </div>
             ) : (
               <select
+                id="settings-model"
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-[13px] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 value={selectedModelId ?? ""}
                 onChange={(e) => {
