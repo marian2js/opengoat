@@ -19,10 +19,24 @@ export function OpportunityCard({ completedActions, opportunity, onActionClick, 
     : null;
   const isRelatedCompleted = relatedAction && completedActions?.has(relatedAction.id);
 
+  const handleCardClick = () => {
+    if (relatedAction && isRelatedCompleted && onViewResults) {
+      onViewResults(relatedAction.id);
+    } else if (relatedAction && onActionClick) {
+      onActionClick(relatedAction.id, buildActionPrompt(relatedAction), relatedAction.title);
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-card/60 px-4 py-3">
+    <div
+      role="button"
+      tabIndex={0}
+      className="group/insight flex flex-col gap-2 rounded-lg border border-border/50 bg-card/60 px-4 py-3 transition-all duration-150 hover:border-primary/30 hover:bg-card/80 cursor-pointer"
+      onClick={handleCardClick}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleCardClick(); } }}
+    >
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-sm font-semibold leading-snug text-foreground">
+        <h3 className="text-sm font-semibold leading-snug text-foreground group-hover/insight:text-primary transition-colors">
           {opportunity.title}
         </h3>
         <Badge
@@ -38,8 +52,8 @@ export function OpportunityCard({ completedActions, opportunity, onActionClick, 
       {relatedAction && isRelatedCompleted && onViewResults ? (
         <button
           type="button"
-          className="group/link mt-0.5 flex w-fit items-center gap-1 text-[11px] font-medium text-emerald-600 transition-colors hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
-          onClick={() => onViewResults(relatedAction.id)}
+          className="group/link mt-0.5 flex w-fit items-center gap-1 text-xs font-medium text-emerald-600 transition-colors hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+          onClick={(e) => { e.stopPropagation(); onViewResults(relatedAction.id); }}
         >
           <CheckCircleIcon className="size-3" />
           <span>View results</span>
@@ -48,10 +62,11 @@ export function OpportunityCard({ completedActions, opportunity, onActionClick, 
       ) : relatedAction && onActionClick ? (
         <button
           type="button"
-          className="group/link mt-0.5 flex w-fit items-center gap-1 text-[11px] font-medium text-primary/70 transition-colors hover:text-primary"
-          onClick={() =>
-            onActionClick(relatedAction.id, buildActionPrompt(relatedAction), relatedAction.title)
-          }
+          className="group/link mt-0.5 flex w-fit items-center gap-1 text-xs font-medium text-primary/70 transition-colors hover:text-primary"
+          onClick={(e) => {
+            e.stopPropagation();
+            onActionClick(relatedAction.id, buildActionPrompt(relatedAction), relatedAction.title);
+          }}
         >
           <span>{relatedAction.title}</span>
           <ArrowRightIcon className="size-3 transition-transform group-hover/link:translate-x-0.5" />
