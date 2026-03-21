@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { SidecarClient } from "@/lib/sidecar/client";
+import { cleanProviderName } from "@/features/agents/display-helpers";
 
 interface ConnectionsWorkspaceProps {
   authOverview: AuthOverview | null;
@@ -250,7 +251,7 @@ function ConnectionRow({
 
   return (
     <TableRow className="border-border/60 transition-colors hover:bg-muted/20">
-      <TableCell className="text-[12px] font-medium">{connection.providerName}</TableCell>
+      <TableCell className="text-[12px] font-medium">{cleanProviderName(connection.providerName)}</TableCell>
       <TableCell>
         <div className="flex items-center gap-1.5">
           <span className="text-[12px]">{connection.label}</span>
