@@ -83,35 +83,52 @@ function DashboardContent({
   const { suggestedActions, isLoading: isSuggestedLoading } = useSuggestedActions(agentId, client, workspaceReady);
 
   return (
-    <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 lg:p-6">
-      <CompanySummary
-        data={data}
-        domain={domain}
-        faviconSources={faviconSources}
-        isLoading={isLoading}
-        error={error}
-      />
-      <ActionCardGrid
-        completedActions={completedActions}
-        isLoading={isActionLoading}
-        onActionClick={onActionClick}
-        onViewResults={onViewResults}
-      />
-      <SuggestedActionGrid
-        actions={suggestedActions}
-        completedActions={completedActions}
-        isGenerating={isSuggestedLoading}
-        isActionLoading={isActionLoading}
-        onActionClick={onActionClick}
-        onViewResults={onViewResults}
-      />
-      <OpportunitySection
-        completedActions={completedActions}
-        files={files}
-        isLoading={isLoading}
-        onActionClick={onActionClick}
-        onViewResults={onViewResults}
-      />
+    <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
+      {/* Section 1: Company context */}
+      <div className="pb-5">
+        <CompanySummary
+          data={data}
+          domain={domain}
+          faviconSources={faviconSources}
+          isLoading={isLoading}
+          error={error}
+        />
+      </div>
+
+      {/* Divider: summary → actions */}
+      <div className="border-b border-border/30" />
+
+      {/* Section 2: Action cards (starter + suggested) — dominant area */}
+      <div className="flex flex-col gap-6 py-6">
+        <ActionCardGrid
+          completedActions={completedActions}
+          isLoading={isActionLoading}
+          onActionClick={onActionClick}
+          onViewResults={onViewResults}
+        />
+        <SuggestedActionGrid
+          actions={suggestedActions}
+          completedActions={completedActions}
+          isGenerating={isSuggestedLoading}
+          isActionLoading={isActionLoading}
+          onActionClick={onActionClick}
+          onViewResults={onViewResults}
+        />
+      </div>
+
+      {/* Divider: actions → insights */}
+      <div className="border-b border-border/30" />
+
+      {/* Section 3: Insights — supporting info */}
+      <div className="pt-6">
+        <OpportunitySection
+          completedActions={completedActions}
+          files={files}
+          isLoading={isLoading}
+          onActionClick={onActionClick}
+          onViewResults={onViewResults}
+        />
+      </div>
     </div>
   );
 }
