@@ -1230,7 +1230,7 @@ export class EmbeddedGatewayClient {
 
     if (!exists) {
       const created = await this.request<{ agentId: string }>("agents.create", {
-        name: agent.name,
+        name: agent.name || agent.id,
         workspace: agent.workspaceDir,
       });
 
