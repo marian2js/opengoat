@@ -8,6 +8,7 @@ import {
   LightbulbIcon,
   PackageIcon,
   PencilIcon,
+  SparklesIcon,
   StoreIcon,
   TrendingUpIcon,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { SidecarClient } from "@/lib/sidecar/client";
+import { isRefinableSection } from "@/features/brain/lib/refine-context-prompt";
 
 interface BrainSection {
   id: string;
@@ -126,10 +128,11 @@ Add domain-specific knowledge, documentation excerpts, API references, or any ot
 export interface BrainWorkspaceProps {
   agentId?: string | undefined;
   client: SidecarClient | null;
+  onRefineContext?: (sectionId: string) => void;
   sectionId: string;
 }
 
-export function BrainWorkspace({ agentId, client, sectionId }: BrainWorkspaceProps) {
+export function BrainWorkspace({ agentId, client, onRefineContext, sectionId }: BrainWorkspaceProps) {
   const section = BRAIN_SECTIONS.find((s) => s.id === sectionId) ?? BRAIN_SECTIONS[0]!;
 
   if (!agentId || !client) {
@@ -145,6 +148,7 @@ export function BrainWorkspace({ agentId, client, sectionId }: BrainWorkspacePro
       key={`${agentId}-${section.id}`}
       agentId={agentId}
       client={client}
+      onRefineContext={onRefineContext}
       section={section}
     />
   );
@@ -157,10 +161,12 @@ export function BrainWorkspace({ agentId, client, sectionId }: BrainWorkspacePro
 function BrainEditor({
   agentId,
   client,
+  onRefineContext,
   section,
 }: {
   agentId: string;
   client: SidecarClient;
+  onRefineContext?: (sectionId: string) => void;
   section: BrainSection;
 }) {
   const [content, setContent] = useState("");
@@ -313,6 +319,7 @@ function BrainEditor({
                 Start typing or use the template below. Changes auto-save.
               </span>
             </div>
+
             <button
               type="button"
               onClick={() => {
@@ -349,6 +356,16 @@ function BrainEditor({
       <SectionHeader section={section} saveState={saveState} fileExists={fileExists}>
         {section.id === "knowledge" ? (
           <ImportButton fileInputRef={fileInputRef} onImport={handleImport} onFileSelected={handleFileSelected} />
+        ) : null}
+        {fileExists && onRefineContext && isRefinableSection(section.id) ? (
+          <button
+            type="button"
+            onClick={() => onRefineContext(section.id)}
+            className="flex items-center gap-1.5 rounded-md border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <SparklesIcon className="size-3.5" />
+            Refine context
+          </button>
         ) : null}
         {isEditing ? (
           <button

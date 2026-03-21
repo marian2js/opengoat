@@ -18,6 +18,11 @@ import { SidecarClient } from "@/lib/sidecar/client";
 import { toast } from "sonner";
 import { deduplicateLabel } from "@/lib/utils/deduplicate-label";
 import { getActionMapping, getCompletedActionIds, setActionMapping } from "@/lib/utils/action-map";
+import {
+  buildRefineContextPrompt,
+  buildRefineContextLabel,
+  buildRefineContextActionId,
+} from "@/features/brain/lib/refine-context-prompt";
 type AppView = "dashboard" | "connections" | "connections-add" | "chat" | "brain" | "agents" | "settings";
 
 const ACTIVE_AGENT_KEY = "opengoat:activeAgentId";
@@ -232,6 +237,16 @@ export function App() {
     [client, activeAgentId, isActionLoading, sessions],
   );
 
+  const handleRefineContext = useCallback(
+    (sectionId: string) => {
+      const actionId = buildRefineContextActionId(sectionId);
+      const prompt = buildRefineContextPrompt(sectionId);
+      const label = buildRefineContextLabel(sectionId);
+      void handleActionClick(actionId, prompt, label);
+    },
+    [handleActionClick],
+  );
+
   const handleViewResults = useCallback(
     (actionId: string) => {
       const sessionId = getActionMapping(actionId);
@@ -430,6 +445,7 @@ export function App() {
             <BrainWorkspace
               agentId={activeAgentId}
               client={client}
+              onRefineContext={handleRefineContext}
               sectionId={brainSection}
             />
           ) : currentView === "connections" ? (
