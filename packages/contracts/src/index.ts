@@ -365,6 +365,42 @@ export type BootstrapPromptList = z.infer<typeof bootstrapPromptListSchema>;
 export type WorkspaceFileCheck = z.infer<typeof workspaceFileCheckSchema>;
 export type WorkspaceFileContent = z.infer<typeof workspaceFileContentSchema>;
 
+// --- Skills ---
+
+export const resolvedSkillSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  source: z.enum(["managed", "extra"]),
+});
+
+export const skillListSchema = z.object({
+  skills: z.array(resolvedSkillSchema),
+});
+
+export const installSkillRequestSchema = z.object({
+  skillName: z.string().min(1),
+  sourceUrl: z.string().min(1).optional(),
+});
+
+export const installSkillResultSchema = z.object({
+  skillId: z.string().min(1),
+  skillName: z.string().min(1),
+  source: z.string().min(1),
+  installed: z.boolean(),
+});
+
+export const removeSkillResultSchema = z.object({
+  skillId: z.string().min(1),
+  removed: z.boolean(),
+});
+
+export type ResolvedSkillContract = z.infer<typeof resolvedSkillSchema>;
+export type SkillList = z.infer<typeof skillListSchema>;
+export type InstallSkillRequestContract = z.infer<typeof installSkillRequestSchema>;
+export type InstallSkillResultContract = z.infer<typeof installSkillResultSchema>;
+export type RemoveSkillResultContract = z.infer<typeof removeSkillResultSchema>;
+
 export const appManifest = appManifestSchema.parse(appManifestJson);
 
 export function createBasicAuthHeader(

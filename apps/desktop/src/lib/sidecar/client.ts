@@ -11,6 +11,10 @@ import {
   createAgentRequestSchema,
   createAgentSessionRequestSchema,
   deleteAgentResponseSchema,
+  installSkillRequestSchema,
+  installSkillResultSchema,
+  removeSkillResultSchema,
+  skillListSchema,
   updateAgentRequestSchema,
   updateAgentSessionRequestSchema,
   providerModelCatalogSchema,
@@ -33,11 +37,14 @@ import {
   type AuthSession,
   type BootstrapPromptList,
   type ChatBootstrap,
+  type InstallSkillResultContract,
   type ProviderModelCatalog,
+  type RemoveSkillResultContract,
   type SavedConnection,
   type SidecarBootstrap,
   type SidecarConnection,
   type SidecarHealth,
+  type SkillList,
   type WorkspaceFileCheck,
   type WorkspaceFileContent,
 } from "@opengoat/contracts";
@@ -146,6 +153,33 @@ export class SidecarClient {
     }
 
     return response;
+  }
+
+  async listSkills(agentId: string): Promise<SkillList> {
+    return skillListSchema.parse(
+      await this.request(`/agents/${encodeURIComponent(agentId)}/skills`),
+    );
+  }
+
+  async installSkill(
+    agentId: string,
+    payload: { skillName: string; sourceUrl?: string },
+  ): Promise<InstallSkillResultContract> {
+    return installSkillResultSchema.parse(
+      await this.request(`/agents/${encodeURIComponent(agentId)}/skills`, {
+        body: JSON.stringify(installSkillRequestSchema.parse(payload)),
+        method: "POST",
+      }),
+    );
+  }
+
+  async removeSkill(agentId: string, skillId: string): Promise<RemoveSkillResultContract> {
+    return removeSkillResultSchema.parse(
+      await this.request(
+        `/agents/${encodeURIComponent(agentId)}/skills/${encodeURIComponent(skillId)}`,
+        { method: "DELETE" },
+      ),
+    );
   }
 
   async authOverview(): Promise<AuthOverview> {

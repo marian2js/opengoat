@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
+import { SkillsSection } from "./SkillsSection";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -322,6 +323,9 @@ export function ProjectSettings({
           </div>
         </CardContent>
       </Card>
+
+      {/* ---- Skills ---- */}
+      <SkillsSection agent={agent} client={client} />
 
       {/* ---- Danger zone ---- */}
       <Card className="border-destructive/30">

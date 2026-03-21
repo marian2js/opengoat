@@ -1,4 +1,11 @@
 import { serve } from "@hono/node-server";
+import {
+  NodeCommandRunner,
+  NodeFileSystem,
+  NodeOpenGoatPathsProvider,
+  NodePathPort,
+  SkillService,
+} from "@opengoat/core";
 import packageJson from "../package.json" with { type: "json" };
 import { RuntimeProviderAuthService } from "./auth/service.ts";
 import { RuntimeAuthSessionManager } from "./auth/sessions.ts";
@@ -42,6 +49,13 @@ export async function startSidecarServer(
     paths: gatewaySupervisor.paths,
     target: gatewaySupervisor.connection,
   });
+  const opengoatPaths = new NodeOpenGoatPathsProvider().getPaths();
+  const skillService = new SkillService({
+    fileSystem: new NodeFileSystem(),
+    pathPort: new NodePathPort(),
+    commandRunner: new NodeCommandRunner(),
+  });
+
   const runtime = {
     authService,
     authSessions: new RuntimeAuthSessionManager(() => authService, {
@@ -52,6 +66,8 @@ export async function startSidecarServer(
     config,
     embeddedGateway,
     gatewaySupervisor,
+    opengoatPaths,
+    skillService,
     startedAt: Date.now(),
     version: packageJson.version,
   };

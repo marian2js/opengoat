@@ -11,6 +11,10 @@ import {
   createProjectAgentRequestSchema,
   deleteAgentResponseSchema,
   deleteAgentSessionResponseSchema,
+  installSkillRequestSchema,
+  installSkillResultSchema,
+  removeSkillResultSchema,
+  skillListSchema,
   updateAgentRequestSchema,
   updateAgentSessionRequestSchema,
   workspaceFileCheckSchema,
@@ -185,6 +189,63 @@ export function createAgentRoutes(runtime: SidecarRuntime): Hono {
       payload.label,
     );
     return context.json(agentSessionSchema.parse(session));
+  });
+
+  // ---- Skill management ----
+
+  app.get("/:agentId/skills", async (context) => {
+    const agentId = context.req.param("agentId");
+    const skills = await runtime.skillService.listSkills(
+      runtime.opengoatPaths,
+      agentId,
+    );
+    return context.json(
+      skillListSchema.parse({
+        skills: skills.map((s) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description || undefined,
+          source: s.source,
+        })),
+      }),
+    );
+  });
+
+  app.post("/:agentId/skills", async (context) => {
+    const agentId = context.req.param("agentId");
+    const payload = installSkillRequestSchema.parse(await context.req.json());
+    const result = await runtime.skillService.installSkill(
+      runtime.opengoatPaths,
+      {
+        agentId,
+        skillName: payload.skillName,
+        ...(payload.sourceUrl ? { sourceUrl: payload.sourceUrl } : {}),
+      },
+    );
+    return context.json(
+      installSkillResultSchema.parse({
+        skillId: result.skillId,
+        skillName: result.skillName,
+        source: result.source,
+        installed: true,
+      }),
+      201,
+    );
+  });
+
+  app.delete("/:agentId/skills/:skillId", async (context) => {
+    const agentId = context.req.param("agentId");
+    const skillId = context.req.param("skillId");
+    await runtime.skillService.removeSkill(runtime.opengoatPaths, {
+      agentId,
+      skillId,
+    });
+    return context.json(
+      removeSkillResultSchema.parse({
+        skillId,
+        removed: true,
+      }),
+    );
   });
 
   return app;

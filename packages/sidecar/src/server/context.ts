@@ -1,3 +1,4 @@
+import type { OpenGoatPaths, SkillService } from "@opengoat/core";
 import type { SidecarConfig } from "../config.ts";
 import type { RuntimeProviderAuthService } from "../auth/service.ts";
 import type { RuntimeAuthSessionManager } from "../auth/sessions.ts";
@@ -10,6 +11,8 @@ export interface SidecarRuntime {
   config: SidecarConfig;
   embeddedGateway: EmbeddedGatewayClient;
   gatewaySupervisor: EmbeddedGatewaySupervisor;
+  opengoatPaths: OpenGoatPaths;
+  skillService: SkillService;
   startedAt: number;
   version: string;
 }
