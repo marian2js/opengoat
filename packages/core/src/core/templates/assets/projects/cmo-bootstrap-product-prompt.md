@@ -26,6 +26,7 @@ Build a concise but information-dense source of truth about the product.
 - Preserve confirmed facts.
 - Remove obvious contradictions if new evidence is stronger.
 - Keep the file compact and easy to re-read.
+- Infer brand voice signals from the website's copy, tone, headlines, CTAs, and messaging style. These signals help downstream skills match the company's voice.
 
 ## `PRODUCT.md` structure
 Use this structure:
@@ -71,6 +72,11 @@ Use this structure:
 - Language used repeatedly
 - Main value props
 - Category terms the company uses for itself
+
+## Brand voice signals
+- Tone observed on the website (e.g. formal, casual, playful, authoritative)
+- Communication style (e.g. technical, conversational, educational, aspirational)
+- Brand personality — 3-5 adjectives that capture the brand's feel (inferred from website copy, headlines, CTAs, and messaging style)
 
 ## Open questions
 - Important things that remain unclear

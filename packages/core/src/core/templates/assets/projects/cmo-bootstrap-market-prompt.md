@@ -26,6 +26,7 @@ Research should include:
 - category pages
 - review sites if useful
 - public discussions if useful
+- testimonials, reviews, and site copy for switching dynamics and customer language signals
 
 ## Instructions
 - Do not just list competitors.
@@ -86,6 +87,18 @@ Use this structure:
 - Underserved angles
 - Messaging gaps
 - Segment opportunities
+
+## Switching dynamics
+- Push — frustrations with current solutions that drive customers to look for alternatives
+- Pull — what attracts customers to this product specifically
+- Habit — what keeps users stuck on their current solution (inertia, integrations, familiarity)
+- Anxiety — worries about switching (migration risk, learning curve, cost, vendor lock-in)
+
+## Customer language
+- How customers describe the problem (from testimonials, reviews, site copy, public discussions)
+- How customers describe the solution (the words they use, not the company's marketing language)
+- Terms to use — phrases that resonate with the target audience
+- Terms to avoid — jargon, overused buzzwords, or framing that doesn't match how customers think
 
 ## Open questions
 - Important uncertainties to resolve later
