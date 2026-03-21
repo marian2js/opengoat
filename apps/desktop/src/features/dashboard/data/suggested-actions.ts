@@ -70,7 +70,7 @@ function isValidSuggestedAction(item: unknown): item is SuggestedActionData {
     typeof obj.promise === "string" && obj.promise.length > 0 &&
     typeof obj.description === "string" && obj.description.length > 0 &&
     typeof obj.category === "string" && VALID_CATEGORIES.has(obj.category) &&
-    Array.isArray(obj.skills) && obj.skills.every((s: unknown) => typeof s === "string") &&
+    (obj.skills === undefined || (Array.isArray(obj.skills) && obj.skills.every((s: unknown) => typeof s === "string"))) &&
     typeof obj.prompt === "string" && obj.prompt.length > 0
   );
 }
@@ -112,8 +112,8 @@ export function parseSuggestedActions(raw: string): SuggestedActionData[] {
 export function toActionCard(data: SuggestedActionData): ActionCard {
   return {
     ...data,
+    skills: data.skills ?? [],
     icon: resolveIcon(data.category),
-    skills: data.skills,
   };
 }
 
@@ -127,7 +127,19 @@ export const SUGGESTED_ACTIONS_PROMPT = `You are an expert startup marketing str
 
 Read the workspace context files — PRODUCT.md, MARKET.md, and GROWTH.md — to understand this business deeply.
 
-Then suggest 2-3 action cards that are SPECIFIC to this business. Each card should represent a concrete marketing task the founder can execute with AI assistance.
+AVAILABLE SKILL CATALOG — reference these skill IDs in your suggestions:
+- CRO: page-cro, signup-flow-cro, onboarding-cro, form-cro, popup-cro, paywall-upgrade-cro
+- Content & Copy: copywriting, copy-editing, cold-email, email-sequence, social-content
+- SEO & Discovery: seo-audit, ai-seo, schema-markup, site-architecture, programmatic-seo, content-strategy
+- Paid & Distribution: paid-ads, ad-creative
+- Measurement & Testing: analytics-tracking, ab-test-setup
+- Retention: churn-prevention
+- Growth Engineering: referral-program, free-tool-strategy
+- Strategy: marketing-ideas, marketing-psychology, launch-strategy, pricing-strategy, lead-magnets
+- Sales & GTM: revops, sales-enablement, competitor-alternatives
+- Foundation: product-marketing-context
+
+Analyze the workspace context, consider which skills would be most impactful for this business, and suggest 2-3 action cards. Each card should represent a concrete marketing task that produces a specific deliverable.
 
 IMPORTANT CONSTRAINTS:
 - The following action cards ALREADY exist. Do NOT suggest duplicates or variations of these:
@@ -137,7 +149,8 @@ ${FIXED_CARD_TITLES}
 - Do NOT use vague titles like "Improve marketing", "Build strategy", "Optimize funnel"
 - Prompts must reference PRODUCT.md, MARKET.md, and GROWTH.md
 - Categories must be one of: "conversion", "distribution", "growth", "messaging", "research", "seo"
-- Skills must be an array of skill IDs (can be empty)
+- Skills must be an array of skill IDs from the catalog above — pick the 1-3 most relevant skills for each action
+- Each suggestion must produce a concrete deliverable
 
 Return ONLY a JSON array with 2-3 objects. No other text, no markdown fences, no explanation.
 
@@ -155,12 +168,21 @@ Each object must have these exact fields:
 EXAMPLES OF GOOD SUGGESTIONS (for a product analytics tool):
 [
   {
+    "id": "build-referral-program",
+    "title": "Design a referral program",
+    "promise": "Get a complete referral program with incentives, mechanics, and tracking",
+    "description": "Designs a referral program tailored to this product using viral loop mechanics, incentive structures, and tracking setup.",
+    "category": "growth",
+    "skills": ["referral-program"],
+    "prompt": "Read PRODUCT.md, MARKET.md, and GROWTH.md. Design a complete referral program with incentive structure, viral mechanics, referral flow, tracking setup, and launch plan."
+  },
+  {
     "id": "draft-comparison-vs-mixpanel",
     "title": "Draft comparison page vs Mixpanel",
     "promise": "Create a detailed comparison page highlighting your advantages over Mixpanel",
     "description": "Analyzes Mixpanel's positioning and creates a comparison page draft that highlights your unique advantages, addresses common switching objections, and targets users searching for alternatives.",
     "category": "messaging",
-    "skills": ["copywriting"],
+    "skills": ["competitor-alternatives", "copywriting"],
     "prompt": "Read PRODUCT.md, MARKET.md, and GROWTH.md. Then create a detailed comparison page draft of our product vs Mixpanel..."
   }
 ]

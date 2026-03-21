@@ -64,7 +64,6 @@ void test("parseSuggestedActions: missing required fields filters out invalid ca
     { id: "no-title", promise: "p", description: "d", category: "seo", skills: [], prompt: "pr" },
     { id: "no-category", title: "T", promise: "p", description: "d", category: "invalid", skills: [], prompt: "pr" },
     { id: "", title: "Empty id", promise: "p", description: "d", category: "seo", skills: [], prompt: "pr" },
-    { id: "no-skills", title: "No skills", promise: "p", description: "d", category: "seo", prompt: "pr" },
   ]);
   const result = parseSuggestedActions(input);
   assert.equal(result.length, 1);
@@ -184,4 +183,78 @@ void test("parseSuggestedActions: accepts conversion and growth categories", () 
 void test("SUGGESTED_ACTIONS_PROMPT lists fixed card titles", () => {
   assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("Find launch communities"));
   assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("Draft Product Hunt launch"));
+});
+
+// ---------------------------------------------------------------------------
+// Skill catalog in prompt
+// ---------------------------------------------------------------------------
+
+void test("SUGGESTED_ACTIONS_PROMPT includes skill catalog with representative skill IDs", () => {
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("page-cro"), "Should include CRO skills");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("referral-program"), "Should include growth skills");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("paid-ads"), "Should include paid skills");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("churn-prevention"), "Should include retention skills");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("seo-audit"), "Should include SEO skills");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("cold-email"), "Should include email skills");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("pricing-strategy"), "Should include strategy skills");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("revops"), "Should include sales skills");
+});
+
+void test("SUGGESTED_ACTIONS_PROMPT lists all 6 categories", () => {
+  const categories = ["conversion", "distribution", "growth", "messaging", "research", "seo"];
+  for (const cat of categories) {
+    assert.ok(SUGGESTED_ACTIONS_PROMPT.includes(`"${cat}"`), `Should include category "${cat}"`);
+  }
+});
+
+void test("SUGGESTED_ACTIONS_PROMPT includes skills field in JSON schema", () => {
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes('"skills"'), "Should include skills field in schema");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("skill-id-1"), "Should show skills array example");
+});
+
+// ---------------------------------------------------------------------------
+// Backward compatibility — actions without skills field
+// ---------------------------------------------------------------------------
+
+void test("parseSuggestedActions: accepts action WITHOUT skills field (backward compat)", () => {
+  const input = JSON.stringify([
+    {
+      id: "legacy-action",
+      title: "Legacy action",
+      promise: "p",
+      description: "d",
+      category: "seo",
+      prompt: "Do something",
+    },
+  ]);
+  const result = parseSuggestedActions(input);
+  assert.equal(result.length, 1);
+  assert.equal(result[0]!.id, "legacy-action");
+});
+
+void test("toActionCard: defaults skills to empty array when input lacks skills", () => {
+  const data = {
+    id: "no-skills-card",
+    title: "No Skills",
+    promise: "p",
+    description: "d",
+    category: "seo" as const,
+    prompt: "Test prompt",
+  } as unknown as import("./suggested-actions").SuggestedActionData;
+  const card = toActionCard(data);
+  assert.deepEqual(card.skills, []);
+});
+
+void test("toActionCard: preserves skills when present", () => {
+  const data = {
+    id: "with-skills",
+    title: "With Skills",
+    promise: "p",
+    description: "d",
+    category: "growth" as const,
+    skills: ["referral-program", "lead-magnets"],
+    prompt: "Test prompt",
+  };
+  const card = toActionCard(data);
+  assert.deepEqual(card.skills, ["referral-program", "lead-magnets"]);
 });
