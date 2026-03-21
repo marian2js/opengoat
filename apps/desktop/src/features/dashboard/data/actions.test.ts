@@ -32,7 +32,9 @@ void test("all card ids are unique", () => {
 
 void test("all card categories are valid", () => {
   const validCategories: ActionCategory[] = [
+    "conversion",
     "distribution",
+    "growth",
     "messaging",
     "research",
     "seo",
@@ -130,7 +132,9 @@ void test("generate-content-ideas action card exists with correct properties", (
 
 void test("categoryConfig has an entry for every ActionCategory", () => {
   const categories: ActionCategory[] = [
+    "conversion",
     "distribution",
+    "growth",
     "messaging",
     "research",
     "seo",

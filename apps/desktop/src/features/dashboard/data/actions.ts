@@ -9,7 +9,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 
-export type ActionCategory = "distribution" | "messaging" | "research" | "seo";
+export type ActionCategory = "conversion" | "distribution" | "growth" | "messaging" | "research" | "seo";
 
 export interface ActionCard {
   id: string;
@@ -18,6 +18,8 @@ export interface ActionCard {
   description: string;
   icon: LucideIcon;
   category: ActionCategory;
+  skills: string[];
+  persona?: string;
   prompt: string;
 }
 
@@ -25,10 +27,20 @@ export const categoryConfig: Record<
   ActionCategory,
   { label: string; className: string }
 > = {
+  conversion: {
+    label: "Conversion",
+    className:
+      "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400",
+  },
   distribution: {
     label: "Distribution",
     className:
       "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  },
+  growth: {
+    label: "Growth",
+    className:
+      "border-teal-500/20 bg-teal-500/10 text-teal-700 dark:text-teal-400",
   },
   messaging: {
     label: "Messaging",
@@ -57,6 +69,7 @@ export const starterActions: ActionCard[] = [
       "Identifies the most relevant online communities, forums, and launch platforms where your target audience gathers. Returns a ranked list with fit reasoning, posting norms, and suggested angles.",
     icon: UsersIcon,
     category: "distribution",
+    skills: [],
     prompt: `You are an expert at identifying launch communities and distribution channels for startups.
 
 Read the workspace context files — PRODUCT.md, MARKET.md, and GROWTH.md — to understand this product, its target audience, market positioning, and growth opportunities.
@@ -82,6 +95,7 @@ End with a prioritized action plan: which 3 communities to target first and why.
       "Creates ready-to-use Product Hunt launch assets including tagline options, description variants, first comment drafts, and maker story angles.",
     icon: RocketIcon,
     category: "distribution",
+    skills: [],
     prompt: `You are an expert at Product Hunt launches for startups.
 
 Read the workspace context files — PRODUCT.md, MARKET.md, and GROWTH.md — to understand this product deeply.
@@ -107,6 +121,7 @@ Make everything specific to this product. No generic templates.`,
       "Analyzes Reddit to find the most relevant subreddits, their rules, audience fit, and provides tailored posting strategies for each.",
     icon: GlobeIcon,
     category: "distribution",
+    skills: [],
     prompt: `You are an expert at Reddit marketing for startups.
 
 Read the workspace context files — PRODUCT.md, MARKET.md, and GROWTH.md — to understand this product and its audience.
@@ -138,6 +153,7 @@ End with a Reddit launch playbook: week-by-week engagement plan.`,
       "Analyzes your current homepage hero section and generates improved headline, subheadline, and CTA variants that better communicate your value proposition to your ideal customer.",
     icon: MessageSquareIcon,
     category: "messaging",
+    skills: [],
     prompt: `You are an expert startup copywriter specializing in homepage messaging.
 
 Read the workspace context files — PRODUCT.md, MARKET.md, and GROWTH.md — to understand this product's value proposition, target audience, and competitive positioning.
@@ -167,6 +183,7 @@ For each option, explain why it would resonate with the target ICP. Be specific 
       "Performs a structured analysis of competitor positioning, messaging, and differentiation to identify gaps and opportunities for stronger positioning.",
     icon: SearchIcon,
     category: "research",
+    skills: [],
     prompt: `You are an expert competitive analyst specializing in startup positioning.
 
 Read the workspace context files — PRODUCT.md, MARKET.md, and GROWTH.md — to understand this product's market and competitive landscape.
@@ -206,6 +223,7 @@ Conduct a thorough competitor messaging analysis:
       "Reviews your site for the most impactful, quick-to-implement SEO improvements including meta tags, content structure, keyword opportunities, and technical issues.",
     icon: TrendingUpIcon,
     category: "seo",
+    skills: [],
     prompt: `You are an expert SEO consultant for startups.
 
 Read the workspace context files — PRODUCT.md, MARKET.md, and GROWTH.md — to understand this product, its market, and growth opportunities.
@@ -248,6 +266,7 @@ Be specific to this product's market and audience. No generic SEO checklists.`,
       "Produces specific, ranked content ideas — blog topics, social post themes, and content angles — based on your ICP, positioning, and growth opportunities. Each idea includes a target channel, format suggestion, and impact reasoning.",
     icon: LightbulbIcon,
     category: "messaging",
+    skills: [],
     prompt: `You are an expert content strategist for startups.
 
 Read the workspace context files — PRODUCT.md, MARKET.md, and GROWTH.md — to understand this product's value proposition, target audience, competitive landscape, and growth opportunities.

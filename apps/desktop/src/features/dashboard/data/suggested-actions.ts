@@ -1,7 +1,9 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowUpRightIcon,
   GlobeIcon,
   MessageSquareIcon,
+  MousePointerClickIcon,
   SearchIcon,
   SparklesIcon,
   TrendingUpIcon,
@@ -23,6 +25,7 @@ export interface SuggestedActionData {
   promise: string;
   description: string;
   category: ActionCategory;
+  skills: string[];
   prompt: string;
 }
 
@@ -37,7 +40,9 @@ export const SUGGESTED_ACTIONS_FILENAME = "SUGGESTED_ACTIONS.json";
 // ---------------------------------------------------------------------------
 
 const CATEGORY_ICONS: Record<ActionCategory, LucideIcon> = {
+  conversion: MousePointerClickIcon,
   distribution: GlobeIcon,
+  growth: ArrowUpRightIcon,
   messaging: MessageSquareIcon,
   research: SearchIcon,
   seo: TrendingUpIcon,
@@ -54,7 +59,7 @@ export function resolveIcon(category: string): LucideIcon {
 // JSON parser
 // ---------------------------------------------------------------------------
 
-const VALID_CATEGORIES = new Set<string>(["distribution", "messaging", "research", "seo"]);
+const VALID_CATEGORIES = new Set<string>(["conversion", "distribution", "growth", "messaging", "research", "seo"]);
 
 function isValidSuggestedAction(item: unknown): item is SuggestedActionData {
   if (typeof item !== "object" || item === null) return false;
@@ -65,6 +70,7 @@ function isValidSuggestedAction(item: unknown): item is SuggestedActionData {
     typeof obj.promise === "string" && obj.promise.length > 0 &&
     typeof obj.description === "string" && obj.description.length > 0 &&
     typeof obj.category === "string" && VALID_CATEGORIES.has(obj.category) &&
+    Array.isArray(obj.skills) && obj.skills.every((s: unknown) => typeof s === "string") &&
     typeof obj.prompt === "string" && obj.prompt.length > 0
   );
 }
@@ -107,6 +113,7 @@ export function toActionCard(data: SuggestedActionData): ActionCard {
   return {
     ...data,
     icon: resolveIcon(data.category),
+    skills: data.skills,
   };
 }
 
@@ -129,7 +136,8 @@ ${FIXED_CARD_TITLES}
 - Titles must imply a concrete result (e.g., "Draft comparison page vs [Competitor]", "Write launch post for r/[specific subreddit]")
 - Do NOT use vague titles like "Improve marketing", "Build strategy", "Optimize funnel"
 - Prompts must reference PRODUCT.md, MARKET.md, and GROWTH.md
-- Categories must be one of: "distribution", "messaging", "research", "seo"
+- Categories must be one of: "conversion", "distribution", "growth", "messaging", "research", "seo"
+- Skills must be an array of skill IDs (can be empty)
 
 Return ONLY a JSON array with 2-3 objects. No other text, no markdown fences, no explanation.
 
@@ -139,7 +147,8 @@ Each object must have these exact fields:
   "title": "Short actionable title (under 50 chars)",
   "promise": "One-line benefit statement (under 100 chars)",
   "description": "2-3 sentence description of what this action produces",
-  "category": "distribution" | "messaging" | "research" | "seo",
+  "category": "conversion" | "distribution" | "growth" | "messaging" | "research" | "seo",
+  "skills": ["skill-id-1", "skill-id-2"],
   "prompt": "Full detailed prompt that will be sent to the AI agent. Must reference PRODUCT.md, MARKET.md, and GROWTH.md workspace files. Must produce a concrete, useful output."
 }
 
@@ -151,6 +160,7 @@ EXAMPLES OF GOOD SUGGESTIONS (for a product analytics tool):
     "promise": "Create a detailed comparison page highlighting your advantages over Mixpanel",
     "description": "Analyzes Mixpanel's positioning and creates a comparison page draft that highlights your unique advantages, addresses common switching objections, and targets users searching for alternatives.",
     "category": "messaging",
+    "skills": ["copywriting"],
     "prompt": "Read PRODUCT.md, MARKET.md, and GROWTH.md. Then create a detailed comparison page draft of our product vs Mixpanel..."
   }
 ]
