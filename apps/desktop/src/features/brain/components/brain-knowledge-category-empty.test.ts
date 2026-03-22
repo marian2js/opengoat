@@ -10,13 +10,13 @@ const src = readFileSync(
 
 // ---------------------------------------------------------------------------
 // AC1: "References" section shows a dashed-border container with
-//      "No references yet" when empty
+//      "No references imported" when empty
 // ---------------------------------------------------------------------------
 
-void test("Knowledge content view has 'No references yet' placeholder text", () => {
+void test("Knowledge content view has 'No references imported' placeholder text", () => {
   assert.ok(
-    src.includes("No references yet"),
-    "Must show 'No references yet' text when References section is empty",
+    src.includes("No references imported"),
+    "Must show 'No references imported' text when References section is empty",
   );
 });
 
@@ -24,26 +24,26 @@ void test("References empty state uses dashed-border container", () => {
   // The inline empty state for an empty References section must use
   // the same dashed-border pattern as other empty states in the project
   assert.ok(
-    src.includes("border-dashed") && src.includes("No references yet"),
+    src.includes("border-dashed") && src.includes("No references imported"),
     "References inline empty state must use dashed-border styling",
   );
 });
 
 // ---------------------------------------------------------------------------
 // AC2: "Notes" section shows a dashed-border container with
-//      "No notes yet" when empty
+//      "No notes added" when empty
 // ---------------------------------------------------------------------------
 
-void test("Knowledge content view has 'No notes yet' placeholder text", () => {
+void test("Knowledge content view has 'No notes added' placeholder text", () => {
   assert.ok(
-    src.includes("No notes yet"),
-    "Must show 'No notes yet' text when Notes section is empty",
+    src.includes("No notes added"),
+    "Must show 'No notes added' text when Notes section is empty",
   );
 });
 
 void test("Notes empty state uses dashed-border container", () => {
   assert.ok(
-    src.includes("border-dashed") && src.includes("No notes yet"),
+    src.includes("border-dashed") && src.includes("No notes added"),
     "Notes inline empty state must use dashed-border styling",
   );
 });

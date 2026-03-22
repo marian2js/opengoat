@@ -551,7 +551,7 @@ function BrainEditor({
             className="min-h-[500px] w-full resize-none rounded-lg border border-border/50 bg-transparent p-4 font-mono text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-ring focus:ring-1 focus:ring-ring/30"
           />
         ) : section.id === "knowledge" ? (
-          <KnowledgeContentView content={content} />
+          <KnowledgeContentView content={content} onImport={handleImport} />
         ) : section.id === "memory" ? (
           <MemoryContentView content={content} />
         ) : (
@@ -746,23 +746,35 @@ function KnowledgeInlineEmpty({
   icon: Icon,
   title,
   helperText,
+  onImport,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   helperText: string;
+  onImport?: () => void;
 }) {
   return (
-    <div className="mt-4 flex min-h-[120px] flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 p-6 text-center">
+    <div className="mt-4 flex min-h-[80px] flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 px-6 py-4 text-center">
       <div className="flex size-10 items-center justify-center rounded-full bg-muted/50">
         <Icon className="size-5 text-muted-foreground/50" />
       </div>
       <p className="mt-3 text-sm font-medium text-muted-foreground">{title}</p>
       <p className="mt-1 text-xs text-muted-foreground/60">{helperText}</p>
+      {onImport ? (
+        <button
+          type="button"
+          onClick={onImport}
+          className="mt-3 flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <FileUpIcon className="size-3.5" />
+          Import file
+        </button>
+      ) : null}
     </div>
   );
 }
 
-function KnowledgeContentView({ content }: { content: string }) {
+function KnowledgeContentView({ content, onImport }: { content: string; onImport?: () => void }) {
   const stripped = stripLeadingH1(content);
   const empty = getEmptyKnowledgeSections(stripped);
   const hasEmptySections = empty.references || empty.notes;
@@ -810,14 +822,15 @@ function KnowledgeContentView({ content }: { content: string }) {
             {isReferencesEmpty ? (
               <KnowledgeInlineEmpty
                 icon={BookmarkIcon}
-                title="No references yet"
+                title="No references imported"
                 helperText="Import a file or click Edit to add links and documents."
+                onImport={onImport}
               />
             ) : null}
             {isNotesEmpty ? (
               <KnowledgeInlineEmpty
                 icon={StickyNoteIcon}
-                title="No notes yet"
+                title="No notes added"
                 helperText="Click Edit to capture insights and observations."
               />
             ) : null}
@@ -842,7 +855,7 @@ function MemoryInlineEmpty({
   helperText: string;
 }) {
   return (
-    <div className="mt-4 flex min-h-[120px] flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 p-6 text-center">
+    <div className="mt-4 flex min-h-[80px] flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 px-6 py-4 text-center">
       <div className="flex size-10 items-center justify-center rounded-full bg-muted/50">
         <Icon className="size-5 text-muted-foreground/50" />
       </div>

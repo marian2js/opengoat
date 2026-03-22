@@ -44,22 +44,22 @@ void test("Inline empty state containers use dashed border styling", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC4: Each section has at least min-h-[120px]
+// AC4: Each section has at least min-h-[80px]
 // ---------------------------------------------------------------------------
 
-void test("MemoryInlineEmpty has min-h-[120px]", () => {
+void test("MemoryInlineEmpty has min-h-[80px]", () => {
   assert.ok(
-    src.includes("min-h-[120px]"),
-    "Empty state containers must have min-h-[120px] to prevent collapse",
+    src.includes("min-h-[80px]"),
+    "Empty state containers must have min-h-[80px] to prevent collapse",
   );
 });
 
-void test("KnowledgeInlineEmpty has min-h-[120px]", () => {
+void test("KnowledgeInlineEmpty has min-h-[80px]", () => {
   // Both use the same min-h pattern
-  const matches = src.match(/min-h-\[120px\]/g);
+  const matches = src.match(/min-h-\[80px\]/g);
   assert.ok(
     matches && matches.length >= 2,
-    "Both Memory and Knowledge inline empty states must have min-h-[120px]",
+    "Both Memory and Knowledge inline empty states must have min-h-[80px]",
   );
 });
 
