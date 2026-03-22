@@ -452,6 +452,10 @@ export function App() {
             <ConnectionsWorkspace
               authOverview={authOverview}
               client={client}
+              onAddConnection={() => {
+                setReturnFromConnectionsHash("#connections");
+                window.location.hash = "#connections/add";
+              }}
               onAuthOverviewChange={setAuthOverview}
             />
           ) : currentView === "settings" && activeAgent && client ? (

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckIcon, LoaderCircleIcon, RefreshCcwIcon, Trash2Icon } from "lucide-react";
+import { CheckIcon, LoaderCircleIcon, PlusIcon, RefreshCcwIcon, Trash2Icon } from "lucide-react";
 import type { AuthOverview, ProviderModelCatalog, SavedConnection } from "@/app/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,12 +18,14 @@ import { cleanProviderName } from "@/features/agents/display-helpers";
 interface ConnectionsWorkspaceProps {
   authOverview: AuthOverview | null;
   client: SidecarClient | null;
+  onAddConnection?: () => void;
   onAuthOverviewChange: (nextOverview: AuthOverview) => void;
 }
 
 export function ConnectionsWorkspace({
   authOverview,
   client,
+  onAddConnection,
   onAuthOverviewChange,
 }: ConnectionsWorkspaceProps) {
   const storedConnections = useMemo(
@@ -170,19 +172,33 @@ export function ConnectionsWorkspace({
               Manage default connections, models, and credentials.
             </p>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 rounded-md text-[11px] text-muted-foreground"
-            disabled={!client || isBusy || isRefreshing || Boolean(modelBusyProviderId)}
-            onClick={() => {
-              void refreshOverview();
-            }}
-          >
-            <RefreshCcwIcon className={cn("size-3", isRefreshing && "animate-spin")} />
-            {isRefreshing ? "Refreshing..." : "Refresh"}
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {onAddConnection ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 rounded-md text-[11px]"
+                onClick={onAddConnection}
+              >
+                <PlusIcon className="size-3" />
+                Add connection
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 rounded-md text-[11px] text-muted-foreground"
+              disabled={!client || isBusy || isRefreshing || Boolean(modelBusyProviderId)}
+              onClick={() => {
+                void refreshOverview();
+              }}
+            >
+              <RefreshCcwIcon className={cn("size-3", isRefreshing && "animate-spin")} />
+              {isRefreshing ? "Refreshing..." : "Refresh"}
+            </Button>
+          </div>
         </div>
 
         {storedConnections.length === 0 ? (
@@ -228,6 +244,14 @@ export function ConnectionsWorkspace({
             </Table>
           </div>
         )}
+
+        {storedConnections.length > 0 ? (
+          <div className="mt-3 rounded-lg border border-dashed border-border/40 bg-muted/10 px-4 py-3.5">
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+              Add more connections to access different AI providers and models.
+            </p>
+          </div>
+        ) : null}
       </section>
     </div>
   );

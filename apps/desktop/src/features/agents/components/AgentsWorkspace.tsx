@@ -396,17 +396,32 @@ export function AgentsWorkspace({
                 : formatAgentCount(agents.length)}
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 rounded-md text-[11px] text-muted-foreground"
-            onClick={() => {
-              void refreshAgents();
-            }}
-          >
-            <RefreshCcwIcon className="size-3" />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 rounded-md text-[11px]"
+              onClick={() => {
+                setFeedback(null);
+                setErrorMessage(null);
+                setIsCreateOpen(true);
+              }}
+            >
+              <PlusIcon className="size-3" />
+              Add agent
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 rounded-md text-[11px] text-muted-foreground"
+              onClick={() => {
+                void refreshAgents();
+              }}
+            >
+              <RefreshCcwIcon className="size-3" />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-col">
@@ -520,6 +535,15 @@ export function AgentsWorkspace({
             })
           )}
         </div>
+
+        {!isLoading && agents.length > 0 ? (
+          <div className="border-t border-dashed border-border/40 px-4 py-4 lg:px-5">
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+              Add another agent to expand your library. Connect to different
+              providers or configure specialized models for each workflow.
+            </p>
+          </div>
+        ) : null}
       </section>
     </div>
   );
