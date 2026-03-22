@@ -24,6 +24,7 @@ import {
 } from "@/lib/utils/favicon";
 import { groupSessionsByDate } from "@/lib/utils/group-sessions-by-date";
 import { getDeEmphasizedSessionIds } from "@/lib/utils/session-rerun";
+import { isUnnamedSession } from "@/lib/utils/unnamed-session";
 import { cn } from "@/lib/utils";
 import {
   Collapsible,
@@ -407,6 +408,7 @@ function SessionItem({
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const label = formatSessionLabel(session);
+  const unnamed = isUnnamedSession(session.label);
 
   function commitRename(): void {
     const value = inputRef.current?.value.trim();
@@ -448,10 +450,13 @@ function SessionItem({
         onClick={() => {
           onSelect?.(session.id);
         }}
-        className={cn(deEmphasized && !isActive && "opacity-45")}
+        className={cn(
+          deEmphasized && !isActive && "opacity-45",
+          unnamed && !isActive && "text-sidebar-foreground/50",
+        )}
       >
         <MessageSquareIcon />
-        <span className="truncate">{label}</span>
+        <span className={cn("truncate", unnamed && "italic")}>{label}</span>
       </SidebarMenuButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
