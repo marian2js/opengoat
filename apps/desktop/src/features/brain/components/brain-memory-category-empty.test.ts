@@ -47,7 +47,7 @@ void test("Memory inline empty states use dashed-border container", () => {
 
 void test("Key Decisions empty state has contextual helper text", () => {
   assert.ok(
-    src.includes("Add one via Edit above") || src.includes("Edit above"),
+    src.includes("click Edit") || src.includes("Chat with your agent"),
     "Key Decisions empty state needs CTA helper text referencing the Edit action",
   );
 });

@@ -702,7 +702,7 @@ function KnowledgeEmptyState({
 // ---------------------------------------------------------------------------
 
 const KNOWLEDGE_PROSE_CLASSES =
-  "prose prose-sm prose-invert max-w-none [&>h1:first-child]:hidden [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-0 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-3 [&_h2]:mt-8 [&_h2]:pt-6 [&_h2]:border-t [&_h2]:border-border/20 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-foreground/80 [&_p]:mb-3 [&_ul]:text-sm [&_ul]:text-foreground/80 [&_ul]:mb-3 [&_ul]:ml-1 [&_ol]:text-sm [&_ol]:text-foreground/80 [&_ol]:mb-3 [&_li]:mb-1.5 [&_li]:leading-relaxed [&_strong]:text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_hr]:border-border/40 [&_hr]:my-6 [&_table]:w-full [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:pb-2 [&_th]:border-b [&_td]:text-sm [&_td]:py-1.5 [&_td]:border-b [&_td]:border-border/30 [&_blockquote]:border-l-2 [&_blockquote]:border-border/60 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground";
+  "prose prose-sm dark:prose-invert max-w-none [&>h1:first-child]:hidden [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-0 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-3 [&_h2]:mt-8 [&_h2]:pt-6 [&_h2]:border-t [&_h2]:border-border/20 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-foreground/80 [&_p]:mb-3 [&_ul]:text-sm [&_ul]:text-foreground/80 [&_ul]:mb-3 [&_ul]:ml-1 [&_ol]:text-sm [&_ol]:text-foreground/80 [&_ol]:mb-3 [&_li]:mb-1.5 [&_li]:leading-relaxed [&_strong]:text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_hr]:border-border/40 [&_hr]:my-6 [&_table]:w-full [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:pb-2 [&_th]:border-b [&_td]:text-sm [&_td]:py-1.5 [&_td]:border-b [&_td]:border-border/30 [&_blockquote]:border-l-2 [&_blockquote]:border-border/60 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground";
 
 function KnowledgeInlineEmpty({
   icon: Icon,
@@ -714,9 +714,11 @@ function KnowledgeInlineEmpty({
   helperText: string;
 }) {
   return (
-    <div className="mt-4 rounded-lg border border-dashed border-muted-foreground/20 p-6 text-center">
-      <Icon className="mx-auto mb-2 size-8 text-muted-foreground/40" />
-      <p className="text-sm text-muted-foreground">{title}</p>
+    <div className="mt-4 flex min-h-[120px] flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 p-6 text-center">
+      <div className="flex size-10 items-center justify-center rounded-full bg-muted/50">
+        <Icon className="size-5 text-muted-foreground/50" />
+      </div>
+      <p className="mt-3 text-sm font-medium text-muted-foreground">{title}</p>
       <p className="mt-1 text-xs text-muted-foreground/60">{helperText}</p>
     </div>
   );
@@ -771,14 +773,14 @@ function KnowledgeContentView({ content }: { content: string }) {
               <KnowledgeInlineEmpty
                 icon={BookmarkIcon}
                 title="No references yet"
-                helperText="Import a file or paste a URL to add your first reference"
+                helperText="Import a file or click Edit to add links and documents."
               />
             ) : null}
             {isNotesEmpty ? (
               <KnowledgeInlineEmpty
                 icon={StickyNoteIcon}
                 title="No notes yet"
-                helperText="Add notes to provide additional context for the AI"
+                helperText="Click Edit to capture insights and observations."
               />
             ) : null}
           </div>
@@ -802,9 +804,11 @@ function MemoryInlineEmpty({
   helperText: string;
 }) {
   return (
-    <div className="mt-4 rounded-lg border border-dashed border-muted-foreground/20 p-6 text-center">
-      <Icon className="mx-auto mb-2 size-8 text-muted-foreground/40" />
-      <p className="text-sm text-muted-foreground">{title}</p>
+    <div className="mt-4 flex min-h-[120px] flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 p-6 text-center">
+      <div className="flex size-10 items-center justify-center rounded-full bg-muted/50">
+        <Icon className="size-5 text-muted-foreground/50" />
+      </div>
+      <p className="mt-3 text-sm font-medium text-muted-foreground">{title}</p>
       <p className="mt-1 text-xs text-muted-foreground/60">{helperText}</p>
     </div>
   );
@@ -860,21 +864,21 @@ function MemoryContentView({ content }: { content: string }) {
               <MemoryInlineEmpty
                 icon={ScaleIcon}
                 title="No key decisions recorded yet"
-                helperText="Add one via Edit above"
+                helperText="Chat with your agent or click Edit to add entries."
               />
             ) : null}
             {isPreferencesEmpty ? (
               <MemoryInlineEmpty
                 icon={SlidersHorizontalIcon}
                 title="No preferences set"
-                helperText="Add one via Edit above"
+                helperText="Click Edit to define your brand voice and conventions."
               />
             ) : null}
             {isContextEmpty ? (
               <MemoryInlineEmpty
                 icon={LayersIcon}
                 title="No context added"
-                helperText="Add one via Edit above"
+                helperText="Click Edit to share background context for better assistance."
               />
             ) : null}
           </div>
