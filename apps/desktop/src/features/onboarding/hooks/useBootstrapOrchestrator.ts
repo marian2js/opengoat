@@ -215,9 +215,6 @@ export function useBootstrapOrchestrator(
       await readStreamTextDeltas(
         response,
         (delta) => {
-          updateStep(stepIndex, {
-            streamedText: undefined as unknown as string, // handled below
-          });
           // Use functional setState to safely append to streamedText
           setState((prev) => ({
             ...prev,
