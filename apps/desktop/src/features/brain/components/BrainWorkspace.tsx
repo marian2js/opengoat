@@ -67,8 +67,12 @@ function getEmptyKnowledgeSections(content: string): { references: boolean; note
     }
     const trimmed = line.trim();
     if (trimmed && !trimmed.startsWith("---")) {
-      if (inReferences) referencesHasContent = true;
-      if (inNotes) notesHasContent = true;
+      // Treat bare list markers (e.g. "-", "* ", "1.") as empty — no meaningful content
+      const isBareMarker = /^[-*+]\s*$/.test(trimmed) || /^\d+\.\s*$/.test(trimmed);
+      if (!isBareMarker) {
+        if (inReferences) referencesHasContent = true;
+        if (inNotes) notesHasContent = true;
+      }
     }
   }
 
@@ -827,7 +831,7 @@ function KnowledgeContentView({ content, onImport }: { content: string; onImport
             {sec.heading ? (
               <Markdown remarkPlugins={[remarkGfm]}>{`## ${sec.heading}`}</Markdown>
             ) : null}
-            {sec.body.trim() ? (
+            {sec.body.trim() && !isReferencesEmpty && !isNotesEmpty ? (
               <Markdown remarkPlugins={[remarkGfm]}>{sec.body}</Markdown>
             ) : null}
             {isReferencesEmpty ? (
