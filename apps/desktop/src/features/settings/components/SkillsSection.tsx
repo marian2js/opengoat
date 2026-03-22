@@ -5,6 +5,7 @@ import {
   LoaderCircleIcon,
   PackageIcon,
   PuzzleIcon,
+  SparklesIcon,
   TrashIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -100,7 +101,14 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-[15px]">Skills</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-[15px]">Skills</CardTitle>
+          {!isLoading && managedSkills.length > 0 ? (
+            <Badge variant="secondary" className="text-[10px]">
+              {managedSkills.length} active
+            </Badge>
+          ) : null}
+        </div>
         <CardDescription>Extend your AI CMO with additional capabilities.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -117,6 +125,17 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
           </div>
         ) : (
           <>
+            {/* Bundled skills summary */}
+            {managedSkills.length > 0 ? (
+              <div className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2.5">
+                <SparklesIcon className="size-4 shrink-0 text-primary/70" />
+                <p className="text-[13px] text-muted-foreground">
+                  <span className="font-medium text-foreground">{managedSkills.length} bundled marketing skills active</span>
+                  {" — included with your AI CMO"}
+                </p>
+              </div>
+            ) : null}
+
             {/* Installed extra skills */}
             {extraSkills.length > 0 ? (
               <div className="space-y-2">
@@ -190,8 +209,8 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
               </div>
             ) : null}
 
-            {/* Empty state */}
-            {skills.length === 0 ? (
+            {/* Empty state — only for custom/extra skills */}
+            {extraSkills.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border/40 p-6">
                 <div className="flex flex-col items-center gap-3 py-2">
                   <div className="flex size-10 items-center justify-center rounded-full bg-muted/50">
@@ -199,10 +218,10 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
                   </div>
                   <div className="space-y-1 text-center">
                     <p className="text-[13px] font-medium text-muted-foreground">
-                      No custom skills installed
+                      No additional skills installed
                     </p>
                     <p className="text-[12px] leading-relaxed text-muted-foreground/70">
-                      Skills extend your AI CMO with additional capabilities — from content generation to analytics integrations.
+                      Install custom skills to extend your AI CMO beyond the bundled capabilities.
                     </p>
                   </div>
                 </div>
