@@ -1,1 +1,7 @@
+# Block commits that include .project/ files
+if git diff --cached --name-only | grep -q '^\.project/'; then
+  echo "ERROR: .project/ files are staged. Unstage them: git reset HEAD .project/"
+  exit 1
+fi
+
 pnpm run typecheck
