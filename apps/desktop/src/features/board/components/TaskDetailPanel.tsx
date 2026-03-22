@@ -51,6 +51,36 @@ export function TaskDetailPanel({
     [taskId, client, refresh, onTaskUpdated, task],
   );
 
+  const handleAddBlocker = useCallback(
+    async (content: string) => {
+      if (!taskId) return;
+      await client.addTaskBlocker(taskId, content, task?.owner);
+      refresh();
+      onTaskUpdated();
+    },
+    [taskId, client, refresh, onTaskUpdated, task],
+  );
+
+  const handleAddArtifact = useCallback(
+    async (content: string) => {
+      if (!taskId) return;
+      await client.addTaskArtifact(taskId, content, task?.owner);
+      refresh();
+      onTaskUpdated();
+    },
+    [taskId, client, refresh, onTaskUpdated, task],
+  );
+
+  const handleAddWorklog = useCallback(
+    async (content: string) => {
+      if (!taskId) return;
+      await client.addTaskWorklog(taskId, content, task?.owner);
+      refresh();
+      onTaskUpdated();
+    },
+    [taskId, client, refresh, onTaskUpdated, task],
+  );
+
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent
@@ -121,6 +151,9 @@ export function TaskDetailPanel({
               <TaskQuickActions
                 currentStatus={task.status}
                 onStatusChange={handleStatusChange}
+                onAddBlocker={handleAddBlocker}
+                onAddArtifact={handleAddArtifact}
+                onAddWorklog={handleAddWorklog}
               />
             </SheetFooter>
           </>
