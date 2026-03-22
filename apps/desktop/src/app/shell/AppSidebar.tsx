@@ -456,7 +456,7 @@ function SessionItem({
         )}
       >
         <MessageSquareIcon />
-        <span className={cn("truncate", unnamed && "italic")}>{label}</span>
+        <span className={cn("truncate", unnamed ? "italic" : "font-medium")}>{label}</span>
       </SidebarMenuButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
