@@ -180,76 +180,6 @@ export function ProjectSettings({
         <p className="text-sm text-muted-foreground">{domain}</p>
       </div>
 
-      {/* ---- General ---- */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-[15px]">General</CardTitle>
-          <CardDescription>Basic project information.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="block text-[12px] font-medium text-muted-foreground" htmlFor="settings-name">
-              Name
-            </label>
-            <Input
-              id="settings-name"
-              className="h-9 text-[13px]"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (saveMessage) setSaveMessage(null);
-              }}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="settings-website-url" className="block text-[12px] font-medium text-muted-foreground">
-              Website URL
-            </label>
-            <div className="relative">
-              <GlobeIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/40" />
-              <Input
-                id="settings-website-url"
-                className="h-9 pl-9 text-[13px] text-muted-foreground"
-                readOnly
-                value={agent.description ?? domain}
-              />
-            </div>
-          </div>
-
-          {saveMessage ? (
-            <p
-              className={`text-[12px] ${
-                saveMessage.type === "success" ? "text-success" : "text-destructive"
-              }`}
-            >
-              {saveMessage.type === "success" ? (
-                <CheckIcon className="mr-1 inline-block size-3 align-[-2px]" />
-              ) : null}
-              {saveMessage.text}
-            </p>
-          ) : null}
-
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              className="h-8 text-[13px]"
-              disabled={!hasGeneralChanges || isSaving}
-              onClick={() => void handleSaveGeneral()}
-            >
-              {isSaving ? (
-                <>
-                  <LoaderCircleIcon className="size-3.5 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save"
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* ---- Model ---- */}
       <Card>
         <CardHeader>
@@ -323,6 +253,78 @@ export function ProjectSettings({
                 ))}
               </select>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ---- General ---- */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-[15px]">General</CardTitle>
+          <CardDescription>Basic project information.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-[12px] font-medium text-muted-foreground" htmlFor="settings-name">
+                Name
+              </label>
+              <Input
+                id="settings-name"
+                className="h-9 text-[13px]"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (saveMessage) setSaveMessage(null);
+                }}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="settings-website-url" className="block text-[12px] font-medium text-muted-foreground">
+                Website URL
+              </label>
+              <div className="relative">
+                <GlobeIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/40" />
+                <Input
+                  id="settings-website-url"
+                  className="h-9 pl-9 text-[13px] text-muted-foreground"
+                  readOnly
+                  value={agent.description ?? domain}
+                />
+              </div>
+            </div>
+          </div>
+
+          {saveMessage ? (
+            <p
+              className={`text-[12px] ${
+                saveMessage.type === "success" ? "text-success" : "text-destructive"
+              }`}
+            >
+              {saveMessage.type === "success" ? (
+                <CheckIcon className="mr-1 inline-block size-3 align-[-2px]" />
+              ) : null}
+              {saveMessage.text}
+            </p>
+          ) : null}
+
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              className="h-8 text-[13px]"
+              disabled={!hasGeneralChanges || isSaving}
+              onClick={() => void handleSaveGeneral()}
+            >
+              {isSaving ? (
+                <>
+                  <LoaderCircleIcon className="size-3.5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
           </div>
         </CardContent>
       </Card>
