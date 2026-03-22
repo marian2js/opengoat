@@ -46,7 +46,7 @@ export function OpportunityCard({ completedActions, opportunity, onActionClick, 
           {config.label}
         </Badge>
       </div>
-      <p className="text-xs leading-relaxed text-muted-foreground line-clamp-2">
+      <p className="text-xs leading-relaxed text-muted-foreground line-clamp-2 opacity-80 border-l-2 border-border/30 pl-2">
         {opportunity.explanation}
       </p>
       {relatedAction && isRelatedCompleted && onViewResults ? (
