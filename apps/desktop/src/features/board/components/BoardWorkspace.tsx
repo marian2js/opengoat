@@ -1,18 +1,18 @@
+import { useState } from "react";
 import { AlertCircleIcon, ListChecksIcon, RefreshCwIcon } from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskList } from "@/features/board/hooks/useTaskList";
 import { TaskList, TaskListSkeleton } from "./TaskList";
+import { TaskDetailPanel } from "./TaskDetailPanel";
 
 export interface BoardWorkspaceProps {
   agentId?: string | undefined;
   client: SidecarClient | null;
-  onTaskSelect?: (taskId: string) => void;
 }
 
 export function BoardWorkspace({
   agentId,
   client,
-  onTaskSelect,
 }: BoardWorkspaceProps) {
   if (!agentId || !client) {
     return (
@@ -29,7 +29,6 @@ export function BoardWorkspace({
     <BoardContent
       agentId={agentId}
       client={client}
-      onTaskSelect={onTaskSelect}
     />
   );
 }
@@ -41,17 +40,12 @@ export function BoardWorkspace({
 function BoardContent({
   agentId,
   client,
-  onTaskSelect,
 }: {
   agentId: string;
   client: SidecarClient;
-  onTaskSelect?: (taskId: string) => void;
 }) {
   const { tasks, isLoading, error, refresh } = useTaskList(agentId, client);
-
-  const handleTaskSelect = (taskId: string) => {
-    onTaskSelect?.(taskId);
-  };
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
@@ -99,8 +93,19 @@ function BoardContent({
           </div>
         </div>
       ) : (
-        <TaskList tasks={tasks} onTaskSelect={handleTaskSelect} />
+        <TaskList
+          tasks={tasks}
+          onTaskSelect={(id) => setSelectedTaskId(id)}
+        />
       )}
+
+      <TaskDetailPanel
+        taskId={selectedTaskId}
+        client={client}
+        open={!!selectedTaskId}
+        onClose={() => setSelectedTaskId(null)}
+        onTaskUpdated={refresh}
+      />
     </div>
   );
 }
