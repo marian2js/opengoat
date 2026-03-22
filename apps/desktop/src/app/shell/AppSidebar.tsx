@@ -64,7 +64,7 @@ interface AppSidebarProps {
   activeAgentId?: string | undefined;
   activeBrainSection?: string | undefined;
   activeSessionId?: string | undefined;
-  activeView: "dashboard" | "connections" | "chat" | "brain" | "agents" | "settings";
+  activeView: "dashboard" | "connections" | "chat" | "brain" | "agents" | "settings" | "board";
   agentCatalog: AgentCatalog | null;
   onAddProject?: (() => void) | undefined;
   onNewChat?: (() => void) | undefined;

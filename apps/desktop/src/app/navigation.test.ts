@@ -25,7 +25,8 @@ type AppView =
   | "chat"
   | "brain"
   | "agents"
-  | "settings";
+  | "settings"
+  | "board";
 
 function readViewFromHash(hash: string): AppView {
   if (hash === "#connections/add") return "connections-add";
@@ -34,6 +35,7 @@ function readViewFromHash(hash: string): AppView {
   if (hash === "#agents") return "agents";
   if (hash === "#settings") return "settings";
   if (hash === "#chat") return "chat";
+  if (hash === "#board") return "board";
   return "dashboard";
 }
 

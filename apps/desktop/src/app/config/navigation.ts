@@ -5,6 +5,7 @@ import {
   BrainIcon,
   LayoutDashboardIcon,
   Link2Icon,
+  ListChecksIcon,
   MessageSquareIcon,
   PackageIcon,
   Settings2Icon,
@@ -24,6 +25,11 @@ export const primaryNavigation: NavigationItem[] = [
     title: "Dashboard",
     href: "#dashboard",
     icon: LayoutDashboardIcon,
+  },
+  {
+    title: "Board",
+    href: "#board",
+    icon: ListChecksIcon,
   },
   {
     title: "Chat",

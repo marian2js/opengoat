@@ -9,6 +9,7 @@ import { AddProjectDialog } from "@/features/onboarding/components/AddProjectDia
 import { BootstrapProgress } from "@/features/onboarding/components/BootstrapProgress";
 import { ConnectionCenter } from "@/features/onboarding/components/ConnectionCenter";
 import { BrainWorkspace } from "@/features/brain/components/BrainWorkspace";
+import { BoardWorkspace } from "@/features/board/components/BoardWorkspace";
 import { DashboardWorkspace } from "@/features/dashboard/components/DashboardWorkspace";
 import { ProjectSettings } from "@/features/settings/components/ProjectSettings";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -23,7 +24,7 @@ import {
   buildRefineContextLabel,
   buildRefineContextActionId,
 } from "@/features/brain/lib/refine-context-prompt";
-type AppView = "dashboard" | "connections" | "connections-add" | "chat" | "brain" | "agents" | "settings";
+type AppView = "dashboard" | "connections" | "connections-add" | "chat" | "brain" | "agents" | "settings" | "board";
 
 const ACTIVE_AGENT_KEY = "opengoat:activeAgentId";
 
@@ -402,7 +403,7 @@ export function App() {
             setCreateAgentToken((current) => current + 1);
           }}
         />
-        <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" || currentView === "brain" || currentView === "dashboard" ? "" : "gap-4 overflow-y-auto p-4 lg:p-5"}`}>
+        <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" || currentView === "brain" || currentView === "dashboard" || currentView === "board" ? "" : "gap-4 overflow-y-auto p-4 lg:p-5"}`}>
           {currentView === "dashboard" ? (
             bootstrapContext && client ? (
               <BootstrapProgress
@@ -427,6 +428,11 @@ export function App() {
                 onViewResults={handleViewResults}
               />
             )
+          ) : currentView === "board" ? (
+            <BoardWorkspace
+              agentId={activeAgentId}
+              client={client}
+            />
           ) : currentView === "chat" ? (
               <ChatWorkspace
                 agentId={activeAgentId}
@@ -522,6 +528,10 @@ function readViewFromHash(): AppView {
 
   if (window.location.hash === "#chat") {
     return "chat";
+  }
+
+  if (window.location.hash === "#board") {
+    return "board";
   }
 
   return "dashboard";
