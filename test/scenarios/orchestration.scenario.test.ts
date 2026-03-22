@@ -56,7 +56,8 @@ async function createScenarioHarness(): Promise<{ service: OpenGoatService; root
     pathPort: new NodePathPort(),
     pathsProvider: new TestPathsProvider(root),
     providerRegistry: registry,
-    nowIso: () => "2026-02-06T00:00:00.000Z"
+    nowIso: () => "2026-02-06T00:00:00.000Z",
+    bundledSkillProvisioner: null,
   });
 
   await service.initialize();

@@ -10,6 +10,9 @@ const roots: string[] = [];
 const originalHome = process.env.OPENGOAT_HOME;
 const originalOpenClawStateDir = process.env.OPENCLAW_STATE_DIR;
 const originalOpenClawConfigPath = process.env.OPENCLAW_CONFIG_PATH;
+const originalSkipBundledSkills = process.env.OPENGOAT_SKIP_BUNDLED_SKILLS;
+
+process.env.OPENGOAT_SKIP_BUNDLED_SKILLS = "1";
 const BOOTSTRAP_TIMEOUT_MS = 90_000;
 const INIT_TIMEOUT_MS = 45_000;
 const HARD_RESET_TIMEOUT_MS = 120_000;
@@ -29,6 +32,11 @@ afterEach(async () => {
     delete process.env.OPENCLAW_CONFIG_PATH;
   } else {
     process.env.OPENCLAW_CONFIG_PATH = originalOpenClawConfigPath;
+  }
+  if (originalSkipBundledSkills === undefined) {
+    delete process.env.OPENGOAT_SKIP_BUNDLED_SKILLS;
+  } else {
+    process.env.OPENGOAT_SKIP_BUNDLED_SKILLS = originalSkipBundledSkills;
   }
 
   while (roots.length > 0) {

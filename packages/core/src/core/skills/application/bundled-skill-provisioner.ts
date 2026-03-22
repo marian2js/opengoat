@@ -42,6 +42,10 @@ export class BundledSkillProvisioner {
   public async provisionBundledSkills(
     workspaceDir: string,
   ): Promise<BundledSkillProvisionResult> {
+    if (process.env.OPENGOAT_SKIP_BUNDLED_SKILLS === "1") {
+      return { provisioned: false, createdPaths: [], skippedPaths: [workspaceDir] };
+    }
+
     const currentHash = await this.computeManifestHash();
     const shouldProvision = await this.shouldProvisionSkills(
       workspaceDir,

@@ -125,6 +125,7 @@ interface OpenGoatServiceDeps {
   providerRegistry?: ProviderRegistry;
   commandRunner?: CommandRunnerPort;
   logger?: Logger;
+  bundledSkillProvisioner?: BundledSkillProvisioner | null;
 }
 
 const OPENCLAW_PROVIDER_ID = "openclaw";
@@ -486,10 +487,12 @@ export class OpenGoatService {
     this.pathPort = deps.pathPort;
     this.pathsProvider = deps.pathsProvider;
     this.nowIso = nowIso;
-    const bundledSkillProvisioner = new BundledSkillProvisioner({
-      fileSystem: deps.fileSystem,
-      pathPort: deps.pathPort,
-    });
+    const bundledSkillProvisioner = deps.bundledSkillProvisioner === null
+      ? undefined
+      : (deps.bundledSkillProvisioner ?? new BundledSkillProvisioner({
+          fileSystem: deps.fileSystem,
+          pathPort: deps.pathPort,
+        }));
     this.agentService = new AgentService({
       fileSystem: deps.fileSystem,
       pathPort: deps.pathPort,

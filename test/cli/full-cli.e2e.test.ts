@@ -33,6 +33,7 @@ describe("CLI full e2e smoke", () => {
       OPENCLAW_CMD: stubPath,
       OPENGOAT_OPENCLAW_CMD: stubPath,
       OPENCLAW_STUB_LOG: stubLogPath,
+      OPENGOAT_SKIP_BUNDLED_SKILLS: "1",
     };
 
     await expectOk(
