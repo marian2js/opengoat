@@ -8,6 +8,7 @@ import {
   LayersIcon,
   LightbulbIcon,
   LoaderCircleIcon,
+  MessageSquareIcon,
   PackageIcon,
   PencilIcon,
   ScaleIcon,
@@ -754,22 +755,32 @@ function KnowledgeInlineEmpty({
   onImport?: () => void;
 }) {
   return (
-    <div className="mt-4 flex min-h-[80px] flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 px-6 py-4 text-center">
-      <div className="flex size-10 items-center justify-center rounded-full bg-muted/50">
-        <Icon className="size-5 text-muted-foreground/50" />
+    <div className="mt-4 flex min-h-[120px] flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 bg-muted/30 px-6 py-8 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full bg-muted/80">
+        <Icon className="size-6 text-muted-foreground/50" />
       </div>
       <p className="mt-3 text-sm font-medium text-muted-foreground">{title}</p>
-      <p className="mt-1 text-xs text-muted-foreground/60">{helperText}</p>
-      {onImport ? (
+      <p className="mt-1 max-w-[280px] text-xs leading-relaxed text-muted-foreground/60">{helperText}</p>
+      <div className="mt-4 flex items-center gap-2">
+        {onImport ? (
+          <button
+            type="button"
+            onClick={onImport}
+            className="flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <FileUpIcon className="size-3.5" />
+            Import file
+          </button>
+        ) : null}
         <button
           type="button"
-          onClick={onImport}
-          className="mt-3 flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          onClick={() => { window.location.hash = "#chat"; }}
+          className="flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/5 px-2.5 py-1.5 text-xs text-primary transition-colors hover:bg-primary/10"
         >
-          <FileUpIcon className="size-3.5" />
-          Import file
+          <MessageSquareIcon className="size-3.5" />
+          Go to Chat
         </button>
-      ) : null}
+      </div>
     </div>
   );
 }
