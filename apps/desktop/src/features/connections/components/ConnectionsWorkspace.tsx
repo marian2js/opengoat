@@ -35,14 +35,20 @@ export function ConnectionsWorkspace({
   const [isBusy, setIsBusy] = useState(false);
   const [modelCatalogs, setModelCatalogs] = useState<Record<string, ProviderModelCatalog>>({});
   const [modelBusyProviderId, setModelBusyProviderId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   async function refreshOverview(): Promise<void> {
     if (!client) {
       return;
     }
 
-    const nextOverview = await client.authOverview();
-    onAuthOverviewChange(nextOverview);
+    setIsRefreshing(true);
+    try {
+      const nextOverview = await client.authOverview();
+      onAuthOverviewChange(nextOverview);
+    } finally {
+      setIsRefreshing(false);
+    }
   }
 
   useEffect(() => {
@@ -169,13 +175,13 @@ export function ConnectionsWorkspace({
             variant="ghost"
             size="sm"
             className="h-7 rounded-md text-[11px] text-muted-foreground"
-            disabled={!client || isBusy || Boolean(modelBusyProviderId)}
+            disabled={!client || isBusy || isRefreshing || Boolean(modelBusyProviderId)}
             onClick={() => {
               void refreshOverview();
             }}
           >
-            <RefreshCcwIcon className="size-3" />
-            Refresh
+            <RefreshCcwIcon className={cn("size-3", isRefreshing && "animate-spin")} />
+            {isRefreshing ? "Refreshing..." : "Refresh"}
           </Button>
         </div>
 
