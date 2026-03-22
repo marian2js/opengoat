@@ -3,16 +3,9 @@ export interface DateGroup<T> {
   sessions: T[];
 }
 
-const DATE_GROUP_LABELS = [
-  "Today",
-  "Yesterday",
-  "This Week",
-  "This Month",
-  "Older",
-] as const;
-
 /**
- * Groups sessions into date buckets: Today, Yesterday, This Week, This Month, Older.
+ * Groups sessions into date buckets: Today, Yesterday, then individual dates
+ * for the past 7 days, and "Earlier" for anything older.
  * Empty groups are omitted. Original order within each group is preserved.
  */
 export function groupSessionsByDate<T extends { createdAt: string }>(
@@ -23,31 +16,59 @@ export function groupSessionsByDate<T extends { createdAt: string }>(
 
   const todayStart = startOfDay(now);
   const yesterdayStart = addDays(todayStart, -1);
-  const weekStart = addDays(todayStart, -todayStart.getDay()); // Sunday of this week
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  // Build per-day boundaries for 2–6 days ago
+  const dayBoundaries: { start: Date; label: string }[] = [];
+  for (let i = 2; i <= 6; i++) {
+    const dayStart = addDays(todayStart, -i);
+    dayBoundaries.push({ start: dayStart, label: formatDateLabel(dayStart) });
+  }
+  const earlierCutoff = addDays(todayStart, -7);
 
-  const buckets: T[][] = [[], [], [], [], []];
+  const todayBucket: T[] = [];
+  const yesterdayBucket: T[] = [];
+  const dayBuckets: T[][] = dayBoundaries.map(() => []);
+  const earlierBucket: T[] = [];
 
   for (const session of sessions) {
     const created = new Date(session.createdAt);
     if (created >= todayStart) {
-      buckets[0].push(session);
+      todayBucket.push(session);
     } else if (created >= yesterdayStart) {
-      buckets[1].push(session);
-    } else if (created >= weekStart) {
-      buckets[2].push(session);
-    } else if (created >= monthStart) {
-      buckets[3].push(session);
+      yesterdayBucket.push(session);
+    } else if (created >= earlierCutoff) {
+      // Find which per-day bucket it falls into
+      let placed = false;
+      for (let i = 0; i < dayBoundaries.length; i++) {
+        const nextStart = i === 0 ? yesterdayStart : dayBoundaries[i - 1].start;
+        if (created >= dayBoundaries[i].start && created < nextStart) {
+          dayBuckets[i].push(session);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        earlierBucket.push(session);
+      }
     } else {
-      buckets[4].push(session);
+      earlierBucket.push(session);
     }
   }
 
   const groups: DateGroup<T>[] = [];
-  for (let i = 0; i < DATE_GROUP_LABELS.length; i++) {
-    if (buckets[i].length > 0) {
-      groups.push({ label: DATE_GROUP_LABELS[i], sessions: buckets[i] });
+
+  if (todayBucket.length > 0) {
+    groups.push({ label: "Today", sessions: todayBucket });
+  }
+  if (yesterdayBucket.length > 0) {
+    groups.push({ label: "Yesterday", sessions: yesterdayBucket });
+  }
+  for (let i = 0; i < dayBoundaries.length; i++) {
+    if (dayBuckets[i].length > 0) {
+      groups.push({ label: dayBoundaries[i].label, sessions: dayBuckets[i] });
     }
+  }
+  if (earlierBucket.length > 0) {
+    groups.push({ label: "Earlier", sessions: earlierBucket });
   }
 
   return groups;
@@ -63,4 +84,15 @@ function addDays(date: Date, days: number): Date {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
   return d;
+}
+
+/**
+ * Format a date as "March 20" style label.
+ */
+function formatDateLabel(date: Date): string {
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  return `${months[date.getMonth()]} ${date.getDate()}`;
 }

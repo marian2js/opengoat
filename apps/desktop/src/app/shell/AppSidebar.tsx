@@ -197,8 +197,8 @@ export function AppSidebar({
               <SidebarMenu>
                 {sessionGroups.map((group) => (
                   <li key={group.label} role="none">
-                    <div className="px-2 pt-4 pb-1">
-                      <span className="text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/40">
+                    <div className="px-3 pt-3 pb-1">
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-sidebar-foreground/50">
                         {group.label}
                       </span>
                     </div>
