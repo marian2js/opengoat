@@ -17,7 +17,12 @@ import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
 import type { UIMessage } from "ai";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  SparklesIcon,
+  UserIcon,
+} from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
 import {
   createContext,
@@ -34,15 +39,49 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
 };
 
-export const Message = ({ className, from, ...props }: MessageProps) => (
+export const Message = ({ className, from, children, ...props }: MessageProps) => (
   <div
     className={cn(
-      "group flex w-full max-w-[95%] flex-col gap-2",
-      from === "user" ? "is-user ml-auto justify-end" : "is-assistant",
-      className
+      "group flex w-full max-w-[95%] items-start gap-2",
+      from === "user"
+        ? "is-user ml-auto flex-row-reverse justify-end"
+        : "is-assistant",
+      className,
     )}
     {...props}
-  />
+  >
+    <MessageAvatar from={from} />
+    <div className="flex min-w-0 max-w-full flex-1 flex-col gap-2">
+      {children}
+    </div>
+  </div>
+);
+
+export type MessageAvatarProps = HTMLAttributes<HTMLDivElement> & {
+  from: UIMessage["role"];
+};
+
+export const MessageAvatar = ({
+  from,
+  className,
+  ...props
+}: MessageAvatarProps) => (
+  <div
+    className={cn(
+      "flex size-6 shrink-0 items-center justify-center rounded-full",
+      from === "user"
+        ? "bg-secondary text-muted-foreground"
+        : "bg-primary/10 text-primary",
+      className,
+    )}
+    {...props}
+  >
+    {from === "user" ? (
+      <UserIcon className="size-3.5" />
+    ) : (
+      <SparklesIcon className="size-3.5" />
+    )}
+  </div>
 );
 
 export type MessageContentProps = HTMLAttributes<HTMLDivElement>;
