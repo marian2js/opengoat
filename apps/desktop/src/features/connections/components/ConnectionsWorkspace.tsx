@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { SidecarClient } from "@/lib/sidecar/client";
 import { cleanProviderName } from "@/features/agents/display-helpers";
@@ -319,31 +320,45 @@ function ConnectionRow({
       </TableCell>
       <TableCell className="text-right">
         <div className="flex justify-end gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 rounded-md px-2 text-[11px]"
-            disabled={isBusy || isUpdatingModel || connection.isDefault}
-            onClick={() => {
-              void onSelectDefault(connection.profileId);
-            }}
-          >
-            <CheckIcon className="size-3" />
-            Default
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 rounded-md px-2 text-[11px] text-destructive hover:bg-destructive/8 hover:text-destructive"
-            disabled={isBusy || isUpdatingModel}
-            onClick={() => {
-              void onDelete(connection.profileId);
-            }}
-          >
-            <Trash2Icon className="size-3" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 rounded-md px-2 text-[11px]"
+                disabled={isBusy || isUpdatingModel || connection.isDefault}
+                onClick={() => {
+                  void onSelectDefault(connection.profileId);
+                }}
+              >
+                <CheckIcon className="size-3" />
+                Default
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="px-2 py-1 text-xs">
+              {connection.isDefault ? "Already default" : "Set as default"}
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 rounded-md px-2 text-[11px] text-destructive hover:bg-destructive/8 hover:text-destructive"
+                disabled={isBusy || isUpdatingModel}
+                onClick={() => {
+                  void onDelete(connection.profileId);
+                }}
+              >
+                <Trash2Icon className="size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="px-2 py-1 text-xs">
+              Remove connection
+            </TooltipContent>
+          </Tooltip>
         </div>
       </TableCell>
     </TableRow>
