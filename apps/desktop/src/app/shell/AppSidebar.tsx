@@ -158,30 +158,42 @@ export function AppSidebar({
               >
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
-                    <SidebarMenuButton tooltip="Brain" isActive={activeView === "brain"}>
-                      <BrainIcon />
-                      <span>Brain</span>
-                      <ChevronRightIcon className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                    <SidebarMenuButton
+                      asChild
+                      tooltip="Brain"
+                      isActive={activeView === "brain"}
+                    >
+                      <a href="#brain">
+                        <BrainIcon />
+                        <span>Brain</span>
+                        <ChevronRightIcon className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                      </a>
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>
-                      {brainNavigation.map((item) => (
-                        <SidebarMenuSubItem key={item.title}>
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={
-                              activeView === "brain" &&
-                              item.href === `#brain/${activeBrainSection}`
-                            }
-                          >
-                            <a href={item.href}>
-                              <item.icon />
-                              <span>{item.title}</span>
-                            </a>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
+                      {brainNavigation.map((item) => {
+                        const isSubActive =
+                          activeView === "brain" &&
+                          item.href === `#brain/${activeBrainSection}`;
+                        return (
+                          <SidebarMenuSubItem key={item.title}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={isSubActive}
+                              className={cn(
+                                isSubActive &&
+                                  "border-l-2 border-primary font-medium",
+                              )}
+                            >
+                              <a href={item.href}>
+                                <item.icon />
+                                <span>{item.title}</span>
+                              </a>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
                     </SidebarMenuSub>
                   </CollapsibleContent>
                 </SidebarMenuItem>
