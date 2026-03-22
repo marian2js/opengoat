@@ -17,6 +17,7 @@ import { useMemo, useRef, useState } from "react";
 import {
   brainNavigation,
   primaryNavigation,
+  secondaryNavigation,
 } from "@/app/config/navigation";
 import {
   resolveDomain as sharedResolveDomain,
@@ -199,6 +200,23 @@ export function AppSidebar({
                 </SidebarMenuItem>
               </Collapsible>
 
+              {/* Secondary nav: Agents, Connections (Settings excluded — in footer) */}
+              {secondaryNavigation
+                .filter((item) => item.href !== "#settings")
+                .map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={item.title}
+                      isActive={item.href.slice(1) === activeView}
+                    >
+                      <a href={item.href}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
 
             </SidebarMenu>
           </SidebarGroupContent>
