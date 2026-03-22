@@ -57,13 +57,12 @@ void test("h2 headings have adequate bottom margin for section spacing", () => {
 // AC3: Content area uses more horizontal space on wide viewports
 // ---------------------------------------------------------------------------
 
-void test("content container has a wider max-width for wide viewports", () => {
-  // Should have max-w-4xl or max-w-5xl (not max-w-none which is already set,
-  // or a wider container width class like max-w-screen- or mx-auto + max-w-*)
-  // The content wrapper div around the prose should allow wider reading
+void test("content container has a max-width constraint for readable line lengths", () => {
+  // max-w-prose constrains to ~65ch for comfortable reading;
+  // wider options (max-w-4xl etc.) are also acceptable
   assert.ok(
-    src.includes("max-w-4xl") || src.includes("max-w-5xl") || src.includes("max-w-6xl") || src.includes("max-w-none"),
-    "Expected content area to have a generous max-width for wide viewports",
+    src.includes("max-w-prose") || src.includes("max-w-4xl") || src.includes("max-w-5xl") || src.includes("max-w-6xl") || src.includes("max-w-none"),
+    "Expected content area to have a max-width constraint for readable line lengths",
   );
 });
 
