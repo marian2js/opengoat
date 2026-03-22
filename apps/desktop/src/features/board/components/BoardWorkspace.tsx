@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { AlertCircleIcon, ListChecksIcon, SearchIcon } from "lucide-react";
+import { AlertCircleIcon, ListChecksIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskList } from "@/features/board/hooks/useTaskList";
 import { useBoardFilters } from "@/features/board/hooks/useBoardFilters";
@@ -79,16 +80,24 @@ function BoardContent({
       {isLoading ? (
         <TaskListSkeleton />
       ) : error ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
-          <AlertCircleIcon className="size-8 text-destructive/50" />
-          <p className="text-sm">Failed to load tasks</p>
-          <button
-            type="button"
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
+          <div className="flex size-12 items-center justify-center rounded-xl bg-muted/50">
+            <AlertCircleIcon className="size-6 text-destructive/50" />
+          </div>
+          <div className="flex flex-col items-center gap-1.5">
+            <p className="text-sm font-medium text-foreground">Failed to load tasks</p>
+            <p className="max-w-[280px] text-center text-xs leading-relaxed text-muted-foreground/70">
+              Something went wrong while loading your tasks.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={refresh}
-            className="text-xs text-primary underline-offset-4 hover:underline"
           >
+            <RefreshCwIcon className="size-3.5" />
             Try again
-          </button>
+          </Button>
         </div>
       ) : tasks.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground">

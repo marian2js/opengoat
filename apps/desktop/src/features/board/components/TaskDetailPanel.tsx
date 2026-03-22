@@ -18,7 +18,8 @@ import {
 } from "./TaskDetailSections";
 import { TaskQuickActions } from "./TaskQuickActions";
 import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
-import { AlertCircleIcon, UserIcon, CalendarIcon } from "lucide-react";
+import { AlertCircleIcon, RefreshCwIcon, UserIcon, CalendarIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface TaskDetailPanelProps {
   taskId: string | null;
@@ -169,19 +170,24 @@ function PanelError({
   onRetry: () => void;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
-      <AlertCircleIcon className="size-8 text-destructive/50" />
-      <p className="text-sm">Failed to load task</p>
-      <p className="max-w-[240px] text-center text-xs text-muted-foreground/60">
-        {error}
-      </p>
-      <button
-        type="button"
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
+      <div className="flex size-12 items-center justify-center rounded-xl bg-muted/50">
+        <AlertCircleIcon className="size-6 text-destructive/50" />
+      </div>
+      <div className="flex flex-col items-center gap-1.5">
+        <p className="text-sm font-medium text-foreground">Failed to load task</p>
+        <p className="max-w-[240px] text-center text-xs leading-relaxed text-muted-foreground/60">
+          {error}
+        </p>
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
         onClick={onRetry}
-        className="text-xs text-primary underline-offset-4 hover:underline"
       >
+        <RefreshCwIcon className="size-3.5" />
         Try again
-      </button>
+      </Button>
     </div>
   );
 }
