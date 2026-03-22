@@ -1,11 +1,15 @@
 import { Chat, useChat } from "@ai-sdk/react";
 import {
   BotIcon,
+  CalendarIcon,
   CopyIcon,
+  CrosshairIcon,
   FileTextIcon,
   LoaderCircleIcon,
   SparklesIcon,
+  TrendingUpIcon,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AuthOverview, ChatBootstrap } from "@/app/types";
 import {
@@ -140,10 +144,10 @@ interface ChatWorkspaceProps {
   sessionId?: string | undefined;
 }
 
-const STARTER_PROMPTS = [
-  "What are the top 3 growth opportunities for my product right now?",
-  "Draft a content calendar for the next two weeks.",
-  "Analyze my competitors and find positioning gaps.",
+const STARTER_PROMPTS: { icon: LucideIcon; text: string }[] = [
+  { icon: TrendingUpIcon, text: "What are the top 3 growth opportunities for my product right now?" },
+  { icon: CalendarIcon, text: "Draft a content calendar for the next two weeks." },
+  { icon: CrosshairIcon, text: "Analyze my competitors and find positioning gaps." },
 ];
 
 export function ChatWorkspace({
@@ -445,14 +449,19 @@ function ChatSessionView({
             <div className="grid w-full gap-2 sm:grid-cols-3">
               {STARTER_PROMPTS.map((prompt) => (
                 <button
-                  key={prompt}
+                  key={prompt.text}
                   type="button"
-                  className="rounded-lg border border-border/60 bg-card px-3.5 py-3 text-left text-sm leading-relaxed text-muted-foreground transition-all duration-150 hover:border-primary/30 hover:bg-accent hover:text-foreground"
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/60 bg-card px-3.5 py-3 text-left transition-all duration-150 hover:border-primary/30 hover:bg-accent/40"
                   onClick={() => {
-                    void handleSubmit({ text: prompt });
+                    void handleSubmit({ text: prompt.text });
                   }}
                 >
-                  {prompt}
+                  <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <prompt.icon className="size-3.5" />
+                  </div>
+                  <span className="text-sm font-medium leading-relaxed text-muted-foreground transition-colors group-hover:text-foreground">
+                    {prompt.text}
+                  </span>
                 </button>
               ))}
             </div>
