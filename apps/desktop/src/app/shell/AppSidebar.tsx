@@ -23,6 +23,8 @@ import {
   buildFaviconSources as sharedBuildFaviconSources,
 } from "@/lib/utils/favicon";
 import { groupSessionsByDate } from "@/lib/utils/group-sessions-by-date";
+import { getDeEmphasizedSessionIds } from "@/lib/utils/session-rerun";
+import { cn } from "@/lib/utils";
 import {
   Collapsible,
   CollapsibleContent,
@@ -90,9 +92,14 @@ export function AppSidebar({
   sessions,
 }: AppSidebarProps) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const allSessions = sessions ?? [];
   const sessionGroups = useMemo(
-    () => groupSessionsByDate(sessions ?? []),
-    [sessions],
+    () => groupSessionsByDate(allSessions),
+    [allSessions],
+  );
+  const deEmphasizedIds = useMemo(
+    () => getDeEmphasizedSessionIds(allSessions),
+    [allSessions],
   );
   const projects = resolveAllProjects(agentCatalog, activeAgentId);
   const activeProject = projects.find((p) => p.isActive) ?? projects[0];
@@ -206,6 +213,7 @@ export function AppSidebar({
                       {group.sessions.map((session) => (
                         <SessionItem
                           key={session.id}
+                          deEmphasized={deEmphasizedIds.has(session.id)}
                           isActive={session.id === activeSessionId}
                           isEditing={editingSessionId === session.id}
                           session={session}
@@ -377,6 +385,7 @@ function ProjectIcon({
 // ---------------------------------------------------------------------------
 
 function SessionItem({
+  deEmphasized,
   isActive,
   isEditing,
   session,
@@ -386,6 +395,7 @@ function SessionItem({
   onStartEditing,
   onStopEditing,
 }: {
+  deEmphasized: boolean;
   isActive: boolean;
   isEditing: boolean;
   session: AgentSession;
@@ -438,6 +448,7 @@ function SessionItem({
         onClick={() => {
           onSelect?.(session.id);
         }}
+        className={cn(deEmphasized && !isActive && "opacity-45")}
       >
         <MessageSquareIcon />
         <span className="truncate">{label}</span>
