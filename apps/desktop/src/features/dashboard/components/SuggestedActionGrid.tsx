@@ -51,7 +51,7 @@ export function SuggestedActionGrid({
       {isGenerating ? (
         <SuggestedSkeleton />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 sm:[&>:last-child:nth-child(2n+1)]:col-span-full xl:[&>:last-child:nth-child(2n+1)]:col-auto xl:[&>:last-child:nth-child(3n+1)]:col-span-full">
           {actions.map((card) => (
             <ActionCardItem
               key={card.id}
