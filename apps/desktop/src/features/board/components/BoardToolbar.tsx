@@ -1,4 +1,4 @@
-import { ArrowUpDownIcon, SearchIcon, XIcon } from "lucide-react";
+import { ArrowUpDownIcon, RefreshCwIcon, SearchIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -27,6 +27,9 @@ interface BoardToolbarProps {
   onFilterChange: (filter: BoardFilter) => void;
   onSortChange: (sort: BoardSort) => void;
   onSearchChange: (search: string) => void;
+  onRefresh: () => void;
+  totalCount: number;
+  filteredCount: number;
 }
 
 export function BoardToolbar({
@@ -36,6 +39,9 @@ export function BoardToolbar({
   onFilterChange,
   onSortChange,
   onSearchChange,
+  onRefresh,
+  totalCount,
+  filteredCount,
 }: BoardToolbarProps) {
   const currentSortLabel =
     SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Sort";
@@ -84,27 +90,44 @@ export function BoardToolbar({
         </InputGroup>
       </div>
 
-      {/* Right group: sort dropdown */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm">
-            <ArrowUpDownIcon className="size-3.5" />
-            {currentSortLabel}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuRadioGroup
-            value={sort}
-            onValueChange={(value) => onSortChange(value as BoardSort)}
-          >
-            {SORT_OPTIONS.map((option) => (
-              <DropdownMenuRadioItem key={option.value} value={option.value}>
-                {option.label}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Right group: task count, sort dropdown, refresh */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">
+          {filteredCount === totalCount
+            ? `${totalCount} tasks`
+            : `${filteredCount} of ${totalCount} tasks`}
+        </span>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <ArrowUpDownIcon className="size-3.5" />
+              {currentSortLabel}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuRadioGroup
+              value={sort}
+              onValueChange={(value) => onSortChange(value as BoardSort)}
+            >
+              {SORT_OPTIONS.map((option) => (
+                <DropdownMenuRadioItem key={option.value} value={option.value}>
+                  {option.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="Refresh tasks"
+        >
+          <RefreshCwIcon className="size-4" />
+        </button>
+      </div>
     </div>
   );
 }

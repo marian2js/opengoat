@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertCircleIcon, ListChecksIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
+import { AlertCircleIcon, ListChecksIcon, SearchIcon } from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskList } from "@/features/board/hooks/useTaskList";
 import { useBoardFilters } from "@/features/board/hooks/useBoardFilters";
@@ -60,18 +60,6 @@ function BoardContent({
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-foreground">Board</h2>
-        <button
-          type="button"
-          onClick={refresh}
-          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          aria-label="Refresh tasks"
-        >
-          <RefreshCwIcon className="size-4" />
-        </button>
-      </div>
-
       {!isLoading && !error && tasks.length > 0 && (
         <div className="mb-4">
           <BoardToolbar
@@ -81,6 +69,9 @@ function BoardContent({
             onFilterChange={setFilter}
             onSortChange={setSort}
             onSearchChange={setSearch}
+            onRefresh={refresh}
+            totalCount={tasks.length}
+            filteredCount={filteredTasks.length}
           />
         </div>
       )}
@@ -110,8 +101,8 @@ function BoardContent({
                 No tasks yet
               </h3>
               <p className="max-w-[280px] text-center text-xs leading-relaxed text-muted-foreground/70">
-                No tasks yet. Tasks will appear here when created through
-                actions or chat.
+                Tasks will appear here when created through actions or
+                chat.
               </p>
             </div>
           </div>
