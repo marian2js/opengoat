@@ -57,15 +57,15 @@ void test("OpportunityCard has spacing between title row and description", () =>
   );
 });
 
-void test("OpportunityCard CTA button uses font-medium for prominence", () => {
-  // Action buttons should use font-medium to stand out as second-most prominent
+void test("OpportunityCard CTA button uses font-semibold for prominence", () => {
+  // Action buttons should use font-semibold to stand out as the primary action
   const buttonMatches = src.match(/<button[^>]*className="([^"]*)"/g);
   assert.ok(buttonMatches, "Expected to find button elements");
   for (const match of buttonMatches) {
     const className = match.match(/className="([^"]*)"/)?.[1] ?? "";
     assert.ok(
-      className.includes("font-medium"),
-      `Expected CTA button to have 'font-medium', got: ${className}`,
+      className.includes("font-semibold"),
+      `Expected CTA button to have 'font-semibold', got: ${className}`,
     );
   }
 });

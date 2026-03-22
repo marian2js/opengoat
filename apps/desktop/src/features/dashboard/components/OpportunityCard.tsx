@@ -52,24 +52,24 @@ export function OpportunityCard({ completedActions, opportunity, onActionClick, 
       {relatedAction && isRelatedCompleted && onViewResults ? (
         <button
           type="button"
-          className="group/link mt-0.5 flex w-fit items-center gap-1 text-xs font-medium text-emerald-600 transition-colors hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+          className="group/link mt-1 inline-flex w-fit items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1 text-xs font-semibold text-emerald-600 transition-colors hover:bg-emerald-500/10 hover:border-emerald-500/30 dark:text-emerald-400 dark:border-emerald-400/20 dark:bg-emerald-400/5 dark:hover:bg-emerald-400/10 dark:hover:border-emerald-400/30"
           onClick={(e) => { e.stopPropagation(); onViewResults(relatedAction.id); }}
         >
           <CheckCircleIcon className="size-3" />
           <span>View results</span>
-          <ArrowRightIcon className="size-3 transition-transform group-hover/link:translate-x-0.5" />
+          <ArrowRightIcon className="size-3.5 transition-transform group-hover/link:translate-x-0.5" />
         </button>
       ) : relatedAction && onActionClick ? (
         <button
           type="button"
-          className="group/link mt-0.5 flex w-fit items-center gap-1 text-xs font-medium text-primary/70 transition-colors hover:text-primary"
+          className="group/link mt-1 inline-flex w-fit items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10 hover:border-primary/30 transition-colors"
           onClick={(e) => {
             e.stopPropagation();
             onActionClick(relatedAction.id, buildActionPrompt(relatedAction), relatedAction.title);
           }}
         >
           <span>{relatedAction.title}</span>
-          <ArrowRightIcon className="size-3 transition-transform group-hover/link:translate-x-0.5" />
+          <ArrowRightIcon className="size-3.5 transition-transform group-hover/link:translate-x-0.5" />
         </button>
       ) : null}
     </div>
