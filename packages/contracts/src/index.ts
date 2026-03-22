@@ -401,6 +401,72 @@ export type InstallSkillRequestContract = z.infer<typeof installSkillRequestSche
 export type InstallSkillResultContract = z.infer<typeof installSkillResultSchema>;
 export type RemoveSkillResultContract = z.infer<typeof removeSkillResultSchema>;
 
+// --- Board / Tasks ---
+
+export const taskEntrySchema = z.object({
+  createdAt: z.string().min(1),
+  createdBy: z.string().min(1),
+  content: z.string().min(1),
+});
+
+export const taskRecordSchema = z.object({
+  taskId: z.string().min(1),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  owner: z.string().min(1),
+  assignedTo: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string(),
+  status: z.string().min(1),
+  statusReason: z.string().optional(),
+  blockers: z.array(z.string()),
+  artifacts: z.array(taskEntrySchema),
+  worklog: z.array(taskEntrySchema),
+});
+
+export const taskListPageSchema = z.object({
+  tasks: z.array(taskRecordSchema),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
+});
+
+export const updateTaskStatusRequestSchema = z.object({
+  status: z.string().min(1),
+  reason: z.string().optional(),
+});
+
+export const addTaskBlockerRequestSchema = z.object({
+  content: z.string().min(1),
+});
+
+export const addTaskArtifactRequestSchema = z.object({
+  content: z.string().min(1),
+});
+
+export const addTaskWorklogRequestSchema = z.object({
+  content: z.string().min(1),
+});
+
+export const deleteTasksRequestSchema = z.object({
+  taskIds: z.array(z.string().min(1)).min(1),
+});
+
+export const deleteTasksResponseSchema = z.object({
+  deletedTaskIds: z.array(z.string().min(1)),
+  deletedCount: z.number().int().nonnegative(),
+});
+
+export type TaskEntry = z.infer<typeof taskEntrySchema>;
+export type TaskRecord = z.infer<typeof taskRecordSchema>;
+export type TaskListPage = z.infer<typeof taskListPageSchema>;
+export type UpdateTaskStatusRequest = z.infer<typeof updateTaskStatusRequestSchema>;
+export type AddTaskBlockerRequest = z.infer<typeof addTaskBlockerRequestSchema>;
+export type AddTaskArtifactRequest = z.infer<typeof addTaskArtifactRequestSchema>;
+export type AddTaskWorklogRequest = z.infer<typeof addTaskWorklogRequestSchema>;
+export type DeleteTasksRequest = z.infer<typeof deleteTasksRequestSchema>;
+export type DeleteTasksResponse = z.infer<typeof deleteTasksResponseSchema>;
+
 export const appManifest = appManifestSchema.parse(appManifestJson);
 
 export function createBasicAuthHeader(

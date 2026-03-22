@@ -1,0 +1,149 @@
+import {
+  addTaskArtifactRequestSchema,
+  addTaskBlockerRequestSchema,
+  addTaskWorklogRequestSchema,
+  deleteTasksRequestSchema,
+  updateTaskStatusRequestSchema,
+} from "@opengoat/contracts";
+import { Hono } from "hono";
+import type { SidecarRuntime } from "../context.ts";
+
+const DEFAULT_ACTOR_ID = "sidecar";
+
+export function createTaskRoutes(runtime: SidecarRuntime): Hono {
+  const app = new Hono();
+
+  app.get("/", async (context) => {
+    const status = context.req.query("status") || undefined;
+    const assignee = context.req.query("assignee") || undefined;
+    const limitParam = context.req.query("limit");
+    const offsetParam = context.req.query("offset");
+
+    const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
+    const offset = offsetParam ? Number.parseInt(offsetParam, 10) : undefined;
+
+    const result = await runtime.boardService.listLatestTasksPage(
+      runtime.opengoatPaths,
+      { status, assignee, limit, offset },
+    );
+
+    return context.json(result);
+  });
+
+  app.get("/:taskId", async (context) => {
+    const taskId = context.req.param("taskId");
+
+    try {
+      const task = await runtime.boardService.getTask(
+        runtime.opengoatPaths,
+        taskId,
+      );
+      return context.json(task);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("does not exist")) {
+        return context.json({ error: error.message }, 404);
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/:taskId/status", async (context) => {
+    const taskId = context.req.param("taskId");
+    const actorId = context.req.header("x-actor-id") || DEFAULT_ACTOR_ID;
+    const body = updateTaskStatusRequestSchema.parse(await context.req.json());
+
+    try {
+      const task = await runtime.boardService.updateTaskStatus(
+        runtime.opengoatPaths,
+        actorId,
+        taskId,
+        body.status,
+        body.reason,
+      );
+      return context.json(task);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("does not exist")) {
+        return context.json({ error: error.message }, 404);
+      }
+      throw error;
+    }
+  });
+
+  app.post("/:taskId/blockers", async (context) => {
+    const taskId = context.req.param("taskId");
+    const actorId = context.req.header("x-actor-id") || DEFAULT_ACTOR_ID;
+    const body = addTaskBlockerRequestSchema.parse(await context.req.json());
+
+    try {
+      const task = await runtime.boardService.addTaskBlocker(
+        runtime.opengoatPaths,
+        actorId,
+        taskId,
+        body.content,
+      );
+      return context.json(task);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("does not exist")) {
+        return context.json({ error: error.message }, 404);
+      }
+      throw error;
+    }
+  });
+
+  app.post("/:taskId/artifacts", async (context) => {
+    const taskId = context.req.param("taskId");
+    const actorId = context.req.header("x-actor-id") || DEFAULT_ACTOR_ID;
+    const body = addTaskArtifactRequestSchema.parse(await context.req.json());
+
+    try {
+      const task = await runtime.boardService.addTaskArtifact(
+        runtime.opengoatPaths,
+        actorId,
+        taskId,
+        body.content,
+      );
+      return context.json(task);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("does not exist")) {
+        return context.json({ error: error.message }, 404);
+      }
+      throw error;
+    }
+  });
+
+  app.post("/:taskId/worklog", async (context) => {
+    const taskId = context.req.param("taskId");
+    const actorId = context.req.header("x-actor-id") || DEFAULT_ACTOR_ID;
+    const body = addTaskWorklogRequestSchema.parse(await context.req.json());
+
+    try {
+      const task = await runtime.boardService.addTaskWorklog(
+        runtime.opengoatPaths,
+        actorId,
+        taskId,
+        body.content,
+      );
+      return context.json(task);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("does not exist")) {
+        return context.json({ error: error.message }, 404);
+      }
+      throw error;
+    }
+  });
+
+  app.delete("/", async (context) => {
+    const actorId = context.req.header("x-actor-id") || DEFAULT_ACTOR_ID;
+    const body = deleteTasksRequestSchema.parse(await context.req.json());
+
+    const result = await runtime.boardService.deleteTasks(
+      runtime.opengoatPaths,
+      actorId,
+      body.taskIds,
+    );
+
+    return context.json(result);
+  });
+
+  return app;
+}

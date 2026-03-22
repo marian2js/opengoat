@@ -11,12 +11,20 @@ import {
   createAgentRequestSchema,
   createAgentSessionRequestSchema,
   deleteAgentResponseSchema,
+  deleteTasksRequestSchema,
+  deleteTasksResponseSchema,
   installSkillRequestSchema,
   installSkillResultSchema,
   removeSkillResultSchema,
   skillListSchema,
+  taskListPageSchema,
+  taskRecordSchema,
   updateAgentRequestSchema,
   updateAgentSessionRequestSchema,
+  updateTaskStatusRequestSchema,
+  addTaskBlockerRequestSchema,
+  addTaskArtifactRequestSchema,
+  addTaskWorklogRequestSchema,
   providerModelCatalogSchema,
   createBasicAuthHeader,
   respondAuthSessionRequestSchema,
@@ -37,6 +45,7 @@ import {
   type AuthSession,
   type BootstrapPromptList,
   type ChatBootstrap,
+  type DeleteTasksResponse,
   type InstallSkillResultContract,
   type ProviderModelCatalog,
   type RemoveSkillResultContract,
@@ -45,6 +54,8 @@ import {
   type SidecarConnection,
   type SidecarHealth,
   type SkillList,
+  type TaskListPage,
+  type TaskRecord,
   type WorkspaceFileCheck,
   type WorkspaceFileContent,
 } from "@opengoat/contracts";
@@ -354,6 +365,86 @@ export class SidecarClient {
           respondAuthSessionRequestSchema.parse({ value }),
         ),
         method: "POST",
+      }),
+    );
+  }
+
+  async listTasks(params?: {
+    status?: string;
+    assignee?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<TaskListPage> {
+    const query = new URLSearchParams();
+    if (params?.status) {
+      query.set("status", params.status);
+    }
+    if (params?.assignee) {
+      query.set("assignee", params.assignee);
+    }
+    if (params?.limit !== undefined) {
+      query.set("limit", String(params.limit));
+    }
+    if (params?.offset !== undefined) {
+      query.set("offset", String(params.offset));
+    }
+    const qs = query.toString();
+    return taskListPageSchema.parse(
+      await this.request(`/tasks${qs ? `?${qs}` : ""}`),
+    );
+  }
+
+  async getTask(taskId: string): Promise<TaskRecord> {
+    return taskRecordSchema.parse(
+      await this.request(`/tasks/${encodeURIComponent(taskId)}`),
+    );
+  }
+
+  async updateTaskStatus(
+    taskId: string,
+    status: string,
+    reason?: string,
+  ): Promise<TaskRecord> {
+    return taskRecordSchema.parse(
+      await this.request(`/tasks/${encodeURIComponent(taskId)}/status`, {
+        body: JSON.stringify(updateTaskStatusRequestSchema.parse({ status, reason })),
+        method: "PATCH",
+      }),
+    );
+  }
+
+  async addTaskBlocker(taskId: string, content: string): Promise<TaskRecord> {
+    return taskRecordSchema.parse(
+      await this.request(`/tasks/${encodeURIComponent(taskId)}/blockers`, {
+        body: JSON.stringify(addTaskBlockerRequestSchema.parse({ content })),
+        method: "POST",
+      }),
+    );
+  }
+
+  async addTaskArtifact(taskId: string, content: string): Promise<TaskRecord> {
+    return taskRecordSchema.parse(
+      await this.request(`/tasks/${encodeURIComponent(taskId)}/artifacts`, {
+        body: JSON.stringify(addTaskArtifactRequestSchema.parse({ content })),
+        method: "POST",
+      }),
+    );
+  }
+
+  async addTaskWorklog(taskId: string, content: string): Promise<TaskRecord> {
+    return taskRecordSchema.parse(
+      await this.request(`/tasks/${encodeURIComponent(taskId)}/worklog`, {
+        body: JSON.stringify(addTaskWorklogRequestSchema.parse({ content })),
+        method: "POST",
+      }),
+    );
+  }
+
+  async deleteTasks(taskIds: string[]): Promise<DeleteTasksResponse> {
+    return deleteTasksResponseSchema.parse(
+      await this.request("/tasks", {
+        body: JSON.stringify(deleteTasksRequestSchema.parse({ taskIds })),
+        method: "DELETE",
       }),
     );
   }

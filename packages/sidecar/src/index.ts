@@ -1,5 +1,7 @@
 import { serve } from "@hono/node-server";
 import {
+  AgentManifestService,
+  BoardService,
   NodeCommandRunner,
   NodeFileSystem,
   NodeOpenGoatPathsProvider,
@@ -51,10 +53,19 @@ export async function startSidecarServer(
     target: gatewaySupervisor.connection,
   });
   const opengoatPaths = new NodeOpenGoatPathsProvider().getPaths();
+  const fileSystem = new NodeFileSystem();
+  const pathPort = new NodePathPort();
   const skillService = new SkillService({
-    fileSystem: new NodeFileSystem(),
-    pathPort: new NodePathPort(),
+    fileSystem,
+    pathPort,
     commandRunner: new NodeCommandRunner(),
+  });
+  const agentManifestService = new AgentManifestService({ fileSystem, pathPort });
+  const boardService = new BoardService({
+    fileSystem,
+    pathPort,
+    nowIso: () => new Date().toISOString(),
+    agentManifestService,
   });
 
   const runtime = {
@@ -64,6 +75,7 @@ export async function startSidecarServer(
         void syncAuthProfilesToAllAgents(metadataStore, gatewaySupervisor.paths);
       },
     }),
+    boardService,
     config,
     embeddedGateway,
     gatewaySupervisor,
