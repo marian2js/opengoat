@@ -77,6 +77,53 @@ function getEmptyKnowledgeSections(content: string): { references: boolean; note
   };
 }
 
+/**
+ * Detect which h2 sections in Memory markdown are empty.
+ * Checks Key Decisions, Preferences, and Context sections.
+ */
+function getEmptyMemorySections(content: string): {
+  keyDecisions: boolean;
+  preferences: boolean;
+  context: boolean;
+} {
+  const lines = content.split("\n");
+  let currentSection: "keyDecisions" | "preferences" | "context" | null = null;
+  const exists = { keyDecisions: false, preferences: false, context: false };
+  const hasContent = { keyDecisions: false, preferences: false, context: false };
+
+  for (const line of lines) {
+    if (/^##\s+Key Decisions/i.test(line)) {
+      currentSection = "keyDecisions";
+      exists.keyDecisions = true;
+      continue;
+    }
+    if (/^##\s+Preferences/i.test(line)) {
+      currentSection = "preferences";
+      exists.preferences = true;
+      continue;
+    }
+    if (/^##\s+Context/i.test(line)) {
+      currentSection = "context";
+      exists.context = true;
+      continue;
+    }
+    if (/^##\s+/.test(line)) {
+      currentSection = null;
+      continue;
+    }
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("---") && currentSection) {
+      hasContent[currentSection] = true;
+    }
+  }
+
+  return {
+    keyDecisions: exists.keyDecisions && !hasContent.keyDecisions,
+    preferences: exists.preferences && !hasContent.preferences,
+    context: exists.context && !hasContent.context,
+  };
+}
+
 interface BrainSection {
   id: string;
   label: string;
@@ -467,6 +514,8 @@ function BrainEditor({
           />
         ) : section.id === "knowledge" ? (
           <KnowledgeContentView content={content} />
+        ) : section.id === "memory" ? (
+          <MemoryContentView content={content} />
         ) : (
           <div className={KNOWLEDGE_PROSE_CLASSES}>
             <Markdown remarkPlugins={[remarkGfm]}>{stripLeadingH1(content)}</Markdown>
@@ -730,6 +779,102 @@ function KnowledgeContentView({ content }: { content: string }) {
                 icon={StickyNoteIcon}
                 title="No notes yet"
                 helperText="Add notes to provide additional context for the AI"
+              />
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Memory content view — renders markdown with per-category empty states
+// ---------------------------------------------------------------------------
+
+function MemoryInlineEmpty({
+  icon: Icon,
+  title,
+  helperText,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  helperText: string;
+}) {
+  return (
+    <div className="mt-4 rounded-lg border border-dashed border-muted-foreground/20 p-6 text-center">
+      <Icon className="mx-auto mb-2 size-8 text-muted-foreground/40" />
+      <p className="text-sm text-muted-foreground">{title}</p>
+      <p className="mt-1 text-xs text-muted-foreground/60">{helperText}</p>
+    </div>
+  );
+}
+
+function MemoryContentView({ content }: { content: string }) {
+  const stripped = stripLeadingH1(content);
+  const empty = getEmptyMemorySections(stripped);
+  const hasEmptySections = empty.keyDecisions || empty.preferences || empty.context;
+
+  if (!hasEmptySections) {
+    return (
+      <div className={KNOWLEDGE_PROSE_CLASSES}>
+        <Markdown remarkPlugins={[remarkGfm]}>{stripped}</Markdown>
+      </div>
+    );
+  }
+
+  // Split content into sections so we can inject inline empty states
+  const sections: Array<{ heading: string | null; body: string }> = [];
+  const lines = stripped.split("\n");
+  let currentHeading: string | null = null;
+  let currentBody: string[] = [];
+
+  for (const line of lines) {
+    const h2Match = line.match(/^##\s+(.+)/);
+    if (h2Match) {
+      sections.push({ heading: currentHeading, body: currentBody.join("\n") });
+      currentHeading = h2Match[1]!;
+      currentBody = [];
+    } else {
+      currentBody.push(line);
+    }
+  }
+  sections.push({ heading: currentHeading, body: currentBody.join("\n") });
+
+  return (
+    <div className={KNOWLEDGE_PROSE_CLASSES}>
+      {sections.map((sec, i) => {
+        const isKeyDecisionsEmpty = empty.keyDecisions && sec.heading?.match(/^Key Decisions/i);
+        const isPreferencesEmpty = empty.preferences && sec.heading?.match(/^Preferences/i);
+        const isContextEmpty = empty.context && sec.heading?.match(/^Context/i);
+
+        return (
+          <div key={sec.heading ?? `preamble-${i}`}>
+            {sec.heading ? (
+              <Markdown remarkPlugins={[remarkGfm]}>{`## ${sec.heading}`}</Markdown>
+            ) : null}
+            {sec.body.trim() ? (
+              <Markdown remarkPlugins={[remarkGfm]}>{sec.body}</Markdown>
+            ) : null}
+            {isKeyDecisionsEmpty ? (
+              <MemoryInlineEmpty
+                icon={ScaleIcon}
+                title="No key decisions recorded yet"
+                helperText="Add one via Edit above"
+              />
+            ) : null}
+            {isPreferencesEmpty ? (
+              <MemoryInlineEmpty
+                icon={SlidersHorizontalIcon}
+                title="No preferences set"
+                helperText="Add one via Edit above"
+              />
+            ) : null}
+            {isContextEmpty ? (
+              <MemoryInlineEmpty
+                icon={LayersIcon}
+                title="No context added"
+                helperText="Add one via Edit above"
               />
             ) : null}
           </div>
