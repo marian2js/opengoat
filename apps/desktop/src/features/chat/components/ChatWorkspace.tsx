@@ -431,7 +431,7 @@ function ChatSessionView({
             </div>
           </div>
         ) : visibleMessages.length === 0 && !isAction ? (
-          <div className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-8 py-8 text-center">
+          <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-10 px-4 py-8 text-center">
             <div className="space-y-3">
               <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <SparklesIcon className="size-5" />
@@ -446,18 +446,18 @@ function ChatSessionView({
               </div>
             </div>
 
-            <div className="grid w-full gap-2 sm:grid-cols-3">
+            <div className="grid w-full gap-3">
               {STARTER_PROMPTS.map((prompt) => (
                 <button
                   key={prompt.text}
                   type="button"
-                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/60 bg-card px-3.5 py-3 text-left transition-all duration-150 hover:border-primary/30 hover:bg-accent/40"
+                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-border/60 bg-card p-4 text-left transition-all duration-150 hover:border-primary/30 hover:bg-accent/40"
                   onClick={() => {
                     void handleSubmit({ text: prompt.text });
                   }}
                 >
-                  <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                    <prompt.icon className="size-3.5" />
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <prompt.icon className="size-4" />
                   </div>
                   <span className="text-sm font-medium leading-relaxed text-muted-foreground transition-colors group-hover:text-foreground">
                     {prompt.text}
