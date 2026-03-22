@@ -120,3 +120,21 @@ void test("Empty state placeholder cards have hover states", () => {
     "Empty state cards should have hover states for interactivity",
   );
 });
+
+// ---------------------------------------------------------------------------
+// AC6: Knowledge page descriptions updated to match marketing platform domain
+// ---------------------------------------------------------------------------
+
+void test("Knowledge placeholder does NOT reference 'API references'", () => {
+  assert.ok(
+    !src.includes("API references"),
+    "Knowledge placeholder must not reference 'API references' — use marketing-domain language instead",
+  );
+});
+
+void test("Knowledge section uses marketing-domain language in its description", () => {
+  assert.ok(
+    src.includes("brand guidelines") || src.includes("competitive intelligence") || src.includes("competitive research"),
+    "Knowledge section should reference marketing-domain concepts like brand guidelines or competitive research",
+  );
+});

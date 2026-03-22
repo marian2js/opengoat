@@ -552,7 +552,7 @@ const knowledgeSubsections = [
   {
     icon: BookmarkIcon,
     title: "References",
-    description: "Import product docs, competitor analysis, market research, or API references. The AI uses these to ground its recommendations in real data.",
+    description: "Import product docs, brand guidelines, competitive research, or market data. The AI uses these to ground its recommendations in real data.",
   },
   {
     icon: StickyNoteIcon,
