@@ -124,6 +124,33 @@ function getEmptyMemorySections(content: string): {
   };
 }
 
+/**
+ * Replace old developer-oriented boilerplate descriptions in Memory markdown
+ * with marketing-domain language. Only replaces exact known boilerplate lines.
+ */
+function migrateMemoryBoilerplate(content: string): string {
+  const replacements: [string, string][] = [
+    [
+      "Important decisions and the reasoning behind them.",
+      "Record strategic decisions and the reasoning behind them — positioning changes, campaign strategies, product pivots.",
+    ],
+    [
+      "Coding style, communication preferences, and conventions.",
+      "Define brand voice, content tone, and communication conventions the AI should follow.",
+    ],
+    [
+      "Background information that helps the AI assist more effectively.",
+      "Share product and market context that helps the AI provide more relevant assistance.",
+    ],
+  ];
+
+  let result = content;
+  for (const [oldText, newText] of replacements) {
+    result = result.replace(oldText, newText);
+  }
+  return result;
+}
+
 interface BrainSection {
   id: string;
   label: string;
@@ -293,7 +320,18 @@ function BrainEditor({
     client.readWorkspaceFile(agentId, section.filename).then(
       (result) => {
         if (cancelled) return;
-        setContent(result.exists ? result.content : "");
+        let loaded = result.exists ? result.content : "";
+
+        // Migrate old developer-oriented boilerplate in Memory files
+        if (section.id === "memory" && loaded) {
+          const migrated = migrateMemoryBoilerplate(loaded);
+          if (migrated !== loaded) {
+            loaded = migrated;
+            client.writeWorkspaceFile(agentId, section.filename, migrated);
+          }
+        }
+
+        setContent(loaded);
         setFileExists(result.exists);
         setIsLoading(false);
       },
@@ -815,7 +853,7 @@ function MemoryInlineEmpty({
 }
 
 function MemoryContentView({ content }: { content: string }) {
-  const stripped = stripLeadingH1(content);
+  const stripped = migrateMemoryBoilerplate(stripLeadingH1(content));
   const empty = getEmptyMemorySections(stripped);
   const hasEmptySections = empty.keyDecisions || empty.preferences || empty.context;
 
