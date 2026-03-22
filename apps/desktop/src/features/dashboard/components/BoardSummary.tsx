@@ -22,11 +22,6 @@ function getPills(counts: BoardCounts): CountPill[] {
       className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
     },
     {
-      label: "In Progress",
-      value: counts.doing,
-      className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-    },
-    {
       label: "Blocked",
       value: counts.blocked,
       className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
@@ -62,9 +57,23 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
   if (isEmpty) {
     return (
       <div className="py-5">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <ClipboardListIcon className="size-4" />
-          <span>No active work</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <ClipboardListIcon className="size-4 text-muted-foreground" />
+              <span>Board</span>
+            </div>
+            <span className="text-sm text-muted-foreground">
+              No active tasks — tasks will appear here when created through actions or chat.
+            </span>
+          </div>
+          <a
+            href="#board"
+            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            View Board
+            <ArrowRightIcon className="size-3" />
+          </a>
         </div>
       </div>
     );
