@@ -83,8 +83,33 @@ function getEmptyKnowledgeSections(content: string): { references: boolean; note
 }
 
 /**
+ * Known template descriptions for Memory sections.
+ * These are treated as empty — they don't count as user-added content.
+ */
+const MEMORY_TEMPLATE_DESCRIPTIONS: Record<string, string[]> = {
+  keyDecisions: [
+    "Record strategic decisions and the reasoning behind them — positioning changes, campaign strategies, product pivots.",
+    "Important decisions and the reasoning behind them.",
+  ],
+  preferences: [
+    "Define brand voice, content tone, and communication conventions the AI should follow.",
+    "Coding style, communication preferences, and conventions.",
+  ],
+  context: [
+    "Share product and market context that helps the AI provide more relevant assistance.",
+    "Background information that helps the AI assist more effectively.",
+  ],
+};
+
+function isTemplateDescription(section: string, text: string): boolean {
+  const templates = MEMORY_TEMPLATE_DESCRIPTIONS[section];
+  return templates ? templates.some((t) => text === t) : false;
+}
+
+/**
  * Detect which h2 sections in Memory markdown are empty.
  * Checks Key Decisions, Preferences, and Context sections.
+ * Template descriptions are not counted as user content.
  */
 function getEmptyMemorySections(content: string): {
   keyDecisions: boolean;
@@ -118,7 +143,11 @@ function getEmptyMemorySections(content: string): {
     }
     const trimmed = line.trim();
     if (trimmed && !trimmed.startsWith("---") && currentSection) {
-      hasContent[currentSection] = true;
+      // Treat bare list markers as empty
+      const isBareMarker = /^[-*+]\s*$/.test(trimmed) || /^\d+\.\s*$/.test(trimmed);
+      if (!isBareMarker && !isTemplateDescription(currentSection, trimmed)) {
+        hasContent[currentSection] = true;
+      }
     }
   }
 
@@ -558,7 +587,7 @@ function BrainEditor({
         ) : section.id === "knowledge" ? (
           <KnowledgeContentView content={content} onImport={handleImport} />
         ) : section.id === "memory" ? (
-          <MemoryContentView content={content} />
+          <MemoryContentView content={content} onEdit={() => setIsEditing(true)} />
         ) : (
           <div className={KNOWLEDGE_PROSE_CLASSES}>
             <Markdown remarkPlugins={[remarkGfm]}>{stripLeadingH1(content)}</Markdown>
@@ -864,23 +893,35 @@ function MemoryInlineEmpty({
   icon: Icon,
   title,
   helperText,
+  onEdit,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   helperText: string;
+  onEdit?: () => void;
 }) {
   return (
-    <div className="mt-4 flex min-h-[80px] flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 px-6 py-4 text-center">
-      <div className="flex size-10 items-center justify-center rounded-full bg-muted/50">
-        <Icon className="size-5 text-muted-foreground/50" />
+    <div className="mt-4 flex min-h-[120px] flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 bg-muted/30 px-6 py-8 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full bg-muted/80">
+        <Icon className="size-6 text-muted-foreground/50" />
       </div>
       <p className="mt-3 text-sm font-medium text-muted-foreground">{title}</p>
-      <p className="mt-1 text-xs text-muted-foreground/60">{helperText}</p>
+      <p className="mt-1 max-w-[280px] text-xs italic leading-relaxed text-muted-foreground/60">{helperText}</p>
+      {onEdit ? (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="mt-4 flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <PencilIcon className="size-3.5" />
+          Edit
+        </button>
+      ) : null}
     </div>
   );
 }
 
-function MemoryContentView({ content }: { content: string }) {
+function MemoryContentView({ content, onEdit }: { content: string; onEdit?: () => void }) {
   const stripped = migrateMemoryBoilerplate(stripLeadingH1(content));
   const empty = getEmptyMemorySections(stripped);
   const hasEmptySections = empty.keyDecisions || empty.preferences || empty.context;
@@ -917,13 +958,14 @@ function MemoryContentView({ content }: { content: string }) {
         const isKeyDecisionsEmpty = empty.keyDecisions && sec.heading?.match(/^Key Decisions/i);
         const isPreferencesEmpty = empty.preferences && sec.heading?.match(/^Preferences/i);
         const isContextEmpty = empty.context && sec.heading?.match(/^Context/i);
+        const isSectionEmpty = isKeyDecisionsEmpty || isPreferencesEmpty || isContextEmpty;
 
         return (
           <div key={sec.heading ?? `preamble-${i}`}>
             {sec.heading ? (
               <Markdown remarkPlugins={[remarkGfm]}>{`## ${sec.heading}`}</Markdown>
             ) : null}
-            {sec.body.trim() ? (
+            {sec.body.trim() && !isSectionEmpty ? (
               <Markdown remarkPlugins={[remarkGfm]}>{sec.body}</Markdown>
             ) : null}
             {isKeyDecisionsEmpty ? (
@@ -931,6 +973,7 @@ function MemoryContentView({ content }: { content: string }) {
                 icon={ScaleIcon}
                 title="No key decisions recorded yet"
                 helperText="Chat with your agent or click Edit to add entries."
+                onEdit={onEdit}
               />
             ) : null}
             {isPreferencesEmpty ? (
@@ -938,6 +981,7 @@ function MemoryContentView({ content }: { content: string }) {
                 icon={SlidersHorizontalIcon}
                 title="No preferences set"
                 helperText="Click Edit to define your brand voice and conventions."
+                onEdit={onEdit}
               />
             ) : null}
             {isContextEmpty ? (
@@ -945,6 +989,7 @@ function MemoryContentView({ content }: { content: string }) {
                 icon={LayersIcon}
                 title="No context added"
                 helperText="Click Edit to share background context for better assistance."
+                onEdit={onEdit}
               />
             ) : null}
           </div>
