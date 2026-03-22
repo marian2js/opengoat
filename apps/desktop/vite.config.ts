@@ -62,6 +62,7 @@ export default defineConfig({
         "/chat": { target: "http://127.0.0.1:19749", changeOrigin: true },
         "/auth": { target: "http://127.0.0.1:19749", changeOrigin: true },
         "/global": { target: "http://127.0.0.1:19749", changeOrigin: true },
+        "/tasks": { target: "http://127.0.0.1:19749", changeOrigin: true },
       },
     }),
     watch: {
