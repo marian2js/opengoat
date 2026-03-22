@@ -447,6 +447,122 @@ export function AgentsWorkspace({
                 </div>
               </div>
             </div>
+          ) : agents.length === 1 ? (
+            (() => {
+              const agent = agents[0];
+              const effectiveProviderId = resolveAgentProviderId(agent, authOverview);
+              const effectiveModelCatalog = effectiveProviderId
+                ? modelCatalogs[effectiveProviderId]
+                : undefined;
+
+              return (
+                <div className="border-t border-border/60 px-4 py-5 lg:px-5">
+                  <article className="rounded-xl border border-border/60 bg-card p-6 transition-colors">
+                    <div className="flex items-start gap-4">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                        <BotIcon className="size-5 text-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-[15px] font-semibold text-foreground">
+                              {agent.name}
+                            </h3>
+                            {agent.isDefault ? (
+                              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                                Default
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+                            {agent.description ??
+                              "Finance planning, research, and execution support."}
+                          </p>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          <div className="grid gap-1">
+                            <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground/50">
+                              Provider
+                            </span>
+                            <span className="text-[12px] text-foreground">
+                              {providerLabel(effectiveProviderId, connectedProviders)}
+                            </span>
+                          </div>
+
+                          <label className="grid gap-1">
+                            <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground/50">
+                              Model
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                className="h-8 w-full rounded-md border border-border bg-background px-2.5 text-[12px] text-foreground outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                disabled={
+                                  busyAgentId === agent.id ||
+                                  !effectiveProviderId ||
+                                  !effectiveModelCatalog
+                                }
+                                value={agent.modelId ?? ""}
+                                onChange={(event) => {
+                                  if (!effectiveProviderId) {
+                                    return;
+                                  }
+
+                                  void handleUpdateAgentModel(
+                                    agent,
+                                    effectiveProviderId,
+                                    event.target.value,
+                                  );
+                                }}
+                              >
+                                <option value="">Provider default</option>
+                                {effectiveModelCatalog?.models.map((model) => (
+                                  <option key={model.modelRef} value={model.modelId}>
+                                    {model.label}
+                                  </option>
+                                ))}
+                              </select>
+                              {busyAgentId === agent.id ? (
+                                <LoaderCircleIcon className="size-3.5 animate-spin text-muted-foreground" />
+                              ) : null}
+                            </div>
+                          </label>
+
+                          <div className="grid gap-1">
+                            <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground/50">
+                              Updated
+                            </span>
+                            <span className="text-[12px] text-muted-foreground">
+                              {formatTimestamp(agent.updatedAt)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+
+                  <div className="mt-4 flex flex-col items-center gap-3 rounded-lg border border-dashed border-border/40 bg-muted/10 px-6 py-5">
+                    <p className="text-center text-[13px] leading-relaxed text-muted-foreground">
+                      Create specialized agents for different research workflows — each with
+                      its own provider, model, and instructions.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-md text-[12px]"
+                      onClick={() => {
+                        setFeedback(null);
+                        setErrorMessage(null);
+                        setIsCreateOpen(true);
+                      }}
+                    >
+                      <PlusIcon className="size-3" />
+                      New agent
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()
           ) : (
             agents.map((agent) => {
               const effectiveProviderId = resolveAgentProviderId(agent, authOverview);
@@ -536,7 +652,7 @@ export function AgentsWorkspace({
           )}
         </div>
 
-        {!isLoading && agents.length > 0 ? (
+        {!isLoading && agents.length > 1 ? (
           <div className="border-t border-dashed border-border/40 px-4 py-4 lg:px-5">
             <p className="text-[12px] leading-relaxed text-muted-foreground">
               Add another agent to expand your library. Connect to different
