@@ -20,7 +20,7 @@ export function ActionCardGrid({ completedActions, isLoading, onActionClick, onV
           What would you like to work on?
         </h2>
       </div>
-      <div className="grid justify-items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid justify-items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3 sm:[&>:last-child:nth-child(2n+1)]:col-span-full xl:[&>:last-child:nth-child(2n+1)]:col-auto xl:[&>:last-child:nth-child(3n+1)]:col-span-full">
         {starterActions.map((card) => (
           <ActionCardItem
             key={card.id}
