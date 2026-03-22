@@ -17,8 +17,8 @@ export interface UseBoardFiltersResult {
 }
 
 export function useBoardFilters(tasks: TaskRecord[]): UseBoardFiltersResult {
-  const [filter, setFilter] = useState<BoardFilter>("open");
-  const [sort, setSort] = useState<BoardSort>("updated");
+  const [filter, setFilter] = useState<BoardFilter>("all");
+  const [sort, setSort] = useState<BoardSort>("status");
   const [search, setSearch] = useState("");
 
   const filteredTasks = useMemo(
