@@ -44,11 +44,11 @@ export function TaskDetailPanel({
   const handleStatusChange = useCallback(
     async (status: string, reason?: string) => {
       if (!taskId) return;
-      await client.updateTaskStatus(taskId, status, reason);
+      await client.updateTaskStatus(taskId, status, reason, task?.owner);
       refresh();
       onTaskUpdated();
     },
-    [taskId, client, refresh, onTaskUpdated],
+    [taskId, client, refresh, onTaskUpdated, task],
   );
 
   return (

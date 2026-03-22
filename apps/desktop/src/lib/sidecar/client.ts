@@ -404,38 +404,43 @@ export class SidecarClient {
     taskId: string,
     status: string,
     reason?: string,
+    actorId?: string,
   ): Promise<TaskRecord> {
     return taskRecordSchema.parse(
       await this.request(`/tasks/${encodeURIComponent(taskId)}/status`, {
         body: JSON.stringify(updateTaskStatusRequestSchema.parse({ status, reason })),
         method: "PATCH",
+        ...(actorId ? { headers: { "x-actor-id": actorId } } : {}),
       }),
     );
   }
 
-  async addTaskBlocker(taskId: string, content: string): Promise<TaskRecord> {
+  async addTaskBlocker(taskId: string, content: string, actorId?: string): Promise<TaskRecord> {
     return taskRecordSchema.parse(
       await this.request(`/tasks/${encodeURIComponent(taskId)}/blockers`, {
         body: JSON.stringify(addTaskBlockerRequestSchema.parse({ content })),
         method: "POST",
+        ...(actorId ? { headers: { "x-actor-id": actorId } } : {}),
       }),
     );
   }
 
-  async addTaskArtifact(taskId: string, content: string): Promise<TaskRecord> {
+  async addTaskArtifact(taskId: string, content: string, actorId?: string): Promise<TaskRecord> {
     return taskRecordSchema.parse(
       await this.request(`/tasks/${encodeURIComponent(taskId)}/artifacts`, {
         body: JSON.stringify(addTaskArtifactRequestSchema.parse({ content })),
         method: "POST",
+        ...(actorId ? { headers: { "x-actor-id": actorId } } : {}),
       }),
     );
   }
 
-  async addTaskWorklog(taskId: string, content: string): Promise<TaskRecord> {
+  async addTaskWorklog(taskId: string, content: string, actorId?: string): Promise<TaskRecord> {
     return taskRecordSchema.parse(
       await this.request(`/tasks/${encodeURIComponent(taskId)}/worklog`, {
         body: JSON.stringify(addTaskWorklogRequestSchema.parse({ content })),
         method: "POST",
+        ...(actorId ? { headers: { "x-actor-id": actorId } } : {}),
       }),
     );
   }
