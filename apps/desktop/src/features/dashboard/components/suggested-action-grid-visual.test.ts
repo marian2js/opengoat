@@ -63,14 +63,22 @@ void test("SuggestedActionGrid border works in both light and dark modes", () =>
   );
 });
 
-void test("SuggestedActionGrid violet tint opacity is at least 4% for dark mode visibility", () => {
-  // At 2% opacity the violet tint is invisible in dark mode.
-  // Ensure opacity is >= 0.04 so the section boundary is perceptible.
-  const opacityMatch = src.match(/bg-violet-500\/\[0\.(\d+)\]/);
-  assert.ok(opacityMatch, "Expected bg-violet-500/[0.XX] opacity class");
-  const opacityValue = parseFloat(`0.${opacityMatch![1]}`);
+void test("SuggestedActionGrid uses theme-aware violet tint with separate light/dark opacities", () => {
+  // Light mode needs higher opacity (>= 0.08) to be visible against white backgrounds.
+  // Dark mode stays at 4% which already works well.
+  const lightMatch = src.match(/bg-violet-500\/\[0\.(\d+)\]/);
+  assert.ok(lightMatch, "Expected bg-violet-500/[0.XX] light-mode opacity class");
+  const lightOpacity = parseFloat(`0.${lightMatch![1]}`);
   assert.ok(
-    opacityValue >= 0.04,
-    `Expected violet tint opacity >= 0.04 for dark mode visibility, got ${opacityValue}`,
+    lightOpacity >= 0.08,
+    `Expected light-mode violet tint opacity >= 0.08 for visibility against white, got ${lightOpacity}`,
+  );
+
+  const darkMatch = src.match(/dark:bg-violet-500\/\[0\.(\d+)\]/);
+  assert.ok(darkMatch, "Expected dark:bg-violet-500/[0.XX] dark-mode opacity class");
+  const darkOpacity = parseFloat(`0.${darkMatch![1]}`);
+  assert.ok(
+    darkOpacity >= 0.04,
+    `Expected dark-mode violet tint opacity >= 0.04, got ${darkOpacity}`,
   );
 });
