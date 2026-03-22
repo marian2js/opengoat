@@ -50,13 +50,23 @@ function StepIcon({ status }: { status: BootstrapStepStatus }) {
 
 function StreamingPanel({ text }: { text: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
 
   useEffect(() => {
     const el = containerRef.current;
-    if (el) {
+    if (el && isNearBottomRef.current) {
       el.scrollTop = el.scrollHeight;
     }
   }, [text]);
+
+  const handleScroll = () => {
+    const el = containerRef.current;
+    if (!el) return;
+    // Consider "near bottom" if within 30px of the bottom edge
+    const threshold = 30;
+    isNearBottomRef.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+  };
 
   if (!text) {
     return null;
@@ -65,6 +75,7 @@ function StreamingPanel({ text }: { text: string }) {
   return (
     <div
       ref={containerRef}
+      onScroll={handleScroll}
       className="mt-2 max-h-48 overflow-y-auto rounded-md border border-border/50 bg-muted/30 p-3 font-mono text-xs leading-relaxed text-muted-foreground"
     >
       <pre className="whitespace-pre-wrap break-words">{text}</pre>
