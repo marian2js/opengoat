@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { AlertCircleIcon, ListChecksIcon, RefreshCwIcon } from "lucide-react";
+import { AlertCircleIcon, ListChecksIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskList } from "@/features/board/hooks/useTaskList";
+import { useBoardFilters } from "@/features/board/hooks/useBoardFilters";
 import { TaskList, TaskListSkeleton } from "./TaskList";
 import { TaskDetailPanel } from "./TaskDetailPanel";
+import { BoardToolbar } from "./BoardToolbar";
 
 export interface BoardWorkspaceProps {
   agentId?: string | undefined;
@@ -45,6 +47,15 @@ function BoardContent({
   client: SidecarClient;
 }) {
   const { tasks, isLoading, error, refresh } = useTaskList(agentId, client);
+  const {
+    filteredTasks,
+    filter,
+    sort,
+    search,
+    setFilter,
+    setSort,
+    setSearch,
+  } = useBoardFilters(tasks);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   return (
@@ -60,6 +71,19 @@ function BoardContent({
           <RefreshCwIcon className="size-4" />
         </button>
       </div>
+
+      {!isLoading && !error && tasks.length > 0 && (
+        <div className="mb-4">
+          <BoardToolbar
+            filter={filter}
+            sort={sort}
+            search={search}
+            onFilterChange={setFilter}
+            onSortChange={setSort}
+            onSearchChange={setSearch}
+          />
+        </div>
+      )}
 
       {isLoading ? (
         <TaskListSkeleton />
@@ -92,9 +116,26 @@ function BoardContent({
             </div>
           </div>
         </div>
+      ) : filteredTasks.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground">
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex size-12 items-center justify-center rounded-xl bg-muted/50">
+              <SearchIcon className="size-6 text-muted-foreground/50" />
+            </div>
+            <div className="flex flex-col items-center gap-1.5">
+              <h3 className="text-sm font-medium text-foreground">
+                No matching tasks
+              </h3>
+              <p className="max-w-[280px] text-center text-xs leading-relaxed text-muted-foreground/70">
+                No tasks match your current filters. Try adjusting your filters
+                or search query.
+              </p>
+            </div>
+          </div>
+        </div>
       ) : (
         <TaskList
-          tasks={tasks}
+          tasks={filteredTasks}
           onTaskSelect={(id) => setSelectedTaskId(id)}
         />
       )}
