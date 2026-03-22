@@ -32,6 +32,51 @@ function stripLeadingH1(md: string): string {
   return md.replace(/^#\s+.+\n*/, "");
 }
 
+/**
+ * Detect which h2 sections in Knowledge markdown are empty.
+ * A section is empty if it contains no non-whitespace content
+ * between its heading and the next heading (or end of file).
+ */
+function getEmptyKnowledgeSections(content: string): { references: boolean; notes: boolean } {
+  const lines = content.split("\n");
+  let inReferences = false;
+  let inNotes = false;
+  let referencesExists = false;
+  let notesExists = false;
+  let referencesHasContent = false;
+  let notesHasContent = false;
+
+  for (const line of lines) {
+    if (/^##\s+References/i.test(line)) {
+      inReferences = true;
+      inNotes = false;
+      referencesExists = true;
+      continue;
+    }
+    if (/^##\s+Notes/i.test(line)) {
+      inNotes = true;
+      inReferences = false;
+      notesExists = true;
+      continue;
+    }
+    if (/^##\s+/.test(line)) {
+      inReferences = false;
+      inNotes = false;
+      continue;
+    }
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("---")) {
+      if (inReferences) referencesHasContent = true;
+      if (inNotes) notesHasContent = true;
+    }
+  }
+
+  return {
+    references: referencesExists && !referencesHasContent,
+    notes: notesExists && !notesHasContent,
+  };
+}
+
 interface BrainSection {
   id: string;
   label: string;
@@ -420,8 +465,10 @@ function BrainEditor({
             placeholder={`Start writing your ${section.label.toLowerCase()} notes...`}
             className="min-h-[500px] w-full resize-none rounded-lg border border-border/50 bg-transparent p-4 font-mono text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-ring focus:ring-1 focus:ring-ring/30"
           />
+        ) : section.id === "knowledge" ? (
+          <KnowledgeContentView content={content} />
         ) : (
-          <div className="prose prose-sm prose-invert max-w-none [&>h1:first-child]:hidden [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-0 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mb-3 [&_h2]:mt-8 [&_h2]:pt-6 [&_h2]:border-t [&_h2]:border-border/20 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-foreground/80 [&_p]:mb-3 [&_ul]:text-sm [&_ul]:text-foreground/80 [&_ul]:mb-3 [&_ul]:ml-1 [&_ol]:text-sm [&_ol]:text-foreground/80 [&_ol]:mb-3 [&_li]:mb-1.5 [&_li]:leading-relaxed [&_strong]:text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_hr]:border-border/40 [&_hr]:my-6 [&_table]:w-full [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:pb-2 [&_th]:border-b [&_td]:text-sm [&_td]:py-1.5 [&_td]:border-b [&_td]:border-border/30 [&_blockquote]:border-l-2 [&_blockquote]:border-border/60 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground">
+          <div className={KNOWLEDGE_PROSE_CLASSES}>
             <Markdown remarkPlugins={[remarkGfm]}>{stripLeadingH1(content)}</Markdown>
           </div>
         )}
@@ -597,6 +644,97 @@ function KnowledgeEmptyState({
           <div className="mt-1 text-xs">Open the editor and start writing</div>
         </button>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge content view — renders markdown with per-category empty states
+// ---------------------------------------------------------------------------
+
+const KNOWLEDGE_PROSE_CLASSES =
+  "prose prose-sm prose-invert max-w-none [&>h1:first-child]:hidden [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-0 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mb-3 [&_h2]:mt-8 [&_h2]:pt-6 [&_h2]:border-t [&_h2]:border-border/20 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-foreground/80 [&_p]:mb-3 [&_ul]:text-sm [&_ul]:text-foreground/80 [&_ul]:mb-3 [&_ul]:ml-1 [&_ol]:text-sm [&_ol]:text-foreground/80 [&_ol]:mb-3 [&_li]:mb-1.5 [&_li]:leading-relaxed [&_strong]:text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_hr]:border-border/40 [&_hr]:my-6 [&_table]:w-full [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:pb-2 [&_th]:border-b [&_td]:text-sm [&_td]:py-1.5 [&_td]:border-b [&_td]:border-border/30 [&_blockquote]:border-l-2 [&_blockquote]:border-border/60 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground";
+
+function KnowledgeInlineEmpty({
+  icon: Icon,
+  title,
+  helperText,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  helperText: string;
+}) {
+  return (
+    <div className="mt-4 rounded-lg border border-dashed border-muted-foreground/20 p-6 text-center">
+      <Icon className="mx-auto mb-2 size-8 text-muted-foreground/40" />
+      <p className="text-sm text-muted-foreground">{title}</p>
+      <p className="mt-1 text-xs text-muted-foreground/60">{helperText}</p>
+    </div>
+  );
+}
+
+function KnowledgeContentView({ content }: { content: string }) {
+  const stripped = stripLeadingH1(content);
+  const empty = getEmptyKnowledgeSections(stripped);
+  const hasEmptySections = empty.references || empty.notes;
+
+  if (!hasEmptySections) {
+    return (
+      <div className={KNOWLEDGE_PROSE_CLASSES}>
+        <Markdown remarkPlugins={[remarkGfm]}>{stripped}</Markdown>
+      </div>
+    );
+  }
+
+  // Split content into sections so we can inject inline empty states
+  const sections: Array<{ heading: string | null; body: string }> = [];
+  const lines = stripped.split("\n");
+  let currentHeading: string | null = null;
+  let currentBody: string[] = [];
+
+  for (const line of lines) {
+    const h2Match = line.match(/^##\s+(.+)/);
+    if (h2Match) {
+      sections.push({ heading: currentHeading, body: currentBody.join("\n") });
+      currentHeading = h2Match[1]!;
+      currentBody = [];
+    } else {
+      currentBody.push(line);
+    }
+  }
+  sections.push({ heading: currentHeading, body: currentBody.join("\n") });
+
+  return (
+    <div className={KNOWLEDGE_PROSE_CLASSES}>
+      {sections.map((sec, i) => {
+        const isReferencesEmpty = empty.references && sec.heading?.match(/^References/i);
+        const isNotesEmpty = empty.notes && sec.heading?.match(/^Notes/i);
+
+        return (
+          <div key={sec.heading ?? `preamble-${i}`}>
+            {sec.heading ? (
+              <Markdown remarkPlugins={[remarkGfm]}>{`## ${sec.heading}`}</Markdown>
+            ) : null}
+            {sec.body.trim() ? (
+              <Markdown remarkPlugins={[remarkGfm]}>{sec.body}</Markdown>
+            ) : null}
+            {isReferencesEmpty ? (
+              <KnowledgeInlineEmpty
+                icon={BookmarkIcon}
+                title="No references yet"
+                helperText="Import a file or paste a URL to add your first reference"
+              />
+            ) : null}
+            {isNotesEmpty ? (
+              <KnowledgeInlineEmpty
+                icon={StickyNoteIcon}
+                title="No notes yet"
+                helperText="Add notes to provide additional context for the AI"
+              />
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
