@@ -7,6 +7,8 @@ import { OpportunitySection } from "@/features/dashboard/components/OpportunityS
 import { SuggestedActionGrid } from "@/features/dashboard/components/SuggestedActionGrid";
 import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSummary";
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
+import { useBoardSummary } from "@/features/dashboard/hooks/useBoardSummary";
+import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
 
 export interface DashboardWorkspaceProps {
   agent?: { id: string; name: string; description?: string | undefined } | undefined;
@@ -81,6 +83,7 @@ function DashboardContent({
   const { data, files, isLoading, error } = useWorkspaceSummary(agentId, client);
   const workspaceReady = !isLoading && files !== null;
   const { suggestedActions, isLoading: isSuggestedLoading } = useSuggestedActions(agentId, client, workspaceReady);
+  const boardSummary = useBoardSummary(agentId, client);
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
@@ -116,7 +119,17 @@ function DashboardContent({
         />
       </div>
 
-      {/* Divider: actions → insights */}
+      {/* Divider: actions → board summary */}
+      <div className="border-b border-border/30" />
+
+      {/* Section 2.5: Board summary — compact task status overview */}
+      <BoardSummary
+        counts={boardSummary.counts}
+        isLoading={boardSummary.isLoading}
+        isEmpty={boardSummary.isEmpty}
+      />
+
+      {/* Divider: board summary → insights */}
       <div className="border-b border-border/30" />
 
       {/* Section 3: Insights — supporting info */}
