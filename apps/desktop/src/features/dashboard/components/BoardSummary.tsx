@@ -69,6 +69,10 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
           </div>
           <a
             href="#board"
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.hash = "#board";
+            }}
             className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             View Board
@@ -103,6 +107,10 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
         </div>
         <a
           href="#board"
+          onClick={(e) => {
+            e.preventDefault();
+            window.location.hash = "#board";
+          }}
           className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           View Board
