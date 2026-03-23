@@ -14,18 +14,21 @@ import { buildActionPrompt } from "@/features/dashboard/data/prompt-builder";
 export interface ActionCardItemProps {
   card: ActionCard;
   isCompleted?: boolean | undefined;
+  isHero?: boolean | undefined;
   isLoading?: boolean | undefined;
   onClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
 }
 
-export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewResults }: ActionCardItemProps) {
+export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, onViewResults }: ActionCardItemProps) {
   const Icon = card.icon;
   const config = categoryConfig[card.category];
 
   return (
     <Card
       className={`group/action relative flex flex-col overflow-hidden border transition-all duration-100 ${
+        isHero ? "border-t-2 border-t-primary/40 py-5" : ""
+      } ${
         isLoading
           ? "pointer-events-none border-border/50 bg-card/60 opacity-60"
           : isCompleted
@@ -56,7 +59,7 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
             </span>
           ) : null}
         </div>
-        <CardTitle className="text-sm leading-snug transition-colors group-hover/action:text-primary">
+        <CardTitle className={`leading-snug transition-colors group-hover/action:text-primary ${isHero ? "text-base font-bold" : "text-sm"}`}>
           {card.title}
         </CardTitle>
         <CardDescription className="text-xs line-clamp-2">

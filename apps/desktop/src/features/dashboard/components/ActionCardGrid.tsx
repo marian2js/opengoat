@@ -19,11 +19,12 @@ export function ActionCardGrid({ completedActions, isLoading, onActionClick, onV
         </h2>
       </div>
       <div className="grid justify-items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3 sm:[&>:last-child:nth-child(2n+1)]:col-span-full xl:[&>:last-child:nth-child(2n+1)]:col-auto xl:[&>:last-child:nth-child(3n+1)]:col-span-full">
-        {starterActions.map((card) => (
+        {starterActions.map((card, index) => (
           <ActionCardItem
             key={card.id}
             card={card}
             isCompleted={completedActions?.has(card.id)}
+            isHero={index < 3}
             isLoading={isLoading}
             onClick={onActionClick}
             onViewResults={onViewResults}
