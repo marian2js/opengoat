@@ -28,6 +28,11 @@ import {
   updateAgentSessionRequestSchema,
   updateObjectiveRequestSchema,
   updateTaskStatusRequestSchema,
+  advanceRunPhaseRequestSchema,
+  createRunRequestSchema,
+  runListPageSchema,
+  runRecordSchema,
+  updateRunStatusRequestSchema,
   addTaskBlockerRequestSchema,
   addTaskArtifactRequestSchema,
   addTaskWorklogRequestSchema,
@@ -57,6 +62,8 @@ import {
   type Objective,
   type PlaybookManifest,
   type ProviderModelCatalog,
+  type RunListPage,
+  type RunRecord,
   type RemoveSkillResultContract,
   type SavedConnection,
   type SidecarBootstrap,
@@ -557,6 +564,87 @@ export class SidecarClient {
   async getPlaybook(playbookId: string): Promise<PlaybookManifest> {
     return playbookManifestSchema.parse(
       await this.request(`/playbooks/${encodeURIComponent(playbookId)}`),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Runs
+  // ---------------------------------------------------------------------------
+
+  async createRun(payload: {
+    projectId: string;
+    objectiveId: string;
+    playbookId?: string;
+    title: string;
+    startedFrom?: string;
+    agentId?: string;
+    phase?: string;
+    phaseSummary?: string;
+  }): Promise<RunRecord> {
+    return runRecordSchema.parse(
+      await this.request("/runs", {
+        body: JSON.stringify(createRunRequestSchema.parse(payload)),
+        method: "POST",
+      }),
+    );
+  }
+
+  async getRun(runId: string): Promise<RunRecord> {
+    return runRecordSchema.parse(
+      await this.request(`/runs/${encodeURIComponent(runId)}`),
+    );
+  }
+
+  async listRuns(params?: {
+    projectId?: string;
+    objectiveId?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<RunListPage> {
+    const query = new URLSearchParams();
+    if (params?.projectId) {
+      query.set("projectId", params.projectId);
+    }
+    if (params?.objectiveId) {
+      query.set("objectiveId", params.objectiveId);
+    }
+    if (params?.status) {
+      query.set("status", params.status);
+    }
+    if (params?.limit !== undefined) {
+      query.set("limit", String(params.limit));
+    }
+    if (params?.offset !== undefined) {
+      query.set("offset", String(params.offset));
+    }
+    const qs = query.toString();
+    return runListPageSchema.parse(
+      await this.request(`/runs${qs ? `?${qs}` : ""}`),
+    );
+  }
+
+  async updateRunStatus(runId: string, status: string): Promise<RunRecord> {
+    return runRecordSchema.parse(
+      await this.request(`/runs/${encodeURIComponent(runId)}/status`, {
+        body: JSON.stringify(updateRunStatusRequestSchema.parse({ status })),
+        method: "PATCH",
+      }),
+    );
+  }
+
+  async advanceRunPhase(
+    runId: string,
+    phase: string,
+    phaseSummary?: string,
+  ): Promise<RunRecord> {
+    return runRecordSchema.parse(
+      await this.request(`/runs/${encodeURIComponent(runId)}/advance-phase`, {
+        body: JSON.stringify(
+          advanceRunPhaseRequestSchema.parse({ phase, phaseSummary }),
+        ),
+        method: "POST",
+      }),
     );
   }
 

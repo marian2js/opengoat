@@ -9,6 +9,7 @@ import { createChatRoutes } from "./routes/chat.ts";
 import { createGlobalRoutes } from "./routes/global.ts";
 import { createObjectiveRoutes } from "./routes/objectives.ts";
 import { createPlaybookRoutes } from "./routes/playbooks.ts";
+import { createRunRoutes } from "./routes/runs.ts";
 import { createTaskRoutes } from "./routes/tasks.ts";
 import type { SidecarRuntime } from "./context.ts";
 
@@ -76,6 +77,7 @@ export function createSidecarApp(runtime: SidecarRuntime): Hono<{
   app.route("/auth", createAuthRoutes(runtime));
   app.route("/objectives", createObjectiveRoutes(runtime));
   app.route("/playbooks", createPlaybookRoutes(runtime));
+  app.route("/runs", createRunRoutes(runtime));
   app.route("/tasks", createTaskRoutes(runtime));
 
   app.notFound((context) => context.json({ error: "Not Found" }, 404));

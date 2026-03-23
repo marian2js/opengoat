@@ -1,4 +1,4 @@
-import type { BoardService, ObjectiveService, OpenGoatPaths, PlaybookRegistryService, SkillService } from "@opengoat/core";
+import type { BoardService, ObjectiveService, OpenGoatPaths, PlaybookRegistryService, RunService, SkillService } from "@opengoat/core";
 import type { SidecarConfig } from "../config.ts";
 import type { RuntimeProviderAuthService } from "../auth/service.ts";
 import type { RuntimeAuthSessionManager } from "../auth/sessions.ts";
@@ -15,6 +15,7 @@ export interface SidecarRuntime {
   gatewaySupervisor: EmbeddedGatewaySupervisor;
   opengoatPaths: OpenGoatPaths;
   playbookRegistryService: PlaybookRegistryService;
+  runService: RunService;
   skillService: SkillService;
   startedAt: number;
   version: string;

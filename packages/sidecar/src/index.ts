@@ -9,6 +9,7 @@ import {
   NodePathPort,
   ObjectiveService,
   PlaybookRegistryService,
+  RunService,
   SkillService,
 } from "@opengoat/core";
 import packageJson from "../package.json" with { type: "json" };
@@ -77,6 +78,12 @@ export async function startSidecarServer(
     nowIso: () => new Date().toISOString(),
   });
 
+  const runService = new RunService({
+    fileSystem,
+    pathPort,
+    nowIso: () => new Date().toISOString(),
+  });
+
   const playbookRegistryService = new PlaybookRegistryService([...BUILTIN_PLAYBOOKS]);
 
   const runtime = {
@@ -93,6 +100,7 @@ export async function startSidecarServer(
     objectiveService,
     opengoatPaths,
     playbookRegistryService,
+    runService,
     skillService,
     startedAt: Date.now(),
     version: packageJson.version,

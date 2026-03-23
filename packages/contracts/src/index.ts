@@ -601,6 +601,71 @@ export type UpdateObjectiveRequest = z.infer<typeof updateObjectiveRequestSchema
 export type ListObjectivesQuery = z.infer<typeof listObjectivesQuerySchema>;
 export type ArchiveObjectiveRequest = z.infer<typeof archiveObjectiveRequestSchema>;
 
+// --- Runs ---
+
+export const runStatusSchema = z.enum([
+  "draft",
+  "running",
+  "waiting_review",
+  "blocked",
+  "completed",
+  "cancelled",
+]);
+
+export const runStartedFromSchema = z.enum(["dashboard", "chat", "action"]);
+
+export const runRecordSchema = z.object({
+  runId: z.string().min(1),
+  projectId: z.string().min(1),
+  objectiveId: z.string().min(1),
+  playbookId: z.string().optional(),
+  title: z.string().min(1),
+  status: runStatusSchema,
+  phase: z.string(),
+  phaseSummary: z.string(),
+  startedFrom: runStartedFromSchema,
+  agentId: z.string().min(1),
+  sessionId: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  completedAt: z.string().optional(),
+});
+
+export const createRunRequestSchema = z.object({
+  projectId: z.string().min(1),
+  objectiveId: z.string().min(1),
+  playbookId: z.string().optional(),
+  title: z.string().min(1),
+  startedFrom: runStartedFromSchema.optional(),
+  agentId: z.string().optional(),
+  phase: z.string().optional(),
+  phaseSummary: z.string().optional(),
+});
+
+export const updateRunStatusRequestSchema = z.object({
+  status: runStatusSchema,
+});
+
+export const advanceRunPhaseRequestSchema = z.object({
+  phase: z.string().min(1),
+  phaseSummary: z.string().optional(),
+});
+
+export const runListPageSchema = z.object({
+  runs: z.array(runRecordSchema),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
+});
+
+export type RunStatus = z.infer<typeof runStatusSchema>;
+export type RunStartedFrom = z.infer<typeof runStartedFromSchema>;
+export type RunRecord = z.infer<typeof runRecordSchema>;
+export type CreateRunRequest = z.infer<typeof createRunRequestSchema>;
+export type UpdateRunStatusRequest = z.infer<typeof updateRunStatusRequestSchema>;
+export type AdvanceRunPhaseRequest = z.infer<typeof advanceRunPhaseRequestSchema>;
+export type RunListPage = z.infer<typeof runListPageSchema>;
+
 export const appManifest = appManifestSchema.parse(appManifestJson);
 
 export function createBasicAuthHeader(
