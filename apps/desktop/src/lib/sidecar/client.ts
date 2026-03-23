@@ -11,11 +11,14 @@ import {
   createAgentRequestSchema,
   createAgentSessionRequestSchema,
   deleteAgentResponseSchema,
+  createObjectiveRequestSchema,
   deleteTasksRequestSchema,
   deleteTasksResponseSchema,
   installSkillRequestSchema,
   installSkillResultSchema,
   listPlaybooksResponseSchema,
+  objectiveListSchema,
+  objectiveSchema,
   playbookManifestSchema,
   removeSkillResultSchema,
   skillListSchema,
@@ -23,6 +26,7 @@ import {
   taskRecordSchema,
   updateAgentRequestSchema,
   updateAgentSessionRequestSchema,
+  updateObjectiveRequestSchema,
   updateTaskStatusRequestSchema,
   addTaskBlockerRequestSchema,
   addTaskArtifactRequestSchema,
@@ -50,6 +54,7 @@ import {
   type DeleteTasksResponse,
   type InstallSkillResultContract,
   type ListPlaybooksResponse,
+  type Objective,
   type PlaybookManifest,
   type ProviderModelCatalog,
   type RemoveSkillResultContract,
@@ -456,64 +461,86 @@ export class SidecarClient {
   async createObjective(payload: {
     projectId: string;
     title: string;
-    goalType?: string | undefined;
-    status?: string | undefined;
-    summary?: string | undefined;
-    whyNow?: string | undefined;
-    successDefinition?: string | undefined;
-    timeframe?: string | undefined;
-    alreadyTried?: string | undefined;
-    avoid?: string | undefined;
-    constraints?: string | undefined;
-    preferredChannels?: string | undefined;
-    createdFrom?: string | undefined;
-  }): Promise<unknown> {
-    return this.request("/objectives", {
-      body: JSON.stringify(payload),
-      method: "POST",
-    });
+    goalType?: string;
+    summary?: string;
+    whyNow?: string;
+    successDefinition?: string;
+    timeframe?: string;
+    alreadyTried?: string;
+    avoid?: string;
+    constraints?: string;
+    preferredChannels?: string[];
+  }): Promise<Objective> {
+    return objectiveSchema.parse(
+      await this.request("/objectives", {
+        body: JSON.stringify({
+          projectId: payload.projectId,
+          ...createObjectiveRequestSchema.parse(payload),
+        }),
+        method: "POST",
+      }),
+    );
   }
 
-  async listObjectives(params?: {
-    projectId?: string;
-    status?: string;
-  }): Promise<unknown> {
-    const query = new URLSearchParams();
-    if (params?.projectId) {
-      query.set("projectId", params.projectId);
+  async listObjectives(projectId: string, status?: string): Promise<Objective[]> {
+    const query = new URLSearchParams({ projectId });
+    if (status) {
+      query.set("status", status);
     }
-    if (params?.status) {
-      query.set("status", params.status);
-    }
-    const qs = query.toString();
-    return this.request(`/objectives${qs ? `?${qs}` : ""}`);
+    return objectiveListSchema.parse(
+      await this.request(`/objectives?${query.toString()}`),
+    );
   }
 
-  async getObjective(objectiveId: string): Promise<unknown> {
-    return this.request(`/objectives/${encodeURIComponent(objectiveId)}`);
+  async getObjective(objectiveId: string): Promise<Objective> {
+    return objectiveSchema.parse(
+      await this.request(`/objectives/${encodeURIComponent(objectiveId)}`),
+    );
   }
 
   async updateObjective(
     objectiveId: string,
-    payload: Record<string, unknown>,
-  ): Promise<unknown> {
-    return this.request(`/objectives/${encodeURIComponent(objectiveId)}`, {
-      body: JSON.stringify(payload),
-      method: "PATCH",
-    });
-  }
-
-  async archiveObjective(objectiveId: string): Promise<unknown> {
-    return this.request(
-      `/objectives/${encodeURIComponent(objectiveId)}/archive`,
-      { method: "POST" },
+    changes: {
+      title?: string;
+      goalType?: string;
+      status?: string;
+      summary?: string;
+      whyNow?: string;
+      successDefinition?: string;
+      timeframe?: string;
+      alreadyTried?: string;
+      avoid?: string;
+      constraints?: string;
+      preferredChannels?: string[];
+      isPrimary?: boolean;
+    },
+  ): Promise<Objective> {
+    return objectiveSchema.parse(
+      await this.request(`/objectives/${encodeURIComponent(objectiveId)}`, {
+        body: JSON.stringify(updateObjectiveRequestSchema.parse(changes)),
+        method: "PATCH",
+      }),
     );
   }
 
-  async setPrimaryActiveObjective(objectiveId: string): Promise<unknown> {
-    return this.request(
-      `/objectives/${encodeURIComponent(objectiveId)}/set-primary`,
-      { method: "POST" },
+  async archiveObjective(objectiveId: string): Promise<Objective> {
+    return objectiveSchema.parse(
+      await this.request(
+        `/objectives/${encodeURIComponent(objectiveId)}/archive`,
+        { method: "POST" },
+      ),
+    );
+  }
+
+  async setPrimaryObjective(projectId: string, objectiveId: string): Promise<Objective> {
+    return objectiveSchema.parse(
+      await this.request(
+        `/objectives/${encodeURIComponent(objectiveId)}/set-primary`,
+        {
+          body: JSON.stringify({ projectId }),
+          method: "POST",
+        },
+      ),
     );
   }
 

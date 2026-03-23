@@ -12,7 +12,7 @@ export interface UseActiveObjectiveResult {
 /**
  * Fetches the primary active objective for the current project.
  *
- * Calls `client.listObjectives({ projectId, status: "active" })` on mount
+ * Calls `client.listObjectives(projectId, "active")` on mount
  * and returns the first active objective. Re-fetches when agentId changes.
  *
  * Returns null objective gracefully when the backend hasn't been deployed yet
@@ -38,10 +38,7 @@ export function useActiveObjective(
 
     async function load(): Promise<void> {
       try {
-        const result = await client.listObjectives({
-          projectId: agentId,
-          status: "active",
-        });
+        const result = await client.listObjectives(agentId, "active");
 
         if (cancelled) return;
 

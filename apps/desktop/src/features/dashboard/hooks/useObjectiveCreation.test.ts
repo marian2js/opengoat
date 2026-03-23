@@ -26,7 +26,7 @@ void test("useObjectiveCreation: manages form state with setField", () => {
 
 void test("useObjectiveCreation: has create function that calls API", () => {
   assert.ok(src.includes("createObjective"), "Expected createObjective API call");
-  assert.ok(src.includes("setPrimaryActiveObjective"), "Expected setPrimaryActiveObjective call after creation");
+  assert.ok(src.includes("setPrimaryObjective"), "Expected setPrimaryObjective call after creation");
 });
 
 void test("useObjectiveCreation: tracks isSubmitting state", () => {

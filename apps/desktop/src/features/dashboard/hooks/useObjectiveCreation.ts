@@ -35,7 +35,7 @@ export interface UseObjectiveCreationResult {
  * Manages objective creation form state and submission.
  *
  * On submit, calls `client.createObjective(...)` with status "draft",
- * then `client.setPrimaryActiveObjective(...)` to make it the active objective.
+ * then `client.setPrimaryObjective(...)` to make it the active objective.
  */
 export function useObjectiveCreation(
   agentId: string,
@@ -70,18 +70,18 @@ export function useObjectiveCreation(
       const result = (await client.createObjective({
         projectId: agentId,
         title: formState.title.trim(),
-        status: "draft",
-        createdFrom: "dashboard",
         successDefinition: formState.successDefinition.trim() || undefined,
         alreadyTried: formState.alreadyTried.trim() || undefined,
         avoid: formState.avoid.trim() || undefined,
         timeframe: formState.timeframe.trim() || undefined,
-        preferredChannels: formState.preferredChannels.trim() || undefined,
+        preferredChannels: formState.preferredChannels.trim()
+          ? formState.preferredChannels.split(",").map((c) => c.trim()).filter(Boolean)
+          : undefined,
       })) as Objective;
 
       // Make it the primary active objective
       if (result?.objectiveId) {
-        await client.setPrimaryActiveObjective(result.objectiveId);
+        await client.setPrimaryObjective(agentId, result.objectiveId);
       }
 
       return result;

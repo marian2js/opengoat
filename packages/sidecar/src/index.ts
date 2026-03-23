@@ -7,6 +7,7 @@ import {
   NodeFileSystem,
   NodeOpenGoatPathsProvider,
   NodePathPort,
+  ObjectiveService,
   PlaybookRegistryService,
   SkillService,
 } from "@opengoat/core";
@@ -70,6 +71,12 @@ export async function startSidecarServer(
     agentManifestService,
   });
 
+  const objectiveService = new ObjectiveService({
+    fileSystem,
+    pathPort,
+    nowIso: () => new Date().toISOString(),
+  });
+
   const playbookRegistryService = new PlaybookRegistryService([...BUILTIN_PLAYBOOKS]);
 
   const runtime = {
@@ -83,6 +90,7 @@ export async function startSidecarServer(
     config,
     embeddedGateway,
     gatewaySupervisor,
+    objectiveService,
     opengoatPaths,
     playbookRegistryService,
     skillService,
