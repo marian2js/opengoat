@@ -678,6 +678,134 @@ export type UpdateRunStatusRequest = z.infer<typeof updateRunStatusRequestSchema
 export type AdvanceRunPhaseRequest = z.infer<typeof advanceRunPhaseRequestSchema>;
 export type RunListPage = z.infer<typeof runListPageSchema>;
 
+// --- Artifacts ---
+
+export const artifactStatusSchema = z.enum([
+  "draft",
+  "ready_for_review",
+  "approved",
+  "needs_changes",
+  "archived",
+]);
+
+export const artifactTypeSchema = z.enum([
+  "copy_draft",
+  "content_calendar",
+  "checklist",
+  "backlog",
+  "matrix",
+  "research_brief",
+  "page_outline",
+  "launch_pack",
+  "email_sequence",
+  "strategy_note",
+  "report",
+  "dataset_list",
+]);
+
+export const artifactFormatSchema = z.enum([
+  "markdown",
+  "json",
+  "csv",
+  "txt",
+  "html",
+  "url",
+  "file-ref",
+]);
+
+export const artifactRecordSchema = z.object({
+  artifactId: z.string().min(1),
+  projectId: z.string().min(1),
+  objectiveId: z.string().optional(),
+  runId: z.string().optional(),
+  taskId: z.string().optional(),
+  bundleId: z.string().optional(),
+  type: artifactTypeSchema,
+  title: z.string().min(1),
+  status: artifactStatusSchema,
+  format: artifactFormatSchema,
+  contentRef: z.string().min(1),
+  content: z.string().optional(),
+  summary: z.string().optional(),
+  version: z.number().int().positive(),
+  createdBy: z.string().min(1),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  approvedAt: z.string().optional(),
+  approvedBy: z.string().optional(),
+});
+
+export const artifactVersionSchema = z.object({
+  versionId: z.string().min(1),
+  artifactId: z.string().min(1),
+  version: z.number().int().positive(),
+  content: z.string(),
+  contentRef: z.string().min(1),
+  summary: z.string().optional(),
+  createdBy: z.string().min(1),
+  createdAt: z.string(),
+  note: z.string().optional(),
+});
+
+export const createArtifactRequestSchema = z.object({
+  projectId: z.string().min(1),
+  title: z.string().min(1),
+  type: artifactTypeSchema,
+  format: artifactFormatSchema,
+  contentRef: z.string().min(1),
+  createdBy: z.string().min(1),
+  objectiveId: z.string().optional(),
+  runId: z.string().optional(),
+  taskId: z.string().optional(),
+  bundleId: z.string().optional(),
+  content: z.string().optional(),
+  summary: z.string().optional(),
+});
+
+export const updateArtifactRequestSchema = z.object({
+  title: z.string().min(1).optional(),
+  content: z.string().optional(),
+  contentRef: z.string().min(1).optional(),
+  summary: z.string().optional(),
+});
+
+export const updateArtifactStatusRequestSchema = z.object({
+  status: artifactStatusSchema,
+  actor: z.string().optional(),
+});
+
+export const artifactListPageSchema = z.object({
+  items: z.array(artifactRecordSchema),
+  total: z.number().int().nonnegative(),
+});
+
+export const bundleRecordSchema = z.object({
+  bundleId: z.string().min(1),
+  projectId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const createBundleRequestSchema = z.object({
+  projectId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().optional(),
+});
+
+export type ArtifactStatus = z.infer<typeof artifactStatusSchema>;
+export type ArtifactType = z.infer<typeof artifactTypeSchema>;
+export type ArtifactFormat = z.infer<typeof artifactFormatSchema>;
+export type ArtifactRecord = z.infer<typeof artifactRecordSchema>;
+export type ArtifactVersion = z.infer<typeof artifactVersionSchema>;
+export type CreateArtifactRequest = z.infer<typeof createArtifactRequestSchema>;
+export type UpdateArtifactRequest = z.infer<typeof updateArtifactRequestSchema>;
+export type UpdateArtifactStatusRequest = z.infer<typeof updateArtifactStatusRequestSchema>;
+export type ArtifactListPage = z.infer<typeof artifactListPageSchema>;
+export type BundleRecord = z.infer<typeof bundleRecordSchema>;
+export type CreateBundleRequest = z.infer<typeof createBundleRequestSchema>;
+
 export const appManifest = appManifestSchema.parse(appManifestJson);
 
 export function createBasicAuthHeader(

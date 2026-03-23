@@ -10,6 +10,7 @@ export * from "./core/agents/index.js";
 export * from "./core/bootstrap/index.js";
 export * from "./core/boards/index.js";
 export * from "./core/objectives/index.js";
+export * from "./core/artifacts/index.js";
 export * from "./core/runs/index.js";
 export * from "./core/providers/index.js";
 export * from "./core/projects/index.js";
