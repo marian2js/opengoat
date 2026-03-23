@@ -273,6 +273,11 @@ export function App() {
     [],
   );
 
+  const handleResumeRun = useCallback((sessionId: string) => {
+    setActiveSessionId(sessionId);
+    window.location.hash = "#chat";
+  }, []);
+
   const handleSessionSelect = useCallback((sessionId: string) => {
     setActiveSessionId(sessionId);
     window.location.hash = "#chat";
@@ -441,6 +446,7 @@ export function App() {
                 }}
                 onViewResults={handleViewResults}
                 onRunSessionCreated={handleRunSessionCreated}
+                onResumeRun={handleResumeRun}
               />
             )
           ) : currentView === "board" ? (

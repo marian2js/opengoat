@@ -17,7 +17,9 @@ import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActi
 import { useBoardSummary } from "@/features/dashboard/hooks/useBoardSummary";
 import { useActiveObjective } from "@/features/dashboard/hooks/useActiveObjective";
 import { usePlaybooks } from "@/features/dashboard/hooks/usePlaybooks";
+import { useRuns } from "@/features/dashboard/hooks/useRuns";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
+import { WorkInProgress } from "@/features/dashboard/components/WorkInProgress";
 
 export interface DashboardWorkspaceProps {
   agent?: { id: string; name: string; description?: string | undefined } | undefined;
@@ -28,6 +30,7 @@ export interface DashboardWorkspaceProps {
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
   onRunSessionCreated?: (session: AgentSession, prompt: string, runId: string) => void;
+  onResumeRun?: (sessionId: string) => void;
 }
 
 export function DashboardWorkspace({
@@ -39,6 +42,7 @@ export function DashboardWorkspace({
   onActionClick,
   onViewResults,
   onRunSessionCreated,
+  onResumeRun,
 }: DashboardWorkspaceProps) {
   if (!agentId || !client) {
     return (
@@ -65,6 +69,7 @@ export function DashboardWorkspace({
       onActionClick={onActionClick}
       onViewResults={onViewResults}
       onRunSessionCreated={onRunSessionCreated}
+      onResumeRun={onResumeRun}
     />
   );
 }
@@ -83,6 +88,7 @@ function DashboardContent({
   onActionClick,
   onViewResults,
   onRunSessionCreated,
+  onResumeRun,
 }: {
   agentId: string;
   client: SidecarClient;
@@ -92,7 +98,8 @@ function DashboardContent({
   isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
-  onRunSessionCreated?: (session: AgentSession, prompt: string, runId: string) => void;
+  onRunSessionCreated?: ((session: AgentSession, prompt: string, runId: string) => void) | undefined;
+  onResumeRun?: ((sessionId: string) => void) | undefined;
 }) {
   const { data, files, isLoading, error } = useWorkspaceSummary(agentId, client);
   const workspaceReady = !isLoading && files !== null;
@@ -100,6 +107,7 @@ function DashboardContent({
   const boardSummary = useBoardSummary(agentId, client);
   const activeObjective = useActiveObjective(agentId, client);
   const { playbooks, isLoading: isPlaybooksLoading } = usePlaybooks(client);
+  const runsResult = useRuns(agentId, client);
 
   // Playbook run creation
   const noopSessionCreated = (_s: AgentSession, _p: string, _r: string) => {};
@@ -200,6 +208,18 @@ function DashboardContent({
           onViewResults={onViewResults}
         />
       </div>
+
+      {/* ── Work in Progress — active runs ── */}
+      {(!runsResult.isEmpty || runsResult.isLoading) && (
+        <div className="dashboard-section">
+          <WorkInProgress
+            runs={runsResult.runs}
+            isLoading={runsResult.isLoading}
+            isEmpty={runsResult.isEmpty}
+            onResumeRun={onResumeRun}
+          />
+        </div>
+      )}
 
       {/* ── Board summary — section divider ── */}
       <div className="dashboard-section">
