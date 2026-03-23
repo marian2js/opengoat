@@ -237,31 +237,35 @@ export function AppSidebar({
             ) : null}
             <SidebarGroupContent>
               <SidebarMenu>
-                {sessionGroups.map((group) => (
-                  <li key={group.label} role="none">
-                    <div className="px-3 pt-3 pb-1">
-                      <span className="text-[10px] font-medium uppercase tracking-wider text-sidebar-foreground/50">
-                        {group.label}
-                      </span>
-                    </div>
-                    <ul role="group" className="flex flex-col">
-                      {group.sessions.map((session) => (
-                        <SessionItem
-                          key={session.id}
-                          deEmphasized={deEmphasizedIds.has(session.id)}
-                          isActive={session.id === activeSessionId}
-                          isEditing={editingSessionId === session.id}
-                          session={session}
-                          onDelete={onSessionDelete}
-                          onRename={onSessionRename}
-                          onSelect={onSessionSelect}
-                          onStartEditing={() => setEditingSessionId(session.id)}
-                          onStopEditing={() => setEditingSessionId(null)}
-                        />
-                      ))}
-                    </ul>
-                  </li>
-                ))}
+                {sessionGroups.map((group) => {
+                  const isRecent = group.label === "Today" || group.label === "Yesterday";
+                  return (
+                    <li key={group.label} role="none">
+                      <div className="px-3 pt-3 pb-1">
+                        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
+                          {group.label}
+                        </span>
+                      </div>
+                      <ul role="group" className="flex flex-col">
+                        {group.sessions.map((session) => (
+                          <SessionItem
+                            key={session.id}
+                            deEmphasized={deEmphasizedIds.has(session.id)}
+                            isActive={session.id === activeSessionId}
+                            isEditing={editingSessionId === session.id}
+                            isRecent={isRecent}
+                            session={session}
+                            onDelete={onSessionDelete}
+                            onRename={onSessionRename}
+                            onSelect={onSessionSelect}
+                            onStartEditing={() => setEditingSessionId(session.id)}
+                            onStopEditing={() => setEditingSessionId(null)}
+                          />
+                        ))}
+                      </ul>
+                    </li>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -423,6 +427,7 @@ function SessionItem({
   deEmphasized,
   isActive,
   isEditing,
+  isRecent,
   session,
   onDelete,
   onRename,
@@ -433,6 +438,7 @@ function SessionItem({
   deEmphasized: boolean;
   isActive: boolean;
   isEditing: boolean;
+  isRecent: boolean;
   session: AgentSession;
   onDelete?: ((sessionId: string) => void) | undefined;
   onRename?: ((sessionId: string, label: string) => void) | undefined;
@@ -485,12 +491,20 @@ function SessionItem({
           onSelect?.(session.id);
         }}
         className={cn(
+          isActive && "border-l-2 border-primary bg-primary/5",
           deEmphasized && !isActive && "opacity-45",
           unnamed && !isActive && "text-sidebar-foreground/50",
         )}
       >
         <MessageSquareIcon />
-        <span className={cn("truncate", unnamed ? "italic" : "font-medium")}>{label}</span>
+        <span className={cn(
+          "truncate",
+          unnamed
+            ? "italic"
+            : isRecent
+              ? "font-medium"
+              : "font-normal",
+        )}>{label}</span>
       </SidebarMenuButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

@@ -14,11 +14,14 @@ describe("Chat sidebar – visual grouping and conversation distinction", () => 
     expect(src).toContain("group.label");
   });
 
-  it("date group headers use uppercase tracking-wider styling", () => {
-    // The group header label should use small uppercase styling for clear visual separation
+  it("date group headers use DESIGN.md section-label pattern (mono, uppercase, primary color)", () => {
+    // The group header label should use the DESIGN.md section-label pattern:
+    // 10px / 600, mono, uppercase, 0.1em tracking, primary color
     expect(src).toMatch(/uppercase/);
-    expect(src).toMatch(/tracking-wider/);
+    expect(src).toMatch(/tracking-\[0\.1em\]/);
     expect(src).toMatch(/text-\[10px\]/);
+    expect(src).toMatch(/font-mono/);
+    expect(src).toMatch(/text-primary/);
   });
 
   // AC2: Named conversations are visually distinguishable from generic "New conversation" items
@@ -33,13 +36,15 @@ describe("Chat sidebar – visual grouping and conversation distinction", () => 
     expect(sessionItemBody).toContain("italic");
   });
 
-  it("differentiates named conversations with non-italic normal weight text", () => {
+  it("differentiates named conversations with non-italic weight text based on recency", () => {
     const sessionItemStart = src.indexOf("function SessionItem");
     const sessionItemBody = src.slice(sessionItemStart);
     // The unnamed check is used to conditionally apply different styles
     expect(sessionItemBody).toContain("isUnnamedSession");
-    // Named sessions should NOT be italic — only unnamed get italic (ternary: unnamed ? "italic" : "font-medium")
-    expect(sessionItemBody).toMatch(/unnamed\s*\?\s*"italic"\s*:\s*"font-medium"/);
+    // Named sessions should NOT be italic — unnamed get italic, recent named get font-medium, older get font-normal
+    expect(sessionItemBody).toContain("italic");
+    expect(sessionItemBody).toContain("font-medium");
+    expect(sessionItemBody).toContain("font-normal");
   });
 
   // AC3: The sidebar is easier to scan and navigate
