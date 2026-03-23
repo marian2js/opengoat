@@ -896,6 +896,23 @@ export class SidecarClient {
   }
 
   // ---------------------------------------------------------------------------
+  // Workspace Signals
+  // ---------------------------------------------------------------------------
+
+  async detectWorkspaceSignals(
+    projectId: string,
+  ): Promise<{ created: number; skipped: number }> {
+    return z
+      .object({ created: z.number(), skipped: z.number() })
+      .parse(
+        await this.request("/workspace-signals/detect", {
+          body: JSON.stringify({ projectId }),
+          method: "POST",
+        }),
+      );
+  }
+
+  // ---------------------------------------------------------------------------
   // Signals
   // ---------------------------------------------------------------------------
 

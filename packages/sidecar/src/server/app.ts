@@ -14,6 +14,7 @@ import { createPlaybookRoutes } from "./routes/playbooks.ts";
 import { createRunRoutes } from "./routes/runs.ts";
 import { createSignalRoutes } from "./routes/signals.ts";
 import { createTaskRoutes } from "./routes/tasks.ts";
+import { createWorkspaceSignalRoutes } from "./routes/workspace-signals.ts";
 import type { SidecarRuntime } from "./context.ts";
 
 const TAURI_ORIGINS = new Set([
@@ -86,6 +87,7 @@ export function createSidecarApp(runtime: SidecarRuntime): Hono<{
   app.route("/runs", createRunRoutes(runtime));
   app.route("/signals", createSignalRoutes(runtime));
   app.route("/tasks", createTaskRoutes(runtime));
+  app.route("/workspace-signals", createWorkspaceSignalRoutes(runtime));
 
   app.notFound((context) => context.json({ error: "Not Found" }, 404));
   app.onError((error, context) => {

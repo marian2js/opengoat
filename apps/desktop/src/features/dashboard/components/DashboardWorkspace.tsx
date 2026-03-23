@@ -21,6 +21,7 @@ import { useRuns } from "@/features/dashboard/hooks/useRuns";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
 import { WorkInProgress } from "@/features/dashboard/components/WorkInProgress";
 import { RecentDeliverables } from "@/features/dashboard/components/RecentDeliverables";
+import { SinceYouWereAwaySection } from "@/features/dashboard/components/SinceYouWereAwaySection";
 
 export interface DashboardWorkspaceProps {
   agent?: { id: string; name: string; description?: string | undefined } | undefined;
@@ -221,6 +222,15 @@ function DashboardContent({
           />
         </div>
       )}
+
+      {/* ── Since You Were Away — feed section ── */}
+      <div className="dashboard-section">
+        <SinceYouWereAwaySection
+          client={client}
+          agentId={agentId}
+          projectId={agentId}
+        />
+      </div>
 
       {/* ── Board summary — section divider ── */}
       <div className="dashboard-section">
