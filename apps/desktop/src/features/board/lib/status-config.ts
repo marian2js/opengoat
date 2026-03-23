@@ -5,31 +5,32 @@ export interface StatusConfig {
 
 const STATUS_MAP: Record<string, StatusConfig> = {
   todo: {
-    label: "To Do",
-    className: "bg-muted text-muted-foreground border-transparent",
+    label: "TODO",
+    className:
+      "bg-muted text-muted-foreground border-transparent font-mono text-[10px] uppercase tracking-wider",
   },
   doing: {
-    label: "Doing",
+    label: "IN PROGRESS",
     className:
-      "bg-blue-100 text-blue-700 border-transparent dark:bg-blue-900/30 dark:text-blue-400",
+      "bg-primary/10 text-primary border-transparent font-mono text-[10px] uppercase tracking-wider",
   },
   pending: {
-    label: "Pending",
+    label: "PENDING",
     className:
-      "bg-yellow-100 text-yellow-700 border-transparent dark:bg-yellow-900/30 dark:text-yellow-400",
+      "bg-warning/10 text-warning border-transparent font-mono text-[10px] uppercase tracking-wider dark:bg-yellow-900/20 dark:text-yellow-400",
   },
   blocked: {
-    label: "Blocked",
+    label: "BLOCKED",
     className:
-      "bg-red-100 text-red-700 border-transparent dark:bg-red-900/30 dark:text-red-400",
+      "bg-destructive/10 text-destructive border-transparent font-mono text-[10px] uppercase tracking-wider dark:bg-red-900/20 dark:text-red-400",
   },
   done: {
-    label: "Done",
+    label: "DONE",
     className:
-      "bg-green-100 text-green-700 border-transparent dark:bg-green-900/30 dark:text-green-400",
+      "bg-success/10 text-success border-transparent font-mono text-[10px] uppercase tracking-wider dark:bg-green-900/20 dark:text-green-400",
   },
 };
 
 export function getStatusConfig(status: string): StatusConfig {
-  return STATUS_MAP[status] ?? { label: status, className: "" };
+  return STATUS_MAP[status] ?? { label: status, className: "font-mono text-[10px] uppercase tracking-wider" };
 }

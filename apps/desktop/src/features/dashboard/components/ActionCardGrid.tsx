@@ -16,8 +16,8 @@ export function ActionCardGrid({ completedActions, isLoading, onActionClick, onV
         <div className="rounded-lg bg-primary/8 p-1.5 text-primary">
           <SparklesIcon className="size-4" />
         </div>
-        <h2 className="text-base font-semibold tracking-tight">
-          What would you like to work on?
+        <h2 className="font-display text-base font-bold tracking-tight">
+          Quick Actions
         </h2>
       </div>
       <div className="grid justify-items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3 sm:[&>:last-child:nth-child(2n+1)]:col-span-full xl:[&>:last-child:nth-child(2n+1)]:col-auto xl:[&>:last-child:nth-child(3n+1)]:col-span-full">

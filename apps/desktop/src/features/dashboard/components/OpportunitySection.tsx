@@ -67,7 +67,7 @@ export function OpportunitySection({
         <div className="rounded-lg bg-primary/8 p-1.5 text-primary">
           <LightbulbIcon className="size-4" />
         </div>
-        <h2 className="text-base font-semibold tracking-tight">Insights</h2>
+        <h2 className="font-display text-base font-bold tracking-tight">Insights</h2>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {opportunities.map((opp) => (

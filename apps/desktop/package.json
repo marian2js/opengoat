@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.118",
-    "@fontsource-variable/geist": "^5.2.8",
+    "@fontsource-variable/dm-sans": "^5.2.8",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@opengoat/contracts": "workspace:*",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
     "@streamdown/cjk": "^1.0.2",

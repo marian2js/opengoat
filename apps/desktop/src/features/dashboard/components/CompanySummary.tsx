@@ -126,7 +126,7 @@ export function CompanySummary({ data, domain, faviconSources, isLoading, error 
             <div className="rounded-lg bg-primary/8 p-1.5 text-primary">
               <GlobeIcon className="size-4" />
             </div>
-            <CardTitle className="text-base font-semibold tracking-tight">
+            <CardTitle className="font-display text-base font-bold tracking-tight">
               Company overview
             </CardTitle>
           </div>
@@ -165,7 +165,7 @@ export function CompanySummary({ data, domain, faviconSources, isLoading, error 
                 <GlobeIcon className="size-4" />
               </div>
             )}
-            <CardTitle className="text-base font-semibold tracking-tight">
+            <CardTitle className="font-display text-base font-bold tracking-tight">
               {domain ?? "Company overview"}
             </CardTitle>
           </div>

@@ -121,7 +121,7 @@ export function AppSidebar({
                   <LayoutDashboardIcon className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
-                  <span className="text-[13px] font-semibold tracking-tight">
+                  <span className="font-display text-[13px] font-bold tracking-tight">
                     OpenGoat
                   </span>
                 </div>

@@ -30,7 +30,7 @@ export function AppHeader({
 
   return (
     <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-xl">
-      <div className="flex h-12 items-center gap-3 px-4 lg:px-5">
+      <div className="flex h-11 items-center gap-3 px-4 lg:px-5">
         <SidebarTrigger className="-ml-1 text-muted-foreground/70 hover:text-foreground" />
         <Separator
           orientation="vertical"
@@ -38,7 +38,7 @@ export function AppHeader({
         />
 
         <div className="min-w-0 flex-1">
-          <h1 className="text-[13px] font-medium text-foreground">
+          <h1 className="font-display text-[13px] font-semibold tracking-tight text-foreground">
             {pageTitle}
           </h1>
         </div>

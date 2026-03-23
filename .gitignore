@@ -16,3 +16,4 @@ packages/sidecar/.bundle
 .project/
 # skill vendor downloads
 vendor/
+.gstack/

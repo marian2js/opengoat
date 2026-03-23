@@ -36,15 +36,15 @@ export function SuggestedActionGrid({
   if (actions.length === 0 && !isGenerating) return null;
 
   return (
-    <section className="flex flex-col gap-4 border-t border-border/20 pt-6 rounded-xl bg-violet-500/[0.08] dark:bg-violet-500/[0.04] p-4 -mx-2">
+    <section className="flex flex-col gap-4 border-t border-border/20 pt-6 rounded-xl bg-primary/[0.04] p-4 -mx-2">
       <div className="flex items-center gap-2">
-        <div className="rounded-lg bg-violet-500/10 p-1.5 text-violet-600 dark:text-violet-400">
+        <div className="rounded-lg bg-primary/10 p-1.5 text-primary">
           <WandSparklesIcon className="size-4" />
         </div>
-        <h2 className="text-base font-semibold tracking-tight">
-          Suggested for you
+        <h2 className="font-display text-base font-bold tracking-tight">
+          Suggested Actions
         </h2>
-        <span className="rounded-full border border-violet-500/20 bg-violet-500/8 px-2 py-0.5 text-[10px] font-medium text-violet-600 dark:text-violet-400">
+        <span className="font-mono rounded-full border border-primary/20 bg-primary/8 px-2 py-0.5 text-[10px] font-medium tracking-wider text-primary uppercase">
           AI
         </span>
       </div>

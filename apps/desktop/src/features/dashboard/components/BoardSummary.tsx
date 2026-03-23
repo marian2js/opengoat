@@ -17,19 +17,19 @@ interface CountPill {
 function getPills(counts: BoardCounts): CountPill[] {
   return [
     {
-      label: "Open",
+      label: "OPEN",
       value: counts.open,
-      className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+      className: "bg-primary/10 text-primary",
     },
     {
-      label: "Blocked",
+      label: "BLOCKED",
       value: counts.blocked,
-      className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+      className: "bg-destructive/10 text-destructive dark:bg-red-900/20 dark:text-red-400",
     },
     {
-      label: "Done",
+      label: "DONE",
       value: counts.done,
-      className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      className: "bg-success/10 text-success dark:bg-green-900/20 dark:text-green-400",
     },
   ];
 }
@@ -61,7 +61,7 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
               <ClipboardListIcon className="size-4 text-muted-foreground" />
-              <span>Board</span>
+              <span className="font-display font-bold">Board</span>
             </div>
             <span className="text-sm text-muted-foreground">
               No active tasks — tasks will appear here when created through actions or chat.
@@ -87,13 +87,13 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
             <ClipboardListIcon className="size-4 text-muted-foreground" />
-            <span>Board</span>
+            <span className="font-display font-bold">Board</span>
           </div>
           <div className="flex items-center gap-2">
             {pills.map((pill) => (
               <span
                 key={pill.label}
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${pill.className}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-medium tracking-wider ${pill.className}`}
               >
                 <span className="tabular-nums">{pill.value}</span>
                 <span>{pill.label}</span>
