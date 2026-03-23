@@ -11,6 +11,7 @@ import { ConnectionCenter } from "@/features/onboarding/components/ConnectionCen
 import { BrainWorkspace } from "@/features/brain/components/BrainWorkspace";
 import { BoardWorkspace } from "@/features/board/components/BoardWorkspace";
 import { DashboardWorkspace } from "@/features/dashboard/components/DashboardWorkspace";
+import { ObjectiveWorkspace } from "@/features/objectives/components/ObjectiveWorkspace";
 import { ProjectSettings } from "@/features/settings/components/ProjectSettings";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
@@ -24,7 +25,7 @@ import {
   buildRefineContextLabel,
   buildRefineContextActionId,
 } from "@/features/brain/lib/refine-context-prompt";
-type AppView = "dashboard" | "connections" | "connections-add" | "chat" | "brain" | "agents" | "settings" | "board";
+type AppView = "dashboard" | "connections" | "connections-add" | "chat" | "brain" | "agents" | "settings" | "board" | "objective";
 
 const ACTIVE_AGENT_KEY = "opengoat:activeAgentId";
 
@@ -50,6 +51,8 @@ export function App() {
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [hashView, setHashView] = useState<AppView>(() => readViewFromHash());
   const [brainSection, setBrainSection] = useState<string>(() => readBrainSectionFromHash());
+  const [objectiveId, setObjectiveId] = useState<string | undefined>(() => readObjectiveIdFromHash());
+  const [objectiveTab, setObjectiveTab] = useState<string | undefined>(() => readObjectiveTabFromHash());
   const [retryToken, setRetryToken] = useState(0);
   const [createAgentToken, setCreateAgentToken] = useState(0);
   const [sessions, setSessions] = useState<AgentSession[]>([]);
@@ -177,6 +180,8 @@ export function App() {
     const onHashChange = (): void => {
       setHashView(readViewFromHash());
       setBrainSection(readBrainSectionFromHash());
+      setObjectiveId(readObjectiveIdFromHash());
+      setObjectiveTab(readObjectiveTabFromHash());
     };
 
     window.addEventListener("hashchange", onHashChange);
@@ -422,7 +427,7 @@ export function App() {
             setCreateAgentToken((current) => current + 1);
           }}
         />
-        <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" || currentView === "brain" || currentView === "dashboard" || currentView === "board" ? "" : "gap-4 overflow-y-auto p-4 lg:p-5"}`}>
+        <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" || currentView === "brain" || currentView === "dashboard" || currentView === "board" || currentView === "objective" ? "" : "gap-4 overflow-y-auto p-4 lg:p-5"}`}>
           {currentView === "dashboard" ? (
             bootstrapContext && client ? (
               <BootstrapProgress
@@ -449,6 +454,14 @@ export function App() {
                 onResumeRun={handleResumeRun}
               />
             )
+          ) : currentView === "objective" ? (
+            <ObjectiveWorkspace
+              agentId={activeAgentId}
+              client={client}
+              objectiveId={objectiveId}
+              objectiveTab={objectiveTab}
+              onResumeRun={handleResumeRun}
+            />
           ) : currentView === "board" ? (
             <BoardWorkspace
               agentId={activeAgentId}
@@ -555,6 +568,10 @@ function readViewFromHash(): AppView {
     return "board";
   }
 
+  if (window.location.hash.startsWith("#objective/")) {
+    return "objective";
+  }
+
   return "dashboard";
 }
 
@@ -564,4 +581,18 @@ function readBrainSectionFromHash(): string {
     return hash.slice("#brain/".length);
   }
   return "product";
+}
+
+function readObjectiveIdFromHash(): string | undefined {
+  const hash = window.location.hash;
+  if (!hash.startsWith("#objective/")) return undefined;
+  const parts = hash.slice("#objective/".length).split("/");
+  return parts[0] || undefined;
+}
+
+function readObjectiveTabFromHash(): string | undefined {
+  const hash = window.location.hash;
+  if (!hash.startsWith("#objective/")) return undefined;
+  const parts = hash.slice("#objective/".length).split("/");
+  return parts[1] || undefined;
 }

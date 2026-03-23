@@ -157,7 +157,7 @@ function DashboardContent({
             isLoading={false}
             openTaskCount={boardSummary.counts.open}
             onOpenObjective={() => {
-              // Placeholder — objective detail page (task 0006)
+              window.location.hash = `#objective/${activeObjective.objective!.objectiveId}`;
             }}
             onSwitchObjective={() => handleCreateObjective()}
           />
