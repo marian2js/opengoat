@@ -3,6 +3,7 @@ import {
   BookmarkIcon,
   BrainIcon,
   CheckIcon,
+  DatabaseIcon,
   FileUpIcon,
   FlameIcon,
   LayersIcon,
@@ -23,6 +24,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { isRefinableSection } from "@/features/brain/lib/refine-context-prompt";
+import { OperatingMemorySection } from "./OperatingMemorySection";
 
 /**
  * Strip the leading h1 heading from markdown content.
@@ -275,6 +277,14 @@ Define brand voice, content tone, and communication conventions the AI should fo
 Share product and market context that helps the AI provide more relevant assistance.`,
   },
   {
+    id: "operating-memory",
+    label: "Operating Memory",
+    filename: "",
+    icon: DatabaseIcon,
+    description: "Structured project memory — facts, preferences, and decisions the system uses",
+    placeholder: "",
+  },
+  {
     id: "knowledge",
     label: "Knowledge",
     filename: "KNOWLEDGE.md",
@@ -306,6 +316,21 @@ export function BrainWorkspace({ agentId, client, onRefineContext, sectionId }: 
     return (
       <div className="flex flex-1 items-center justify-center text-muted-foreground">
         No project selected
+      </div>
+    );
+  }
+
+  if (section.id === "operating-memory") {
+    return (
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        <div className="flex items-center gap-3 border-b border-border/20 px-5 py-4 lg:px-6">
+          <DatabaseIcon className="size-4 text-primary" />
+          <div>
+            <h2 className="font-display text-sm font-bold tracking-tight">{section.label}</h2>
+            <p className="text-[11px] text-muted-foreground/70">{section.description}</p>
+          </div>
+        </div>
+        <OperatingMemorySection agentId={agentId} client={client} />
       </div>
     );
   }

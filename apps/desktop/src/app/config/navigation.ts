@@ -3,6 +3,7 @@ import {
   BookOpenIcon,
   BotIcon,
   BrainIcon,
+  DatabaseIcon,
   LayoutDashboardIcon,
   Link2Icon,
   ListChecksIcon,
@@ -43,6 +44,7 @@ export const brainNavigation: NavigationItem[] = [
   { title: "Market", href: "#brain/market", icon: StoreIcon },
   { title: "Growth", href: "#brain/growth", icon: TrendingUpIcon },
   { title: "Memory", href: "#brain/memory", icon: BrainIcon },
+  { title: "Operating Memory", href: "#brain/operating-memory", icon: DatabaseIcon },
   { title: "Knowledge", href: "#brain/knowledge", icon: BookOpenIcon },
 ];
 
