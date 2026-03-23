@@ -17,6 +17,7 @@ import { ArtifactsTab } from "./ArtifactsTab";
 import { TasksTab } from "./TasksTab";
 import { PlaceholderTab } from "./PlaceholderTab";
 import { ObjectiveMemoryTab } from "./ObjectiveMemoryTab";
+import { SignalsTab } from "@/features/signals/components/SignalsTab";
 
 const TABS = [
   { value: "overview", label: "Overview", icon: FileTextIcon },
@@ -101,10 +102,7 @@ export function ObjectiveTabNav({
       </TabsContent>
 
       <TabsContent value="signals">
-        <PlaceholderTab
-          title="Signals"
-          message="Coming soon — signals will surface relevant opportunities for this objective"
-        />
+        <SignalsTab objectiveId={objectiveId} client={client} />
       </TabsContent>
 
       <TabsContent value="memory">
