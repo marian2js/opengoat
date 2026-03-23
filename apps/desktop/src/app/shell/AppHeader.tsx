@@ -29,16 +29,16 @@ export function AppHeader({
                 : "Chat";
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-xl">
-      <div className="flex h-11 items-center gap-3 px-4 lg:px-5">
-        <SidebarTrigger className="-ml-1 text-muted-foreground/70 hover:text-foreground" />
+    <header className="sticky top-0 z-20 border-b border-border/40 bg-background/80 backdrop-blur-xl">
+      <div className="flex h-10 items-center gap-3 px-4 lg:px-5">
+        <SidebarTrigger className="-ml-1 text-muted-foreground/50 hover:text-foreground" />
         <Separator
           orientation="vertical"
-          className="hidden data-[orientation=vertical]:h-4 sm:block"
+          className="hidden data-[orientation=vertical]:h-3.5 sm:block"
         />
 
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-[13px] font-semibold tracking-tight text-foreground">
+          <h1 className="font-display text-[13px] font-bold tracking-tight text-foreground">
             {pageTitle}
           </h1>
         </div>
@@ -61,17 +61,17 @@ function ThemeToggle() {
   ];
 
   return (
-    <div className="flex items-center rounded-md border border-border/60 bg-muted/50 p-0.5">
+    <div className="flex items-center rounded-md border border-border/40 bg-muted/30 p-0.5">
       {options.map((option) => (
         <button
           key={option.value}
           type="button"
           title={option.label}
           className={cn(
-            "flex size-6 items-center justify-center rounded-[3px] transition-all duration-150",
+            "flex size-6 items-center justify-center rounded-[3px] transition-all duration-100",
             theme === option.value
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
+              ? "bg-card text-foreground shadow-sm"
+              : "text-muted-foreground/50 hover:text-muted-foreground",
           )}
           onClick={() => {
             setTheme(option.value);
