@@ -21,37 +21,43 @@ export interface Opportunity {
 
 export const opportunityCategoryConfig: Record<
   OpportunityCategory,
-  { label: string; className: string }
+  { label: string; className: string; accentColor: string }
 > = {
   conversion: {
     label: "Conversion",
     className:
       "border-rose-500/30 text-rose-700 dark:text-rose-400",
+    accentColor: "bg-rose-500",
   },
   distribution: {
     label: "Distribution",
     className:
       "border-blue-500/30 text-blue-700 dark:text-blue-400",
+    accentColor: "bg-blue-500",
   },
   growth: {
     label: "Growth",
     className:
       "border-teal-500/30 text-teal-700 dark:text-teal-400",
+    accentColor: "bg-teal-500",
   },
   messaging: {
     label: "Messaging",
     className:
       "border-purple-500/30 text-purple-700 dark:text-purple-400",
+    accentColor: "bg-purple-500",
   },
   research: {
     label: "Research",
     className:
       "border-amber-500/30 text-amber-700 dark:text-amber-400",
+    accentColor: "bg-amber-500",
   },
   seo: {
     label: "SEO",
     className:
       "border-emerald-500/30 text-emerald-700 dark:text-emerald-400",
+    accentColor: "bg-emerald-500",
   },
 };
 

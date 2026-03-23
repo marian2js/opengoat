@@ -31,11 +31,12 @@ export function OpportunityCard({ completedActions, opportunity, onActionClick, 
     <div
       role="button"
       tabIndex={0}
-      className="group/insight flex flex-col rounded-lg border border-border/50 bg-card/80 transition-all duration-150 hover:-translate-y-px hover:border-primary/30 hover:shadow-sm cursor-pointer"
+      className="group/insight relative flex flex-col overflow-hidden rounded-lg border border-border/50 bg-card/80 transition-all duration-150 hover:-translate-y-px hover:border-primary/30 hover:shadow-sm cursor-pointer"
       onClick={handleCardClick}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleCardClick(); } }}
     >
-      <div className="flex flex-1 flex-col gap-2 px-4 py-3">
+      <div className={`absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] ${config.accentColor} opacity-50 transition-opacity group-hover/insight:opacity-100`} />
+      <div className="flex flex-1 flex-col gap-2 py-3 pl-5 pr-4">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-[13px] font-semibold leading-snug text-foreground transition-colors group-hover/insight:text-primary">
             {opportunity.title}
@@ -52,7 +53,7 @@ export function OpportunityCard({ completedActions, opportunity, onActionClick, 
         </p>
       </div>
       {relatedAction ? (
-        <div className="border-t border-border/30 px-4 py-2">
+        <div className="border-t border-border/30 py-2 pl-5 pr-4">
           {isRelatedCompleted && onViewResults ? (
             <button
               type="button"

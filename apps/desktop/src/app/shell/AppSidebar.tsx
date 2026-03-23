@@ -200,6 +200,9 @@ export function AppSidebar({
                 </SidebarMenuItem>
               </Collapsible>
 
+              {/* Divider before secondary nav */}
+              <div className="mx-2 my-1 h-px bg-sidebar-border/60" />
+
               {/* Secondary nav: Agents, Connections (Settings excluded — in footer) */}
               {secondaryNavigation
                 .filter((item) => item.href !== "#settings")
