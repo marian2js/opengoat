@@ -16,6 +16,7 @@ import { RunsTab } from "./RunsTab";
 import { ArtifactsTab } from "./ArtifactsTab";
 import { TasksTab } from "./TasksTab";
 import { PlaceholderTab } from "./PlaceholderTab";
+import { ObjectiveMemoryTab } from "./ObjectiveMemoryTab";
 
 const TABS = [
   { value: "overview", label: "Overview", icon: FileTextIcon },
@@ -107,9 +108,10 @@ export function ObjectiveTabNav({
       </TabsContent>
 
       <TabsContent value="memory">
-        <PlaceholderTab
-          title="Memory"
-          message="Coming soon — objective-specific memory entries will be visible and editable here"
+        <ObjectiveMemoryTab
+          agentId={agentId}
+          objectiveId={objectiveId}
+          client={client}
         />
       </TabsContent>
 
