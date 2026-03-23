@@ -445,6 +445,74 @@ export class SidecarClient {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Objectives
+  // ---------------------------------------------------------------------------
+
+  async createObjective(payload: {
+    projectId: string;
+    title: string;
+    goalType?: string | undefined;
+    status?: string | undefined;
+    summary?: string | undefined;
+    whyNow?: string | undefined;
+    successDefinition?: string | undefined;
+    timeframe?: string | undefined;
+    alreadyTried?: string | undefined;
+    avoid?: string | undefined;
+    constraints?: string | undefined;
+    preferredChannels?: string | undefined;
+    createdFrom?: string | undefined;
+  }): Promise<unknown> {
+    return this.request("/objectives", {
+      body: JSON.stringify(payload),
+      method: "POST",
+    });
+  }
+
+  async listObjectives(params?: {
+    projectId?: string;
+    status?: string;
+  }): Promise<unknown> {
+    const query = new URLSearchParams();
+    if (params?.projectId) {
+      query.set("projectId", params.projectId);
+    }
+    if (params?.status) {
+      query.set("status", params.status);
+    }
+    const qs = query.toString();
+    return this.request(`/objectives${qs ? `?${qs}` : ""}`);
+  }
+
+  async getObjective(objectiveId: string): Promise<unknown> {
+    return this.request(`/objectives/${encodeURIComponent(objectiveId)}`);
+  }
+
+  async updateObjective(
+    objectiveId: string,
+    payload: Record<string, unknown>,
+  ): Promise<unknown> {
+    return this.request(`/objectives/${encodeURIComponent(objectiveId)}`, {
+      body: JSON.stringify(payload),
+      method: "PATCH",
+    });
+  }
+
+  async archiveObjective(objectiveId: string): Promise<unknown> {
+    return this.request(
+      `/objectives/${encodeURIComponent(objectiveId)}/archive`,
+      { method: "POST" },
+    );
+  }
+
+  async setPrimaryActiveObjective(objectiveId: string): Promise<unknown> {
+    return this.request(
+      `/objectives/${encodeURIComponent(objectiveId)}/set-primary`,
+      { method: "POST" },
+    );
+  }
+
   async deleteTasks(taskIds: string[]): Promise<DeleteTasksResponse> {
     return deleteTasksResponseSchema.parse(
       await this.request("/tasks", {

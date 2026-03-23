@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { LayoutDashboardIcon } from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
@@ -5,9 +6,13 @@ import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
 import { OpportunitySection } from "@/features/dashboard/components/OpportunitySection";
 import { SuggestedActionGrid } from "@/features/dashboard/components/SuggestedActionGrid";
+import { ActiveObjectiveSection } from "@/features/dashboard/components/ActiveObjectiveSection";
+import { ObjectiveComposerPrompt } from "@/features/dashboard/components/ObjectiveComposerPrompt";
+import { ObjectiveCreationSheet } from "@/features/dashboard/components/ObjectiveCreationSheet";
 import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSummary";
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
 import { useBoardSummary } from "@/features/dashboard/hooks/useBoardSummary";
+import { useActiveObjective } from "@/features/dashboard/hooks/useActiveObjective";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
 
 export interface DashboardWorkspaceProps {
@@ -84,9 +89,56 @@ function DashboardContent({
   const workspaceReady = !isLoading && files !== null;
   const { suggestedActions, isLoading: isSuggestedLoading } = useSuggestedActions(agentId, client, workspaceReady);
   const boardSummary = useBoardSummary(agentId, client);
+  const activeObjective = useActiveObjective(agentId, client);
+
+  // Sheet open state and prefill
+  const [isCreationOpen, setIsCreationOpen] = useState(false);
+  const [prefillTitle, setPrefillTitle] = useState<string | undefined>(undefined);
+
+  function handleCreateObjective(title?: string): void {
+    setPrefillTitle(title);
+    setIsCreationOpen(true);
+  }
+
+  function handleObjectiveCreated(): void {
+    activeObjective.refetch();
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
+      {/* Active Objective or Composer Prompt — first section */}
+      <div className="mb-6">
+        {activeObjective.isLoading ? (
+          <ActiveObjectiveSection
+            objective={{
+              objectiveId: "",
+              projectId: agentId,
+              title: "",
+              status: "draft",
+              createdFrom: "dashboard",
+              createdAt: "",
+              updatedAt: "",
+            }}
+            isLoading
+            openTaskCount={0}
+          />
+        ) : activeObjective.objective ? (
+          <ActiveObjectiveSection
+            objective={activeObjective.objective}
+            isLoading={false}
+            openTaskCount={boardSummary.counts.open}
+            onOpenObjective={() => {
+              // Placeholder — objective detail page (task 0006)
+            }}
+            onSwitchObjective={() => handleCreateObjective()}
+          />
+        ) : (
+          <ObjectiveComposerPrompt
+            onCreateObjective={handleCreateObjective}
+          />
+        )}
+      </div>
+
       {/* Company context — ultra-compact header strip */}
       <div className="mb-6 border-b border-border/20 pb-4">
         <CompanySummary
@@ -135,6 +187,16 @@ function DashboardContent({
           onViewResults={onViewResults}
         />
       </div>
+
+      {/* Objective Creation Sheet — portaled */}
+      <ObjectiveCreationSheet
+        open={isCreationOpen}
+        onOpenChange={setIsCreationOpen}
+        agentId={agentId}
+        client={client}
+        prefillTitle={prefillTitle}
+        onObjectiveCreated={handleObjectiveCreated}
+      />
     </div>
   );
 }
