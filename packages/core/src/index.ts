@@ -9,6 +9,7 @@ export * from "./core/ports/paths-provider.port.js";
 export * from "./core/agents/index.js";
 export * from "./core/bootstrap/index.js";
 export * from "./core/boards/index.js";
+export * from "./core/objectives/index.js";
 export * from "./core/providers/index.js";
 export * from "./core/projects/index.js";
 export * from "./core/opengoat/index.js";

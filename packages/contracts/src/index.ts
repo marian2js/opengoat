@@ -515,6 +515,92 @@ export type PlaybookPhase = z.infer<typeof playbookPhaseSchema>;
 export type PlaybookManifest = z.infer<typeof playbookManifestSchema>;
 export type ListPlaybooksResponse = z.infer<typeof listPlaybooksResponseSchema>;
 
+// --- Objectives ---
+
+export const objectiveStatusSchema = z.enum([
+  "draft",
+  "active",
+  "paused",
+  "completed",
+  "abandoned",
+]);
+
+export const objectiveCreatedFromSchema = z.enum([
+  "dashboard",
+  "chat",
+  "action",
+  "manual",
+  "signal",
+]);
+
+export const objectiveSchema = z.object({
+  objectiveId: z.string().min(1),
+  projectId: z.string().min(1),
+  title: z.string().min(1),
+  goalType: z.string(),
+  status: objectiveStatusSchema,
+  summary: z.string(),
+  whyNow: z.string().optional(),
+  successDefinition: z.string().optional(),
+  timeframe: z.string().optional(),
+  alreadyTried: z.string().optional(),
+  avoid: z.string().optional(),
+  constraints: z.string().optional(),
+  preferredChannels: z.array(z.string()).optional(),
+  createdFrom: objectiveCreatedFromSchema,
+  isPrimary: z.boolean().default(false),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  archivedAt: z.string().optional(),
+});
+
+export const createObjectiveRequestSchema = z.object({
+  title: z.string().min(1),
+  goalType: z.string().optional(),
+  summary: z.string().optional(),
+  whyNow: z.string().optional(),
+  successDefinition: z.string().optional(),
+  timeframe: z.string().optional(),
+  alreadyTried: z.string().optional(),
+  avoid: z.string().optional(),
+  constraints: z.string().optional(),
+  preferredChannels: z.array(z.string()).optional(),
+});
+
+export const updateObjectiveRequestSchema = z.object({
+  title: z.string().min(1).optional(),
+  goalType: z.string().optional(),
+  status: objectiveStatusSchema.optional(),
+  summary: z.string().optional(),
+  whyNow: z.string().optional(),
+  successDefinition: z.string().optional(),
+  timeframe: z.string().optional(),
+  alreadyTried: z.string().optional(),
+  avoid: z.string().optional(),
+  constraints: z.string().optional(),
+  preferredChannels: z.array(z.string()).optional(),
+  isPrimary: z.boolean().optional(),
+});
+
+export const listObjectivesQuerySchema = z.object({
+  projectId: z.string().min(1),
+  status: objectiveStatusSchema.optional(),
+});
+
+export const archiveObjectiveRequestSchema = z.object({
+  reason: z.string().optional(),
+});
+
+export const objectiveListSchema = z.array(objectiveSchema);
+
+export type ObjectiveStatus = z.infer<typeof objectiveStatusSchema>;
+export type ObjectiveCreatedFrom = z.infer<typeof objectiveCreatedFromSchema>;
+export type Objective = z.infer<typeof objectiveSchema>;
+export type CreateObjectiveRequest = z.infer<typeof createObjectiveRequestSchema>;
+export type UpdateObjectiveRequest = z.infer<typeof updateObjectiveRequestSchema>;
+export type ListObjectivesQuery = z.infer<typeof listObjectivesQuerySchema>;
+export type ArchiveObjectiveRequest = z.infer<typeof archiveObjectiveRequestSchema>;
+
 export const appManifest = appManifestSchema.parse(appManifestJson);
 
 export function createBasicAuthHeader(
