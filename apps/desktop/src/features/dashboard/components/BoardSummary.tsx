@@ -6,7 +6,6 @@ export interface BoardSummaryProps {
   counts: BoardCounts;
   isLoading: boolean;
   isEmpty: boolean;
-  onNavigateToBoard?: (() => void) | undefined;
 }
 
 interface CountPill {
@@ -35,7 +34,7 @@ function getPills(counts: BoardCounts): CountPill[] {
   ];
 }
 
-export function BoardSummary({ counts, isLoading, isEmpty, onNavigateToBoard }: BoardSummaryProps) {
+export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) {
   if (isLoading) {
     return (
       <div className="relative z-10 py-5">
@@ -68,14 +67,13 @@ export function BoardSummary({ counts, isLoading, isEmpty, onNavigateToBoard }: 
               No active tasks — tasks will appear here when created through actions or chat.
             </span>
           </div>
-          <button
-            type="button"
-            onClick={onNavigateToBoard}
+          <a
+            href="#board"
             className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             View Board
             <ArrowRightIcon className="size-3" />
-          </button>
+          </a>
         </div>
       </div>
     );
@@ -103,14 +101,13 @@ export function BoardSummary({ counts, isLoading, isEmpty, onNavigateToBoard }: 
             ))}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onNavigateToBoard}
+        <a
+          href="#board"
           className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           View Board
           <ArrowRightIcon className="size-3" />
-        </button>
+        </a>
       </div>
     </div>
   );

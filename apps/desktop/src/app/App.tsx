@@ -425,9 +425,6 @@ export function App() {
                 onActionClick={(id, prompt, label) => {
                   void handleActionClick(id, prompt, label);
                 }}
-                onNavigateToBoard={() => {
-                  window.location.hash = "#board";
-                }}
                 onViewResults={handleViewResults}
               />
             )

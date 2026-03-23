@@ -10,13 +10,14 @@ const boardSummarySrc = readFileSync(
   "utf-8",
 );
 
-describe("View Board link navigation — Dashboard → Board", () => {
-  // AC1: View Board uses native anchor navigation with href="#board"
-  it("BoardSummary uses anchor elements with href='#board' for navigation", () => {
+describe("View Board anchor navigation — Dashboard → Board", () => {
+  // AC1: Clicking "View Board" navigates to Board page via native hash link
+  it("uses anchor elements with href='#board' instead of button elements", () => {
     expect(boardSummarySrc).toContain('href="#board"');
+    expect(boardSummarySrc).not.toContain('type="button"');
   });
 
-  // Both the empty state and the populated state must have anchor navigation
+  // AC2: Both empty state and populated state have anchor navigation
   it("has anchor link in the empty state View Board", () => {
     const afterIsEmpty = boardSummarySrc.split(/if\s*\(isEmpty\)/)[1];
     expect(afterIsEmpty).toBeTruthy();
@@ -32,14 +33,22 @@ describe("View Board link navigation — Dashboard → Board", () => {
     expect(afterPills).toContain("View Board");
   });
 
-  // Does not use window.location.hash directly
-  it("does not use window.location.hash directly in BoardSummary", () => {
-    expect(boardSummarySrc).not.toContain("window.location.hash");
+  // The component should not rely on onClick callback for navigation
+  it("does not use onClick handler for View Board navigation", () => {
+    expect(boardSummarySrc).not.toContain("onNavigateToBoard");
+    expect(boardSummarySrc).not.toContain("onClick={onNavigateToBoard}");
   });
 
-  // Sidebar is not affected
+  // AC5: Sidebar is not affected
   it("does not import or modify sidebar components", () => {
     expect(boardSummarySrc).not.toContain("SidebarMenu");
     expect(boardSummarySrc).not.toContain("AppSidebar");
+  });
+
+  // Uses native <a> tags for the View Board links
+  it("renders exactly two anchor elements for View Board", () => {
+    const anchorMatches = boardSummarySrc.match(/<a\s/g);
+    expect(anchorMatches).not.toBeNull();
+    expect(anchorMatches!.length).toBe(2);
   });
 });

@@ -17,7 +17,6 @@ export interface DashboardWorkspaceProps {
   completedActions?: Set<string> | undefined;
   isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
-  onNavigateToBoard?: (() => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
 }
 
@@ -28,7 +27,6 @@ export function DashboardWorkspace({
   completedActions,
   isActionLoading,
   onActionClick,
-  onNavigateToBoard,
   onViewResults,
 }: DashboardWorkspaceProps) {
   if (!agentId || !client) {
@@ -54,7 +52,6 @@ export function DashboardWorkspace({
       faviconSources={faviconSources}
       isActionLoading={isActionLoading}
       onActionClick={onActionClick}
-      onNavigateToBoard={onNavigateToBoard}
       onViewResults={onViewResults}
     />
   );
@@ -72,7 +69,6 @@ function DashboardContent({
   faviconSources,
   isActionLoading,
   onActionClick,
-  onNavigateToBoard,
   onViewResults,
 }: {
   agentId: string;
@@ -82,7 +78,6 @@ function DashboardContent({
   faviconSources?: string[] | undefined;
   isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
-  onNavigateToBoard?: (() => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
 }) {
   const { data, files, isLoading, error } = useWorkspaceSummary(agentId, client);
@@ -132,7 +127,6 @@ function DashboardContent({
         counts={boardSummary.counts}
         isLoading={boardSummary.isLoading}
         isEmpty={boardSummary.isEmpty}
-        onNavigateToBoard={onNavigateToBoard}
       />
 
       {/* Divider: board summary → insights */}
