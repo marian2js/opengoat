@@ -385,19 +385,13 @@ export function AgentsWorkspace({
       ) : null}
 
       <section className="rounded-lg border border-border/50 bg-card/80">
-        <div className="flex items-center justify-between gap-3 px-4 py-3 lg:px-5">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5 lg:px-5">
+          <div className="flex items-center gap-2">
             <BotIcon className="size-3.5 text-primary" />
-            <div>
-              <h2 className="font-display text-sm font-bold tracking-tight">
-                Agent library
-              </h2>
-              <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/60">
-                {agents.length === 0
-                  ? "No custom agents yet"
-                  : formatAgentCount(agents.length)}
-              </p>
-            </div>
+            <h2 className="section-label">Agent Library</h2>
+            <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+              {agents.length}
+            </span>
           </div>
           <div className="flex items-center gap-1.5">
             <Button
@@ -436,18 +430,32 @@ export function AgentsWorkspace({
               </div>
             </div>
           ) : agents.length === 0 ? (
-            <div className="border-t border-border/60 px-4 py-5 lg:px-5">
-              <div className="flex max-w-sm flex-col gap-2.5 rounded-lg border border-dashed border-border/60 bg-muted/20 p-5">
-                <BotIcon className="size-5 text-muted-foreground/40" />
-                <div>
-                  <h3 className="text-[13px] font-medium text-foreground">
+            <div className="border-t border-border/60 px-4 py-8 lg:px-5">
+              <div className="flex flex-col items-center gap-4 text-center">
+                <div className="flex size-12 items-center justify-center rounded-xl bg-primary/8">
+                  <BotIcon className="size-6 text-primary/50" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-medium text-foreground">
                     No agents yet
                   </h3>
-                  <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
-                    Create your first agent to start defining reusable finance
-                    workflows.
+                  <p className="max-w-[300px] text-[12px] leading-relaxed text-muted-foreground/70">
+                    Create your first agent with its own provider, model, and instructions.
                   </p>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 h-8 rounded-md text-[12px]"
+                  onClick={() => {
+                    setFeedback(null);
+                    setErrorMessage(null);
+                    setIsCreateOpen(true);
+                  }}
+                >
+                  <PlusIcon className="size-3" />
+                  Create agent
+                </Button>
               </div>
             </div>
           ) : agents.length === 1 ? (
@@ -460,8 +468,9 @@ export function AgentsWorkspace({
 
               return (
                 <div className="border-t border-border/60 px-4 py-5 lg:px-5">
-                  <article className="rounded-xl border border-border/60 bg-card p-6 transition-colors">
-                    <div className="flex items-start gap-4">
+                  <article className="relative overflow-hidden rounded-xl border border-border/60 bg-card p-6 transition-colors">
+                    <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] bg-primary opacity-60" />
+                    <div className="flex items-start gap-4 pl-1">
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                         <BotIcon className="size-5 text-primary" />
                       </div>
@@ -544,24 +553,27 @@ export function AgentsWorkspace({
                     </div>
                   </article>
 
-                  <div className="mt-4 flex flex-col items-center gap-3 rounded-lg border border-dashed border-border/40 bg-muted/10 px-6 py-5">
-                    <p className="text-center text-[13px] leading-relaxed text-muted-foreground">
-                      Create specialized agents for different research workflows — each with
-                      its own provider, model, and instructions.
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 rounded-md text-[12px]"
-                      onClick={() => {
-                        setFeedback(null);
-                        setErrorMessage(null);
-                        setIsCreateOpen(true);
-                      }}
-                    >
-                      <PlusIcon className="size-3" />
-                      New agent
-                    </Button>
+                  <div className="group/cta mt-4 flex cursor-pointer items-center gap-4 rounded-lg border border-dashed border-border/40 bg-muted/10 px-5 py-4 transition-all hover:border-primary/30 hover:bg-primary/[0.03]"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setFeedback(null);
+                      setErrorMessage(null);
+                      setIsCreateOpen(true);
+                    }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setFeedback(null); setErrorMessage(null); setIsCreateOpen(true); } }}
+                  >
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 text-muted-foreground/40 transition-colors group-hover/cta:border-primary/30 group-hover/cta:text-primary">
+                      <PlusIcon className="size-4" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[13px] font-medium text-foreground/80 transition-colors group-hover/cta:text-foreground">
+                        Add another agent
+                      </p>
+                      <p className="text-[11px] text-muted-foreground/50">
+                        Each agent gets its own provider, model, and instructions.
+                      </p>
+                    </div>
                   </div>
                 </div>
               );
