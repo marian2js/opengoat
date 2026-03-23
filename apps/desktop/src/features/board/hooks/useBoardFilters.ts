@@ -8,12 +8,21 @@ import {
   type SourceTypeFilter,
   type StatusFilter,
 } from "@/features/board/lib/board-filters";
+import {
+  groupTasks,
+  type BoardGrouping,
+  type ObjectiveMapEntry,
+  type RunMapEntry,
+  type TaskGroup,
+} from "@/features/board/lib/board-grouping";
 
 /** @deprecated Use StatusFilter instead */
 export type BoardFilter = StatusFilter;
 
 export interface UseBoardFiltersResult {
   filteredTasks: TaskRecord[];
+  groupedTasks: TaskGroup[];
+  grouping: BoardGrouping;
   filterState: BoardFilterState;
   filter: StatusFilter;
   sort: BoardSort;
@@ -21,6 +30,7 @@ export interface UseBoardFiltersResult {
   setFilter: (filter: StatusFilter) => void;
   setSort: (sort: BoardSort) => void;
   setSearch: (search: string) => void;
+  setGrouping: (grouping: BoardGrouping) => void;
   setObjectiveFilter: (objectiveId: string | null) => void;
   setRunFilter: (runId: string | null) => void;
   setSourceTypeFilter: (sourceType: SourceTypeFilter | null) => void;
@@ -42,7 +52,11 @@ function parseHashObjectiveId(): string | null {
   }
 }
 
-export function useBoardFilters(tasks: TaskRecord[]): UseBoardFiltersResult {
+export function useBoardFilters(
+  tasks: TaskRecord[],
+  objectiveMap: Map<string, ObjectiveMapEntry> = new Map(),
+  runMap: Map<string, RunMapEntry> = new Map(),
+): UseBoardFiltersResult {
   const [filterState, setFilterState] = useState<BoardFilterState>(() => {
     const hashObjective = parseHashObjectiveId();
     return {
@@ -52,6 +66,7 @@ export function useBoardFilters(tasks: TaskRecord[]): UseBoardFiltersResult {
   });
   const [sort, setSort] = useState<BoardSort>("status");
   const [search, setSearch] = useState("");
+  const [grouping, setGrouping] = useState<BoardGrouping>("none");
 
   // Sync objective filter to URL hash
   useEffect(() => {
@@ -88,6 +103,11 @@ export function useBoardFilters(tasks: TaskRecord[]): UseBoardFiltersResult {
     [tasks, filterState, sort, search],
   );
 
+  const groupedTasks = useMemo(
+    () => groupTasks(filteredTasks, grouping, objectiveMap, runMap),
+    [filteredTasks, grouping, objectiveMap, runMap],
+  );
+
   const setFilter = useCallback((status: StatusFilter) => {
     setFilterState((prev) => ({ ...prev, status }));
   }, []);
@@ -115,6 +135,7 @@ export function useBoardFilters(tasks: TaskRecord[]): UseBoardFiltersResult {
   const clearFilters = useCallback(() => {
     setFilterState(DEFAULT_FILTER_STATE);
     setSearch("");
+    setGrouping("none");
   }, []);
 
   const activeFilterCount = useMemo(() => {
@@ -131,6 +152,8 @@ export function useBoardFilters(tasks: TaskRecord[]): UseBoardFiltersResult {
 
   return {
     filteredTasks,
+    groupedTasks,
+    grouping,
     filterState,
     filter: filterState.status,
     sort,
@@ -138,6 +161,7 @@ export function useBoardFilters(tasks: TaskRecord[]): UseBoardFiltersResult {
     setFilter,
     setSort,
     setSearch,
+    setGrouping,
     setObjectiveFilter,
     setRunFilter,
     setSourceTypeFilter,

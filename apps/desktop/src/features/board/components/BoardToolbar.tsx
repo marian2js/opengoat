@@ -1,4 +1,4 @@
-import { ArrowUpDownIcon, FilterXIcon, RefreshCwIcon, SearchIcon, XIcon } from "lucide-react";
+import { ArrowUpDownIcon, FilterXIcon, LayersIcon, RefreshCwIcon, SearchIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,12 +28,14 @@ import {
   type SourceTypeFilter,
   type StatusFilter,
 } from "@/features/board/lib/board-filters";
+import { GROUPING_OPTIONS, type BoardGrouping } from "@/features/board/lib/board-grouping";
 import type { ObjectiveOption } from "@/features/board/hooks/useObjectiveList";
 
 interface BoardToolbarProps {
   filter: StatusFilter;
   sort: BoardSort;
   search: string;
+  grouping: BoardGrouping;
   objectiveId: string | null;
   sourceType: SourceTypeFilter | null;
   stale: boolean;
@@ -43,6 +45,7 @@ interface BoardToolbarProps {
   onFilterChange: (filter: StatusFilter) => void;
   onSortChange: (sort: BoardSort) => void;
   onSearchChange: (search: string) => void;
+  onGroupingChange: (grouping: BoardGrouping) => void;
   onObjectiveChange: (objectiveId: string | null) => void;
   onSourceTypeChange: (sourceType: SourceTypeFilter | null) => void;
   onStaleChange: (stale: boolean) => void;
@@ -57,6 +60,7 @@ export function BoardToolbar({
   filter,
   sort,
   search,
+  grouping,
   objectiveId,
   sourceType,
   stale,
@@ -66,6 +70,7 @@ export function BoardToolbar({
   onFilterChange,
   onSortChange,
   onSearchChange,
+  onGroupingChange,
   onObjectiveChange,
   onSourceTypeChange,
   onStaleChange,
@@ -77,6 +82,8 @@ export function BoardToolbar({
 }: BoardToolbarProps) {
   const currentSortLabel =
     SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Sort";
+  const currentGroupingLabel =
+    GROUPING_OPTIONS.find((o) => o.value === grouping)?.label ?? "Group";
 
   return (
     <div className="flex flex-col gap-2">
@@ -135,6 +142,27 @@ export function BoardToolbar({
               ? `${totalCount} tasks`
               : `${filteredCount} of ${totalCount} tasks`}
           </span>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 text-[11px]">
+                <LayersIcon className="size-3" />
+                {currentGroupingLabel}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup
+                value={grouping}
+                onValueChange={(value) => onGroupingChange(value as BoardGrouping)}
+              >
+                {GROUPING_OPTIONS.map((option) => (
+                  <DropdownMenuRadioItem key={option.value} value={option.value}>
+                    {option.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
