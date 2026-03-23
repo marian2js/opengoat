@@ -64,7 +64,7 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
               <h2 className="section-label">Board</h2>
             </div>
             <span className="text-xs text-muted-foreground/60">
-              No active tasks yet
+              Tasks will appear when created from actions or chat
             </span>
           </div>
           <a
