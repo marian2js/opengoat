@@ -3,13 +3,19 @@ import {
   agentSchema,
   agentSessionListSchema,
   agentSessionSchema,
+  artifactListPageSchema,
+  artifactRecordSchema,
+  artifactVersionSchema,
   authSessionSchema,
   authOverviewSchema,
   bootstrapPromptListSchema,
+  bundleRecordSchema,
   chatBootstrapSchema,
   connectProviderSecretRequestSchema,
   createAgentRequestSchema,
   createAgentSessionRequestSchema,
+  createArtifactRequestSchema,
+  createBundleRequestSchema,
   deleteAgentResponseSchema,
   createObjectiveRequestSchema,
   deleteTasksRequestSchema,
@@ -26,6 +32,8 @@ import {
   taskRecordSchema,
   updateAgentRequestSchema,
   updateAgentSessionRequestSchema,
+  updateArtifactRequestSchema,
+  updateArtifactStatusRequestSchema,
   updateObjectiveRequestSchema,
   updateTaskStatusRequestSchema,
   advanceRunPhaseRequestSchema,
@@ -50,11 +58,15 @@ import {
   workspaceFileContentSchema,
   type AgentSession,
   type AgentSessionList,
+  type ArtifactListPage,
+  type ArtifactRecord,
+  type ArtifactVersion,
   type AuthOverview,
   type Agent,
   type AgentCatalog,
   type AuthSession,
   type BootstrapPromptList,
+  type BundleRecord,
   type ChatBootstrap,
   type DeleteTasksResponse,
   type InstallSkillResultContract,
@@ -75,6 +87,7 @@ import {
   type WorkspaceFileCheck,
   type WorkspaceFileContent,
 } from "@opengoat/contracts";
+import { z } from "zod";
 
 export class SidecarClient {
   constructor(private readonly connection: SidecarConnection) {}
@@ -662,6 +675,136 @@ export class SidecarClient {
         body: JSON.stringify(payload),
         method: "POST",
       }),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Artifacts
+  // ---------------------------------------------------------------------------
+
+  async listArtifacts(params?: {
+    projectId?: string;
+    objectiveId?: string;
+    runId?: string;
+    taskId?: string;
+    bundleId?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<ArtifactListPage> {
+    const query = new URLSearchParams();
+    if (params?.projectId) {
+      query.set("projectId", params.projectId);
+    }
+    if (params?.objectiveId) {
+      query.set("objectiveId", params.objectiveId);
+    }
+    if (params?.runId) {
+      query.set("runId", params.runId);
+    }
+    if (params?.taskId) {
+      query.set("taskId", params.taskId);
+    }
+    if (params?.bundleId) {
+      query.set("bundleId", params.bundleId);
+    }
+    if (params?.status) {
+      query.set("status", params.status);
+    }
+    if (params?.limit !== undefined) {
+      query.set("limit", String(params.limit));
+    }
+    if (params?.offset !== undefined) {
+      query.set("offset", String(params.offset));
+    }
+    const qs = query.toString();
+    return artifactListPageSchema.parse(
+      await this.request(`/artifacts${qs ? `?${qs}` : ""}`),
+    );
+  }
+
+  async getArtifact(artifactId: string): Promise<ArtifactRecord> {
+    return artifactRecordSchema.parse(
+      await this.request(`/artifacts/${encodeURIComponent(artifactId)}`),
+    );
+  }
+
+  async createArtifact(data: {
+    projectId: string;
+    title: string;
+    type: string;
+    format: string;
+    contentRef: string;
+    createdBy: string;
+    objectiveId?: string;
+    runId?: string;
+    taskId?: string;
+    bundleId?: string;
+    content?: string;
+    summary?: string;
+  }): Promise<ArtifactRecord> {
+    return artifactRecordSchema.parse(
+      await this.request("/artifacts", {
+        body: JSON.stringify(createArtifactRequestSchema.parse(data)),
+        method: "POST",
+      }),
+    );
+  }
+
+  async updateArtifact(
+    artifactId: string,
+    data: {
+      title?: string;
+      content?: string;
+      contentRef?: string;
+      summary?: string;
+    },
+  ): Promise<ArtifactRecord> {
+    return artifactRecordSchema.parse(
+      await this.request(`/artifacts/${encodeURIComponent(artifactId)}`, {
+        body: JSON.stringify(updateArtifactRequestSchema.parse(data)),
+        method: "PATCH",
+      }),
+    );
+  }
+
+  async updateArtifactStatus(
+    artifactId: string,
+    status: string,
+    feedback?: string,
+    actorId?: string,
+  ): Promise<ArtifactRecord> {
+    return artifactRecordSchema.parse(
+      await this.request(`/artifacts/${encodeURIComponent(artifactId)}/status`, {
+        body: JSON.stringify(updateArtifactStatusRequestSchema.parse({ status, actor: actorId })),
+        method: "PATCH",
+        ...(actorId ? { headers: { "x-actor-id": actorId } } : {}),
+      }),
+    );
+  }
+
+  async getArtifactVersions(artifactId: string): Promise<ArtifactVersion[]> {
+    return z.array(artifactVersionSchema).parse(
+      await this.request(`/artifacts/${encodeURIComponent(artifactId)}/versions`),
+    );
+  }
+
+  async createBundle(data: {
+    projectId: string;
+    title: string;
+    description?: string;
+  }): Promise<BundleRecord> {
+    return bundleRecordSchema.parse(
+      await this.request("/bundles", {
+        body: JSON.stringify(createBundleRequestSchema.parse(data)),
+        method: "POST",
+      }),
+    );
+  }
+
+  async listBundleArtifacts(bundleId: string): Promise<ArtifactRecord[]> {
+    return z.array(artifactRecordSchema).parse(
+      await this.request(`/bundles/${encodeURIComponent(bundleId)}`),
     );
   }
 

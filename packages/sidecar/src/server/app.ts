@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { Hono } from "hono";
 import { sidecarLogger } from "../logger.ts";
 import { createAgentRoutes } from "./routes/agents.ts";
+import { createArtifactRoutes, createBundleRoutes } from "./routes/artifacts.ts";
 import { createAuthRoutes } from "./routes/auth.ts";
 import { createChatRoutes } from "./routes/chat.ts";
 import { createGlobalRoutes } from "./routes/global.ts";
@@ -72,6 +73,8 @@ export function createSidecarApp(runtime: SidecarRuntime): Hono<{
   });
 
   app.route("/agents", createAgentRoutes(runtime));
+  app.route("/artifacts", createArtifactRoutes(runtime));
+  app.route("/bundles", createBundleRoutes(runtime));
   app.route("/chat", createChatRoutes(runtime));
   app.route("/global", createGlobalRoutes(runtime));
   app.route("/auth", createAuthRoutes(runtime));

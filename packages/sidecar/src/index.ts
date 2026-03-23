@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import {
   AgentManifestService,
+  ArtifactService,
   BoardService,
   BUILTIN_PLAYBOOKS,
   NodeCommandRunner,
@@ -84,9 +85,16 @@ export async function startSidecarServer(
     nowIso: () => new Date().toISOString(),
   });
 
+  const artifactService = new ArtifactService({
+    fileSystem,
+    pathPort,
+    nowIso: () => new Date().toISOString(),
+  });
+
   const playbookRegistryService = new PlaybookRegistryService([...BUILTIN_PLAYBOOKS]);
 
   const runtime = {
+    artifactService,
     authService,
     authSessions: new RuntimeAuthSessionManager(() => authService, {
       onAuthComplete: () => {
