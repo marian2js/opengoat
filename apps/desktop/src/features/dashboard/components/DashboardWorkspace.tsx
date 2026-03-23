@@ -20,6 +20,7 @@ import { usePlaybooks } from "@/features/dashboard/hooks/usePlaybooks";
 import { useRuns } from "@/features/dashboard/hooks/useRuns";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
 import { WorkInProgress } from "@/features/dashboard/components/WorkInProgress";
+import { RecentDeliverables } from "@/features/dashboard/components/RecentDeliverables";
 
 export interface DashboardWorkspaceProps {
   agent?: { id: string; name: string; description?: string | undefined } | undefined;
@@ -227,6 +228,17 @@ function DashboardContent({
           counts={boardSummary.counts}
           isLoading={boardSummary.isLoading}
           isEmpty={boardSummary.isEmpty}
+        />
+      </div>
+
+      {/* ── Recent Deliverables — section divider ── */}
+      <div className="dashboard-section">
+        <RecentDeliverables
+          agentId={agentId}
+          client={client}
+          onPreview={() => {
+            // Wire to ArtifactReviewPanel when task 0022 is complete
+          }}
         />
       </div>
 
