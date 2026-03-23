@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckIcon, LoaderCircleIcon, PlusIcon, RefreshCcwIcon, Trash2Icon } from "lucide-react";
+import { CheckIcon, Link2Icon, LoaderCircleIcon, PlusIcon, RefreshCcwIcon, Trash2Icon } from "lucide-react";
 import type { AuthOverview, ProviderModelCatalog, SavedConnection } from "@/app/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -163,15 +163,14 @@ export function ConnectionsWorkspace({
         <MessageBanner tone="success">{feedback}</MessageBanner>
       ) : null}
 
-      <section className="min-w-0">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-display text-sm font-bold tracking-tight">
-              Current connections
-            </h2>
-            <p className="mt-0.5 text-[11px] text-muted-foreground/70">
-              Manage default connections, models, and credentials.
-            </p>
+      <section className="min-w-0 rounded-lg border border-border/50 bg-card/80">
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5 lg:px-5">
+          <div className="flex items-center gap-2">
+            <Link2Icon className="size-3.5 text-primary" />
+            <h2 className="section-label">Connections</h2>
+            <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+              {storedConnections.length}
+            </span>
           </div>
           <div className="flex items-center gap-1.5">
             {onAddConnection ? (
@@ -203,11 +202,34 @@ export function ConnectionsWorkspace({
         </div>
 
         {storedConnections.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border/60 bg-card px-5 py-8 text-center text-[13px] text-muted-foreground">
-            No saved connections yet.
+          <div className="border-t border-border/60 px-4 py-8 lg:px-5">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-primary/8">
+                <Link2Icon className="size-6 text-primary/50" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-medium text-foreground">
+                  No connections yet
+                </h3>
+                <p className="max-w-[300px] text-[12px] leading-relaxed text-muted-foreground/70">
+                  Connect an AI provider to start using agents and chat.
+                </p>
+              </div>
+              {onAddConnection ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 h-8 rounded-md text-[12px]"
+                  onClick={onAddConnection}
+                >
+                  <PlusIcon className="size-3" />
+                  Add connection
+                </Button>
+              ) : null}
+            </div>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border/50 bg-card/80">
+          <div className="overflow-hidden border-t border-border/60">
             <Table>
               <TableHeader>
                 <TableRow className="border-border/50 bg-muted/30 hover:bg-muted/30">
@@ -236,11 +258,25 @@ export function ConnectionsWorkspace({
           </div>
         )}
 
-        {storedConnections.length > 0 ? (
-          <div className="mt-3 rounded-lg border border-dashed border-border/40 bg-muted/10 px-4 py-3.5">
-            <p className="text-[12px] leading-relaxed text-muted-foreground">
-              Add more connections to access different AI providers and models.
-            </p>
+        {storedConnections.length > 0 && onAddConnection ? (
+          <div
+            className="group/cta flex cursor-pointer items-center gap-4 border-t border-dashed border-border/40 px-4 py-3.5 transition-all hover:bg-primary/[0.03] lg:px-5"
+            role="button"
+            tabIndex={0}
+            onClick={onAddConnection}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onAddConnection(); } }}
+          >
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-dashed border-muted-foreground/20 text-muted-foreground/40 transition-colors group-hover/cta:border-primary/30 group-hover/cta:text-primary">
+              <PlusIcon className="size-3.5" />
+            </div>
+            <div className="flex-1">
+              <p className="text-[12px] font-medium text-foreground/80 transition-colors group-hover/cta:text-foreground">
+                Add another connection
+              </p>
+              <p className="text-[11px] text-muted-foreground/50">
+                Access different AI providers and models.
+              </p>
+            </div>
           </div>
         ) : null}
       </section>
