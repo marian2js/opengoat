@@ -62,7 +62,7 @@ export function OpportunitySection({
   }
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-4 rounded-xl bg-muted/40 p-5">
       <div className="flex items-center gap-2">
         <LightbulbIcon className="size-3.5 text-primary" />
         <h2 className="section-label">Insights</h2>

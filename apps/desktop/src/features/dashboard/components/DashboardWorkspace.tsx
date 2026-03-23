@@ -109,8 +109,8 @@ function DashboardContent({
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
-      {/* Active Objective or Composer Prompt — first section */}
-      <div className="mb-6">
+      {/* ── Header area: Objective + Company context ── */}
+      <div className="mb-8">
         {activeObjective.isLoading ? (
           <ActiveObjectiveSection
             objective={{
@@ -142,8 +142,7 @@ function DashboardContent({
         )}
       </div>
 
-      {/* Company context — ultra-compact header strip */}
-      <div className="mb-6 border-b border-border/20 pb-4">
+      <div className="mb-8 border-b border-border/20 pb-5">
         <CompanySummary
           data={data}
           domain={domain}
@@ -153,22 +152,26 @@ function DashboardContent({
         />
       </div>
 
-      {/* Playbook Library — primary action section */}
-      <div className="mb-8">
+      {/* ── Playbook Library ── */}
+      <div className="mb-2">
         <PlaybookLibrary
           playbooks={playbooks}
           isLoading={isPlaybooksLoading}
         />
       </div>
 
-      {/* Quick actions — secondary */}
-      <div className="flex flex-col gap-8">
+      {/* ── Quick Actions — section divider ── */}
+      <div className="dashboard-section">
         <ActionCardGrid
           completedActions={completedActions}
           isLoading={isActionLoading}
           onActionClick={onActionClick}
           onViewResults={onViewResults}
         />
+      </div>
+
+      {/* ── Suggested Actions — section divider (hidden when empty) ── */}
+      <div className="dashboard-section">
         <SuggestedActionGrid
           actions={suggestedActions}
           completedActions={completedActions}
@@ -179,8 +182,8 @@ function DashboardContent({
         />
       </div>
 
-      {/* Board summary — compact task status strip */}
-      <div className="mt-8 border-t border-border/20">
+      {/* ── Board summary — section divider ── */}
+      <div className="dashboard-section">
         <BoardSummary
           counts={boardSummary.counts}
           isLoading={boardSummary.isLoading}
@@ -188,8 +191,8 @@ function DashboardContent({
         />
       </div>
 
-      {/* Insights — supporting info */}
-      <div className="border-t border-border/20 pt-6">
+      {/* ── Insights — section divider + background tint ── */}
+      <div className="dashboard-section">
         <OpportunitySection
           completedActions={completedActions}
           files={files}
