@@ -14,6 +14,7 @@ export interface TaskRecord {
   description: string;
   status: string;
   statusReason?: string;
+  metadata?: Record<string, unknown>;
   blockers: string[];
   artifacts: TaskEntry[];
   worklog: TaskEntry[];
@@ -24,6 +25,7 @@ export interface CreateTaskOptions {
   description: string;
   assignedTo?: string;
   status?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ListTasksOptions {

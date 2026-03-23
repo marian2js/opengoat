@@ -39,6 +39,7 @@ export interface CreateRunOptions {
   agentId?: string;
   phase?: string;
   phaseSummary?: string;
+  sessionId?: string;
 }
 
 export interface ListRunsOptions {

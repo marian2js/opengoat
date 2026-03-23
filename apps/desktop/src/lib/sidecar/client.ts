@@ -580,6 +580,7 @@ export class SidecarClient {
     agentId?: string;
     phase?: string;
     phaseSummary?: string;
+    sessionId?: string;
   }): Promise<RunRecord> {
     return runRecordSchema.parse(
       await this.request("/runs", {
@@ -643,6 +644,22 @@ export class SidecarClient {
         body: JSON.stringify(
           advanceRunPhaseRequestSchema.parse({ phase, phaseSummary }),
         ),
+        method: "POST",
+      }),
+    );
+  }
+
+  async createTaskFromRun(payload: {
+    runId: string;
+    objectiveId: string;
+    title: string;
+    description: string;
+    assignedTo?: string;
+    status?: string;
+  }): Promise<TaskRecord> {
+    return taskRecordSchema.parse(
+      await this.request("/tasks/from-run", {
+        body: JSON.stringify(payload),
         method: "POST",
       }),
     );

@@ -737,6 +737,107 @@ describe("BoardService (tasks-only)", () => {
   });
 });
 
+describe("BoardService — task metadata", () => {
+  it("createTask with metadata persists and returns metadata", async () => {
+    const harness = await createHarness();
+
+    const task = await harness.boardService.createTask(harness.paths, "goat", {
+      title: "Metadata test",
+      description: "Task with metadata",
+      metadata: { runId: "run-abc", objectiveId: "obj-123" },
+    });
+
+    expect(task.metadata).toEqual({ runId: "run-abc", objectiveId: "obj-123" });
+  });
+
+  it("createTask without metadata returns undefined metadata", async () => {
+    const harness = await createHarness();
+
+    const task = await harness.boardService.createTask(harness.paths, "goat", {
+      title: "No metadata test",
+      description: "Task without metadata",
+    });
+
+    expect(task.metadata).toBeUndefined();
+  });
+
+  it("getTask retrieves metadata as parsed JSON", async () => {
+    const harness = await createHarness();
+
+    const created = await harness.boardService.createTask(harness.paths, "goat", {
+      title: "Retrievable metadata",
+      description: "Check getTask returns metadata",
+      metadata: { runId: "run-xyz", extra: 42 },
+    });
+
+    const fetched = await harness.boardService.getTask(harness.paths, created.taskId);
+    expect(fetched.metadata).toEqual({ runId: "run-xyz", extra: 42 });
+  });
+
+  it("listTasks includes metadata on each record", async () => {
+    const harness = await createHarness();
+
+    await harness.boardService.createTask(harness.paths, "goat", {
+      title: "Task with meta",
+      description: "Has metadata",
+      metadata: { source: "run" },
+    });
+    await harness.boardService.createTask(harness.paths, "goat", {
+      title: "Task without meta",
+      description: "No metadata",
+    });
+
+    const tasks = await harness.boardService.listTasks(harness.paths, { limit: 10 });
+    const withMeta = tasks.find((t) => t.title === "Task with meta");
+    const withoutMeta = tasks.find((t) => t.title === "Task without meta");
+
+    expect(withMeta?.metadata).toEqual({ source: "run" });
+    expect(withoutMeta?.metadata).toBeUndefined();
+  });
+
+  it("createTaskFromRun sets correct metadata", async () => {
+    const harness = await createHarness();
+
+    const task = await harness.boardService.createTaskFromRun(
+      harness.paths,
+      "goat",
+      "run-001",
+      "obj-002",
+      { title: "Run task", description: "Created from a run" },
+    );
+
+    expect(task.metadata).toEqual({ runId: "run-001", objectiveId: "obj-002" });
+    expect(task.title).toBe("Run task");
+    expect(task.description).toBe("Created from a run");
+  });
+
+  it("createTaskFromRun creates task with all standard fields plus metadata", async () => {
+    const harness = await createHarness();
+
+    const task = await harness.boardService.createTaskFromRun(
+      harness.paths,
+      "goat",
+      "run-003",
+      "obj-004",
+      {
+        title: "Full fields test",
+        description: "Task with everything",
+        assignedTo: "cto",
+        status: "doing",
+      },
+    );
+
+    expect(task.title).toBe("Full fields test");
+    expect(task.description).toBe("Task with everything");
+    expect(task.assignedTo).toBe("cto");
+    expect(task.status).toBe("doing");
+    expect(task.metadata).toEqual({ runId: "run-003", objectiveId: "obj-004" });
+    expect(task.blockers).toEqual([]);
+    expect(task.artifacts).toEqual([]);
+    expect(task.worklog).toEqual([]);
+  });
+});
+
 async function createHarness(options?: {
   nowIso?: () => string;
 }): Promise<{

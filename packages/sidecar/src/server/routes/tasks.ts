@@ -2,6 +2,7 @@ import {
   addTaskArtifactRequestSchema,
   addTaskBlockerRequestSchema,
   addTaskWorklogRequestSchema,
+  createTaskFromRunRequestSchema,
   deleteTasksRequestSchema,
   updateTaskStatusRequestSchema,
 } from "@opengoat/contracts";
@@ -124,6 +125,32 @@ export function createTaskRoutes(runtime: SidecarRuntime): Hono {
         body.content,
       );
       return context.json(task);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("does not exist")) {
+        return context.json({ error: error.message }, 404);
+      }
+      throw error;
+    }
+  });
+
+  app.post("/from-run", async (context) => {
+    const actorId = context.req.header("x-actor-id") || DEFAULT_ACTOR_ID;
+    const body = createTaskFromRunRequestSchema.parse(await context.req.json());
+
+    try {
+      const task = await runtime.boardService.createTaskFromRun(
+        runtime.opengoatPaths,
+        actorId,
+        body.runId,
+        body.objectiveId,
+        {
+          title: body.title,
+          description: body.description,
+          assignedTo: body.assignedTo,
+          status: body.status,
+        },
+      );
+      return context.json(task, 201);
     } catch (error) {
       if (error instanceof Error && error.message.includes("does not exist")) {
         return context.json({ error: error.message }, 404);

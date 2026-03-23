@@ -1,4 +1,4 @@
-import { type AgentCatalog, type AgentSession, type AuthOverview } from "@opengoat/contracts";
+import { type AgentCatalog, type AgentSession, type AuthOverview, type PlaybookManifest } from "@opengoat/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/app/shell/AppHeader";
 import { AppSidebar } from "@/app/shell/AppSidebar";
@@ -248,6 +248,20 @@ export function App() {
     [handleActionClick],
   );
 
+  const handleRunSessionCreated = useCallback(
+    (session: AgentSession, prompt: string, runId: string) => {
+      markActionSession(session.id);
+      setActionMapping(runId, session.id);
+      setCompletedActions(getCompletedActionIds());
+      setSessions((prev) => [session, ...prev]);
+      setActiveSessionId(session.id);
+      setPendingActionPrompt(prompt);
+      setActionSessionId(session.id);
+      window.location.hash = "#chat";
+    },
+    [],
+  );
+
   const handleViewResults = useCallback(
     (actionId: string) => {
       const sessionId = getActionMapping(actionId);
@@ -426,6 +440,7 @@ export function App() {
                   void handleActionClick(id, prompt, label);
                 }}
                 onViewResults={handleViewResults}
+                onRunSessionCreated={handleRunSessionCreated}
               />
             )
           ) : currentView === "board" ? (

@@ -51,6 +51,7 @@ interface TaskRow {
   description: string;
   status: string;
   status_reason: string | null;
+  metadata: string | null;
 }
 
 interface EntryRow {
@@ -136,6 +137,10 @@ export class BoardService {
     const taskId = createEntityId(`task-${title}`);
     const createdAt = this.resolveNowIso();
 
+    const metadataJson = options.metadata
+      ? JSON.stringify(options.metadata)
+      : null;
+
     this.execute(
       db,
       `INSERT INTO tasks (
@@ -149,8 +154,9 @@ export class BoardService {
          title,
          description,
          status,
-         status_reason
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         status_reason,
+         metadata
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         taskId,
         INTERNAL_TASK_BUCKET_ID,
@@ -163,6 +169,7 @@ export class BoardService {
         description,
         status,
         null,
+        metadataJson,
       ],
     );
     await this.persistDatabase(paths, db);
@@ -181,7 +188,7 @@ export class BoardService {
     const rows = assignee
       ? this.queryAll<TaskRow>(
           db,
-          `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+          `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata
            FROM tasks
            WHERE assigned_to_agent_id = ?
            ORDER BY created_at DESC, task_id DESC
@@ -190,7 +197,7 @@ export class BoardService {
         )
       : this.queryAll<TaskRow>(
           db,
-          `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+          `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata
            FROM tasks
            ORDER BY created_at DESC, task_id DESC
            LIMIT ?`,
@@ -259,7 +266,7 @@ export class BoardService {
 
     const rows = this.queryAll<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+      `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata
        FROM tasks
        ${whereClause}
        ORDER BY created_at DESC, task_id DESC
@@ -535,6 +542,19 @@ export class BoardService {
     return this.requireTask(db, resolvedTaskId);
   }
 
+  public async createTaskFromRun(
+    paths: OpenGoatPaths,
+    actorId: string,
+    runId: string,
+    objectiveId: string,
+    taskOptions: Omit<CreateTaskOptions, "metadata">,
+  ): Promise<TaskRecord> {
+    return this.createTask(paths, actorId, {
+      ...taskOptions,
+      metadata: { runId, objectiveId },
+    });
+  }
+
   private assertTaskUpdatePermission(
     task: TaskRecord,
     actorId: string,
@@ -566,7 +586,7 @@ export class BoardService {
   private requireTask(db: SqlJsDatabase, taskId: string): TaskRecord {
     const row = this.queryOne<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason
+      `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata
        FROM tasks
        WHERE task_id = ?`,
       [taskId],
@@ -640,6 +660,15 @@ export class BoardService {
       [row.task_id],
     );
 
+    let metadata: Record<string, unknown> | undefined;
+    if (row.metadata) {
+      try {
+        metadata = JSON.parse(row.metadata) as Record<string, unknown>;
+      } catch {
+        metadata = undefined;
+      }
+    }
+
     return {
       taskId: row.task_id,
       createdAt: row.created_at,
@@ -653,6 +682,7 @@ export class BoardService {
       description: row.description,
       status: row.status,
       statusReason: row.status_reason?.trim() || undefined,
+      metadata,
       blockers: blockersRows.map((entry) => entry.content),
       artifacts: artifactsRows.map((entry) => toTaskEntry(entry)),
       worklog: worklogRows.map((entry) => toTaskEntry(entry)),
@@ -723,6 +753,7 @@ export class BoardService {
     this.ensureTaskProjectColumnRemoved(db);
     this.ensureTaskUpdatedAtColumn(db);
     this.ensureTaskTimestampInsertCompatibility(db);
+    this.ensureTaskMetadataColumn(db);
     this.execute(
       db,
       `CREATE TABLE IF NOT EXISTS task_blockers (
@@ -1216,6 +1247,19 @@ export class BoardService {
       db,
       "ALTER TABLE boards ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0;",
     );
+  }
+
+  private ensureTaskMetadataColumn(db: SqlJsDatabase): void {
+    const columns = this.queryAll<{ name: string }>(
+      db,
+      "PRAGMA table_info(tasks);",
+    );
+    const hasMetadata = columns.some((column) => column.name === "metadata");
+    if (hasMetadata) {
+      return;
+    }
+
+    this.execute(db, "ALTER TABLE tasks ADD COLUMN metadata TEXT;");
   }
 
   private touchTaskUpdatedAt(db: SqlJsDatabase, taskId: string): void {

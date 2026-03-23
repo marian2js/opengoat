@@ -9,12 +9,14 @@ export interface PlaybookLibraryProps {
   playbooks: PlaybookManifest[];
   isLoading: boolean;
   onStartPlaybook?: (playbook: PlaybookManifest) => void;
+  isStartingPlaybook?: boolean;
 }
 
 export function PlaybookLibrary({
   playbooks,
   isLoading,
   onStartPlaybook,
+  isStartingPlaybook,
 }: PlaybookLibraryProps) {
   const [selectedPlaybook, setSelectedPlaybook] = useState<PlaybookManifest | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -73,6 +75,7 @@ export function PlaybookLibrary({
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onStart={handleStart}
+        isStarting={isStartingPlaybook}
       />
     </section>
   );

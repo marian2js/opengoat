@@ -3,6 +3,7 @@ import {
   CheckCircleIcon,
   ClipboardListIcon,
   ClockIcon,
+  LoaderIcon,
   PlayIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ export interface PlaybookStartDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onStart?: (playbook: PlaybookManifest) => void;
+  isStarting?: boolean;
 }
 
 export function PlaybookStartDialog({
@@ -29,6 +31,7 @@ export function PlaybookStartDialog({
   open,
   onOpenChange,
   onStart,
+  isStarting,
 }: PlaybookStartDialogProps) {
   if (!playbook) return null;
 
@@ -125,13 +128,17 @@ export function PlaybookStartDialog({
           <Button
             variant="default"
             className="gap-1.5"
+            disabled={isStarting}
             onClick={() => {
               onStart?.(playbook);
-              onOpenChange(false);
             }}
           >
-            <PlayIcon className="size-3.5" />
-            Start playbook
+            {isStarting ? (
+              <LoaderIcon className="size-3.5 animate-spin" />
+            ) : (
+              <PlayIcon className="size-3.5" />
+            )}
+            {isStarting ? "Starting…" : "Start playbook"}
           </Button>
         </DialogFooter>
       </DialogContent>

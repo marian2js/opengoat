@@ -158,8 +158,8 @@ describe("PlaybookStartDialog", () => {
     expect(playbookStartDialogSrc).toContain("onStart?.(playbook)");
   });
 
-  it("closes dialog on start", () => {
-    expect(playbookStartDialogSrc).toContain("onOpenChange(false)");
+  it("disables start button while starting", () => {
+    expect(playbookStartDialogSrc).toContain("disabled={isStarting}");
   });
 
   it("returns null when no playbook is selected", () => {

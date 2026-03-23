@@ -100,7 +100,7 @@ export class RunService {
         options.phaseSummary ?? "",
         options.startedFrom ?? "dashboard",
         options.agentId ?? "goat",
-        null,
+        options.sessionId ?? null,
         now,
         now,
         null,

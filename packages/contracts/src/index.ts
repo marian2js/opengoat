@@ -419,6 +419,7 @@ export const taskRecordSchema = z.object({
   description: z.string(),
   status: z.string().min(1),
   statusReason: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   blockers: z.array(z.string()),
   artifacts: z.array(taskEntrySchema),
   worklog: z.array(taskEntrySchema),
@@ -464,8 +465,18 @@ export type UpdateTaskStatusRequest = z.infer<typeof updateTaskStatusRequestSche
 export type AddTaskBlockerRequest = z.infer<typeof addTaskBlockerRequestSchema>;
 export type AddTaskArtifactRequest = z.infer<typeof addTaskArtifactRequestSchema>;
 export type AddTaskWorklogRequest = z.infer<typeof addTaskWorklogRequestSchema>;
+export const createTaskFromRunRequestSchema = z.object({
+  runId: z.string().min(1),
+  objectiveId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  assignedTo: z.string().optional(),
+  status: z.string().optional(),
+});
+
 export type DeleteTasksRequest = z.infer<typeof deleteTasksRequestSchema>;
 export type DeleteTasksResponse = z.infer<typeof deleteTasksResponseSchema>;
+export type CreateTaskFromRunRequest = z.infer<typeof createTaskFromRunRequestSchema>;
 
 // --- Playbooks ---
 
@@ -640,6 +651,7 @@ export const createRunRequestSchema = z.object({
   agentId: z.string().optional(),
   phase: z.string().optional(),
   phaseSummary: z.string().optional(),
+  sessionId: z.string().optional(),
 });
 
 export const updateRunStatusRequestSchema = z.object({

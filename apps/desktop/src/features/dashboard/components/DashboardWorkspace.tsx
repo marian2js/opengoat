@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { LayoutDashboardIcon } from "lucide-react";
+import type { AgentSession, PlaybookManifest } from "@opengoat/contracts";
 import type { SidecarClient } from "@/lib/sidecar/client";
+import { useStartPlaybookRun } from "@/features/dashboard/hooks/useStartPlaybookRun";
 import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
@@ -25,6 +27,7 @@ export interface DashboardWorkspaceProps {
   isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
+  onRunSessionCreated?: (session: AgentSession, prompt: string, runId: string) => void;
 }
 
 export function DashboardWorkspace({
@@ -35,6 +38,7 @@ export function DashboardWorkspace({
   isActionLoading,
   onActionClick,
   onViewResults,
+  onRunSessionCreated,
 }: DashboardWorkspaceProps) {
   if (!agentId || !client) {
     return (
@@ -60,6 +64,7 @@ export function DashboardWorkspace({
       isActionLoading={isActionLoading}
       onActionClick={onActionClick}
       onViewResults={onViewResults}
+      onRunSessionCreated={onRunSessionCreated}
     />
   );
 }
@@ -77,6 +82,7 @@ function DashboardContent({
   isActionLoading,
   onActionClick,
   onViewResults,
+  onRunSessionCreated,
 }: {
   agentId: string;
   client: SidecarClient;
@@ -86,6 +92,7 @@ function DashboardContent({
   isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
+  onRunSessionCreated?: (session: AgentSession, prompt: string, runId: string) => void;
 }) {
   const { data, files, isLoading, error } = useWorkspaceSummary(agentId, client);
   const workspaceReady = !isLoading && files !== null;
@@ -93,6 +100,16 @@ function DashboardContent({
   const boardSummary = useBoardSummary(agentId, client);
   const activeObjective = useActiveObjective(agentId, client);
   const { playbooks, isLoading: isPlaybooksLoading } = usePlaybooks(client);
+
+  // Playbook run creation
+  const noopSessionCreated = (_s: AgentSession, _p: string, _r: string) => {};
+  const { startRun, isStarting: isStartingPlaybook } = useStartPlaybookRun({
+    client,
+    activeAgentId: agentId,
+    activeObjectiveId: activeObjective.objective?.objectiveId,
+    projectId: agentId,
+    onSessionCreated: onRunSessionCreated ?? noopSessionCreated,
+  });
 
   // Sheet open state and prefill
   const [isCreationOpen, setIsCreationOpen] = useState(false);
@@ -157,6 +174,8 @@ function DashboardContent({
         <PlaybookLibrary
           playbooks={playbooks}
           isLoading={isPlaybooksLoading}
+          onStartPlaybook={activeObjective.objective ? startRun : undefined}
+          isStartingPlaybook={isStartingPlaybook}
         />
       </div>
 
