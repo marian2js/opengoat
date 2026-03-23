@@ -175,20 +175,20 @@ export function ProjectSettings({
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Project settings</h1>
-        <p className="text-sm text-muted-foreground">{domain}</p>
+      <div className="flex items-baseline gap-3">
+        <h1 className="font-display text-lg font-bold tracking-tight">Project settings</h1>
+        <span className="font-mono text-[11px] text-muted-foreground/50">{domain}</span>
       </div>
 
       {/* ---- Model ---- */}
-      <Card>
+      <Card className="border-border/50">
         <CardHeader>
-          <CardTitle className="text-[15px]">Model</CardTitle>
-          <CardDescription>Choose the AI provider and model for this project.</CardDescription>
+          <CardTitle className="text-[14px] font-semibold">Model</CardTitle>
+          <CardDescription className="text-[12px]">Choose the AI provider and model for this project.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
-            <label htmlFor="settings-provider" className="block text-[12px] font-medium text-muted-foreground">
+            <label htmlFor="settings-provider" className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
               Provider
             </label>
             <select
@@ -219,7 +219,7 @@ export function ProjectSettings({
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="settings-model" className="block text-[12px] font-medium text-muted-foreground">
+            <label htmlFor="settings-model" className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
               Model
             </label>
             {isLoadingModels ? (
@@ -258,15 +258,15 @@ export function ProjectSettings({
       </Card>
 
       {/* ---- General ---- */}
-      <Card>
+      <Card className="border-border/50">
         <CardHeader>
-          <CardTitle className="text-[15px]">General</CardTitle>
-          <CardDescription>Basic project information.</CardDescription>
+          <CardTitle className="text-[14px] font-semibold">General</CardTitle>
+          <CardDescription className="text-[12px]">Basic project information.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="block text-[12px] font-medium text-muted-foreground" htmlFor="settings-name">
+              <label className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60" htmlFor="settings-name">
                 Name
               </label>
               <Input
@@ -281,7 +281,7 @@ export function ProjectSettings({
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="settings-website-url" className="block text-[12px] font-medium text-muted-foreground">
+              <label htmlFor="settings-website-url" className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
                 Website URL
               </label>
               <div className="relative">
@@ -333,10 +333,10 @@ export function ProjectSettings({
       <SkillsSection agent={agent} client={client} />
 
       {/* ---- Danger zone ---- */}
-      <Card className="border-destructive/30">
+      <Card className="border-destructive/20">
         <CardHeader>
-          <CardTitle className="text-[15px] text-destructive">Danger zone</CardTitle>
-          <CardDescription>Irreversible actions for this project.</CardDescription>
+          <CardTitle className="text-[14px] font-semibold text-destructive">Danger zone</CardTitle>
+          <CardDescription className="text-[12px]">Irreversible actions for this project.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-start justify-between gap-4">

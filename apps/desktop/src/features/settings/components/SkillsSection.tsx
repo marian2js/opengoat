@@ -99,17 +99,17 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
   const managedSkills = skills.filter((s) => s.source === "managed");
 
   return (
-    <Card>
+    <Card className="border-border/50">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <CardTitle className="text-[15px]">Skills</CardTitle>
+          <CardTitle className="text-[14px] font-semibold">Skills</CardTitle>
           {!isLoading && managedSkills.length > 0 ? (
-            <Badge variant="secondary" className="text-[10px]">
+            <Badge variant="secondary" className="font-mono text-[10px]">
               {managedSkills.length} active
             </Badge>
           ) : null}
         </div>
-        <CardDescription>Extend your AI CMO with additional capabilities.</CardDescription>
+        <CardDescription className="text-[12px]">Extend your AI CMO with additional capabilities.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Loading state */}
@@ -139,7 +139,7 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
             {/* Installed extra skills */}
             {extraSkills.length > 0 ? (
               <div className="space-y-2">
-                <span className="block text-[12px] font-medium text-muted-foreground" role="heading" aria-level={3}>
+                <span className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60" role="heading" aria-level={3}>
                   Installed skills
                 </span>
                 <div className="divide-y divide-border rounded-md border">
@@ -182,7 +182,7 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
             {/* Built-in/managed skills (read-only) */}
             {managedSkills.length > 0 ? (
               <div className="space-y-2">
-                <span className="block text-[12px] font-medium text-muted-foreground" role="heading" aria-level={3}>
+                <span className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60" role="heading" aria-level={3}>
                   Built-in skills
                 </span>
                 <div className="divide-y divide-border rounded-md border">
@@ -230,7 +230,7 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
 
             {/* Install form */}
             <div className="space-y-2">
-              <label htmlFor="skill-install-input" className="block text-[12px] font-medium text-muted-foreground">
+              <label htmlFor="skill-install-input" className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
                 Install a skill
               </label>
               <div className="flex gap-2">
