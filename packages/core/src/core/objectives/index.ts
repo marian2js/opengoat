@@ -1,3 +1,4 @@
+export { ObjectiveService } from "./application/objective.service.js";
 export type {
   CreateObjectiveOptions,
   ListObjectivesOptions,
