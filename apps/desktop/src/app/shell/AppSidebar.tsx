@@ -25,6 +25,7 @@ import {
 } from "@/lib/utils/favicon";
 import { groupSessionsByDate } from "@/lib/utils/group-sessions-by-date";
 import { getDeEmphasizedSessionIds } from "@/lib/utils/session-rerun";
+import { humanizeSessionLabel } from "@/lib/utils/session-label";
 import { isUnnamedSession } from "@/lib/utils/unnamed-session";
 import { cn } from "@/lib/utils";
 import {
@@ -76,7 +77,7 @@ interface AppSidebarProps {
 }
 
 function formatSessionLabel(session: AgentSession): string {
-  return session.label ?? "Untitled chat";
+  return humanizeSessionLabel(session.label, session.createdAt);
 }
 
 export function AppSidebar({

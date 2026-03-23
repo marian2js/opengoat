@@ -1,3 +1,5 @@
+import { isUuidLikeLabel } from "./session-label";
+
 const UNNAMED_PATTERNS = [
   "new conversation",
   "untitled chat",
@@ -12,5 +14,6 @@ export function isUnnamedSession(label: string | undefined): boolean {
   if (!label) return true;
   const trimmed = label.trim().toLowerCase();
   if (trimmed === "") return true;
-  return UNNAMED_PATTERNS.includes(trimmed);
+  if (UNNAMED_PATTERNS.includes(trimmed)) return true;
+  return isUuidLikeLabel(label);
 }

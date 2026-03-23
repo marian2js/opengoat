@@ -265,10 +265,10 @@ export function ChatWorkspace({
 
 function deriveSessionLabel(text: string): string {
   const trimmed = text.trim().replace(/\s+/g, " ");
-  if (trimmed.length <= 50) {
+  if (trimmed.length <= 40) {
     return trimmed;
   }
-  return `${trimmed.slice(0, 47)}...`;
+  return `${trimmed.slice(0, 37)}...`;
 }
 
 function ChatSessionView({

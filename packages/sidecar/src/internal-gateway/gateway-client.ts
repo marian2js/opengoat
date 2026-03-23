@@ -455,13 +455,24 @@ function toChatTranscriptMessage(
   };
 }
 
-function resolveSessionLabel(row: GatewaySessionRow, agentName: string): string {
-  return (
-    row.label?.trim() ??
-    row.displayName?.trim() ??
-    row.derivedTitle?.trim() ??
-    `${agentName} chat`
-  );
+const UUID_FULL_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_SHORT_RE = /^[0-9a-f]{8}(?:\s*\(.*\))?$/i;
+
+function isUuidLikeLabel(value: string | undefined | null): boolean {
+  if (!value) return false;
+  const t = value.trim();
+  return t !== "" && (UUID_FULL_RE.test(t) || UUID_SHORT_RE.test(t));
+}
+
+function resolveSessionLabel(row: GatewaySessionRow, agentName: string): string | undefined {
+  const candidates = [row.label, row.displayName, row.derivedTitle];
+  for (const c of candidates) {
+    const trimmed = c?.trim();
+    if (trimmed && !isUuidLikeLabel(trimmed)) {
+      return trimmed;
+    }
+  }
+  return undefined;
 }
 
 function toAgentSession(params: {
@@ -474,12 +485,13 @@ function toAgentSession(params: {
     : new Date().toISOString();
   const sessionId = params.row.sessionId ?? params.row.key;
 
+  const label = resolveSessionLabel(params.row, params.agent.name);
   return {
     agentId: params.agent.id,
     agentName: params.agent.name,
     createdAt: updatedAt,
     id: sessionId,
-    label: resolveSessionLabel(params.row, params.agent.name),
+    ...(label ? { label } : {}),
     sessionFile: resolveGatewaySessionFile(params.paths, params.agent.id, sessionId),
     sessionKey: params.row.key,
     updatedAt,
