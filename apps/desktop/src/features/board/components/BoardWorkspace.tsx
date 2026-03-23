@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskList } from "@/features/board/hooks/useTaskList";
 import { useBoardFilters } from "@/features/board/hooks/useBoardFilters";
+import { useObjectiveList } from "@/features/board/hooks/useObjectiveList";
 import { TaskList, TaskListSkeleton } from "./TaskList";
 import { TaskDetailPanel } from "./TaskDetailPanel";
 import { BoardToolbar } from "./BoardToolbar";
@@ -50,13 +51,21 @@ function BoardContent({
   const { tasks, isLoading, error, refresh } = useTaskList(agentId, client);
   const {
     filteredTasks,
+    filterState,
     filter,
     sort,
     search,
     setFilter,
     setSort,
     setSearch,
+    setObjectiveFilter,
+    setSourceTypeFilter,
+    setStaleFilter,
+    setReadyForReviewFilter,
+    clearFilters,
+    activeFilterCount,
   } = useBoardFilters(tasks);
+  const { objectives } = useObjectiveList(agentId, client);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   return (
@@ -67,9 +76,20 @@ function BoardContent({
             filter={filter}
             sort={sort}
             search={search}
+            objectiveId={filterState.objectiveId}
+            sourceType={filterState.sourceType}
+            stale={filterState.stale}
+            readyForReview={filterState.readyForReview}
+            activeFilterCount={activeFilterCount}
+            objectives={objectives}
             onFilterChange={setFilter}
             onSortChange={setSort}
             onSearchChange={setSearch}
+            onObjectiveChange={setObjectiveFilter}
+            onSourceTypeChange={setSourceTypeFilter}
+            onStaleChange={setStaleFilter}
+            onReadyForReviewChange={setReadyForReviewFilter}
+            onClearFilters={clearFilters}
             onRefresh={refresh}
             totalCount={tasks.length}
             filteredCount={filteredTasks.length}

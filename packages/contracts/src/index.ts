@@ -403,6 +403,8 @@ export type RemoveSkillResultContract = z.infer<typeof removeSkillResultSchema>;
 
 // --- Board / Tasks ---
 
+export const taskSourceTypeSchema = z.enum(["chat", "playbook", "action", "manual"]);
+
 export const taskEntrySchema = z.object({
   createdAt: z.string().min(1),
   createdBy: z.string().min(1),
@@ -419,6 +421,10 @@ export const taskRecordSchema = z.object({
   description: z.string(),
   status: z.string().min(1),
   statusReason: z.string().optional(),
+  objectiveId: z.string().optional(),
+  runId: z.string().optional(),
+  sourceType: taskSourceTypeSchema.optional(),
+  sourceId: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   blockers: z.array(z.string()),
   artifacts: z.array(taskEntrySchema),
@@ -458,6 +464,7 @@ export const deleteTasksResponseSchema = z.object({
   deletedCount: z.number().int().nonnegative(),
 });
 
+export type TaskSourceType = z.infer<typeof taskSourceTypeSchema>;
 export type TaskEntry = z.infer<typeof taskEntrySchema>;
 export type TaskRecord = z.infer<typeof taskRecordSchema>;
 export type TaskListPage = z.infer<typeof taskListPageSchema>;

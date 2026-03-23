@@ -17,6 +17,9 @@ export function createTaskRoutes(runtime: SidecarRuntime): Hono {
   app.get("/", async (context) => {
     const status = context.req.query("status") || undefined;
     const assignee = context.req.query("assignee") || undefined;
+    const objectiveId = context.req.query("objectiveId") || undefined;
+    const runId = context.req.query("runId") || undefined;
+    const sourceType = context.req.query("sourceType") || undefined;
     const limitParam = context.req.query("limit");
     const offsetParam = context.req.query("offset");
 
@@ -25,7 +28,7 @@ export function createTaskRoutes(runtime: SidecarRuntime): Hono {
 
     const result = await runtime.boardService.listLatestTasksPage(
       runtime.opengoatPaths,
-      { status, assignee, limit, offset },
+      { status, assignee, objectiveId, runId, sourceType, limit, offset },
     );
 
     return context.json(result);

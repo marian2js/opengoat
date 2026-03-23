@@ -416,6 +416,9 @@ export class SidecarClient {
   async listTasks(params?: {
     status?: string;
     assignee?: string;
+    objectiveId?: string;
+    runId?: string;
+    sourceType?: string;
     limit?: number;
     offset?: number;
   }): Promise<TaskListPage> {
@@ -425,6 +428,15 @@ export class SidecarClient {
     }
     if (params?.assignee) {
       query.set("assignee", params.assignee);
+    }
+    if (params?.objectiveId) {
+      query.set("objectiveId", params.objectiveId);
+    }
+    if (params?.runId) {
+      query.set("runId", params.runId);
+    }
+    if (params?.sourceType) {
+      query.set("sourceType", params.sourceType);
     }
     if (params?.limit !== undefined) {
       query.set("limit", String(params.limit));

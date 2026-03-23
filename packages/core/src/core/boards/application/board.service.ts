@@ -52,6 +52,10 @@ interface TaskRow {
   status: string;
   status_reason: string | null;
   metadata: string | null;
+  objective_id: string | null;
+  run_id: string | null;
+  source_type: string | null;
+  source_id: string | null;
 }
 
 interface EntryRow {
@@ -141,6 +145,16 @@ export class BoardService {
       ? JSON.stringify(options.metadata)
       : null;
 
+    // Extract linkage fields from metadata for dedicated columns
+    const objectiveId =
+      (options.metadata?.objectiveId as string | undefined) ?? null;
+    const runId =
+      (options.metadata?.runId as string | undefined) ?? null;
+    const sourceType =
+      (options.metadata?.sourceType as string | undefined) ?? null;
+    const sourceId =
+      (options.metadata?.sourceId as string | undefined) ?? null;
+
     this.execute(
       db,
       `INSERT INTO tasks (
@@ -155,8 +169,12 @@ export class BoardService {
          description,
          status,
          status_reason,
-         metadata
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         metadata,
+         objective_id,
+         run_id,
+         source_type,
+         source_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         taskId,
         INTERNAL_TASK_BUCKET_ID,
@@ -170,6 +188,10 @@ export class BoardService {
         status,
         null,
         metadataJson,
+        objectiveId,
+        runId,
+        sourceType,
+        sourceId,
       ],
     );
     await this.persistDatabase(paths, db);
@@ -188,7 +210,7 @@ export class BoardService {
     const rows = assignee
       ? this.queryAll<TaskRow>(
           db,
-          `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata
+          `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata, objective_id, run_id, source_type, source_id
            FROM tasks
            WHERE assigned_to_agent_id = ?
            ORDER BY created_at DESC, task_id DESC
@@ -197,7 +219,7 @@ export class BoardService {
         )
       : this.queryAll<TaskRow>(
           db,
-          `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata
+          `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata, objective_id, run_id, source_type, source_id
            FROM tasks
            ORDER BY created_at DESC, task_id DESC
            LIMIT ?`,
@@ -220,6 +242,9 @@ export class BoardService {
       assignee?: string;
       owner?: string;
       status?: string;
+      objectiveId?: string;
+      runId?: string;
+      sourceType?: string;
       limit?: number;
       offset?: number;
     } = {},
@@ -237,6 +262,9 @@ export class BoardService {
       ? normalizeEntityId(options.owner, "owner")
       : undefined;
     const status = options.status?.trim() || undefined;
+    const objectiveId = options.objectiveId?.trim() || undefined;
+    const runId = options.runId?.trim() || undefined;
+    const sourceType = options.sourceType?.trim() || undefined;
 
     const conditions: string[] = [];
     const params: (string | number)[] = [];
@@ -253,6 +281,18 @@ export class BoardService {
       conditions.push("status = ?");
       params.push(status);
     }
+    if (objectiveId) {
+      conditions.push("objective_id = ?");
+      params.push(objectiveId);
+    }
+    if (runId) {
+      conditions.push("run_id = ?");
+      params.push(runId);
+    }
+    if (sourceType) {
+      conditions.push("source_type = ?");
+      params.push(sourceType);
+    }
 
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -266,7 +306,7 @@ export class BoardService {
 
     const rows = this.queryAll<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata
+      `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata, objective_id, run_id, source_type, source_id
        FROM tasks
        ${whereClause}
        ORDER BY created_at DESC, task_id DESC
@@ -586,7 +626,7 @@ export class BoardService {
   private requireTask(db: SqlJsDatabase, taskId: string): TaskRecord {
     const row = this.queryOne<TaskRow>(
       db,
-      `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata
+      `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata, objective_id, run_id, source_type, source_id
        FROM tasks
        WHERE task_id = ?`,
       [taskId],
@@ -682,6 +722,10 @@ export class BoardService {
       description: row.description,
       status: row.status,
       statusReason: row.status_reason?.trim() || undefined,
+      objectiveId: row.objective_id || undefined,
+      runId: row.run_id || undefined,
+      sourceType: (row.source_type as TaskRecord["sourceType"]) || undefined,
+      sourceId: row.source_id || undefined,
       metadata,
       blockers: blockersRows.map((entry) => entry.content),
       artifacts: artifactsRows.map((entry) => toTaskEntry(entry)),
@@ -754,6 +798,7 @@ export class BoardService {
     this.ensureTaskUpdatedAtColumn(db);
     this.ensureTaskTimestampInsertCompatibility(db);
     this.ensureTaskMetadataColumn(db);
+    this.ensureTaskLinkageColumns(db);
     this.execute(
       db,
       `CREATE TABLE IF NOT EXISTS task_blockers (
@@ -823,6 +868,18 @@ export class BoardService {
     this.execute(
       db,
       "CREATE INDEX IF NOT EXISTS idx_task_worklog_task_id ON task_worklog(task_id);",
+    );
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_tasks_objective_id ON tasks(objective_id);",
+    );
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_tasks_run_id ON tasks(run_id);",
+    );
+    this.execute(
+      db,
+      "CREATE INDEX IF NOT EXISTS idx_tasks_source_type ON tasks(source_type);",
     );
 
     await this.persistDatabase(paths, db);
@@ -1260,6 +1317,61 @@ export class BoardService {
     }
 
     this.execute(db, "ALTER TABLE tasks ADD COLUMN metadata TEXT;");
+  }
+
+  private ensureTaskLinkageColumns(db: SqlJsDatabase): void {
+    const columns = this.queryAll<{ name: string }>(
+      db,
+      "PRAGMA table_info(tasks);",
+    );
+    const columnNames = new Set(columns.map((c) => c.name));
+
+    if (!columnNames.has("objective_id")) {
+      this.execute(db, "ALTER TABLE tasks ADD COLUMN objective_id TEXT;");
+    }
+    if (!columnNames.has("run_id")) {
+      this.execute(db, "ALTER TABLE tasks ADD COLUMN run_id TEXT;");
+    }
+    if (!columnNames.has("source_type")) {
+      this.execute(db, "ALTER TABLE tasks ADD COLUMN source_type TEXT;");
+    }
+    if (!columnNames.has("source_id")) {
+      this.execute(db, "ALTER TABLE tasks ADD COLUMN source_id TEXT;");
+    }
+
+    // Backfill from metadata JSON for existing tasks that were created via createTaskFromRun
+    this.execute(
+      db,
+      `UPDATE tasks
+       SET objective_id = json_extract(metadata, '$.objectiveId')
+       WHERE objective_id IS NULL
+         AND metadata IS NOT NULL
+         AND json_extract(metadata, '$.objectiveId') IS NOT NULL;`,
+    );
+    this.execute(
+      db,
+      `UPDATE tasks
+       SET run_id = json_extract(metadata, '$.runId')
+       WHERE run_id IS NULL
+         AND metadata IS NOT NULL
+         AND json_extract(metadata, '$.runId') IS NOT NULL;`,
+    );
+    this.execute(
+      db,
+      `UPDATE tasks
+       SET source_type = json_extract(metadata, '$.sourceType')
+       WHERE source_type IS NULL
+         AND metadata IS NOT NULL
+         AND json_extract(metadata, '$.sourceType') IS NOT NULL;`,
+    );
+    this.execute(
+      db,
+      `UPDATE tasks
+       SET source_id = json_extract(metadata, '$.sourceId')
+       WHERE source_id IS NULL
+         AND metadata IS NOT NULL
+         AND json_extract(metadata, '$.sourceId') IS NOT NULL;`,
+    );
   }
 
   private touchTaskUpdatedAt(db: SqlJsDatabase, taskId: string): void {

@@ -14,6 +14,10 @@ export interface TaskRecord {
   description: string;
   status: string;
   statusReason?: string;
+  objectiveId?: string;
+  runId?: string;
+  sourceType?: "chat" | "playbook" | "action" | "manual";
+  sourceId?: string;
   metadata?: Record<string, unknown>;
   blockers: string[];
   artifacts: TaskEntry[];

@@ -22,8 +22,10 @@ describe("Board default filter — show all tasks instead of only open", () => {
   // AC1: When navigating to the Board page, blocked and pending tasks are
   //      visible without user action (default filter must not be "open")
   it("defaults to the 'all' filter, not 'open'", () => {
-    expect(useBoardFiltersSrc).toContain('useState<BoardFilter>("all")');
+    // The hook uses DEFAULT_FILTER_STATE which has status: "all"
+    expect(useBoardFiltersSrc).toContain("DEFAULT_FILTER_STATE");
     expect(useBoardFiltersSrc).not.toContain('useState<BoardFilter>("open")');
+    expect(useBoardFiltersSrc).not.toContain('useState<StatusFilter>("open")');
   });
 
   // AC2 & AC3: Open tasks first, blocked/pending below, done at bottom
