@@ -51,17 +51,21 @@ export function BoardToolbar({
       {/* Left group: filter pills + search */}
       <div className="flex items-center gap-2">
         {/* Filter pills */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 rounded-lg border border-border/50 bg-muted/30 p-0.5">
           {FILTER_OPTIONS.map((option) => (
-            <Button
+            <button
               key={option.value}
-              variant={filter === option.value ? "secondary" : "ghost"}
-              size="sm"
+              type="button"
               onClick={() => onFilterChange(option.value)}
               aria-pressed={filter === option.value}
+              className={`rounded-md px-3 py-1 font-mono text-[11px] font-medium tracking-wide transition-all ${
+                filter === option.value
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
               {option.label}
-            </Button>
+            </button>
           ))}
         </div>
 
@@ -92,7 +96,7 @@ export function BoardToolbar({
 
       {/* Right group: task count, sort dropdown, refresh */}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">
+        <span className="font-mono text-[11px] tabular-nums text-muted-foreground/60">
           {filteredCount === totalCount
             ? `${totalCount} tasks`
             : `${filteredCount} of ${totalCount} tasks`}
@@ -100,8 +104,8 @@ export function BoardToolbar({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <ArrowUpDownIcon className="size-3.5" />
+            <Button variant="outline" size="sm" className="h-7 text-[11px]">
+              <ArrowUpDownIcon className="size-3" />
               {currentSortLabel}
             </Button>
           </DropdownMenuTrigger>
@@ -122,10 +126,10 @@ export function BoardToolbar({
         <button
           type="button"
           onClick={onRefresh}
-          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="rounded-md p-1.5 text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Refresh tasks"
         >
-          <RefreshCwIcon className="size-4" />
+          <RefreshCwIcon className="size-3.5" />
         </button>
       </div>
     </div>
