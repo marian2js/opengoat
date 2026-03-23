@@ -87,8 +87,8 @@ function DashboardContent({
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
-      {/* Section 1: Company context */}
-      <div className="pb-5">
+      {/* Section 1: Company context — compact header strip */}
+      <div className="pb-4">
         <CompanySummary
           data={data}
           domain={domain}
@@ -98,11 +98,8 @@ function DashboardContent({
         />
       </div>
 
-      {/* Divider: summary → actions */}
-      <div className="border-b border-border/30" />
-
-      {/* Section 2: Action cards (starter + suggested) — dominant area */}
-      <div className="flex flex-col gap-8 py-6">
+      {/* Section 2: Action cards — the hero area */}
+      <div className="flex flex-col gap-6 py-5">
         <ActionCardGrid
           completedActions={completedActions}
           isLoading={isActionLoading}
@@ -119,21 +116,17 @@ function DashboardContent({
         />
       </div>
 
-      {/* Divider: actions → board summary */}
-      <div className="border-b border-border/30" />
+      {/* Board summary — compact task status strip */}
+      <div className="border-t border-border/20">
+        <BoardSummary
+          counts={boardSummary.counts}
+          isLoading={boardSummary.isLoading}
+          isEmpty={boardSummary.isEmpty}
+        />
+      </div>
 
-      {/* Section 2.5: Board summary — compact task status overview */}
-      <BoardSummary
-        counts={boardSummary.counts}
-        isLoading={boardSummary.isLoading}
-        isEmpty={boardSummary.isEmpty}
-      />
-
-      {/* Divider: board summary → insights */}
-      <div className="border-b border-border/30" />
-
-      {/* Section 3: Insights — supporting info */}
-      <div className="pt-6">
+      {/* Insights — supporting info */}
+      <div className="border-t border-border/20 pt-5">
         <OpportunitySection
           completedActions={completedActions}
           files={files}

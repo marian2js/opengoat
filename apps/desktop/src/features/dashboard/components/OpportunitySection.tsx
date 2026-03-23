@@ -64,10 +64,8 @@ export function OpportunitySection({
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <div className="rounded-lg bg-primary/8 p-1.5 text-primary">
-          <LightbulbIcon className="size-4" />
-        </div>
-        <h2 className="font-display text-base font-bold tracking-tight">Insights</h2>
+        <LightbulbIcon className="size-3.5 text-primary" />
+        <h2 className="section-label">Insights</h2>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {opportunities.map((opp) => (

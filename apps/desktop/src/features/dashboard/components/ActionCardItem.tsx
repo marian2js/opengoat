@@ -25,12 +25,12 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
 
   return (
     <Card
-      className={`group/action relative overflow-hidden border bg-card/90 transition-all duration-100 before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-primary before:opacity-0 before:transition-opacity ${
+      className={`group/action relative overflow-hidden border bg-card/80 transition-all duration-100 before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-primary before:opacity-0 before:transition-opacity ${
         isLoading
-          ? "pointer-events-none border-border/70 opacity-60"
+          ? "pointer-events-none border-border/50 opacity-60"
           : isCompleted
-            ? "cursor-pointer border-primary/20 hover:border-primary/40 hover:shadow-sm hover:before:opacity-100"
-            : "cursor-pointer border-border/70 hover:-translate-y-px hover:border-primary/40 hover:shadow-sm hover:before:opacity-100"
+            ? "cursor-pointer border-primary/20 hover:border-primary/30 hover:shadow-sm hover:before:opacity-100"
+            : "cursor-pointer border-border/50 hover:-translate-y-px hover:border-primary/30 hover:shadow-sm hover:before:opacity-100"
       }`}
       onClick={() => {
         if (!isLoading) {

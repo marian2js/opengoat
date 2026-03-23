@@ -123,10 +123,8 @@ export function CompanySummary({ data, domain, faviconSources, isLoading, error 
       <Card className="shrink-0 border border-border/70 bg-card/90">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <div className="rounded-lg bg-primary/8 p-1.5 text-primary">
-              <GlobeIcon className="size-4" />
-            </div>
-            <CardTitle className="font-display text-base font-bold tracking-tight">
+            <GlobeIcon className="size-3.5 text-primary" />
+            <CardTitle className="section-label">
               Company overview
             </CardTitle>
           </div>
@@ -146,26 +144,26 @@ export function CompanySummary({ data, domain, faviconSources, isLoading, error 
 
   return (
     <Card
-      className="group/summary shrink-0 border border-border/70 bg-card/90 cursor-pointer transition-colors hover:border-border"
+      className="group/summary shrink-0 border border-border/50 bg-card/80 cursor-pointer transition-colors hover:border-border/80"
       onClick={() => setExpanded((v) => !v)}
     >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             {hasFavicon ? (
-              <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent">
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-accent">
                 <FaviconIcon
                   domain={domain}
                   faviconSources={faviconSources}
-                  className="size-4 rounded-sm"
+                  className="size-3.5 rounded-sm"
                 />
               </div>
             ) : (
-              <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary">
-                <GlobeIcon className="size-4" />
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/8 text-primary">
+                <GlobeIcon className="size-3.5" />
               </div>
             )}
-            <CardTitle className="font-display text-base font-bold tracking-tight">
+            <CardTitle className="font-display text-sm font-bold tracking-tight">
               {domain ?? "Company overview"}
             </CardTitle>
           </div>

@@ -13,10 +13,8 @@ export function ActionCardGrid({ completedActions, isLoading, onActionClick, onV
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <div className="rounded-lg bg-primary/8 p-1.5 text-primary">
-          <SparklesIcon className="size-4" />
-        </div>
-        <h2 className="font-display text-base font-bold tracking-tight">
+        <SparklesIcon className="size-3.5 text-primary" />
+        <h2 className="section-label">
           Quick Actions
         </h2>
       </div>
