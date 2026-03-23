@@ -774,7 +774,7 @@ function KnowledgeEmptyState({
 // ---------------------------------------------------------------------------
 
 const KNOWLEDGE_PROSE_CLASSES =
-  "prose prose-sm dark:prose-invert max-w-prose [&>h1:first-child]:hidden [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-0 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mb-3 [&_h2]:mt-8 [&_h2]:pt-6 [&_h2]:border-t [&_h2]:border-border/20 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-6 [&_h4]:text-sm [&_h4]:font-medium [&_h4]:mb-2 [&_h4]:mt-6 [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-foreground/80 [&_p]:mb-4 [&_ul]:text-sm [&_ul]:text-foreground/80 [&_ul]:mb-4 [&_ul]:pl-4 [&_ol]:text-sm [&_ol]:text-foreground/80 [&_ol]:mb-4 [&_ol]:pl-4 [&_li]:mb-1.5 [&_li]:leading-relaxed [&_strong]:text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_code]:text-xs [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:text-xs [&_pre]:overflow-x-auto [&_hr]:border-border/40 [&_hr]:my-6 [&_table]:w-full [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:pb-2 [&_th]:border-b [&_td]:text-sm [&_td]:py-1.5 [&_td]:border-b [&_td]:border-border/30 [&_blockquote]:border-l-2 [&_blockquote]:border-border/60 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground";
+  "prose prose-sm dark:prose-invert max-w-prose [&>h1:first-child]:hidden [&_h1]:text-lg [&_h1]:font-display [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-0 [&_h2]:font-display [&_h2]:text-[13px] [&_h2]:font-bold [&_h2]:tracking-tight [&_h2]:mb-3 [&_h2]:mt-8 [&_h2]:pt-6 [&_h2]:border-t [&_h2]:border-border/15 [&_h3]:text-[13px] [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-6 [&_h4]:text-[13px] [&_h4]:font-medium [&_h4]:mb-2 [&_h4]:mt-6 [&_p]:text-[13px] [&_p]:leading-relaxed [&_p]:text-foreground/80 [&_p]:mb-3 [&_ul]:text-[13px] [&_ul]:text-foreground/80 [&_ul]:mb-3 [&_ul]:pl-4 [&_ol]:text-[13px] [&_ol]:text-foreground/80 [&_ol]:mb-3 [&_ol]:pl-4 [&_li]:mb-1 [&_li]:leading-relaxed [&_strong]:text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_code]:text-[11px] [&_code]:font-mono [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:text-[11px] [&_pre]:font-mono [&_pre]:overflow-x-auto [&_hr]:border-border/30 [&_hr]:my-6 [&_table]:w-full [&_th]:text-left [&_th]:font-mono [&_th]:text-[10px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-muted-foreground [&_th]:pb-2 [&_th]:border-b [&_td]:text-[13px] [&_td]:py-1.5 [&_td]:border-b [&_td]:border-border/20 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/30 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground";
 
 function KnowledgeInlineEmpty({
   icon: Icon,
@@ -1015,14 +1015,12 @@ function SectionHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between px-5 py-4 lg:px-6">
+    <div className="flex items-center justify-between border-b border-border/20 px-5 py-4 lg:px-6">
       <div className="flex items-center gap-3">
-        <div className="flex size-9 items-center justify-center rounded-lg bg-accent">
-          <section.icon className="size-4.5" />
-        </div>
+        <section.icon className="size-4 text-primary" />
         <div>
-          <h2 className="text-base font-semibold">{section.label}</h2>
-          <p className="text-xs text-muted-foreground">{section.description}</p>
+          <h2 className="font-display text-sm font-bold tracking-tight">{section.label}</h2>
+          <p className="text-[11px] text-muted-foreground/70">{section.description}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -1038,7 +1036,7 @@ function SectionHeader({
               <span className="text-emerald-500">Saved</span>
             </>
           ) : fileExists ? (
-            <span className="text-muted-foreground/50">{section.filename}</span>
+            <span className="font-mono text-[10px] text-muted-foreground/40">{section.filename}</span>
           ) : null}
         </div>
         {children}
