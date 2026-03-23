@@ -166,10 +166,10 @@ export function ConnectionsWorkspace({
       <section className="min-w-0">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-[14px] font-semibold text-foreground">
+            <h2 className="font-display text-sm font-bold tracking-tight">
               Current connections
             </h2>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">
+            <p className="mt-0.5 text-[11px] text-muted-foreground/70">
               Manage default connections, models, and credentials.
             </p>
           </div>
@@ -207,25 +207,15 @@ export function ConnectionsWorkspace({
             No saved connections yet.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border/60 bg-card">
+          <div className="overflow-hidden rounded-lg border border-border/50 bg-card/80">
             <Table>
               <TableHeader>
-                <TableRow className="border-border/60 hover:bg-transparent">
-                  <TableHead className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
-                    Provider
-                  </TableHead>
-                  <TableHead className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
-                    Connection
-                  </TableHead>
-                  <TableHead className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
-                    Model
-                  </TableHead>
-                  <TableHead className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
-                    Updated
-                  </TableHead>
-                  <TableHead className="text-right text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/60">
-                    Actions
-                  </TableHead>
+                <TableRow className="border-border/50 bg-muted/30 hover:bg-muted/30">
+                  <TableHead>Provider</TableHead>
+                  <TableHead>Connection</TableHead>
+                  <TableHead>Model</TableHead>
+                  <TableHead>Updated</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -315,7 +305,7 @@ function ConnectionRow({
           {isUpdatingModel ? <LoaderCircleIcon className="size-3.5 animate-spin text-muted-foreground" /> : null}
         </div>
       </TableCell>
-      <TableCell className="text-[12px] text-muted-foreground/60">
+      <TableCell className="font-mono text-[11px] text-muted-foreground/60 tabular-nums">
         {formatDate(connection.updatedAt)}
       </TableCell>
       <TableCell className="text-right">

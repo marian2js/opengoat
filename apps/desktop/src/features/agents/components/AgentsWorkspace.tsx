@@ -384,17 +384,20 @@ export function AgentsWorkspace({
         </Card>
       ) : null}
 
-      <section className="rounded-lg border border-border/60 bg-card">
+      <section className="rounded-lg border border-border/50 bg-card/80">
         <div className="flex items-center justify-between gap-3 px-4 py-3 lg:px-5">
-          <div>
-            <h2 className="text-[14px] font-semibold text-foreground">
-              Agent library
-            </h2>
-            <p className="mt-0.5 text-[12px] text-muted-foreground">
-              {agents.length === 0
-                ? "No custom agents yet."
-                : formatAgentCount(agents.length)}
-            </p>
+          <div className="flex items-center gap-2.5">
+            <BotIcon className="size-3.5 text-primary" />
+            <div>
+              <h2 className="font-display text-sm font-bold tracking-tight">
+                Agent library
+              </h2>
+              <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/60">
+                {agents.length === 0
+                  ? "No custom agents yet"
+                  : formatAgentCount(agents.length)}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-1.5">
             <Button
@@ -482,7 +485,7 @@ export function AgentsWorkspace({
 
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                           <div className="grid gap-1">
-                            <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground/50">
+                            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
                               Provider
                             </span>
                             <span className="text-[12px] text-foreground">
@@ -491,7 +494,7 @@ export function AgentsWorkspace({
                           </div>
 
                           <label className="grid gap-1">
-                            <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground/50">
+                            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
                               Model
                             </span>
                             <div className="flex items-center gap-1.5">
@@ -529,7 +532,7 @@ export function AgentsWorkspace({
                           </label>
 
                           <div className="grid gap-1">
-                            <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground/50">
+                            <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
                               Updated
                             </span>
                             <span className="text-[12px] text-muted-foreground">
@@ -596,7 +599,7 @@ export function AgentsWorkspace({
 
                   <div className="grid gap-2.5 text-[12px] text-muted-foreground sm:grid-cols-2 lg:grid-cols-1">
                     <div className="grid gap-1">
-                      <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground/50">
+                      <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
                         Provider
                       </span>
                       <span className="text-[12px] text-foreground">
@@ -605,7 +608,7 @@ export function AgentsWorkspace({
                     </div>
 
                     <label className="grid gap-1">
-                      <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground/50">
+                      <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
                         Model
                       </span>
                       <div className="flex items-center gap-1.5">
