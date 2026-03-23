@@ -806,6 +806,104 @@ export type ArtifactListPage = z.infer<typeof artifactListPageSchema>;
 export type BundleRecord = z.infer<typeof bundleRecordSchema>;
 export type CreateBundleRequest = z.infer<typeof createBundleRequestSchema>;
 
+// --- Memory ---
+
+export const projectMemoryCategorySchema = z.enum([
+  "brand_voice",
+  "product_facts",
+  "icp_facts",
+  "competitors",
+  "channels_tried",
+  "channels_to_avoid",
+  "founder_preferences",
+  "approval_preferences",
+  "messaging_constraints",
+  "legal_compliance",
+  "team_process",
+]);
+
+export const objectiveMemoryCategorySchema = z.enum([
+  "current_goal",
+  "success_definition",
+  "already_tried",
+  "avoid",
+  "current_best_hypothesis",
+  "review_notes",
+  "final_decisions",
+  "open_questions",
+]);
+
+export const memoryCategorySchema = z.union([
+  projectMemoryCategorySchema,
+  objectiveMemoryCategorySchema,
+]);
+
+export const memoryScopeSchema = z.enum(["project", "objective"]);
+
+export const memoryRecordSchema = z.object({
+  memoryId: z.string().min(1),
+  projectId: z.string().min(1),
+  objectiveId: z.string().nullable(),
+  category: memoryCategorySchema,
+  scope: memoryScopeSchema,
+  content: z.string().min(1),
+  source: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+  createdBy: z.string().min(1),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  userConfirmed: z.boolean(),
+  supersedes: z.string().nullable(),
+  replacedBy: z.string().nullable(),
+});
+
+export const createMemoryRequestSchema = z.object({
+  projectId: z.string().min(1),
+  category: memoryCategorySchema,
+  scope: memoryScopeSchema,
+  content: z.string().min(1),
+  source: z.string().min(1),
+  createdBy: z.string().min(1),
+  objectiveId: z.string().min(1).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  userConfirmed: z.boolean().optional(),
+  supersedes: z.string().min(1).optional(),
+});
+
+export const updateMemoryRequestSchema = z.object({
+  content: z.string().min(1).optional(),
+  confidence: z.number().min(0).max(1).optional(),
+  userConfirmed: z.boolean().optional(),
+});
+
+export const listMemoriesQuerySchema = z.object({
+  projectId: z.string().min(1),
+  objectiveId: z.string().min(1).optional(),
+  category: memoryCategorySchema.optional(),
+  scope: memoryScopeSchema.optional(),
+  activeOnly: z.boolean().optional(),
+});
+
+export const deleteMemoryRequestSchema = z.object({});
+
+export const resolveConflictRequestSchema = z.object({
+  keepMemoryId: z.string().min(1),
+  replaceMemoryId: z.string().min(1),
+});
+
+export const memoryListSchema = z.array(memoryRecordSchema);
+
+export type ProjectMemoryCategory = z.infer<typeof projectMemoryCategorySchema>;
+export type ObjectiveMemoryCategory = z.infer<typeof objectiveMemoryCategorySchema>;
+export type MemoryCategory = z.infer<typeof memoryCategorySchema>;
+export type MemoryScope = z.infer<typeof memoryScopeSchema>;
+export type MemoryRecord = z.infer<typeof memoryRecordSchema>;
+export type CreateMemoryRequest = z.infer<typeof createMemoryRequestSchema>;
+export type UpdateMemoryRequest = z.infer<typeof updateMemoryRequestSchema>;
+export type ListMemoriesQuery = z.infer<typeof listMemoriesQuerySchema>;
+export type DeleteMemoryRequest = z.infer<typeof deleteMemoryRequestSchema>;
+export type ResolveConflictRequest = z.infer<typeof resolveConflictRequestSchema>;
+
 export const appManifest = appManifestSchema.parse(appManifestJson);
 
 export function createBasicAuthHeader(
