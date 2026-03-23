@@ -88,7 +88,7 @@ function DashboardContent({
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
       {/* Company context — ultra-compact header strip */}
-      <div className="mb-5 border-b border-border/30 pb-3">
+      <div className="mb-6 border-b border-border/20 pb-4">
         <CompanySummary
           data={data}
           domain={domain}
@@ -99,7 +99,7 @@ function DashboardContent({
       </div>
 
       {/* Action cards — the hero area */}
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-8">
         <ActionCardGrid
           completedActions={completedActions}
           isLoading={isActionLoading}
@@ -117,7 +117,7 @@ function DashboardContent({
       </div>
 
       {/* Board summary — compact task status strip */}
-      <div className="mt-6 border-t border-border/20">
+      <div className="mt-8 border-t border-border/20">
         <BoardSummary
           counts={boardSummary.counts}
           isLoading={boardSummary.isLoading}
@@ -126,7 +126,7 @@ function DashboardContent({
       </div>
 
       {/* Insights — supporting info */}
-      <div className="border-t border-border/20 pt-5">
+      <div className="border-t border-border/20 pt-6">
         <OpportunitySection
           completedActions={completedActions}
           files={files}

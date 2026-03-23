@@ -25,12 +25,12 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
 
   return (
     <Card
-      className={`group/action relative flex flex-col overflow-hidden border transition-all duration-100 before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-primary before:opacity-0 before:transition-opacity ${
+      className={`group/action relative flex flex-col overflow-hidden border transition-all duration-100 ${
         isLoading
           ? "pointer-events-none border-border/50 bg-card/60 opacity-60"
           : isCompleted
-            ? "cursor-pointer border-primary/20 bg-card/90 hover:border-primary/30 hover:shadow-sm hover:before:opacity-100"
-            : "cursor-pointer border-border/50 bg-card/90 hover:-translate-y-px hover:border-primary/30 hover:shadow-md hover:shadow-primary/5 hover:before:opacity-100"
+            ? "cursor-pointer border-primary/20 bg-card/90 hover:border-primary/30 hover:shadow-sm"
+            : "cursor-pointer border-border/50 bg-card/90 hover:-translate-y-px hover:border-primary/30 hover:shadow-md hover:shadow-primary/5"
       }`}
       onClick={() => {
         if (!isLoading) {
@@ -42,7 +42,9 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
         }
       }}
     >
-      <CardHeader className="flex-1">
+      {/* Category accent — thin left border for visual differentiation */}
+      <div className={`absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] ${config.accentColor} ${isCompleted ? "opacity-40" : "opacity-60 group-hover/action:opacity-100"} transition-opacity`} />
+      <CardHeader className="flex-1 pl-5">
         <div className="flex items-center gap-2">
           <Badge variant="outline" className={`text-[10px] ${config.className}`}>
             {config.label}
@@ -76,7 +78,7 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
           </div>
         </CardAction>
       </CardHeader>
-      <div className="flex items-center gap-3 border-t border-border/30 px-4 py-2.5">
+      <div className="flex items-center gap-3 border-t border-border/30 py-2.5 pl-5 pr-4">
         {isLoading ? (
           <span className="animate-pulse font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Starting...</span>
         ) : isCompleted ? (

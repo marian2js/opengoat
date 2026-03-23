@@ -59,20 +59,20 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
       <div className="relative z-10 py-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-              <ClipboardListIcon className="size-4 text-muted-foreground" />
-              <span className="font-display font-bold">Board</span>
+            <div className="flex items-center gap-2">
+              <ClipboardListIcon className="size-3.5 text-primary" />
+              <h2 className="section-label">Board</h2>
             </div>
-            <span className="text-sm text-muted-foreground">
-              No active tasks — tasks will appear here when created through actions or chat.
+            <span className="text-xs text-muted-foreground/60">
+              No active tasks yet
             </span>
           </div>
           <a
             href="#board"
-            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            className="group/link inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
           >
             View Board
-            <ArrowRightIcon className="size-3" />
+            <ArrowRightIcon className="size-3 transition-transform group-hover/link:translate-x-0.5" />
           </a>
         </div>
       </div>
@@ -80,34 +80,38 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
   }
 
   const pills = getPills(counts);
+  const total = counts.open + counts.blocked + counts.done;
 
   return (
     <div className="relative z-10 py-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-            <ClipboardListIcon className="size-4 text-muted-foreground" />
-            <span className="font-display font-bold">Board</span>
-          </div>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {pills.map((pill) => (
-              <span
-                key={pill.label}
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-medium tracking-wider ${pill.className}`}
-              >
-                <span className="tabular-nums">{pill.value}</span>
-                <span>{pill.label}</span>
-              </span>
-            ))}
+            <ClipboardListIcon className="size-3.5 text-primary" />
+            <h2 className="section-label">Board</h2>
+            <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+              {total}
+            </span>
           </div>
+          <a
+            href="#board"
+            className="group/link inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+          >
+            View Board
+            <ArrowRightIcon className="size-3 transition-transform group-hover/link:translate-x-0.5" />
+          </a>
         </div>
-        <a
-          href="#board"
-          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          View Board
-          <ArrowRightIcon className="size-3" />
-        </a>
+        <div className="flex items-center gap-2">
+          {pills.map((pill) => (
+            <span
+              key={pill.label}
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-medium tracking-wider ${pill.className}`}
+            >
+              <span className="tabular-nums">{pill.value}</span>
+              <span>{pill.label}</span>
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );

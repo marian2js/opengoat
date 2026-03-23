@@ -31,37 +31,43 @@ export interface ActionCard {
 
 export const categoryConfig: Record<
   ActionCategory,
-  { label: string; className: string }
+  { label: string; className: string; accentColor: string }
 > = {
   conversion: {
     label: "Conversion",
     className:
       "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400",
+    accentColor: "bg-rose-500",
   },
   distribution: {
     label: "Distribution",
     className:
       "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-400",
+    accentColor: "bg-blue-500",
   },
   growth: {
     label: "Growth",
     className:
       "border-teal-500/20 bg-teal-500/10 text-teal-700 dark:text-teal-400",
+    accentColor: "bg-teal-500",
   },
   messaging: {
     label: "Messaging",
     className:
       "border-purple-500/20 bg-purple-500/10 text-purple-700 dark:text-purple-400",
+    accentColor: "bg-purple-500",
   },
   research: {
     label: "Research",
     className:
       "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    accentColor: "bg-amber-500",
   },
   seo: {
     label: "SEO",
     className:
       "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    accentColor: "bg-emerald-500",
   },
 };
 
