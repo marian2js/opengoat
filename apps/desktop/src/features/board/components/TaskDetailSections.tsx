@@ -8,7 +8,7 @@ import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+    <h4 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
       {children}
     </h4>
   );
@@ -20,7 +20,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 export function TaskBlockersSection({ blockers }: { blockers: string[] }) {
   return (
-    <div className="border-t pt-4">
+    <div className="border-t border-border/40 pt-4">
       <SectionHeading>Blockers</SectionHeading>
       {blockers.length === 0 ? (
         <p className="text-xs text-muted-foreground/60">No blockers</p>
@@ -48,7 +48,7 @@ export function TaskArtifactsSection({
   artifacts: TaskEntry[];
 }) {
   return (
-    <div className="border-t pt-4">
+    <div className="border-t border-border/40 pt-4">
       <SectionHeading>Artifacts</SectionHeading>
       {artifacts.length === 0 ? (
         <p className="text-xs text-muted-foreground/60">No artifacts</p>
@@ -77,7 +77,7 @@ export function TaskArtifactsSection({
 
 export function TaskWorklogSection({ worklog }: { worklog: TaskEntry[] }) {
   return (
-    <div className="border-t pt-4">
+    <div className="border-t border-border/40 pt-4">
       <SectionHeading>Worklog</SectionHeading>
       {worklog.length === 0 ? (
         <p className="text-xs text-muted-foreground/60">No worklog entries</p>

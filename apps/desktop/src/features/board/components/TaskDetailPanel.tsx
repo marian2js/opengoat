@@ -107,16 +107,16 @@ export function TaskDetailPanel({
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground/60">
                     <span className="inline-flex items-center gap-1">
                       <UserIcon className="size-3" />
                       {task.assignedTo || "Unassigned"}
                     </span>
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1 font-mono tabular-nums">
                       <CalendarIcon className="size-3" />
                       Created {formatRelativeTime(task.createdAt)}
                     </span>
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1 font-mono tabular-nums">
                       <CalendarIcon className="size-3" />
                       Updated {formatRelativeTime(task.updatedAt)}
                     </span>
@@ -127,8 +127,8 @@ export function TaskDetailPanel({
 
             <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4">
               {/* Description */}
-              <div className="border-t pt-4">
-                <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <div className="border-t border-border/40 pt-4">
+                <h4 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
                   Description
                 </h4>
                 {task.description ? (
