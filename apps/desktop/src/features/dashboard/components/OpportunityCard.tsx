@@ -31,46 +31,52 @@ export function OpportunityCard({ completedActions, opportunity, onActionClick, 
     <div
       role="button"
       tabIndex={0}
-      className="group/insight flex flex-col gap-2 rounded-lg border border-border/50 bg-card/60 px-4 py-3 transition-all duration-150 hover:border-primary/30 hover:bg-card/80 cursor-pointer"
+      className="group/insight flex flex-col rounded-lg border border-border/50 bg-card/80 transition-all duration-150 hover:-translate-y-px hover:border-primary/30 hover:shadow-sm cursor-pointer"
       onClick={handleCardClick}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleCardClick(); } }}
     >
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-sm font-semibold leading-snug text-foreground group-hover/insight:text-primary transition-colors">
-          {opportunity.title}
-        </h3>
-        <Badge
-          variant="outline"
-          className={`shrink-0 text-[10px] ${config.className}`}
-        >
-          {config.label}
-        </Badge>
+      <div className="flex flex-1 flex-col gap-2 px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-[13px] font-semibold leading-snug text-foreground transition-colors group-hover/insight:text-primary">
+            {opportunity.title}
+          </h3>
+          <Badge
+            variant="outline"
+            className={`shrink-0 text-[10px] ${config.className}`}
+          >
+            {config.label}
+          </Badge>
+        </div>
+        <p className="border-l-2 border-border/30 pl-2 text-[11px] leading-relaxed text-muted-foreground/70 line-clamp-2">
+          {opportunity.explanation}
+        </p>
       </div>
-      <p className="text-xs leading-relaxed text-muted-foreground line-clamp-2 opacity-80 border-l-2 border-border/30 pl-2">
-        {opportunity.explanation}
-      </p>
-      {relatedAction && isRelatedCompleted && onViewResults ? (
-        <button
-          type="button"
-          className="group/link mt-1 inline-flex w-fit items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1 text-xs font-semibold text-emerald-600 transition-colors hover:bg-emerald-500/10 hover:border-emerald-500/30 dark:text-emerald-400 dark:border-emerald-400/20 dark:bg-emerald-400/5 dark:hover:bg-emerald-400/10 dark:hover:border-emerald-400/30"
-          onClick={(e) => { e.stopPropagation(); onViewResults(relatedAction.id); }}
-        >
-          <CheckCircleIcon className="size-3" />
-          <span>View results</span>
-          <ArrowRightIcon className="size-3.5 transition-transform group-hover/link:translate-x-0.5" />
-        </button>
-      ) : relatedAction && onActionClick ? (
-        <button
-          type="button"
-          className="group/link mt-1 inline-flex w-fit items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10 hover:border-primary/30 transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-            onActionClick(relatedAction.id, buildActionPrompt(relatedAction), relatedAction.title);
-          }}
-        >
-          <span>{relatedAction.title}</span>
-          <ArrowRightIcon className="size-3.5 transition-transform group-hover/link:translate-x-0.5" />
-        </button>
+      {relatedAction ? (
+        <div className="border-t border-border/30 px-4 py-2">
+          {isRelatedCompleted && onViewResults ? (
+            <button
+              type="button"
+              className="group/link inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-emerald-600 transition-colors hover:text-emerald-500 dark:text-emerald-400"
+              onClick={(e) => { e.stopPropagation(); onViewResults(relatedAction.id); }}
+            >
+              <CheckCircleIcon className="size-3" />
+              <span>View results</span>
+              <ArrowRightIcon className="size-3 transition-transform group-hover/link:translate-x-0.5" />
+            </button>
+          ) : onActionClick ? (
+            <button
+              type="button"
+              className="group/link inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 transition-colors hover:text-primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                onActionClick(relatedAction.id, buildActionPrompt(relatedAction), relatedAction.title);
+              }}
+            >
+              <span>{relatedAction.title}</span>
+              <ArrowRightIcon className="size-3 transition-transform group-hover/link:translate-x-0.5" />
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

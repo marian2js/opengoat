@@ -25,12 +25,12 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
 
   return (
     <Card
-      className={`group/action relative overflow-hidden border bg-card/80 transition-all duration-100 before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-primary before:opacity-0 before:transition-opacity ${
+      className={`group/action relative flex flex-col overflow-hidden border transition-all duration-100 before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-primary before:opacity-0 before:transition-opacity ${
         isLoading
-          ? "pointer-events-none border-border/50 opacity-60"
+          ? "pointer-events-none border-border/50 bg-card/60 opacity-60"
           : isCompleted
-            ? "cursor-pointer border-primary/20 hover:border-primary/30 hover:shadow-sm hover:before:opacity-100"
-            : "cursor-pointer border-border/50 hover:-translate-y-px hover:border-primary/30 hover:shadow-sm hover:before:opacity-100"
+            ? "cursor-pointer border-primary/20 bg-card/90 hover:border-primary/30 hover:shadow-sm hover:before:opacity-100"
+            : "cursor-pointer border-border/50 bg-card/90 hover:-translate-y-px hover:border-primary/30 hover:shadow-md hover:shadow-primary/5 hover:before:opacity-100"
       }`}
       onClick={() => {
         if (!isLoading) {
@@ -42,7 +42,7 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
         }
       }}
     >
-      <CardHeader>
+      <CardHeader className="flex-1">
         <div className="flex items-center gap-2">
           <Badge variant="outline" className={`text-[10px] ${config.className}`}>
             {config.label}
@@ -54,7 +54,7 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
             </span>
           ) : null}
         </div>
-        <CardTitle className="text-sm leading-snug group-hover/action:text-primary transition-colors">
+        <CardTitle className="text-sm leading-snug transition-colors group-hover/action:text-primary">
           {card.title}
         </CardTitle>
         <CardDescription className="text-xs line-clamp-2">
@@ -76,18 +76,18 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
           </div>
         </CardAction>
       </CardHeader>
-      <div className="flex items-center gap-3 px-4 pb-3">
+      <div className="flex items-center gap-3 border-t border-border/30 px-4 py-2.5">
         {isLoading ? (
-          <span className="animate-pulse text-xs font-medium text-muted-foreground/70">Starting...</span>
+          <span className="animate-pulse font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Starting...</span>
         ) : isCompleted ? (
           <>
-            <span className="flex items-center gap-1 text-xs font-medium text-primary/80 transition-colors group-hover/action:text-primary">
+            <span className="flex items-center gap-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-primary/80 transition-colors group-hover/action:text-primary">
               View results
               <ArrowRightIcon className="size-3 transition-transform group-hover/action:translate-x-0.5" />
             </span>
             <button
               type="button"
-              className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+              className="flex items-center gap-1 font-mono text-[9px] font-medium uppercase tracking-wider text-muted-foreground/40 transition-colors hover:text-muted-foreground"
               onClick={(e) => {
                 e.stopPropagation();
                 onClick?.(card.id, buildActionPrompt(card), card.title);
@@ -98,8 +98,8 @@ export function ActionCardItem({ card, isCompleted, isLoading, onClick, onViewRe
             </button>
           </>
         ) : (
-          <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground/70 transition-colors group-hover/action:text-primary">
-            Start
+          <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 transition-colors group-hover/action:text-primary">
+            Run
             <ArrowRightIcon className="size-3 transition-transform group-hover/action:translate-x-0.5" />
           </span>
         )}

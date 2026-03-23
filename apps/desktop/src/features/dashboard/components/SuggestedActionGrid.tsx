@@ -17,7 +17,7 @@ function SuggestedSkeleton() {
       {[1, 2, 3].map((i) => (
         <div
           key={i}
-          className="h-[140px] animate-pulse rounded-xl border border-border/40 bg-muted/30"
+          className="h-[140px] animate-pulse rounded-xl border border-primary/10 bg-primary/[0.03]"
         />
       ))}
     </div>
@@ -36,13 +36,13 @@ export function SuggestedActionGrid({
   if (actions.length === 0 && !isGenerating) return null;
 
   return (
-    <section className="flex flex-col gap-4 border-t border-border/20 pt-6 rounded-xl bg-primary/[0.04] p-4 -mx-2">
+    <section className="flex flex-col gap-4 rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
       <div className="flex items-center gap-2">
         <WandSparklesIcon className="size-3.5 text-primary" />
         <h2 className="section-label">
           Suggested Actions
         </h2>
-        <span className="font-mono rounded-full border border-primary/20 bg-primary/8 px-1.5 py-px text-[9px] font-semibold tracking-wider text-primary uppercase">
+        <span className="rounded-full border border-primary/20 bg-primary/8 px-1.5 py-px font-mono text-[9px] font-semibold uppercase tracking-wider text-primary">
           AI
         </span>
       </div>
