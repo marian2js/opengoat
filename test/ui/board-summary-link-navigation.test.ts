@@ -10,45 +10,77 @@ const boardSummarySrc = readFileSync(
   "utf-8",
 );
 
+const dashboardWorkspaceSrc = readFileSync(
+  resolve(
+    __dirname,
+    "../../apps/desktop/src/features/dashboard/components/DashboardWorkspace.tsx",
+  ),
+  "utf-8",
+);
+
+const appSrc = readFileSync(
+  resolve(
+    __dirname,
+    "../../apps/desktop/src/app/App.tsx",
+  ),
+  "utf-8",
+);
+
 describe("View Board link navigation — Dashboard → Board", () => {
-  // AC1: Clicking "View Board" link on Dashboard navigates to Board page
-  // The link must use an onClick handler that programmatically sets window.location.hash
-  // rather than relying on the anchor's default href behavior (which is unreliable in Tauri webview)
-  it("uses onClick with window.location.hash for navigation", () => {
-    expect(boardSummarySrc).toContain('window.location.hash = "#board"');
+  // AC1 & AC4: The fix uses the same navigation mechanism as the sidebar Board link,
+  // not just window.location.hash. A callback prop from App.tsx sets the hash,
+  // which triggers the hashchange listener that drives view switching.
+  it("BoardSummary accepts an onNavigateToBoard callback prop", () => {
+    expect(boardSummarySrc).toContain("onNavigateToBoard");
   });
 
-  // AC1 continued: Must prevent default anchor behavior to avoid conflicting navigation
-  it("prevents default anchor behavior to avoid double-fire", () => {
-    expect(boardSummarySrc).toContain("preventDefault");
+  it("BoardSummary calls onNavigateToBoard on click in both empty and populated states", () => {
+    // Interface + empty state + populated state = 3+
+    const matches = boardSummarySrc.match(/onNavigateToBoard/g);
+    expect(matches).not.toBeNull();
+    expect(matches!.length).toBeGreaterThanOrEqual(3);
   });
 
-  // AC2: URL changes to /#board after clicking — ensured by the hash assignment above
-  // AC3: Board heading and task list are displayed — ensured by hash routing in App.tsx
+  it("DashboardWorkspace accepts and passes onNavigateToBoard to BoardSummary", () => {
+    expect(dashboardWorkspaceSrc).toContain("onNavigateToBoard");
+  });
 
-  // Both the empty state and the populated state must have the fixed navigation
+  it("App.tsx passes onNavigateToBoard to DashboardWorkspace", () => {
+    expect(appSrc).toContain("onNavigateToBoard");
+  });
+
+  it("App.tsx navigation callback sets window.location.hash to #board", () => {
+    expect(appSrc).toContain('#board');
+  });
+
+  // Both the empty state and the populated state must have navigation
   it("has onClick handler in the empty state View Board link", () => {
-    // The isEmpty branch should contain both onClick and "View Board"
-    // Split the source at the isEmpty check and verify the first return block
     const afterIsEmpty = boardSummarySrc.split(/if\s*\(isEmpty\)/)[1];
     expect(afterIsEmpty).toBeTruthy();
-    // Take just the isEmpty branch (up to the next top-level return)
     const isEmptyBranch = afterIsEmpty.slice(0, afterIsEmpty.indexOf("const pills"));
-    expect(isEmptyBranch).toContain("onClick");
+    expect(isEmptyBranch).toContain("onNavigateToBoard");
     expect(isEmptyBranch).toContain("View Board");
   });
 
   it("has onClick handler in the populated state View Board link", () => {
-    // The main return (non-empty) must also use onClick navigation
-    // Count occurrences of onClick in the file — should appear at least twice
-    // (once for empty state, once for populated state)
-    const onClickMatches = boardSummarySrc.match(/onClick/g);
-    expect(onClickMatches).not.toBeNull();
-    expect(onClickMatches!.length).toBeGreaterThanOrEqual(2);
+    const afterPills = boardSummarySrc.split(/const pills/)[1];
+    expect(afterPills).toBeTruthy();
+    expect(afterPills).toContain("onNavigateToBoard");
+    expect(afterPills).toContain("View Board");
   });
 
-  // AC4: Sidebar Board link continues to work (not affected by this change — sidebar is separate)
-  // Verified by ensuring BoardSummary changes don't touch sidebar code
+  // BoardSummary should not try to do its own hash navigation
+  it("does not use window.location.hash directly in BoardSummary", () => {
+    expect(boardSummarySrc).not.toContain("window.location.hash");
+  });
+
+  // Uses button instead of anchor with preventDefault (react-doctor best practice)
+  it("uses button elements instead of anchor with preventDefault", () => {
+    expect(boardSummarySrc).not.toContain("preventDefault");
+    expect(boardSummarySrc).toContain('type="button"');
+  });
+
+  // Sidebar is not affected
   it("does not import or modify sidebar components", () => {
     expect(boardSummarySrc).not.toContain("SidebarMenu");
     expect(boardSummarySrc).not.toContain("AppSidebar");

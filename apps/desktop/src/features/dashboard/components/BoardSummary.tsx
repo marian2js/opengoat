@@ -6,6 +6,7 @@ export interface BoardSummaryProps {
   counts: BoardCounts;
   isLoading: boolean;
   isEmpty: boolean;
+  onNavigateToBoard?: (() => void) | undefined;
 }
 
 interface CountPill {
@@ -34,7 +35,7 @@ function getPills(counts: BoardCounts): CountPill[] {
   ];
 }
 
-export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) {
+export function BoardSummary({ counts, isLoading, isEmpty, onNavigateToBoard }: BoardSummaryProps) {
   if (isLoading) {
     return (
       <div className="py-5">
@@ -67,17 +68,14 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
               No active tasks — tasks will appear here when created through actions or chat.
             </span>
           </div>
-          <a
-            href="#board"
-            onClick={(e) => {
-              e.preventDefault();
-              window.location.hash = "#board";
-            }}
+          <button
+            type="button"
+            onClick={() => onNavigateToBoard?.()}
             className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             View Board
             <ArrowRightIcon className="size-3" />
-          </a>
+          </button>
         </div>
       </div>
     );
@@ -105,17 +103,14 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
             ))}
           </div>
         </div>
-        <a
-          href="#board"
-          onClick={(e) => {
-            e.preventDefault();
-            window.location.hash = "#board";
-          }}
+        <button
+          type="button"
+          onClick={() => onNavigateToBoard?.()}
           className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           View Board
           <ArrowRightIcon className="size-3" />
-        </a>
+        </button>
       </div>
     </div>
   );
