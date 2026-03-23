@@ -1,6 +1,8 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskDetail } from "@/features/board/hooks/useTaskDetail";
+import { useLinkedEntities } from "@/features/board/hooks/useLinkedEntities";
+import { computeSuggestedAction } from "@/features/board/lib/suggested-action";
 import {
   Sheet,
   SheetContent,
@@ -16,6 +18,11 @@ import {
   TaskArtifactsSection,
   TaskWorklogSection,
 } from "./TaskDetailSections";
+import { LinkedObjectiveSection } from "./LinkedObjectiveSection";
+import { LinkedRunSection } from "./LinkedRunSection";
+import { LinkedArtifactsSection } from "./LinkedArtifactsSection";
+import { RelatedSignalsSection } from "./RelatedSignalsSection";
+import { SuggestedNextAction } from "./SuggestedNextAction";
 import { TaskQuickActions } from "./TaskQuickActions";
 import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
 import { AlertCircleIcon, RefreshCwIcon, UserIcon, CalendarIcon } from "lucide-react";
@@ -39,6 +46,13 @@ export function TaskDetailPanel({
   const { task, isLoading, error, refresh } = useTaskDetail(
     open ? taskId : null,
     client,
+  );
+
+  const linked = useLinkedEntities(task, client);
+
+  const suggestion = useMemo(
+    () => (task ? computeSuggestedAction(task, linked.artifacts, linked.signals) : null),
+    [task, linked.artifacts, linked.signals],
   );
 
   const handleStatusChange = useCallback(
@@ -142,9 +156,19 @@ export function TaskDetailPanel({
                 )}
               </div>
 
+              <LinkedObjectiveSection objective={linked.objective} />
+              <LinkedRunSection run={linked.run} />
+              <LinkedArtifactsSection artifacts={linked.artifacts} />
+              <RelatedSignalsSection
+                signals={linked.signals}
+                objectiveId={task.objectiveId}
+              />
+
               <TaskBlockersSection blockers={task.blockers} />
               <TaskArtifactsSection artifacts={task.artifacts} />
               <TaskWorklogSection worklog={task.worklog} />
+
+              <SuggestedNextAction suggestion={suggestion} />
             </div>
 
             <SheetFooter className="border-t pt-3">

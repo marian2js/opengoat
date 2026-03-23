@@ -29,7 +29,7 @@ function makeTask(overrides: Partial<TaskRecord> & { taskId: string; status: str
 
 void test("computeBoardCounts: returns zero counts for empty array", () => {
   const counts = computeBoardCounts([]);
-  assert.deepEqual(counts, { open: 0, doing: 0, blocked: 0, done: 0, total: 0 });
+  assert.deepEqual(counts, { open: 0, doing: 0, blocked: 0, pending: 0, done: 0, total: 0 });
 });
 
 void test("computeBoardCounts: counts todo tasks as open", () => {
@@ -80,14 +80,29 @@ void test("computeBoardCounts: handles mixed statuses correctly", () => {
   assert.equal(counts.total, 8);
 });
 
-void test("computeBoardCounts: pending tasks count toward total but not open/doing/blocked/done", () => {
+void test("computeBoardCounts: pending tasks tracked in pending count", () => {
   const tasks = [makeTask({ taskId: "1", status: "pending" })];
   const counts = computeBoardCounts(tasks);
   assert.equal(counts.open, 0);
   assert.equal(counts.doing, 0);
   assert.equal(counts.blocked, 0);
+  assert.equal(counts.pending, 1);
   assert.equal(counts.done, 0);
   assert.equal(counts.total, 1);
+});
+
+void test("computeBoardCounts: mixed statuses include pending count", () => {
+  const tasks = [
+    makeTask({ taskId: "1", status: "todo" }),
+    makeTask({ taskId: "2", status: "pending" }),
+    makeTask({ taskId: "3", status: "pending" }),
+    makeTask({ taskId: "4", status: "done" }),
+  ];
+  const counts = computeBoardCounts(tasks);
+  assert.equal(counts.open, 1);
+  assert.equal(counts.pending, 2);
+  assert.equal(counts.done, 1);
+  assert.equal(counts.total, 4);
 });
 
 void test("computeBoardCounts: unknown statuses count toward total only", () => {

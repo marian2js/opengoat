@@ -7,6 +7,8 @@ export interface BoardCounts {
   doing: number;
   /** Tasks with status "blocked" */
   blocked: number;
+  /** Tasks with status "pending" */
+  pending: number;
   /** Tasks with status "done" */
   done: number;
   /** Total number of tasks */
@@ -17,6 +19,7 @@ export function computeBoardCounts(tasks: TaskRecord[]): BoardCounts {
   let open = 0;
   let doing = 0;
   let blocked = 0;
+  let pending = 0;
   let done = 0;
 
   for (const task of tasks) {
@@ -31,11 +34,14 @@ export function computeBoardCounts(tasks: TaskRecord[]): BoardCounts {
       case "blocked":
         blocked++;
         break;
+      case "pending":
+        pending++;
+        break;
       case "done":
         done++;
         break;
     }
   }
 
-  return { open, doing, blocked, done, total: tasks.length };
+  return { open, doing, blocked, pending, done, total: tasks.length };
 }

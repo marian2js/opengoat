@@ -45,10 +45,10 @@ describe("View Board anchor navigation — Dashboard → Board", () => {
     expect(boardSummarySrc).not.toContain("AppSidebar");
   });
 
-  // Uses native <a> tags for the View Board links
-  it("renders exactly two anchor elements for View Board", () => {
+  // Uses native <a> tags for the View Board links + optional active objective link
+  it("renders anchor elements for View Board and active objective", () => {
     const anchorMatches = boardSummarySrc.match(/<a\s/g);
     expect(anchorMatches).not.toBeNull();
-    expect(anchorMatches!.length).toBe(2);
+    expect(anchorMatches!.length).toBe(3); // 2 View Board + 1 active objective
   });
 });

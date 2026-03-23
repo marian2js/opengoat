@@ -8,7 +8,7 @@ export interface UseBoardSummaryResult {
   isEmpty: boolean;
 }
 
-const ZERO_COUNTS: BoardCounts = { open: 0, doing: 0, blocked: 0, done: 0, total: 0 };
+const ZERO_COUNTS: BoardCounts = { open: 0, doing: 0, blocked: 0, pending: 0, done: 0, total: 0 };
 
 export function useBoardSummary(
   agentId: string,

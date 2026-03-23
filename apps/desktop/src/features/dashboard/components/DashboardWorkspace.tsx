@@ -238,6 +238,10 @@ function DashboardContent({
           counts={boardSummary.counts}
           isLoading={boardSummary.isLoading}
           isEmpty={boardSummary.isEmpty}
+          activeObjective={activeObjective.objective ? {
+            objectiveId: activeObjective.objective.objectiveId,
+            title: activeObjective.objective.title,
+          } : null}
         />
       </div>
 

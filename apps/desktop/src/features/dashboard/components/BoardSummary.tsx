@@ -1,11 +1,17 @@
-import { ClipboardListIcon, ArrowRightIcon } from "lucide-react";
+import { ClipboardListIcon, ArrowRightIcon, TargetIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BoardCounts } from "@/features/dashboard/lib/compute-board-counts";
+
+export interface ActiveObjectiveInfo {
+  objectiveId: string;
+  title: string;
+}
 
 export interface BoardSummaryProps {
   counts: BoardCounts;
   isLoading: boolean;
   isEmpty: boolean;
+  activeObjective?: ActiveObjectiveInfo | null;
 }
 
 interface CountPill {
@@ -27,6 +33,11 @@ function getPills(counts: BoardCounts): CountPill[] {
       className: "bg-destructive/10 text-destructive dark:bg-red-900/20 dark:text-red-400",
     },
     {
+      label: "PENDING REVIEW",
+      value: counts.pending,
+      className: "bg-warning/10 text-warning dark:bg-amber-900/20 dark:text-amber-400",
+    },
+    {
       label: "DONE",
       value: counts.done,
       className: "bg-success/10 text-success dark:bg-green-900/20 dark:text-green-400",
@@ -34,7 +45,7 @@ function getPills(counts: BoardCounts): CountPill[] {
   ];
 }
 
-export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) {
+export function BoardSummary({ counts, isLoading, isEmpty, activeObjective }: BoardSummaryProps) {
   if (isLoading) {
     return (
       <div className="relative z-10 py-5">
@@ -80,7 +91,7 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
   }
 
   const pills = getPills(counts);
-  const total = counts.open + counts.blocked + counts.done;
+  const total = counts.open + counts.blocked + counts.pending + counts.done;
 
   return (
     <div className="relative z-10 py-5">
@@ -101,7 +112,7 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
             <ArrowRightIcon className="size-3 transition-transform group-hover/link:translate-x-0.5" />
           </a>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {pills.map((pill) => (
             <span
               key={pill.label}
@@ -112,6 +123,17 @@ export function BoardSummary({ counts, isLoading, isEmpty }: BoardSummaryProps) 
             </span>
           ))}
         </div>
+        {activeObjective && (
+          <div className="flex items-center gap-2">
+            <TargetIcon className="size-3 text-primary/60" />
+            <a
+              href={`#board?objective=${activeObjective.objectiveId}`}
+              className="text-xs text-muted-foreground hover:text-primary transition-colors truncate"
+            >
+              {activeObjective.title}
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );
