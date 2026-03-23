@@ -16,6 +16,7 @@ import {
   createAgentSessionRequestSchema,
   createArtifactRequestSchema,
   createBundleRequestSchema,
+  createMemoryRequestSchema,
   deleteAgentResponseSchema,
   createObjectiveRequestSchema,
   deleteTasksRequestSchema,
@@ -23,10 +24,13 @@ import {
   installSkillRequestSchema,
   installSkillResultSchema,
   listPlaybooksResponseSchema,
+  memoryListSchema,
+  memoryRecordSchema,
   objectiveListSchema,
   objectiveSchema,
   playbookManifestSchema,
   removeSkillResultSchema,
+  resolveConflictRequestSchema,
   skillListSchema,
   taskListPageSchema,
   taskRecordSchema,
@@ -34,6 +38,7 @@ import {
   updateAgentSessionRequestSchema,
   updateArtifactRequestSchema,
   updateArtifactStatusRequestSchema,
+  updateMemoryRequestSchema,
   updateObjectiveRequestSchema,
   updateTaskStatusRequestSchema,
   advanceRunPhaseRequestSchema,
@@ -70,7 +75,9 @@ import {
   type ChatBootstrap,
   type DeleteTasksResponse,
   type InstallSkillResultContract,
+  type CreateMemoryRequest,
   type ListPlaybooksResponse,
+  type MemoryRecord,
   type Objective,
   type PlaybookManifest,
   type ProviderModelCatalog,
@@ -806,6 +813,78 @@ export class SidecarClient {
     return z.array(artifactRecordSchema).parse(
       await this.request(`/bundles/${encodeURIComponent(bundleId)}`),
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Memory
+  // ---------------------------------------------------------------------------
+
+  async listMemories(params: {
+    projectId: string;
+    objectiveId?: string;
+    category?: string;
+    scope?: string;
+    activeOnly?: boolean;
+  }): Promise<MemoryRecord[]> {
+    const query = new URLSearchParams();
+    query.set("projectId", params.projectId);
+    if (params.objectiveId) {
+      query.set("objectiveId", params.objectiveId);
+    }
+    if (params.category) {
+      query.set("category", params.category);
+    }
+    if (params.scope) {
+      query.set("scope", params.scope);
+    }
+    if (params.activeOnly !== undefined) {
+      query.set("activeOnly", String(params.activeOnly));
+    }
+    const qs = query.toString();
+    return memoryListSchema.parse(await this.request(`/memories?${qs}`));
+  }
+
+  async getMemory(memoryId: string): Promise<MemoryRecord> {
+    return memoryRecordSchema.parse(
+      await this.request(`/memories/${encodeURIComponent(memoryId)}`),
+    );
+  }
+
+  async createMemory(payload: CreateMemoryRequest): Promise<MemoryRecord> {
+    return memoryRecordSchema.parse(
+      await this.request("/memories", {
+        body: JSON.stringify(createMemoryRequestSchema.parse(payload)),
+        method: "POST",
+      }),
+    );
+  }
+
+  async updateMemory(
+    memoryId: string,
+    payload: { content?: string; confidence?: number; userConfirmed?: boolean },
+  ): Promise<MemoryRecord> {
+    return memoryRecordSchema.parse(
+      await this.request(`/memories/${encodeURIComponent(memoryId)}`, {
+        body: JSON.stringify(updateMemoryRequestSchema.parse(payload)),
+        method: "PATCH",
+      }),
+    );
+  }
+
+  async deleteMemory(memoryId: string): Promise<void> {
+    await this.request(`/memories/${encodeURIComponent(memoryId)}`, {
+      method: "DELETE",
+    });
+  }
+
+  async resolveMemoryConflict(payload: {
+    keepMemoryId: string;
+    replaceMemoryId: string;
+  }): Promise<void> {
+    await this.request("/memories/conflicts/resolve", {
+      body: JSON.stringify(resolveConflictRequestSchema.parse(payload)),
+      method: "POST",
+    });
   }
 
   async deleteTasks(taskIds: string[]): Promise<DeleteTasksResponse> {

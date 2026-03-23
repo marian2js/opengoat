@@ -8,6 +8,7 @@ import { createArtifactRoutes, createBundleRoutes } from "./routes/artifacts.ts"
 import { createAuthRoutes } from "./routes/auth.ts";
 import { createChatRoutes } from "./routes/chat.ts";
 import { createGlobalRoutes } from "./routes/global.ts";
+import { createMemoryRoutes } from "./routes/memory.ts";
 import { createObjectiveRoutes } from "./routes/objectives.ts";
 import { createPlaybookRoutes } from "./routes/playbooks.ts";
 import { createRunRoutes } from "./routes/runs.ts";
@@ -78,6 +79,7 @@ export function createSidecarApp(runtime: SidecarRuntime): Hono<{
   app.route("/chat", createChatRoutes(runtime));
   app.route("/global", createGlobalRoutes(runtime));
   app.route("/auth", createAuthRoutes(runtime));
+  app.route("/memories", createMemoryRoutes(runtime));
   app.route("/objectives", createObjectiveRoutes(runtime));
   app.route("/playbooks", createPlaybookRoutes(runtime));
   app.route("/runs", createRunRoutes(runtime));

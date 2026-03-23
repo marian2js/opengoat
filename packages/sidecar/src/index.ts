@@ -4,6 +4,7 @@ import {
   ArtifactService,
   BoardService,
   BUILTIN_PLAYBOOKS,
+  MemoryService,
   NodeCommandRunner,
   NodeFileSystem,
   NodeOpenGoatPathsProvider,
@@ -85,6 +86,12 @@ export async function startSidecarServer(
     nowIso: () => new Date().toISOString(),
   });
 
+  const memoryService = new MemoryService({
+    fileSystem,
+    pathPort,
+    nowIso: () => new Date().toISOString(),
+  });
+
   const artifactService = new ArtifactService({
     fileSystem,
     pathPort,
@@ -105,6 +112,7 @@ export async function startSidecarServer(
     config,
     embeddedGateway,
     gatewaySupervisor,
+    memoryService,
     objectiveService,
     opengoatPaths,
     playbookRegistryService,
