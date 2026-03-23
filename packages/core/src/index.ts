@@ -16,6 +16,7 @@ export * from "./core/orchestration/index.js";
 export * from "./core/sessions/index.js";
 export * from "./core/scenarios/index.js";
 export * from "./core/skills/index.js";
+export * from "./core/playbooks/index.js";
 export * from "./core/acp/index.js";
 export * from "./core/logging/index.js";
 export * from "./apps/runtime/create-opengoat-runtime.js";

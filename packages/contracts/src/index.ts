@@ -467,6 +467,54 @@ export type AddTaskWorklogRequest = z.infer<typeof addTaskWorklogRequestSchema>;
 export type DeleteTasksRequest = z.infer<typeof deleteTasksRequestSchema>;
 export type DeleteTasksResponse = z.infer<typeof deleteTasksResponseSchema>;
 
+// --- Playbooks ---
+
+export const playbookSourceSchema = z.enum([
+  "builtin",
+  "installed",
+  "generated",
+  "organization-template",
+]);
+
+export const playbookPhaseSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().min(1),
+  expectedArtifacts: z.array(z.string()).optional(),
+});
+
+export const playbookManifestSchema = z.object({
+  playbookId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  idealFor: z.string().min(1),
+  goalTypes: z.array(z.string().min(1)).min(1),
+  requiredInputs: z.array(z.string()),
+  optionalInputs: z.array(z.string()),
+  skillRefs: z.array(z.string()),
+  defaultPhases: z.array(playbookPhaseSchema).min(1),
+  artifactTypes: z.array(z.string().min(1)).min(1),
+  taskPolicy: z.string().min(1),
+  approvalPolicy: z.string().min(1),
+  evaluationRubric: z.string().min(1),
+  version: z.string().min(1),
+  source: playbookSourceSchema,
+  /** Display-only: typical time to first deliverable */
+  timeToFirstValue: z.string().optional(),
+  /** Display-only: whether this playbook creates tracked work */
+  createsTrackedWork: z.boolean().optional(),
+});
+
+export const listPlaybooksResponseSchema = z.object({
+  playbooks: z.array(playbookManifestSchema),
+});
+
+export const getPlaybookResponseSchema = playbookManifestSchema;
+
+export type PlaybookSource = z.infer<typeof playbookSourceSchema>;
+export type PlaybookPhase = z.infer<typeof playbookPhaseSchema>;
+export type PlaybookManifest = z.infer<typeof playbookManifestSchema>;
+export type ListPlaybooksResponse = z.infer<typeof listPlaybooksResponseSchema>;
+
 export const appManifest = appManifestSchema.parse(appManifestJson);
 
 export function createBasicAuthHeader(

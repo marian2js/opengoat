@@ -15,6 +15,8 @@ import {
   deleteTasksResponseSchema,
   installSkillRequestSchema,
   installSkillResultSchema,
+  listPlaybooksResponseSchema,
+  playbookManifestSchema,
   removeSkillResultSchema,
   skillListSchema,
   taskListPageSchema,
@@ -47,6 +49,8 @@ import {
   type ChatBootstrap,
   type DeleteTasksResponse,
   type InstallSkillResultContract,
+  type ListPlaybooksResponse,
+  type PlaybookManifest,
   type ProviderModelCatalog,
   type RemoveSkillResultContract,
   type SavedConnection,
@@ -510,6 +514,22 @@ export class SidecarClient {
     return this.request(
       `/objectives/${encodeURIComponent(objectiveId)}/set-primary`,
       { method: "POST" },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Playbooks
+  // ---------------------------------------------------------------------------
+
+  async listPlaybooks(): Promise<ListPlaybooksResponse> {
+    return listPlaybooksResponseSchema.parse(
+      await this.request("/playbooks"),
+    );
+  }
+
+  async getPlaybook(playbookId: string): Promise<PlaybookManifest> {
+    return playbookManifestSchema.parse(
+      await this.request(`/playbooks/${encodeURIComponent(playbookId)}`),
     );
   }
 

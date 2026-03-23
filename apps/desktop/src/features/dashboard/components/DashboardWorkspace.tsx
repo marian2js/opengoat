@@ -5,6 +5,7 @@ import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
 import { OpportunitySection } from "@/features/dashboard/components/OpportunitySection";
+import { PlaybookLibrary } from "@/features/dashboard/components/PlaybookLibrary";
 import { SuggestedActionGrid } from "@/features/dashboard/components/SuggestedActionGrid";
 import { ActiveObjectiveSection } from "@/features/dashboard/components/ActiveObjectiveSection";
 import { ObjectiveComposerPrompt } from "@/features/dashboard/components/ObjectiveComposerPrompt";
@@ -13,6 +14,7 @@ import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSumm
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
 import { useBoardSummary } from "@/features/dashboard/hooks/useBoardSummary";
 import { useActiveObjective } from "@/features/dashboard/hooks/useActiveObjective";
+import { usePlaybooks } from "@/features/dashboard/hooks/usePlaybooks";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
 
 export interface DashboardWorkspaceProps {
@@ -90,6 +92,7 @@ function DashboardContent({
   const { suggestedActions, isLoading: isSuggestedLoading } = useSuggestedActions(agentId, client, workspaceReady);
   const boardSummary = useBoardSummary(agentId, client);
   const activeObjective = useActiveObjective(agentId, client);
+  const { playbooks, isLoading: isPlaybooksLoading } = usePlaybooks(client);
 
   // Sheet open state and prefill
   const [isCreationOpen, setIsCreationOpen] = useState(false);
@@ -150,7 +153,15 @@ function DashboardContent({
         />
       </div>
 
-      {/* Action cards — the hero area */}
+      {/* Playbook Library — primary action section */}
+      <div className="mb-8">
+        <PlaybookLibrary
+          playbooks={playbooks}
+          isLoading={isPlaybooksLoading}
+        />
+      </div>
+
+      {/* Quick actions — secondary */}
       <div className="flex flex-col gap-8">
         <ActionCardGrid
           completedActions={completedActions}

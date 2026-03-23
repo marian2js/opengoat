@@ -2,10 +2,12 @@ import { serve } from "@hono/node-server";
 import {
   AgentManifestService,
   BoardService,
+  BUILTIN_PLAYBOOKS,
   NodeCommandRunner,
   NodeFileSystem,
   NodeOpenGoatPathsProvider,
   NodePathPort,
+  PlaybookRegistryService,
   SkillService,
 } from "@opengoat/core";
 import packageJson from "../package.json" with { type: "json" };
@@ -68,6 +70,8 @@ export async function startSidecarServer(
     agentManifestService,
   });
 
+  const playbookRegistryService = new PlaybookRegistryService([...BUILTIN_PLAYBOOKS]);
+
   const runtime = {
     authService,
     authSessions: new RuntimeAuthSessionManager(() => authService, {
@@ -80,6 +84,7 @@ export async function startSidecarServer(
     embeddedGateway,
     gatewaySupervisor,
     opengoatPaths,
+    playbookRegistryService,
     skillService,
     startedAt: Date.now(),
     version: packageJson.version,
