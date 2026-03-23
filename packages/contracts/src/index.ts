@@ -904,6 +904,107 @@ export type ListMemoriesQuery = z.infer<typeof listMemoriesQuerySchema>;
 export type DeleteMemoryRequest = z.infer<typeof deleteMemoryRequestSchema>;
 export type ResolveConflictRequest = z.infer<typeof resolveConflictRequestSchema>;
 
+// --- Signals ---
+
+export const signalSourceTypeSchema = z.enum([
+  "web",
+  "competitor",
+  "community",
+  "seo",
+  "ai-search",
+  "workspace",
+]);
+
+export const signalImportanceSchema = z.enum([
+  "low",
+  "medium",
+  "high",
+  "critical",
+]);
+
+export const signalFreshnessSchema = z.enum([
+  "fresh",
+  "recent",
+  "aging",
+  "stale",
+]);
+
+export const signalStatusSchema = z.enum([
+  "new",
+  "seen",
+  "saved",
+  "promoted",
+  "dismissed",
+]);
+
+export const signalSchema = z.object({
+  signalId: z.string().min(1),
+  projectId: z.string().min(1),
+  objectiveId: z.string().optional(),
+  sourceType: signalSourceTypeSchema,
+  signalType: z.string().min(1),
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  evidence: z.string().optional(),
+  importance: signalImportanceSchema,
+  freshness: signalFreshnessSchema,
+  status: signalStatusSchema,
+  createdAt: z.string(),
+  updatedAt: z.string().optional(),
+});
+
+export const createSignalRequestSchema = z.object({
+  projectId: z.string().min(1),
+  sourceType: signalSourceTypeSchema,
+  signalType: z.string().min(1),
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  evidence: z.string().optional(),
+  importance: signalImportanceSchema,
+  freshness: signalFreshnessSchema,
+  objectiveId: z.string().min(1).optional(),
+});
+
+export const updateSignalStatusRequestSchema = z.object({
+  status: z.string().min(1),
+});
+
+export const listSignalsRequestSchema = z.object({
+  projectId: z.string().min(1),
+  objectiveId: z.string().min(1).optional(),
+  status: signalStatusSchema.optional(),
+  sourceType: signalSourceTypeSchema.optional(),
+  limit: z.number().int().positive().optional(),
+  offset: z.number().int().nonnegative().optional(),
+});
+
+export const promoteSignalRequestSchema = z.object({
+  targetObjectiveId: z.string().min(1).optional(),
+});
+
+export const dismissSignalRequestSchema = z.object({
+  reason: z.string().optional(),
+});
+
+export const signalListPageSchema = z.object({
+  items: z.array(signalSchema),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
+});
+
+export type SignalSourceType = z.infer<typeof signalSourceTypeSchema>;
+export type SignalImportance = z.infer<typeof signalImportanceSchema>;
+export type SignalFreshness = z.infer<typeof signalFreshnessSchema>;
+export type SignalStatus = z.infer<typeof signalStatusSchema>;
+export type Signal = z.infer<typeof signalSchema>;
+export type CreateSignalRequest = z.infer<typeof createSignalRequestSchema>;
+export type UpdateSignalStatusRequest = z.infer<typeof updateSignalStatusRequestSchema>;
+export type ListSignalsRequest = z.infer<typeof listSignalsRequestSchema>;
+export type PromoteSignalRequest = z.infer<typeof promoteSignalRequestSchema>;
+export type DismissSignalRequest = z.infer<typeof dismissSignalRequestSchema>;
+export type SignalListPage = z.infer<typeof signalListPageSchema>;
+
 export const appManifest = appManifestSchema.parse(appManifestJson);
 
 export function createBasicAuthHeader(

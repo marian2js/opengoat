@@ -13,6 +13,7 @@ export * from "./core/objectives/index.js";
 export * from "./core/artifacts/index.js";
 export * from "./core/runs/index.js";
 export * from "./core/memory/index.js";
+export * from "./core/signals/index.js";
 export * from "./core/providers/index.js";
 export * from "./core/projects/index.js";
 export * from "./core/opengoat/index.js";

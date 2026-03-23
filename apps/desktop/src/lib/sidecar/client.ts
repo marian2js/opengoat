@@ -17,10 +17,12 @@ import {
   createArtifactRequestSchema,
   createBundleRequestSchema,
   createMemoryRequestSchema,
+  createSignalRequestSchema,
   deleteAgentResponseSchema,
   createObjectiveRequestSchema,
   deleteTasksRequestSchema,
   deleteTasksResponseSchema,
+  dismissSignalRequestSchema,
   installSkillRequestSchema,
   installSkillResultSchema,
   listPlaybooksResponseSchema,
@@ -29,8 +31,11 @@ import {
   objectiveListSchema,
   objectiveSchema,
   playbookManifestSchema,
+  promoteSignalRequestSchema,
   removeSkillResultSchema,
   resolveConflictRequestSchema,
+  signalListPageSchema,
+  signalSchema,
   skillListSchema,
   taskListPageSchema,
   taskRecordSchema,
@@ -40,6 +45,7 @@ import {
   updateArtifactStatusRequestSchema,
   updateMemoryRequestSchema,
   updateObjectiveRequestSchema,
+  updateSignalStatusRequestSchema,
   updateTaskStatusRequestSchema,
   advanceRunPhaseRequestSchema,
   createRunRequestSchema,
@@ -85,6 +91,8 @@ import {
   type RunRecord,
   type RemoveSkillResultContract,
   type SavedConnection,
+  type Signal,
+  type SignalListPage,
   type SidecarBootstrap,
   type SidecarConnection,
   type SidecarHealth,
@@ -885,6 +893,95 @@ export class SidecarClient {
       body: JSON.stringify(resolveConflictRequestSchema.parse(payload)),
       method: "POST",
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Signals
+  // ---------------------------------------------------------------------------
+
+  async listSignals(params?: {
+    projectId?: string;
+    objectiveId?: string;
+    status?: string;
+    sourceType?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<SignalListPage> {
+    const query = new URLSearchParams();
+    if (params?.projectId) {
+      query.set("projectId", params.projectId);
+    }
+    if (params?.objectiveId) {
+      query.set("objectiveId", params.objectiveId);
+    }
+    if (params?.status) {
+      query.set("status", params.status);
+    }
+    if (params?.sourceType) {
+      query.set("sourceType", params.sourceType);
+    }
+    if (params?.limit !== undefined) {
+      query.set("limit", String(params.limit));
+    }
+    if (params?.offset !== undefined) {
+      query.set("offset", String(params.offset));
+    }
+    const qs = query.toString();
+    return signalListPageSchema.parse(
+      await this.request(`/signals${qs ? `?${qs}` : ""}`),
+    );
+  }
+
+  async createSignal(payload: {
+    projectId: string;
+    sourceType: string;
+    signalType: string;
+    title: string;
+    summary: string;
+    evidence?: string;
+    importance: string;
+    freshness: string;
+    objectiveId?: string;
+  }): Promise<Signal> {
+    return signalSchema.parse(
+      await this.request("/signals", {
+        body: JSON.stringify(createSignalRequestSchema.parse(payload)),
+        method: "POST",
+      }),
+    );
+  }
+
+  async getSignal(signalId: string): Promise<Signal> {
+    return signalSchema.parse(
+      await this.request(`/signals/${encodeURIComponent(signalId)}`),
+    );
+  }
+
+  async updateSignalStatus(signalId: string, status: string): Promise<Signal> {
+    return signalSchema.parse(
+      await this.request(`/signals/${encodeURIComponent(signalId)}/status`, {
+        body: JSON.stringify(updateSignalStatusRequestSchema.parse({ status })),
+        method: "PATCH",
+      }),
+    );
+  }
+
+  async promoteSignal(signalId: string, targetObjectiveId?: string): Promise<Signal> {
+    return signalSchema.parse(
+      await this.request(`/signals/${encodeURIComponent(signalId)}/promote`, {
+        body: JSON.stringify(promoteSignalRequestSchema.parse({ targetObjectiveId })),
+        method: "POST",
+      }),
+    );
+  }
+
+  async dismissSignal(signalId: string): Promise<Signal> {
+    return signalSchema.parse(
+      await this.request(`/signals/${encodeURIComponent(signalId)}/dismiss`, {
+        body: JSON.stringify(dismissSignalRequestSchema.parse({})),
+        method: "POST",
+      }),
+    );
   }
 
   async deleteTasks(taskIds: string[]): Promise<DeleteTasksResponse> {

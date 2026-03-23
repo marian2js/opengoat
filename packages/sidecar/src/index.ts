@@ -6,6 +6,7 @@ import {
   BUILTIN_PLAYBOOKS,
   MemoryService,
   NodeCommandRunner,
+  SignalService,
   NodeFileSystem,
   NodeOpenGoatPathsProvider,
   NodePathPort,
@@ -92,6 +93,12 @@ export async function startSidecarServer(
     nowIso: () => new Date().toISOString(),
   });
 
+  const signalService = new SignalService({
+    fileSystem,
+    pathPort,
+    nowIso: () => new Date().toISOString(),
+  });
+
   const artifactService = new ArtifactService({
     fileSystem,
     pathPort,
@@ -117,6 +124,7 @@ export async function startSidecarServer(
     opengoatPaths,
     playbookRegistryService,
     runService,
+    signalService,
     skillService,
     startedAt: Date.now(),
     version: packageJson.version,
