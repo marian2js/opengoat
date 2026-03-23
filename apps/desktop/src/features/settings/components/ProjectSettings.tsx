@@ -3,6 +3,7 @@ import {
   CheckIcon,
   GlobeIcon,
   LoaderCircleIcon,
+  Settings2Icon,
   TrashIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -175,9 +176,12 @@ export function ProjectSettings({
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
-      <div className="flex items-baseline gap-3">
-        <h1 className="font-display text-lg font-bold tracking-tight">Project settings</h1>
-        <span className="font-mono text-[11px] text-muted-foreground/50">{domain}</span>
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Settings2Icon className="size-3.5 text-primary" />
+          <h1 className="section-label">Project Settings</h1>
+        </div>
+        <span className="font-mono text-[11px] text-muted-foreground/40">{domain}</span>
       </div>
 
       {/* ---- Model ---- */}
