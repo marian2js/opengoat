@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import { ClipboardListIcon, ArrowRightIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BoardCounts } from "@/features/dashboard/lib/compute-board-counts";
@@ -36,9 +37,28 @@ function getPills(counts: BoardCounts): CountPill[] {
 }
 
 export function BoardSummary({ counts, isLoading, isEmpty, onNavigateToBoard }: BoardSummaryProps) {
+  const linkRef = useRef<HTMLAnchorElement>(null);
+
+  // Attach a native DOM click listener that bypasses React's synthetic event
+  // system. React's event delegation can fail when ancestor elements intercept
+  // events via stopPropagation or when overlapping elements block delegation.
+  // The <a href="#board"> provides native hash navigation as the primary
+  // mechanism; this listener fires the callback as a secondary signal.
+  useEffect(() => {
+    const el = linkRef.current;
+    if (!el || !onNavigateToBoard) return;
+
+    const handleClick = () => {
+      onNavigateToBoard();
+    };
+
+    el.addEventListener("click", handleClick);
+    return () => el.removeEventListener("click", handleClick);
+  }, [onNavigateToBoard, isLoading, isEmpty]);
+
   if (isLoading) {
     return (
-      <div className="py-5">
+      <div className="relative z-10 py-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Skeleton className="h-4 w-16" />
@@ -57,7 +77,7 @@ export function BoardSummary({ counts, isLoading, isEmpty, onNavigateToBoard }: 
 
   if (isEmpty) {
     return (
-      <div className="py-5">
+      <div className="relative z-10 py-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
@@ -68,14 +88,14 @@ export function BoardSummary({ counts, isLoading, isEmpty, onNavigateToBoard }: 
               No active tasks — tasks will appear here when created through actions or chat.
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => onNavigateToBoard?.()}
+          <a
+            ref={linkRef}
+            href="#board"
             className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             View Board
             <ArrowRightIcon className="size-3" />
-          </button>
+          </a>
         </div>
       </div>
     );
@@ -84,7 +104,7 @@ export function BoardSummary({ counts, isLoading, isEmpty, onNavigateToBoard }: 
   const pills = getPills(counts);
 
   return (
-    <div className="py-5">
+    <div className="relative z-10 py-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
@@ -103,14 +123,14 @@ export function BoardSummary({ counts, isLoading, isEmpty, onNavigateToBoard }: 
             ))}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => onNavigateToBoard?.()}
+        <a
+          ref={linkRef}
+          href="#board"
           className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           View Board
           <ArrowRightIcon className="size-3" />
-        </button>
+        </a>
       </div>
     </div>
   );
