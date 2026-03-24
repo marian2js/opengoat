@@ -8,32 +8,32 @@ import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h4 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+    <h4 className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
       {children}
     </h4>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Blockers
+// Blockers — visually prominent because they block work
 // ---------------------------------------------------------------------------
 
 export function TaskBlockersSection({ blockers }: { blockers: string[] }) {
+  if (blockers.length === 0) return null;
+
   return (
-    <div className="border-t border-border/40 pt-4">
+    <div className="border-t border-border/40 py-3">
       <SectionHeading>Blockers</SectionHeading>
-      {blockers.length === 0 ? (
-        <p className="text-xs text-muted-foreground/60">No blockers</p>
-      ) : (
-        <ul className="space-y-2">
+      <div className="mt-1.5 rounded-lg border border-red-500/15 bg-red-500/5 px-3 py-2">
+        <ul className="space-y-1.5">
           {blockers.map((blocker, i) => (
-            <li key={i} className="flex items-start gap-2 text-sm">
-              <ShieldAlertIcon className="mt-0.5 size-3.5 shrink-0 text-red-500" />
-              <span>{blocker}</span>
+            <li key={i} className="flex items-start gap-2 text-[13px]">
+              <ShieldAlertIcon className="mt-0.5 size-3.5 shrink-0 text-red-400" />
+              <span className="text-foreground/90">{blocker}</span>
             </li>
           ))}
         </ul>
-      )}
+      </div>
     </div>
   );
 }
@@ -47,26 +47,24 @@ export function TaskArtifactsSection({
 }: {
   artifacts: TaskEntry[];
 }) {
+  if (artifacts.length === 0) return null;
+
   return (
-    <div className="border-t border-border/40 pt-4">
+    <div className="border-t border-border/40 py-3">
       <SectionHeading>Artifacts</SectionHeading>
-      {artifacts.length === 0 ? (
-        <p className="text-xs text-muted-foreground/60">No artifacts</p>
-      ) : (
-        <ul className="space-y-2">
-          {artifacts.map((entry, i) => (
-            <li key={i} className="flex items-start gap-2 text-sm">
-              <FileTextIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
-                <p className="break-words">{entry.content}</p>
-                <p className="text-xs text-muted-foreground/60">
-                  {formatRelativeTime(entry.createdAt)}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className="space-y-1">
+        {artifacts.map((entry, i) => (
+          <li key={i} className="flex items-start gap-2 text-[13px]">
+            <FileTextIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/50" />
+            <div className="min-w-0 flex-1">
+              <span className="text-foreground/80">{entry.content}</span>
+              <span className="ml-2 text-[11px] text-muted-foreground/40">
+                {formatRelativeTime(entry.createdAt)}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -76,26 +74,24 @@ export function TaskArtifactsSection({
 // ---------------------------------------------------------------------------
 
 export function TaskWorklogSection({ worklog }: { worklog: TaskEntry[] }) {
+  if (worklog.length === 0) return null;
+
   return (
-    <div className="border-t border-border/40 pt-4">
-      <SectionHeading>Worklog</SectionHeading>
-      {worklog.length === 0 ? (
-        <p className="text-xs text-muted-foreground/60">No worklog entries</p>
-      ) : (
-        <ul className="space-y-2">
-          {worklog.map((entry, i) => (
-            <li key={i} className="flex items-start gap-2 text-sm">
-              <ClockIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <div className="min-w-0">
-                <p className="break-words">{entry.content}</p>
-                <p className="text-xs text-muted-foreground/60">
-                  {formatRelativeTime(entry.createdAt)}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="border-t border-border/40 py-3">
+      <SectionHeading>Activity</SectionHeading>
+      <ul className="space-y-1">
+        {worklog.map((entry, i) => (
+          <li key={i} className="flex items-start gap-2 text-[13px]">
+            <ClockIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/50" />
+            <div className="min-w-0 flex-1">
+              <span className="text-foreground/80">{entry.content}</span>
+              <span className="ml-2 text-[11px] text-muted-foreground/40">
+                {formatRelativeTime(entry.createdAt)}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

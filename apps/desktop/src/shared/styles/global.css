@@ -1,40 +1,39 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/dm-sans";
 @import "@fontsource-variable/jetbrains-mono";
 
 @custom-variant dark (&:is(.dark *));
 
 /* ────────────────────────── LIGHT THEME ──────────────────────────
-   Refined Industrial — warm neutrals, teal accent, intentional surfaces
+   Signal Black — cold-neutral zinc, emerald accent, precision surfaces.
    See DESIGN.md for full specification.
    ──────────────────────────────────────────────────────────────── */
 :root {
-  /* Teal primary — distinctive in the AI space */
-  --primary: oklch(0.58 0.12 175);
+  /* Emerald primary — distinctive in the AI space */
+  --primary: oklch(0.55 0.15 160);       /* #059669 emerald-600 */
   --primary-foreground: oklch(0.99 0 0);
-  --ring: oklch(0.58 0.12 175);
+  --ring: oklch(0.55 0.15 160);
 
-  /* Warm neutral surfaces */
-  --background: oklch(0.975 0.004 70);
-  --foreground: oklch(0.13 0.01 55);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.13 0.01 55);
+  /* Cold-neutral zinc surfaces */
+  --background: oklch(0.98 0.002 250);   /* #FAFAFA zinc-50 */
+  --foreground: oklch(0.07 0.005 250);   /* #09090B zinc-950 */
+  --card: oklch(1 0 0);                  /* #FFFFFF */
+  --card-foreground: oklch(0.07 0.005 250);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.13 0.01 55);
-  --secondary: oklch(0.955 0.004 70);
-  --secondary-foreground: oklch(0.22 0.01 55);
-  --muted: oklch(0.96 0.004 70);
-  --muted-foreground: oklch(0.46 0.01 55);
-  --accent: oklch(0.96 0.008 175);
-  --accent-foreground: oklch(0.18 0.01 55);
+  --popover-foreground: oklch(0.07 0.005 250);
+  --secondary: oklch(0.96 0.002 250);    /* #F4F4F5 zinc-100 */
+  --secondary-foreground: oklch(0.22 0.005 250);
+  --muted: oklch(0.96 0.002 250);        /* #F4F4F5 zinc-100 */
+  --muted-foreground: oklch(0.55 0.005 250);  /* #71717A zinc-500 */
+  --accent: oklch(0.96 0.006 160);       /* subtle emerald tint */
+  --accent-foreground: oklch(0.18 0.005 250);
   --destructive: oklch(0.55 0.2 27);
-  --border: oklch(0.91 0.004 70);
-  --input: oklch(0.93 0.004 70);
+  --border: oklch(0.87 0.002 250);       /* #D4D4D8 zinc-300 */
+  --input: oklch(0.90 0.002 250);        /* #E4E4E7 zinc-200 */
 
-  /* Chart colors — teal-anchored spectrum */
-  --chart-1: oklch(0.58 0.12 175);
+  /* Chart colors — emerald-anchored spectrum */
+  --chart-1: oklch(0.55 0.15 160);
   --chart-2: oklch(0.55 0.1 230);
   --chart-3: oklch(0.62 0.13 145);
   --chart-4: oklch(0.60 0.12 35);
@@ -42,15 +41,15 @@
 
   --radius: 0.5rem;
 
-  /* Sidebar — slightly warmer, recessed */
-  --sidebar: oklch(0.965 0.004 70);
-  --sidebar-foreground: oklch(0.16 0.01 55);
-  --sidebar-primary: oklch(0.58 0.12 175);
+  /* Sidebar — zinc-100 recessed */
+  --sidebar: oklch(0.96 0.002 250);
+  --sidebar-foreground: oklch(0.15 0.005 250);
+  --sidebar-primary: oklch(0.55 0.15 160);
   --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.955 0.008 175);
-  --sidebar-accent-foreground: oklch(0.16 0.01 55);
-  --sidebar-border: oklch(0.92 0.004 70);
-  --sidebar-ring: oklch(0.58 0.12 175);
+  --sidebar-accent: oklch(0.93 0.002 250);
+  --sidebar-accent-foreground: oklch(0.15 0.005 250);
+  --sidebar-border: oklch(0.90 0.002 250);
+  --sidebar-ring: oklch(0.55 0.15 160);
 
   /* Semantic */
   --success: oklch(0.55 0.16 155);
@@ -62,54 +61,53 @@
 }
 
 /* ──────────────────────── DARK THEME ────────────────────────────
-   Warm undertones (#141210 not #0a0a0f). Surface elevation via
-   lightness steps. Apple proved warm darks work for tools you
-   spend hours in.
+   Cold-neutral zinc base (#09090B). Surface elevation via stark
+   lightness jumps. Cards must be obviously elevated, not muddy.
 
    Surface elevation ladder:
-     sidebar     0.085   deepest panel
-     background  0.105   deepest content
-     card        0.145   elevated surface
-     muted       0.17    subtle fills, hovers
-     secondary   0.19    interactive secondary
-     accent      0.21    highlighted areas
-   Border: 7% white — barely visible, clean
+     sidebar     0.06    deepest panel
+     background  0.07    deepest content (#09090B)
+     card        0.12    elevated surface (#18181B)
+     muted       0.16    subtle fills
+     secondary   0.18    interactive secondary
+     hover       0.20    hover / interactive (#27272A)
+   Border: 6% white — barely visible, clean
    ──────────────────────────────────────────────────────────────── */
 .dark {
-  --primary: oklch(0.78 0.13 175);
-  --primary-foreground: oklch(0.10 0.01 55);
-  --ring: oklch(0.78 0.13 175);
+  --primary: oklch(0.77 0.15 163);       /* #34D399 emerald-400 */
+  --primary-foreground: oklch(0.07 0.005 250);
+  --ring: oklch(0.77 0.15 163);
 
-  --background: oklch(0.105 0.008 55);
-  --foreground: oklch(0.91 0.005 70);
-  --card: oklch(0.145 0.008 55);
-  --card-foreground: oklch(0.91 0.005 70);
-  --popover: oklch(0.16 0.008 55);
-  --popover-foreground: oklch(0.91 0.005 70);
-  --secondary: oklch(0.19 0.008 55);
-  --secondary-foreground: oklch(0.91 0.005 70);
-  --muted: oklch(0.17 0.008 55);
-  --muted-foreground: oklch(0.55 0.005 55);
-  --accent: oklch(0.21 0.012 175);
-  --accent-foreground: oklch(0.91 0.005 70);
+  --background: oklch(0.07 0.003 250);   /* #09090B zinc-950 */
+  --foreground: oklch(0.98 0.002 250);   /* #FAFAFA zinc-50 */
+  --card: oklch(0.12 0.003 250);         /* #18181B zinc-900 */
+  --card-foreground: oklch(0.98 0.002 250);
+  --popover: oklch(0.14 0.003 250);
+  --popover-foreground: oklch(0.98 0.002 250);
+  --secondary: oklch(0.18 0.003 250);
+  --secondary-foreground: oklch(0.98 0.002 250);
+  --muted: oklch(0.16 0.003 250);
+  --muted-foreground: oklch(0.63 0.003 250);  /* #A1A1AA zinc-400 */
+  --accent: oklch(0.18 0.008 163);       /* subtle emerald tint */
+  --accent-foreground: oklch(0.98 0.002 250);
   --destructive: oklch(0.62 0.19 25);
-  --border: oklch(1 0 0 / 7%);
-  --input: oklch(0.17 0.008 55);
+  --border: oklch(1 0 0 / 6%);
+  --input: oklch(0.16 0.003 250);
 
-  --chart-1: oklch(0.78 0.13 175);
+  --chart-1: oklch(0.77 0.15 163);
   --chart-2: oklch(0.65 0.1 230);
   --chart-3: oklch(0.72 0.12 145);
   --chart-4: oklch(0.68 0.12 35);
   --chart-5: oklch(0.62 0.08 285);
 
-  --sidebar: oklch(0.085 0.008 55);
-  --sidebar-foreground: oklch(0.86 0.005 70);
-  --sidebar-primary: oklch(0.78 0.13 175);
-  --sidebar-primary-foreground: oklch(0.10 0.01 55);
-  --sidebar-accent: oklch(0.14 0.012 175);
-  --sidebar-accent-foreground: oklch(0.86 0.005 70);
+  --sidebar: oklch(0.06 0.003 250);      /* #0F0F11 darker than bg */
+  --sidebar-foreground: oklch(0.93 0.002 250);
+  --sidebar-primary: oklch(0.77 0.15 163);
+  --sidebar-primary-foreground: oklch(0.07 0.005 250);
+  --sidebar-accent: oklch(0.12 0.008 163);
+  --sidebar-accent-foreground: oklch(0.93 0.002 250);
   --sidebar-border: oklch(1 0 0 / 6%);
-  --sidebar-ring: oklch(0.78 0.13 175);
+  --sidebar-ring: oklch(0.77 0.15 163);
 
   --success: oklch(0.68 0.14 155);
   --success-foreground: oklch(0.10 0 0);
@@ -120,8 +118,8 @@
 }
 
 @theme inline {
-  --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Satoshi", "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "General Sans", "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -177,7 +175,7 @@ body {
   min-height: 100vh;
   background: var(--background);
   color: var(--foreground);
-  font-family: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -198,7 +196,7 @@ select {
 
 /* ─── Display font utility ─── */
 .font-display {
-  font-family: "Satoshi", "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  font-family: "General Sans", "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 /* ─── Mono font utility ─── */
@@ -206,7 +204,7 @@ select {
   font-family: "JetBrains Mono Variable", ui-monospace, "SF Mono", monospace;
 }
 
-/* ─── Section label — monospace uppercase teal ─── */
+/* ─── Section label — monospace uppercase emerald ─── */
 .section-label {
   font-family: "JetBrains Mono Variable", ui-monospace, monospace;
   font-size: 10px;
@@ -220,7 +218,7 @@ select {
 .dashboard-section {
   padding-top: 40px;
   border-top: 1px solid;
-  border-color: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 :root[class~="light"] .dashboard-section,
@@ -258,22 +256,6 @@ select {
 /* Provider logo dark-mode color swap */
 .dark .provider-mark svg {
   fill: var(--provider-mark-dark-color, currentColor) !important;
-}
-
-/* Subtle noise texture overlay for depth */
-.surface-noise::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.03;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  background-size: 128px 128px;
-  z-index: 0;
-}
-
-.dark .surface-noise::before {
-  opacity: 0.025;
 }
 
 /* Respect prefers-reduced-motion — required for accessibility (WCAG 2.3.3) */

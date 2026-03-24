@@ -15,14 +15,14 @@ const ARTIFACT_STATUS_STYLES: Record<string, string> = {
 };
 
 export function LinkedArtifactsSection({ artifacts }: LinkedArtifactsSectionProps) {
+  if (artifacts.length === 0) return null;
+
   return (
-    <div className="border-t border-border/40 pt-4">
-      <h4 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-        Linked Artifacts
+    <div className="border-t border-border/40 py-3">
+      <h4 className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+        Artifacts
       </h4>
-      {artifacts.length === 0 ? (
-        <p className="text-xs text-muted-foreground/60">No linked artifacts</p>
-      ) : (
+      {artifacts.length > 0 && (
         <ul className="space-y-2">
           {artifacts.map((artifact) => (
             <li key={artifact.artifactId} className="flex items-center gap-2 text-sm">

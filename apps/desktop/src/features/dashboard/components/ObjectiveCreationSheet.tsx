@@ -5,12 +5,12 @@ import {
   LoaderCircleIcon,
 } from "lucide-react";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,7 +29,7 @@ export interface ObjectiveCreationSheetProps {
   onObjectiveCreated?: (() => void) | undefined;
 }
 
-type SheetPhase = "form" | "brief";
+type DialogPhase = "form" | "brief";
 
 export function ObjectiveCreationSheet({
   open,
@@ -39,7 +39,7 @@ export function ObjectiveCreationSheet({
   prefillTitle,
   onObjectiveCreated,
 }: ObjectiveCreationSheetProps) {
-  const [phase, setPhase] = useState<SheetPhase>("form");
+  const [phase, setPhase] = useState<DialogPhase>("form");
   const [showAllFields, setShowAllFields] = useState(false);
   const [createdObjective, setCreatedObjective] = useState<Objective | null>(null);
 
@@ -114,31 +114,30 @@ export function ObjectiveCreationSheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="flex flex-col sm:max-w-md"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="flex max-h-[85vh] flex-col sm:max-w-lg"
       >
         {phase === "form" ? (
           <>
-            <SheetHeader>
-              <SheetTitle className="font-display text-lg font-bold tracking-tight">
+            <DialogHeader>
+              <DialogTitle className="font-display text-lg font-bold tracking-tight">
                 Create objective
-              </SheetTitle>
-              <SheetDescription>
-                Define what you want to achieve. Start with a title — you can
-                add details now or let the AI infer them.
-              </SheetDescription>
-            </SheetHeader>
+              </DialogTitle>
+              <DialogDescription className="text-[13px]">
+                Define what you want to achieve. Start with a title — the AI
+                will fill in the rest.
+              </DialogDescription>
+            </DialogHeader>
 
-            <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4">
+            <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 pb-2">
               {/* Title — always shown */}
               <div className="flex flex-col gap-1.5">
                 <label
                   htmlFor="obj-title"
-                  className="font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                  className="text-[13px] font-medium text-foreground/80"
                 >
-                  What do you want help with? *
+                  What do you want help with?
                 </label>
                 <Input
                   id="obj-title"
@@ -152,9 +151,10 @@ export function ObjectiveCreationSheet({
               <div className="flex flex-col gap-1.5">
                 <label
                   htmlFor="obj-success"
-                  className="font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                  className="text-[13px] font-medium text-foreground/80"
                 >
                   What does success look like?
+                  <span className="ml-1 text-muted-foreground/50">(optional)</span>
                 </label>
                 <Textarea
                   id="obj-success"
@@ -170,18 +170,18 @@ export function ObjectiveCreationSheet({
               {/* Toggle for full form */}
               <button
                 type="button"
-                className="flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
+                className="flex items-center gap-1 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground"
                 onClick={() => setShowAllFields(!showAllFields)}
               >
                 {showAllFields ? (
                   <>
                     <ChevronUpIcon className="size-3.5" />
-                    Hide extra fields
+                    Fewer fields
                   </>
                 ) : (
                   <>
                     <ChevronDownIcon className="size-3.5" />
-                    Show all fields
+                    More fields
                   </>
                 )}
               </button>
@@ -192,7 +192,7 @@ export function ObjectiveCreationSheet({
                   <div className="flex flex-col gap-1.5">
                     <label
                       htmlFor="obj-tried"
-                      className="font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                      className="text-[13px] font-medium text-foreground/80"
                     >
                       What have you already tried?
                     </label>
@@ -210,7 +210,7 @@ export function ObjectiveCreationSheet({
                   <div className="flex flex-col gap-1.5">
                     <label
                       htmlFor="obj-avoid"
-                      className="font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                      className="text-[13px] font-medium text-foreground/80"
                     >
                       Anything to avoid?
                     </label>
@@ -226,9 +226,9 @@ export function ObjectiveCreationSheet({
                   <div className="flex flex-col gap-1.5">
                     <label
                       htmlFor="obj-timeframe"
-                      className="font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                      className="text-[13px] font-medium text-foreground/80"
                     >
-                      Timeframe / urgency
+                      Timeframe
                     </label>
                     <Input
                       id="obj-timeframe"
@@ -241,7 +241,7 @@ export function ObjectiveCreationSheet({
                   <div className="flex flex-col gap-1.5">
                     <label
                       htmlFor="obj-channels"
-                      className="font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                      className="text-[13px] font-medium text-foreground/80"
                     >
                       Channel preferences
                     </label>
@@ -258,7 +258,7 @@ export function ObjectiveCreationSheet({
                   <div className="flex flex-col gap-1.5">
                     <label
                       htmlFor="obj-notes"
-                      className="font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                      className="text-[13px] font-medium text-foreground/80"
                     >
                       Notes
                     </label>
@@ -275,15 +275,25 @@ export function ObjectiveCreationSheet({
 
               {/* Error */}
               {formError ? (
-                <p className="text-sm text-destructive">{formError}</p>
+                <div className="rounded-lg border border-red-500/15 bg-red-500/5 px-3 py-2 text-[13px] text-red-400">
+                  {formError}
+                </div>
               ) : null}
             </div>
 
             {/* Submit */}
-            <div className="mt-auto border-t border-border/30 p-4">
+            <div className="mt-auto flex items-center justify-end gap-3 border-t border-border/30 p-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClose}
+              >
+                Cancel
+              </Button>
               <Button
                 variant="default"
-                className="w-full gap-2"
+                size="sm"
+                className="gap-2"
                 disabled={!formState.title.trim() || isSubmitting}
                 onClick={() => void handleCreateDraft()}
               >
@@ -293,7 +303,7 @@ export function ObjectiveCreationSheet({
                     Creating...
                   </>
                 ) : (
-                  "Create draft objective"
+                  "Create objective"
                 )}
               </Button>
             </div>
@@ -301,16 +311,16 @@ export function ObjectiveCreationSheet({
         ) : (
           /* Brief phase */
           <>
-            <SheetHeader>
-              <SheetTitle className="font-display text-lg font-bold tracking-tight">
+            <DialogHeader>
+              <DialogTitle className="font-display text-lg font-bold tracking-tight">
                 Objective brief
-              </SheetTitle>
-              <SheetDescription>
+              </DialogTitle>
+              <DialogDescription>
                 {createdObjective?.title
                   ? `Brief for "${createdObjective.title}"`
                   : "AI-generated brief based on your objective and project context."}
-              </SheetDescription>
-            </SheetHeader>
+              </DialogDescription>
+            </DialogHeader>
 
             <ObjectiveBriefPanel
               brief={brief}
@@ -322,7 +332,7 @@ export function ObjectiveCreationSheet({
             />
           </>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

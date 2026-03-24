@@ -16,17 +16,17 @@ const IMPORTANCE_DOT: Record<string, string> = {
 const MAX_VISIBLE = 3;
 
 export function RelatedSignalsSection({ signals, objectiveId }: RelatedSignalsSectionProps) {
+  if (signals.length === 0) return null;
+
   const visible = signals.slice(0, MAX_VISIBLE);
   const remaining = signals.length - MAX_VISIBLE;
 
   return (
-    <div className="border-t border-border/40 pt-4">
-      <h4 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-        Related Signals
+    <div className="border-t border-border/40 py-3">
+      <h4 className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+        Signals
       </h4>
-      {signals.length === 0 ? (
-        <p className="text-xs text-muted-foreground/60">No related signals</p>
-      ) : (
+      {signals.length > 0 && (
         <div className="space-y-1.5">
           {visible.map((signal) => (
             <div

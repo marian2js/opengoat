@@ -59,10 +59,18 @@ export default defineConfig({
     ...(!host && {
       proxy: {
         "/agents": { target: "http://127.0.0.1:19749", changeOrigin: true },
-        "/chat": { target: "http://127.0.0.1:19749", changeOrigin: true },
+        "/artifacts": { target: "http://127.0.0.1:19749", changeOrigin: true },
         "/auth": { target: "http://127.0.0.1:19749", changeOrigin: true },
+        "/bundles": { target: "http://127.0.0.1:19749", changeOrigin: true },
+        "/chat": { target: "http://127.0.0.1:19749", changeOrigin: true },
         "/global": { target: "http://127.0.0.1:19749", changeOrigin: true },
+        "/memories": { target: "http://127.0.0.1:19749", changeOrigin: true },
+        "/objectives": { target: "http://127.0.0.1:19749", changeOrigin: true },
+        "/playbooks": { target: "http://127.0.0.1:19749", changeOrigin: true },
+        "/runs": { target: "http://127.0.0.1:19749", changeOrigin: true },
+        "/signals": { target: "http://127.0.0.1:19749", changeOrigin: true },
         "/tasks": { target: "http://127.0.0.1:19749", changeOrigin: true },
+        "/workspace-signals": { target: "http://127.0.0.1:19749", changeOrigin: true },
       },
     }),
     watch: {

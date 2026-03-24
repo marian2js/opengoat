@@ -1,4 +1,5 @@
-import { ArrowUpDownIcon, FilterXIcon, LayersIcon, RefreshCwIcon, SearchIcon, XIcon } from "lucide-react";
+import { ArrowUpDownIcon, FilterIcon, FilterXIcon, LayersIcon, RefreshCwIcon, SearchIcon, XIcon } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -80,72 +81,96 @@ export function BoardToolbar({
   totalCount,
   filteredCount,
 }: BoardToolbarProps) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const currentSortLabel =
     SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Sort";
   const currentGroupingLabel =
     GROUPING_OPTIONS.find((o) => o.value === grouping)?.label ?? "Group";
+  const hasAdvancedFilters = objectiveId !== null || sourceType !== null || stale || readyForReview;
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Row 1: status pills + search + count + sort + refresh */}
-      <div className="flex items-center justify-between gap-3">
-        {/* Left group: filter pills + search */}
-        <div className="flex items-center gap-2">
-          {/* Filter pills */}
-          <div className="flex items-center gap-0.5 rounded-lg border border-border/50 bg-muted/30 p-0.5">
-            {FILTER_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => onFilterChange(option.value)}
-                aria-pressed={filter === option.value}
-                className={`rounded-md px-3 py-1 font-mono text-[11px] font-medium tracking-wide transition-all ${
-                  filter === option.value
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Search input */}
-          <InputGroup className="w-48">
-            <InputGroupAddon align="inline-start">
-              <SearchIcon className="size-3.5" />
-            </InputGroupAddon>
-            <InputGroupInput
-              placeholder="Search tasks..."
-              value={search}
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
-            {search && (
-              <InputGroupAddon align="inline-end">
-                <InputGroupButton
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={() => onSearchChange("")}
-                  aria-label="Clear search"
-                >
-                  <XIcon className="size-3" />
-                </InputGroupButton>
-              </InputGroupAddon>
-            )}
-          </InputGroup>
+      {/* Single row: status tabs + search + controls */}
+      <div className="flex items-center gap-3">
+        {/* Status filter tabs */}
+        <div className="flex items-center">
+          {FILTER_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onFilterChange(option.value)}
+              aria-pressed={filter === option.value}
+              className={`relative px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                filter === option.value
+                  ? "text-foreground"
+                  : "text-muted-foreground/60 hover:text-muted-foreground"
+              }`}
+            >
+              {option.label}
+              {filter === option.value && (
+                <span className="absolute inset-x-2 -bottom-[9px] h-[2px] rounded-full bg-primary" />
+              )}
+            </button>
+          ))}
         </div>
 
-        {/* Right group: task count, sort dropdown, refresh */}
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[11px] tabular-nums text-muted-foreground/60">
+        {/* Separator */}
+        <div className="h-4 w-px bg-border" />
+
+        {/* Search input */}
+        <InputGroup className="w-52">
+          <InputGroupAddon align="inline-start">
+            <SearchIcon className="size-3.5" />
+          </InputGroupAddon>
+          <InputGroupInput
+            placeholder="Search tasks..."
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+          {search && (
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => onSearchChange("")}
+                aria-label="Clear search"
+              >
+                <XIcon className="size-3" />
+              </InputGroupButton>
+            </InputGroupAddon>
+          )}
+        </InputGroup>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Right controls */}
+        <div className="flex items-center gap-1.5">
+          <span className="mr-1 font-mono text-[11px] tabular-nums text-muted-foreground/50">
             {filteredCount === totalCount
               ? `${totalCount} tasks`
               : `${filteredCount} of ${totalCount} tasks`}
           </span>
 
+          {/* Advanced filters toggle */}
+          <Button
+            variant={showAdvanced || hasAdvancedFilters ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 gap-1 text-[11px]"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            <FilterIcon className="size-3" />
+            Filter
+            {activeFilterCount > 0 && (
+              <span className="ml-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 text-[11px]">
+              <Button variant="ghost" size="sm" className="h-7 gap-1 text-[11px]">
                 <LayersIcon className="size-3" />
                 {currentGroupingLabel}
               </Button>
@@ -166,7 +191,7 @@ export function BoardToolbar({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 text-[11px]">
+              <Button variant="ghost" size="sm" className="h-7 gap-1 text-[11px]">
                 <ArrowUpDownIcon className="size-3" />
                 {currentSortLabel}
               </Button>
@@ -188,7 +213,7 @@ export function BoardToolbar({
           <button
             type="button"
             onClick={onRefresh}
-            className="rounded-md p-1.5 text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
+            className="rounded-md p-1.5 text-muted-foreground/40 transition-colors hover:bg-muted hover:text-foreground"
             aria-label="Refresh tasks"
           >
             <RefreshCwIcon className="size-3.5" />
@@ -196,102 +221,100 @@ export function BoardToolbar({
         </div>
       </div>
 
-      {/* Row 2: objective dropdown + source type pills + toggle chips + clear */}
-      <div className="flex items-center gap-2">
-        {/* Objective dropdown */}
-        {objectives.length > 0 && (
-          <Select
-            value={objectiveId ?? "__all__"}
-            onValueChange={(value) =>
-              onObjectiveChange(value === "__all__" ? null : value)
-            }
-          >
-            <SelectTrigger className="h-7 w-44 text-[11px]">
-              <SelectValue placeholder="All Objectives" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All Objectives</SelectItem>
-              {objectives.map((obj) => (
-                <SelectItem key={obj.objectiveId} value={obj.objectiveId}>
-                  {obj.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+      {/* Underline separator */}
+      <div className="h-px bg-border" />
 
-        {/* Source type filter pills */}
-        <div className="flex items-center gap-0.5 rounded-lg border border-border/50 bg-muted/30 p-0.5">
+      {/* Advanced filter row — collapsible */}
+      {(showAdvanced || hasAdvancedFilters) && (
+        <div className="flex items-center gap-2 pb-1">
+          {/* Source type pills */}
+          <div className="flex items-center gap-0.5">
+            {SOURCE_TYPE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() =>
+                  onSourceTypeChange(
+                    sourceType === option.value ? null : option.value,
+                  )
+                }
+                aria-pressed={sourceType === option.value}
+                className={`rounded-md px-2 py-1 text-[11px] font-medium transition-all ${
+                  sourceType === option.value
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground/60 hover:text-muted-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="h-4 w-px bg-border" />
+
+          {/* Toggle chips */}
           <button
             type="button"
-            onClick={() => onSourceTypeChange(null)}
-            aria-pressed={sourceType === null}
-            className={`rounded-md px-2.5 py-0.5 font-mono text-[10px] font-medium tracking-wide transition-all ${
-              sourceType === null
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+            onClick={() => onStaleChange(!stale)}
+            className={`rounded-md px-2 py-1 text-[11px] font-medium transition-all ${
+              stale
+                ? "bg-warning/10 text-warning"
+                : "text-muted-foreground/60 hover:text-muted-foreground"
             }`}
           >
-            All
+            Stale
           </button>
-          {SOURCE_TYPE_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() =>
-                onSourceTypeChange(
-                  sourceType === option.value ? null : option.value,
-                )
-              }
-              aria-pressed={sourceType === option.value}
-              className={`rounded-md px-2.5 py-0.5 font-mono text-[10px] font-medium tracking-wide transition-all ${
-                sourceType === option.value
-                  ? "bg-primary/10 text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
 
-        {/* Toggle chips */}
-        <button
-          type="button"
-          onClick={() => onStaleChange(!stale)}
-          className={`rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-medium tracking-wide transition-all ${
-            stale
-              ? "border-primary/40 bg-primary/10 text-primary"
-              : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
-          }`}
-        >
-          Stale
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onReadyForReviewChange(!readyForReview)}
-          className={`rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-medium tracking-wide transition-all ${
-            readyForReview
-              ? "border-primary/40 bg-primary/10 text-primary"
-              : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
-          }`}
-        >
-          Needs Review
-        </button>
-
-        {/* Clear filters */}
-        {activeFilterCount > 0 && (
           <button
             type="button"
-            onClick={onClearFilters}
-            className="ml-auto flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={() => onReadyForReviewChange(!readyForReview)}
+            className={`rounded-md px-2 py-1 text-[11px] font-medium transition-all ${
+              readyForReview
+                ? "bg-info/10 text-info"
+                : "text-muted-foreground/60 hover:text-muted-foreground"
+            }`}
           >
-            <FilterXIcon className="size-3" />
-            Clear ({activeFilterCount})
+            Needs Review
           </button>
-        )}
-      </div>
+
+          {/* Objective dropdown */}
+          {objectives.length > 0 && (
+            <>
+              <div className="h-4 w-px bg-border" />
+              <Select
+                value={objectiveId ?? "__all__"}
+                onValueChange={(value) =>
+                  onObjectiveChange(value === "__all__" ? null : value)
+                }
+              >
+                <SelectTrigger className="h-7 w-40 text-[11px]">
+                  <SelectValue placeholder="All Objectives" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Objectives</SelectItem>
+                  {objectives.map((obj) => (
+                    <SelectItem key={obj.objectiveId} value={obj.objectiveId}>
+                      {obj.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
+
+          {/* Clear filters */}
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={onClearFilters}
+              className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground/60 transition-colors hover:text-foreground"
+            >
+              <FilterXIcon className="size-3" />
+              Clear
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

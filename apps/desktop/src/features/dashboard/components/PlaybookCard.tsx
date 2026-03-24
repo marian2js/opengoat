@@ -44,8 +44,8 @@ const GOAL_TYPE_STYLES: Record<string, { className: string; accentColor: string 
     accentColor: "bg-orange-500",
   },
   "lead-gen": {
-    className: "border-teal-500/20 bg-teal-500/10 text-teal-700 dark:text-teal-400",
-    accentColor: "bg-teal-500",
+    className: "border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
+    accentColor: "bg-cyan-500",
   },
   onboarding: {
     className: "border-indigo-500/20 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400",

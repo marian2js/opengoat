@@ -4,13 +4,13 @@ import { useTaskDetail } from "@/features/board/hooks/useTaskDetail";
 import { useLinkedEntities } from "@/features/board/hooks/useLinkedEntities";
 import { computeSuggestedAction } from "@/features/board/lib/suggested-action";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TaskStatusBadge } from "./TaskStatusBadge";
 import {
@@ -96,10 +96,9 @@ export function TaskDetailPanel({
   );
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent
-        side="right"
-        className="flex flex-col sm:max-w-lg"
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        className="flex max-h-[85vh] flex-col sm:max-w-xl"
       >
         {isLoading ? (
           <PanelSkeleton />
@@ -107,62 +106,54 @@ export function TaskDetailPanel({
           <PanelError error={error} onRetry={refresh} />
         ) : task ? (
           <>
-            <SheetHeader className="space-y-3">
-              <SheetTitle className="pr-8 leading-snug">
-                {task.title}
-              </SheetTitle>
-              <SheetDescription asChild>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <TaskStatusBadge status={task.status} />
-                    {task.statusReason && (
-                      <span className="text-xs text-muted-foreground">
-                        {task.statusReason}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground/60">
-                    <span className="inline-flex items-center gap-1">
-                      <UserIcon className="size-3" />
-                      {task.assignedTo || "Unassigned"}
-                    </span>
-                    <span className="inline-flex items-center gap-1 font-mono tabular-nums">
-                      <CalendarIcon className="size-3" />
-                      Created {formatRelativeTime(task.createdAt)}
-                    </span>
-                    <span className="inline-flex items-center gap-1 font-mono tabular-nums">
-                      <CalendarIcon className="size-3" />
-                      Updated {formatRelativeTime(task.updatedAt)}
-                    </span>
-                  </div>
-                </div>
-              </SheetDescription>
-            </SheetHeader>
-
-            <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4">
-              {/* Description */}
-              <div className="border-t border-border/40 pt-4">
-                <h4 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-                  Description
-                </h4>
-                {task.description ? (
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                    {task.description}
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground/60">
-                    No description
-                  </p>
+            <DialogHeader className="space-y-2">
+              <div className="flex items-center gap-2.5">
+                <TaskStatusBadge status={task.status} />
+                {task.statusReason && (
+                  <span className="text-xs text-muted-foreground">
+                    &mdash; {task.statusReason}
+                  </span>
                 )}
               </div>
+              <DialogTitle className="pr-8 text-lg leading-snug">
+                {task.title}
+              </DialogTitle>
+              <DialogDescription asChild>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/50">
+                  <span className="inline-flex items-center gap-1">
+                    <UserIcon className="size-3" />
+                    {task.assignedTo || "Unassigned"}
+                  </span>
+                  <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+                    Created {formatRelativeTime(task.createdAt)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+                    Updated {formatRelativeTime(task.updatedAt)}
+                  </span>
+                </div>
+              </DialogDescription>
+            </DialogHeader>
 
-              <LinkedObjectiveSection objective={linked.objective} />
-              <LinkedRunSection run={linked.run} />
-              <LinkedArtifactsSection artifacts={linked.artifacts} />
-              <RelatedSignalsSection
-                signals={linked.signals}
-                objectiveId={task.objectiveId}
-              />
+            <div className="flex-1 space-y-0 overflow-y-auto px-4 pb-4">
+              {/* Description */}
+              {task.description && (
+                <div className="pb-4">
+                  <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/80">
+                    {task.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Only show sections that have data */}
+              {linked.objective && <LinkedObjectiveSection objective={linked.objective} />}
+              {linked.run && <LinkedRunSection run={linked.run} />}
+              {linked.artifacts.length > 0 && <LinkedArtifactsSection artifacts={linked.artifacts} />}
+              {linked.signals.length > 0 && (
+                <RelatedSignalsSection
+                  signals={linked.signals}
+                  objectiveId={task.objectiveId}
+                />
+              )}
 
               <TaskBlockersSection blockers={task.blockers} />
               <TaskArtifactsSection artifacts={task.artifacts} />
@@ -171,7 +162,7 @@ export function TaskDetailPanel({
               <SuggestedNextAction suggestion={suggestion} />
             </div>
 
-            <SheetFooter className="border-t pt-3">
+            <DialogFooter>
               <TaskQuickActions
                 currentStatus={task.status}
                 onStatusChange={handleStatusChange}
@@ -179,11 +170,11 @@ export function TaskDetailPanel({
                 onAddArtifact={handleAddArtifact}
                 onAddWorklog={handleAddWorklog}
               />
-            </SheetFooter>
+            </DialogFooter>
           </>
         ) : null}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 

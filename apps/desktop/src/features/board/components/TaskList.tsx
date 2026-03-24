@@ -48,11 +48,11 @@ function TaskRow({ task, onSelect, objectiveMap, runMap }: TaskRowProps) {
 
   return (
     <TableRow
-      className="group/row cursor-pointer transition-colors hover:bg-primary/[0.03] dark:hover:bg-primary/[0.04]"
+      className="group/row cursor-pointer border-border/30 transition-colors hover:bg-accent/50"
       onClick={() => onSelect(task.taskId)}
     >
       {/* Title + inline chips */}
-      <TableCell className="max-w-[400px] text-[13px] font-medium text-foreground/90 group-hover/row:text-foreground">
+      <TableCell className="max-w-[400px] py-2.5 text-[13px] font-medium text-foreground/85 group-hover/row:text-foreground">
         <div className="flex items-center gap-1.5 overflow-hidden">
           <span className="truncate">{task.title}</span>
           {objective && <ObjectiveChip label={objective.title} />}
@@ -148,15 +148,15 @@ export function TaskList({
   const isGrouped = groups && groups.length > 0 && !(groups.length === 1 && groups[0]!.key === "__all__");
 
   return (
-    <div className="flex-1 overflow-y-auto rounded-lg border border-border/50">
+    <div className="flex-1 overflow-y-auto">
       <Table>
         <TableHeader>
-          <TableRow className="border-b border-border/50 bg-muted/30 hover:bg-muted/30">
-            <TableHead className="w-[35%]">Title</TableHead>
-            <TableHead className="w-[120px]">Status</TableHead>
-            <TableHead className="w-[100px]">Context</TableHead>
-            <TableHead className="w-[100px]">Updated</TableHead>
-            <TableHead>Owner</TableHead>
+          <TableRow className="border-b border-border hover:bg-transparent">
+            <TableHead className="w-[40%] py-2 text-[11px] font-medium text-muted-foreground/50">Title</TableHead>
+            <TableHead className="w-[120px] py-2 text-[11px] font-medium text-muted-foreground/50">Status</TableHead>
+            <TableHead className="w-[100px] py-2 text-[11px] font-medium text-muted-foreground/50">Context</TableHead>
+            <TableHead className="w-[100px] py-2 text-[11px] font-medium text-muted-foreground/50">Updated</TableHead>
+            <TableHead className="py-2 text-[11px] font-medium text-muted-foreground/50">Owner</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -232,15 +232,15 @@ function GroupSection({
 
 export function TaskListSkeleton() {
   return (
-    <div className="flex-1 overflow-y-auto rounded-lg border border-border/50">
+    <div className="flex-1 overflow-y-auto">
       <Table>
         <TableHeader>
-          <TableRow className="border-b border-border/50 bg-muted/30 hover:bg-muted/30">
-            <TableHead className="w-[35%]">Title</TableHead>
-            <TableHead className="w-[120px]">Status</TableHead>
-            <TableHead className="w-[100px]">Context</TableHead>
-            <TableHead className="w-[100px]">Updated</TableHead>
-            <TableHead>Owner</TableHead>
+          <TableRow className="border-b border-border hover:bg-transparent">
+            <TableHead className="w-[40%] py-2 text-[11px] font-medium text-muted-foreground/50">Title</TableHead>
+            <TableHead className="w-[120px] py-2 text-[11px] font-medium text-muted-foreground/50">Status</TableHead>
+            <TableHead className="w-[100px] py-2 text-[11px] font-medium text-muted-foreground/50">Context</TableHead>
+            <TableHead className="w-[100px] py-2 text-[11px] font-medium text-muted-foreground/50">Updated</TableHead>
+            <TableHead className="py-2 text-[11px] font-medium text-muted-foreground/50">Owner</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

@@ -7,46 +7,47 @@
 - **Project type:** Desktop app (Tauri) with sidebar-first layout, task boards, chat interface, and knowledge management.
 
 ## Aesthetic Direction
-- **Direction:** Refined Industrial
-- **Decoration level:** Intentional — subtle noise texture overlay for depth, surface elevation via shadows rather than heavy borders. No gratuitous decoration.
-- **Mood:** Mission control, not SaaS dashboard. Confident, precise, warm. The kind of tool you trust to run things while you focus on strategy. Irreverent name, serious function.
-- **Reference sites:** Linear (discipline, density, acid accent), Raycast (dark-first, command-driven), Alma (elegant restraint)
+- **Direction:** Signal Black
+- **Decoration level:** Minimal. No noise textures, no grain overlays. Depth via subtle shadow and stark surface elevation only. Every visual element earns its place.
+- **Mood:** Precision instrument, not SaaS dashboard. The feeling of opening a well-made tool where everything is in its place. Confident, sharp, focused. Irreverent name, serious function.
+- **Reference sites:** Linear (discipline, density, monochrome base), Raycast (dark-first, premium restraint), Vercel (typography, clean surfaces)
 
 ## Typography
-- **Display/Hero:** Satoshi (700, 800) — Geometric sans with warmth and personality. Stands out from the Inter/Geist/Poppins crowd. Confident without being flashy.
-- **Body:** DM Sans (400, 500, 600, 700) — Exceptionally readable at small sizes, great x-height, pairs naturally with Satoshi.
-- **UI/Labels:** DM Sans (500, 600) — Same as body for consistency.
-- **Data/Tables:** DM Sans with `font-feature-settings: "tnum" 1` — Tabular figures for aligned numbers.
+- **Display/Hero:** General Sans (700, 800) — Geometric sans with warmth and personality. Available from Fontshare. The personality that Satoshi was supposed to bring, actually loaded and rendered.
+- **Body:** Instrument Sans (400, 500, 600, 700) — Pristine at small sizes, excellent x-height, modern. Clean without being sterile.
+- **UI/Labels:** Instrument Sans (500, 600) — Same as body for consistency.
+- **Data/Tables:** Instrument Sans with `font-feature-settings: "tnum" 1` — Tabular figures for aligned numbers.
 - **Code:** JetBrains Mono (400, 500, 600) — Developer tool standard. Used for code blocks, agent configs, status labels, and monospace metadata captions.
-- **Loading:** Satoshi from Fontshare CDN (`api.fontshare.com`), DM Sans and JetBrains Mono from Bunny Fonts CDN (`fonts.bunny.net`).
+- **Loading:** General Sans from Fontshare CDN (`api.fontshare.com`), Instrument Sans and JetBrains Mono from Google Fonts (`fonts.googleapis.com`).
 - **Scale:**
-  - 48px / 800 — Page hero (rare, dashboard welcome only)
-  - 32px / 700 — Section hero
-  - 22px / 700 — Section title
-  - 18px / 600 — Subsection heading
-  - 15px / 500 — Body text (primary reading size)
-  - 13px / 400-500 — Secondary text, descriptions, UI labels
-  - 11px / 500-600 — Monospace captions, badges, metadata (uppercase + tracking)
-  - 10px / 600 — Section labels (mono, uppercase, 0.1em tracking, primary color)
+  - 48px / 800 — Page hero (rare, dashboard welcome only). General Sans, letter-spacing: -0.03em.
+  - 32px / 700 — Section hero. General Sans, letter-spacing: -0.02em.
+  - 22px / 700 — Section title. General Sans, letter-spacing: -0.01em.
+  - 18px / 600 — Subsection heading. Instrument Sans.
+  - 15px / 500 — Body text (primary reading size). Instrument Sans.
+  - 13px / 400-500 — Secondary text, descriptions, UI labels. Instrument Sans.
+  - 11px / 500-600 — Monospace captions, badges, metadata (uppercase + tracking). JetBrains Mono.
+  - 10px / 600 — Section labels (mono, uppercase, 0.1em tracking, accent color). JetBrains Mono.
 
 ## Color
-- **Approach:** Restrained with a bold accent. Color is rare and meaningful — the teal accent does all the heavy lifting against warm neutrals.
-- **Primary (light):** `#0D9488` / `oklch(0.58 0.12 175)` — Electric teal. Distinctive in the AI space (everyone uses purple). Reads as "alive" and "intelligent."
-- **Primary (dark):** `#2DD4BF` / `oklch(0.78 0.14 175)` — Brighter teal for dark surfaces.
-- **Primary hover (light):** `#0F766E`
-- **Primary hover (dark):** `#5EEAD4`
-- **Primary subtle (light):** `#CCFBF1` — Tinted backgrounds for badges, highlights.
-- **Primary subtle (dark):** `rgba(45, 212, 191, 0.12)` — Transparent overlay for dark mode.
-- **Primary ghost:** `rgba(13, 148, 136, 0.08)` (light) / `rgba(45, 212, 191, 0.06)` (dark) — Hover states, ghost buttons.
-- **Neutrals:** Warm-tinted grays throughout. NOT cool blue-grays.
-  - Light: `#faf9f7` (bg) → `#f5f3f0` (sidebar) → `#ffffff` (elevated) → `#f3f1ee` (sunken) → `#e8e5e0` (border) → `#1a1714` (fg)
-  - Dark: `#141210` (bg) → `#110f0d` (sidebar) → `#1e1b18` (elevated) → `#0e0d0b` (sunken) → `rgba(255,255,255,0.07)` (border) → `#e8e4de` (fg)
+- **Approach:** Restrained with electric accent. Nearly monochrome base. Color is rare and meaningful — the emerald accent creates focal points, not ambient glow. Use accent on only 5-10% of the UI surface.
+- **Primary (light):** `#059669` (emerald-600) — Deep, saturated emerald. Reads clearly on white/light surfaces.
+- **Primary (dark):** `#34D399` (emerald-400) — Electric emerald. Pops on near-black. Vivid without being neon.
+- **Primary hover (light):** `#047857` (emerald-700)
+- **Primary hover (dark):** `#6EE7B7` (emerald-300)
+- **Primary subtle (light):** `rgba(5, 150, 105, 0.08)` — Ghost backgrounds for badges, highlights.
+- **Primary subtle (dark):** `rgba(52, 211, 153, 0.08)` — Transparent overlay for dark mode.
+- **Neutrals:** Cold-neutral zinc scale. NOT warm-tinted. Clean and precise.
+  - Light: `#FAFAFA` (bg) → `#F4F4F5` (sidebar/sunken) → `#FFFFFF` (elevated) → `#E4E4E7` (hover) → `#D4D4D8` (border) → `#09090B` (fg)
+  - Dark: `#09090B` (bg) → `#0F0F11` (sidebar) → `#18181B` (elevated) → `#27272A` (hover) → `rgba(255,255,255,0.06)` (border) → `#FAFAFA` (fg)
+- **Text hierarchy (dark):** `#FAFAFA` (primary) → `#A1A1AA` (secondary) → `#71717A` (muted)
+- **Text hierarchy (light):** `#09090B` (primary) → `#71717A` (secondary) → `#A1A1AA` (muted)
 - **Semantic:**
   - Success: `#16a34a` (light) / `#4ade80` (dark) — Agent completed, tests passing
   - Warning: `#d97706` (light) / `#fbbf24` (dark) — Rate limits, pending review
   - Error: `#dc2626` (light) / `#f87171` (dark) — Failed tasks, connection lost
   - Info: `#2563eb` (light) / `#60a5fa` (dark) — Queued, informational
-- **Dark mode strategy:** Warm undertones (`#141210` not `#0a0a0f`). Surface elevation via lightness steps (0.10 → 0.125 → 0.165 → 0.19). Reduce accent saturation ~10% for eye comfort. Apple proved warm darks work for tools you spend hours in.
+- **Dark mode strategy:** Cold-neutral zinc base (`#09090B` not `#141210`). Surface elevation via stark lightness jumps — cards must be obviously elevated, not muddy. Elevation ladder: sidebar (0.06) → background (0.04) → elevated (0.10) → hover (0.17). Border at 6% white opacity — barely visible, clean.
 
 ## Spacing
 - **Base unit:** 4px
@@ -56,14 +57,14 @@
 ## Layout
 - **Approach:** Grid-disciplined, sidebar-first
 - **Grid:** Sidebar (220px collapsed to icon) + fluid main content
-- **Max content width:** 1200px
+- **Max content width:** 1000px (tighter than previous 1200px — better reading measure, more focused)
 - **Border radius:** Hierarchical — sm: 4px (badges, small chips), md: 8px (buttons, inputs, inner cards), lg: 12px (cards, panels, modals), full: 9999px (pills, avatars, status dots)
 - **Density tiers by view:**
-  - **Dashboard:** Comfortable density. Action cards with breathing room, stats at a glance. Company context as a compact header strip (domain + agent count), NOT a content block. Action cards are the hero — front and center. Insights and board summary below the fold.
-  - **Board:** Compact density. Tight rows, subtle status badges, monospace metadata. Think Linear's issue list: calm, dense, software-like. No Trello-style kanban cards or visual noise. Status via small colored dots + uppercase mono badges. Metadata (assignee, dates, priority) inline and subtle.
-  - **Brain:** Compact density. Dense knowledge sections, collapsible panels, clear section labels. Content-forward — the knowledge itself is the UI.
-  - **Agents:** Compact density. Agent list as a tight table/list with status indicators, tool badges, and inline metrics. Not large cards.
-  - **Chat:** Standard density. Conversation needs vertical breathing room. Messages have generous line-height. Code blocks and tool outputs are compact within messages.
+  - **Dashboard:** Comfortable density. Stats row at top (4-column grid). Action cards in a 2-column grid (NOT single-column scroll). Company context as a compact header strip. Actions are the hero — front and center. Insights and board summary below the fold.
+  - **Board:** Compact density. Tight rows, subtle status badges, monospace metadata. Linear-style issue list: calm, dense, software-like. No kanban cards. Status via small colored dots + uppercase mono badges. Metadata inline and subtle.
+  - **Brain:** Compact density. Dense knowledge sections, collapsible panels, clear section labels. Content-forward.
+  - **Agents:** Compact density. Agent list as tight table/list with status indicators, tool badges, and inline metrics. Not large cards.
+  - **Chat:** Standard density. Generous line-height for messages. Code blocks and tool outputs compact within messages.
   - **Connections / Settings:** Standard density. Form-based views with clear grouping.
 
 ## Motion
@@ -74,22 +75,35 @@
   - Respect `prefers-reduced-motion` — collapse all animations to 0.01ms.
   - No bounce, no overshoot, no playful easing. Snappy and precise.
   - Sidebar collapse/expand: 200ms ease-in-out.
-  - Card hover: 100ms (transform + shadow only, no color animation on the card itself).
-  - Action card hover: 2px teal top-border fade-in, subtle translateY(-1px).
+  - Card hover: 100ms ease-out. translateY(-1px) + subtle shadow increase. Border shifts to accent at 25% opacity.
+  - No noise texture animations, no grain overlays, no ambient glow effects.
 
 ## UI Copy Principles
 - **Action labels must be concrete and outcome-based.** Not "Run action" → "Run competitor analysis." Not "View results" → "View analysis report." Not "Adjust something" → "Show 2 bolder variants."
 - **Status labels are monospace uppercase.** DONE, IN PROGRESS, REVIEW, BLOCKED, QUEUED. Short, scannable.
-- **Section labels are monospace uppercase with primary color.** `01 — TYPOGRAPHY`, `QUICK ACTIONS`, `RECENT TASKS`.
+- **Section labels are monospace uppercase with accent color.** `QUICK ACTIONS`, `RECENT TASKS`, `AGENT LIBRARY`.
 - **No marketing copy in the app.** No "Built for teams" or "Powered by AI." The UI speaks through function, not slogans.
+
+## Key Design Rules
+- Primary color is emerald, not teal/purple/blue
+- Fonts: General Sans (display), Instrument Sans (body), JetBrains Mono (code)
+- Dark mode uses cold-neutral zinc base (#09090B), not warm brown
+- Dashboard is action-first: stats row + 2-column action card grid hero, company summary compressed
+- Board uses compact list view with status dots, NOT kanban cards
+- Accent color used sparingly — only 5-10% of UI surface. Not on every section label and border.
+- No noise textures, no grain overlays. Depth via shadow and surface contrast only.
 
 ## Decisions Log
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-03-23 | Initial design system created | Created by /design-consultation based on competitive research (Alma, Flowise, CrewAI, Linear, Raycast) and product context |
-| 2026-03-23 | Teal primary over purple/blue | Every AI tool uses purple/blue. Teal is distinctive, reads as "alive" not "corporate," and creates visual tension against warm neutrals |
-| 2026-03-23 | Satoshi + DM Sans over Geist | Geist is fine but generic (stock shadcn). Satoshi has geometric personality; DM Sans is more readable at small sizes |
-| 2026-03-23 | Warm dark mode (#141210) | Conventional cold blue-black (#0a0a0f) is harsh for extended use. Warm darks are more inviting — proven by Apple's design language |
-| 2026-03-23 | Density tiers by view | Dashboard = comfortable (action-first), Board/Brain/Agents = compact (Linear-style density), Chat = standard (conversation needs air) |
-| 2026-03-23 | Action-first Dashboard | Dashboard leads with stats + action cards, company context compressed to header strip. Users see "what can I do now" not "read this summary" |
-| 2026-03-23 | No kanban cards on Board | Board uses calm list view with status dots + mono badges. Matches V3 board spec. Trello-style cards add visual noise without information gain |
+| 2026-03-23 | Teal primary over purple/blue | Every AI tool uses purple/blue. Teal is distinctive, reads as "alive" not "corporate" |
+| 2026-03-23 | Warm dark mode (#141210) | Conventional cold blue-black is harsh for extended use. Warm darks are more inviting |
+| 2026-03-23 | Density tiers by view | Dashboard = comfortable (action-first), Board/Brain/Agents = compact (Linear-style density), Chat = standard |
+| 2026-03-24 | **Signal Black redesign** | Full aesthetic overhaul. Old system looked like stock shadcn with a teal variable swap — murky surfaces, monotone accent, Satoshi never loaded |
+| 2026-03-24 | Cold-neutral zinc base over warm | Warm undertones (#141210) made the UI feel muddy, not warm. Cold zinc (#09090B) provides sharper contrast and cleaner surfaces. Linear, Raycast, Vercel all use cold darks for dev tools |
+| 2026-03-24 | Electric emerald over teal | Teal was too muted against warm backgrounds and was used everywhere. Emerald (#34D399) is brighter, more vivid, and used sparingly (5-10% of surface) to create focal points |
+| 2026-03-24 | General Sans + Instrument Sans | Satoshi was never loading (no CDN import). General Sans provides the same geometric personality from Fontshare. Instrument Sans replaces DM Sans with better small-size rendering |
+| 2026-03-24 | Kill noise texture | The surface-noise overlay added nothing visible. Removed in favor of clean surfaces with stark elevation contrast |
+| 2026-03-24 | 2-column action grid | Single-column dashboard was a scroll pit with 9 sections. 2-column grid for action cards reduces scrolling and adds visual variety |
+| 2026-03-24 | Max width 1000px (from 1200px) | Tighter reading measure, more focused content. 1200px spread content too thin |

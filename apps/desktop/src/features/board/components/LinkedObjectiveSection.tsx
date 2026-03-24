@@ -15,30 +15,28 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export function LinkedObjectiveSection({ objective }: LinkedObjectiveSectionProps) {
+  if (!objective) return null;
+
   return (
-    <div className="border-t border-border/40 pt-4">
-      <h4 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-        Linked Objective
+    <div className="border-t border-border/40 py-3">
+      <h4 className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+        Objective
       </h4>
-      {!objective ? (
-        <p className="text-xs text-muted-foreground/60">No linked objective</p>
-      ) : (
-        <div className="flex items-center gap-2">
-          <TargetIcon className="size-3.5 shrink-0 text-primary/60" />
-          <a
-            href={`#objectives/${objective.objectiveId}`}
-            className="text-sm font-medium text-foreground hover:text-primary transition-colors truncate"
-          >
-            {objective.title}
-          </a>
-          <Badge
-            variant="outline"
-            className={`shrink-0 border-transparent font-mono text-[10px] uppercase tracking-wider ${STATUS_STYLES[objective.status] ?? ""}`}
-          >
-            {objective.status}
-          </Badge>
-        </div>
-      )}
+      <div className="flex items-center gap-2">
+        <TargetIcon className="size-3.5 shrink-0 text-primary/60" />
+        <a
+          href={`#objectives/${objective.objectiveId}`}
+          className="truncate text-[13px] font-medium text-foreground transition-colors hover:text-primary"
+        >
+          {objective.title}
+        </a>
+        <Badge
+          variant="outline"
+          className={`shrink-0 border-transparent font-mono text-[10px] uppercase tracking-wider ${STATUS_STYLES[objective.status] ?? ""}`}
+        >
+          {objective.status}
+        </Badge>
+      </div>
     </div>
   );
 }

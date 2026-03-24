@@ -1,38 +1,54 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getStatusConfig } from "@/features/board/lib/status-config";
-import { ShieldAlertIcon, FileTextIcon, ClockIcon } from "lucide-react";
+import {
+  ShieldAlertIcon,
+  FileTextIcon,
+  ClockIcon,
+  ChevronDownIcon,
+  PlusIcon,
+} from "lucide-react";
 
 const ALL_STATUSES = ["todo", "doing", "pending", "blocked", "done"] as const;
 const REASON_STATUSES = new Set(["pending", "blocked"]);
 
-const STATUS_BUTTON_CLASSES: Record<string, string> = {
-  todo: "",
-  doing: "text-blue-600 dark:text-blue-400",
-  pending: "text-yellow-600 dark:text-yellow-400",
-  blocked: "text-red-600 dark:text-red-400",
-  done: "text-green-600 dark:text-green-400",
+const STATUS_DOT_CLASSES: Record<string, string> = {
+  todo: "bg-zinc-400",
+  doing: "bg-primary",
+  pending: "bg-yellow-400",
+  blocked: "bg-red-400",
+  done: "bg-green-400",
 };
 
 type EntryKind = "blocker" | "artifact" | "worklog";
 
-const ENTRY_CONFIG: Record<EntryKind, { label: string; icon: typeof ShieldAlertIcon; className: string; placeholder: string }> = {
+const ENTRY_CONFIG: Record<
+  EntryKind,
+  {
+    label: string;
+    icon: typeof ShieldAlertIcon;
+    placeholder: string;
+  }
+> = {
   blocker: {
     label: "Add Blocker",
     icon: ShieldAlertIcon,
-    className: "text-red-600 dark:text-red-400",
     placeholder: "Describe the blocker…",
   },
   artifact: {
     label: "Add Artifact",
     icon: FileTextIcon,
-    className: "text-muted-foreground",
     placeholder: "Describe the artifact…",
   },
   worklog: {
     label: "Add Worklog",
     icon: ClockIcon,
-    className: "text-muted-foreground",
     placeholder: "What was done…",
   },
 };
@@ -58,7 +74,9 @@ export function TaskQuickActions({
   const [activeEntry, setActiveEntry] = useState<EntryKind | null>(null);
   const [entryContent, setEntryContent] = useState("");
 
-  const availableTransitions = ALL_STATUSES.filter((s) => s !== currentStatus);
+  const availableTransitions = ALL_STATUSES.filter(
+    (s) => s !== currentStatus,
+  );
 
   const entryHandlers: Record<EntryKind, (content: string) => Promise<void>> = {
     blocker: onAddBlocker,
@@ -66,7 +84,7 @@ export function TaskQuickActions({
     worklog: onAddWorklog,
   };
 
-  const handleClick = async (status: string) => {
+  const handleStatusSelect = async (status: string) => {
     if (REASON_STATUSES.has(status)) {
       setPendingAction(status);
       setReason("");
@@ -121,115 +139,137 @@ export function TaskQuickActions({
     setEntryContent("");
   };
 
+  // Inline input for reason or entry
+  if (pendingAction) {
+    return (
+      <div className="flex w-full items-center gap-2">
+        <input
+          type="text"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder={`Reason for ${getStatusConfig(pendingAction).label.toLowerCase()} (optional)`}
+          className="h-8 flex-1 rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void handleConfirmReason();
+            if (e.key === "Escape") handleCancelReason();
+          }}
+          autoFocus
+        />
+        <Button
+          variant="default"
+          size="sm"
+          disabled={isUpdating}
+          onClick={() => void handleConfirmReason()}
+        >
+          Confirm
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={isUpdating}
+          onClick={handleCancelReason}
+        >
+          Cancel
+        </Button>
+      </div>
+    );
+  }
+
+  if (activeEntry) {
+    const cfg = ENTRY_CONFIG[activeEntry];
+    return (
+      <div className="flex w-full items-center gap-2">
+        <input
+          type="text"
+          value={entryContent}
+          onChange={(e) => setEntryContent(e.target.value)}
+          placeholder={cfg.placeholder}
+          className="h-8 flex-1 rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void handleConfirmEntry();
+            if (e.key === "Escape") handleCancelEntry();
+          }}
+          autoFocus
+        />
+        <Button
+          variant="default"
+          size="sm"
+          disabled={isUpdating || !entryContent.trim()}
+          onClick={() => void handleConfirmEntry()}
+        >
+          Add
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={isUpdating}
+          onClick={handleCancelEntry}
+        >
+          Cancel
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-3">
-      {/* Status transitions */}
-      <div className="flex flex-wrap gap-2">
-        {availableTransitions.map((status) => {
-          const config = getStatusConfig(status);
-          return (
-            <Button
-              key={status}
-              variant="outline"
-              size="sm"
-              disabled={isUpdating}
-              className={STATUS_BUTTON_CLASSES[status] ?? ""}
-              onClick={() => void handleClick(status)}
-            >
-              {`Mark ${config.label}`}
+    <div className="flex w-full items-center justify-between">
+      {/* Left: Status change dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" disabled={isUpdating} className="gap-1.5">
+            Move to
+            <ChevronDownIcon className="size-3.5 text-muted-foreground" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {availableTransitions.map((status) => {
+            const config = getStatusConfig(status);
+            return (
+              <DropdownMenuItem
+                key={status}
+                onClick={() => void handleStatusSelect(status)}
+                className="gap-2"
+              >
+                <span
+                  className={`size-2 rounded-full ${STATUS_DOT_CLASSES[status] ?? "bg-muted-foreground"}`}
+                />
+                <span className="font-mono text-[11px] uppercase tracking-wider">
+                  {config.label}
+                </span>
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Right: Add entry buttons */}
+      <div className="flex items-center gap-1">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+              <PlusIcon className="size-3.5" />
+              Add
+              <ChevronDownIcon className="size-3 text-muted-foreground/50" />
             </Button>
-          );
-        })}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {(Object.keys(ENTRY_CONFIG) as EntryKind[]).map((kind) => {
+              const cfg = ENTRY_CONFIG[kind];
+              const Icon = cfg.icon;
+              return (
+                <DropdownMenuItem
+                  key={kind}
+                  onClick={() => handleEntryClick(kind)}
+                  className="gap-2"
+                >
+                  <Icon className="size-3.5" />
+                  {cfg.label}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-
-      {/* Reason input for pending/blocked */}
-      {pendingAction && (
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder={`Reason for ${getStatusConfig(pendingAction).label.toLowerCase()} (optional)`}
-            className="h-7 flex-1 rounded-md border border-border bg-background px-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void handleConfirmReason();
-              if (e.key === "Escape") handleCancelReason();
-            }}
-            autoFocus
-          />
-          <Button
-            variant="default"
-            size="sm"
-            disabled={isUpdating}
-            onClick={() => void handleConfirmReason()}
-          >
-            Confirm
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={isUpdating}
-            onClick={handleCancelReason}
-          >
-            Cancel
-          </Button>
-        </div>
-      )}
-
-      {/* Add blocker / artifact / worklog buttons */}
-      <div className="flex flex-wrap gap-2 border-t pt-3">
-        {(Object.keys(ENTRY_CONFIG) as EntryKind[]).map((kind) => {
-          const cfg = ENTRY_CONFIG[kind];
-          const Icon = cfg.icon;
-          return (
-            <Button
-              key={kind}
-              variant="ghost"
-              size="sm"
-              disabled={isUpdating}
-              className={cfg.className}
-              onClick={() => handleEntryClick(kind)}
-            >
-              <Icon className="size-3.5" />
-              {cfg.label}
-            </Button>
-          );
-        })}
-      </div>
-
-      {/* Inline content input for add entry */}
-      {activeEntry && (
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={entryContent}
-            onChange={(e) => setEntryContent(e.target.value)}
-            placeholder={ENTRY_CONFIG[activeEntry].placeholder}
-            className="h-7 flex-1 rounded-md border border-border bg-background px-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void handleConfirmEntry();
-              if (e.key === "Escape") handleCancelEntry();
-            }}
-            autoFocus
-          />
-          <Button
-            variant="default"
-            size="sm"
-            disabled={isUpdating || !entryContent.trim()}
-            onClick={() => void handleConfirmEntry()}
-          >
-            Add
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={isUpdating}
-            onClick={handleCancelEntry}
-          >
-            Cancel
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

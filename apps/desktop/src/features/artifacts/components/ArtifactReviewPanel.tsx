@@ -1,12 +1,12 @@
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useArtifact } from "@/features/artifacts/hooks/useArtifact";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -73,10 +73,9 @@ export function ArtifactReviewPanel({
   );
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent
-        side="right"
-        className="flex flex-col sm:max-w-lg"
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        className="flex max-h-[85vh] flex-col sm:max-w-lg"
       >
         {isLoading ? (
           <PanelSkeleton />
@@ -84,11 +83,11 @@ export function ArtifactReviewPanel({
           <PanelError error={error} onRetry={refresh} />
         ) : artifact ? (
           <>
-            <SheetHeader className="space-y-3">
-              <SheetTitle className="pr-8 leading-snug">
+            <DialogHeader className="space-y-3">
+              <DialogTitle className="pr-8 leading-snug">
                 {artifact.title}
-              </SheetTitle>
-              <SheetDescription asChild>
+              </DialogTitle>
+              <DialogDescription asChild>
                 <div className="flex flex-col gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <ArtifactStatusBadge status={artifact.status} />
@@ -116,8 +115,8 @@ export function ArtifactReviewPanel({
                     </span>
                   </div>
                 </div>
-              </SheetDescription>
-            </SheetHeader>
+              </DialogDescription>
+            </DialogHeader>
 
             <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4">
               {/* Summary */}
@@ -144,8 +143,8 @@ export function ArtifactReviewPanel({
             </div>
           </>
         ) : null}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 

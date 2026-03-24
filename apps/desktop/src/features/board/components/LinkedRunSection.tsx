@@ -16,14 +16,14 @@ const RUN_STATUS_STYLES: Record<string, string> = {
 };
 
 export function LinkedRunSection({ run }: LinkedRunSectionProps) {
+  if (!run) return null;
+
   return (
-    <div className="border-t border-border/40 pt-4">
-      <h4 className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-        Linked Run
+    <div className="border-t border-border/40 py-3">
+      <h4 className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+        Run
       </h4>
-      {!run ? (
-        <p className="text-xs text-muted-foreground/60">No linked run</p>
-      ) : (
+      {run && (
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
             <PlayIcon className="size-3.5 shrink-0 text-primary/60" />
