@@ -47,7 +47,7 @@ export function MemoryEntryForm({
       <textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        placeholder="What should the system remember?"
+        placeholder="What should the system know?"
         rows={3}
         className="w-full resize-none rounded-md border border-border/40 bg-transparent px-3 py-2 text-[13px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
         autoFocus

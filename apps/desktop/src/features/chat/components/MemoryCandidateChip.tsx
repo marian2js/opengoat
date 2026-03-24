@@ -77,7 +77,7 @@ export function MemoryCandidateChip({
     return (
       <div className="mt-2 flex items-center gap-1.5 rounded-md border border-green-500/20 bg-green-500/[0.06] px-2.5 py-1.5 text-[11px] text-green-600 dark:text-green-400">
         <CheckIcon className="size-3" />
-        <span>Saved to memory</span>
+        <span>Saved to Brain</span>
       </div>
     );
   }

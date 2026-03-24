@@ -147,7 +147,7 @@ describe("ObjectiveMemoryTab component", () => {
 
   it("handles delete with confirmation dialog", () => {
     const src = readSrc(filePath);
-    expect(src).toContain("Delete memory entry");
+    expect(src).toContain("Delete entry");
     expect(src).toContain("DialogContent");
   });
 

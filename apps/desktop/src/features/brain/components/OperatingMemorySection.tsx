@@ -196,11 +196,11 @@ export function OperatingMemorySection({ agentId, client }: OperatingMemorySecti
           <DatabaseIcon className="size-7 text-muted-foreground/50" />
         </div>
         <h3 className="mt-4 font-display text-sm font-bold tracking-tight text-foreground/80">
-          Project memory is empty
+          No saved guidance yet
         </h3>
         <p className="mt-1.5 max-w-xs text-center text-xs leading-relaxed text-muted-foreground/60">
-          Memory entries help the system remember brand voice, product facts, preferences, and
-          constraints. Add entries so suggestions stay aligned with your project.
+          Saved guidance helps the system stay aligned with your brand voice, product facts,
+          preferences, and constraints. This is optional — you can start using the app without it.
         </p>
         <button
           type="button"
@@ -208,7 +208,7 @@ export function OperatingMemorySection({ agentId, client }: OperatingMemorySecti
           className="mt-5 flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <PlusIcon className="size-3.5" />
-          Add your first memory
+          Add your first entry
         </button>
 
         {creatingCategory && (
@@ -290,7 +290,7 @@ export function OperatingMemorySection({ agentId, client }: OperatingMemorySecti
       <Dialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
         <DialogContent className="sm:max-w-xs" showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Delete memory entry</DialogTitle>
+            <DialogTitle>Delete entry</DialogTitle>
             <DialogDescription>
               This entry will be permanently removed. This action cannot be undone.
             </DialogDescription>

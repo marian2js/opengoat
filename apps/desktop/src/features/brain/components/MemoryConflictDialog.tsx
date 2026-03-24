@@ -39,7 +39,7 @@ export function MemoryConflictDialog({
             Potential conflict detected
           </DialogTitle>
           <DialogDescription>
-            An existing memory entry in this category may overlap with your new entry.
+            An existing entry in this category may overlap with your new entry.
             Choose how to proceed.
           </DialogDescription>
         </DialogHeader>

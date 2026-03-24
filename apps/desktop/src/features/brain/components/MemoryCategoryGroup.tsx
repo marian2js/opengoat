@@ -68,7 +68,7 @@ export function MemoryCategoryGroup({
           className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
         >
           <PlusIcon className="size-3" />
-          Add memory
+          Add entry
         </button>
       </div>
 

@@ -206,10 +206,10 @@ export function ObjectiveMemoryTab({ agentId, objectiveId, client }: ObjectiveMe
           <DatabaseIcon className="size-7 text-muted-foreground/50" />
         </div>
         <h3 className="mt-4 font-display text-sm font-bold tracking-tight text-foreground/80">
-          No objective memories yet
+          No objective context yet
         </h3>
         <p className="mt-1.5 max-w-xs text-center text-xs leading-relaxed text-muted-foreground/60">
-          Memory entries capture context, decisions, and constraints specific to this objective.
+          Context entries capture decisions and constraints specific to this objective.
           Add entries so the system stays aligned with your goal.
         </p>
         <button
@@ -218,7 +218,7 @@ export function ObjectiveMemoryTab({ agentId, objectiveId, client }: ObjectiveMe
           className="mt-5 flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <PlusIcon className="size-3.5" />
-          Add your first memory
+          Add your first entry
         </button>
       </div>
     );
@@ -323,7 +323,7 @@ export function ObjectiveMemoryTab({ agentId, objectiveId, client }: ObjectiveMe
       <Dialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
         <DialogContent className="sm:max-w-xs" showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Delete memory entry</DialogTitle>
+            <DialogTitle>Delete entry</DialogTitle>
             <DialogDescription>
               This entry will be permanently removed. This action cannot be undone.
             </DialogDescription>

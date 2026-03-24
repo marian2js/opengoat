@@ -261,11 +261,11 @@ What self-reinforcing loops drive growth?`,
   },
   {
     id: "memory",
-    label: "Memory",
+    label: "Company Context",
     filename: "MEMORY.md",
     icon: BrainIcon,
-    description: "Strategic decisions, brand preferences, and product context",
-    placeholder: `# Memory
+    description: "Product details, brand positioning, and company background",
+    placeholder: `# Company Context
 
 ## Key Decisions
 Record strategic decisions and the reasoning behind them — positioning changes, campaign strategies, product pivots.
@@ -278,15 +278,15 @@ Share product and market context that helps the AI provide more relevant assista
   },
   {
     id: "operating-memory",
-    label: "Operating Memory",
+    label: "Saved Guidance",
     filename: "",
     icon: DatabaseIcon,
-    description: "Structured project memory — facts, preferences, and decisions the system uses",
+    description: "Preferences, constraints, and decisions the system uses to stay aligned",
     placeholder: "",
   },
   {
     id: "knowledge",
-    label: "Knowledge",
+    label: "Knowledge Base",
     filename: "KNOWLEDGE.md",
     icon: BookOpenIcon,
     description: "Domain knowledge, documentation, and imported references",
@@ -670,7 +670,7 @@ function MemoryEmptyState({
       <div className="flex items-center gap-2 text-muted-foreground">
         <LightbulbIcon className="size-4 text-amber-500/70" />
         <span className="text-xs">
-          Build your AI&apos;s memory. Add decisions, preferences, and context it should remember.
+          Add decisions, preferences, and context to help your AI stay aligned with your company.
         </span>
       </div>
 
@@ -701,7 +701,7 @@ function MemoryEmptyState({
         >
           <FlameIcon className="mb-2 size-4 text-orange-500/70" />
           <div className="font-medium text-foreground/70">Use template</div>
-          <div className="mt-1 text-xs">Start with a pre-filled template for memory</div>
+          <div className="mt-1 text-xs">Start with a pre-filled template for company context</div>
         </button>
         <button
           type="button"
