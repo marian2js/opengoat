@@ -4,6 +4,7 @@ import {
   ArtifactService,
   BoardService,
   BUILTIN_PLAYBOOKS,
+  ChatSdkBridgeService,
   MemoryService,
   MessagingConnectionService,
   MessagingRouterService,
@@ -16,6 +17,7 @@ import {
   PlaybookRegistryService,
   RunService,
   SkillService,
+  TelegramChannelService,
 } from "@opengoat/core";
 import packageJson from "../package.json" with { type: "json" };
 import { RuntimeProviderAuthService } from "./auth/service.ts";
@@ -27,6 +29,7 @@ import { AgentMetadataStoreService } from "./internal-gateway/metadata-store.ts"
 import { EmbeddedGatewaySupervisor } from "./internal-gateway/supervisor.ts";
 
 import { sidecarLogger } from "./logger.ts";
+import { MessagingGatewayAdapter } from "./internal-gateway/messaging-gateway-adapter.ts";
 import { createSidecarApp } from "./server/app.ts";
 
 export interface SidecarServerHandle {
@@ -122,6 +125,21 @@ export async function startSidecarServer(
     connectionService: messagingConnectionService,
   });
 
+  const messagingGatewayAdapter = new MessagingGatewayAdapter(embeddedGateway);
+
+  const chatSdkBridgeService = new ChatSdkBridgeService({
+    connectionService: messagingConnectionService,
+    routerService: messagingRouterService,
+    gateway: messagingGatewayAdapter,
+  });
+
+  const telegramChannelService = new TelegramChannelService({
+    connectionService: messagingConnectionService,
+    routerService: messagingRouterService,
+    bridgeService: chatSdkBridgeService,
+    paths: opengoatPaths,
+  });
+
   const runtime = {
     artifactService,
     authService,
@@ -143,6 +161,7 @@ export async function startSidecarServer(
     runService,
     signalService,
     skillService,
+    telegramChannelService,
     startedAt: Date.now(),
     version: packageJson.version,
   };

@@ -15,6 +15,7 @@ import { createRunRoutes } from "./routes/runs.ts";
 import { createSignalRoutes } from "./routes/signals.ts";
 import { createTaskRoutes } from "./routes/tasks.ts";
 import { createMessagingRoutes } from "./routes/messaging.ts";
+import { createTelegramWebhookRoutes } from "./routes/telegram-webhook.ts";
 import { createWorkspaceSignalRoutes } from "./routes/workspace-signals.ts";
 import type { SidecarRuntime } from "./context.ts";
 
@@ -57,8 +58,20 @@ export function createSidecarApp(runtime: SidecarRuntime): Hono<{
     }),
   );
 
+  // Telegram webhook route — mounted BEFORE basic auth middleware
+  // Telegram POSTs updates directly; security is via x-telegram-bot-api-secret-token header
+  app.route(
+    "/messaging/telegram/webhook",
+    createTelegramWebhookRoutes(runtime),
+  );
+
   app.use("*", async (context, next) => {
     if (context.req.method === "OPTIONS") {
+      return next();
+    }
+
+    // Skip auth for already-handled Telegram webhook paths
+    if (context.req.path.startsWith("/messaging/telegram/webhook/")) {
       return next();
     }
 

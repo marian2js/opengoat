@@ -5,6 +5,7 @@ import {
   Trash2Icon,
   SmartphoneIcon,
   SendIcon,
+  SettingsIcon,
 } from "lucide-react";
 import type { MessagingConnection } from "@/app/types";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { SidecarClient } from "@/lib/sidecar/client";
+import { TelegramSetupFlow } from "./TelegramSetupFlow";
 
 interface MessagingConnectionsPanelProps {
   client: SidecarClient | null;
@@ -54,6 +56,8 @@ export function MessagingConnectionsPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [showTelegramSetup, setShowTelegramSetup] = useState(false);
+  const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
 
   const loadConnections = useCallback(async () => {
     if (!client) {
@@ -81,6 +85,12 @@ export function MessagingConnectionsPanel({
     }
     setShowTypeSelector(false);
     setErrorMessage(null);
+
+    if (type === "telegram") {
+      setShowTelegramSetup(true);
+      return;
+    }
+
     try {
       const meta = TYPE_META[type];
       await client.createMessagingConnection({
@@ -93,6 +103,11 @@ export function MessagingConnectionsPanel({
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  function handleTelegramSetupComplete(): void {
+    setShowTelegramSetup(false);
+    void loadConnections();
   }
 
   async function handleDelete(connectionId: string): Promise<void> {
@@ -138,7 +153,18 @@ export function MessagingConnectionsPanel({
         </div>
       ) : null}
 
-      {showTypeSelector ? (
+      {showTelegramSetup && client ? (
+        <div className="border-t border-border/60 px-4 py-3 lg:px-5">
+          <TelegramSetupFlow
+            client={client}
+            sidecarBaseUrl={`http://localhost:${window.location.port || "3001"}`}
+            onComplete={handleTelegramSetupComplete}
+            onCancel={() => setShowTelegramSetup(false)}
+          />
+        </div>
+      ) : null}
+
+      {showTypeSelector && !showTelegramSetup ? (
         <div className="border-t border-border/60 px-4 py-3 lg:px-5">
           <p className="mb-2 text-[12px] text-muted-foreground">
             Select a messaging platform to connect:
@@ -188,11 +214,24 @@ export function MessagingConnectionsPanel({
         <div className="border-t border-border/60">
           <div className="divide-y divide-border/40">
             {connections.map((connection) => (
-              <MessagingConnectionRow
-                key={connection.connectionId}
-                connection={connection}
-                onDelete={handleDelete}
-              />
+              <div key={connection.connectionId}>
+                <MessagingConnectionRow
+                  connection={connection}
+                  isSelected={selectedConnection === connection.connectionId}
+                  onSelect={() =>
+                    setSelectedConnection(
+                      selectedConnection === connection.connectionId
+                        ? null
+                        : connection.connectionId,
+                    )
+                  }
+                  onDelete={handleDelete}
+                />
+                {selectedConnection === connection.connectionId &&
+                connection.type === "telegram" ? (
+                  <TelegramConnectionDetail connection={connection} />
+                ) : null}
+              </div>
             ))}
           </div>
         </div>
@@ -203,9 +242,13 @@ export function MessagingConnectionsPanel({
 
 function MessagingConnectionRow({
   connection,
+  isSelected,
+  onSelect,
   onDelete,
 }: {
   connection: MessagingConnection;
+  isSelected: boolean;
+  onSelect: () => void;
   onDelete: (connectionId: string) => Promise<void>;
 }) {
   const meta = TYPE_META[connection.type] ?? {
@@ -218,7 +261,18 @@ function MessagingConnectionRow({
   const statusLabel = STATUS_LABEL[connection.status] ?? connection.status;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/20 lg:px-5">
+    <div
+      className={cn(
+        "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/20 lg:px-5 cursor-pointer",
+        isSelected && "bg-muted/10",
+      )}
+      onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onSelect();
+      }}
+    >
       <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border/50 bg-background">
         <Icon className={cn("size-4", meta.color)} />
       </div>
@@ -243,6 +297,27 @@ function MessagingConnectionRow({
           </span>
         </div>
       </div>
+      {connection.type === "telegram" ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 rounded-md px-2 text-[11px] text-muted-foreground hover:text-foreground"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect();
+              }}
+            >
+              <SettingsIcon className="size-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="px-2 py-1 text-xs">
+            Connection details
+          </TooltipContent>
+        </Tooltip>
+      ) : null}
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
@@ -250,7 +325,8 @@ function MessagingConnectionRow({
             variant="ghost"
             size="sm"
             className="h-7 rounded-md px-2 text-[11px] text-destructive hover:bg-destructive/8 hover:text-destructive"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               void onDelete(connection.connectionId);
             }}
           >
@@ -261,6 +337,57 @@ function MessagingConnectionRow({
           Remove connection
         </TooltipContent>
       </Tooltip>
+    </div>
+  );
+}
+
+function TelegramConnectionDetail({
+  connection,
+}: {
+  connection: MessagingConnection;
+}) {
+  let config: { botToken?: string; secretToken?: string; webhookUrl?: string } =
+    {};
+  try {
+    if (connection.configRef) {
+      config = JSON.parse(connection.configRef);
+    }
+  } catch {
+    // Invalid config
+  }
+
+  return (
+    <div className="border-t border-border/30 bg-muted/10 px-4 py-3 lg:px-5">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">Status</span>
+          <span className="text-[11px] font-medium text-foreground">
+            {STATUS_LABEL[connection.status] ?? connection.status}
+          </span>
+        </div>
+        {config.webhookUrl ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-muted-foreground">
+              Webhook URL
+            </span>
+            <span className="truncate text-[10px] font-mono text-muted-foreground/70">
+              {config.webhookUrl}
+            </span>
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">Project</span>
+          <span className="text-[11px] text-foreground">
+            {connection.defaultProjectId}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">Created</span>
+          <span className="text-[10px] font-mono text-muted-foreground/70">
+            {new Date(connection.createdAt).toLocaleDateString()}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

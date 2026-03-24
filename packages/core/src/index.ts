@@ -25,6 +25,7 @@ export * from "./core/playbooks/index.js";
 export * from "./core/messaging-connections/index.js";
 export * from "./core/messaging-router/index.js";
 export * from "./core/messaging-bridge/index.js";
+export * from "./core/telegram-channel/index.js";
 export * from "./core/acp/index.js";
 export * from "./core/logging/index.js";
 export * from "./apps/runtime/create-opengoat-runtime.js";
