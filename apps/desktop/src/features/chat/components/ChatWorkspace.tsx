@@ -63,6 +63,12 @@ import { useChatScope } from "@/features/chat/hooks/useChatScope";
 import { ScopeIndicator } from "@/features/chat/components/ScopeIndicator";
 import { ObjectiveBanner } from "@/features/chat/components/ObjectiveBanner";
 import { SidecarClient } from "@/lib/sidecar/client";
+import { detectGoalIntent } from "@/features/chat/lib/goal-detection";
+import { detectMemoryCandidates } from "@/features/chat/lib/memory-detection";
+import { useDismissedProposals } from "@/features/chat/hooks/useDismissedProposals";
+import { useDismissedMemories } from "@/features/chat/hooks/useDismissedMemories";
+import { ProposalCard } from "@/features/chat/components/ProposalCard";
+import { MemoryCandidateChip } from "@/features/chat/components/MemoryCandidateChip";
 
 /**
  * Cache of Chat instances keyed by session ID.
@@ -394,6 +400,28 @@ function ChatSessionView({
 
   const isStreaming = status === "streaming" || status === "submitted";
   const latestMessage = messages[messages.length - 1];
+
+  // Compute last assistant message ID and recent user texts for detection
+  const lastAssistantId = useMemo(() => {
+    for (let i = visibleMessages.length - 1; i >= 0; i--) {
+      const msg = visibleMessages[i];
+      if (msg && msg.role === "assistant") return msg.id;
+    }
+    return undefined;
+  }, [visibleMessages]);
+
+  const recentUserTexts = useMemo(() => {
+    const texts: string[] = [];
+    for (let i = messages.length - 1; i >= 0 && texts.length < 3; i--) {
+      const msg = messages[i];
+      if (msg && msg.role === "user") {
+        const parts = getTextParts(msg);
+        if (parts.length > 0) texts.unshift(parts.join(" "));
+      }
+    }
+    return texts;
+  }, [messages]);
+
   const providerName =
     authOverview?.providers.find(
       (provider) =>
@@ -521,6 +549,13 @@ function ChatSessionView({
               key={message.id}
               isStreaming={isStreaming && latestMessage?.id === message.id}
               message={message}
+              isLastAssistant={message.id === lastAssistantId}
+              recentUserTexts={recentUserTexts}
+              scope={scope}
+              setScope={setScope}
+              client={client}
+              agentId={agentId}
+              sessionId={bootstrap.session.id}
             />
           ))
         )}
@@ -606,9 +641,23 @@ function getFileParts(message: ChatUIMessage) {
 function ChatMessage({
   isStreaming,
   message,
+  isLastAssistant,
+  recentUserTexts,
+  scope,
+  setScope,
+  client,
+  agentId,
+  sessionId,
 }: {
   isStreaming: boolean;
   message: ChatUIMessage;
+  isLastAssistant?: boolean | undefined;
+  recentUserTexts?: string[] | undefined;
+  scope?: ChatScope | undefined;
+  setScope?: ((scope: ChatScope) => void) | undefined;
+  client?: SidecarClient | null | undefined;
+  agentId?: string | undefined;
+  sessionId?: string | undefined;
 }) {
   const activityParts = getActivityParts(message);
   const reasoningText = getReasoningText(message);
@@ -619,6 +668,23 @@ function ChatMessage({
     message.role === "assistant" &&
     isStreaming &&
     activityParts.some((activity) => activity.status === "active");
+
+  // Detection — only on the last non-streaming assistant message
+  const shouldDetect =
+    message.role === "assistant" &&
+    isLastAssistant &&
+    !isStreaming &&
+    fullText.length > 0;
+
+  const goalResult = useMemo(() => {
+    if (!shouldDetect || !recentUserTexts) return { detected: false, goalPhrase: "", confidence: 0 };
+    return detectGoalIntent(recentUserTexts, fullText);
+  }, [shouldDetect, recentUserTexts, fullText]);
+
+  const memoryCandidates = useMemo(() => {
+    if (!shouldDetect) return [];
+    return detectMemoryCandidates(fullText);
+  }, [shouldDetect, fullText]);
 
   if (message.role === "user") {
     const imageParts = fileParts.filter((f) => f.mediaType.startsWith("image/"));
@@ -692,7 +758,98 @@ function ChatMessage({
           </MessageToolbar>
         </MessageContent>
       ) : null}
+
+      {/* Goal-to-objective proposal card */}
+      {goalResult.detected && sessionId && scope && setScope && client && agentId ? (
+        <ChatProposalCardWrapper
+          goalPhrase={goalResult.goalPhrase}
+          sessionId={sessionId}
+          scope={scope}
+          setScope={setScope}
+          client={client}
+          agentId={agentId}
+        />
+      ) : null}
+
+      {/* Memory candidate chips */}
+      {memoryCandidates.length > 0 && sessionId && scope && client && agentId ? (
+        <ChatMemoryCandidatesWrapper
+          candidates={memoryCandidates}
+          sessionId={sessionId}
+          scope={scope}
+          client={client}
+          agentId={agentId}
+        />
+      ) : null}
     </Message>
+  );
+}
+
+/** Wrapper that uses the dismissed-proposals hook (hooks can't be conditional). */
+function ChatProposalCardWrapper({
+  goalPhrase,
+  sessionId,
+  scope,
+  setScope,
+  client,
+  agentId,
+}: {
+  goalPhrase: string;
+  sessionId: string;
+  scope: ChatScope;
+  setScope: (scope: ChatScope) => void;
+  client: SidecarClient;
+  agentId: string;
+}) {
+  const { isDismissed, dismiss } = useDismissedProposals(sessionId);
+  if (isDismissed) return null;
+  return (
+    <ProposalCard
+      goalPhrase={goalPhrase}
+      sessionId={sessionId}
+      scope={scope}
+      setScope={setScope}
+      client={client}
+      agentId={agentId}
+      onDismiss={dismiss}
+    />
+  );
+}
+
+/** Wrapper that uses the dismissed-memories hook (hooks can't be conditional). */
+function ChatMemoryCandidatesWrapper({
+  candidates,
+  sessionId,
+  scope,
+  client,
+  agentId,
+}: {
+  candidates: import("@/features/chat/lib/memory-detection").MemoryCandidate[];
+  sessionId: string;
+  scope: ChatScope;
+  client: SidecarClient;
+  agentId: string;
+}) {
+  const { dismissedIds, dismiss } = useDismissedMemories(sessionId);
+  const visible = candidates.filter((c) => !dismissedIds.has(c.id));
+  if (visible.length === 0) return null;
+  return (
+    <div className="space-y-0">
+      {visible.map((candidate) => (
+        <MemoryCandidateChip
+          key={candidate.id}
+          candidateId={candidate.id}
+          content={candidate.content}
+          suggestedCategory={candidate.suggestedCategory}
+          suggestedScope={candidate.suggestedScope}
+          confidence={candidate.confidence}
+          scope={scope}
+          client={client}
+          agentId={agentId}
+          onDismiss={dismiss}
+        />
+      ))}
+    </div>
   );
 }
 
