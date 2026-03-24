@@ -1012,6 +1012,82 @@ export type PromoteSignalRequest = z.infer<typeof promoteSignalRequestSchema>;
 export type DismissSignalRequest = z.infer<typeof dismissSignalRequestSchema>;
 export type SignalListPage = z.infer<typeof signalListPageSchema>;
 
+// --- Messaging ---
+
+export const messagingConnectionTypeSchema = z.enum(["telegram", "whatsapp"]);
+
+export const messagingConnectionStatusSchema = z.enum([
+  "pending",
+  "connected",
+  "disconnected",
+  "error",
+]);
+
+export const messagingConnectionSchema = z.object({
+  connectionId: z.string().min(1),
+  workspaceId: z.string().min(1),
+  type: messagingConnectionTypeSchema,
+  status: messagingConnectionStatusSchema,
+  displayName: z.string().min(1),
+  defaultProjectId: z.string().min(1),
+  configRef: z.string().nullable(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+});
+
+export const createMessagingConnectionRequestSchema = z.object({
+  workspaceId: z.string().min(1),
+  type: messagingConnectionTypeSchema,
+  displayName: z.string().min(1),
+  defaultProjectId: z.string().min(1),
+  configRef: z.string().optional(),
+});
+
+export const updateMessagingConnectionRequestSchema = z.object({
+  status: messagingConnectionStatusSchema.optional(),
+  displayName: z.string().min(1).optional(),
+  defaultProjectId: z.string().min(1).optional(),
+  configRef: z.string().nullable().optional(),
+});
+
+export const messagingConnectionListSchema = z.array(messagingConnectionSchema);
+
+export const messagingThreadLinkSchema = z.object({
+  threadLinkId: z.string().min(1),
+  connectionId: z.string().min(1),
+  externalThreadId: z.string().min(1),
+  projectId: z.string().min(1),
+  chatThreadId: z.string().min(1),
+  lastSeenAt: z.string().min(1),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+});
+
+export const messagingThreadLinkListSchema = z.array(messagingThreadLinkSchema);
+
+export const inboundMessageEventSchema = z.object({
+  connectionId: z.string().min(1),
+  externalThreadId: z.string().min(1),
+  senderName: z.string().optional(),
+  text: z.string().min(1),
+  timestamp: z.string().min(1),
+});
+
+export const outboundMessageResultSchema = z.object({
+  externalThreadId: z.string().min(1),
+  text: z.string().min(1),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type MessagingConnectionType = z.infer<typeof messagingConnectionTypeSchema>;
+export type MessagingConnectionStatus = z.infer<typeof messagingConnectionStatusSchema>;
+export type MessagingConnection = z.infer<typeof messagingConnectionSchema>;
+export type CreateMessagingConnectionRequest = z.infer<typeof createMessagingConnectionRequestSchema>;
+export type UpdateMessagingConnectionRequest = z.infer<typeof updateMessagingConnectionRequestSchema>;
+export type MessagingThreadLink = z.infer<typeof messagingThreadLinkSchema>;
+export type InboundMessageEvent = z.infer<typeof inboundMessageEventSchema>;
+export type OutboundMessageResult = z.infer<typeof outboundMessageResultSchema>;
+
 export const appManifest = appManifestSchema.parse(appManifestJson);
 
 export function createBasicAuthHeader(

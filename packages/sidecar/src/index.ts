@@ -5,6 +5,8 @@ import {
   BoardService,
   BUILTIN_PLAYBOOKS,
   MemoryService,
+  MessagingConnectionService,
+  MessagingRouterService,
   NodeCommandRunner,
   SignalService,
   NodeFileSystem,
@@ -107,6 +109,19 @@ export async function startSidecarServer(
 
   const playbookRegistryService = new PlaybookRegistryService([...BUILTIN_PLAYBOOKS]);
 
+  const messagingConnectionService = new MessagingConnectionService({
+    fileSystem,
+    pathPort,
+    nowIso: () => new Date().toISOString(),
+  });
+
+  const messagingRouterService = new MessagingRouterService({
+    fileSystem,
+    pathPort,
+    nowIso: () => new Date().toISOString(),
+    connectionService: messagingConnectionService,
+  });
+
   const runtime = {
     artifactService,
     authService,
@@ -120,6 +135,8 @@ export async function startSidecarServer(
     embeddedGateway,
     gatewaySupervisor,
     memoryService,
+    messagingConnectionService,
+    messagingRouterService,
     objectiveService,
     opengoatPaths,
     playbookRegistryService,

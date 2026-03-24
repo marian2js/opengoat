@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { SidecarClient } from "@/lib/sidecar/client";
 import { cleanProviderName } from "@/features/agents/display-helpers";
+import { MessagingConnectionsPanel } from "./MessagingConnectionsPanel";
 
 interface ConnectionsWorkspaceProps {
   authOverview: AuthOverview | null;
@@ -280,6 +281,8 @@ export function ConnectionsWorkspace({
           </div>
         ) : null}
       </section>
+
+      <MessagingConnectionsPanel client={client} />
     </div>
   );
 }

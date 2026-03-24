@@ -17,6 +17,7 @@ import {
   createArtifactRequestSchema,
   createBundleRequestSchema,
   createMemoryRequestSchema,
+  createMessagingConnectionRequestSchema,
   createSignalRequestSchema,
   deleteAgentResponseSchema,
   createObjectiveRequestSchema,
@@ -28,6 +29,8 @@ import {
   listPlaybooksResponseSchema,
   memoryListSchema,
   memoryRecordSchema,
+  messagingConnectionListSchema,
+  messagingConnectionSchema,
   objectiveListSchema,
   objectiveSchema,
   playbookManifestSchema,
@@ -44,6 +47,7 @@ import {
   updateArtifactRequestSchema,
   updateArtifactStatusRequestSchema,
   updateMemoryRequestSchema,
+  updateMessagingConnectionRequestSchema,
   updateObjectiveRequestSchema,
   updateSignalStatusRequestSchema,
   updateTaskStatusRequestSchema,
@@ -84,6 +88,7 @@ import {
   type CreateMemoryRequest,
   type ListPlaybooksResponse,
   type MemoryRecord,
+  type MessagingConnection,
   type Objective,
   type PlaybookManifest,
   type ProviderModelCatalog,
@@ -1010,6 +1015,63 @@ export class SidecarClient {
         body: JSON.stringify(dismissSignalRequestSchema.parse({})),
         method: "POST",
       }),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Messaging Connections
+  // ---------------------------------------------------------------------------
+
+  async listMessagingConnections(workspaceId = "default"): Promise<MessagingConnection[]> {
+    const query = new URLSearchParams({ workspaceId });
+    return messagingConnectionListSchema.parse(
+      await this.request(`/messaging/connections?${query.toString()}`),
+    );
+  }
+
+  async createMessagingConnection(payload: {
+    workspaceId: string;
+    type: "telegram" | "whatsapp";
+    displayName: string;
+    defaultProjectId: string;
+    configRef?: string;
+  }): Promise<MessagingConnection> {
+    return messagingConnectionSchema.parse(
+      await this.request("/messaging/connections", {
+        body: JSON.stringify(
+          createMessagingConnectionRequestSchema.parse(payload),
+        ),
+        method: "POST",
+      }),
+    );
+  }
+
+  async updateMessagingConnection(
+    connectionId: string,
+    updates: {
+      status?: string;
+      displayName?: string;
+      defaultProjectId?: string;
+      configRef?: string | null;
+    },
+  ): Promise<MessagingConnection> {
+    return messagingConnectionSchema.parse(
+      await this.request(
+        `/messaging/connections/${encodeURIComponent(connectionId)}`,
+        {
+          body: JSON.stringify(
+            updateMessagingConnectionRequestSchema.parse(updates),
+          ),
+          method: "PATCH",
+        },
+      ),
+    );
+  }
+
+  async deleteMessagingConnection(connectionId: string): Promise<void> {
+    await this.request(
+      `/messaging/connections/${encodeURIComponent(connectionId)}`,
+      { method: "DELETE" },
     );
   }
 

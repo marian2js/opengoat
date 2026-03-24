@@ -14,6 +14,7 @@ import { createPlaybookRoutes } from "./routes/playbooks.ts";
 import { createRunRoutes } from "./routes/runs.ts";
 import { createSignalRoutes } from "./routes/signals.ts";
 import { createTaskRoutes } from "./routes/tasks.ts";
+import { createMessagingRoutes } from "./routes/messaging.ts";
 import { createWorkspaceSignalRoutes } from "./routes/workspace-signals.ts";
 import type { SidecarRuntime } from "./context.ts";
 
@@ -87,6 +88,7 @@ export function createSidecarApp(runtime: SidecarRuntime): Hono<{
   app.route("/runs", createRunRoutes(runtime));
   app.route("/signals", createSignalRoutes(runtime));
   app.route("/tasks", createTaskRoutes(runtime));
+  app.route("/messaging", createMessagingRoutes(runtime));
   app.route("/workspace-signals", createWorkspaceSignalRoutes(runtime));
 
   app.notFound((context) => context.json({ error: "Not Found" }, 404));
