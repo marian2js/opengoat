@@ -58,6 +58,10 @@ import {
   type ChatUIMessage,
 } from "@/features/chat/message-parts";
 import { createChatTransport } from "@/features/chat/transport";
+import type { ChatScope } from "@/features/chat/lib/chat-scope";
+import { useChatScope } from "@/features/chat/hooks/useChatScope";
+import { ScopeIndicator } from "@/features/chat/components/ScopeIndicator";
+import { ObjectiveBanner } from "@/features/chat/components/ObjectiveBanner";
 import { SidecarClient } from "@/lib/sidecar/client";
 
 /**
@@ -138,7 +142,9 @@ interface ChatWorkspaceProps {
   agentId?: string | undefined;
   authOverview: AuthOverview | null;
   client: SidecarClient | null;
+  initialScope?: ChatScope | null | undefined;
   onBootstrap?: ((sessionId: string) => void) | undefined;
+  onInitialScopeConsumed?: (() => void) | undefined;
   onPendingPromptConsumed?: (() => void) | undefined;
   onSessionLabelUpdate?: ((sessionId: string, label: string) => void) | undefined;
   pendingActionPrompt?: string | null | undefined;
@@ -155,7 +161,9 @@ export function ChatWorkspace({
   agentId,
   authOverview,
   client,
+  initialScope,
   onBootstrap,
+  onInitialScopeConsumed,
   onPendingPromptConsumed,
   onSessionLabelUpdate,
   pendingActionPrompt,
@@ -253,9 +261,12 @@ export function ChatWorkspace({
   return (
     <ChatSessionView
       key={bootstrap.session.id}
+      agentId={agentId}
       authOverview={authOverview}
       bootstrap={bootstrap}
       client={client}
+      initialScope={initialScope}
+      onInitialScopeConsumed={onInitialScopeConsumed}
       onPendingPromptConsumed={onPendingPromptConsumed}
       onSessionLabelUpdate={onSessionLabelUpdate}
       pendingActionPrompt={pendingActionPrompt}
@@ -272,16 +283,22 @@ function deriveSessionLabel(text: string): string {
 }
 
 function ChatSessionView({
+  agentId,
   authOverview,
   bootstrap,
   client,
+  initialScope,
+  onInitialScopeConsumed,
   onPendingPromptConsumed,
   onSessionLabelUpdate,
   pendingActionPrompt,
 }: {
+  agentId?: string | undefined;
   authOverview: AuthOverview | null;
   bootstrap: ChatBootstrap;
   client: SidecarClient | null;
+  initialScope?: ChatScope | null | undefined;
+  onInitialScopeConsumed?: (() => void) | undefined;
   onPendingPromptConsumed?: (() => void) | undefined;
   onSessionLabelUpdate?: ((sessionId: string, label: string) => void) | undefined;
   pendingActionPrompt?: string | null | undefined;
@@ -290,6 +307,20 @@ function ChatSessionView({
   const hasCustomLabelRef = useRef(bootstrap.messages.length > 0);
   const didMountRef = useRef(false);
   const pendingPromptSentRef = useRef(false);
+  const initialScopeAppliedRef = useRef(false);
+
+  // Chat scope management
+  const { scope, setScope, clearScope } = useChatScope(bootstrap.session.id);
+
+  // Apply initial scope from external navigation (e.g., Dashboard → Chat)
+  useEffect(() => {
+    if (initialScope && !initialScopeAppliedRef.current) {
+      initialScopeAppliedRef.current = true;
+      setScope(initialScope);
+      onInitialScopeConsumed?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialScope]);
 
   // Re-use existing Chat instance if one exists (preserves streaming state)
   const chat = useMemo(() => {
@@ -409,8 +440,24 @@ function ChatSessionView({
               {bootstrap.resolvedModelId ? ` / ${bootstrap.resolvedModelId}` : ""}
             </span>
           ) : null}
+          <ScopeIndicator
+            scope={scope}
+            onClear={clearScope}
+          />
         </div>
       </div>
+
+      {/* Objective banner — between header and messages */}
+      {client && agentId && (scope.type === "objective" || scope.type === "run") ? (
+        <div className="relative">
+          <ObjectiveBanner
+            scope={scope}
+            setScope={setScope}
+            client={client}
+            agentId={agentId}
+          />
+        </div>
+      ) : null}
 
       {/* Messages area */}
       <div

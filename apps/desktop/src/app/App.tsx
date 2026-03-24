@@ -4,6 +4,7 @@ import { AppHeader } from "@/app/shell/AppHeader";
 import { AppSidebar } from "@/app/shell/AppSidebar";
 import { AgentsWorkspace } from "@/features/agents/components/AgentsWorkspace";
 import { ChatWorkspace, evictChatSession, markActionSession } from "@/features/chat/components/ChatWorkspace";
+import type { ChatScope } from "@/features/chat/lib/chat-scope";
 import { ConnectionsWorkspace } from "@/features/connections/components/ConnectionsWorkspace";
 import { AddProjectDialog } from "@/features/onboarding/components/AddProjectDialog";
 import { BootstrapProgress } from "@/features/onboarding/components/BootstrapProgress";
@@ -70,6 +71,7 @@ export function App() {
   const [actionSessionId, setActionSessionId] = useState<string | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [completedActions, setCompletedActions] = useState<Set<string>>(() => getCompletedActionIds());
+  const [pendingChatScope, setPendingChatScope] = useState<ChatScope | null>(null);
 
   const activeAgentId = resolveActiveAgentId(agentCatalog, selectedAgentId);
   const activeAgent = agentCatalog?.agents.find((a) => a.id === activeAgentId);
@@ -254,7 +256,7 @@ export function App() {
   );
 
   const handleRunSessionCreated = useCallback(
-    (session: AgentSession, prompt: string, runId: string) => {
+    (session: AgentSession, prompt: string, runId: string, objectiveId?: string) => {
       markActionSession(session.id);
       setActionMapping(runId, session.id);
       setCompletedActions(getCompletedActionIds());
@@ -262,6 +264,9 @@ export function App() {
       setActiveSessionId(session.id);
       setPendingActionPrompt(prompt);
       setActionSessionId(session.id);
+      if (objectiveId) {
+        setPendingChatScope({ type: "run", objectiveId, runId });
+      }
       window.location.hash = "#chat";
     },
     [],
@@ -472,7 +477,11 @@ export function App() {
                 agentId={activeAgentId}
                 authOverview={authOverview}
                 client={client}
+                initialScope={pendingChatScope}
                 onBootstrap={handleBootstrap}
+                onInitialScopeConsumed={() => {
+                  setPendingChatScope(null);
+                }}
                 onPendingPromptConsumed={() => {
                   setPendingActionPrompt(null);
                   setActionSessionId(null);

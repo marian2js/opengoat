@@ -31,7 +31,7 @@ export interface DashboardWorkspaceProps {
   isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
-  onRunSessionCreated?: (session: AgentSession, prompt: string, runId: string) => void;
+  onRunSessionCreated?: (session: AgentSession, prompt: string, runId: string, objectiveId?: string) => void;
   onResumeRun?: (sessionId: string) => void;
 }
 
@@ -100,7 +100,7 @@ function DashboardContent({
   isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
-  onRunSessionCreated?: ((session: AgentSession, prompt: string, runId: string) => void) | undefined;
+  onRunSessionCreated?: ((session: AgentSession, prompt: string, runId: string, objectiveId?: string) => void) | undefined;
   onResumeRun?: ((sessionId: string) => void) | undefined;
 }) {
   const { data, files, isLoading, error } = useWorkspaceSummary(agentId, client);
@@ -112,7 +112,7 @@ function DashboardContent({
   const runsResult = useRuns(agentId, client);
 
   // Playbook run creation
-  const noopSessionCreated = (_s: AgentSession, _p: string, _r: string) => {};
+  const noopSessionCreated = (_s: AgentSession, _p: string, _r: string, _o?: string) => {};
   const { startRun, isStarting: isStartingPlaybook } = useStartPlaybookRun({
     client,
     activeAgentId: agentId,

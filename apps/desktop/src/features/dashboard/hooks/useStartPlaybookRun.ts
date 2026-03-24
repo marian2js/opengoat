@@ -12,6 +12,7 @@ export interface UseStartPlaybookRunParams {
     session: AgentSession,
     prompt: string,
     runId: string,
+    objectiveId?: string,
   ) => void;
 }
 
@@ -88,7 +89,7 @@ export function useStartPlaybookRun({
         await client.updateRunStatus(run.runId, "running");
 
         // 8. Callback — App.tsx handles state + navigation
-        onSessionCreated(session, composedPrompt, run.runId);
+        onSessionCreated(session, composedPrompt, run.runId, activeObjectiveId);
       } catch (err) {
         const wrapped =
           err instanceof Error ? err : new Error("Failed to start playbook run");
