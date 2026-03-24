@@ -317,6 +317,8 @@ function ChatSessionView({
 
   // Chat scope management
   const { scope, setScope, clearScope } = useChatScope(bootstrap.session.id);
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
 
   // Apply initial scope from external navigation (e.g., Dashboard → Chat)
   useEffect(() => {
@@ -337,6 +339,16 @@ function ChatSessionView({
     const transport = createChatTransport({
       agentId: bootstrap.agent.id,
       client,
+      getScope: () => {
+        const s = scopeRef.current;
+        if (s.type === "objective") {
+          return { type: "objective", objectiveId: s.objectiveId };
+        }
+        if (s.type === "run") {
+          return { type: "run", objectiveId: s.objectiveId, runId: s.runId };
+        }
+        return null;
+      },
       sessionId: bootstrap.session.id,
     });
     const instance = new Chat<ChatUIMessage>({

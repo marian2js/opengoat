@@ -7,9 +7,16 @@ import type { ChatActivity } from "@opengoat/contracts";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import type { ChatUIMessage } from "./message-parts";
 
+interface ChatScopeForTransport {
+  type: "objective" | "run";
+  objectiveId: string;
+  runId?: string;
+}
+
 interface CreateChatTransportParams {
   agentId: string;
   client: SidecarClient | null;
+  getScope?: () => ChatScopeForTransport | null;
   sessionId: string;
 }
 
@@ -44,11 +51,13 @@ function createBrowserTransport(
     ...(params.client ? { headers: params.client.createAuthHeaders() } : {}),
     prepareSendMessagesRequest({ messages }) {
       const latestMessage = messages[messages.length - 1];
+      const scope = params.getScope?.();
 
       return {
         body: {
           agentId: params.agentId,
           ...(latestMessage ? { message: latestMessage } : {}),
+          ...(scope ? { scope } : {}),
           sessionId: params.sessionId,
         },
       };
@@ -96,11 +105,13 @@ function createDesktopTransport(
             controller.close();
           };
 
+          const scope = params.getScope?.();
           void invoke("stream_chat", {
             events,
             payload: {
               agentId: params.agentId,
               message: latestMessage,
+              ...(scope ? { scope } : {}),
               sessionId: params.sessionId,
             },
           }).catch((error: unknown) => {
