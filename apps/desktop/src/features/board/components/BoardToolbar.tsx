@@ -15,13 +15,6 @@ import {
   InputGroupButton,
 } from "@/components/ui/input-group";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   FILTER_OPTIONS,
   SORT_OPTIONS,
   SOURCE_TYPE_OPTIONS,
@@ -30,27 +23,21 @@ import {
   type StatusFilter,
 } from "@/features/board/lib/board-filters";
 import { GROUPING_OPTIONS, type BoardGrouping } from "@/features/board/lib/board-grouping";
-import type { ObjectiveOption } from "@/features/board/hooks/useObjectiveList";
 
 interface BoardToolbarProps {
   filter: StatusFilter;
   sort: BoardSort;
   search: string;
   grouping: BoardGrouping;
-  objectiveId: string | null;
   sourceType: SourceTypeFilter | null;
   stale: boolean;
-  readyForReview: boolean;
   activeFilterCount: number;
-  objectives: ObjectiveOption[];
   onFilterChange: (filter: StatusFilter) => void;
   onSortChange: (sort: BoardSort) => void;
   onSearchChange: (search: string) => void;
   onGroupingChange: (grouping: BoardGrouping) => void;
-  onObjectiveChange: (objectiveId: string | null) => void;
   onSourceTypeChange: (sourceType: SourceTypeFilter | null) => void;
   onStaleChange: (stale: boolean) => void;
-  onReadyForReviewChange: (readyForReview: boolean) => void;
   onClearFilters: () => void;
   onRefresh: () => void;
   totalCount: number;
@@ -62,20 +49,15 @@ export function BoardToolbar({
   sort,
   search,
   grouping,
-  objectiveId,
   sourceType,
   stale,
-  readyForReview,
   activeFilterCount,
-  objectives,
   onFilterChange,
   onSortChange,
   onSearchChange,
   onGroupingChange,
-  onObjectiveChange,
   onSourceTypeChange,
   onStaleChange,
-  onReadyForReviewChange,
   onClearFilters,
   onRefresh,
   totalCount,
@@ -86,7 +68,7 @@ export function BoardToolbar({
     SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Sort";
   const currentGroupingLabel =
     GROUPING_OPTIONS.find((o) => o.value === grouping)?.label ?? "Group";
-  const hasAdvancedFilters = objectiveId !== null || sourceType !== null || stale || readyForReview;
+  const hasAdvancedFilters = sourceType !== null || stale;
 
   return (
     <div className="flex flex-col gap-2">
@@ -264,43 +246,6 @@ export function BoardToolbar({
           >
             Stale
           </button>
-
-          <button
-            type="button"
-            onClick={() => onReadyForReviewChange(!readyForReview)}
-            className={`rounded-md px-2 py-1 text-[11px] font-medium transition-all ${
-              readyForReview
-                ? "bg-info/10 text-info"
-                : "text-muted-foreground/60 hover:text-muted-foreground"
-            }`}
-          >
-            Needs Review
-          </button>
-
-          {/* Objective dropdown */}
-          {objectives.length > 0 && (
-            <>
-              <div className="h-4 w-px bg-border" />
-              <Select
-                value={objectiveId ?? "__all__"}
-                onValueChange={(value) =>
-                  onObjectiveChange(value === "__all__" ? null : value)
-                }
-              >
-                <SelectTrigger className="h-7 w-40 text-[11px]">
-                  <SelectValue placeholder="All Objectives" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All Objectives</SelectItem>
-                  {objectives.map((obj) => (
-                    <SelectItem key={obj.objectiveId} value={obj.objectiveId}>
-                      {obj.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </>
-          )}
 
           {/* Clear filters */}
           {activeFilterCount > 0 && (

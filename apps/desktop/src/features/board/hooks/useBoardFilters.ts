@@ -11,8 +11,6 @@ import {
 import {
   groupTasks,
   type BoardGrouping,
-  type ObjectiveMapEntry,
-  type RunMapEntry,
   type TaskGroup,
 } from "@/features/board/lib/board-grouping";
 
@@ -54,8 +52,6 @@ function parseHashObjectiveId(): string | null {
 
 export function useBoardFilters(
   tasks: TaskRecord[],
-  objectiveMap: Map<string, ObjectiveMapEntry> = new Map(),
-  runMap: Map<string, RunMapEntry> = new Map(),
 ): UseBoardFiltersResult {
   const [filterState, setFilterState] = useState<BoardFilterState>(() => {
     const hashObjective = parseHashObjectiveId();
@@ -104,8 +100,8 @@ export function useBoardFilters(
   );
 
   const groupedTasks = useMemo(
-    () => groupTasks(filteredTasks, grouping, objectiveMap, runMap),
-    [filteredTasks, grouping, objectiveMap, runMap],
+    () => groupTasks(filteredTasks, grouping),
+    [filteredTasks, grouping],
   );
 
   const setFilter = useCallback((status: StatusFilter) => {

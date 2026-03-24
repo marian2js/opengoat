@@ -51,7 +51,7 @@ export function TaskArtifactsSection({
 
   return (
     <div className="border-t border-border/40 py-3">
-      <SectionHeading>Artifacts</SectionHeading>
+      <SectionHeading>Outputs</SectionHeading>
       <ul className="space-y-1">
         {artifacts.map((entry, i) => (
           <li key={i} className="flex items-start gap-2 text-[13px]">

@@ -11,37 +11,21 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TaskStatusBadge } from "./TaskStatusBadge";
-import { ObjectiveChip } from "./ObjectiveChip";
-import { RunChip } from "./RunChip";
 import { ContextBadge } from "./ContextBadge";
 import { ReviewIndicator } from "./ReviewIndicator";
 import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
-import type { TaskGroup, ObjectiveMapEntry, RunMapEntry } from "@/features/board/lib/board-grouping";
+import type { TaskGroup } from "@/features/board/lib/board-grouping";
 
 // ---------------------------------------------------------------------------
-// TaskRow (enriched)
+// TaskRow (simplified)
 // ---------------------------------------------------------------------------
 
 interface TaskRowProps {
   task: TaskRecord;
   onSelect: (taskId: string) => void;
-  objectiveMap: Map<string, ObjectiveMapEntry>;
-  runMap: Map<string, RunMapEntry>;
 }
 
-function getTaskObjectiveId(task: TaskRecord): string | undefined {
-  return task.objectiveId ?? (task.metadata?.objectiveId as string | undefined);
-}
-
-function getTaskRunId(task: TaskRecord): string | undefined {
-  return task.runId ?? (task.metadata?.runId as string | undefined);
-}
-
-function TaskRow({ task, onSelect, objectiveMap, runMap }: TaskRowProps) {
-  const objId = getTaskObjectiveId(task);
-  const runId = getTaskRunId(task);
-  const objective = objId ? objectiveMap.get(objId) : undefined;
-  const run = runId ? runMap.get(runId) : undefined;
+function TaskRow({ task, onSelect }: TaskRowProps) {
   const artifactCount = task.artifacts?.length ?? 0;
   const blockerCount = task.blockers?.length ?? 0;
   const isReview = task.status === "pending";
@@ -51,12 +35,10 @@ function TaskRow({ task, onSelect, objectiveMap, runMap }: TaskRowProps) {
       className="group/row cursor-pointer border-border/30 transition-colors hover:bg-accent/50"
       onClick={() => onSelect(task.taskId)}
     >
-      {/* Title + inline chips */}
+      {/* Title */}
       <TableCell className="max-w-[400px] py-2.5 text-[13px] font-medium text-foreground/85 group-hover/row:text-foreground">
         <div className="flex items-center gap-1.5 overflow-hidden">
           <span className="truncate">{task.title}</span>
-          {objective && <ObjectiveChip label={objective.title} />}
-          {run && <RunChip label={run.playbookTitle ?? run.title} />}
         </div>
       </TableCell>
 
@@ -65,10 +47,10 @@ function TaskRow({ task, onSelect, objectiveMap, runMap }: TaskRowProps) {
         <TaskStatusBadge status={task.status} />
       </TableCell>
 
-      {/* Context: artifact count, blocker count, review indicator */}
+      {/* Context: output count, blocker count, review indicator */}
       <TableCell>
         <div className="flex items-center gap-1.5">
-          <ContextBadge count={artifactCount} label="artifacts" />
+          <ContextBadge count={artifactCount} label="outputs" />
           <ContextBadge count={blockerCount} variant="danger" label="blockers" />
           <ReviewIndicator show={isReview} />
         </div>
@@ -131,19 +113,12 @@ interface TaskListProps {
   tasks: TaskRecord[];
   groups?: TaskGroup[];
   onTaskSelect: (taskId: string) => void;
-  objectiveMap?: Map<string, ObjectiveMapEntry>;
-  runMap?: Map<string, RunMapEntry>;
 }
-
-const EMPTY_OBJ_MAP = new Map<string, ObjectiveMapEntry>();
-const EMPTY_RUN_MAP = new Map<string, RunMapEntry>();
 
 export function TaskList({
   tasks,
   groups,
   onTaskSelect,
-  objectiveMap = EMPTY_OBJ_MAP,
-  runMap = EMPTY_RUN_MAP,
 }: TaskListProps) {
   const isGrouped = groups && groups.length > 0 && !(groups.length === 1 && groups[0]!.key === "__all__");
 
@@ -166,8 +141,6 @@ export function TaskList({
                 key={group.key}
                 group={group}
                 onTaskSelect={onTaskSelect}
-                objectiveMap={objectiveMap}
-                runMap={runMap}
               />
             ))
           ) : (
@@ -176,8 +149,6 @@ export function TaskList({
                 key={task.taskId}
                 task={task}
                 onSelect={onTaskSelect}
-                objectiveMap={objectiveMap}
-                runMap={runMap}
               />
             ))
           )}
@@ -194,13 +165,9 @@ export function TaskList({
 function GroupSection({
   group,
   onTaskSelect,
-  objectiveMap,
-  runMap,
 }: {
   group: TaskGroup;
   onTaskSelect: (taskId: string) => void;
-  objectiveMap: Map<string, ObjectiveMapEntry>;
-  runMap: Map<string, RunMapEntry>;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -218,8 +185,6 @@ function GroupSection({
             key={task.taskId}
             task={task}
             onSelect={onTaskSelect}
-            objectiveMap={objectiveMap}
-            runMap={runMap}
           />
         ))}
     </>

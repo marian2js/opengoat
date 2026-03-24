@@ -6,7 +6,7 @@ import type { TaskRecord } from "@opengoat/contracts";
 
 export type StatusFilter = "all" | "open" | "blocked" | "pending" | "done";
 export type BoardSort = "updated" | "status" | "newest" | "oldest";
-export type SourceTypeFilter = "chat" | "playbook" | "action" | "manual";
+export type SourceTypeFilter = "chat" | "action" | "manual";
 
 /** @deprecated Use StatusFilter instead */
 export type BoardFilter = StatusFilter;
@@ -196,7 +196,6 @@ export const FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
 
 export const SOURCE_TYPE_OPTIONS: { value: SourceTypeFilter; label: string }[] = [
   { value: "chat", label: "Chat" },
-  { value: "playbook", label: "Playbook" },
   { value: "action", label: "Action" },
   { value: "manual", label: "Manual" },
 ];

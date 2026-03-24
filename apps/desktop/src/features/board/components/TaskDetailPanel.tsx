@@ -18,10 +18,7 @@ import {
   TaskArtifactsSection,
   TaskWorklogSection,
 } from "./TaskDetailSections";
-import { LinkedObjectiveSection } from "./LinkedObjectiveSection";
-import { LinkedRunSection } from "./LinkedRunSection";
 import { LinkedArtifactsSection } from "./LinkedArtifactsSection";
-import { RelatedSignalsSection } from "./RelatedSignalsSection";
 import { SuggestedNextAction } from "./SuggestedNextAction";
 import { TaskQuickActions } from "./TaskQuickActions";
 import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
@@ -51,8 +48,8 @@ export function TaskDetailPanel({
   const linked = useLinkedEntities(task, client);
 
   const suggestion = useMemo(
-    () => (task ? computeSuggestedAction(task, linked.artifacts, linked.signals) : null),
-    [task, linked.artifacts, linked.signals],
+    () => (task ? computeSuggestedAction(task, linked.artifacts) : null),
+    [task, linked.artifacts],
   );
 
   const handleStatusChange = useCallback(
@@ -145,15 +142,7 @@ export function TaskDetailPanel({
               )}
 
               {/* Only show sections that have data */}
-              {linked.objective && <LinkedObjectiveSection objective={linked.objective} />}
-              {linked.run && <LinkedRunSection run={linked.run} />}
               {linked.artifacts.length > 0 && <LinkedArtifactsSection artifacts={linked.artifacts} />}
-              {linked.signals.length > 0 && (
-                <RelatedSignalsSection
-                  signals={linked.signals}
-                  objectiveId={task.objectiveId}
-                />
-              )}
 
               <TaskBlockersSection blockers={task.blockers} />
               <TaskArtifactsSection artifacts={task.artifacts} />

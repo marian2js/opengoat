@@ -4,9 +4,6 @@ import { Button } from "@/components/ui/button";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskList } from "@/features/board/hooks/useTaskList";
 import { useBoardFilters } from "@/features/board/hooks/useBoardFilters";
-import { useObjectiveList } from "@/features/board/hooks/useObjectiveList";
-import { useObjectiveMap } from "@/features/board/hooks/useObjectiveMap";
-import { useRunMap } from "@/features/board/hooks/useRunMap";
 import { TaskList, TaskListSkeleton } from "./TaskList";
 import { TaskDetailPanel } from "./TaskDetailPanel";
 import { BoardToolbar } from "./BoardToolbar";
@@ -51,9 +48,6 @@ function BoardContent({
   client: SidecarClient;
 }) {
   const { tasks, isLoading, error, refresh } = useTaskList(agentId, client);
-  const { objectives } = useObjectiveList(agentId, client);
-  const { objectiveMap } = useObjectiveMap(agentId, client);
-  const { runMap } = useRunMap(agentId, client);
   const {
     filteredTasks,
     groupedTasks,
@@ -66,13 +60,11 @@ function BoardContent({
     setSort,
     setSearch,
     setGrouping,
-    setObjectiveFilter,
     setSourceTypeFilter,
     setStaleFilter,
-    setReadyForReviewFilter,
     clearFilters,
     activeFilterCount,
-  } = useBoardFilters(tasks, objectiveMap, runMap);
+  } = useBoardFilters(tasks);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   return (
@@ -84,20 +76,15 @@ function BoardContent({
             sort={sort}
             search={search}
             grouping={grouping}
-            objectiveId={filterState.objectiveId}
             sourceType={filterState.sourceType}
             stale={filterState.stale}
-            readyForReview={filterState.readyForReview}
             activeFilterCount={activeFilterCount}
-            objectives={objectives}
             onFilterChange={setFilter}
             onSortChange={setSort}
             onSearchChange={setSearch}
             onGroupingChange={setGrouping}
-            onObjectiveChange={setObjectiveFilter}
             onSourceTypeChange={setSourceTypeFilter}
             onStaleChange={setStaleFilter}
-            onReadyForReviewChange={setReadyForReviewFilter}
             onClearFilters={clearFilters}
             onRefresh={refresh}
             totalCount={tasks.length}
@@ -167,8 +154,6 @@ function BoardContent({
           tasks={filteredTasks}
           groups={groupedTasks}
           onTaskSelect={(id) => setSelectedTaskId(id)}
-          objectiveMap={objectiveMap}
-          runMap={runMap}
         />
       )}
 

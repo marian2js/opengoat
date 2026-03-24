@@ -42,9 +42,9 @@ const ENTRY_CONFIG: Record<
     placeholder: "Describe the blocker…",
   },
   artifact: {
-    label: "Add Artifact",
+    label: "Add Output",
     icon: FileTextIcon,
-    placeholder: "Describe the artifact…",
+    placeholder: "Describe the output…",
   },
   worklog: {
     label: "Add Worklog",

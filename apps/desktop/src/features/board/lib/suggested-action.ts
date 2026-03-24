@@ -1,4 +1,4 @@
-import type { TaskRecord, ArtifactRecord, Signal } from "@opengoat/contracts";
+import type { TaskRecord, ArtifactRecord } from "@opengoat/contracts";
 
 export interface SuggestedAction {
   text: string;
@@ -8,7 +8,6 @@ export interface SuggestedAction {
 export function computeSuggestedAction(
   task: TaskRecord,
   artifacts: ArtifactRecord[],
-  _signals: Signal[],
 ): SuggestedAction | null {
   // Rule 1: blocked with blockers
   if (task.status === "blocked" && task.blockers.length > 0) {
@@ -19,14 +18,14 @@ export function computeSuggestedAction(
     };
   }
 
-  // Rule 2: artifacts ready for review
+  // Rule 2: outputs ready for review
   const pendingArtifacts = artifacts.filter(
     (a) => a.status === "ready_for_review",
   );
   if (pendingArtifacts.length > 0) {
     const n = pendingArtifacts.length;
     return {
-      text: `Review ${n} pending artifact${n === 1 ? "" : "s"}`,
+      text: `Review ${n} pending output${n === 1 ? "" : "s"}`,
       icon: "file-check",
     };
   }
@@ -36,20 +35,24 @@ export function computeSuggestedAction(
     return { text: "Waiting for review", icon: "clock" };
   }
 
-  // Rule 4: all artifacts approved and task is doing
+  // Rule 4: all outputs approved and task is doing
   if (
     task.status === "doing" &&
     artifacts.length > 0 &&
     artifacts.every((a) => a.status === "approved")
   ) {
     return {
-      text: "Mark as done — all artifacts approved",
+      text: "Mark as done — all outputs approved",
       icon: "check-circle",
     };
   }
 
-  // Rule 5: task is todo
+  // Rule 5: task is todo — check for previous activity to decide language
   if (task.status === "todo") {
+    const hasActivity = (task.worklog?.length ?? 0) > 0;
+    if (hasActivity) {
+      return { text: "Resume this task", icon: "play" };
+    }
     return { text: "Start working on this task", icon: "play" };
   }
 

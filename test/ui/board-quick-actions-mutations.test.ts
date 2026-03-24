@@ -34,10 +34,10 @@ describe("Blocker, artifact, and worklog quick actions", () => {
     });
   });
 
-  // AC2: Task detail panel has an "Add Artifact" action
-  describe("Add Artifact action", () => {
-    it("TaskQuickActions renders an Add Artifact button", () => {
-      expect(taskQuickActionsSrc).toContain("Add Artifact");
+  // AC2: Task detail panel has an "Add Output" action
+  describe("Add Output action", () => {
+    it("TaskQuickActions renders an Add Output button", () => {
+      expect(taskQuickActionsSrc).toContain("Add Output");
     });
 
     it("TaskDetailPanel defines a handleAddArtifact callback", () => {

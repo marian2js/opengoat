@@ -57,7 +57,6 @@ describe("Extended board filter system", () => {
     it("exports sourceTypeEnum options for UI", () => {
       expect(boardFiltersSrc).toContain("SOURCE_TYPE_OPTIONS");
       expect(boardFiltersSrc).toContain('"chat"');
-      expect(boardFiltersSrc).toContain('"playbook"');
       expect(boardFiltersSrc).toContain('"action"');
       expect(boardFiltersSrc).toContain('"manual"');
     });
@@ -123,11 +122,6 @@ describe("Extended board filter system", () => {
   });
 
   describe("BoardToolbar", () => {
-    it("renders objective dropdown filter", () => {
-      expect(boardToolbarSrc).toContain("All Objectives");
-      expect(boardToolbarSrc).toContain("onObjectiveChange");
-    });
-
     it("renders source type filter pills", () => {
       expect(boardToolbarSrc).toContain("SOURCE_TYPE_OPTIONS");
       expect(boardToolbarSrc).toContain("onSourceTypeChange");
@@ -138,11 +132,6 @@ describe("Extended board filter system", () => {
       expect(boardToolbarSrc).toContain("onStaleChange");
     });
 
-    it("renders needs review toggle chip", () => {
-      expect(boardToolbarSrc).toContain("Needs Review");
-      expect(boardToolbarSrc).toContain("onReadyForReviewChange");
-    });
-
     it("renders clear filters button with count", () => {
       expect(boardToolbarSrc).toContain("onClearFilters");
       expect(boardToolbarSrc).toContain("activeFilterCount");
@@ -151,15 +140,9 @@ describe("Extended board filter system", () => {
   });
 
   describe("BoardWorkspace", () => {
-    it("uses useObjectiveList hook", () => {
-      expect(boardWorkspaceSrc).toContain("useObjectiveList");
-    });
-
-    it("passes all filter props to BoardToolbar", () => {
-      expect(boardWorkspaceSrc).toContain("objectiveId={filterState.objectiveId}");
+    it("passes filter props to BoardToolbar", () => {
       expect(boardWorkspaceSrc).toContain("sourceType={filterState.sourceType}");
       expect(boardWorkspaceSrc).toContain("stale={filterState.stale}");
-      expect(boardWorkspaceSrc).toContain("readyForReview={filterState.readyForReview}");
     });
   });
 });
