@@ -3,8 +3,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/app/shell/AppHeader";
 import { AppSidebar } from "@/app/shell/AppSidebar";
 import { AgentsWorkspace } from "@/features/agents/components/AgentsWorkspace";
-import { ChatWorkspace, evictChatSession, markActionSession } from "@/features/chat/components/ChatWorkspace";
+import { ChatWorkspace, evictChatSession, isActionSession, markActionSession } from "@/features/chat/components/ChatWorkspace";
 import type { ChatScope } from "@/features/chat/lib/chat-scope";
+import { ActionSessionView } from "@/features/action-session/components/ActionSessionView";
+import { setActionSessionMeta } from "@/features/action-session/lib/action-session-state";
 import { ConnectionsWorkspace } from "@/features/connections/components/ConnectionsWorkspace";
 import { AddProjectDialog } from "@/features/onboarding/components/AddProjectDialog";
 import { BootstrapProgress } from "@/features/onboarding/components/BootstrapProgress";
@@ -26,7 +28,7 @@ import {
   buildRefineContextLabel,
   buildRefineContextActionId,
 } from "@/features/brain/lib/refine-context-prompt";
-type AppView = "dashboard" | "connections" | "connections-add" | "chat" | "brain" | "agents" | "settings" | "board" | "objective";
+type AppView = "dashboard" | "connections" | "connections-add" | "chat" | "action-session" | "brain" | "agents" | "settings" | "board" | "objective";
 
 const ACTIVE_AGENT_KEY = "opengoat:activeAgentId";
 
@@ -72,6 +74,7 @@ export function App() {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [completedActions, setCompletedActions] = useState<Set<string>>(() => getCompletedActionIds());
   const [pendingChatScope, setPendingChatScope] = useState<ChatScope | null>(null);
+  const [pendingActionTitle, setPendingActionTitle] = useState<string | null>(null);
 
   const activeAgentId = resolveActiveAgentId(agentCatalog, selectedAgentId);
   const activeAgent = agentCatalog?.agents.find((a) => a.id === activeAgentId);
@@ -234,7 +237,15 @@ export function App() {
         setActiveSessionId(session.id);
         setPendingActionPrompt(prompt);
         setActionSessionId(session.id);
-        window.location.hash = "#chat";
+        setPendingActionTitle(label);
+        setActionSessionMeta(session.id, {
+          actionId,
+          actionTitle: label,
+          state: "starting",
+          savedToBoard: false,
+          startedAt: Date.now(),
+        });
+        window.location.hash = "#action-session";
       } catch (error) {
         console.error("Failed to create action session", error);
         toast.error("Something went wrong. Please try again.");
@@ -267,7 +278,7 @@ export function App() {
       if (objectiveId) {
         setPendingChatScope({ type: "run", objectiveId, runId });
       }
-      window.location.hash = "#chat";
+      window.location.hash = "#action-session";
     },
     [],
   );
@@ -277,7 +288,11 @@ export function App() {
       const sessionId = getActionMapping(actionId);
       if (sessionId) {
         setActiveSessionId(sessionId);
-        window.location.hash = "#chat";
+        if (isActionSession(sessionId)) {
+          window.location.hash = "#action-session";
+        } else {
+          window.location.hash = "#chat";
+        }
       }
     },
     [],
@@ -285,7 +300,11 @@ export function App() {
 
   const handleResumeRun = useCallback((sessionId: string) => {
     setActiveSessionId(sessionId);
-    window.location.hash = "#chat";
+    if (isActionSession(sessionId)) {
+      window.location.hash = "#action-session";
+    } else {
+      window.location.hash = "#chat";
+    }
   }, []);
 
   const handleSessionSelect = useCallback((sessionId: string) => {
@@ -432,7 +451,7 @@ export function App() {
             setCreateAgentToken((current) => current + 1);
           }}
         />
-        <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" || currentView === "brain" || currentView === "dashboard" || currentView === "board" || currentView === "objective" ? "" : "gap-4 overflow-y-auto p-4 lg:p-5"}`}>
+        <div className={`flex min-h-0 flex-1 flex-col ${currentView === "chat" || currentView === "action-session" || currentView === "brain" || currentView === "dashboard" || currentView === "board" || currentView === "objective" ? "" : "gap-4 overflow-y-auto p-4 lg:p-5"}`}>
           {currentView === "dashboard" ? (
             bootstrapContext && client ? (
               <BootstrapProgress
@@ -472,6 +491,27 @@ export function App() {
               agentId={activeAgentId}
               client={client}
             />
+          ) : currentView === "action-session" ? (
+              <ActionSessionView
+                agentId={activeAgentId}
+                authOverview={authOverview}
+                client={client}
+                pendingActionPrompt={activeSessionId === actionSessionId ? pendingActionPrompt : null}
+                sessionId={activeSessionId}
+                actionTitle={pendingActionTitle ?? undefined}
+                onPendingPromptConsumed={() => {
+                  setPendingActionPrompt(null);
+                  setActionSessionId(null);
+                  setPendingActionTitle(null);
+                }}
+                onViewChat={(sid) => {
+                  setActiveSessionId(sid);
+                  window.location.hash = "#chat";
+                }}
+                onBackToDashboard={() => {
+                  window.location.hash = "#dashboard";
+                }}
+              />
           ) : currentView === "chat" ? (
               <ChatWorkspace
                 agentId={activeAgentId}
@@ -567,6 +607,10 @@ function readViewFromHash(): AppView {
 
   if (window.location.hash === "#settings") {
     return "settings";
+  }
+
+  if (window.location.hash === "#action-session") {
+    return "action-session";
   }
 
   if (window.location.hash === "#chat") {

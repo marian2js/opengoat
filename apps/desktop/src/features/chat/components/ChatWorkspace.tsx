@@ -74,7 +74,7 @@ import { MemoryCandidateChip } from "@/features/chat/components/MemoryCandidateC
  * Cache of Chat instances keyed by session ID.
  * Keeps streaming state alive when the user switches between sessions.
  */
-const chatCache = new Map<string, Chat<ChatUIMessage>>();
+export const chatCache = new Map<string, Chat<ChatUIMessage>>();
 
 /** Remove a session from the chat cache (e.g. on delete). */
 export function evictChatSession(sessionId: string): void {
