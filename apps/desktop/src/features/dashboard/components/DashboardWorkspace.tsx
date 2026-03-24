@@ -1,27 +1,20 @@
-import { useState } from "react";
 import { LayoutDashboardIcon } from "lucide-react";
-import type { AgentSession, PlaybookManifest } from "@opengoat/contracts";
+import type { AgentSession } from "@opengoat/contracts";
 import type { SidecarClient } from "@/lib/sidecar/client";
-import { useStartPlaybookRun } from "@/features/dashboard/hooks/useStartPlaybookRun";
 import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
-import { OpportunitySection } from "@/features/dashboard/components/OpportunitySection";
-import { PlaybookLibrary } from "@/features/dashboard/components/PlaybookLibrary";
 import { SuggestedActionGrid } from "@/features/dashboard/components/SuggestedActionGrid";
-import { ActiveObjectiveSection } from "@/features/dashboard/components/ActiveObjectiveSection";
-import { ObjectiveComposerPrompt } from "@/features/dashboard/components/ObjectiveComposerPrompt";
-import { ObjectiveCreationSheet } from "@/features/dashboard/components/ObjectiveCreationSheet";
+import { FreeTextInput } from "@/features/dashboard/components/FreeTextInput";
+import { NowWorkingOn } from "@/features/dashboard/components/NowWorkingOn";
+import { RecentOutputs } from "@/features/dashboard/components/RecentOutputs";
 import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSummary";
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
 import { useBoardSummary } from "@/features/dashboard/hooks/useBoardSummary";
 import { useActiveObjective } from "@/features/dashboard/hooks/useActiveObjective";
-import { usePlaybooks } from "@/features/dashboard/hooks/usePlaybooks";
 import { useRuns } from "@/features/dashboard/hooks/useRuns";
+import { useRecentArtifacts } from "@/features/dashboard/hooks/useRecentArtifacts";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
-import { WorkInProgress } from "@/features/dashboard/components/WorkInProgress";
-import { RecentDeliverables } from "@/features/dashboard/components/RecentDeliverables";
-import { SinceYouWereAwaySection } from "@/features/dashboard/components/SinceYouWereAwaySection";
 
 export interface DashboardWorkspaceProps {
   agent?: { id: string; name: string; description?: string | undefined } | undefined;
@@ -43,7 +36,6 @@ export function DashboardWorkspace({
   isActionLoading,
   onActionClick,
   onViewResults,
-  onRunSessionCreated,
   onResumeRun,
 }: DashboardWorkspaceProps) {
   if (!agentId || !client) {
@@ -70,7 +62,6 @@ export function DashboardWorkspace({
       isActionLoading={isActionLoading}
       onActionClick={onActionClick}
       onViewResults={onViewResults}
-      onRunSessionCreated={onRunSessionCreated}
       onResumeRun={onResumeRun}
     />
   );
@@ -89,7 +80,6 @@ function DashboardContent({
   isActionLoading,
   onActionClick,
   onViewResults,
-  onRunSessionCreated,
   onResumeRun,
 }: {
   agentId: string;
@@ -100,7 +90,6 @@ function DashboardContent({
   isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
-  onRunSessionCreated?: ((session: AgentSession, prompt: string, runId: string, objectiveId?: string) => void) | undefined;
   onResumeRun?: ((sessionId: string) => void) | undefined;
 }) {
   const { data, files, isLoading, error } = useWorkspaceSummary(agentId, client);
@@ -108,67 +97,28 @@ function DashboardContent({
   const { suggestedActions, isLoading: isSuggestedLoading } = useSuggestedActions(agentId, client, workspaceReady);
   const boardSummary = useBoardSummary(agentId, client);
   const activeObjective = useActiveObjective(agentId, client);
-  const { playbooks, isLoading: isPlaybooksLoading } = usePlaybooks(client);
   const runsResult = useRuns(agentId, client);
+  const recentArtifacts = useRecentArtifacts(agentId, client);
 
-  // Playbook run creation
-  const noopSessionCreated = (_s: AgentSession, _p: string, _r: string, _o?: string) => {};
-  const { startRun, isStarting: isStartingPlaybook } = useStartPlaybookRun({
-    client,
-    activeAgentId: agentId,
-    activeObjectiveId: activeObjective.objective?.objectiveId,
-    projectId: agentId,
-    onSessionCreated: onRunSessionCreated ?? noopSessionCreated,
-  });
+  // Mode detection: Mode B when active work exists
+  const hasActiveWork =
+    (!activeObjective.isLoading && activeObjective.objective !== null) ||
+    (!runsResult.isLoading && runsResult.runs.length > 0);
 
-  // Sheet open state and prefill
-  const [isCreationOpen, setIsCreationOpen] = useState(false);
-  const [prefillTitle, setPrefillTitle] = useState<string | undefined>(undefined);
+  // Latest artifact for NowWorkingOn preview
+  const latestArtifact =
+    recentArtifacts.standaloneArtifacts[0] ??
+    recentArtifacts.bundleGroups[0]?.artifacts[0] ??
+    null;
 
-  function handleCreateObjective(title?: string): void {
-    setPrefillTitle(title);
-    setIsCreationOpen(true);
-  }
-
-  function handleObjectiveCreated(): void {
-    activeObjective.refetch();
+  // Free-text submit handler — routes to chat via onActionClick
+  function handleFreeTextSubmit(text: string) {
+    onActionClick?.("free-text", text, text.slice(0, 50));
   }
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
-      {/* ── Header area: Objective + Company context ── */}
-      <div className="mb-8">
-        {activeObjective.isLoading ? (
-          <ActiveObjectiveSection
-            objective={{
-              objectiveId: "",
-              projectId: agentId,
-              title: "",
-              status: "draft",
-              createdFrom: "dashboard",
-              createdAt: "",
-              updatedAt: "",
-            }}
-            isLoading
-            openTaskCount={0}
-          />
-        ) : activeObjective.objective ? (
-          <ActiveObjectiveSection
-            objective={activeObjective.objective}
-            isLoading={false}
-            openTaskCount={boardSummary.counts.open}
-            onOpenObjective={() => {
-              window.location.hash = `#objective/${activeObjective.objective!.objectiveId}`;
-            }}
-            onSwitchObjective={() => handleCreateObjective()}
-          />
-        ) : (
-          <ObjectiveComposerPrompt
-            onCreateObjective={handleCreateObjective}
-          />
-        )}
-      </div>
-
+      {/* ── Company context — always shown ── */}
       <div className="mb-8 border-b border-border/20 pb-5">
         <CompanySummary
           data={data}
@@ -179,103 +129,88 @@ function DashboardContent({
         />
       </div>
 
-      {/* ── Playbook Library ── */}
-      <div className="mb-2">
-        <PlaybookLibrary
-          playbooks={playbooks}
-          isLoading={isPlaybooksLoading}
-          onStartPlaybook={activeObjective.objective ? startRun : undefined}
-          isStartingPlaybook={isStartingPlaybook}
-        />
-      </div>
+      {hasActiveWork ? (
+        /* ═══════════════════════════════════════════════════════
+         * Mode B — Active work exists
+         * ═══════════════════════════════════════════════════════ */
+        <>
+          {/* Now working on — latest run + output preview + quick actions */}
+          <div className="mb-6">
+            <NowWorkingOn
+              runs={runsResult.runs}
+              latestArtifact={latestArtifact}
+              onResumeRun={onResumeRun}
+            />
+          </div>
 
-      {/* ── Quick Actions — section divider ── */}
-      <div className="dashboard-section">
-        <ActionCardGrid
-          completedActions={completedActions}
-          isLoading={isActionLoading}
-          onActionClick={onActionClick}
-          onViewResults={onViewResults}
-        />
-      </div>
+          {/* Compact recent work list */}
+          <div className="dashboard-section">
+            <RecentOutputs
+              agentId={agentId}
+              client={client}
+            />
+          </div>
 
-      {/* ── Suggested Actions — section divider (hidden when empty) ── */}
-      <div className="dashboard-section">
-        <SuggestedActionGrid
-          actions={suggestedActions}
-          completedActions={completedActions}
-          isGenerating={isSuggestedLoading}
-          isActionLoading={isActionLoading}
-          onActionClick={onActionClick}
-          onViewResults={onViewResults}
-        />
-      </div>
+          {/* Board summary — compact task counts */}
+          <div className="dashboard-section">
+            <BoardSummary
+              counts={boardSummary.counts}
+              isLoading={boardSummary.isLoading}
+              isEmpty={boardSummary.isEmpty}
+            />
+          </div>
 
-      {/* ── Work in Progress — active runs ── */}
-      {(!runsResult.isEmpty || runsResult.isLoading) && (
-        <div className="dashboard-section">
-          <WorkInProgress
-            runs={runsResult.runs}
-            isLoading={runsResult.isLoading}
-            isEmpty={runsResult.isEmpty}
-            onResumeRun={onResumeRun}
-          />
-        </div>
+          {/* Action cards — secondary in Mode B */}
+          <div className="dashboard-section opacity-80">
+            <ActionCardGrid
+              completedActions={completedActions}
+              isLoading={isActionLoading}
+              onActionClick={onActionClick}
+              onViewResults={onViewResults}
+            />
+          </div>
+        </>
+      ) : (
+        /* ═══════════════════════════════════════════════════════
+         * Mode A — No active work
+         * ═══════════════════════════════════════════════════════ */
+        <>
+          {/* Starter actions — primary launch point */}
+          <div className="dashboard-section">
+            <ActionCardGrid
+              completedActions={completedActions}
+              isLoading={isActionLoading}
+              onActionClick={onActionClick}
+              onViewResults={onViewResults}
+            />
+          </div>
+
+          {/* Free-text input — replaces objective composer */}
+          <div className="dashboard-section py-2">
+            <FreeTextInput onSubmit={handleFreeTextSubmit} />
+          </div>
+
+          {/* AI-suggested actions */}
+          <div className="dashboard-section">
+            <SuggestedActionGrid
+              actions={suggestedActions}
+              completedActions={completedActions}
+              isGenerating={isSuggestedLoading}
+              isActionLoading={isActionLoading}
+              onActionClick={onActionClick}
+              onViewResults={onViewResults}
+            />
+          </div>
+
+          {/* Recent outputs — optional, only if outputs exist */}
+          <div className="dashboard-section">
+            <RecentOutputs
+              agentId={agentId}
+              client={client}
+            />
+          </div>
+        </>
       )}
-
-      {/* ── Since You Were Away — feed section ── */}
-      <div className="dashboard-section">
-        <SinceYouWereAwaySection
-          client={client}
-          agentId={agentId}
-          projectId={agentId}
-        />
-      </div>
-
-      {/* ── Board summary — section divider ── */}
-      <div className="dashboard-section">
-        <BoardSummary
-          counts={boardSummary.counts}
-          isLoading={boardSummary.isLoading}
-          isEmpty={boardSummary.isEmpty}
-          activeObjective={activeObjective.objective ? {
-            objectiveId: activeObjective.objective.objectiveId,
-            title: activeObjective.objective.title,
-          } : null}
-        />
-      </div>
-
-      {/* ── Recent Deliverables — section divider ── */}
-      <div className="dashboard-section">
-        <RecentDeliverables
-          agentId={agentId}
-          client={client}
-          onPreview={() => {
-            // Wire to ArtifactReviewPanel when task 0022 is complete
-          }}
-        />
-      </div>
-
-      {/* ── Insights — section divider + background tint ── */}
-      <div className="dashboard-section">
-        <OpportunitySection
-          completedActions={completedActions}
-          files={files}
-          isLoading={isLoading}
-          onActionClick={onActionClick}
-          onViewResults={onViewResults}
-        />
-      </div>
-
-      {/* Objective Creation Sheet — portaled */}
-      <ObjectiveCreationSheet
-        open={isCreationOpen}
-        onOpenChange={setIsCreationOpen}
-        agentId={agentId}
-        client={client}
-        prefillTitle={prefillTitle}
-        onObjectiveCreated={handleObjectiveCreated}
-      />
     </div>
   );
 }

@@ -465,9 +465,11 @@ describe("Loading and error states", () => {
 // ---------------------------------------------------------------------------
 // Dashboard wiring
 // ---------------------------------------------------------------------------
+// Sprint 5: ActiveObjectiveSection removed from dashboard default flow.
+// Objective navigation is no longer the primary dashboard entry point.
 describe("Dashboard entry point", () => {
-  it("ActiveObjectiveSection onOpenObjective navigates to objective hash", () => {
+  it("does not render ActiveObjectiveSection (Sprint 5 simplification)", () => {
     const src = readSrc("features/dashboard/components/DashboardWorkspace.tsx");
-    expect(src).toContain("#objective/");
+    expect(src).not.toContain("ActiveObjectiveSection");
   });
 });

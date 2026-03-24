@@ -20,6 +20,7 @@ const suggestedGridSrc = readFileSync(
 
 describe("Dashboard grid – orphan card visual balance", () => {
   // AC1 & AC2: Grid handles orphan (last) cards spanning full width
+  // Sprint 5: ActionCardGrid uses 2-column layout per DESIGN.md
   describe("ActionCardGrid", () => {
     it("applies col-span-full to the last card when it is alone on a 2-col row", () => {
       // sm breakpoint: last-child that is at an odd position spans full width
@@ -28,18 +29,8 @@ describe("Dashboard grid – orphan card visual balance", () => {
       );
     });
 
-    it("applies col-span-full to the last card when it is alone on a 3-col row", () => {
-      // xl breakpoint: last-child at position 3n+1 spans full width
-      expect(actionGridSrc).toMatch(
-        /xl:\[&>:last-child:nth-child\(3n\+1\)\]:col-span-full/,
-      );
-    });
-
-    it("resets 2-col spanning at xl breakpoint to avoid conflict", () => {
-      // At xl, the 2n+1 rule from sm is overridden back to col-auto
-      expect(actionGridSrc).toMatch(
-        /xl:\[&>:last-child:nth-child\(2n\+1\)\]:col-auto/,
-      );
+    it("uses 2-column grid layout per DESIGN.md", () => {
+      expect(actionGridSrc).toContain("sm:grid-cols-2");
     });
   });
 

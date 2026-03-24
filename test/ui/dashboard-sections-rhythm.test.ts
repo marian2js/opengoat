@@ -10,14 +10,6 @@ const dashboardSrc = readFileSync(
   "utf-8",
 );
 
-const opportunitySrc = readFileSync(
-  resolve(
-    __dirname,
-    "../../apps/desktop/src/features/dashboard/components/OpportunitySection.tsx",
-  ),
-  "utf-8",
-);
-
 const suggestedSrc = readFileSync(
   resolve(
     __dirname,
@@ -55,9 +47,9 @@ describe("Dashboard sections rhythm — visual separation and spacing", () => {
       expect(dashboardSrc).toMatch(/dashboard-section[\s\S]*BoardSummary/);
     });
 
-    it("wraps OpportunitySection in a dashboard-section divider", () => {
-      // Insights section should be wrapped in dashboard-section for separation
-      expect(dashboardSrc).toMatch(/dashboard-section[\s\S]*OpportunitySection/);
+    it("wraps RecentOutputs in a dashboard-section divider", () => {
+      // Recent outputs section should be wrapped in dashboard-section for separation
+      expect(dashboardSrc).toMatch(/dashboard-section[\s\S]*RecentOutputs/);
     });
   });
 
@@ -94,28 +86,8 @@ describe("Dashboard sections rhythm — visual separation and spacing", () => {
       expect(suggestedSrc).toContain("section-label");
     });
 
-    it("OpportunitySection uses section-label class", () => {
-      expect(opportunitySrc).toContain("section-label");
-    });
-
     it("BoardSummary uses section-label class", () => {
       expect(boardSummarySrc).toContain("section-label");
-    });
-  });
-
-  // AC5: Visual rhythm — Insights section has subtle background tint
-  describe("Insights section differentiation", () => {
-    it("OpportunitySection has a subtle background tint wrapper", () => {
-      // The insights section should have a bg tint to differentiate from action cards
-      expect(opportunitySrc).toMatch(/bg-muted|bg-card|bg-primary/);
-    });
-
-    it("OpportunitySection wrapper has rounded corners", () => {
-      expect(opportunitySrc).toMatch(/rounded-xl|rounded-lg/);
-    });
-
-    it("OpportunitySection wrapper has padding", () => {
-      expect(opportunitySrc).toMatch(/\bp-4\b|\bp-5\b|\bp-6\b/);
     });
   });
 });

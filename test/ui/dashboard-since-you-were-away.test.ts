@@ -272,17 +272,12 @@ describe("SinceYouWereAwaySection component", () => {
 // ---------------------------------------------------------------------------
 // Phase 6: DashboardWorkspace integration
 // ---------------------------------------------------------------------------
-describe("DashboardWorkspace — SinceYouWereAway integrated", () => {
-  it("imports SinceYouWereAwaySection", () => {
+// Sprint 5: SinceYouWereAwaySection removed from dashboard default flow.
+// The component still exists but is no longer rendered in DashboardWorkspace.
+describe("DashboardWorkspace — SinceYouWereAway removed from dashboard", () => {
+  it("does not import SinceYouWereAwaySection", () => {
     const src = readSrc("features/dashboard/components/DashboardWorkspace.tsx");
-    expect(src).toContain("SinceYouWereAwaySection");
-  });
-
-  it("renders SinceYouWereAwaySection with client and agentId", () => {
-    const src = readSrc("features/dashboard/components/DashboardWorkspace.tsx");
-    expect(src).toContain("<SinceYouWereAwaySection");
-    expect(src).toContain("client");
-    expect(src).toContain("agentId");
+    expect(src).not.toContain("SinceYouWereAwaySection");
   });
 });
 

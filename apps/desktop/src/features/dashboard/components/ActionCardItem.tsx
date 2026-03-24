@@ -1,4 +1,4 @@
-import { ArrowRightIcon, CheckCircleIcon, LoaderCircleIcon, RotateCwIcon } from "lucide-react";
+import { ArrowRightIcon, CheckCircleIcon, ClipboardListIcon, ClockIcon, LoaderCircleIcon, RotateCwIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -103,10 +103,26 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, 
             </button>
           </>
         ) : (
-          <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 transition-colors group-hover/action:text-primary">
-            Run
-            <ArrowRightIcon className="size-3 transition-transform group-hover/action:translate-x-0.5" />
-          </span>
+          <div className="flex flex-1 items-center justify-between">
+            <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 transition-colors group-hover/action:text-primary">
+              Run
+              <ArrowRightIcon className="size-3 transition-transform group-hover/action:translate-x-0.5" />
+            </span>
+            <div className="flex items-center gap-2">
+              {card.timeToFirstOutput && (
+                <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/40">
+                  <ClockIcon className="size-2.5" />
+                  {card.timeToFirstOutput}
+                </span>
+              )}
+              {card.createsTrackedWork && (
+                <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/40">
+                  <ClipboardListIcon className="size-2.5" />
+                  Board
+                </span>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </Card>

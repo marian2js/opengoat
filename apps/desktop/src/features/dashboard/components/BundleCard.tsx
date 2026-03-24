@@ -20,7 +20,7 @@ export function BundleCard({ bundle, onPreview }: BundleCardProps) {
 
   return (
     <div className="relative rounded-lg border transition-all duration-100 hover:border-primary/30">
-      {/* Left accent bar — primary teal for bundles */}
+      {/* Left accent bar — primary emerald for bundles */}
       <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] bg-primary opacity-60 transition-opacity hover:opacity-100" />
 
       {/* Header — clickable to toggle */}
@@ -42,7 +42,7 @@ export function BundleCard({ bundle, onPreview }: BundleCardProps) {
 
         {/* Count badge */}
         <span className="shrink-0 rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
-          {bundle.artifacts.length} artifact{bundle.artifacts.length !== 1 ? "s" : ""}
+          {bundle.artifacts.length} output{bundle.artifacts.length !== 1 ? "s" : ""}
         </span>
 
         {/* Status summary pills */}

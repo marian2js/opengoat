@@ -167,30 +167,14 @@ describe("PlaybookStartDialog", () => {
   });
 });
 
+// Sprint 5: PlaybookLibrary removed from dashboard default flow.
+// Playbooks are demoted; actions replace playbooks as the entry point.
 describe("DashboardWorkspace integration", () => {
-  it("imports PlaybookLibrary", () => {
-    expect(dashboardWorkspaceSrc).toContain("PlaybookLibrary");
+  it("does not import PlaybookLibrary (Sprint 5 simplification)", () => {
+    expect(dashboardWorkspaceSrc).not.toContain("PlaybookLibrary");
   });
 
-  it("uses usePlaybooks hook", () => {
-    expect(dashboardWorkspaceSrc).toContain("usePlaybooks");
-    expect(dashboardWorkspaceSrc).toContain("isPlaybooksLoading");
-  });
-
-  it("renders PlaybookLibrary before ActionCardGrid", () => {
-    const playbookIdx = dashboardWorkspaceSrc.indexOf("PlaybookLibrary");
-    const actionIdx = dashboardWorkspaceSrc.indexOf("ActionCardGrid");
-    // PlaybookLibrary section must appear before ActionCardGrid section in JSX
-    const jsxStart = dashboardWorkspaceSrc.indexOf("return (");
-    const playbookJsxIdx = dashboardWorkspaceSrc.indexOf("<PlaybookLibrary", jsxStart);
-    const actionJsxIdx = dashboardWorkspaceSrc.indexOf("<ActionCardGrid", jsxStart);
-    expect(playbookJsxIdx).toBeLessThan(actionJsxIdx);
-    expect(playbookIdx).toBeGreaterThan(-1);
-    expect(actionIdx).toBeGreaterThan(-1);
-  });
-
-  it("passes playbooks and isLoading props to PlaybookLibrary", () => {
-    expect(dashboardWorkspaceSrc).toContain("playbooks={playbooks}");
-    expect(dashboardWorkspaceSrc).toContain("isLoading={isPlaybooksLoading}");
+  it("does not use usePlaybooks hook", () => {
+    expect(dashboardWorkspaceSrc).not.toContain("usePlaybooks");
   });
 });

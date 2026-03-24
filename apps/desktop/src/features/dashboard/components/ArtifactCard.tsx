@@ -64,7 +64,7 @@ export function ArtifactCard({ artifact, onPreview, compact }: ArtifactCardProps
               onClick={() => onPreview(artifact.artifactId)}
               className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-primary opacity-0 transition-all hover:text-primary/80 group-hover/artifact:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
             >
-              Preview artifact
+              View output
               <ArrowRightIcon className="size-3 transition-transform group-hover/artifact:translate-x-0.5" />
             </button>
           ) : null}
