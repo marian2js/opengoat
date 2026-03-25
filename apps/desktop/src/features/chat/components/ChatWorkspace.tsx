@@ -139,6 +139,32 @@ export function markActionSession(sessionId: string): void {
   persistActionSessions();
 }
 
+/**
+ * Known starter action label prefixes.
+ * Used as a heuristic fallback when localStorage is empty (e.g. cleared data,
+ * different device, fresh session). Matches are conservative — only threads
+ * whose labels start with a known action name are detected.
+ */
+const ACTION_LABEL_PREFIXES = [
+  "Launch on Product Hunt",
+  "Rewrite homepage hero",
+  "Improve homepage conversion",
+  "Build outbound sequence",
+  "Find SEO quick wins",
+  "Create comparison page outline",
+  "Generate founder content ideas",
+  "Create lead magnet ideas",
+];
+
+/**
+ * Heuristic fallback: check if a session label matches a known starter action.
+ * Returns true if the label starts with any known action prefix.
+ */
+export function isLikelyActionSession(label: string): boolean {
+  if (!label) return false;
+  return ACTION_LABEL_PREFIXES.some((prefix) => label.startsWith(prefix));
+}
+
 /** Check if a session was initiated by an action card. */
 export function isActionSession(sessionId: string): boolean {
   if (actionSessionIds.has(sessionId)) {

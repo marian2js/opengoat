@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { getActionSessionMeta } from "@/features/action-session/lib/action-session-state";
+import { isLikelyActionSession, markActionSession } from "@/features/chat/components/ChatWorkspace";
 import {
   brainNavigation,
   primaryNavigation,
@@ -310,7 +311,11 @@ export function AppSidebar({
                                 return (
                                   <>
                                     {visibleSessions.map((session) => {
-                                      const sessionIsAction = checkIsAction(session.id);
+                                      let sessionIsAction = checkIsAction(session.id);
+                                      if (!sessionIsAction && session.label && isLikelyActionSession(session.label)) {
+                                        sessionIsAction = true;
+                                        markActionSession(session.id); // backfill localStorage
+                                      }
                                       return (
                                         <SessionItem
                                           key={session.id}
