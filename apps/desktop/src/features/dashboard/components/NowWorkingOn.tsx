@@ -1,6 +1,7 @@
 import { ArrowRightIcon, PlayCircleIcon, ClipboardListIcon, EyeIcon } from "lucide-react";
 import type { RunRecord } from "@opengoat/contracts";
 import type { ArtifactRecord } from "@opengoat/contracts";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
 
 export interface NowWorkingOnProps {
@@ -107,6 +108,29 @@ export function NowWorkingOn({ runs, latestArtifact, onResumeRun }: NowWorkingOn
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+export function NowWorkingOnSkeleton() {
+  return (
+    <section className="animate-pulse rounded-lg border bg-card/90 p-4">
+      {/* Header: icon + label + status badge */}
+      <div className="mb-3 flex items-center gap-2.5">
+        <Skeleton className="size-7 rounded-md" />
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="h-4 w-16 rounded-full" />
+      </div>
+      {/* Title + timestamp */}
+      <div className="mb-3 space-y-1.5">
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="h-2.5 w-20" />
+      </div>
+      {/* Action buttons placeholder */}
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-7 w-24 rounded-md" />
+        <Skeleton className="h-7 w-20 rounded-md" />
+      </div>
     </section>
   );
 }

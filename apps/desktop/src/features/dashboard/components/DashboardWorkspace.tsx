@@ -7,7 +7,7 @@ import { ActiveWorkSection } from "@/features/dashboard/components/ActiveWorkSec
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
 import { SuggestedActionGrid } from "@/features/dashboard/components/SuggestedActionGrid";
 import { FreeTextInput } from "@/features/dashboard/components/FreeTextInput";
-import { NowWorkingOn } from "@/features/dashboard/components/NowWorkingOn";
+import { NowWorkingOn, NowWorkingOnSkeleton } from "@/features/dashboard/components/NowWorkingOn";
 import { RecentOutputs } from "@/features/dashboard/components/RecentOutputs";
 import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSummary";
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
@@ -158,7 +158,11 @@ function DashboardContent({
           )}
 
           {/* Now working on — latest run + output preview + quick actions */}
-          {runsResult.runs.length > 0 && (
+          {runsResult.isLoading ? (
+            <div className="dashboard-section pb-4">
+              <NowWorkingOnSkeleton />
+            </div>
+          ) : runsResult.runs.length > 0 ? (
             <div className="dashboard-section pb-4">
               <NowWorkingOn
                 runs={runsResult.runs}
@@ -166,7 +170,7 @@ function DashboardContent({
                 onResumeRun={onResumeRun}
               />
             </div>
-          )}
+          ) : null}
 
           {/* Compact recent work list */}
           <RecentOutputs
