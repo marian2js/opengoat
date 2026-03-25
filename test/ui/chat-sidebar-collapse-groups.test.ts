@@ -38,7 +38,7 @@ describe("Chat sidebar – collapsible date groups", () => {
   // AC5: Expanding/collapsing is smooth (no layout jumps)
   it("uses CollapsibleContent for smooth expand/collapse", () => {
     // The session list should be inside CollapsibleContent
-    expect(sidebarSrc).toMatch(/CollapsibleContent[\s\S]*group\.sessions\.map|group\.sessions\.map[\s\S]*CollapsibleContent/);
+    expect(sidebarSrc).toMatch(/CollapsibleContent[\s\S]*visibleSessions\.map|visibleSessions\.map[\s\S]*CollapsibleContent/);
   });
 
   // AC6: Search expands all groups or shows flat results

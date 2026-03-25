@@ -67,6 +67,8 @@ import {
 } from "@/components/ui/sidebar";
 
 
+const MAX_VISIBLE_TODAY = 5;
+
 interface AppSidebarProps {
   activeAgentId?: string | undefined;
   activeBrainSection?: string | undefined;
@@ -104,6 +106,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showAllToday, setShowAllToday] = useState(false);
   const allSessions = sessions ?? [];
   const filteredSessions = useMemo(() => {
     if (!searchQuery.trim()) return allSessions;
@@ -300,26 +303,46 @@ export function AppSidebar({
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <ul role="group" className="flex flex-col">
-                              {group.sessions.map((session) => {
-                                const sessionIsAction = checkIsAction(session.id);
+                              {(() => {
+                                const isTodayCapped = group.label === "Today" && !showAllToday && group.sessions.length > MAX_VISIBLE_TODAY;
+                                const visibleSessions = isTodayCapped ? group.sessions.slice(0, MAX_VISIBLE_TODAY) : group.sessions;
+                                const hiddenCount = group.sessions.length - visibleSessions.length;
                                 return (
-                                  <SessionItem
-                                    key={session.id}
-                                    actionMeta={sessionIsAction ? getActionSessionMeta(session.id) : null}
-                                    deEmphasized={deEmphasizedIds.has(session.id)}
-                                    isAction={sessionIsAction}
-                                    isActive={session.id === activeSessionId}
-                                    isEditing={editingSessionId === session.id}
-                                    isRecent={isRecent}
-                                    session={session}
-                                    onDelete={onSessionDelete}
-                                    onRename={onSessionRename}
-                                    onSelect={onSessionSelect}
-                                    onStartEditing={() => setEditingSessionId(session.id)}
-                                    onStopEditing={() => setEditingSessionId(null)}
-                                  />
+                                  <>
+                                    {visibleSessions.map((session) => {
+                                      const sessionIsAction = checkIsAction(session.id);
+                                      return (
+                                        <SessionItem
+                                          key={session.id}
+                                          actionMeta={sessionIsAction ? getActionSessionMeta(session.id) : null}
+                                          deEmphasized={deEmphasizedIds.has(session.id)}
+                                          isAction={sessionIsAction}
+                                          isActive={session.id === activeSessionId}
+                                          isEditing={editingSessionId === session.id}
+                                          isRecent={isRecent}
+                                          session={session}
+                                          onDelete={onSessionDelete}
+                                          onRename={onSessionRename}
+                                          onSelect={onSessionSelect}
+                                          onStartEditing={() => setEditingSessionId(session.id)}
+                                          onStopEditing={() => setEditingSessionId(null)}
+                                        />
+                                      );
+                                    })}
+                                    {hiddenCount > 0 && (
+                                      <li className="px-3 py-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => setShowAllToday(true)}
+                                          className="text-[11px] text-sidebar-foreground/50 hover:text-sidebar-foreground/80 transition-colors"
+                                        >
+                                          Show {hiddenCount} more
+                                        </button>
+                                      </li>
+                                    )}
+                                  </>
                                 );
-                              })}
+                              })()}
                             </ul>
                           </CollapsibleContent>
                         </li>
