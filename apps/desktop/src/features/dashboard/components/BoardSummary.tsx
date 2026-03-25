@@ -84,7 +84,7 @@ export function BoardSummary({ counts, isLoading, isEmpty, activeObjective }: Bo
             </span>
           </div>
           <div className="hidden sm:flex items-center gap-2">
-            {pills.map((pill) => (
+            {pills.filter((pill) => pill.value > 0).map((pill) => (
               <span
                 key={pill.label}
                 className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-mono text-[10px] font-medium tracking-wider ${pill.className}`}
