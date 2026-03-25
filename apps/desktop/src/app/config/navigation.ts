@@ -43,9 +43,9 @@ export const brainNavigation: NavigationItem[] = [
   { title: "Product", href: "#brain/product", icon: PackageIcon },
   { title: "Market", href: "#brain/market", icon: StoreIcon },
   { title: "Growth", href: "#brain/growth", icon: TrendingUpIcon },
-  { title: "Company Context", href: "#brain/memory", icon: BrainIcon },
-  { title: "Saved Guidance", href: "#brain/operating-memory", icon: DatabaseIcon },
-  { title: "Knowledge Base", href: "#brain/knowledge", icon: BookOpenIcon },
+  { title: "Company Context", href: "#brain/company-context", icon: BrainIcon },
+  { title: "Saved Guidance", href: "#brain/saved-guidance", icon: DatabaseIcon },
+  { title: "Knowledge Base", href: "#brain/knowledge-base", icon: BookOpenIcon },
 ];
 
 export const secondaryNavigation: NavigationItem[] = [

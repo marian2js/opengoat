@@ -17,10 +17,10 @@ const navSrc = readFileSync(
 // BrainWorkspace wiring tests
 // ---------------------------------------------------------------------------
 
-void test("BrainWorkspace: BRAIN_SECTIONS includes operating-memory entry", () => {
+void test("BrainWorkspace: BRAIN_SECTIONS includes saved-guidance entry", () => {
   assert.ok(
-    brainSrc.includes("operating-memory"),
-    "Expected 'operating-memory' section in BRAIN_SECTIONS",
+    brainSrc.includes("saved-guidance"),
+    "Expected 'saved-guidance' section in BRAIN_SECTIONS",
   );
 });
 
@@ -31,17 +31,17 @@ void test("BrainWorkspace: imports OperatingMemorySection", () => {
   );
 });
 
-void test("BrainWorkspace: conditionally renders OperatingMemorySection for operating-memory section", () => {
+void test("BrainWorkspace: conditionally renders OperatingMemorySection for saved-guidance section", () => {
   assert.ok(
-    brainSrc.includes("OperatingMemorySection") && brainSrc.includes("operating-memory"),
-    "Expected conditional rendering of OperatingMemorySection when section is operating-memory",
+    brainSrc.includes("OperatingMemorySection") && brainSrc.includes("saved-guidance"),
+    "Expected conditional rendering of OperatingMemorySection when section is saved-guidance",
   );
 });
 
-void test("BrainWorkspace: operating-memory section has DatabaseIcon", () => {
+void test("BrainWorkspace: saved-guidance section has DatabaseIcon", () => {
   assert.ok(
     brainSrc.includes("DatabaseIcon"),
-    "Expected DatabaseIcon for operating-memory section",
+    "Expected DatabaseIcon for saved-guidance section",
   );
 });
 
@@ -49,23 +49,23 @@ void test("BrainWorkspace: operating-memory section has DatabaseIcon", () => {
 // Navigation wiring tests
 // ---------------------------------------------------------------------------
 
-void test("Navigation: brainNavigation includes Operating Memory entry", () => {
+void test("Navigation: brainNavigation includes Saved Guidance entry", () => {
   assert.ok(
-    navSrc.includes("Operating Memory"),
-    "Expected 'Operating Memory' entry in brainNavigation",
+    navSrc.includes("Saved Guidance"),
+    "Expected 'Saved Guidance' entry in brainNavigation",
   );
 });
 
-void test("Navigation: Operating Memory links to #brain/operating-memory", () => {
+void test("Navigation: Saved Guidance links to #brain/saved-guidance", () => {
   assert.ok(
-    navSrc.includes("#brain/operating-memory"),
-    "Expected href '#brain/operating-memory' in navigation",
+    navSrc.includes("#brain/saved-guidance"),
+    "Expected href '#brain/saved-guidance' in navigation",
   );
 });
 
 void test("Navigation: imports DatabaseIcon", () => {
   assert.ok(
     navSrc.includes("DatabaseIcon"),
-    "Expected DatabaseIcon import for Operating Memory nav item",
+    "Expected DatabaseIcon import for Saved Guidance nav item",
   );
 });

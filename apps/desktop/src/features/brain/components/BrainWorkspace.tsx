@@ -260,7 +260,7 @@ What drives users to come back?
 What self-reinforcing loops drive growth?`,
   },
   {
-    id: "memory",
+    id: "company-context",
     label: "Company Context",
     filename: "MEMORY.md",
     icon: BrainIcon,
@@ -277,7 +277,7 @@ Define brand voice, content tone, and communication conventions the AI should fo
 Share product and market context that helps the AI provide more relevant assistance.`,
   },
   {
-    id: "operating-memory",
+    id: "saved-guidance",
     label: "Saved Guidance",
     filename: "",
     icon: DatabaseIcon,
@@ -285,7 +285,7 @@ Share product and market context that helps the AI provide more relevant assista
     placeholder: "",
   },
   {
-    id: "knowledge",
+    id: "knowledge-base",
     label: "Knowledge Base",
     filename: "KNOWLEDGE.md",
     icon: BookOpenIcon,
@@ -320,7 +320,7 @@ export function BrainWorkspace({ agentId, client, onRefineContext, sectionId }: 
     );
   }
 
-  if (section.id === "operating-memory") {
+  if (section.id === "saved-guidance") {
     return (
       <div className="flex flex-1 flex-col overflow-y-auto">
         <div className="flex items-center gap-3 border-b border-border/20 px-5 py-4 lg:px-6">
@@ -384,7 +384,7 @@ function BrainEditor({
         let loaded = result.exists ? result.content : "";
 
         // Migrate old developer-oriented boilerplate in Memory files
-        if (section.id === "memory" && loaded) {
+        if (section.id === "company-context" && loaded) {
           const migrated = migrateMemoryBoilerplate(loaded);
           if (migrated !== loaded) {
             loaded = migrated;
@@ -518,14 +518,14 @@ function BrainEditor({
     return (
       <div className="flex flex-1 flex-col overflow-y-auto">
         <SectionHeader section={section} saveState={saveState} fileExists={fileExists}>
-          {section.id === "knowledge" ? (
+          {section.id === "knowledge-base" ? (
             <ImportButton fileInputRef={fileInputRef} onImport={handleImport} onFileSelected={handleFileSelected} />
           ) : null}
         </SectionHeader>
         <div className="flex-1 px-5 pb-5 lg:px-6 lg:pb-6">
-          {section.id === "memory" ? (
+          {section.id === "company-context" ? (
             <MemoryEmptyState onUseTemplate={useTemplate} onWriteFromScratch={writeFromScratch} />
-          ) : section.id === "knowledge" ? (
+          ) : section.id === "knowledge-base" ? (
             <KnowledgeEmptyState onUseTemplate={useTemplate} onWriteFromScratch={writeFromScratch} onImport={handleImport} />
           ) : (
             <div className="flex flex-col gap-3">
@@ -614,9 +614,9 @@ function BrainEditor({
             placeholder={`Start writing your ${section.label.toLowerCase()} notes...`}
             className="min-h-[500px] w-full resize-none rounded-lg border border-border/50 bg-transparent p-4 font-mono text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-ring focus:ring-1 focus:ring-ring/30"
           />
-        ) : section.id === "knowledge" ? (
+        ) : section.id === "knowledge-base" ? (
           <KnowledgeContentView content={content} onImport={handleImport} />
-        ) : section.id === "memory" ? (
+        ) : section.id === "company-context" ? (
           <MemoryContentView content={content} onEdit={() => setIsEditing(true)} />
         ) : (
           <div className={KNOWLEDGE_PROSE_CLASSES}>

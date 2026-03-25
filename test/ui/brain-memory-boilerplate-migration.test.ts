@@ -32,7 +32,7 @@ describe("migrateMemoryBoilerplate", () => {
   // AC3: Existing projects are updated or display corrected text
   it("is applied when loading memory content in BrainEditor", () => {
     expect(src).toContain("migrateMemoryBoilerplate");
-    expect(src).toMatch(/section\.id === ["']memory["']/);
+    expect(src).toMatch(/section\.id === ["']company-context["']/);
   });
 
   it("is applied in MemoryContentView for display", () => {
@@ -48,8 +48,8 @@ describe("migrateMemoryBoilerplate", () => {
 
   // AC4: New projects continue using the updated template
   it("memory placeholder template uses marketing-domain language", () => {
-    // Find the memory section placeholder by looking after id: "memory"
-    const memoryIndex = src.indexOf('id: "memory"');
+    // Find the company-context section placeholder
+    const memoryIndex = src.indexOf('id: "company-context"');
     expect(memoryIndex).toBeGreaterThan(0);
     const memorySection = src.slice(memoryIndex, memoryIndex + 600);
     const placeholderMatch = memorySection.match(/placeholder:\s*`([^`]+)`/s);

@@ -29,11 +29,11 @@ describe("Brain simplified terminology — navigation labels", () => {
     expect(nav).toContain('"Knowledge Base"');
   });
 
-  it("href paths remain unchanged for routing stability", () => {
+  it("href paths use URL-friendly slugs", () => {
     const nav = readSrc("app/config/navigation.ts");
-    expect(nav).toContain("#brain/memory");
-    expect(nav).toContain("#brain/operating-memory");
-    expect(nav).toContain("#brain/knowledge");
+    expect(nav).toContain("#brain/company-context");
+    expect(nav).toContain("#brain/saved-guidance");
+    expect(nav).toContain("#brain/knowledge-base");
   });
 });
 
@@ -43,30 +43,30 @@ describe("Brain simplified terminology — navigation labels", () => {
 describe("Brain simplified terminology — BRAIN_SECTIONS", () => {
   const src = readSrc("features/brain/components/BrainWorkspace.tsx");
 
-  it('memory section label is "Company Context"', () => {
-    const memoryIdx = src.indexOf('id: "memory"');
-    expect(memoryIdx).toBeGreaterThan(0);
-    const sectionSlice = src.slice(memoryIdx, memoryIdx + 300);
+  it('company-context section label is "Company Context"', () => {
+    const idx = src.indexOf('id: "company-context"');
+    expect(idx).toBeGreaterThan(0);
+    const sectionSlice = src.slice(idx, idx + 300);
     expect(sectionSlice).toContain('label: "Company Context"');
   });
 
-  it('operating-memory section label is "Saved Guidance"', () => {
-    const opMemIdx = src.indexOf('id: "operating-memory"');
-    expect(opMemIdx).toBeGreaterThan(0);
-    const sectionSlice = src.slice(opMemIdx, opMemIdx + 300);
+  it('saved-guidance section label is "Saved Guidance"', () => {
+    const idx = src.indexOf('id: "saved-guidance"');
+    expect(idx).toBeGreaterThan(0);
+    const sectionSlice = src.slice(idx, idx + 300);
     expect(sectionSlice).toContain('label: "Saved Guidance"');
   });
 
-  it('knowledge section label is "Knowledge Base"', () => {
-    const knowIdx = src.indexOf('id: "knowledge"');
-    expect(knowIdx).toBeGreaterThan(0);
-    const sectionSlice = src.slice(knowIdx, knowIdx + 300);
+  it('knowledge-base section label is "Knowledge Base"', () => {
+    const idx = src.indexOf('id: "knowledge-base"');
+    expect(idx).toBeGreaterThan(0);
+    const sectionSlice = src.slice(idx, idx + 300);
     expect(sectionSlice).toContain('label: "Knowledge Base"');
   });
 
-  it("operating-memory description mentions alignment, not memory jargon", () => {
-    const opMemIdx = src.indexOf('id: "operating-memory"');
-    const sectionSlice = src.slice(opMemIdx, opMemIdx + 300);
+  it("saved-guidance description mentions alignment, not memory jargon", () => {
+    const idx = src.indexOf('id: "saved-guidance"');
+    const sectionSlice = src.slice(idx, idx + 300);
     expect(sectionSlice).toContain("stay aligned");
   });
 });
