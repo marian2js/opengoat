@@ -32,23 +32,23 @@ function TaskRow({ task, onSelect }: TaskRowProps) {
 
   return (
     <TableRow
-      className="group/row cursor-pointer border-border/30 transition-colors hover:bg-accent/50"
+      className="group/row cursor-pointer border-border/20 transition-colors hover:bg-primary/[0.04] even:bg-muted/[0.03]"
       onClick={() => onSelect(task.taskId)}
     >
       {/* Title */}
-      <TableCell className="max-w-[400px] py-2.5 text-[13px] font-medium text-foreground/85 group-hover/row:text-foreground">
+      <TableCell className="max-w-[400px] py-3 text-[13px] font-medium text-foreground/85 group-hover/row:text-foreground">
         <div className="flex items-center gap-1.5 overflow-hidden">
           <span className="truncate">{task.title}</span>
         </div>
       </TableCell>
 
       {/* Status */}
-      <TableCell>
+      <TableCell className="py-3">
         <TaskStatusBadge status={task.status} />
       </TableCell>
 
       {/* Context: output count, blocker count, review indicator */}
-      <TableCell>
+      <TableCell className="py-3">
         <div className="flex items-center gap-1.5">
           <ContextBadge count={artifactCount} label="outputs" />
           <ContextBadge count={blockerCount} variant="danger" label="blockers" />
@@ -57,12 +57,12 @@ function TaskRow({ task, onSelect }: TaskRowProps) {
       </TableCell>
 
       {/* Updated */}
-      <TableCell className="font-mono text-[11px] text-muted-foreground/70 tabular-nums">
+      <TableCell className="py-3 font-mono text-[11px] text-muted-foreground/60 tabular-nums">
         {formatRelativeTime(task.updatedAt)}
       </TableCell>
 
       {/* Owner */}
-      <TableCell className="text-[13px] text-muted-foreground">
+      <TableCell className="py-3 font-mono text-[11px] text-muted-foreground/50 uppercase tracking-wider">
         {task.owner || "\u2014"}
       </TableCell>
     </TableRow>
@@ -126,12 +126,12 @@ export function TaskList({
     <div className="flex-1 overflow-y-auto">
       <Table>
         <TableHeader>
-          <TableRow className="border-b border-border hover:bg-transparent">
-            <TableHead className="w-[40%] py-2 text-[11px] font-medium text-muted-foreground/50">Title</TableHead>
-            <TableHead className="w-[120px] py-2 text-[11px] font-medium text-muted-foreground/50">Status</TableHead>
-            <TableHead className="w-[100px] py-2 text-[11px] font-medium text-muted-foreground/50">Context</TableHead>
-            <TableHead className="w-[100px] py-2 text-[11px] font-medium text-muted-foreground/50">Updated</TableHead>
-            <TableHead className="py-2 text-[11px] font-medium text-muted-foreground/50">Owner</TableHead>
+          <TableRow className="border-b border-border/40 hover:bg-transparent">
+            <TableHead className="w-[40%] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Title</TableHead>
+            <TableHead className="w-[120px] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Status</TableHead>
+            <TableHead className="w-[100px] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Context</TableHead>
+            <TableHead className="w-[100px] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Updated</TableHead>
+            <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Owner</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -200,12 +200,12 @@ export function TaskListSkeleton() {
     <div className="flex-1 overflow-y-auto">
       <Table>
         <TableHeader>
-          <TableRow className="border-b border-border hover:bg-transparent">
-            <TableHead className="w-[40%] py-2 text-[11px] font-medium text-muted-foreground/50">Title</TableHead>
-            <TableHead className="w-[120px] py-2 text-[11px] font-medium text-muted-foreground/50">Status</TableHead>
-            <TableHead className="w-[100px] py-2 text-[11px] font-medium text-muted-foreground/50">Context</TableHead>
-            <TableHead className="w-[100px] py-2 text-[11px] font-medium text-muted-foreground/50">Updated</TableHead>
-            <TableHead className="py-2 text-[11px] font-medium text-muted-foreground/50">Owner</TableHead>
+          <TableRow className="border-b border-border/40 hover:bg-transparent">
+            <TableHead className="w-[40%] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Title</TableHead>
+            <TableHead className="w-[120px] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Status</TableHead>
+            <TableHead className="w-[100px] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Context</TableHead>
+            <TableHead className="w-[100px] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Updated</TableHead>
+            <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Owner</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
