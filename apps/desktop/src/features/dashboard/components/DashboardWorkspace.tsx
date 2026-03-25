@@ -3,6 +3,7 @@ import type { AgentSession } from "@opengoat/contracts";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
+import { ActiveWorkSection } from "@/features/dashboard/components/ActiveWorkSection";
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
 import { SuggestedActionGrid } from "@/features/dashboard/components/SuggestedActionGrid";
 import { FreeTextInput } from "@/features/dashboard/components/FreeTextInput";
@@ -12,6 +13,7 @@ import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSumm
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
 import { useBoardSummary } from "@/features/dashboard/hooks/useBoardSummary";
 import { useActiveObjective } from "@/features/dashboard/hooks/useActiveObjective";
+import { useActionSessions } from "@/features/dashboard/hooks/useActionSessions";
 import { useRuns } from "@/features/dashboard/hooks/useRuns";
 import { useRecentArtifacts } from "@/features/dashboard/hooks/useRecentArtifacts";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
@@ -97,11 +99,13 @@ function DashboardContent({
   const { suggestedActions, isLoading: isSuggestedLoading } = useSuggestedActions(agentId, client, workspaceReady);
   const boardSummary = useBoardSummary(agentId, client);
   const activeObjective = useActiveObjective(agentId, client);
+  const actionSessions = useActionSessions();
   const runsResult = useRuns(agentId, client);
   const recentArtifacts = useRecentArtifacts(agentId, client);
 
-  // Mode detection: Mode B when active work exists
+  // Mode detection: Mode B when active work exists (action sessions OR API runs/objectives)
   const hasActiveWork =
+    actionSessions.hasActiveWork ||
     (!activeObjective.isLoading && activeObjective.objective !== null) ||
     (!runsResult.isLoading && runsResult.runs.length > 0);
 
@@ -137,6 +141,11 @@ function DashboardContent({
           {/* Free-text input — always accessible for ad-hoc asks */}
           <div className="dashboard-section pb-2">
             <FreeTextInput onSubmit={handleFreeTextSubmit} />
+          </div>
+
+          {/* Active work — action sessions with continue/review quick actions */}
+          <div className="mb-6">
+            <ActiveWorkSection onContinueSession={onResumeRun} />
           </div>
 
           {/* Now working on — latest run + output preview + quick actions */}

@@ -148,6 +148,10 @@ export function updateActionSessionState(sessionId: string, state: ActionSession
   }
 }
 
+export function getAllActionSessionMetas(): MetaStore {
+  return loadMetaStore();
+}
+
 export function markSessionSavedToBoard(sessionId: string): void {
   const store = loadMetaStore();
   const existing = store[sessionId];
