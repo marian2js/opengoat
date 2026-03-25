@@ -191,21 +191,20 @@ export function OperatingMemorySection({ agentId, client }: OperatingMemorySecti
   // Empty state
   if (isEmpty && !creatingCategory) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-5 py-12">
-        <div className="flex size-14 items-center justify-center rounded-full bg-muted/80">
-          <DatabaseIcon className="size-7 text-muted-foreground/50" />
+      <div className="flex flex-1 flex-col items-center justify-center px-5 py-10">
+        <div className="flex size-10 items-center justify-center rounded-lg bg-muted/60">
+          <DatabaseIcon className="size-5 text-muted-foreground/40" />
         </div>
-        <h3 className="mt-4 font-display text-sm font-bold tracking-tight text-foreground/80">
+        <h3 className="mt-3 font-display text-sm font-bold tracking-tight text-foreground/80">
           No saved guidance yet
         </h3>
-        <p className="mt-1.5 max-w-xs text-center text-xs leading-relaxed text-muted-foreground/60">
-          Saved guidance helps the system stay aligned with your brand voice, product facts,
-          preferences, and constraints. This is optional — you can start using the app without it.
+        <p className="mt-1 max-w-[300px] text-center text-xs leading-relaxed text-muted-foreground/50">
+          Help the system stay aligned with your brand voice, preferences, and constraints.
         </p>
         <button
           type="button"
           onClick={() => setCreatingCategory(CATEGORY_ORDER[0]!)}
-          className="mt-5 flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          className="mt-4 flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
         >
           <PlusIcon className="size-3.5" />
           Add your first entry
