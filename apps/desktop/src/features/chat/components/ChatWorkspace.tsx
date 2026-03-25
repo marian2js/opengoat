@@ -468,14 +468,14 @@ function ChatSessionView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Agent/provider bar */}
-      <div className="flex items-center gap-3 border-b border-border/30 px-4 py-2 lg:px-6">
+      <div className="flex items-center gap-3 border-b border-border/20 bg-card/40 px-4 py-2.5 lg:px-6">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
             <BotIcon className="size-3" />
             {bootstrap.agent.name}
           </span>
           {providerName ? (
-            <span className="rounded-md bg-muted/50 px-2 py-0.5 font-mono text-[10px] text-muted-foreground/60">
+            <span className="rounded-md bg-muted/40 px-2 py-0.5 font-mono text-[10px] text-muted-foreground/50">
               {providerName}
               {bootstrap.resolvedModelId ? ` / ${bootstrap.resolvedModelId}` : ""}
             </span>
@@ -521,36 +521,36 @@ function ChatSessionView({
         ) : visibleMessages.length === 0 && !isAction ? (
           <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-8 px-4 py-8 text-center">
             <div className="space-y-3">
-              <div className="mx-auto flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <SparklesIcon className="size-5" />
               </div>
-              <div className="space-y-1">
-                <h1 className="font-display text-lg font-bold tracking-tight text-foreground">
+              <div className="space-y-1.5">
+                <h1 className="font-display text-[18px] font-bold tracking-tight text-foreground">
                   Start a conversation
                 </h1>
-                <p className="text-[13px] leading-relaxed text-muted-foreground/70">
+                <p className="text-[13px] leading-relaxed text-muted-foreground/60">
                   Ask {bootstrap.agent.name} about marketing strategy, growth, and content.
                 </p>
               </div>
             </div>
 
-            <div className="grid w-full gap-2.5">
+            <div className="grid w-full gap-2">
               {STARTER_PROMPTS.map((prompt) => (
                 <button
                   key={prompt.text}
                   type="button"
-                  className="group/starter flex cursor-pointer items-center gap-3 rounded-lg border border-border/40 bg-card/60 px-4 py-3.5 text-left transition-all duration-150 hover:-translate-y-px hover:border-primary/30 hover:bg-card hover:shadow-sm"
+                  className="group/starter flex cursor-pointer items-center gap-3.5 rounded-xl border border-border/30 bg-card/50 px-4 py-3.5 text-left transition-all duration-150 hover:-translate-y-px hover:border-primary/25 hover:bg-card/80 hover:shadow-sm"
                   onClick={() => {
                     void handleSubmit({ text: prompt.text });
                   }}
                 >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/8 text-primary transition-colors group-hover/starter:bg-primary group-hover/starter:text-primary-foreground">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary transition-colors group-hover/starter:bg-primary group-hover/starter:text-primary-foreground">
                     <prompt.icon className="size-4" />
                   </div>
                   <span className="flex-1 text-[13px] font-medium leading-relaxed text-muted-foreground transition-colors group-hover/starter:text-foreground">
                     {prompt.text}
                   </span>
-                  <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground/30 transition-all group-hover/starter:translate-x-0.5 group-hover/starter:text-primary" />
+                  <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground/20 transition-all group-hover/starter:translate-x-0.5 group-hover/starter:text-primary" />
                 </button>
               ))}
             </div>
@@ -590,7 +590,7 @@ function ChatSessionView({
       </div>
 
       {/* Chat input */}
-      <div className="border-t border-border/60 px-4 py-3 lg:px-6">
+      <div className="border-t border-border/30 bg-card/30 px-4 py-3.5 lg:px-6">
         <PromptInput
           accept="image/*,.pdf,.txt,.md,.csv,.json,.js,.jsx,.ts,.tsx,.py,.rb,.go,.rs,.java,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.sh,.bash,.zsh,.yaml,.yml,.toml,.xml,.html,.css,.scss,.sql,.r,.lua,.php,.pl,.ex,.exs,.hs,.ml,.scala,.clj,.dart,.vue,.svelte,.astro,.log,.env,.ini,.cfg,.conf,.diff,.patch"
           globalDrop
