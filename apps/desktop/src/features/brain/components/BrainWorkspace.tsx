@@ -813,30 +813,32 @@ function KnowledgeInlineEmpty({
   onImport?: () => void;
 }) {
   return (
-    <div className="mt-4 flex min-h-[120px] flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 bg-muted/30 px-6 py-8 text-center">
-      <div className="flex size-12 items-center justify-center rounded-full bg-muted/80">
-        <Icon className="size-6 text-muted-foreground/50" />
+    <div className="mt-3 flex items-center gap-3 rounded-lg border border-dashed border-muted-foreground/15 bg-muted/20 px-4 py-3">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted/60">
+        <Icon className="size-4 text-muted-foreground/40" />
       </div>
-      <p className="mt-3 text-sm font-medium text-muted-foreground">{title}</p>
-      <p className="mt-1 max-w-[280px] text-xs leading-relaxed text-muted-foreground/60">{helperText}</p>
-      <div className="mt-4 flex items-center gap-2">
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-medium text-muted-foreground/70">{title}</p>
+        <p className="text-xs text-muted-foreground/50">{helperText}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
         {onImport ? (
           <button
             type="button"
             onClick={onImport}
-            className="flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="flex items-center gap-1 rounded-md border border-border/40 px-2 py-1 text-[11px] text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
           >
-            <FileUpIcon className="size-3.5" />
-            Import file
+            <FileUpIcon className="size-3" />
+            Import
           </button>
         ) : null}
         <button
           type="button"
           onClick={() => { window.location.hash = "#chat"; }}
-          className="flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/5 px-2.5 py-1.5 text-xs text-primary transition-colors hover:bg-primary/10"
+          className="flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1 text-[11px] text-primary/70 transition-colors hover:bg-primary/5 hover:text-primary"
         >
-          <MessageSquareIcon className="size-3.5" />
-          Go to Chat
+          <MessageSquareIcon className="size-3" />
+          Chat
         </button>
       </div>
     </div>
@@ -926,19 +928,21 @@ function MemoryInlineEmpty({
   onEdit?: () => void;
 }) {
   return (
-    <div className="mt-4 flex min-h-[120px] flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 bg-muted/30 px-6 py-8 text-center">
-      <div className="flex size-12 items-center justify-center rounded-full bg-muted/80">
-        <Icon className="size-6 text-muted-foreground/50" />
+    <div className="mt-3 flex items-center gap-3 rounded-lg border border-dashed border-muted-foreground/15 bg-muted/20 px-4 py-3">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted/60">
+        <Icon className="size-4 text-muted-foreground/40" />
       </div>
-      <p className="mt-3 text-sm font-medium text-muted-foreground">{title}</p>
-      <p className="mt-1 max-w-[280px] text-xs italic leading-relaxed text-muted-foreground/60">{helperText}</p>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-medium text-muted-foreground/70">{title}</p>
+        <p className="text-xs text-muted-foreground/50">{helperText}</p>
+      </div>
       {onEdit ? (
         <button
           type="button"
           onClick={onEdit}
-          className="mt-4 flex items-center gap-1.5 rounded-md border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="flex shrink-0 items-center gap-1 rounded-md border border-border/40 px-2 py-1 text-[11px] text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
         >
-          <PencilIcon className="size-3.5" />
+          <PencilIcon className="size-3" />
           Edit
         </button>
       ) : null}
