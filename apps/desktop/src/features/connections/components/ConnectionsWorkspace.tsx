@@ -334,6 +334,8 @@ function ConnectionRow({
                 type="button"
                 variant="ghost"
                 size="sm"
+                aria-label="Remove connection"
+                title="Remove connection"
                 className="h-7 rounded-md px-2 text-[11px] text-destructive hover:bg-destructive/8 hover:text-destructive"
                 disabled={isBusy}
                 onClick={() => {

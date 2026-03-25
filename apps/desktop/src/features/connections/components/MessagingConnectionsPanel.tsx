@@ -386,6 +386,7 @@ function MessagingConnectionRow({
               variant="ghost"
               size="sm"
               aria-label="Remove connection"
+              title="Remove connection"
               className="h-7 rounded-md px-2 text-[11px] text-muted-foreground/40 hover:bg-destructive/8 hover:text-destructive"
               onClick={(e) => {
                 e.stopPropagation();
