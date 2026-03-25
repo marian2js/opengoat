@@ -322,13 +322,15 @@ function MessagingConnectionRow({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 rounded-md px-2 text-[11px] text-muted-foreground hover:text-foreground"
+              aria-label="Connection details"
+              className="h-8 rounded-md px-2.5 text-[11px] text-primary hover:bg-primary/8 hover:text-primary"
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect();
               }}
             >
               <SettingsIcon className="size-3" />
+              <span>Details</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="px-2 py-1 text-xs">
@@ -342,13 +344,15 @@ function MessagingConnectionRow({
             type="button"
             variant="ghost"
             size="sm"
-            className="h-7 rounded-md px-2 text-[11px] text-destructive hover:bg-destructive/8 hover:text-destructive"
+            aria-label="Remove connection"
+            className="h-8 rounded-md px-2.5 text-[11px] text-destructive hover:bg-destructive/8 hover:text-destructive"
             onClick={(e) => {
               e.stopPropagation();
               void onDelete(connection.connectionId);
             }}
           >
             <Trash2Icon className="size-3" />
+            <span>Remove</span>
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="px-2 py-1 text-xs">
