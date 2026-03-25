@@ -528,36 +528,39 @@ function BrainEditor({
           ) : section.id === "knowledge" ? (
             <KnowledgeEmptyState onUseTemplate={useTemplate} onWriteFromScratch={writeFromScratch} onImport={handleImport} />
           ) : (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <LightbulbIcon className="size-4 text-amber-500/70" />
-                <span className="text-xs">
-                  Start typing or use the template below. Changes auto-save.
-                </span>
-              </div>
+            <div className="flex flex-col gap-3">
+              <p className="text-xs text-muted-foreground/60">
+                Start typing or use the template below. Changes auto-save.
+              </p>
 
-              <button
-                type="button"
-                onClick={useTemplate}
-                className="rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
-              >
-                <FlameIcon className="mb-2 size-4 text-orange-500/70" />
-                <div className="font-medium text-foreground/70">Use template</div>
-                <div className="mt-1 text-xs">
-                  Start with a pre-filled template for {section.label.toLowerCase()}
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={writeFromScratch}
-                className="rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
-              >
-                <PencilIcon className="mb-2 size-4" />
-                <div className="font-medium text-foreground/70">Write from scratch</div>
-                <div className="mt-1 text-xs">
-                  Open the editor and start writing
-                </div>
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={useTemplate}
+                  className="flex flex-1 items-center gap-3 rounded-lg border border-primary/20 bg-primary/[0.03] px-4 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.06]"
+                >
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
+                    <FlameIcon className="size-4 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-medium text-foreground/80">Use template</div>
+                    <div className="text-xs text-muted-foreground/50">Pre-filled for {section.label.toLowerCase()}</div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={writeFromScratch}
+                  className="flex flex-1 items-center gap-3 rounded-lg border border-border/40 px-4 py-3 text-left transition-colors hover:border-border/60 hover:bg-accent/20"
+                >
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted/60">
+                    <PencilIcon className="size-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-medium text-foreground/80">Write from scratch</div>
+                    <div className="text-xs text-muted-foreground/50">Open the editor</div>
+                  </div>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -695,24 +698,32 @@ function MemoryEmptyState({
         ))}
       </div>
 
-      <div className="flex gap-3 pt-2">
+      <div className="flex gap-2 pt-2">
         <button
           type="button"
           onClick={onUseTemplate}
-          className="flex-1 rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
+          className="flex flex-1 items-center gap-3 rounded-lg border border-primary/20 bg-primary/[0.03] px-4 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.06]"
         >
-          <FlameIcon className="mb-2 size-4 text-orange-500/70" />
-          <div className="font-medium text-foreground/70">Use template</div>
-          <div className="mt-1 text-xs">Start with a pre-filled template for company context</div>
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
+            <FlameIcon className="size-4 text-primary" />
+          </div>
+          <div>
+            <div className="text-[13px] font-medium text-foreground/80">Use template</div>
+            <div className="text-xs text-muted-foreground/50">Pre-filled for company context</div>
+          </div>
         </button>
         <button
           type="button"
           onClick={onWriteFromScratch}
-          className="flex-1 rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
+          className="flex flex-1 items-center gap-3 rounded-lg border border-border/40 px-4 py-3 text-left transition-colors hover:border-border/60 hover:bg-accent/20"
         >
-          <PencilIcon className="mb-2 size-4" />
-          <div className="font-medium text-foreground/70">Write from scratch</div>
-          <div className="mt-1 text-xs">Open the editor and start writing</div>
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted/60">
+            <PencilIcon className="size-4 text-muted-foreground" />
+          </div>
+          <div>
+            <div className="text-[13px] font-medium text-foreground/80">Write from scratch</div>
+            <div className="text-xs text-muted-foreground/50">Open the editor</div>
+          </div>
         </button>
       </div>
     </div>
@@ -772,24 +783,32 @@ function KnowledgeEmptyState({
         ))}
       </div>
 
-      <div className="flex gap-3 pt-2">
+      <div className="flex gap-2 pt-2">
         <button
           type="button"
           onClick={onUseTemplate}
-          className="flex-1 rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
+          className="flex flex-1 items-center gap-3 rounded-lg border border-primary/20 bg-primary/[0.03] px-4 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.06]"
         >
-          <FlameIcon className="mb-2 size-4 text-orange-500/70" />
-          <div className="font-medium text-foreground/70">Use template</div>
-          <div className="mt-1 text-xs">Start with a pre-filled template for knowledge</div>
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
+            <FlameIcon className="size-4 text-primary" />
+          </div>
+          <div>
+            <div className="text-[13px] font-medium text-foreground/80">Use template</div>
+            <div className="text-xs text-muted-foreground/50">Pre-filled for knowledge</div>
+          </div>
         </button>
         <button
           type="button"
           onClick={onWriteFromScratch}
-          className="flex-1 rounded-lg border border-dashed border-border/60 p-4 text-left text-sm text-muted-foreground transition-colors hover:border-border hover:bg-accent/30"
+          className="flex flex-1 items-center gap-3 rounded-lg border border-border/40 px-4 py-3 text-left transition-colors hover:border-border/60 hover:bg-accent/20"
         >
-          <PencilIcon className="mb-2 size-4" />
-          <div className="font-medium text-foreground/70">Write from scratch</div>
-          <div className="mt-1 text-xs">Open the editor and start writing</div>
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted/60">
+            <PencilIcon className="size-4 text-muted-foreground" />
+          </div>
+          <div>
+            <div className="text-[13px] font-medium text-foreground/80">Write from scratch</div>
+            <div className="text-xs text-muted-foreground/50">Open the editor</div>
+          </div>
         </button>
       </div>
     </div>
