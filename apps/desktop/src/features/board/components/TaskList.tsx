@@ -41,11 +41,11 @@ function TaskRow({ task, onSelect }: TaskRowProps) {
 
   return (
     <TableRow
-      className={`group/row relative cursor-pointer border-border/20 transition-colors hover:bg-primary/[0.04] even:bg-muted/[0.03] before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:rounded-sm before:opacity-0 before:transition-opacity hover:before:opacity-100 ${accent}`}
+      className="group/row cursor-pointer border-border/20 transition-colors hover:bg-primary/[0.04] even:bg-muted/[0.03]"
       onClick={() => onSelect(task.taskId)}
     >
       {/* Title */}
-      <TableCell className="max-w-[400px] py-3 pl-4 text-[13px] font-medium text-foreground/85 group-hover/row:text-foreground">
+      <TableCell className={`relative max-w-[400px] py-3 pl-5 text-[13px] font-medium text-foreground/85 group-hover/row:text-foreground before:absolute before:inset-y-1 before:left-0 before:w-[3px] before:rounded-sm before:opacity-0 before:transition-opacity group-hover/row:before:opacity-100 ${accent}`}>
         <div className="flex items-center gap-1.5 overflow-hidden">
           <span className="truncate">{task.title}</span>
         </div>
