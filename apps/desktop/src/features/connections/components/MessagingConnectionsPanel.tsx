@@ -414,6 +414,25 @@ function WhatsAppConnectionDetail({
   onReconnect: () => void;
 }) {
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const isPending = connection.status === "pending";
+
+  async function handleStartQrLinking() {
+    if (!client) {
+      setQrError("Messaging service not running — start the sidecar to link WhatsApp");
+      return;
+    }
+    setQrError(null);
+    setIsReconnecting(true);
+    try {
+      await client.startWhatsAppSession(connection.connectionId);
+      onReconnect();
+    } catch {
+      setQrError("Messaging service not running — start the sidecar to link WhatsApp");
+    } finally {
+      setIsReconnecting(false);
+    }
+  }
 
   async function handleReconnect() {
     if (!client) return;
@@ -440,25 +459,73 @@ function WhatsAppConnectionDetail({
 
   return (
     <div className="border-t border-border/30 bg-muted/10 px-4 py-3 lg:px-5">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground">Status</span>
-          <span className="text-[11px] font-medium text-foreground">
-            {STATUS_LABEL[connection.status] ?? connection.status}
-          </span>
+      <div className="space-y-3">
+        {isPending && (
+          <div className="space-y-2.5">
+            <span className="text-xs font-mono uppercase tracking-wider text-primary">
+              HOW TO CONNECT
+            </span>
+            <ol className="list-none space-y-1.5 pl-0">
+              <li className="text-sm text-muted-foreground">
+                <span className="mr-1.5 font-mono text-xs text-primary/70">1.</span>
+                {"Click \"Start QR Linking\" below"}
+              </li>
+              <li className="text-sm text-muted-foreground">
+                <span className="mr-1.5 font-mono text-xs text-primary/70">2.</span>
+                A QR code will appear — scan it with WhatsApp on your phone
+                <span className="mt-0.5 block pl-5 text-xs text-muted-foreground/60">
+                  WhatsApp → Settings → Linked Devices → Link a Device
+                </span>
+              </li>
+              <li className="text-sm text-muted-foreground">
+                <span className="mr-1.5 font-mono text-xs text-primary/70">3.</span>
+                Once linked, the status will update to Connected
+              </li>
+            </ol>
+            {qrError && (
+              <div className="rounded-lg border border-warning/20 bg-warning/8 px-3 py-2 text-[12px] text-warning-foreground">
+                {qrError}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">Status</span>
+            <span className="text-[11px] font-medium text-foreground">
+              {STATUS_LABEL[connection.status] ?? connection.status}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">Project</span>
+            <span className="text-[11px] text-foreground">
+              {connection.defaultProjectId}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">Created</span>
+            <span className="text-[10px] font-mono text-muted-foreground/70">
+              {new Date(connection.createdAt).toLocaleDateString()}
+            </span>
+          </div>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground">Project</span>
-          <span className="text-[11px] text-foreground">
-            {connection.defaultProjectId}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground">Created</span>
-          <span className="text-[10px] font-mono text-muted-foreground/70">
-            {new Date(connection.createdAt).toLocaleDateString()}
-          </span>
-        </div>
+
+        {isPending && (
+          <div className="pt-1">
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 rounded-md bg-primary px-4 text-[12px] font-medium text-primary-foreground hover:bg-primary/90"
+              disabled={isReconnecting}
+              onClick={() => void handleStartQrLinking()}
+            >
+              <PlayIcon className="mr-1.5 size-3.5" />
+              {isReconnecting ? "Starting…" : "Start QR Linking"}
+            </Button>
+          </div>
+        )}
+
         {(connection.status === "disconnected" || connection.status === "error") && (
           <div className="flex gap-2 pt-1">
             <Button
@@ -492,6 +559,7 @@ function TelegramConnectionDetail({
 }: {
   connection: MessagingConnection;
 }) {
+  const isPending = connection.status === "pending";
   let config: { botToken?: string; secretToken?: string; webhookUrl?: string } =
     {};
   try {
@@ -504,34 +572,58 @@ function TelegramConnectionDetail({
 
   return (
     <div className="border-t border-border/30 bg-muted/10 px-4 py-3 lg:px-5">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground">Status</span>
-          <span className="text-[11px] font-medium text-foreground">
-            {STATUS_LABEL[connection.status] ?? connection.status}
-          </span>
-        </div>
-        {config.webhookUrl ? (
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-muted-foreground">
-              Webhook URL
+      <div className="space-y-3">
+        {isPending && (
+          <div className="space-y-2.5">
+            <span className="text-xs font-mono uppercase tracking-wider text-primary">
+              COMPLETE SETUP
             </span>
-            <span className="truncate text-[10px] font-mono text-muted-foreground/70">
-              {config.webhookUrl}
+            <ol className="list-none space-y-1.5 pl-0">
+              <li className="text-sm text-muted-foreground">
+                <span className="mr-1.5 font-mono text-xs text-primary/70">1.</span>
+                Create a bot with BotFather on Telegram
+              </li>
+              <li className="text-sm text-muted-foreground">
+                <span className="mr-1.5 font-mono text-xs text-primary/70">2.</span>
+                Paste the bot token into the setup form above
+              </li>
+              <li className="text-sm text-muted-foreground">
+                <span className="mr-1.5 font-mono text-xs text-primary/70">3.</span>
+                Configure the webhook URL and confirm the connection
+              </li>
+            </ol>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">Status</span>
+            <span className="text-[11px] font-medium text-foreground">
+              {STATUS_LABEL[connection.status] ?? connection.status}
             </span>
           </div>
-        ) : null}
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground">Project</span>
-          <span className="text-[11px] text-foreground">
-            {connection.defaultProjectId}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground">Created</span>
-          <span className="text-[10px] font-mono text-muted-foreground/70">
-            {new Date(connection.createdAt).toLocaleDateString()}
-          </span>
+          {config.webhookUrl ? (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-muted-foreground">
+                Webhook URL
+              </span>
+              <span className="truncate text-[10px] font-mono text-muted-foreground/70">
+                {config.webhookUrl}
+              </span>
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">Project</span>
+            <span className="text-[11px] text-foreground">
+              {connection.defaultProjectId}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">Created</span>
+            <span className="text-[10px] font-mono text-muted-foreground/70">
+              {new Date(connection.createdAt).toLocaleDateString()}
+            </span>
+          </div>
         </div>
       </div>
     </div>
