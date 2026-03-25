@@ -1,10 +1,12 @@
 import type { Agent, AuthOverview, ProviderModelOption } from "@opengoat/contracts";
 import {
   CheckIcon,
+  CpuIcon,
   GlobeIcon,
   LoaderCircleIcon,
   Settings2Icon,
   TrashIcon,
+  UserIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -187,8 +189,15 @@ export function ProjectSettings({
       {/* ---- Model ---- */}
       <Card className="border-border/50">
         <CardHeader>
-          <CardTitle className="text-[14px] font-semibold">Model</CardTitle>
-          <CardDescription className="text-[12px]">Choose the AI provider and model for this project.</CardDescription>
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-7 items-center justify-center rounded-md bg-primary/8">
+              <CpuIcon className="size-3.5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-[14px] font-semibold">Model</CardTitle>
+              <CardDescription className="text-[12px]">Choose the AI provider and model for this project.</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
@@ -264,8 +273,15 @@ export function ProjectSettings({
       {/* ---- General ---- */}
       <Card className="border-border/50">
         <CardHeader>
-          <CardTitle className="text-[14px] font-semibold">General</CardTitle>
-          <CardDescription className="text-[12px]">Basic project information.</CardDescription>
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-7 items-center justify-center rounded-md bg-muted/60">
+              <UserIcon className="size-3.5 text-muted-foreground" />
+            </div>
+            <div>
+              <CardTitle className="text-[14px] font-semibold">General</CardTitle>
+              <CardDescription className="text-[12px]">Basic project information.</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-4">
@@ -339,8 +355,15 @@ export function ProjectSettings({
       {/* ---- Danger zone ---- */}
       <Card className="border-destructive/20">
         <CardHeader>
-          <CardTitle className="text-[14px] font-semibold text-destructive">Danger zone</CardTitle>
-          <CardDescription className="text-[12px]">Irreversible actions for this project.</CardDescription>
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-7 items-center justify-center rounded-md bg-destructive/8">
+              <TrashIcon className="size-3.5 text-destructive/70" />
+            </div>
+            <div>
+              <CardTitle className="text-[14px] font-semibold text-destructive">Danger zone</CardTitle>
+              <CardDescription className="text-[12px]">Irreversible actions for this project.</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex items-start justify-between gap-4">

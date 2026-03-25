@@ -101,15 +101,22 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
   return (
     <Card className="border-border/50">
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-[14px] font-semibold">Skills</CardTitle>
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-7 items-center justify-center rounded-md bg-muted/60">
+            <PuzzleIcon className="size-3.5 text-muted-foreground" />
+          </div>
+          <div className="flex items-center gap-2">
+            <div>
+              <CardTitle className="text-[14px] font-semibold">Skills</CardTitle>
+              <CardDescription className="text-[12px]">Extend your AI CMO with additional capabilities.</CardDescription>
+            </div>
+          </div>
           {!isLoading && managedSkills.length > 0 ? (
-            <Badge variant="secondary" className="font-mono text-[10px]">
+            <Badge variant="secondary" className="ml-auto font-mono text-[10px]">
               {managedSkills.length} active
             </Badge>
           ) : null}
         </div>
-        <CardDescription className="text-[12px]">Extend your AI CMO with additional capabilities.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Loading state */}
@@ -211,19 +218,17 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
 
             {/* Empty state — only for custom/extra skills */}
             {extraSkills.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border/40 p-6">
-                <div className="flex flex-col items-center gap-3 py-2">
-                  <div className="flex size-10 items-center justify-center rounded-full bg-muted/50">
-                    <PuzzleIcon className="size-5 text-muted-foreground/60" />
-                  </div>
-                  <div className="space-y-1 text-center">
-                    <p className="text-[13px] font-medium text-muted-foreground">
-                      No additional skills installed
-                    </p>
-                    <p className="text-[12px] leading-relaxed text-muted-foreground/70">
-                      Install custom skills to extend your AI CMO beyond the bundled capabilities.
-                    </p>
-                  </div>
+              <div className="flex items-center gap-3 rounded-lg border border-dashed border-border/40 px-4 py-4">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted/50">
+                  <SparklesIcon className="size-4 text-muted-foreground/40" />
+                </div>
+                <div>
+                  <p className="text-[12px] font-medium text-muted-foreground">
+                    No additional skills installed
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground/50">
+                    Install custom skills below to extend beyond bundled capabilities.
+                  </p>
                 </div>
               </div>
             ) : null}
