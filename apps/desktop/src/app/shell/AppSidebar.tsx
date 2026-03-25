@@ -1,4 +1,5 @@
 import type { AgentCatalog, AgentSession } from "@opengoat/contracts";
+import type { ActionSessionMeta } from "@/features/action-session/types";
 import {
   BrainIcon,
   CheckIcon,
@@ -16,6 +17,7 @@ import {
   LayoutDashboardIcon,
 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { getActionSessionMeta } from "@/features/action-session/lib/action-session-state";
 import {
   brainNavigation,
   primaryNavigation,
@@ -278,22 +280,26 @@ export function AppSidebar({
                           </span>
                         </div>
                         <ul role="group" className="flex flex-col">
-                          {group.sessions.map((session) => (
-                            <SessionItem
-                              key={session.id}
-                              deEmphasized={deEmphasizedIds.has(session.id)}
-                              isAction={checkIsAction(session.id)}
-                              isActive={session.id === activeSessionId}
-                              isEditing={editingSessionId === session.id}
-                              isRecent={isRecent}
-                              session={session}
-                              onDelete={onSessionDelete}
-                              onRename={onSessionRename}
-                              onSelect={onSessionSelect}
-                              onStartEditing={() => setEditingSessionId(session.id)}
-                              onStopEditing={() => setEditingSessionId(null)}
-                            />
-                          ))}
+                          {group.sessions.map((session) => {
+                            const sessionIsAction = checkIsAction(session.id);
+                            return (
+                              <SessionItem
+                                key={session.id}
+                                actionMeta={sessionIsAction ? getActionSessionMeta(session.id) : null}
+                                deEmphasized={deEmphasizedIds.has(session.id)}
+                                isAction={sessionIsAction}
+                                isActive={session.id === activeSessionId}
+                                isEditing={editingSessionId === session.id}
+                                isRecent={isRecent}
+                                session={session}
+                                onDelete={onSessionDelete}
+                                onRename={onSessionRename}
+                                onSelect={onSessionSelect}
+                                onStartEditing={() => setEditingSessionId(session.id)}
+                                onStopEditing={() => setEditingSessionId(null)}
+                              />
+                            );
+                          })}
                         </ul>
                       </li>
                     );
@@ -457,10 +463,23 @@ function ProjectIcon({
 }
 
 // ---------------------------------------------------------------------------
+// Action session status badge helpers
+// ---------------------------------------------------------------------------
+
+const STATE_BADGE_MAP: Record<string, { label: string; color: string }> = {
+  working: { label: "WORKING", color: "text-primary/70" },
+  "needs-input": { label: "INPUT", color: "text-amber-400" },
+  "ready-to-review": { label: "REVIEW", color: "text-primary" },
+  "saved-to-board": { label: "SAVED", color: "text-sidebar-foreground/50" },
+  done: { label: "DONE", color: "text-sidebar-foreground/40" },
+};
+
+// ---------------------------------------------------------------------------
 // Session item
 // ---------------------------------------------------------------------------
 
 function SessionItem({
+  actionMeta,
   deEmphasized,
   isAction,
   isActive,
@@ -473,6 +492,7 @@ function SessionItem({
   onStartEditing,
   onStopEditing,
 }: {
+  actionMeta: ActionSessionMeta | null;
   deEmphasized: boolean;
   isAction: boolean;
   isActive: boolean;
@@ -489,6 +509,7 @@ function SessionItem({
   const label = formatSessionLabel(session);
   const unnamed = isUnnamedSession(session.label);
   const Icon = isAction ? ZapIcon : MessageSquareIcon;
+  const badge = isAction && actionMeta ? STATE_BADGE_MAP[actionMeta.state] : null;
 
   function commitRename(): void {
     const value = inputRef.current?.value.trim();
@@ -536,7 +557,7 @@ function SessionItem({
           unnamed && !isActive && "text-sidebar-foreground/50",
         )}
       >
-        <Icon className={cn(isAction && "text-primary")} />
+        <Icon className={cn("shrink-0", isAction && "text-primary")} />
         <span className={cn(
           "truncate",
           unnamed
@@ -545,6 +566,14 @@ function SessionItem({
               ? "font-medium"
               : "font-normal",
         )}>{label}</span>
+        {badge ? (
+          <span className={cn(
+            "ml-auto shrink-0 font-mono text-[10px] font-semibold uppercase tracking-wide",
+            badge.color,
+          )}>
+            {badge.label}
+          </span>
+        ) : null}
       </SidebarMenuButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
