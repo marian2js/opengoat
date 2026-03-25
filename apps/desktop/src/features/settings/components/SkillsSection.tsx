@@ -102,8 +102,8 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
     <Card className="border-border/50">
       <CardHeader>
         <div className="flex items-center gap-2.5">
-          <div className="flex size-7 items-center justify-center rounded-md bg-muted/60">
-            <PuzzleIcon className="size-3.5 text-muted-foreground" />
+          <div className="flex size-7 items-center justify-center rounded-md bg-primary/8">
+            <PuzzleIcon className="size-3.5 text-primary" />
           </div>
           <div className="flex items-center gap-2">
             <div>
