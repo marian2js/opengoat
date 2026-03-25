@@ -106,6 +106,21 @@ try {
   // Ignore corrupt localStorage
 }
 
+// Also hydrate from opengoat:actionSessionMeta (sessions may only exist there)
+try {
+  const metaRaw = localStorage.getItem("opengoat:actionSessionMeta");
+  if (metaRaw) {
+    const meta: unknown = JSON.parse(metaRaw);
+    if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+      for (const id of Object.keys(meta as Record<string, unknown>)) {
+        actionSessionIds.add(id);
+      }
+    }
+  }
+} catch {
+  // Ignore corrupt localStorage
+}
+
 function persistActionSessions(): void {
   try {
     localStorage.setItem(
@@ -135,6 +150,19 @@ export function isActionSession(sessionId: string): boolean {
       const ids: unknown = JSON.parse(stored);
       if (Array.isArray(ids) && ids.includes(sessionId)) {
         actionSessionIds.add(sessionId);
+        return true;
+      }
+    }
+  } catch {
+    // Ignore
+  }
+  // Fallback: check if session has action metadata (opengoat:actionSessionMeta)
+  try {
+    const metaRaw = localStorage.getItem("opengoat:actionSessionMeta");
+    if (metaRaw) {
+      const meta: unknown = JSON.parse(metaRaw);
+      if (meta && typeof meta === "object" && !Array.isArray(meta) && (meta as Record<string, unknown>)[sessionId]) {
+        actionSessionIds.add(sessionId); // backfill the set
         return true;
       }
     }
