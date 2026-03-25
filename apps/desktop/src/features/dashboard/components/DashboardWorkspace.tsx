@@ -134,6 +134,11 @@ function DashboardContent({
          * Mode B — Active work exists
          * ═══════════════════════════════════════════════════════ */
         <>
+          {/* Free-text input — always accessible for ad-hoc asks */}
+          <div className="dashboard-section pb-2">
+            <FreeTextInput onSubmit={handleFreeTextSubmit} />
+          </div>
+
           {/* Now working on — latest run + output preview + quick actions */}
           <div className="mb-6">
             <NowWorkingOn
@@ -175,7 +180,12 @@ function DashboardContent({
          * Mode A — No active work
          * ═══════════════════════════════════════════════════════ */
         <>
-          {/* Starter actions — primary launch point */}
+          {/* Free-text input — primary entry point, above the fold */}
+          <div className="dashboard-section pb-2">
+            <FreeTextInput onSubmit={handleFreeTextSubmit} />
+          </div>
+
+          {/* Starter actions — secondary launch point */}
           <div className="dashboard-section">
             <ActionCardGrid
               completedActions={completedActions}
@@ -183,11 +193,6 @@ function DashboardContent({
               onActionClick={onActionClick}
               onViewResults={onViewResults}
             />
-          </div>
-
-          {/* Free-text input — replaces objective composer */}
-          <div className="dashboard-section py-2">
-            <FreeTextInput onSubmit={handleFreeTextSubmit} />
           </div>
 
           {/* AI-suggested actions */}
