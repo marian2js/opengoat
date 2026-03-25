@@ -118,9 +118,18 @@ export function AppSidebar({
       return label.toLowerCase().includes(q);
     });
   }, [allSessions, searchQuery]);
+  // Hide unnamed (empty) sessions — keep the active session visible so the
+  // user can still see a thread they just created via "New chat".
+  const displaySessions = useMemo(
+    () =>
+      filteredSessions.filter(
+        (s) => s.id === activeSessionId || !isUnnamedSession(s.label),
+      ),
+    [filteredSessions, activeSessionId],
+  );
   const sessionGroups = useMemo(
-    () => simplifyDateGroups(groupSessionsByDate(filteredSessions)),
-    [filteredSessions],
+    () => simplifyDateGroups(groupSessionsByDate(displaySessions)),
+    [displaySessions],
   );
   const deEmphasizedIds = useMemo(
     () => getDeEmphasizedSessionIds(allSessions),
