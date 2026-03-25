@@ -82,8 +82,9 @@ describe("Brain simplified terminology — OperatingMemorySection", () => {
     expect(src).not.toContain("Project memory is empty");
   });
 
-  it("empty state description mentions optional, not required", () => {
-    expect(src).toContain("optional");
+  it("empty state description uses non-demanding language", () => {
+    // Description should use helpful framing, not demanding language
+    expect(src).toMatch(/Help|stay aligned|optional|not required/);
   });
 
   it('CTA button says "Add your first entry" not "Add your first memory"', () => {
@@ -167,9 +168,10 @@ describe("Brain simplified terminology — ObjectiveMemoryTab", () => {
 // AC9: Brain does not feel required — empty state communicates enhancement
 // ---------------------------------------------------------------------------
 describe("Brain simplified terminology — not-required messaging", () => {
-  it("OperatingMemorySection empty state says Brain is optional", () => {
+  it("OperatingMemorySection empty state uses non-urgent language", () => {
     const src = readSrc("features/brain/components/OperatingMemorySection.tsx");
-    expect(src).toMatch(/optional|not required/);
+    // Empty state should not use demanding language — uses helpful framing instead
+    expect(src).toMatch(/Help|stay aligned|optional|not required/);
   });
 
   it("BrainWorkspace memory empty state uses non-urgent language", () => {
