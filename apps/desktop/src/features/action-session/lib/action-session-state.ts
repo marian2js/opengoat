@@ -152,6 +152,15 @@ export function getAllActionSessionMetas(): MetaStore {
   return loadMetaStore();
 }
 
+export function updateActionSessionLatestOutput(sessionId: string, output: string): void {
+  const store = loadMetaStore();
+  const existing = store[sessionId];
+  if (existing) {
+    store[sessionId] = { ...existing, latestOutput: output };
+    persistMetaStore(store);
+  }
+}
+
 export function markSessionSavedToBoard(sessionId: string): void {
   const store = loadMetaStore();
   const existing = store[sessionId];

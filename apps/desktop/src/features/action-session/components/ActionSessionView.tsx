@@ -17,6 +17,7 @@ import {
   setActionSessionMeta,
   markSessionSavedToBoard,
   updateActionSessionState,
+  updateActionSessionLatestOutput,
 } from "../lib/action-session-state";
 import type { ActionSessionState } from "../types";
 import { ActionSessionHeader } from "./ActionSessionHeader";
@@ -244,6 +245,15 @@ function ActionSessionInner({
 
   // Extract outputs from assistant messages
   const outputs = useMemo(() => extractOutputs(messages), [messages]);
+
+  // Persist latest output preview for dashboard display
+  useEffect(() => {
+    if (outputs.length > 0) {
+      const latest = outputs[outputs.length - 1]!;
+      const preview = latest.content.slice(0, 200);
+      updateActionSessionLatestOutput(bootstrap.session.id, preview);
+    }
+  }, [outputs, bootstrap.session.id]);
 
   // Extract question for needs-input state
   const pendingQuestion = useMemo(() => {

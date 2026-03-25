@@ -22,6 +22,7 @@ export interface ActionSessionMeta {
   state: ActionSessionState;
   savedToBoard: boolean;
   startedAt: number;
+  latestOutput?: string;
 }
 
 export interface OutputBlock {

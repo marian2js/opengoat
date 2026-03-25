@@ -9,6 +9,7 @@ export interface ActionSessionEntry {
   state: ActionSessionMeta["state"];
   savedToBoard: boolean;
   startedAt: number;
+  latestOutput?: string;
 }
 
 const ACTIVE_STATES = new Set(["starting", "working", "needs-input"]);
@@ -58,6 +59,7 @@ export function useActionSessions(): UseActionSessionsResult {
       state: meta.state,
       savedToBoard: meta.savedToBoard,
       startedAt: meta.startedAt,
+      latestOutput: meta.latestOutput,
     }),
   );
 

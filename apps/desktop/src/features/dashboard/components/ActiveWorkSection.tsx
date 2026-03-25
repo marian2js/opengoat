@@ -7,6 +7,7 @@ import {
   AlertCircleIcon,
   CircleDotIcon,
   SaveIcon,
+  LayoutDashboardIcon,
 } from "lucide-react";
 import { useActionSessions } from "@/features/dashboard/hooks/useActionSessions";
 import type { ActionSessionEntry } from "@/features/dashboard/hooks/useActionSessions";
@@ -76,22 +77,43 @@ function SessionCard({
 
   if (variant === "recent") {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-md border border-border/30 px-3 py-2 transition-colors hover:border-border/50">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <StateIcon className="size-3.5 shrink-0 text-muted-foreground/60" />
-          <span className="truncate text-sm text-foreground">
-            {session.actionTitle}
-          </span>
-          <span
-            className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider ${config.className}`}
-          >
-            {config.label}
-          </span>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="font-mono text-[10px] tabular-nums text-muted-foreground/50">
+      <div className="rounded-md border border-border/30 px-3 py-2 transition-colors hover:border-border/50">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <StateIcon className="size-3.5 shrink-0 text-muted-foreground/60" />
+            <span className="truncate text-sm text-foreground">
+              {session.actionTitle}
+            </span>
+            <span
+              className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider ${config.className}`}
+            >
+              {config.label}
+            </span>
+          </div>
+          <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/50">
             {formatTimeAgo(session.startedAt)}
           </span>
+        </div>
+
+        {/* Output preview */}
+        {session.latestOutput && (
+          <p className="mt-1.5 line-clamp-2 pl-6 text-xs leading-relaxed text-muted-foreground">
+            {session.latestOutput}
+          </p>
+        )}
+
+        {/* Quick actions */}
+        <div className="mt-2 flex items-center gap-2 pl-6">
+          {onContinue && (
+            <button
+              type="button"
+              onClick={() => onContinue(session.sessionId)}
+              className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary/20"
+            >
+              Continue
+              <ArrowRightIcon className="size-3" />
+            </button>
+          )}
           {onContinue && (
             <button
               type="button"
@@ -102,6 +124,13 @@ function SessionCard({
               <EyeIcon className="size-3" />
             </button>
           )}
+          <a
+            href="#board"
+            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+          >
+            Open Board
+            <LayoutDashboardIcon className="size-3" />
+          </a>
         </div>
       </div>
     );
@@ -122,9 +151,16 @@ function SessionCard({
         </span>
       </div>
 
-      <h3 className="mb-3 text-sm font-medium text-foreground">
+      <h3 className="mb-1 text-sm font-medium text-foreground">
         {session.actionTitle}
       </h3>
+
+      {/* Output preview */}
+      {session.latestOutput && (
+        <p className="mb-3 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+          {session.latestOutput}
+        </p>
+      )}
 
       {/* Pending question indicator */}
       {session.state === "needs-input" && (
@@ -157,6 +193,13 @@ function SessionCard({
             Review
           </button>
         )}
+        <a
+          href="#board"
+          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+        >
+          <LayoutDashboardIcon className="size-3" />
+          Open Board
+        </a>
       </div>
     </div>
   );
