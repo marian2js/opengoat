@@ -33,46 +33,23 @@ describe("Dashboard Board Summary – pill colors and empty state polish", () =>
     });
   });
 
-  // AC2: Empty state includes a "View Board" link for discoverability
-  describe("Empty state CTA", () => {
-    it("shows a 'View Board' link in the empty state", () => {
-      // The empty state block (when isEmpty is true) should contain a View Board link
-      expect(boardSummarySrc).toMatch(/isEmpty[\s\S]*View Board/);
+  // AC2: Empty state returns null — hidden per spec (no empty sections on dashboard)
+  describe("Empty state behavior", () => {
+    it("returns null when empty to avoid showing empty sections", () => {
+      const afterIsEmpty = boardSummarySrc.split(/if\s*\(isEmpty\)/)[1];
+      expect(afterIsEmpty).toBeTruthy();
+      expect(afterIsEmpty).toContain("return null");
+    });
+  });
+
+  // AC3: Populated state has View Board link
+  describe("Populated state", () => {
+    it("shows a View Board link in the populated state", () => {
+      expect(boardSummarySrc).toContain("View Board");
     });
 
-    it("has an ArrowRightIcon in the empty state link", () => {
+    it("has an ArrowRightIcon for the link", () => {
       expect(boardSummarySrc).toContain("ArrowRightIcon");
-    });
-  });
-
-  // AC3: Empty state has brief copy explaining how tasks appear
-  describe("Empty state copy", () => {
-    it("includes copy about tasks appearing through actions or chat", () => {
-      expect(boardSummarySrc).toMatch(
-        /tasks.*will appear|appear.*when created/i,
-      );
-    });
-
-    it("does not just say 'No active work' with no further context", () => {
-      // The old copy was too terse — should have an explanation
-      expect(boardSummarySrc).not.toMatch(
-        /No active work<\/span>\s*<\/div>\s*<\/div>\s*\);/,
-      );
-    });
-  });
-
-  // AC4: Empty state is visible enough that a user scanning the dashboard would notice it
-  describe("Empty state visibility", () => {
-    it("renders a Board label in the empty state for context", () => {
-      // Even when empty, the Board label should appear so users know it exists
-      expect(boardSummarySrc).toMatch(/isEmpty[\s\S]*Board/);
-    });
-
-    it("uses the same justify-between layout as the populated state", () => {
-      // The empty state should have a structured layout, not just a tiny muted line
-      expect(boardSummarySrc).toMatch(
-        /isEmpty[\s\S]*justify-between/,
-      );
     });
   });
 });

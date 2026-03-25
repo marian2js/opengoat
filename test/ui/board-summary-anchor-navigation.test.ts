@@ -17,13 +17,13 @@ describe("View Board anchor navigation — Dashboard → Board", () => {
     expect(boardSummarySrc).not.toContain('type="button"');
   });
 
-  // AC2: Both empty state and populated state have anchor navigation
-  it("has anchor link in the empty state View Board", () => {
+  // AC2: Empty state returns null (hidden per spec — no empty sections)
+  it("returns null when empty instead of showing a placeholder", () => {
     const afterIsEmpty = boardSummarySrc.split(/if\s*\(isEmpty\)/)[1];
     expect(afterIsEmpty).toBeTruthy();
-    const isEmptyBranch = afterIsEmpty.slice(0, afterIsEmpty.indexOf("const pills"));
-    expect(isEmptyBranch).toContain('href="#board"');
-    expect(isEmptyBranch).toContain("View Board");
+    // Should return null immediately
+    expect(afterIsEmpty.trimStart().startsWith("{")).toBe(true);
+    expect(afterIsEmpty).toContain("return null");
   });
 
   it("has anchor link in the populated state View Board", () => {
@@ -45,10 +45,10 @@ describe("View Board anchor navigation — Dashboard → Board", () => {
     expect(boardSummarySrc).not.toContain("AppSidebar");
   });
 
-  // Uses native <a> tags for the View Board links + optional active objective link
+  // Uses native <a> tags for the View Board link + optional active objective link
   it("renders anchor elements for View Board and active objective", () => {
     const anchorMatches = boardSummarySrc.match(/<a\s/g);
     expect(anchorMatches).not.toBeNull();
-    expect(anchorMatches!.length).toBe(3); // 2 View Board + 1 active objective
+    expect(anchorMatches!.length).toBe(2); // 1 View Board + 1 active objective
   });
 });

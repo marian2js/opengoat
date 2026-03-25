@@ -16,13 +16,11 @@ describe("View Board link navigation — Dashboard → Board", () => {
     expect(boardSummarySrc).toContain('href="#board"');
   });
 
-  // Both the empty state and the populated state must have anchor navigation
-  it("has anchor link in the empty state View Board", () => {
+  // Empty state returns null — hidden per spec (no empty sections)
+  it("returns null for empty state instead of showing placeholder", () => {
     const afterIsEmpty = boardSummarySrc.split(/if\s*\(isEmpty\)/)[1];
     expect(afterIsEmpty).toBeTruthy();
-    const isEmptyBranch = afterIsEmpty.slice(0, afterIsEmpty.indexOf("const pills"));
-    expect(isEmptyBranch).toContain('href="#board"');
-    expect(isEmptyBranch).toContain("View Board");
+    expect(afterIsEmpty).toContain("return null");
   });
 
   it("has anchor link in the populated state View Board", () => {
