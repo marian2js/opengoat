@@ -62,37 +62,37 @@ void test("returns descriptive label unchanged", () => {
   );
 });
 
-void test("returns date-based fallback for UUID label", () => {
+void test("returns 'New chat' fallback for UUID label", () => {
   const result = humanizeSessionLabel("f1a26b39 (2026-03-22)", "2026-03-22T10:00:00Z");
-  assert.equal(result, "Chat \u2014 Mar 22");
+  assert.equal(result, "New chat");
 });
 
-void test("returns date-based fallback for full UUID label", () => {
+void test("returns 'New chat' fallback for full UUID label", () => {
   const result = humanizeSessionLabel(
     "f1a26b39-abcd-1234-5678-123456789abc",
     "2026-03-22T10:00:00Z",
   );
-  assert.equal(result, "Chat \u2014 Mar 22");
+  assert.equal(result, "New chat");
 });
 
-void test("returns date-based fallback for bare hex UUID label", () => {
+void test("returns 'New chat' fallback for bare hex UUID label", () => {
   const result = humanizeSessionLabel("15480b2f", "2026-03-22T14:30:00Z");
-  assert.equal(result, "Chat \u2014 Mar 22");
+  assert.equal(result, "New chat");
 });
 
-void test("returns fallback for undefined label", () => {
+void test("returns 'New chat' fallback for undefined label", () => {
   const result = humanizeSessionLabel(undefined, "2026-03-22T10:00:00Z");
-  assert.equal(result, "Chat \u2014 Mar 22");
+  assert.equal(result, "New chat");
 });
 
-void test("returns fallback for empty label", () => {
+void test("returns 'New chat' fallback for empty label", () => {
   const result = humanizeSessionLabel("", "2026-03-22T10:00:00Z");
-  assert.equal(result, "Chat \u2014 Mar 22");
+  assert.equal(result, "New chat");
 });
 
-void test("returns generic fallback for invalid date", () => {
+void test("returns 'New chat' fallback for invalid date", () => {
   const result = humanizeSessionLabel("f1a26b39", "invalid-date");
-  assert.equal(result, "New conversation");
+  assert.equal(result, "New chat");
 });
 
 void test("preserves action labels with run numbers", () => {
@@ -102,15 +102,15 @@ void test("preserves action labels with run numbers", () => {
   );
 });
 
-void test("truncates long labels to 40 characters", () => {
-  const longLabel = "This is a very long conversation title that should be truncated";
+void test("truncates long labels to 55 characters", () => {
+  const longLabel = "This is a very long conversation title that definitely should be truncated at some point";
   const result = humanizeSessionLabel(longLabel, "2026-03-22T10:00:00Z");
-  assert.ok(result.length <= 40);
+  assert.ok(result.length <= 55);
   assert.ok(result.endsWith("..."));
 });
 
-void test("does not truncate labels at exactly 40 chars", () => {
-  const label = "A".repeat(40);
+void test("does not truncate labels at exactly 55 chars", () => {
+  const label = "A".repeat(55);
   const result = humanizeSessionLabel(label, "2026-03-22T10:00:00Z");
   assert.equal(result, label);
 });

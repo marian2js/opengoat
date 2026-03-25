@@ -18,6 +18,14 @@ describe("isUnnamedSession", () => {
     expect(isUnnamedSession("new conversation")).toBe(true);
   });
 
+  it("returns true for 'New chat'", () => {
+    expect(isUnnamedSession("New chat")).toBe(true);
+  });
+
+  it("returns true for 'new chat' (case insensitive)", () => {
+    expect(isUnnamedSession("new chat")).toBe(true);
+  });
+
   it("returns true for 'Untitled chat'", () => {
     expect(isUnnamedSession("Untitled chat")).toBe(true);
   });

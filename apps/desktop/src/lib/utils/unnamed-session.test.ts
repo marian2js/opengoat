@@ -14,6 +14,14 @@ void test("returns true for 'new conversation'", () => {
   assert.equal(isUnnamedSession("new conversation"), true);
 });
 
+void test("returns true for 'New chat'", () => {
+  assert.equal(isUnnamedSession("New chat"), true);
+});
+
+void test("returns true for 'new chat' (case-insensitive)", () => {
+  assert.equal(isUnnamedSession("new chat"), true);
+});
+
 void test("returns true for 'Untitled chat' (case-insensitive)", () => {
   assert.equal(isUnnamedSession("Untitled chat"), true);
 });

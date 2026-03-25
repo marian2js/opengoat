@@ -63,6 +63,7 @@ import { useChatScope } from "@/features/chat/hooks/useChatScope";
 import { ScopeIndicator } from "@/features/chat/components/ScopeIndicator";
 import { ObjectiveBanner } from "@/features/chat/components/ObjectiveBanner";
 import { SidecarClient } from "@/lib/sidecar/client";
+import { isUnnamedSession } from "@/lib/utils/unnamed-session";
 import { detectGoalIntent } from "@/features/chat/lib/goal-detection";
 import { detectMemoryCandidates } from "@/features/chat/lib/memory-detection";
 import { useDismissedProposals } from "@/features/chat/hooks/useDismissedProposals";
@@ -310,10 +311,10 @@ export function ChatWorkspace({
 
 function deriveSessionLabel(text: string): string {
   const trimmed = text.trim().replace(/\s+/g, " ");
-  if (trimmed.length <= 40) {
+  if (trimmed.length <= 55) {
     return trimmed;
   }
-  return `${trimmed.slice(0, 37)}...`;
+  return `${trimmed.slice(0, 52)}...`;
 }
 
 function ChatSessionView({
@@ -338,10 +339,27 @@ function ChatSessionView({
   pendingActionPrompt?: string | null | undefined;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
-  const hasCustomLabelRef = useRef(bootstrap.messages.length > 0);
+  const hasCustomLabelRef = useRef(
+    bootstrap.messages.length > 0 && !isUnnamedSession(bootstrap.session.label),
+  );
   const didMountRef = useRef(false);
   const pendingPromptSentRef = useRef(false);
   const initialScopeAppliedRef = useRef(false);
+
+  // Auto-fix generic labels for existing sessions that already have messages
+  useEffect(() => {
+    if (hasCustomLabelRef.current || !client) return;
+    const firstUserMsg = bootstrap.messages.find((m) => m.role === "user");
+    if (!firstUserMsg?.text?.trim()) return;
+    hasCustomLabelRef.current = true;
+    const label = deriveSessionLabel(firstUserMsg.text);
+    void client.updateSessionLabel(bootstrap.session.id, label).then(() => {
+      onSessionLabelUpdate?.(bootstrap.session.id, label);
+    }).catch(() => {
+      // Silently ignore — label is cosmetic
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bootstrap.session.id]);
 
   // Chat scope management
   const { scope, setScope, clearScope } = useChatScope(bootstrap.session.id);

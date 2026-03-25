@@ -2,6 +2,7 @@ import { isUuidLikeLabel } from "./session-label";
 
 const UNNAMED_PATTERNS = [
   "new conversation",
+  "new chat",
   "untitled chat",
   "untitled",
 ];

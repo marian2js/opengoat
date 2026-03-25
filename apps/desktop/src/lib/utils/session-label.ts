@@ -17,42 +17,29 @@ export function isUuidLikeLabel(label: string | undefined | null): boolean {
   return UUID_FULL_RE.test(trimmed) || UUID_SHORT_RE.test(trimmed);
 }
 
-const MONTH_NAMES = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
-function formatDateLabel(iso: string): string | null {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const month = MONTH_NAMES[d.getUTCMonth()];
-  const day = d.getUTCDate();
-  return `Chat \u2014 ${month} ${day}`;
-}
-
 /**
  * Returns a human-readable session label, replacing UUID-like or missing
- * labels with a date-based fallback derived from createdAt.
+ * labels with "New chat" instead of a date-based fallback.
  *
- * Concise titles (<=40 chars) are returned as-is.
+ * Concise titles (<=55 chars) are returned as-is.
  * Longer titles are truncated with "…".
  */
 export function humanizeSessionLabel(
   label: string | undefined | null,
-  createdAt: string,
+  _createdAt: string,
 ): string {
   const trimmed = label?.trim() ?? "";
 
-  // Missing or UUID-like → date-based fallback
+  // Missing or UUID-like → "New chat" (no more generic date labels)
   if (trimmed === "" || isUuidLikeLabel(trimmed)) {
-    return formatDateLabel(createdAt) ?? "New conversation";
+    return "New chat";
   }
 
   // Concise labels pass through
-  if (trimmed.length <= 40) {
+  if (trimmed.length <= 55) {
     return trimmed;
   }
 
   // Truncate long labels
-  return `${trimmed.slice(0, 37)}...`;
+  return `${trimmed.slice(0, 52)}...`;
 }
