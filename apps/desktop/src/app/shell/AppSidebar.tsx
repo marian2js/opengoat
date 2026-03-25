@@ -29,6 +29,7 @@ import {
   resolveDomain as sharedResolveDomain,
   buildFaviconSources as sharedBuildFaviconSources,
 } from "@/lib/utils/favicon";
+import { formatShortTime } from "@/lib/utils/format-short-time";
 import { groupSessionsByDate } from "@/lib/utils/group-sessions-by-date";
 import { simplifyDateGroups } from "@/lib/utils/simplify-date-groups";
 import { getDeEmphasizedSessionIds } from "@/lib/utils/session-rerun";
@@ -308,6 +309,15 @@ export function AppSidebar({
                                 const isTodayCapped = group.label === "Today" && !showAllToday && group.sessions.length > MAX_VISIBLE_TODAY;
                                 const visibleSessions = isTodayCapped ? group.sessions.slice(0, MAX_VISIBLE_TODAY) : group.sessions;
                                 const hiddenCount = group.sessions.length - visibleSessions.length;
+                                // Detect duplicate labels within this group
+                                const labelCounts = new Map<string, number>();
+                                for (const s of group.sessions) {
+                                  const l = formatSessionLabel(s);
+                                  labelCounts.set(l, (labelCounts.get(l) ?? 0) + 1);
+                                }
+                                const duplicateLabels = new Set(
+                                  [...labelCounts.entries()].filter(([, c]) => c > 1).map(([l]) => l),
+                                );
                                 return (
                                   <>
                                     {visibleSessions.map((session) => {
@@ -316,6 +326,10 @@ export function AppSidebar({
                                         sessionIsAction = true;
                                         markActionSession(session.id); // backfill localStorage
                                       }
+                                      const label = formatSessionLabel(session);
+                                      const timestamp = duplicateLabels.has(label)
+                                        ? formatShortTime(session.createdAt)
+                                        : undefined;
                                       return (
                                         <SessionItem
                                           key={session.id}
@@ -326,6 +340,7 @@ export function AppSidebar({
                                           isEditing={editingSessionId === session.id}
                                           isRecent={isRecent}
                                           session={session}
+                                          timestamp={timestamp}
                                           onDelete={onSessionDelete}
                                           onRename={onSessionRename}
                                           onSelect={onSessionSelect}
@@ -536,6 +551,7 @@ function SessionItem({
   isEditing,
   isRecent,
   session,
+  timestamp,
   onDelete,
   onRename,
   onSelect,
@@ -549,6 +565,7 @@ function SessionItem({
   isEditing: boolean;
   isRecent: boolean;
   session: AgentSession;
+  timestamp?: string | undefined;
   onDelete?: ((sessionId: string) => void) | undefined;
   onRename?: ((sessionId: string, label: string) => void) | undefined;
   onSelect?: ((sessionId: string) => void) | undefined;
@@ -615,7 +632,7 @@ function SessionItem({
             : isRecent
               ? "font-medium"
               : "font-normal",
-        )}>{label}</span>
+        )}>{label}{timestamp ? <span className="text-[11px] font-normal text-sidebar-foreground/40"> · {timestamp}</span> : null}</span>
         {badge ? (
           <span className={cn(
             "ml-auto shrink-0 font-mono text-[10px] font-semibold uppercase tracking-wide",
