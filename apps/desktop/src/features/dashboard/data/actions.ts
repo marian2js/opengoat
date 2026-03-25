@@ -28,43 +28,67 @@ export interface ActionCard {
 
 export const categoryConfig: Record<
   ActionCategory,
-  { label: string; className: string; accentColor: string }
+  { label: string; className: string; accentColor: string; iconBg: string; iconText: string; iconHoverBg: string; iconHoverText: string }
 > = {
   conversion: {
     label: "Conversion",
     className:
       "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400",
     accentColor: "bg-rose-500",
+    iconBg: "bg-rose-500/10",
+    iconText: "text-rose-600 dark:text-rose-400",
+    iconHoverBg: "group-hover/action:bg-rose-500",
+    iconHoverText: "group-hover/action:text-white",
   },
   distribution: {
     label: "Distribution",
     className:
       "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-400",
     accentColor: "bg-blue-500",
+    iconBg: "bg-blue-500/10",
+    iconText: "text-blue-600 dark:text-blue-400",
+    iconHoverBg: "group-hover/action:bg-blue-500",
+    iconHoverText: "group-hover/action:text-white",
   },
   growth: {
     label: "Growth",
     className:
       "border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
     accentColor: "bg-cyan-500",
+    iconBg: "bg-cyan-500/10",
+    iconText: "text-cyan-600 dark:text-cyan-400",
+    iconHoverBg: "group-hover/action:bg-cyan-500",
+    iconHoverText: "group-hover/action:text-white",
   },
   messaging: {
     label: "Messaging",
     className:
       "border-purple-500/20 bg-purple-500/10 text-purple-700 dark:text-purple-400",
     accentColor: "bg-purple-500",
+    iconBg: "bg-purple-500/10",
+    iconText: "text-purple-600 dark:text-purple-400",
+    iconHoverBg: "group-hover/action:bg-purple-500",
+    iconHoverText: "group-hover/action:text-white",
   },
   research: {
     label: "Research",
     className:
       "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400",
     accentColor: "bg-amber-500",
+    iconBg: "bg-amber-500/10",
+    iconText: "text-amber-600 dark:text-amber-400",
+    iconHoverBg: "group-hover/action:bg-amber-500",
+    iconHoverText: "group-hover/action:text-white",
   },
   seo: {
     label: "SEO",
     className:
       "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     accentColor: "bg-emerald-500",
+    iconBg: "bg-emerald-500/10",
+    iconText: "text-emerald-600 dark:text-emerald-400",
+    iconHoverBg: "group-hover/action:bg-emerald-500",
+    iconHoverText: "group-hover/action:text-white",
   },
 };
 

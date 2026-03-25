@@ -69,7 +69,7 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, 
           <div className={`rounded-lg p-2 transition-all ${
             isCompleted
               ? "bg-emerald-500/10 text-emerald-600 group-hover/action:bg-emerald-500 group-hover/action:text-white dark:text-emerald-400"
-              : "bg-primary/8 text-primary group-hover/action:bg-primary group-hover/action:text-primary-foreground"
+              : `${config.iconBg} ${config.iconText} ${config.iconHoverBg} ${config.iconHoverText}`
           }`}>
             {isLoading ? (
               <LoaderCircleIcon className="size-4 animate-spin" />
