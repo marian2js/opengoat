@@ -63,8 +63,10 @@ export function OpportunitySection({
 
   return (
     <section className="flex flex-col gap-4 rounded-xl bg-muted/40 p-5">
-      <div className="flex items-center gap-2">
-        <LightbulbIcon className="size-3.5 text-primary" />
+      <div className="flex items-center gap-2.5">
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+          <LightbulbIcon className="size-3.5 text-primary" />
+        </div>
         <h2 className="section-label">Insights</h2>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

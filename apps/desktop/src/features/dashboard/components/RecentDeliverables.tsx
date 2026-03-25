@@ -22,8 +22,10 @@ export function RecentDeliverables({ agentId, client, onPreview }: RecentDeliver
     return (
       <div className="py-5">
         {/* Section header */}
-        <div className="mb-3 flex items-center gap-2">
-          <PackageIcon className="size-3.5 text-primary" />
+        <div className="mb-3 flex items-center gap-2.5">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+            <PackageIcon className="size-3.5 text-primary" />
+          </div>
           <h2 className="section-label">Recent Deliverables</h2>
         </div>
 
@@ -60,8 +62,10 @@ export function RecentDeliverables({ agentId, client, onPreview }: RecentDeliver
   return (
     <div className="py-5">
       {/* Section header */}
-      <div className="mb-3 flex items-center gap-2">
-        <PackageIcon className="size-3.5 text-primary" />
+      <div className="mb-3 flex items-center gap-2.5">
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+          <PackageIcon className="size-3.5 text-primary" />
+        </div>
         <h2 className="section-label">Recent Deliverables</h2>
         <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
           {totalCount}

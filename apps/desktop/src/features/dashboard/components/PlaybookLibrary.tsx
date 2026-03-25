@@ -53,8 +53,10 @@ export function PlaybookLibrary({
   return (
     <section className="flex flex-col gap-4">
       {/* Section label */}
-      <div className="flex items-center gap-2">
-        <BookOpenIcon className="size-3.5 text-primary" />
+      <div className="flex items-center gap-2.5">
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+          <BookOpenIcon className="size-3.5 text-primary" />
+        </div>
         <h2 className="section-label">Playbook Library</h2>
       </div>
 

@@ -15,8 +15,10 @@ export function ActionSessionOutputs({ outputs }: ActionSessionOutputsProps) {
 
   return (
     <div className="flex flex-col gap-3 px-5 py-3">
-      <div className="flex items-center gap-2">
-        <FileTextIcon className="size-3.5 text-primary" />
+      <div className="flex items-center gap-2.5">
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+          <FileTextIcon className="size-3.5 text-primary" />
+        </div>
         <h2 className="section-label">Outputs</h2>
         <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
           {outputs.length}

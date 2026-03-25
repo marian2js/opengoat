@@ -110,8 +110,10 @@ export function ObjectiveComposerPrompt({
   return (
     <section className="flex flex-col gap-6">
       {/* Section label */}
-      <div className="flex items-center gap-2">
-        <TargetIcon className="size-3.5 text-primary" />
+      <div className="flex items-center gap-2.5">
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+          <TargetIcon className="size-3.5 text-primary" />
+        </div>
         <h2 className="section-label">Objective</h2>
       </div>
 

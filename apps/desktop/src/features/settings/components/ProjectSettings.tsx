@@ -179,8 +179,10 @@ export function ProjectSettings({
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <Settings2Icon className="size-3.5 text-primary" />
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+            <Settings2Icon className="size-3.5 text-primary" />
+          </div>
           <h1 className="section-label">Project Settings</h1>
         </div>
         <span className="font-mono text-[11px] text-muted-foreground/40">{domain}</span>
