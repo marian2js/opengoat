@@ -16,6 +16,10 @@ import { createSignalRoutes } from "./routes/signals.ts";
 import { createTaskRoutes } from "./routes/tasks.ts";
 import { createMessagingRoutes } from "./routes/messaging.ts";
 import { createTelegramWebhookRoutes } from "./routes/telegram-webhook.ts";
+import {
+  createWhatsAppSessionRoutes,
+  createWhatsAppQrRoutes,
+} from "./routes/whatsapp-session.ts";
 import { createWorkspaceSignalRoutes } from "./routes/workspace-signals.ts";
 import type { SidecarRuntime } from "./context.ts";
 
@@ -65,13 +69,23 @@ export function createSidecarApp(runtime: SidecarRuntime): Hono<{
     createTelegramWebhookRoutes(runtime),
   );
 
+  // WhatsApp QR SSE route — mounted BEFORE basic auth middleware
+  // The SSE stream is scoped to a specific connectionId; session is initiated by an authenticated POST
+  app.route(
+    "/messaging/whatsapp",
+    createWhatsAppQrRoutes(runtime),
+  );
+
   app.use("*", async (context, next) => {
     if (context.req.method === "OPTIONS") {
       return next();
     }
 
-    // Skip auth for already-handled Telegram webhook paths
-    if (context.req.path.startsWith("/messaging/telegram/webhook/")) {
+    // Skip auth for already-handled Telegram webhook and WhatsApp QR paths
+    if (
+      context.req.path.startsWith("/messaging/telegram/webhook/") ||
+      context.req.path.startsWith("/messaging/whatsapp/qr/")
+    ) {
       return next();
     }
 
@@ -102,6 +116,7 @@ export function createSidecarApp(runtime: SidecarRuntime): Hono<{
   app.route("/signals", createSignalRoutes(runtime));
   app.route("/tasks", createTaskRoutes(runtime));
   app.route("/messaging", createMessagingRoutes(runtime));
+  app.route("/messaging/whatsapp", createWhatsAppSessionRoutes(runtime));
   app.route("/workspace-signals", createWorkspaceSignalRoutes(runtime));
 
   app.notFound((context) => context.json({ error: "Not Found" }, 404));

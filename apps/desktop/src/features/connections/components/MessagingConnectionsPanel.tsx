@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { TelegramSetupFlow } from "./TelegramSetupFlow";
+import { WhatsAppSetupFlow } from "./WhatsAppSetupFlow";
 
 interface MessagingConnectionsPanelProps {
   client: SidecarClient | null;
@@ -57,6 +58,7 @@ export function MessagingConnectionsPanel({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [showTelegramSetup, setShowTelegramSetup] = useState(false);
+  const [showWhatsAppSetup, setShowWhatsAppSetup] = useState(false);
   const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
 
   const loadConnections = useCallback(async () => {
@@ -91,22 +93,19 @@ export function MessagingConnectionsPanel({
       return;
     }
 
-    try {
-      const meta = TYPE_META[type];
-      await client.createMessagingConnection({
-        workspaceId: "default",
-        type,
-        displayName: `${meta?.label ?? type} Connection`,
-        defaultProjectId: "default",
-      });
-      await loadConnections();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : String(error));
+    if (type === "whatsapp") {
+      setShowWhatsAppSetup(true);
+      return;
     }
   }
 
   function handleTelegramSetupComplete(): void {
     setShowTelegramSetup(false);
+    void loadConnections();
+  }
+
+  function handleWhatsAppSetupComplete(): void {
+    setShowWhatsAppSetup(false);
     void loadConnections();
   }
 
@@ -164,7 +163,18 @@ export function MessagingConnectionsPanel({
         </div>
       ) : null}
 
-      {showTypeSelector && !showTelegramSetup ? (
+      {showWhatsAppSetup && client ? (
+        <div className="border-t border-border/60 px-4 py-3 lg:px-5">
+          <WhatsAppSetupFlow
+            client={client}
+            sidecarBaseUrl={`http://localhost:${window.location.port || "3001"}`}
+            onComplete={handleWhatsAppSetupComplete}
+            onCancel={() => setShowWhatsAppSetup(false)}
+          />
+        </div>
+      ) : null}
+
+      {showTypeSelector && !showTelegramSetup && !showWhatsAppSetup ? (
         <div className="border-t border-border/60 px-4 py-3 lg:px-5">
           <p className="mb-2 text-[12px] text-muted-foreground">
             Select a messaging platform to connect:
@@ -230,6 +240,14 @@ export function MessagingConnectionsPanel({
                 {selectedConnection === connection.connectionId &&
                 connection.type === "telegram" ? (
                   <TelegramConnectionDetail connection={connection} />
+                ) : null}
+                {selectedConnection === connection.connectionId &&
+                connection.type === "whatsapp" ? (
+                  <WhatsAppConnectionDetail
+                    connection={connection}
+                    client={client}
+                    onReconnect={() => void loadConnections()}
+                  />
                 ) : null}
               </div>
             ))}
@@ -297,7 +315,7 @@ function MessagingConnectionRow({
           </span>
         </div>
       </div>
-      {connection.type === "telegram" ? (
+      {(connection.type === "telegram" || connection.type === "whatsapp") ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -337,6 +355,89 @@ function MessagingConnectionRow({
           Remove connection
         </TooltipContent>
       </Tooltip>
+    </div>
+  );
+}
+
+function WhatsAppConnectionDetail({
+  connection,
+  client,
+  onReconnect,
+}: {
+  connection: MessagingConnection;
+  client: SidecarClient | null;
+  onReconnect: () => void;
+}) {
+  const [isReconnecting, setIsReconnecting] = useState(false);
+
+  async function handleReconnect() {
+    if (!client) return;
+    setIsReconnecting(true);
+    try {
+      await client.startWhatsAppSession(connection.connectionId);
+      onReconnect();
+    } catch {
+      // Reconnect failure
+    } finally {
+      setIsReconnecting(false);
+    }
+  }
+
+  async function handleUnlink() {
+    if (!client) return;
+    try {
+      await client.stopWhatsAppSession(connection.connectionId);
+      onReconnect();
+    } catch {
+      // Best effort
+    }
+  }
+
+  return (
+    <div className="border-t border-border/30 bg-muted/10 px-4 py-3 lg:px-5">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">Status</span>
+          <span className="text-[11px] font-medium text-foreground">
+            {STATUS_LABEL[connection.status] ?? connection.status}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">Project</span>
+          <span className="text-[11px] text-foreground">
+            {connection.defaultProjectId}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">Created</span>
+          <span className="text-[10px] font-mono text-muted-foreground/70">
+            {new Date(connection.createdAt).toLocaleDateString()}
+          </span>
+        </div>
+        {(connection.status === "disconnected" || connection.status === "error") && (
+          <div className="flex gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px]"
+              disabled={isReconnecting}
+              onClick={() => void handleReconnect()}
+            >
+              {isReconnecting ? "Reconnecting…" : "Reconnect"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-[11px] text-destructive hover:text-destructive"
+              onClick={() => void handleUnlink()}
+            >
+              Unlink
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

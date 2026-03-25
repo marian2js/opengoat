@@ -1075,6 +1075,30 @@ export class SidecarClient {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // WhatsApp Session Management
+  // ---------------------------------------------------------------------------
+
+  async startWhatsAppSession(connectionId: string): Promise<{ ok: boolean; message?: string }> {
+    return (await this.request(
+      `/messaging/whatsapp/start-session/${encodeURIComponent(connectionId)}`,
+      { method: "POST" },
+    )) as { ok: boolean; message?: string };
+  }
+
+  async stopWhatsAppSession(connectionId: string): Promise<{ ok: boolean }> {
+    return (await this.request(
+      `/messaging/whatsapp/stop-session/${encodeURIComponent(connectionId)}`,
+      { method: "POST" },
+    )) as { ok: boolean };
+  }
+
+  getWhatsAppQrUrl(connectionId: string): string {
+    return this.createApiUrl(
+      `/messaging/whatsapp/qr/${encodeURIComponent(connectionId)}`,
+    );
+  }
+
   async deleteTasks(taskIds: string[]): Promise<DeleteTasksResponse> {
     return deleteTasksResponseSchema.parse(
       await this.request("/tasks", {

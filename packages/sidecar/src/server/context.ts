@@ -1,4 +1,4 @@
-import type { ArtifactService, BoardService, MemoryService, MessagingConnectionService, MessagingRouterService, ObjectiveService, OpenGoatPaths, PlaybookRegistryService, RunService, SignalService, SkillService, TelegramChannelService } from "@opengoat/core";
+import type { ArtifactService, BoardService, MemoryService, MessagingConnectionService, MessagingRouterService, ObjectiveService, OpenGoatPaths, PlaybookRegistryService, RunService, SignalService, SkillService, TelegramChannelService, WhatsAppChannelService } from "@opengoat/core";
 import type { SidecarConfig } from "../config.ts";
 import type { RuntimeProviderAuthService } from "../auth/service.ts";
 import type { RuntimeAuthSessionManager } from "../auth/sessions.ts";
@@ -23,6 +23,7 @@ export interface SidecarRuntime {
   signalService: SignalService;
   skillService: SkillService;
   telegramChannelService: TelegramChannelService;
+  whatsappChannelService: WhatsAppChannelService;
   startedAt: number;
   version: string;
 }

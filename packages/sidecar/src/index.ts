@@ -18,6 +18,7 @@ import {
   RunService,
   SkillService,
   TelegramChannelService,
+  WhatsAppChannelService,
 } from "@opengoat/core";
 import packageJson from "../package.json" with { type: "json" };
 import { RuntimeProviderAuthService } from "./auth/service.ts";
@@ -140,6 +141,13 @@ export async function startSidecarServer(
     paths: opengoatPaths,
   });
 
+  const whatsappChannelService = new WhatsAppChannelService({
+    connectionService: messagingConnectionService,
+    routerService: messagingRouterService,
+    bridgeService: chatSdkBridgeService,
+    paths: opengoatPaths,
+  });
+
   const runtime = {
     artifactService,
     authService,
@@ -162,6 +170,7 @@ export async function startSidecarServer(
     signalService,
     skillService,
     telegramChannelService,
+    whatsappChannelService,
     startedAt: Date.now(),
     version: packageJson.version,
   };
