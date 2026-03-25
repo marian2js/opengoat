@@ -290,6 +290,22 @@ export function AppSidebar({
                     const isRecent = group.label === "Today" || group.label === "Yesterday";
                     const isSearching = searchQuery.trim().length > 0;
                     const defaultOpen = group.label === "Today" || isSearching;
+                    const isGroupExpanded = expandedGroups.has(group.label);
+                    const isCapped = !isGroupExpanded && group.sessions.length > MAX_VISIBLE;
+                    const visibleSessions = isCapped ? group.sessions.slice(0, MAX_VISIBLE) : group.sessions;
+                    const hiddenCount = group.sessions.length - visibleSessions.length;
+                    // Detect duplicate labels within this group —
+                    // strip trailing dedup suffixes like " (16)" so
+                    // "Launch on Product Hunt (15)" and "(16)" are
+                    // recognised as the same base name.
+                    const labelCounts = new Map<string, number>();
+                    for (const s of group.sessions) {
+                      const l = baseLabel(formatSessionLabel(s));
+                      labelCounts.set(l, (labelCounts.get(l) ?? 0) + 1);
+                    }
+                    const duplicateLabels = new Set(
+                      [...labelCounts.entries()].filter(([, c]) => c > 1).map(([l]) => l),
+                    );
                     return (
                       <Collapsible
                         key={group.label}
@@ -315,79 +331,57 @@ export function AppSidebar({
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <ul role="group" className="flex flex-col">
-                              {(() => {
-                                const isGroupExpanded = expandedGroups.has(group.label);
-                                const isCapped = !isGroupExpanded && group.sessions.length > MAX_VISIBLE;
-                                const visibleSessions = isCapped ? group.sessions.slice(0, MAX_VISIBLE) : group.sessions;
-                                const hiddenCount = group.sessions.length - visibleSessions.length;
-                                // Detect duplicate labels within this group —
-                                // strip trailing dedup suffixes like " (16)" so
-                                // "Launch on Product Hunt (15)" and "(16)" are
-                                // recognised as the same base name.
-                                const labelCounts = new Map<string, number>();
-                                for (const s of group.sessions) {
-                                  const l = baseLabel(formatSessionLabel(s));
-                                  labelCounts.set(l, (labelCounts.get(l) ?? 0) + 1);
+                              {visibleSessions.map((session) => {
+                                let sessionIsAction = checkIsAction(session.id);
+                                if (!sessionIsAction && session.label && isLikelyActionSession(session.label)) {
+                                  sessionIsAction = true;
+                                  markActionSession(session.id); // backfill localStorage
                                 }
-                                const duplicateLabels = new Set(
-                                  [...labelCounts.entries()].filter(([, c]) => c > 1).map(([l]) => l),
-                                );
+                                const label = formatSessionLabel(session);
+                                const timestamp = duplicateLabels.has(baseLabel(label))
+                                  ? formatShortTime(session.createdAt)
+                                  : undefined;
                                 return (
-                                  <>
-                                    {visibleSessions.map((session) => {
-                                      let sessionIsAction = checkIsAction(session.id);
-                                      if (!sessionIsAction && session.label && isLikelyActionSession(session.label)) {
-                                        sessionIsAction = true;
-                                        markActionSession(session.id); // backfill localStorage
-                                      }
-                                      const label = formatSessionLabel(session);
-                                      const timestamp = duplicateLabels.has(baseLabel(label))
-                                        ? formatShortTime(session.createdAt)
-                                        : undefined;
-                                      return (
-                                        <SessionItem
-                                          key={session.id}
-                                          actionMeta={sessionIsAction ? getActionSessionMeta(session.id) : null}
-                                          deEmphasized={deEmphasizedIds.has(session.id)}
-                                          isAction={sessionIsAction}
-                                          isActive={session.id === activeSessionId}
-                                          isEditing={editingSessionId === session.id}
-                                          isRecent={isRecent}
-                                          session={session}
-                                          timestamp={timestamp}
-                                          onDelete={onSessionDelete}
-                                          onRename={onSessionRename}
-                                          onSelect={onSessionSelect}
-                                          onStartEditing={() => setEditingSessionId(session.id)}
-                                          onStopEditing={() => setEditingSessionId(null)}
-                                        />
-                                      );
-                                    })}
-                                    {hiddenCount > 0 && (
-                                      <li className="px-3 py-1.5">
-                                        <button
-                                          type="button"
-                                          onClick={() => setExpandedGroups((prev) => { const next = new Set(prev); next.add(group.label); return next; })}
-                                          className="text-[11px] text-sidebar-foreground/50 hover:text-sidebar-foreground/80 transition-colors"
-                                        >
-                                          Show {hiddenCount} more
-                                        </button>
-                                      </li>
-                                    )}
-                                    {isGroupExpanded && group.sessions.length > MAX_VISIBLE && (
-                                      <li className="px-3 py-1.5">
-                                        <button
-                                          type="button"
-                                          onClick={() => setExpandedGroups((prev) => { const next = new Set(prev); next.delete(group.label); return next; })}
-                                          className="text-[11px] text-sidebar-foreground/50 hover:text-sidebar-foreground/80 transition-colors"
-                                        >
-                                          Show less
-                                        </button>
-                                      </li>
-                                    )}
-                                  </>
+                                  <SessionItem
+                                    key={session.id}
+                                    actionMeta={sessionIsAction ? getActionSessionMeta(session.id) : null}
+                                    deEmphasized={deEmphasizedIds.has(session.id)}
+                                    isAction={sessionIsAction}
+                                    isActive={session.id === activeSessionId}
+                                    isEditing={editingSessionId === session.id}
+                                    isRecent={isRecent}
+                                    session={session}
+                                    timestamp={timestamp}
+                                    onDelete={onSessionDelete}
+                                    onRename={onSessionRename}
+                                    onSelect={onSessionSelect}
+                                    onStartEditing={() => setEditingSessionId(session.id)}
+                                    onStopEditing={() => setEditingSessionId(null)}
+                                  />
                                 );
-                              })()}
+                              })}
+                              {hiddenCount > 0 && (
+                                <li className="px-3 py-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setExpandedGroups((prev) => { const next = new Set(prev); next.add(group.label); return next; }); }}
+                                    className="text-[11px] text-sidebar-foreground/50 hover:text-sidebar-foreground/80 transition-colors"
+                                  >
+                                    Show {hiddenCount} more
+                                  </button>
+                                </li>
+                              )}
+                              {isGroupExpanded && group.sessions.length > MAX_VISIBLE && (
+                                <li className="px-3 py-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setExpandedGroups((prev) => { const next = new Set(prev); next.delete(group.label); return next; }); }}
+                                    className="text-[11px] text-sidebar-foreground/50 hover:text-sidebar-foreground/80 transition-colors"
+                                  >
+                                    Show less
+                                  </button>
+                                </li>
+                              )}
                             </ul>
                           </CollapsibleContent>
                         </li>
