@@ -474,30 +474,38 @@ export function AgentsWorkspace({
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                         <BotIcon className="size-5 text-primary" />
                       </div>
-                      <div className="min-w-0 flex-1 space-y-3">
+                      <div className="min-w-0 flex-1 space-y-4">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-[15px] font-semibold text-foreground">
+                            <h3 className="font-display text-[16px] font-bold tracking-tight text-foreground">
                               {agent.name}
                             </h3>
                             {agent.isDefault ? (
-                              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                                 Default
                               </span>
                             ) : null}
                           </div>
                           <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-                            {agent.description ??
-                              "Marketing strategy, growth, and content execution."}
+                            {(() => {
+                              const desc = agent.description ?? "";
+                              // Show a friendlier description instead of raw URL
+                              try {
+                                const url = new URL(desc.startsWith("http") ? desc : `https://${desc}`);
+                                return `AI CMO for ${url.hostname.replace(/^www\./, "")} — marketing strategy, growth, and content execution.`;
+                              } catch {
+                                return desc || "Marketing strategy, growth, and content execution.";
+                              }
+                            })()}
                           </p>
                         </div>
 
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <div className="grid gap-4 rounded-lg border border-border/30 bg-muted/20 p-4 sm:grid-cols-3">
                           <div className="grid gap-1">
                             <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
                               Provider
                             </span>
-                            <span className="text-[12px] text-foreground">
+                            <span className="text-[13px] font-medium text-foreground">
                               {providerLabel(effectiveProviderId, connectedProviders)}
                             </span>
                           </div>
@@ -544,7 +552,7 @@ export function AgentsWorkspace({
                             <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
                               Updated
                             </span>
-                            <span className="text-[12px] text-muted-foreground">
+                            <span className="text-[13px] text-muted-foreground">
                               {formatTimestamp(agent.updatedAt)}
                             </span>
                           </div>
@@ -553,7 +561,7 @@ export function AgentsWorkspace({
                     </div>
                   </article>
 
-                  <div className="group/cta mt-4 flex cursor-pointer items-center gap-4 rounded-lg border border-dashed border-border/40 bg-muted/10 px-5 py-4 transition-all hover:border-primary/30 hover:bg-primary/[0.03]"
+                  <div className="group/cta mt-4 flex cursor-pointer items-center gap-4 rounded-lg border border-dashed border-border/40 px-5 py-4 transition-all hover:border-primary/30 hover:bg-primary/[0.03]"
                     role="button"
                     tabIndex={0}
                     onClick={() => {
