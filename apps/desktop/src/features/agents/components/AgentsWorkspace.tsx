@@ -488,7 +488,7 @@ export function AgentsWorkspace({
                           </div>
                           <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
                             {agent.description ??
-                              "Finance planning, research, and execution support."}
+                              "Marketing strategy, growth, and content execution."}
                           </p>
                         </div>
 
@@ -605,7 +605,7 @@ export function AgentsWorkspace({
                     </div>
                     <p className="text-[12px] leading-relaxed text-muted-foreground">
                       {agent.description ??
-                        "Finance planning, research, and execution support."}
+                        "Marketing strategy, growth, and content execution."}
                     </p>
                   </div>
 
