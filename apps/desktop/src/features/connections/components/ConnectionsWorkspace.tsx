@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckIcon, Link2Icon, LoaderCircleIcon, PlusIcon, RefreshCcwIcon, Trash2Icon } from "lucide-react";
+import { CheckIcon, Link2Icon, PlusIcon, RefreshCcwIcon, Trash2Icon } from "lucide-react";
 import type { AuthOverview, ProviderModelCatalog, SavedConnection } from "@/app/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { SidecarClient } from "@/lib/sidecar/client";
 import { cleanProviderName } from "@/features/agents/display-helpers";
 import { MessagingConnectionsPanel } from "./MessagingConnectionsPanel";
+import { resolveModelDisplayLabel } from "./model-display-helpers";
 
 interface ConnectionsWorkspaceProps {
   authOverview: AuthOverview | null;
@@ -38,7 +39,6 @@ export function ConnectionsWorkspace({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [modelCatalogs, setModelCatalogs] = useState<Record<string, ProviderModelCatalog>>({});
-  const [modelBusyProviderId, setModelBusyProviderId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   async function refreshOverview(): Promise<void> {
@@ -129,31 +129,6 @@ export function ConnectionsWorkspace({
     }
   }
 
-  async function handleSetModel(providerId: string, modelRef: string): Promise<void> {
-    if (!client) {
-      return;
-    }
-
-    setErrorMessage(null);
-    setFeedback(null);
-    setModelBusyProviderId(providerId);
-
-    try {
-      const nextOverview = await client.setProviderModel(providerId, modelRef);
-      onAuthOverviewChange(nextOverview);
-      const nextCatalog = await client.providerModels(providerId);
-      setModelCatalogs((current) => ({
-        ...current,
-        [providerId]: nextCatalog,
-      }));
-      setFeedback("Model updated.");
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error));
-    } finally {
-      setModelBusyProviderId(null);
-    }
-  }
-
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4">
       {errorMessage ? (
@@ -191,7 +166,7 @@ export function ConnectionsWorkspace({
               variant="ghost"
               size="sm"
               className="h-7 rounded-md text-[11px] text-muted-foreground"
-              disabled={!client || isBusy || isRefreshing || Boolean(modelBusyProviderId)}
+              disabled={!client || isBusy || isRefreshing}
               onClick={() => {
                 void refreshOverview();
               }}
@@ -247,11 +222,9 @@ export function ConnectionsWorkspace({
                     key={connection.profileId}
                     connection={connection}
                     isBusy={isBusy}
-                    isUpdatingModel={modelBusyProviderId === connection.providerId}
                     modelCatalog={modelCatalogs[connection.providerId]}
                     onDelete={handleDelete}
                     onSelectDefault={handleSelectDefault}
-                    onSetModel={handleSetModel}
                   />
                 ))}
               </TableBody>
@@ -290,24 +263,17 @@ export function ConnectionsWorkspace({
 function ConnectionRow({
   connection,
   isBusy,
-  isUpdatingModel,
   modelCatalog,
   onDelete,
   onSelectDefault,
-  onSetModel,
 }: {
   connection: SavedConnection;
   isBusy: boolean;
-  isUpdatingModel: boolean;
   modelCatalog: ProviderModelCatalog | undefined;
   onDelete: (profileId: string) => Promise<void>;
   onSelectDefault: (profileId: string) => Promise<void>;
-  onSetModel: (providerId: string, modelRef: string) => Promise<void>;
 }) {
-  const selectedModelRef =
-    modelCatalog?.currentModelRef ??
-    modelCatalog?.models[0]?.modelRef ??
-    (connection.activeModelId ? `${connection.providerId}/${connection.activeModelId}` : "");
+  const modelLabel = resolveModelDisplayLabel(modelCatalog, connection.activeModelId);
 
   return (
     <TableRow className="border-border/60 transition-colors hover:bg-muted/20">
@@ -326,23 +292,14 @@ function ConnectionRow({
         </div>
       </TableCell>
       <TableCell>
-        <div className="flex min-w-[14rem] items-center gap-1.5">
-          <select
-            className="h-8 w-full rounded-md border border-border bg-background px-2.5 text-[12px] text-foreground outline-none transition-colors focus:border-primary"
-            disabled={isUpdatingModel || !modelCatalog || modelCatalog.models.length === 0}
-            value={selectedModelRef}
-            onChange={(event) => {
-              void onSetModel(connection.providerId, event.target.value);
-            }}
-          >
-            {modelCatalog?.models.map((model) => (
-              <option key={model.modelRef} value={model.modelRef}>
-                {model.label}
-              </option>
-            ))}
-          </select>
-          {isUpdatingModel ? <LoaderCircleIcon className="size-3.5 animate-spin text-muted-foreground" /> : null}
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="text-[12px] text-foreground">{modelLabel}</span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="px-2 py-1 text-xs">
+            Change model in Settings or Agents
+          </TooltipContent>
+        </Tooltip>
       </TableCell>
       <TableCell className="font-mono text-[11px] text-muted-foreground/60 tabular-nums">
         {formatDate(connection.updatedAt)}
@@ -356,7 +313,7 @@ function ConnectionRow({
                 variant="ghost"
                 size="sm"
                 className="h-7 rounded-md px-2 text-[11px]"
-                disabled={isBusy || isUpdatingModel || connection.isDefault}
+                disabled={isBusy || connection.isDefault}
                 onClick={() => {
                   void onSelectDefault(connection.profileId);
                 }}
@@ -376,7 +333,7 @@ function ConnectionRow({
                 variant="ghost"
                 size="sm"
                 className="h-7 rounded-md px-2 text-[11px] text-destructive hover:bg-destructive/8 hover:text-destructive"
-                disabled={isBusy || isUpdatingModel}
+                disabled={isBusy}
                 onClick={() => {
                   void onDelete(connection.profileId);
                 }}
