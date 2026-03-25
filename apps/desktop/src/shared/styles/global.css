@@ -270,6 +270,274 @@ select {
   }
 }
 
+/* ─── Streamdown — chat markdown prose styling ─── */
+
+/* Headings within Streamdown content */
+[data-streamdown="heading-1"] {
+  font-family: "General Sans", "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+[data-streamdown="heading-2"] {
+  font-family: "General Sans", "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  line-height: 1.35;
+  margin-top: 1.25rem;
+  margin-bottom: 0.375rem;
+}
+
+[data-streamdown="heading-3"] {
+  font-family: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+[data-streamdown="heading-4"],
+[data-streamdown="heading-5"],
+[data-streamdown="heading-6"] {
+  font-family: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted-foreground);
+}
+
+/* Inline code */
+[data-streamdown="inline-code"] {
+  font-family: "JetBrains Mono Variable", ui-monospace, "SF Mono", monospace;
+  font-size: 0.8125em;
+  font-weight: 500;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.dark [data-streamdown="inline-code"] {
+  background: oklch(0.16 0.003 250);
+  border-color: oklch(1 0 0 / 8%);
+}
+
+/* Code block container */
+[data-streamdown="code-block"] {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.dark [data-streamdown="code-block"] {
+  border-color: oklch(1 0 0 / 8%);
+}
+
+/* Code block header — language label + actions */
+[data-streamdown="code-block-header"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.375rem 0.75rem;
+  font-family: "JetBrains Mono Variable", ui-monospace, "SF Mono", monospace;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.dark [data-streamdown="code-block-header"] {
+  background: oklch(0.10 0.003 250);
+  border-bottom-color: oklch(1 0 0 / 6%);
+}
+
+/* Code block body — the actual code */
+[data-streamdown="code-block-body"] {
+  padding: 0.75rem 1rem;
+  font-family: "JetBrains Mono Variable", ui-monospace, "SF Mono", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: auto;
+  background: var(--secondary);
+}
+
+.dark [data-streamdown="code-block-body"] {
+  background: oklch(0.08 0.003 250);
+}
+
+[data-streamdown="code-block-body"] pre {
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+}
+
+[data-streamdown="code-block-body"] code {
+  font-family: inherit;
+  font-size: inherit;
+  background: transparent;
+}
+
+/* Code block action buttons */
+[data-streamdown="code-block-actions"] {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+[data-streamdown="code-block-copy-button"],
+[data-streamdown="code-block-download-button"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+  opacity: 0.5;
+  transition: opacity 150ms, background 150ms;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+[data-streamdown="code-block-copy-button"]:hover,
+[data-streamdown="code-block-download-button"]:hover {
+  opacity: 1;
+  background: var(--accent);
+}
+
+/* Blockquotes */
+[data-streamdown="blockquote"],
+.space-y-4 > blockquote {
+  border-left: 3px solid var(--primary);
+  padding-left: 1rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.dark [data-streamdown="blockquote"],
+.dark .space-y-4 > blockquote {
+  border-left-color: oklch(0.77 0.15 163 / 40%);
+}
+
+/* Links */
+[data-streamdown="link"],
+.space-y-4 a[href] {
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 150ms;
+}
+
+[data-streamdown="link"]:hover,
+.space-y-4 a[href]:hover {
+  border-bottom-color: var(--primary);
+}
+
+/* Horizontal rule */
+[data-streamdown="hr"],
+.space-y-4 > hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.25rem 0;
+}
+
+/* Tables in Streamdown */
+[data-streamdown="table-wrapper"] {
+  overflow-x: auto;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.dark [data-streamdown="table-wrapper"] {
+  border-color: oklch(1 0 0 / 8%);
+}
+
+[data-streamdown="table"] {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+[data-streamdown="table-head"] {
+  background: var(--muted);
+}
+
+.dark [data-streamdown="table-head"] {
+  background: oklch(0.10 0.003 250);
+}
+
+[data-streamdown="table-head"] th {
+  padding: 0.5rem 0.75rem;
+  font-family: "JetBrains Mono Variable", ui-monospace, "SF Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: left;
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+}
+
+[data-streamdown="table-body"] td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.dark [data-streamdown="table-head"] th,
+.dark [data-streamdown="table-body"] td {
+  border-bottom-color: oklch(1 0 0 / 6%);
+}
+
+[data-streamdown="table-body"] tr:last-child td {
+  border-bottom: none;
+}
+
+[data-streamdown="table-body"] tr:hover {
+  background: var(--accent);
+}
+
+/* Stronger list markers */
+[data-streamdown="ordered-list"],
+[data-streamdown="unordered-list"] {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+[data-streamdown="ordered-list"] > [data-streamdown="list-item"]::marker {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+[data-streamdown="unordered-list"] > [data-streamdown="list-item"]::marker {
+  color: var(--muted-foreground);
+}
+
+/* Bold and strong in Streamdown prose */
+.space-y-4 strong,
+.space-y-4 b {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
 /* Custom select styling */
 select {
   appearance: none;
