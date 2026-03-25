@@ -324,7 +324,9 @@ export function BrainWorkspace({ agentId, client, onRefineContext, sectionId }: 
     return (
       <div className="flex flex-1 flex-col overflow-y-auto">
         <div className="flex items-center gap-3 border-b border-border/20 px-5 py-4 lg:px-6">
-          <DatabaseIcon className="size-4 text-primary" />
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+            <DatabaseIcon className="size-3.5 text-primary" />
+          </div>
           <div>
             <h2 className="font-display text-sm font-bold tracking-tight">{section.label}</h2>
             <p className="text-[11px] text-muted-foreground/70">{section.description}</p>
@@ -1046,7 +1048,9 @@ function SectionHeader({
   return (
     <div className="flex items-center justify-between border-b border-border/20 px-5 py-4 lg:px-6">
       <div className="flex items-center gap-3">
-        <section.icon className="size-4 text-primary" />
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+          <section.icon className="size-3.5 text-primary" />
+        </div>
         <div>
           <h2 className="font-display text-sm font-bold tracking-tight">{section.label}</h2>
           <p className="text-[11px] text-muted-foreground/70">{section.description}</p>
