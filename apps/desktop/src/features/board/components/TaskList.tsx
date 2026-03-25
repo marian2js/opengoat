@@ -25,18 +25,27 @@ interface TaskRowProps {
   onSelect: (taskId: string) => void;
 }
 
+const STATUS_ACCENT: Record<string, string> = {
+  todo: "before:bg-muted-foreground/30",
+  doing: "before:bg-primary",
+  pending: "before:bg-warning dark:before:bg-yellow-400",
+  blocked: "before:bg-destructive dark:before:bg-red-400",
+  done: "before:bg-success dark:before:bg-green-400",
+};
+
 function TaskRow({ task, onSelect }: TaskRowProps) {
   const artifactCount = task.artifacts?.length ?? 0;
   const blockerCount = task.blockers?.length ?? 0;
   const isReview = task.status === "pending";
+  const accent = STATUS_ACCENT[task.status] ?? "before:bg-muted-foreground/30";
 
   return (
     <TableRow
-      className="group/row cursor-pointer border-border/20 transition-colors hover:bg-primary/[0.04] even:bg-muted/[0.03]"
+      className={`group/row relative cursor-pointer border-border/20 transition-colors hover:bg-primary/[0.04] even:bg-muted/[0.03] before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:rounded-sm before:opacity-0 before:transition-opacity hover:before:opacity-100 ${accent}`}
       onClick={() => onSelect(task.taskId)}
     >
       {/* Title */}
-      <TableCell className="max-w-[400px] py-3 text-[13px] font-medium text-foreground/85 group-hover/row:text-foreground">
+      <TableCell className="max-w-[400px] py-3 pl-4 text-[13px] font-medium text-foreground/85 group-hover/row:text-foreground">
         <div className="flex items-center gap-1.5 overflow-hidden">
           <span className="truncate">{task.title}</span>
         </div>
