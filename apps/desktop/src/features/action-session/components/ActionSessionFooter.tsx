@@ -19,7 +19,7 @@ export function ActionSessionFooter({
         className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeftIcon className="size-3" />
-        Dashboard
+        Back to dashboard
       </button>
       <div className="flex items-center gap-2">
         <button
