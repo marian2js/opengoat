@@ -276,8 +276,8 @@ export function ProjectSettings({
       <Card className="border-border/50">
         <CardHeader>
           <div className="flex items-center gap-2.5">
-            <div className="flex size-7 items-center justify-center rounded-md bg-muted/60">
-              <UserIcon className="size-3.5 text-muted-foreground" />
+            <div className="flex size-7 items-center justify-center rounded-md bg-primary/8">
+              <UserIcon className="size-3.5 text-primary" />
             </div>
             <div>
               <CardTitle className="text-[14px] font-semibold">General</CardTitle>
