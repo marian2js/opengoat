@@ -70,36 +70,33 @@ export function CompanySummary({ data, domain, faviconSources, isLoading, error 
     : null;
 
   return (
-    <div className="flex items-center gap-3 py-1">
-      {/* Favicon + domain */}
-      <div className="flex shrink-0 items-center gap-2">
-        {hasFavicon ? (
-          <div className="flex size-5 shrink-0 items-center justify-center rounded bg-accent">
-            <FaviconIcon
-              domain={domain}
-              faviconSources={faviconSources}
-              className="size-3.5 rounded-sm"
-            />
-          </div>
-        ) : (
-          <div className="flex size-5 shrink-0 items-center justify-center rounded bg-primary/8 text-primary">
-            <GlobeIcon className="size-3" />
-          </div>
-        )}
-        <span className="font-display text-[13px] font-bold tracking-tight text-foreground">
+    <div className="flex items-center gap-3">
+      {/* Favicon */}
+      {hasFavicon ? (
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-card ring-1 ring-border/40">
+          <FaviconIcon
+            domain={domain}
+            faviconSources={faviconSources}
+            className="size-4 rounded-sm"
+          />
+        </div>
+      ) : (
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary">
+          <GlobeIcon className="size-3.5" />
+        </div>
+      )}
+
+      {/* Domain + summary */}
+      <div className="min-w-0 flex-1">
+        <span className="font-display text-sm font-bold tracking-tight text-foreground">
           {domain ?? "Project"}
         </span>
+        {shortSummary ? (
+          <p className="truncate text-[12px] leading-snug text-muted-foreground/60">
+            {shortSummary}
+          </p>
+        ) : null}
       </div>
-
-      {/* Divider */}
-      <div className="h-3 w-px shrink-0 bg-border/60" />
-
-      {/* Short product summary */}
-      {shortSummary ? (
-        <p className="min-w-0 truncate text-[12px] text-muted-foreground/70">
-          {shortSummary}
-        </p>
-      ) : null}
     </div>
   );
 }
