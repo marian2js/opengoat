@@ -6,6 +6,7 @@ import {
   SmartphoneIcon,
   SendIcon,
   SettingsIcon,
+  PlayIcon,
 } from "lucide-react";
 import type { MessagingConnection } from "@/app/types";
 import { Badge } from "@/components/ui/badge";
@@ -223,10 +224,21 @@ export function MessagingConnectionsPanel({
       {connections.length > 0 ? (
         <div className="border-t border-border/60">
           <div className="divide-y divide-border/40">
-            {connections.map((connection) => (
+            {connections.map((connection) => {
+              // Disambiguate duplicate display names by type
+              const sameTypeConns = connections.filter(
+                (c) => c.type === connection.type && c.displayName === connection.displayName,
+              );
+              const disambiguatedName =
+                sameTypeConns.length > 1
+                  ? `${connection.displayName} #${sameTypeConns.indexOf(connection) + 1}`
+                  : connection.displayName;
+
+              return (
               <div key={connection.connectionId}>
                 <MessagingConnectionRow
                   connection={connection}
+                  resolvedName={disambiguatedName}
                   isSelected={selectedConnection === connection.connectionId}
                   onSelect={() =>
                     setSelectedConnection(
@@ -250,7 +262,8 @@ export function MessagingConnectionsPanel({
                   />
                 ) : null}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -260,11 +273,13 @@ export function MessagingConnectionsPanel({
 
 function MessagingConnectionRow({
   connection,
+  resolvedName,
   isSelected,
   onSelect,
   onDelete,
 }: {
   connection: MessagingConnection;
+  resolvedName: string;
   isSelected: boolean;
   onSelect: () => void;
   onDelete: (connectionId: string) => Promise<void>;
@@ -277,6 +292,8 @@ function MessagingConnectionRow({
   const Icon = meta.icon;
   const statusDot = STATUS_DOT[connection.status] ?? "bg-zinc-400";
   const statusLabel = STATUS_LABEL[connection.status] ?? connection.status;
+  const isPending = connection.status === "pending";
+  const isWhatsApp = connection.type === "whatsapp";
 
   return (
     <div
@@ -297,7 +314,7 @@ function MessagingConnectionRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-[12px] font-medium text-foreground truncate">
-            {connection.displayName}
+            {resolvedName}
           </span>
           <Badge
             variant="secondary"
@@ -314,6 +331,16 @@ function MessagingConnectionRow({
             {statusLabel}
           </span>
         </div>
+        {isPending && isWhatsApp && (
+          <p className="mt-1 text-[11px] text-amber-400/80">
+            Scan QR code to link your WhatsApp account
+          </p>
+        )}
+        {isPending && !isWhatsApp && (
+          <p className="mt-1 text-[11px] text-amber-400/80">
+            Complete the setup to activate this connection
+          </p>
+        )}
       </div>
       {(connection.type === "telegram" || connection.type === "whatsapp") ? (
         <Tooltip>
@@ -322,19 +349,33 @@ function MessagingConnectionRow({
               type="button"
               variant="ghost"
               size="sm"
-              aria-label="Connection details"
-              className="h-8 rounded-md px-2.5 text-[11px] text-primary hover:bg-primary/8 hover:text-primary"
+              aria-label={isPending ? "Complete setup" : "Connection details"}
+              className={cn(
+                "h-8 rounded-md px-2.5 text-[11px]",
+                isPending
+                  ? "text-amber-400 hover:bg-amber-400/8 hover:text-amber-300"
+                  : "text-primary hover:bg-primary/8 hover:text-primary",
+              )}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect();
               }}
             >
-              <SettingsIcon className="size-3" />
-              <span>Details</span>
+              {isPending ? (
+                <>
+                  <PlayIcon className="size-3" />
+                  <span>Complete Setup</span>
+                </>
+              ) : (
+                <>
+                  <SettingsIcon className="size-3" />
+                  <span>Details</span>
+                </>
+              )}
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="px-2 py-1 text-xs">
-            Connection details
+            {isPending ? "Complete connection setup" : "Connection details"}
           </TooltipContent>
         </Tooltip>
       ) : null}
