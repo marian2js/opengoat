@@ -233,12 +233,12 @@ export function ConnectionsWorkspace({
           <div className="overflow-hidden border-t border-border/60">
             <Table>
               <TableHeader>
-                <TableRow className="border-border/50 bg-muted/30 hover:bg-muted/30">
-                  <TableHead>Provider</TableHead>
-                  <TableHead>Connection</TableHead>
-                  <TableHead>Model</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow className="border-border/40 hover:bg-transparent">
+                  <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Provider</TableHead>
+                  <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Connection</TableHead>
+                  <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Model</TableHead>
+                  <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Updated</TableHead>
+                  <TableHead className="py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
