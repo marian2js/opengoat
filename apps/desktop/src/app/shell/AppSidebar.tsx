@@ -9,11 +9,13 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  SearchIcon,
   Settings2Icon,
   TrashIcon,
+  ZapIcon,
   LayoutDashboardIcon,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   brainNavigation,
   primaryNavigation,
@@ -24,6 +26,7 @@ import {
   buildFaviconSources as sharedBuildFaviconSources,
 } from "@/lib/utils/favicon";
 import { groupSessionsByDate } from "@/lib/utils/group-sessions-by-date";
+import { simplifyDateGroups } from "@/lib/utils/simplify-date-groups";
 import { getDeEmphasizedSessionIds } from "@/lib/utils/session-rerun";
 import { humanizeSessionLabel } from "@/lib/utils/session-label";
 import { isUnnamedSession } from "@/lib/utils/unnamed-session";
@@ -67,6 +70,7 @@ interface AppSidebarProps {
   activeSessionId?: string | undefined;
   activeView: "dashboard" | "connections" | "chat" | "brain" | "agents" | "settings" | "board";
   agentCatalog: AgentCatalog | null;
+  isActionSession?: ((sessionId: string) => boolean) | undefined;
   onAddProject?: (() => void) | undefined;
   onNewChat?: (() => void) | undefined;
   onProjectSwitch?: ((agentId: string) => void) | undefined;
@@ -86,6 +90,7 @@ export function AppSidebar({
   activeSessionId,
   activeView,
   agentCatalog,
+  isActionSession,
   onAddProject,
   onNewChat,
   onProjectSwitch,
@@ -95,14 +100,27 @@ export function AppSidebar({
   sessions,
 }: AppSidebarProps) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const allSessions = sessions ?? [];
+  const filteredSessions = useMemo(() => {
+    if (!searchQuery.trim()) return allSessions;
+    const q = searchQuery.trim().toLowerCase();
+    return allSessions.filter((s) => {
+      const label = humanizeSessionLabel(s.label, s.createdAt);
+      return label.toLowerCase().includes(q);
+    });
+  }, [allSessions, searchQuery]);
   const sessionGroups = useMemo(
-    () => groupSessionsByDate(allSessions),
-    [allSessions],
+    () => simplifyDateGroups(groupSessionsByDate(filteredSessions)),
+    [filteredSessions],
   );
   const deEmphasizedIds = useMemo(
     () => getDeEmphasizedSessionIds(allSessions),
     [allSessions],
+  );
+  const checkIsAction = useCallback(
+    (sessionId: string) => isActionSession?.(sessionId) ?? false,
+    [isActionSession],
   );
   const projects = resolveAllProjects(agentCatalog, activeAgentId);
   const activeProject = projects.find((p) => p.isActive) ?? projects[0];
@@ -226,7 +244,7 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {activeView === "chat" && sessionGroups.length > 0 ? (
+        {activeView === "chat" ? (
           <SidebarGroup>
             <SidebarGroupLabel>Chats</SidebarGroupLabel>
             {onNewChat ? (
@@ -236,37 +254,56 @@ export function AppSidebar({
               </SidebarGroupAction>
             ) : null}
             <SidebarGroupContent>
-              <SidebarMenu>
-                {sessionGroups.map((group) => {
-                  const isRecent = group.label === "Today" || group.label === "Yesterday";
-                  return (
-                    <li key={group.label} role="none">
-                      <div className="px-3 pt-3 pb-1">
-                        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
-                          {group.label}
-                        </span>
-                      </div>
-                      <ul role="group" className="flex flex-col">
-                        {group.sessions.map((session) => (
-                          <SessionItem
-                            key={session.id}
-                            deEmphasized={deEmphasizedIds.has(session.id)}
-                            isActive={session.id === activeSessionId}
-                            isEditing={editingSessionId === session.id}
-                            isRecent={isRecent}
-                            session={session}
-                            onDelete={onSessionDelete}
-                            onRename={onSessionRename}
-                            onSelect={onSessionSelect}
-                            onStartEditing={() => setEditingSessionId(session.id)}
-                            onStopEditing={() => setEditingSessionId(null)}
-                          />
-                        ))}
-                      </ul>
-                    </li>
-                  );
-                })}
-              </SidebarMenu>
+              <div className="px-2 pb-1">
+                <div className="relative">
+                  <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-sidebar-foreground/40" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search chats…"
+                    className="h-7 w-full rounded-md border border-sidebar-border bg-sidebar pl-7 pr-2 text-[13px] text-sidebar-foreground placeholder:text-sidebar-foreground/40 outline-none focus:ring-1 focus:ring-primary/40"
+                  />
+                </div>
+              </div>
+              {sessionGroups.length > 0 ? (
+                <SidebarMenu>
+                  {sessionGroups.map((group) => {
+                    const isRecent = group.label === "Today" || group.label === "Yesterday";
+                    return (
+                      <li key={group.label} role="none">
+                        <div className="px-3 pt-3 pb-1">
+                          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
+                            {group.label}
+                          </span>
+                        </div>
+                        <ul role="group" className="flex flex-col">
+                          {group.sessions.map((session) => (
+                            <SessionItem
+                              key={session.id}
+                              deEmphasized={deEmphasizedIds.has(session.id)}
+                              isAction={checkIsAction(session.id)}
+                              isActive={session.id === activeSessionId}
+                              isEditing={editingSessionId === session.id}
+                              isRecent={isRecent}
+                              session={session}
+                              onDelete={onSessionDelete}
+                              onRename={onSessionRename}
+                              onSelect={onSessionSelect}
+                              onStartEditing={() => setEditingSessionId(session.id)}
+                              onStopEditing={() => setEditingSessionId(null)}
+                            />
+                          ))}
+                        </ul>
+                      </li>
+                    );
+                  })}
+                </SidebarMenu>
+              ) : allSessions.length > 0 ? (
+                <div className="px-3 py-4 text-center text-[13px] text-sidebar-foreground/50">
+                  No chats match &ldquo;{searchQuery}&rdquo;
+                </div>
+              ) : null}
             </SidebarGroupContent>
           </SidebarGroup>
         ) : null}
@@ -425,6 +462,7 @@ function ProjectIcon({
 
 function SessionItem({
   deEmphasized,
+  isAction,
   isActive,
   isEditing,
   isRecent,
@@ -436,6 +474,7 @@ function SessionItem({
   onStopEditing,
 }: {
   deEmphasized: boolean;
+  isAction: boolean;
   isActive: boolean;
   isEditing: boolean;
   isRecent: boolean;
@@ -449,6 +488,7 @@ function SessionItem({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const label = formatSessionLabel(session);
   const unnamed = isUnnamedSession(session.label);
+  const Icon = isAction ? ZapIcon : MessageSquareIcon;
 
   function commitRename(): void {
     const value = inputRef.current?.value.trim();
@@ -462,7 +502,7 @@ function SessionItem({
     return (
       <SidebarMenuItem>
         <div className="flex h-8 items-center gap-2 px-2">
-          <MessageSquareIcon className="size-4 shrink-0 text-sidebar-foreground/70" />
+          <Icon className={cn("size-4 shrink-0", isAction ? "text-primary" : "text-sidebar-foreground/70")} />
           <input
             ref={inputRef}
             autoFocus
@@ -496,7 +536,7 @@ function SessionItem({
           unnamed && !isActive && "text-sidebar-foreground/50",
         )}
       >
-        <MessageSquareIcon />
+        <Icon className={cn(isAction && "text-primary")} />
         <span className={cn(
           "truncate",
           unnamed

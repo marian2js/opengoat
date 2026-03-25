@@ -426,6 +426,7 @@ export function App() {
         activeSessionId={activeSessionId}
         activeView={currentView}
         agentCatalog={agentCatalog}
+        isActionSession={isActionSession}
         onAddProject={() => setShowAddProject(true)}
         onNewChat={() => {
           void handleNewChat();
