@@ -3,6 +3,7 @@ import type { ActionSessionMeta } from "@/features/action-session/types";
 import {
   BrainIcon,
   CheckIcon,
+  ChevronDownIcon,
   ChevronRightIcon,
   ChevronsUpDownIcon,
   GlobeIcon,
@@ -272,36 +273,57 @@ export function AppSidebar({
                 <SidebarMenu>
                   {sessionGroups.map((group) => {
                     const isRecent = group.label === "Today" || group.label === "Yesterday";
+                    const isSearching = searchQuery.trim().length > 0;
+                    const defaultOpen = group.label === "Today" || isSearching;
                     return (
-                      <li key={group.label} role="none">
-                        <div className="px-3 pt-3 pb-1">
-                          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
-                            {group.label}
-                          </span>
-                        </div>
-                        <ul role="group" className="flex flex-col">
-                          {group.sessions.map((session) => {
-                            const sessionIsAction = checkIsAction(session.id);
-                            return (
-                              <SessionItem
-                                key={session.id}
-                                actionMeta={sessionIsAction ? getActionSessionMeta(session.id) : null}
-                                deEmphasized={deEmphasizedIds.has(session.id)}
-                                isAction={sessionIsAction}
-                                isActive={session.id === activeSessionId}
-                                isEditing={editingSessionId === session.id}
-                                isRecent={isRecent}
-                                session={session}
-                                onDelete={onSessionDelete}
-                                onRename={onSessionRename}
-                                onSelect={onSessionSelect}
-                                onStartEditing={() => setEditingSessionId(session.id)}
-                                onStopEditing={() => setEditingSessionId(null)}
-                              />
-                            );
-                          })}
-                        </ul>
-                      </li>
+                      <Collapsible
+                        key={group.label}
+                        defaultOpen={defaultOpen}
+                        open={isSearching ? true : undefined}
+                        asChild
+                        className="group/dategroup"
+                      >
+                        <li role="none">
+                          <CollapsibleTrigger asChild>
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-1.5 px-3 pt-3 pb-1 text-left"
+                            >
+                              <ChevronRightIcon className="size-3 text-primary/60 transition-transform duration-150 group-data-[state=open]/dategroup:rotate-90" />
+                              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
+                                {group.label}
+                              </span>
+                              <span className="font-mono text-[10px] font-normal text-sidebar-foreground/40">
+                                {group.sessions.length}
+                              </span>
+                            </button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <ul role="group" className="flex flex-col">
+                              {group.sessions.map((session) => {
+                                const sessionIsAction = checkIsAction(session.id);
+                                return (
+                                  <SessionItem
+                                    key={session.id}
+                                    actionMeta={sessionIsAction ? getActionSessionMeta(session.id) : null}
+                                    deEmphasized={deEmphasizedIds.has(session.id)}
+                                    isAction={sessionIsAction}
+                                    isActive={session.id === activeSessionId}
+                                    isEditing={editingSessionId === session.id}
+                                    isRecent={isRecent}
+                                    session={session}
+                                    onDelete={onSessionDelete}
+                                    onRename={onSessionRename}
+                                    onSelect={onSessionSelect}
+                                    onStartEditing={() => setEditingSessionId(session.id)}
+                                    onStopEditing={() => setEditingSessionId(null)}
+                                  />
+                                );
+                              })}
+                            </ul>
+                          </CollapsibleContent>
+                        </li>
+                      </Collapsible>
                     );
                   })}
                 </SidebarMenu>
