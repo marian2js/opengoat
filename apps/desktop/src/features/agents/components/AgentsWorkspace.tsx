@@ -386,8 +386,10 @@ export function AgentsWorkspace({
 
       <section className="rounded-lg border border-border/50 bg-card/80">
         <div className="flex items-center justify-between gap-3 px-4 py-3.5 lg:px-5">
-          <div className="flex items-center gap-2">
-            <BotIcon className="size-3.5 text-primary" />
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+              <BotIcon className="size-3.5 text-primary" />
+            </div>
             <h2 className="section-label">Agent Library</h2>
             <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
               {agents.length}

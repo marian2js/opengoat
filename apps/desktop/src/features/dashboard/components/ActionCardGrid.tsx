@@ -12,8 +12,10 @@ export interface ActionCardGridProps {
 export function ActionCardGrid({ completedActions, isLoading, onActionClick, onViewResults }: ActionCardGridProps) {
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <SparklesIcon className="size-3.5 text-primary" />
+      <div className="flex items-center gap-2.5">
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+          <SparklesIcon className="size-3.5 text-primary" />
+        </div>
         <h2 className="section-label">
           What can I help with?
         </h2>

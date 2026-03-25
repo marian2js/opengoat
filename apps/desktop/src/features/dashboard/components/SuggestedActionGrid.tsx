@@ -37,8 +37,10 @@ export function SuggestedActionGrid({
 
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-primary/10 bg-primary/[0.02] p-4">
-      <div className="flex items-center gap-2">
-        <WandSparklesIcon className="size-3.5 text-primary" />
+      <div className="flex items-center gap-2.5">
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+          <WandSparklesIcon className="size-3.5 text-primary" />
+        </div>
         <h2 className="section-label">
           Suggested Actions
         </h2>

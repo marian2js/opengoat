@@ -217,8 +217,10 @@ export function ActiveWorkSection({ onContinueSession }: ActiveWorkSectionProps)
       {/* Now working on — active sessions */}
       {activeSessions.length > 0 && (
         <section>
-          <div className="mb-3 flex items-center gap-2">
-            <PlayCircleIcon className="size-3.5 text-primary" />
+          <div className="mb-3 flex items-center gap-2.5">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+              <PlayCircleIcon className="size-3.5 text-primary" />
+            </div>
             <h2 className="section-label">Now working on</h2>
           </div>
           <div className="space-y-2">
@@ -237,8 +239,10 @@ export function ActiveWorkSection({ onContinueSession }: ActiveWorkSectionProps)
       {/* Recent work — completed sessions */}
       {recentSessions.length > 0 && (
         <section>
-          <div className="mb-3 flex items-center gap-2">
-            <ClockIcon className="size-3.5 text-primary" />
+          <div className="mb-3 flex items-center gap-2.5">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+              <ClockIcon className="size-3.5 text-primary" />
+            </div>
             <h2 className="section-label">Recent work</h2>
             <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
               {recentSessions.length}
