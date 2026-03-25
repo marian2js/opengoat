@@ -298,8 +298,9 @@ function MessagingConnectionRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/20 lg:px-5 cursor-pointer",
+        "flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-muted/20 lg:px-5 cursor-pointer",
         isSelected && "bg-muted/10",
+        isPending && "bg-amber-400/[0.03]",
       )}
       onClick={onSelect}
       role="button"
@@ -308,12 +309,17 @@ function MessagingConnectionRow({
         if (e.key === "Enter" || e.key === " ") onSelect();
       }}
     >
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border/50 bg-background">
-        <Icon className={cn("size-4", meta.color)} />
+      <div className={cn(
+        "flex size-9 shrink-0 items-center justify-center rounded-lg border",
+        isPending
+          ? "border-amber-400/20 bg-amber-400/8"
+          : "border-border/50 bg-background",
+      )}>
+        <Icon className={cn("size-4", isPending ? "text-amber-400" : meta.color)} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-[12px] font-medium text-foreground truncate">
+          <span className="text-[13px] font-medium text-foreground truncate">
             {resolvedName}
           </span>
           <Badge
@@ -327,79 +333,71 @@ function MessagingConnectionRow({
           <span
             className={cn("inline-block size-1.5 rounded-full", statusDot)}
           />
-          <span className="text-[11px] text-muted-foreground/70">
+          <span className={cn(
+            "font-mono text-[10px] uppercase tracking-wider",
+            isPending ? "font-semibold text-amber-400/80" : "text-muted-foreground/60",
+          )}>
             {statusLabel}
           </span>
+          {isPending && (
+            <span className="text-[11px] text-muted-foreground/50">
+              {isWhatsApp ? "— scan QR to link" : "— finish setup to activate"}
+            </span>
+          )}
         </div>
-        {isPending && isWhatsApp && (
-          <p className="mt-1 text-[11px] text-amber-400/80">
-            Scan QR code to link your WhatsApp account
-          </p>
-        )}
-        {isPending && !isWhatsApp && (
-          <p className="mt-1 text-[11px] text-amber-400/80">
-            Complete the setup to activate this connection
-          </p>
-        )}
       </div>
-      {(connection.type === "telegram" || connection.type === "whatsapp") ? (
+      <div className="flex items-center gap-1">
+        {(connection.type === "telegram" || connection.type === "whatsapp") ? (
+          <Button
+            type="button"
+            variant={isPending ? "outline" : "ghost"}
+            size="sm"
+            aria-label={isPending ? "Complete setup" : "Connection details"}
+            className={cn(
+              "h-7 rounded-md px-2.5 text-[11px]",
+              isPending
+                ? "border-amber-400/30 text-amber-400 hover:bg-amber-400/8 hover:text-amber-300"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect();
+            }}
+          >
+            {isPending ? (
+              <>
+                <PlayIcon className="size-3" />
+                <span>Complete Setup</span>
+              </>
+            ) : (
+              <>
+                <SettingsIcon className="size-3" />
+                <span>Details</span>
+              </>
+            )}
+          </Button>
+        ) : null}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              aria-label={isPending ? "Complete setup" : "Connection details"}
-              className={cn(
-                "h-8 rounded-md px-2.5 text-[11px]",
-                isPending
-                  ? "text-amber-400 hover:bg-amber-400/8 hover:text-amber-300"
-                  : "text-primary hover:bg-primary/8 hover:text-primary",
-              )}
+              aria-label="Remove connection"
+              className="h-7 rounded-md px-2 text-[11px] text-muted-foreground/40 hover:bg-destructive/8 hover:text-destructive"
               onClick={(e) => {
                 e.stopPropagation();
-                onSelect();
+                void onDelete(connection.connectionId);
               }}
             >
-              {isPending ? (
-                <>
-                  <PlayIcon className="size-3" />
-                  <span>Complete Setup</span>
-                </>
-              ) : (
-                <>
-                  <SettingsIcon className="size-3" />
-                  <span>Details</span>
-                </>
-              )}
+              <Trash2Icon className="size-3" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="px-2 py-1 text-xs">
-            {isPending ? "Complete connection setup" : "Connection details"}
+            Remove connection
           </TooltipContent>
         </Tooltip>
-      ) : null}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label="Remove connection"
-            className="h-8 rounded-md px-2.5 text-[11px] text-destructive hover:bg-destructive/8 hover:text-destructive"
-            onClick={(e) => {
-              e.stopPropagation();
-              void onDelete(connection.connectionId);
-            }}
-          >
-            <Trash2Icon className="size-3" />
-            <span>Remove</span>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="px-2 py-1 text-xs">
-          Remove connection
-        </TooltipContent>
-      </Tooltip>
+      </div>
     </div>
   );
 }
