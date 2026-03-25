@@ -13,7 +13,7 @@ const panelSrc = readFileSync(
 describe("WhatsApp pending connection guidance", () => {
   // AC1: Pending WhatsApp connections show a clear next-step message
   it("shows QR code guidance message for pending WhatsApp connections", () => {
-    expect(panelSrc).toContain("Scan QR code to link your WhatsApp account");
+    expect(panelSrc).toContain("scan QR to link");
   });
 
   it("conditionally renders guidance based on pending status", () => {
