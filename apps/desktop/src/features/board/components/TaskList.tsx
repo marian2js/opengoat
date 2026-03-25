@@ -89,7 +89,18 @@ interface GroupHeaderProps {
   onToggle: () => void;
 }
 
+const GROUP_DOT_COLOR: Record<string, string> = {
+  "in progress": "bg-primary",
+  doing: "bg-primary",
+  todo: "bg-muted-foreground/40",
+  pending: "bg-warning dark:bg-yellow-400",
+  blocked: "bg-destructive dark:bg-red-400",
+  done: "bg-success dark:bg-green-400",
+};
+
 function GroupHeader({ label, count, isExpanded, onToggle }: GroupHeaderProps) {
+  const dotColor = GROUP_DOT_COLOR[label.toLowerCase()] ?? "bg-muted-foreground/40";
+
   return (
     <TableRow
       className="cursor-pointer border-t border-border/40 bg-muted/20 transition-colors hover:bg-muted/40"
@@ -102,6 +113,7 @@ function GroupHeader({ label, count, isExpanded, onToggle }: GroupHeaderProps) {
           ) : (
             <ChevronRightIcon className="size-3.5 text-muted-foreground/60" />
           )}
+          <span className={`size-2 shrink-0 rounded-full ${dotColor}`} />
           <span className="font-mono text-[11px] font-medium uppercase tracking-wider text-foreground/80">
             {label}
           </span>
