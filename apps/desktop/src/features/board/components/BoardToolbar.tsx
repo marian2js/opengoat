@@ -74,24 +74,21 @@ export function BoardToolbar({
     <div className="flex flex-col gap-2">
       {/* Single row: status tabs + search + controls */}
       <div className="flex items-center gap-3">
-        {/* Status filter tabs */}
-        <div className="flex items-center">
+        {/* Status filter tabs — pill-style active state */}
+        <div className="flex items-center gap-0.5">
           {FILTER_OPTIONS.map((option) => (
             <button
               key={option.value}
               type="button"
               onClick={() => onFilterChange(option.value)}
               aria-pressed={filter === option.value}
-              className={`relative px-3 py-1.5 text-[13px] font-medium transition-colors ${
+              className={`rounded-md px-2.5 py-1 text-[13px] font-medium transition-all ${
                 filter === option.value
-                  ? "text-foreground"
-                  : "text-muted-foreground/60 hover:text-muted-foreground"
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground/60 hover:bg-muted/60 hover:text-muted-foreground"
               }`}
             >
               {option.label}
-              {filter === option.value && (
-                <span className="absolute inset-x-2 -bottom-[9px] h-[2px] rounded-full bg-primary" />
-              )}
             </button>
           ))}
         </div>
