@@ -69,7 +69,7 @@ import {
 } from "@/components/ui/sidebar";
 
 
-const MAX_VISIBLE_TODAY = 5;
+const MAX_VISIBLE = 5;
 
 interface AppSidebarProps {
   activeAgentId?: string | undefined;
@@ -108,7 +108,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showAllToday, setShowAllToday] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const allSessions = sessions ?? [];
   const filteredSessions = useMemo(() => {
     if (!searchQuery.trim()) return allSessions;
@@ -315,8 +315,9 @@ export function AppSidebar({
                           <CollapsibleContent>
                             <ul role="group" className="flex flex-col">
                               {(() => {
-                                const isTodayCapped = group.label === "Today" && !showAllToday && group.sessions.length > MAX_VISIBLE_TODAY;
-                                const visibleSessions = isTodayCapped ? group.sessions.slice(0, MAX_VISIBLE_TODAY) : group.sessions;
+                                const isGroupExpanded = expandedGroups.has(group.label);
+                                const isCapped = !isGroupExpanded && group.sessions.length > MAX_VISIBLE;
+                                const visibleSessions = isCapped ? group.sessions.slice(0, MAX_VISIBLE) : group.sessions;
                                 const hiddenCount = group.sessions.length - visibleSessions.length;
                                 // Detect duplicate labels within this group
                                 const labelCounts = new Map<string, number>();
@@ -362,10 +363,21 @@ export function AppSidebar({
                                       <li className="px-3 py-1.5">
                                         <button
                                           type="button"
-                                          onClick={() => setShowAllToday(true)}
+                                          onClick={() => setExpandedGroups((prev) => { const next = new Set(prev); next.add(group.label); return next; })}
                                           className="text-[11px] text-sidebar-foreground/50 hover:text-sidebar-foreground/80 transition-colors"
                                         >
                                           Show {hiddenCount} more
+                                        </button>
+                                      </li>
+                                    )}
+                                    {isGroupExpanded && group.sessions.length > MAX_VISIBLE && (
+                                      <li className="px-3 py-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => setExpandedGroups((prev) => { const next = new Set(prev); next.delete(group.label); return next; })}
+                                          className="text-[11px] text-sidebar-foreground/50 hover:text-sidebar-foreground/80 transition-colors"
+                                        >
+                                          Show less
                                         </button>
                                       </li>
                                     )}
