@@ -432,10 +432,10 @@ export function ConnectionCenter({
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-5xl flex-col">
         <header className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-primary">
+            <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.3em] text-primary">
               OpenGoat
             </div>
-            <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground lg:text-4xl">
+            <h1 className="mt-4 font-display text-2xl font-bold tracking-tight text-foreground lg:text-4xl">
               {step === "providers"
                 ? "Connect a provider"
                 : step === "website"
@@ -570,7 +570,7 @@ export function ConnectionCenter({
                 <div className="flex items-center gap-3">
                   <ProviderMark provider={selectedProvider} />
                   <div>
-                    <div className="text-xl font-semibold tracking-tight text-foreground">
+                    <div className="font-display text-xl font-bold tracking-tight text-foreground">
                       {formatProviderName(selectedProvider)}
                     </div>
                     <p className="mt-0.5 text-[13px] text-muted-foreground">
@@ -1076,7 +1076,7 @@ function WebsiteUrlStep({
         </div>
 
         <div className="space-y-2">
-          <h2 className="text-[16px] font-semibold tracking-tight text-foreground">
+          <h2 className="font-display text-[16px] font-bold tracking-tight text-foreground">
             What product is this for?
           </h2>
           <p className="text-[13px] leading-6 text-muted-foreground">
