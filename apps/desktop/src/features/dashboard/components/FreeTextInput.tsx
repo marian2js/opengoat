@@ -29,7 +29,7 @@ export function FreeTextInput({ onSubmit }: FreeTextInputProps) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative rounded-xl border border-border/40 bg-card/60 shadow-sm transition-all focus-within:border-primary/40 focus-within:shadow-md focus-within:shadow-primary/5">
       <textarea
         ref={textareaRef}
         value={value}
@@ -42,7 +42,7 @@ export function FreeTextInput({ onSubmit }: FreeTextInputProps) {
         }}
         placeholder="What do you want help with right now?"
         rows={1}
-        className="w-full resize-none rounded-xl border border-border/60 bg-card/80 px-4 py-3.5 pr-12 text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/15 focus:shadow-sm"
+        className="w-full resize-none rounded-xl border-0 bg-transparent px-4 py-3.5 pr-12 text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
       />
       <button
         type="button"

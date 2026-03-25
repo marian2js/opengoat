@@ -66,37 +66,16 @@ export function BoardSummary({ counts, isLoading, isEmpty, activeObjective }: Bo
   }
 
   if (isEmpty) {
-    return (
-      <div className="relative z-10 py-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <ClipboardListIcon className="size-3.5 text-primary" />
-              <h2 className="section-label">Board</h2>
-            </div>
-            <span className="text-xs text-muted-foreground/60">
-              Tasks will appear when created from actions or chat
-            </span>
-          </div>
-          <a
-            href="#board"
-            className="group/link inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
-          >
-            View Board
-            <ArrowRightIcon className="size-3 transition-transform group-hover/link:translate-x-0.5" />
-          </a>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   const pills = getPills(counts);
   const total = counts.open + counts.blocked + counts.pending + counts.done;
 
   return (
-    <div className="relative z-10 py-5">
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
+    <div className="relative z-10 rounded-lg border border-border/30 bg-card/50 px-4 py-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <ClipboardListIcon className="size-3.5 text-primary" />
             <h2 className="section-label">Board</h2>
@@ -104,37 +83,37 @@ export function BoardSummary({ counts, isLoading, isEmpty, activeObjective }: Bo
               {total}
             </span>
           </div>
+          <div className="hidden sm:flex items-center gap-2">
+            {pills.map((pill) => (
+              <span
+                key={pill.label}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-mono text-[10px] font-medium tracking-wider ${pill.className}`}
+              >
+                <span className="tabular-nums">{pill.value}</span>
+                <span>{pill.label}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+        <a
+          href="#board"
+          className="group/link inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+        >
+          View Board
+          <ArrowRightIcon className="size-3 transition-transform group-hover/link:translate-x-0.5" />
+        </a>
+      </div>
+      {activeObjective && (
+        <div className="mt-2 flex items-center gap-2">
+          <TargetIcon className="size-3 text-primary/60" />
           <a
-            href="#board"
-            className="group/link inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+            href={`#board?objective=${activeObjective.objectiveId}`}
+            className="text-xs text-muted-foreground hover:text-primary transition-colors truncate"
           >
-            View Board
-            <ArrowRightIcon className="size-3 transition-transform group-hover/link:translate-x-0.5" />
+            {activeObjective.title}
           </a>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {pills.map((pill) => (
-            <span
-              key={pill.label}
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-medium tracking-wider ${pill.className}`}
-            >
-              <span className="tabular-nums">{pill.value}</span>
-              <span>{pill.label}</span>
-            </span>
-          ))}
-        </div>
-        {activeObjective && (
-          <div className="flex items-center gap-2">
-            <TargetIcon className="size-3 text-primary/60" />
-            <a
-              href={`#board?objective=${activeObjective.objectiveId}`}
-              className="text-xs text-muted-foreground hover:text-primary transition-colors truncate"
-            >
-              {activeObjective.title}
-            </a>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

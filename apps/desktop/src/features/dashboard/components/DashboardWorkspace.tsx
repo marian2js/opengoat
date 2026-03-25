@@ -122,8 +122,8 @@ function DashboardContent({
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
-      {/* ── Company context — always shown ── */}
-      <div className="mb-8 border-b border-border/20 pb-5">
+      {/* ── Company context — compact strip ── */}
+      <div className="mb-5 border-b border-border/20 pb-4">
         <CompanySummary
           data={data}
           domain={domain}
@@ -133,49 +133,53 @@ function DashboardContent({
         />
       </div>
 
+      {/* Free-text input — always the primary entry point */}
+      <div className="mb-5">
+        <FreeTextInput onSubmit={handleFreeTextSubmit} />
+      </div>
+
       {hasActiveWork ? (
         /* ═══════════════════════════════════════════════════════
          * Mode B — Active work exists
          * ═══════════════════════════════════════════════════════ */
         <>
-          {/* Free-text input — always accessible for ad-hoc asks */}
-          <div className="dashboard-section pb-2">
-            <FreeTextInput onSubmit={handleFreeTextSubmit} />
-          </div>
+          {/* Board summary — compact task counts */}
+          {!boardSummary.isLoading && !boardSummary.isEmpty && (
+            <div className="mb-5">
+              <BoardSummary
+                counts={boardSummary.counts}
+                isLoading={boardSummary.isLoading}
+                isEmpty={boardSummary.isEmpty}
+              />
+            </div>
+          )}
 
           {/* Active work — action sessions with continue/review quick actions */}
-          <div className="mb-6">
-            <ActiveWorkSection onContinueSession={onResumeRun} />
-          </div>
+          {actionSessions.hasActiveWork && (
+            <div className="dashboard-section pb-4">
+              <ActiveWorkSection onContinueSession={onResumeRun} />
+            </div>
+          )}
 
           {/* Now working on — latest run + output preview + quick actions */}
-          <div className="mb-6">
-            <NowWorkingOn
-              runs={runsResult.runs}
-              latestArtifact={latestArtifact}
-              onResumeRun={onResumeRun}
-            />
-          </div>
+          {runsResult.runs.length > 0 && (
+            <div className="dashboard-section pb-4">
+              <NowWorkingOn
+                runs={runsResult.runs}
+                latestArtifact={latestArtifact}
+                onResumeRun={onResumeRun}
+              />
+            </div>
+          )}
 
           {/* Compact recent work list */}
-          <div className="dashboard-section">
-            <RecentOutputs
-              agentId={agentId}
-              client={client}
-            />
-          </div>
-
-          {/* Board summary — compact task counts */}
-          <div className="dashboard-section">
-            <BoardSummary
-              counts={boardSummary.counts}
-              isLoading={boardSummary.isLoading}
-              isEmpty={boardSummary.isEmpty}
-            />
-          </div>
+          <RecentOutputs
+            agentId={agentId}
+            client={client}
+          />
 
           {/* Action cards — secondary in Mode B */}
-          <div className="dashboard-section opacity-80">
+          <div className="dashboard-section">
             <ActionCardGrid
               completedActions={completedActions}
               isLoading={isActionLoading}
@@ -189,10 +193,16 @@ function DashboardContent({
          * Mode A — No active work
          * ═══════════════════════════════════════════════════════ */
         <>
-          {/* Free-text input — primary entry point, above the fold */}
-          <div className="dashboard-section pb-2">
-            <FreeTextInput onSubmit={handleFreeTextSubmit} />
-          </div>
+          {/* Board summary — show if tasks exist */}
+          {!boardSummary.isLoading && !boardSummary.isEmpty && (
+            <div className="mb-5">
+              <BoardSummary
+                counts={boardSummary.counts}
+                isLoading={boardSummary.isLoading}
+                isEmpty={boardSummary.isEmpty}
+              />
+            </div>
+          )}
 
           {/* Starter actions — secondary launch point */}
           <div className="dashboard-section">
@@ -217,12 +227,10 @@ function DashboardContent({
           </div>
 
           {/* Recent outputs — optional, only if outputs exist */}
-          <div className="dashboard-section">
-            <RecentOutputs
-              agentId={agentId}
-              client={client}
-            />
-          </div>
+          <RecentOutputs
+            agentId={agentId}
+            client={client}
+          />
         </>
       )}
     </div>
