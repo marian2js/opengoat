@@ -138,6 +138,9 @@ function DashboardContent({
         <FreeTextInput onSubmit={handleFreeTextSubmit} />
       </div>
 
+      {/* Active work — always rendered, component self-manages visibility */}
+      <ActiveWorkSection onContinueSession={onResumeRun} />
+
       {hasActiveWork ? (
         /* ═══════════════════════════════════════════════════════
          * Mode B — Active work exists
@@ -151,13 +154,6 @@ function DashboardContent({
                 isLoading={boardSummary.isLoading}
                 isEmpty={boardSummary.isEmpty}
               />
-            </div>
-          )}
-
-          {/* Active work — action sessions with continue/review quick actions */}
-          {actionSessions.hasActiveWork && (
-            <div className="dashboard-section pb-4">
-              <ActiveWorkSection onContinueSession={onResumeRun} />
             </div>
           )}
 

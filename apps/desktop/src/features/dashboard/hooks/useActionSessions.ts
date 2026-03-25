@@ -37,14 +37,21 @@ export function useActionSessions(): UseActionSessionsResult {
     setRefreshKey((k) => k + 1);
   }, []);
 
-  // Re-read on focus (user may return from action-session view)
+  // Re-read on focus, navigation, and cross-tab storage changes
   useEffect(() => {
-    const onFocus = () => setRefreshKey((k) => k + 1);
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("hashchange", onFocus);
+    const onRefresh = () => setRefreshKey((k) => k + 1);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "opengoat:actionSessionMeta" || e.key === null) {
+        setRefreshKey((k) => k + 1);
+      }
+    };
+    window.addEventListener("focus", onRefresh);
+    window.addEventListener("hashchange", onRefresh);
+    window.addEventListener("storage", onStorage);
     return () => {
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("hashchange", onFocus);
+      window.removeEventListener("focus", onRefresh);
+      window.removeEventListener("hashchange", onRefresh);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 

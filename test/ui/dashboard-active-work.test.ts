@@ -141,7 +141,7 @@ describe("DashboardWorkspace active work integration", () => {
     expect(src).toContain("ActiveWorkSection");
   });
 
-  it("renders ActiveWorkSection in Mode B", () => {
+  it("renders ActiveWorkSection in dashboard", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
     expect(src).toContain("<ActiveWorkSection");
   });
@@ -168,13 +168,13 @@ describe("Mode A stays clean", () => {
     expect(src).toContain("return null");
   });
 
-  it("Mode A does not render ActiveWorkSection", () => {
+  it("ActiveWorkSection renders before Mode A/B split and self-manages visibility", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
-    // ActiveWorkSection should only appear in the hasActiveWork branch
-    // The Mode A section should not contain ActiveWorkSection
-    const modeAComment = "Mode A";
-    const modeBComment = "Mode B";
-    expect(src).toContain(modeAComment);
-    expect(src).toContain(modeBComment);
+    // ActiveWorkSection is rendered outside Mode A/B split — it handles its own visibility
+    const activeWorkPos = src.indexOf("<ActiveWorkSection");
+    const modeSplitPos = src.indexOf("{hasActiveWork ?");
+    expect(activeWorkPos).toBeGreaterThan(-1);
+    expect(modeSplitPos).toBeGreaterThan(-1);
+    expect(activeWorkPos).toBeLessThan(modeSplitPos);
   });
 });

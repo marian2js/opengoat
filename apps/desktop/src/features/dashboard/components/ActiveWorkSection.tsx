@@ -213,7 +213,7 @@ export function ActiveWorkSection({ onContinueSession }: ActiveWorkSectionProps)
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mb-5 space-y-4">
       {/* Now working on — active sessions */}
       {activeSessions.length > 0 && (
         <section>
