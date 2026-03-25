@@ -29,6 +29,7 @@ import {
   resolveDomain as sharedResolveDomain,
   buildFaviconSources as sharedBuildFaviconSources,
 } from "@/lib/utils/favicon";
+import { baseLabel } from "@/lib/utils/base-label";
 import { formatShortTime } from "@/lib/utils/format-short-time";
 import { groupSessionsByDate } from "@/lib/utils/group-sessions-by-date";
 import { simplifyDateGroups } from "@/lib/utils/simplify-date-groups";
@@ -319,10 +320,13 @@ export function AppSidebar({
                                 const isCapped = !isGroupExpanded && group.sessions.length > MAX_VISIBLE;
                                 const visibleSessions = isCapped ? group.sessions.slice(0, MAX_VISIBLE) : group.sessions;
                                 const hiddenCount = group.sessions.length - visibleSessions.length;
-                                // Detect duplicate labels within this group
+                                // Detect duplicate labels within this group —
+                                // strip trailing dedup suffixes like " (16)" so
+                                // "Launch on Product Hunt (15)" and "(16)" are
+                                // recognised as the same base name.
                                 const labelCounts = new Map<string, number>();
                                 for (const s of group.sessions) {
-                                  const l = formatSessionLabel(s);
+                                  const l = baseLabel(formatSessionLabel(s));
                                   labelCounts.set(l, (labelCounts.get(l) ?? 0) + 1);
                                 }
                                 const duplicateLabels = new Set(
@@ -337,7 +341,7 @@ export function AppSidebar({
                                         markActionSession(session.id); // backfill localStorage
                                       }
                                       const label = formatSessionLabel(session);
-                                      const timestamp = duplicateLabels.has(label)
+                                      const timestamp = duplicateLabels.has(baseLabel(label))
                                         ? formatShortTime(session.createdAt)
                                         : undefined;
                                       return (
@@ -653,7 +657,8 @@ function SessionItem({
             : isRecent
               ? "font-medium"
               : "font-normal",
-        )}>{label}{timestamp ? <span className="text-[11px] font-normal text-sidebar-foreground/40"> · {timestamp}</span> : null}</span>
+        )}>{label}</span>
+        {timestamp ? <span className="shrink-0 text-[11px] font-normal text-sidebar-foreground/40"> · {timestamp}</span> : null}
         {badge ? (
           <span className={cn(
             "ml-auto shrink-0 font-mono text-[10px] font-semibold uppercase tracking-wide",
