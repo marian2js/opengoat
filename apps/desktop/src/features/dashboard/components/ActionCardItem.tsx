@@ -45,8 +45,8 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, 
         }
       }}
     >
-      {/* Category accent — thin left border for visual differentiation */}
-      <div className={`absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] ${config.accentColor} ${isCompleted ? "opacity-40" : "opacity-60 group-hover/action:opacity-100"} transition-opacity`} />
+      {/* Category accent — thin left border, emerald on hover */}
+      <div className={`absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] bg-border/40 ${isCompleted ? "bg-primary/30" : "group-hover/action:bg-primary"} transition-colors`} />
       <CardHeader className="flex-1 pl-5">
         <div className="flex items-center gap-2">
           <Badge variant="outline" className={`text-[10px] ${config.className}`}>
