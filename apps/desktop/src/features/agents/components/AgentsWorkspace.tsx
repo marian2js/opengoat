@@ -470,8 +470,8 @@ export function AgentsWorkspace({
 
               return (
                 <div className="border-t border-border/60 px-4 py-5 lg:px-5">
-                  <article className="relative overflow-hidden rounded-xl border border-border/60 bg-card p-6 transition-colors">
-                    <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] bg-primary opacity-60" />
+                  <article className="group/agent relative overflow-hidden rounded-xl border border-border/60 bg-card p-6 transition-colors hover:border-primary/20">
+                    <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] bg-border/40 transition-colors group-hover/agent:bg-primary" />
                     <div className="flex items-start gap-4 pl-1">
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                         <BotIcon className="size-5 text-primary" />
