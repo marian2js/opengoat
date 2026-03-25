@@ -104,7 +104,7 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, 
           </>
         ) : (
           <div className="flex flex-1 items-center justify-between">
-            <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 transition-colors group-hover/action:text-primary">
+            <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 transition-colors group-hover/action:text-primary">
               Run
               <ArrowRightIcon className="size-3 transition-transform group-hover/action:translate-x-0.5" />
             </span>
