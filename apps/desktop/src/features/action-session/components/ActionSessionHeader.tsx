@@ -1,4 +1,4 @@
-import { ClockIcon } from "lucide-react";
+import { ClockIcon, ZapIcon } from "lucide-react";
 import type { ActionSessionState } from "../types";
 
 interface ActionSessionHeaderProps {
@@ -42,16 +42,21 @@ export function ActionSessionHeader({
   const elapsed = useElapsed(startedAt);
 
   return (
-    <div className="flex items-center justify-between border-b border-border/30 px-5 py-3">
+    <div className="flex items-center justify-between border-b border-border/30 px-5 py-3.5">
       <div className="flex items-center gap-3">
-        <h1 className="font-display text-lg font-bold tracking-tight text-foreground">
-          {actionTitle}
-        </h1>
-        <span
-          className={`rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${stateColors[state]}`}
-        >
-          {stateLabels[state]}
-        </span>
+        <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10">
+          <ZapIcon className="size-3.5 text-primary" />
+        </div>
+        <div className="flex items-center gap-2.5">
+          <h1 className="font-display text-[15px] font-bold tracking-tight text-foreground">
+            {actionTitle}
+          </h1>
+          <span
+            className={`rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${stateColors[state]}`}
+          >
+            {stateLabels[state]}
+          </span>
+        </div>
       </div>
       <div className="flex items-center gap-1.5 text-muted-foreground/60">
         <ClockIcon className="size-3" />
