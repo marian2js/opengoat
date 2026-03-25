@@ -27,7 +27,7 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, 
   return (
     <Card
       className={`group/action relative flex flex-col overflow-hidden border transition-all duration-100 ${
-        isHero ? "border-t-2 border-t-primary/40 py-5" : ""
+        isHero ? "py-5" : ""
       } ${
         isLoading
           ? "pointer-events-none border-border/50 bg-card/60 opacity-60"
