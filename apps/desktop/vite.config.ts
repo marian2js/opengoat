@@ -65,6 +65,7 @@ export default defineConfig({
         "/chat": { target: "http://127.0.0.1:19749", changeOrigin: true },
         "/global": { target: "http://127.0.0.1:19749", changeOrigin: true },
         "/memories": { target: "http://127.0.0.1:19749", changeOrigin: true },
+        "/messaging": { target: "http://127.0.0.1:19749", changeOrigin: true },
         "/objectives": { target: "http://127.0.0.1:19749", changeOrigin: true },
         "/playbooks": { target: "http://127.0.0.1:19749", changeOrigin: true },
         "/runs": { target: "http://127.0.0.1:19749", changeOrigin: true },
