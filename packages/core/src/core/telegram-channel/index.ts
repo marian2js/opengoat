@@ -1,5 +1,6 @@
 export { TelegramChannelService } from "./application/telegram-channel.service.js";
 export type { WebhookResult } from "./application/telegram-channel.service.js";
+export { formatForTelegram } from "./application/telegram-format-converter.js";
 export type {
   TelegramConnectionConfig,
   TelegramChannelDeps,

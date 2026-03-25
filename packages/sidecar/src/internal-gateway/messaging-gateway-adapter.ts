@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { GatewayPort } from "@opengoat/core";
+import { getChannelPrompt, type ChannelType } from "@opengoat/core";
 import type { EmbeddedGatewayClient } from "./gateway-client.ts";
 
 export class MessagingGatewayAdapter implements GatewayPort {
@@ -13,11 +14,18 @@ export class MessagingGatewayAdapter implements GatewayPort {
     _projectId: string,
     chatThreadId: string,
     message: string,
+    channelType?: ChannelType,
   ): Promise<string> {
+    let text = message;
+    if (channelType) {
+      const channelPrompt = getChannelPrompt(channelType);
+      text = `${channelPrompt}\n\n${message}`;
+    }
+
     const response = await this.gateway.streamConversation({
       message: {
         id: randomUUID(),
-        parts: [{ type: "text" as const, text: message }],
+        parts: [{ type: "text" as const, text }],
         role: "user" as const,
         createdAt: new Date(),
       },

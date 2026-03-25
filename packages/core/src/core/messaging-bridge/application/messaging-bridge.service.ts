@@ -52,6 +52,7 @@ export class ChatSdkBridgeService {
       threadResult.projectId,
       threadResult.chatThreadId,
       event.text,
+      event.channelType,
     );
 
     await this.routerService.updateLastSeen(paths, threadResult.chatThreadId);

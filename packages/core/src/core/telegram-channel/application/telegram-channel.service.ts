@@ -13,6 +13,7 @@ import {
   FOLLOW_UP_BUTTONS,
   CALLBACK_RESPONSES,
 } from "../domain/telegram-channel.js";
+import { formatForTelegram } from "./telegram-format-converter.js";
 
 interface TelegramChannelServiceDeps {
   connectionService: MessagingConnectionService;
@@ -117,12 +118,14 @@ export class TelegramChannelService {
       senderName,
       text: message.text!,
       timestamp: new Date(message.date * 1000).toISOString(),
+      channelType: "telegram",
     });
 
-    // Send response with follow-up buttons
+    // Format and send response with follow-up buttons
+    const formattedText = formatForTelegram(result.text);
     await this.sendTelegramMessage(botToken, {
       chat_id: chatId,
-      text: result.text,
+      text: formattedText,
       parse_mode: "Markdown",
       reply_markup: FOLLOW_UP_BUTTONS,
     });
@@ -162,15 +165,17 @@ export class TelegramChannelService {
       senderName: callback.from.first_name,
       text: responseText,
       timestamp: new Date().toISOString(),
+      channelType: "telegram",
     });
 
-    // Send the agent response with follow-up buttons
+    // Format and send the agent response with follow-up buttons
+    const formattedText = formatForTelegram(result.text);
     const replyMarkup: TelegramInlineKeyboardMarkup | undefined =
       action === "more" ? undefined : FOLLOW_UP_BUTTONS;
 
     await this.sendTelegramMessage(botToken, {
       chat_id: chatId,
-      text: result.text,
+      text: formattedText,
       parse_mode: "Markdown",
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     });

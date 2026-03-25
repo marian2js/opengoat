@@ -304,6 +304,7 @@ export class WhatsAppChannelService {
         timestamp: new Date(
           (msg.messageTimestamp ?? Date.now() / 1000) * 1000,
         ).toISOString(),
+        channelType: "whatsapp",
       });
 
       // Format and chunk response
