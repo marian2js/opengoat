@@ -15,7 +15,7 @@ export interface UseRecentArtifactsResult {
   isEmpty: boolean;
 }
 
-const MAX_VISIBLE = 8;
+const MAX_VISIBLE = 4;
 
 /** Polling interval for live updates (15 seconds) */
 const POLL_INTERVAL_MS = 15_000;
@@ -106,6 +106,17 @@ function processArtifacts(items: ArtifactRecord[]): {
     }
   }
 
+  // Deduplicate standalone artifacts by type + createdBy (keep most recent)
+  const deduped = new Map<string, ArtifactRecord>();
+  for (const artifact of standaloneList) {
+    const key = `${artifact.type}::${artifact.createdBy ?? "unknown"}`;
+    const existing = deduped.get(key);
+    if (!existing || new Date(artifact.createdAt) > new Date(existing.createdAt)) {
+      deduped.set(key, artifact);
+    }
+  }
+  const dedupedStandalone = Array.from(deduped.values());
+
   // Build bundle groups sorted by most recent artifact
   const groups: BundleGroup[] = Array.from(bundleMap.entries()).map(
     ([id, artifacts]) => ({
@@ -138,7 +149,7 @@ function processArtifacts(items: ArtifactRecord[]): {
       group: g,
       ts: new Date(g.artifacts[0]!.createdAt).getTime(),
     })),
-    ...standaloneList.map((a) => ({
+    ...dedupedStandalone.map((a) => ({
       kind: "standalone" as const,
       artifact: a,
       ts: new Date(a.createdAt).getTime(),
