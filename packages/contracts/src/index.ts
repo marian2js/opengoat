@@ -1113,6 +1113,7 @@ export const specialistAgentSchema = z.object({
   icon: z.string().min(1),
   category: specialistCategorySchema,
   instructionTemplate: z.string().min(1),
+  starterSuggestions: z.array(z.string().min(1)).length(3),
 });
 
 export type SpecialistAgent = z.infer<typeof specialistAgentSchema>;

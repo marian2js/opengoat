@@ -221,10 +221,10 @@ interface ChatWorkspaceProps {
   sessionId?: string | undefined;
 }
 
-const STARTER_PROMPTS: { icon: LucideIcon; text: string }[] = [
-  { icon: TrendingUpIcon, text: "What are the top 3 growth opportunities for my product right now?" },
-  { icon: CalendarIcon, text: "Draft a content calendar for the next two weeks." },
-  { icon: CrosshairIcon, text: "Analyze my competitors and find positioning gaps." },
+const DEFAULT_STARTER_PROMPTS: { icon: LucideIcon; text: string }[] = [
+  { icon: TrendingUpIcon, text: "What's the highest-leverage marketing move for my company right now?" },
+  { icon: CalendarIcon, text: "Which specialist should I start with?" },
+  { icon: CrosshairIcon, text: "Summarize opportunities across all marketing channels." },
 ];
 
 export function ChatWorkspace({
@@ -243,6 +243,16 @@ export function ChatWorkspace({
   pendingHandoffContext,
   sessionId,
 }: ChatWorkspaceProps) {
+  const starterPrompts = useMemo(() => {
+    if (!currentSpecialistId) return DEFAULT_STARTER_PROMPTS;
+    const meta = getSpecialistMeta(currentSpecialistId);
+    if (!meta) return DEFAULT_STARTER_PROMPTS;
+    return meta.starterSuggestions.map((text) => ({
+      icon: SparklesIcon as LucideIcon,
+      text,
+    }));
+  }, [currentSpecialistId]);
+
   const [bootstrap, setBootstrap] = useState<ChatBootstrap | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -660,7 +670,7 @@ function ChatSessionView({
             </div>
 
             <div className="grid w-full gap-2">
-              {STARTER_PROMPTS.map((prompt) => (
+              {starterPrompts.map((prompt) => (
                 <button
                   key={prompt.text}
                   type="button"

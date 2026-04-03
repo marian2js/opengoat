@@ -17,6 +17,11 @@ export const SPECIALIST_ROSTER: readonly SpecialistAgent[] = [
     ],
     icon: "brain",
     category: "manager",
+    starterSuggestions: [
+      "What's the highest-leverage marketing move for my company right now?",
+      "Which specialist should I start with?",
+      "Summarize opportunities across all marketing channels.",
+    ],
     instructionTemplate: `You are the CMO — the top-level marketing lead for this company.
 Your job is to coordinate the specialist team, not to do deep domain work yourself.
 Always ground your advice in the company's shared context (product, market, ICP).
@@ -59,6 +64,11 @@ When producing cross-functional summaries, explicitly name which specialist pers
     ],
     icon: "search",
     category: "specialist",
+    starterSuggestions: [
+      "Map my competitor landscape and find messaging gaps.",
+      "Which communities does my ICP hang out in?",
+      "Analyze customer language from reviews and forums.",
+    ],
     instructionTemplate: `You are the Market Intel specialist — you own competitor, community, and customer-voice research.
 Your job is to surface external insights that the rest of the team can act on.
 Always look for evidence: real quotes, actual competitor copy, specific community threads.
@@ -90,6 +100,11 @@ When launch surfaces are identified, suggest "The Distribution Agent could help 
     ],
     icon: "target",
     category: "specialist",
+    starterSuggestions: [
+      "Sharpen my one-liner to stand out from competitors.",
+      "Write 3 differentiation angles for my ICP.",
+      "Compare my messaging against top competitors.",
+    ],
     instructionTemplate: `You are the Positioning specialist — you own how this company is framed and differentiated.
 Your job is to produce messaging that is specific, sharp, and clearly better than generic descriptions.
 Every one-liner must pass the "would a competitor say this?" test — if yes, it's too generic.
@@ -121,6 +136,11 @@ When outreach angles emerge, suggest "The Outbound Agent could help craft outrea
     ],
     icon: "layout",
     category: "specialist",
+    starterSuggestions: [
+      "Rewrite my homepage hero with 3 variants.",
+      "Audit my site's trust signals and CTAs.",
+      "Identify the top conversion blockers on my site.",
+    ],
     instructionTemplate: `You are the Website Conversion specialist — you own the website's ability to convert.
 Your job is to produce concrete page improvements, not abstract conversion advice.
 Hero rewrites should include headline, subheadline, and CTA — ready to paste in.
@@ -151,6 +171,11 @@ When pages need SEO improvements, suggest "The SEO/AEO Agent could help optimize
     ],
     icon: "globe",
     category: "specialist",
+    starterSuggestions: [
+      "Find my best SEO quick wins by effort vs. impact.",
+      "Which comparison pages should I build?",
+      "How visible is my product in AI answer engines?",
+    ],
     instructionTemplate: `You are the SEO/AEO specialist — you own search and answer-engine visibility.
 Your job is to find the highest-leverage organic opportunities for this specific company.
 SEO opportunities should be prioritized by difficulty vs. traffic potential vs. intent quality.
@@ -181,6 +206,11 @@ When page improvements are needed, suggest "The Website Conversion Agent could h
     ],
     icon: "megaphone",
     category: "specialist",
+    starterSuggestions: [
+      "Create a Product Hunt launch pack.",
+      "Which channels should I prioritize for launch?",
+      "Build a launch sequencing plan.",
+    ],
     instructionTemplate: `You are the Distribution specialist — you own launches, communities, and directories.
 Your job is to produce launch-ready materials and distribution plans, not just advice.
 Product Hunt packs should include tagline options, maker comment, description, and first-comment draft.
@@ -212,6 +242,11 @@ When launch content is needed, suggest "The Content Agent could help produce lau
     ],
     icon: "pen-tool",
     category: "specialist",
+    starterSuggestions: [
+      "Generate 10 founder-led content ideas with hooks.",
+      "Create an editorial brief for my top content angle.",
+      "Build a repurposing plan for one pillar post.",
+    ],
     instructionTemplate: `You are the Content specialist — you own ongoing content production.
 Your job is to produce content that is specific to this company, not generic marketing content.
 Content ideas should come from real company knowledge, customer pain points, and market gaps.
@@ -242,6 +277,11 @@ When content needs distribution planning, suggest "The Distribution Agent could 
     ],
     icon: "send",
     category: "specialist",
+    starterSuggestions: [
+      "Draft a 3-email cold outreach sequence.",
+      "Write subject line variants for my ICP.",
+      "Map my outreach segments to pain points.",
+    ],
     instructionTemplate: `You are the Outbound specialist — you own direct outreach and messaging sequences.
 Your job is to produce outreach that feels personal and relevant, not mass-market spam.
 Cold email sequences should be 3-5 emails with specific spacing and escalation logic.
