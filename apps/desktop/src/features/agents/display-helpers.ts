@@ -6,6 +6,13 @@ export function formatAgentCount(count: number): string {
 }
 
 /**
+ * Returns a properly pluralized task count string.
+ */
+export function formatTaskCount(count: number): string {
+  return `${count} ${count === 1 ? "task" : "tasks"}`;
+}
+
+/**
  * Auth-action phrases → clean provider display names.
  */
 const PROVIDER_NAME_MAP: Record<string, string> = {

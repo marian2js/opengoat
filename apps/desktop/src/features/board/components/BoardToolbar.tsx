@@ -127,8 +127,8 @@ export function BoardToolbar({
         <div className="flex items-center gap-1.5">
           <span className="mr-1 font-mono text-[11px] tabular-nums text-muted-foreground/50">
             {filteredCount === totalCount
-              ? `${totalCount} tasks`
-              : `${filteredCount} of ${totalCount} tasks`}
+              ? `${totalCount} ${totalCount === 1 ? 'task' : 'tasks'}`
+              : `${filteredCount} of ${totalCount} ${totalCount === 1 ? 'task' : 'tasks'}`}
           </span>
 
           {/* Advanced filters toggle */}

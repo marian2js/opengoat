@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, BrainIcon } from "lucide-react";
 
 export interface FreeTextInputProps {
   onSubmit: (text: string) => void;
@@ -30,6 +30,13 @@ export function FreeTextInput({ onSubmit }: FreeTextInputProps) {
 
   return (
     <div className="relative rounded-xl border border-border/40 bg-card shadow-sm transition-all duration-150 focus-within:border-primary/30 focus-within:shadow-md focus-within:shadow-primary/5 dark:border-white/[0.08] dark:bg-[#18181B] dark:shadow-md">
+      {/* CMO routing indicator */}
+      <div className="flex items-center gap-1.5 px-5 pt-3 pb-0">
+        <div className="flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5">
+          <BrainIcon className="size-3 text-primary" />
+          <span className="text-[11px] font-medium text-primary">CMO</span>
+        </div>
+      </div>
       <textarea
         ref={textareaRef}
         value={value}
@@ -40,9 +47,9 @@ export function FreeTextInput({ onSubmit }: FreeTextInputProps) {
             handleSubmit();
           }
         }}
-        placeholder="What do you want help with right now?"
+        placeholder="Ask CMO — What do you want help with right now?"
         rows={1}
-        className="w-full resize-none rounded-xl border-0 bg-transparent px-5 py-4 pr-14 text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+        className="w-full resize-none rounded-xl border-0 bg-transparent px-5 pt-2 pb-4 pr-14 text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
       />
       <button
         type="button"

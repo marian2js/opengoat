@@ -99,7 +99,7 @@ export function ActiveObjectiveSection({
             <div className="flex items-center gap-1.5">
               <ClipboardListIcon className="size-3 text-muted-foreground/50" />
               <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-                {openTaskCount} tasks
+                {openTaskCount} {openTaskCount === 1 ? 'task' : 'tasks'}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
