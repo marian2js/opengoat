@@ -5,17 +5,29 @@ import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
 
 export interface ArtifactCardProps {
   artifact: ArtifactRecord;
+  specialistName?: string;
   onPreview?: (artifactId: string) => void;
+  onNavigate?: (artifact: ArtifactRecord) => void;
   compact?: boolean;
 }
 
-export function ArtifactCard({ artifact, onPreview, compact }: ArtifactCardProps) {
+export function ArtifactCard({ artifact, specialistName, onPreview, onNavigate, compact }: ArtifactCardProps) {
   const typeConfig = getArtifactTypeConfig(artifact.type);
   const statusConfig = getArtifactStatusConfig(artifact.status);
 
+  const handleClick = () => {
+    if (onNavigate) {
+      onNavigate(artifact);
+    }
+  };
+
   return (
     <div
-      className={`group/artifact relative rounded-lg border transition-all duration-100 hover:-translate-y-px hover:border-primary/30 hover:shadow-sm ${compact ? "p-2" : "p-3"}`}
+      role={onNavigate ? "button" : undefined}
+      tabIndex={onNavigate ? 0 : undefined}
+      onClick={onNavigate ? handleClick : undefined}
+      onKeyDown={onNavigate ? (e) => { if (e.key === "Enter" || e.key === " ") handleClick(); } : undefined}
+      className={`group/artifact relative rounded-lg border transition-all duration-100 hover:-translate-y-px hover:border-primary/30 hover:shadow-sm ${onNavigate ? "cursor-pointer" : ""} ${compact ? "p-2" : "p-3"}`}
     >
       {/* Left accent bar */}
       <div
@@ -23,7 +35,7 @@ export function ArtifactCard({ artifact, onPreview, compact }: ArtifactCardProps
       />
 
       <div className="pl-3">
-        {/* Top row: type badge + status badge */}
+        {/* Top row: type badge + status badge + specialist attribution */}
         <div className="mb-1.5 flex items-center gap-2">
           <span
             className={`inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider ${typeConfig.badgeClassName}`}
@@ -38,6 +50,11 @@ export function ArtifactCard({ artifact, onPreview, compact }: ArtifactCardProps
             />
             {statusConfig.label}
           </span>
+          {specialistName ? (
+            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary/8 px-2 py-0.5 font-mono text-[10px] font-medium text-primary">
+              {specialistName}
+            </span>
+          ) : null}
         </div>
 
         {/* Title */}
@@ -61,12 +78,17 @@ export function ArtifactCard({ artifact, onPreview, compact }: ArtifactCardProps
           {onPreview ? (
             <button
               type="button"
-              onClick={() => onPreview(artifact.artifactId)}
+              onClick={(e) => { e.stopPropagation(); onPreview(artifact.artifactId); }}
               className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-primary opacity-0 transition-all hover:text-primary/80 group-hover/artifact:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
             >
               View output
               <ArrowRightIcon className="size-3 transition-transform group-hover/artifact:translate-x-0.5" />
             </button>
+          ) : onNavigate ? (
+            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-primary opacity-0 transition-all group-hover/artifact:opacity-100">
+              Open
+              <ArrowRightIcon className="size-3 transition-transform group-hover/artifact:translate-x-0.5" />
+            </span>
           ) : null}
         </div>
       </div>

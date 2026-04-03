@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { ChevronRightIcon, PackageIcon } from "lucide-react";
+import type { ArtifactRecord } from "@opengoat/contracts";
 import type { BundleGroup } from "@/features/dashboard/hooks/useRecentArtifacts";
 import { ArtifactCard } from "@/features/dashboard/components/ArtifactCard";
 import { getArtifactStatusConfig } from "@/features/dashboard/lib/artifact-type-config";
 
 export interface BundleCardProps {
   bundle: BundleGroup;
+  specialistName?: string;
   onPreview?: (artifactId: string) => void;
+  onNavigate?: (artifact: ArtifactRecord) => void;
 }
 
-export function BundleCard({ bundle, onPreview }: BundleCardProps) {
+export function BundleCard({ bundle, specialistName, onPreview, onNavigate }: BundleCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   // Compute status summary counts
@@ -45,6 +48,13 @@ export function BundleCard({ bundle, onPreview }: BundleCardProps) {
           {bundle.artifacts.length} output{bundle.artifacts.length !== 1 ? "s" : ""}
         </span>
 
+        {/* Specialist attribution */}
+        {specialistName ? (
+          <span className="shrink-0 rounded-full bg-primary/8 px-2 py-0.5 font-mono text-[10px] font-medium text-primary">
+            {specialistName}
+          </span>
+        ) : null}
+
         {/* Status summary pills */}
         <div className="hidden items-center gap-1.5 sm:flex">
           {Array.from(statusCounts.entries()).map(([status, count]) => {
@@ -69,7 +79,9 @@ export function BundleCard({ bundle, onPreview }: BundleCardProps) {
             <ArtifactCard
               key={artifact.artifactId}
               artifact={artifact}
+              specialistName={specialistName}
               onPreview={onPreview}
+              onNavigate={onNavigate}
               compact
             />
           ))}

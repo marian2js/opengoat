@@ -1,7 +1,9 @@
 import { LayoutDashboardIcon } from "lucide-react";
-import type { AgentSession } from "@opengoat/contracts";
+import type { AgentSession, ArtifactRecord } from "@opengoat/contracts";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
+import { getActionMapping } from "@/lib/utils/action-map";
+import { isActionSession } from "@/features/chat/components/ChatWorkspace";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
 import { ActiveWorkSection } from "@/features/dashboard/components/ActiveWorkSection";
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
@@ -128,6 +130,31 @@ function DashboardContent({
     window.location.hash = `#chat?specialist=${specialistId}`;
   }
 
+  // Navigate to the session that produced an artifact output
+  function handleOutputNavigate(artifact: ArtifactRecord) {
+    // Try to find the session via the run ID mapping
+    if (artifact.runId) {
+      const sessionId = getActionMapping(artifact.runId);
+      if (sessionId) {
+        if (isActionSession(sessionId)) {
+          window.location.hash = "#action-session";
+        } else {
+          window.location.hash = "#chat";
+        }
+        return;
+      }
+    }
+
+    // Fallback: navigate to specialist chat if createdBy matches a specialist
+    if (artifact.createdBy) {
+      window.location.hash = `#chat?specialist=${encodeURIComponent(artifact.createdBy)}`;
+      return;
+    }
+
+    // Last resort: go to general chat
+    window.location.hash = "#chat";
+  }
+
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
       <div className="mx-auto w-full max-w-[1000px]">
@@ -184,6 +211,7 @@ function DashboardContent({
           <RecentOutputs
             agentId={agentId}
             client={client}
+            onNavigate={handleOutputNavigate}
           />
 
           {/* Action cards — secondary in Mode B */}
@@ -250,6 +278,7 @@ function DashboardContent({
           <RecentOutputs
             agentId={agentId}
             client={client}
+            onNavigate={handleOutputNavigate}
           />
 
           {/* Board summary — bottom, only if tasks exist */}
