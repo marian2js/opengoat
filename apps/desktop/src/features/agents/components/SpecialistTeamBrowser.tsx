@@ -1,17 +1,20 @@
-import type { SpecialistAgent } from "@opengoat/contracts";
+import type { ArtifactRecord, SpecialistAgent } from "@opengoat/contracts";
 import { useEffect, useState } from "react";
 import { AlertCircleIcon, LoaderCircleIcon, UsersIcon } from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { SpecialistCard } from "./SpecialistCard";
+import type { SpecialistLastOutput } from "./SpecialistCard";
 
 interface SpecialistTeamBrowserProps {
   client: SidecarClient | null;
+  agentId?: string;
 }
 
-export function SpecialistTeamBrowser({ client }: SpecialistTeamBrowserProps) {
+export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowserProps) {
   const [specialists, setSpecialists] = useState<SpecialistAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastOutputMap, setLastOutputMap] = useState<Record<string, SpecialistLastOutput>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +56,34 @@ export function SpecialistTeamBrowser({ client }: SpecialistTeamBrowserProps) {
       cancelled = true;
     };
   }, [client]);
+
+  // Fetch recent artifacts and map to specialists by createdBy field
+  useEffect(() => {
+    if (!client || !agentId) return;
+    let cancelled = false;
+
+    client
+      .listArtifacts({ projectId: agentId, limit: 30 })
+      .then((page) => {
+        if (cancelled) return;
+        const map: Record<string, SpecialistLastOutput> = {};
+        for (const artifact of page.items) {
+          const specialistId = artifact.createdBy;
+          if (!map[specialistId]) {
+            map[specialistId] = {
+              title: artifact.title,
+              createdAt: artifact.createdAt,
+            };
+          }
+        }
+        setLastOutputMap(map);
+      })
+      .catch(() => {
+        // Silently ignore — last output is non-critical
+      });
+
+    return () => { cancelled = true; };
+  }, [client, agentId]);
 
   function handleChat(specialistId: string): void {
     window.location.hash = `#chat?specialist=${encodeURIComponent(specialistId)}`;
@@ -109,7 +140,7 @@ export function SpecialistTeamBrowser({ client }: SpecialistTeamBrowserProps) {
           {/* CMO / Manager card — full width hero */}
           {manager ? (
             <div>
-              <SpecialistCard specialist={manager} onChat={handleChat} />
+              <SpecialistCard specialist={manager} onChat={handleChat} lastOutput={lastOutputMap[manager.id]} />
             </div>
           ) : null}
 
@@ -121,6 +152,7 @@ export function SpecialistTeamBrowser({ client }: SpecialistTeamBrowserProps) {
                   key={specialist.id}
                   specialist={specialist}
                   onChat={handleChat}
+                  lastOutput={lastOutputMap[specialist.id]}
                 />
               ))}
             </div>

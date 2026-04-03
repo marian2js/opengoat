@@ -22,6 +22,7 @@ import { getActionSessionMeta } from "@/features/action-session/lib/action-sessi
 import { isLikelyActionSession, markActionSession } from "@/features/chat/components/ChatWorkspace";
 import {
   brainNavigation,
+  demotedNavigation,
   primaryNavigation,
   secondaryNavigation,
 } from "@/app/config/navigation";
@@ -193,6 +194,23 @@ export function AppSidebar({
                         }
                       }}
                     >
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+
+              {/* Board — demoted, visually subdued */}
+              {demotedNavigation.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={item.title}
+                    isActive={item.href.slice(1) === activeView}
+                    className="text-muted-foreground/70"
+                  >
+                    <a href={item.href}>
                       <item.icon />
                       <span>{item.title}</span>
                     </a>

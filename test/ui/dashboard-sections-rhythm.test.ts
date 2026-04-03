@@ -86,8 +86,9 @@ describe("Dashboard sections rhythm — visual separation and spacing", () => {
       expect(suggestedSrc).toContain("section-label");
     });
 
-    it("BoardSummary uses section-label class", () => {
-      expect(boardSummarySrc).toContain("section-label");
+    it("BoardSummary is a compact strip (no section-label needed)", () => {
+      // BoardSummary is now a minimal count-only strip, not a full section
+      expect(boardSummarySrc).toContain("Board");
     });
   });
 });

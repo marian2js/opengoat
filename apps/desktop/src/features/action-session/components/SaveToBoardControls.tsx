@@ -25,7 +25,7 @@ export function SaveToBoardControls({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    () => new Set(outputs.map((o) => o.id)),
+    () => new Set(),
   );
 
   function toggleOutput(id: string) {
@@ -78,14 +78,17 @@ export function SaveToBoardControls({
 
   return (
     <div className="mx-5 rounded-lg border border-primary/20 bg-primary/5 p-4">
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-1.5 flex items-center gap-2">
         <CheckCircleIcon className="size-4 text-primary" />
         <p className="text-sm font-medium text-foreground">
-          This work is ready. Save to Board?
+          Any concrete follow-up work? Save action items to Board.
         </p>
       </div>
+      <p className="mb-3 text-[12px] leading-relaxed text-muted-foreground">
+        Board is for human follow-up tasks — implementation steps, external blockers, things to revisit. Agent insights and strategy live in your chat history.
+      </p>
 
-      {/* Output checklist */}
+      {/* Output checklist — unchecked by default, opt-in */}
       <div className="mb-4 space-y-2">
         {outputs.map((output) => (
           <label

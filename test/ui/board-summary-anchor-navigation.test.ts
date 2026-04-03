@@ -11,7 +11,7 @@ const boardSummarySrc = readFileSync(
 );
 
 describe("View Board anchor navigation — Dashboard → Board", () => {
-  // AC1: Clicking "View Board" navigates to Board page via native hash link
+  // AC1: Clicking "View" navigates to Board page via native hash link
   it("uses anchor elements with href='#board' instead of button elements", () => {
     expect(boardSummarySrc).toContain('href="#board"');
     expect(boardSummarySrc).not.toContain('type="button"');
@@ -26,11 +26,11 @@ describe("View Board anchor navigation — Dashboard → Board", () => {
     expect(afterIsEmpty).toContain("return null");
   });
 
-  it("has anchor link in the populated state View Board", () => {
-    const afterPills = boardSummarySrc.split(/const pills/)[1];
-    expect(afterPills).toBeTruthy();
-    expect(afterPills).toContain('href="#board"');
-    expect(afterPills).toContain("View Board");
+  it("has anchor link in the populated state", () => {
+    const afterTotal = boardSummarySrc.split(/const total/)[1];
+    expect(afterTotal).toBeTruthy();
+    expect(afterTotal).toContain('href="#board"');
+    expect(afterTotal).toContain("View");
   });
 
   // The component should not rely on onClick callback for navigation
@@ -45,10 +45,10 @@ describe("View Board anchor navigation — Dashboard → Board", () => {
     expect(boardSummarySrc).not.toContain("AppSidebar");
   });
 
-  // Uses native <a> tags for the View Board link + optional active objective link
-  it("renders anchor elements for View Board and active objective", () => {
+  // Uses native <a> tag for the View link (compact: no active objective link)
+  it("renders an anchor element for View link", () => {
     const anchorMatches = boardSummarySrc.match(/<a\s/g);
     expect(anchorMatches).not.toBeNull();
-    expect(anchorMatches!.length).toBe(2); // 1 View Board + 1 active objective
+    expect(anchorMatches!.length).toBe(1);
   });
 });

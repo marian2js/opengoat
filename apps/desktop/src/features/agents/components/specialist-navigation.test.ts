@@ -40,24 +40,25 @@ void test("Agents is NOT in secondaryNavigation array", () => {
 // AC: Nav order is Dashboard, Agents, Chat, Board per spec Section 10.1
 // ---------------------------------------------------------------------------
 
-void test("Primary nav order is Dashboard, Agents, Chat, Board", () => {
+void test("Primary nav order is Dashboard, Agents, Chat (Board demoted)", () => {
   const primaryBlock = src.slice(
     src.indexOf("primaryNavigation"),
-    src.indexOf("brainNavigation"),
+    src.indexOf("demotedNavigation"),
   );
   const dashboardIdx = primaryBlock.indexOf('"Dashboard"');
   const agentsIdx = primaryBlock.indexOf('"Agents"');
   const chatIdx = primaryBlock.indexOf('"Chat"');
-  const boardIdx = primaryBlock.indexOf('"Board"');
 
   assert.ok(dashboardIdx >= 0, "Dashboard must be in primary nav");
   assert.ok(agentsIdx >= 0, "Agents must be in primary nav");
   assert.ok(chatIdx >= 0, "Chat must be in primary nav");
-  assert.ok(boardIdx >= 0, "Board must be in primary nav");
 
   assert.ok(dashboardIdx < agentsIdx, "Dashboard must come before Agents");
   assert.ok(agentsIdx < chatIdx, "Agents must come before Chat");
-  assert.ok(chatIdx < boardIdx, "Chat must come before Board");
+
+  // Board is demoted — not in primaryNavigation
+  const boardIdx = primaryBlock.indexOf('"Board"');
+  assert.ok(boardIdx < 0, "Board must NOT be in primary nav");
 });
 
 // ---------------------------------------------------------------------------

@@ -10,30 +10,21 @@ const boardSummarySrc = readFileSync(
   "utf-8",
 );
 
-describe("Dashboard Board Summary – pill colors and empty state polish", () => {
-  // AC1: Status pills have visually distinct colors (no two pills share the same color)
-  describe("Pill color distinctness", () => {
-    it("does not have an 'In Progress' pill (removed as redundant)", () => {
-      // "In Progress" is a subset of "Open" — showing both is confusing in a summary
-      expect(boardSummarySrc).not.toContain('"In Progress"');
+describe("Dashboard Board Summary – compact count-only strip", () => {
+  // Board summary is now a minimal inline strip (no pills, no active objective)
+  describe("Compact layout", () => {
+    it("shows a total count", () => {
+      expect(boardSummarySrc).toContain("total");
     });
 
-    it("each remaining pill has a unique color class", () => {
-      // Extract all className strings from pill definitions
-      const classMatches = boardSummarySrc.match(
-        /className:\s*"(bg-[^"]+)"/g,
-      );
-      expect(classMatches).toBeTruthy();
-      const classNames = classMatches!.map((m) =>
-        m.replace(/className:\s*"/, "").replace(/"$/, ""),
-      );
-      // All pill classNames should be unique (no two pills share the same color)
-      const uniqueClassNames = new Set(classNames);
-      expect(uniqueClassNames.size).toBe(classNames.length);
+    it("does not show per-status pills", () => {
+      expect(boardSummarySrc).not.toContain("getPills");
+      expect(boardSummarySrc).not.toContain('"OPEN"');
+      expect(boardSummarySrc).not.toContain('"BLOCKED"');
     });
   });
 
-  // AC2: Empty state returns null — hidden per spec (no empty sections on dashboard)
+  // Empty state returns null — hidden per spec (no empty sections on dashboard)
   describe("Empty state behavior", () => {
     it("returns null when empty to avoid showing empty sections", () => {
       const afterIsEmpty = boardSummarySrc.split(/if\s*\(isEmpty\)/)[1];
@@ -42,10 +33,11 @@ describe("Dashboard Board Summary – pill colors and empty state polish", () =>
     });
   });
 
-  // AC3: Populated state has View Board link
+  // Populated state has View link
   describe("Populated state", () => {
-    it("shows a View Board link in the populated state", () => {
-      expect(boardSummarySrc).toContain("View Board");
+    it("shows a View link to the board", () => {
+      expect(boardSummarySrc).toContain("View");
+      expect(boardSummarySrc).toContain("#board");
     });
 
     it("has an ArrowRightIcon for the link", () => {

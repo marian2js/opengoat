@@ -620,6 +620,7 @@ export function App() {
           ) : (
             <SpecialistTeamBrowser
               client={client}
+              agentId={activeAgentId}
             />
           )}
         </div>

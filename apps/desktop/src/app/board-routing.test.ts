@@ -68,23 +68,25 @@ test("readViewFromHash: all known views resolve correctly", () => {
 // Tests: Navigation config ordering
 // ---------------------------------------------------------------------------
 
-test("primaryNavigation includes Board after Chat (order: Dashboard, Agents, Chat, Board)", async () => {
-  const { primaryNavigation } = await import("../app/config/navigation.ts");
-  const titles = primaryNavigation.map((item) => item.title);
-  assert.deepEqual(titles, ["Dashboard", "Agents", "Chat", "Board"]);
+test("Board is demoted from primaryNavigation to demotedNavigation", async () => {
+  const { primaryNavigation, demotedNavigation } = await import("../app/config/navigation.ts");
+  const primaryTitles = primaryNavigation.map((item) => item.title);
+  assert.deepEqual(primaryTitles, ["Dashboard", "Agents", "Chat"]);
+  const demotedTitles = demotedNavigation.map((item) => item.title);
+  assert.ok(demotedTitles.includes("Board"), "Board should be in demotedNavigation");
 });
 
-test("Board nav item has correct href", async () => {
-  const { primaryNavigation } = await import("../app/config/navigation.ts");
-  const boardItem = primaryNavigation.find((item) => item.title === "Board");
-  assert.ok(boardItem, "Board item should exist in primaryNavigation");
+test("Board nav item has correct href in demotedNavigation", async () => {
+  const { demotedNavigation } = await import("../app/config/navigation.ts");
+  const boardItem = demotedNavigation.find((item) => item.title === "Board");
+  assert.ok(boardItem, "Board item should exist in demotedNavigation");
   assert.equal(boardItem.href, "#board");
 });
 
-test("Board nav item has an icon", async () => {
-  const { primaryNavigation } = await import("../app/config/navigation.ts");
-  const boardItem = primaryNavigation.find((item) => item.title === "Board");
-  assert.ok(boardItem, "Board item should exist in primaryNavigation");
+test("Board nav item has an icon in demotedNavigation", async () => {
+  const { demotedNavigation } = await import("../app/config/navigation.ts");
+  const boardItem = demotedNavigation.find((item) => item.title === "Board");
+  assert.ok(boardItem, "Board item should exist in demotedNavigation");
   assert.ok(typeof boardItem.icon === "function" || typeof boardItem.icon === "object", "Board item should have an icon");
 });
 

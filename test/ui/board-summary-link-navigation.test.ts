@@ -23,11 +23,11 @@ describe("View Board link navigation — Dashboard → Board", () => {
     expect(afterIsEmpty).toContain("return null");
   });
 
-  it("has anchor link in the populated state View Board", () => {
-    const afterPills = boardSummarySrc.split(/const pills/)[1];
-    expect(afterPills).toBeTruthy();
-    expect(afterPills).toContain('href="#board"');
-    expect(afterPills).toContain("View Board");
+  it("has anchor link in the populated state", () => {
+    const afterTotal = boardSummarySrc.split(/const total/)[1];
+    expect(afterTotal).toBeTruthy();
+    expect(afterTotal).toContain('href="#board"');
+    expect(afterTotal).toContain("View");
   });
 
   // Does not use window.location.hash directly

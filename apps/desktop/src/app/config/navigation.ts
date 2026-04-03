@@ -37,6 +37,9 @@ export const primaryNavigation: NavigationItem[] = [
     href: "#chat",
     icon: MessageSquareIcon,
   },
+];
+
+export const demotedNavigation: NavigationItem[] = [
   {
     title: "Board",
     href: "#board",

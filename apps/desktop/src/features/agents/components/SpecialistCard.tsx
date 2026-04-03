@@ -1,15 +1,22 @@
 import type { SpecialistAgent } from "@opengoat/contracts";
-import { MessageSquareIcon } from "lucide-react";
+import { MessageSquareIcon, PackageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { resolveSpecialistIcon } from "@/features/agents/specialist-icons";
+import { humanizeOutputLabel, formatRelativeTime } from "@/lib/utils/output-labels";
+
+export interface SpecialistLastOutput {
+  title: string;
+  createdAt: string;
+}
 
 interface SpecialistCardProps {
   specialist: SpecialistAgent;
   onChat: (specialistId: string) => void;
+  lastOutput?: SpecialistLastOutput | null;
 }
 
-export function SpecialistCard({ specialist, onChat }: SpecialistCardProps) {
+export function SpecialistCard({ specialist, onChat, lastOutput }: SpecialistCardProps) {
   const Icon = resolveSpecialistIcon(specialist.icon);
   const isManager = specialist.category === "manager";
 
@@ -70,6 +77,19 @@ export function SpecialistCard({ specialist, onChat }: SpecialistCardProps) {
           </span>
         ))}
       </div>
+
+      {/* Last output — only shown when available */}
+      {lastOutput ? (
+        <div className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <PackageIcon className="size-3 shrink-0" />
+          <span className="truncate">
+            {humanizeOutputLabel(lastOutput.title)}
+          </span>
+          <span className="shrink-0 text-muted-foreground/60">
+            — {formatRelativeTime(lastOutput.createdAt)}
+          </span>
+        </div>
+      ) : null}
 
       {/* CTA */}
       <div className="mt-4 pt-3 border-t border-border/30">
