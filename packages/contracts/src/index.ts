@@ -481,9 +481,14 @@ export const createTaskFromRunRequestSchema = z.object({
   status: z.string().optional(),
 });
 
+export const setLeadingTaskRequestSchema = z.object({
+  taskId: z.string().min(1),
+});
+
 export type DeleteTasksRequest = z.infer<typeof deleteTasksRequestSchema>;
 export type DeleteTasksResponse = z.infer<typeof deleteTasksResponseSchema>;
 export type CreateTaskFromRunRequest = z.infer<typeof createTaskFromRunRequestSchema>;
+export type SetLeadingTaskRequest = z.infer<typeof setLeadingTaskRequestSchema>;
 
 // --- Playbooks ---
 
@@ -1087,6 +1092,31 @@ export type UpdateMessagingConnectionRequest = z.infer<typeof updateMessagingCon
 export type MessagingThreadLink = z.infer<typeof messagingThreadLinkSchema>;
 export type InboundMessageEvent = z.infer<typeof inboundMessageEventSchema>;
 export type OutboundMessageResult = z.infer<typeof outboundMessageResultSchema>;
+
+// --- Specialist Agents ---
+
+export const specialistCategorySchema = z.enum(["manager", "specialist"]);
+
+export const specialistAgentSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  role: z.string().min(1),
+  description: z.string().min(1),
+  reasonToExist: z.string().min(1),
+  outputTypes: z.array(z.string().min(1)).min(1),
+  icon: z.string().min(1),
+  category: specialistCategorySchema,
+  instructionTemplate: z.string().min(1),
+});
+
+export type SpecialistAgent = z.infer<typeof specialistAgentSchema>;
+export type SpecialistCategory = z.infer<typeof specialistCategorySchema>;
+
+export const specialistRosterSchema = z.object({
+  specialists: z.array(specialistAgentSchema),
+});
+
+export type SpecialistRoster = z.infer<typeof specialistRosterSchema>;
 
 export const appManifest = appManifestSchema.parse(appManifestJson);
 

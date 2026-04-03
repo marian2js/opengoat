@@ -21,6 +21,7 @@ export * from "./core/orchestration/index.js";
 export * from "./core/sessions/index.js";
 export * from "./core/scenarios/index.js";
 export * from "./core/skills/index.js";
+export * from "./core/specialists/specialist-registry.js";
 export * from "./core/playbooks/index.js";
 export * from "./core/messaging-connections/index.js";
 export * from "./core/messaging-router/index.js";

@@ -20,6 +20,7 @@ import {
   createWhatsAppSessionRoutes,
   createWhatsAppQrRoutes,
 } from "./routes/whatsapp-session.ts";
+import { createSpecialistRoutes } from "./routes/specialists.ts";
 import { createWorkspaceSignalRoutes } from "./routes/workspace-signals.ts";
 import type { SidecarRuntime } from "./context.ts";
 
@@ -57,7 +58,7 @@ export function createSidecarApp(runtime: SidecarRuntime): Hono<{
 
         return undefined;
       },
-      allowHeaders: ["Authorization", "Content-Type"],
+      allowHeaders: ["Authorization", "Content-Type", "x-actor-id"],
       allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     }),
   );
@@ -103,6 +104,7 @@ export function createSidecarApp(runtime: SidecarRuntime): Hono<{
     return next();
   });
 
+  app.route("/agents/specialists", createSpecialistRoutes());
   app.route("/agents", createAgentRoutes(runtime));
   app.route("/artifacts", createArtifactRoutes(runtime));
   app.route("/bundles", createBundleRoutes(runtime));
