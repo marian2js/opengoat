@@ -19,6 +19,7 @@ export interface ActionCard {
   description: string;
   icon: LucideIcon;
   category: ActionCategory;
+  specialistId?: string;
   skills: string[];
   persona?: string;
   prompt: string;
@@ -106,6 +107,7 @@ export const starterActions: ActionCard[] = [
       "Creates ready-to-use Product Hunt launch assets including tagline options, description variants, first comment drafts, and maker story angles.",
     icon: RocketIcon,
     category: "distribution",
+    specialistId: "distribution",
     skills: ["launch-strategy"],
     persona: "growth-hacker",
     prompt: `Use the Product Hunt section from launch-strategy — preparation, launch day, post-launch phases — and the case studies (SavvyCal, Reform) to create a complete launch package.
@@ -129,6 +131,7 @@ Produce:
       "Analyzes your current homepage hero section and generates improved headline, subheadline, and CTA variants that better communicate your value proposition.",
     icon: MessageSquareIcon,
     category: "messaging",
+    specialistId: "website-conversion",
     skills: ["copywriting", "page-cro"],
     persona: "brand-guardian",
     prompt: `Use copywriting's headline formulas (outcome-focused, problem-focused, audience-focused, proof-focused) and CTA guidelines. Combine with page-cro's value proposition clarity assessment, CTA hierarchy, and visual hierarchy analysis.
@@ -151,6 +154,7 @@ Produce:
       "Performs a systematic conversion rate optimization analysis across 7 dimensions with prioritized recommendations, copy alternatives, and test ideas.",
     icon: MousePointerClickIcon,
     category: "conversion",
+    specialistId: "website-conversion",
     skills: ["page-cro"],
     persona: "ux-researcher",
     prompt: `Use page-cro's 7-dimension analysis framework: value proposition clarity, headline effectiveness, CTA placement, visual hierarchy, trust signals, objection handling, and friction points. Apply the page-type-specific frameworks (homepage, landing, pricing, feature, blog).
@@ -172,6 +176,7 @@ Produce:
       "Creates a complete cold email outreach sequence using proven copy frameworks, with subject lines, body copy, follow-up timing, and personalization strategies.",
     icon: MailIcon,
     category: "messaging",
+    specialistId: "outbound",
     skills: ["cold-email", "email-sequence"],
     persona: "outbound-strategist",
     prompt: `Use cold-email's 11+ copy frameworks (PAS, BAB, QVC, AIDA, Star-Story-Solution, etc.), subject line patterns, personalization strategies, and follow-up sequences. Combine with email-sequence's timing and automation patterns.
@@ -193,6 +198,7 @@ Produce a 4-5 email sequence with:
       "Performs a focused SEO audit to surface the highest-impact quick wins: technical fixes, on-page improvements, and content opportunities you can act on this week.",
     icon: GlobeIcon,
     category: "seo",
+    specialistId: "seo-aeo",
     skills: ["seo-audit", "content-strategy"],
     persona: "seo-specialist",
     prompt: `Use seo-audit's framework to surface only quick wins — changes that can be implemented this week with high expected impact. Focus on: crawlability issues, missing meta tags, thin content, internal linking gaps, and low-hanging keyword opportunities. Combine with content-strategy's prioritization scoring.
@@ -213,6 +219,7 @@ Produce:
       "Performs a structured analysis of competitor positioning and creates an outline for a comparison page that highlights your differentiation.",
     icon: SearchIcon,
     category: "research",
+    specialistId: "seo-aeo",
     skills: ["competitor-alternatives", "marketing-psychology"],
     persona: "brand-guardian",
     prompt: `Use competitor-alternatives' 4 comparison page formats (alternative, alternatives, vs, competitor-vs-competitor) and content architecture. Apply marketing-psychology's behavioral science frameworks and mental models.
@@ -235,6 +242,7 @@ Produce:
       "Produces specific, ranked content ideas for founder-led marketing — LinkedIn posts, Twitter threads, blog topics, and newsletter angles tailored to your positioning.",
     icon: LightbulbIcon,
     category: "growth",
+    specialistId: "content",
     skills: ["content-strategy", "marketing-ideas"],
     persona: "content-creator",
     prompt: `Use content-strategy's ideation sources (keyword data, call transcripts, forum research, competitor analysis) and prioritization framework. Combine with marketing-ideas' 139 categorized marketing tactics for creative angles.
@@ -259,6 +267,7 @@ Rank by impact. Call out 2-3 "low-effort, high-impact" quick wins.`,
       "Generates lead magnet concepts tailored to your ICP, with positioning rationale, content outlines, and landing page copy angles for each concept.",
     icon: FileTextIcon,
     category: "growth",
+    specialistId: "content",
     skills: ["content-strategy", "page-cro"],
     persona: "growth-hacker",
     prompt: `Use content-strategy's audience-first ideation and page-cro's conversion principles to design lead magnets that attract and qualify your ideal customers.

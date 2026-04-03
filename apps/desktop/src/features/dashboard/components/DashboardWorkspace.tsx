@@ -5,10 +5,12 @@ import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
 import { ActiveWorkSection } from "@/features/dashboard/components/ActiveWorkSection";
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
+import { DashboardAgentRoster } from "@/features/dashboard/components/DashboardAgentRoster";
 import { SuggestedActionGrid } from "@/features/dashboard/components/SuggestedActionGrid";
 import { FreeTextInput } from "@/features/dashboard/components/FreeTextInput";
 import { NowWorkingOn, NowWorkingOnSkeleton } from "@/features/dashboard/components/NowWorkingOn";
 import { RecentOutputs } from "@/features/dashboard/components/RecentOutputs";
+import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
 import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSummary";
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
 import { useBoardSummary } from "@/features/dashboard/hooks/useBoardSummary";
@@ -16,7 +18,7 @@ import { useActiveObjective } from "@/features/dashboard/hooks/useActiveObjectiv
 import { useActionSessions } from "@/features/dashboard/hooks/useActionSessions";
 import { useRuns } from "@/features/dashboard/hooks/useRuns";
 import { useRecentArtifacts } from "@/features/dashboard/hooks/useRecentArtifacts";
-import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
+import { useSpecialistRoster } from "@/features/dashboard/hooks/useSpecialistRoster";
 
 export interface DashboardWorkspaceProps {
   agent?: { id: string; name: string; description?: string | undefined } | undefined;
@@ -102,6 +104,7 @@ function DashboardContent({
   const actionSessions = useActionSessions();
   const runsResult = useRuns(agentId, client);
   const recentArtifacts = useRecentArtifacts(agentId, client);
+  const specialistRoster = useSpecialistRoster(client);
 
   // Mode detection: Mode B when active work exists (action sessions OR API runs/objectives)
   const hasActiveWork =
@@ -118,6 +121,11 @@ function DashboardContent({
   // Free-text submit handler — routes to chat via onActionClick
   function handleFreeTextSubmit(text: string) {
     onActionClick?.("free-text", text, text.slice(0, 50));
+  }
+
+  // Specialist chat handler — navigates to chat with specialist context
+  function handleSpecialistChat(specialistId: string) {
+    window.location.hash = `#chat?specialist=${specialistId}`;
   }
 
   return (
@@ -147,17 +155,6 @@ function DashboardContent({
          * Mode B — Active work exists
          * ═══════════════════════════════════════════════════════ */
         <>
-          {/* Board summary — compact task counts */}
-          {!boardSummary.isLoading && !boardSummary.isEmpty && (
-            <div className="mb-5">
-              <BoardSummary
-                counts={boardSummary.counts}
-                isLoading={boardSummary.isLoading}
-                isEmpty={boardSummary.isEmpty}
-              />
-            </div>
-          )}
-
           {/* Now working on — latest run + output preview + quick actions */}
           {runsResult.isLoading ? (
             <div className="dashboard-section pb-4">
@@ -173,6 +170,16 @@ function DashboardContent({
             </div>
           ) : null}
 
+          {/* Agent Roster — compact in Mode B */}
+          {!specialistRoster.isLoading && specialistRoster.specialists.length > 0 && (
+            <div className="dashboard-section">
+              <DashboardAgentRoster
+                specialists={specialistRoster.specialists}
+                onChat={handleSpecialistChat}
+              />
+            </div>
+          )}
+
           {/* Compact recent work list */}
           <RecentOutputs
             agentId={agentId}
@@ -184,19 +191,15 @@ function DashboardContent({
             <ActionCardGrid
               completedActions={completedActions}
               isLoading={isActionLoading}
+              specialists={specialistRoster.specialists}
               onActionClick={onActionClick}
               onViewResults={onViewResults}
             />
           </div>
-        </>
-      ) : (
-        /* ═══════════════════════════════════════════════════════
-         * Mode A — No active work
-         * ═══════════════════════════════════════════════════════ */
-        <>
-          {/* Board summary — show if tasks exist */}
+
+          {/* Board summary — bottom, only if tasks exist */}
           {!boardSummary.isLoading && !boardSummary.isEmpty && (
-            <div className="mb-5">
+            <div className="dashboard-section">
               <BoardSummary
                 counts={boardSummary.counts}
                 isLoading={boardSummary.isLoading}
@@ -204,12 +207,28 @@ function DashboardContent({
               />
             </div>
           )}
+        </>
+      ) : (
+        /* ═══════════════════════════════════════════════════════
+         * Mode A — No active work
+         * ═══════════════════════════════════════════════════════ */
+        <>
+          {/* Agent Roster — prominent in Mode A */}
+          {!specialistRoster.isLoading && specialistRoster.specialists.length > 0 && (
+            <div className="dashboard-section">
+              <DashboardAgentRoster
+                specialists={specialistRoster.specialists}
+                onChat={handleSpecialistChat}
+              />
+            </div>
+          )}
 
-          {/* Starter actions — secondary launch point */}
+          {/* Starter actions — with specialist attribution */}
           <div className="dashboard-section">
             <ActionCardGrid
               completedActions={completedActions}
               isLoading={isActionLoading}
+              specialists={specialistRoster.specialists}
               onActionClick={onActionClick}
               onViewResults={onViewResults}
             />
@@ -232,6 +251,17 @@ function DashboardContent({
             agentId={agentId}
             client={client}
           />
+
+          {/* Board summary — bottom, only if tasks exist */}
+          {!boardSummary.isLoading && !boardSummary.isEmpty && (
+            <div className="dashboard-section">
+              <BoardSummary
+                counts={boardSummary.counts}
+                isLoading={boardSummary.isLoading}
+                isEmpty={boardSummary.isEmpty}
+              />
+            </div>
+          )}
         </>
       )}
       </div>

@@ -16,11 +16,12 @@ export interface ActionCardItemProps {
   isCompleted?: boolean | undefined;
   isHero?: boolean | undefined;
   isLoading?: boolean | undefined;
+  specialistName?: string | undefined;
   onClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
 }
 
-export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, onViewResults }: ActionCardItemProps) {
+export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialistName, onClick, onViewResults }: ActionCardItemProps) {
   const Icon = card.icon;
   const config = categoryConfig[card.category];
 
@@ -107,6 +108,11 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, 
               <ArrowRightIcon className="size-3 transition-transform duration-150 group-hover/action:translate-x-0.5" />
             </span>
             <div className="flex items-center gap-2.5">
+              {specialistName ? (
+                <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/40">
+                  {specialistName} Agent
+                </span>
+              ) : null}
               {card.timeToFirstOutput && (
                 <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/30">
                   <ClockIcon className="size-2.5" />
