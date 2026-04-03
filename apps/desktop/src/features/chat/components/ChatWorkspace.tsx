@@ -668,38 +668,41 @@ function ChatSessionView({
             </div>
           </div>
         ) : visibleMessages.length === 0 && !isAction ? (
-          <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-8 px-4 py-8 text-center">
-            <div className="space-y-3">
-              <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-10 px-4 py-8 text-center">
+            <div className="space-y-4">
+              <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/8 ring-1 ring-primary/10 text-primary">
                 <SparklesIcon className="size-5" />
               </div>
-              <div className="space-y-1.5">
-                <h1 className="font-display text-[18px] font-bold tracking-tight text-foreground">
-                  Start a conversation
+              <div className="space-y-2">
+                <h1 className="font-display text-[22px] font-bold tracking-[-0.01em] text-foreground">
+                  {effectiveSpecialistMeta
+                    ? `Chat with ${effectiveSpecialistMeta.name}`
+                    : "Start a conversation"}
                 </h1>
-                <p className="text-[13px] leading-relaxed text-muted-foreground/60">
-                  Ask {effectiveSpecialistMeta?.name ?? bootstrap.agent.name} about marketing strategy, growth, and content.
+                <p className="mx-auto max-w-sm text-[13px] leading-relaxed text-muted-foreground/50">
+                  {effectiveSpecialistMeta
+                    ? effectiveSpecialistMeta.role
+                    : "Ask your AI CMO about marketing strategy, growth, and content."}
                 </p>
               </div>
             </div>
 
-            <div className="grid w-full gap-2">
+            <div className="grid w-full gap-2.5 sm:grid-cols-2 sm:[&>:last-child:nth-child(2n+1)]:col-span-full">
               {starterPrompts.map((prompt) => (
                 <button
                   key={prompt.text}
                   type="button"
-                  className="group/starter flex cursor-pointer items-center gap-3.5 rounded-xl border border-border/30 bg-card/50 px-4 py-3.5 text-left transition-all duration-150 hover:-translate-y-px hover:border-primary/25 hover:bg-card/80 hover:shadow-sm"
+                  className="group/starter flex cursor-pointer items-start gap-3 rounded-xl border border-border/20 bg-card/40 px-4 py-3.5 text-left transition-all duration-100 hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card/70 hover:shadow-md hover:shadow-black/5 dark:border-white/[0.04] dark:hover:border-primary/15 dark:hover:shadow-black/20"
                   onClick={() => {
                     void handleSubmit({ text: prompt.text });
                   }}
                 >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary transition-colors group-hover/starter:bg-primary group-hover/starter:text-primary-foreground">
-                    <prompt.icon className="size-4" />
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary/70 transition-colors group-hover/starter:bg-primary group-hover/starter:text-primary-foreground">
+                    <prompt.icon className="size-3.5" />
                   </div>
-                  <span className="flex-1 text-[13px] font-medium leading-relaxed text-muted-foreground transition-colors group-hover/starter:text-foreground">
+                  <span className="flex-1 text-[13px] font-medium leading-snug text-muted-foreground/70 transition-colors group-hover/starter:text-foreground">
                     {prompt.text}
                   </span>
-                  <ArrowRightIcon className="size-3.5 shrink-0 text-muted-foreground/20 transition-all group-hover/starter:translate-x-0.5 group-hover/starter:text-primary" />
                 </button>
               ))}
             </div>
