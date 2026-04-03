@@ -243,16 +243,6 @@ export function ChatWorkspace({
   pendingHandoffContext,
   sessionId,
 }: ChatWorkspaceProps) {
-  const starterPrompts = useMemo(() => {
-    if (!currentSpecialistId) return DEFAULT_STARTER_PROMPTS;
-    const meta = getSpecialistMeta(currentSpecialistId);
-    if (!meta) return DEFAULT_STARTER_PROMPTS;
-    return meta.starterSuggestions.map((text) => ({
-      icon: SparklesIcon as LucideIcon,
-      text,
-    }));
-  }, [currentSpecialistId]);
-
   const [bootstrap, setBootstrap] = useState<ChatBootstrap | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -443,6 +433,17 @@ function ChatSessionView({
   const effectiveSpecialistMeta = effectiveSpecialistId
     ? getSpecialistMeta(effectiveSpecialistId)
     : undefined;
+
+  // Starter prompts: specialist-specific or default CMO starters
+  const starterPrompts = useMemo(() => {
+    if (!effectiveSpecialistId) return DEFAULT_STARTER_PROMPTS;
+    const meta = getSpecialistMeta(effectiveSpecialistId);
+    if (!meta) return DEFAULT_STARTER_PROMPTS;
+    return meta.starterSuggestions.map((text) => ({
+      icon: SparklesIcon as LucideIcon,
+      text,
+    }));
+  }, [effectiveSpecialistId]);
 
   // Re-use existing Chat instance if one exists (preserves streaming state)
   const chat = useMemo(() => {
