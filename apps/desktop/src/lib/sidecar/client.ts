@@ -13,6 +13,7 @@ import {
   chatBootstrapSchema,
   connectProviderSecretRequestSchema,
   createAgentRequestSchema,
+  specialistRosterSchema,
   createAgentSessionRequestSchema,
   createArtifactRequestSchema,
   createBundleRequestSchema,
@@ -102,6 +103,7 @@ import {
   type SidecarConnection,
   type SidecarHealth,
   type SkillList,
+  type SpecialistRoster,
   type TaskListPage,
   type TaskRecord,
   type WorkspaceFileCheck,
@@ -142,6 +144,12 @@ export class SidecarClient {
 
   async agentCatalog(): Promise<AgentCatalog> {
     return agentCatalogSchema.parse(await this.request("/agents"));
+  }
+
+  async specialists(): Promise<SpecialistRoster> {
+    return specialistRosterSchema.parse(
+      await this.request("/agents/specialists"),
+    );
   }
 
   async createProjectAgent(projectUrl: string): Promise<Agent> {

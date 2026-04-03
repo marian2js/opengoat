@@ -68,10 +68,10 @@ test("readViewFromHash: all known views resolve correctly", () => {
 // Tests: Navigation config ordering
 // ---------------------------------------------------------------------------
 
-test("primaryNavigation includes Board between Dashboard and Chat", async () => {
+test("primaryNavigation includes Board after Chat (order: Dashboard, Agents, Chat, Board)", async () => {
   const { primaryNavigation } = await import("../app/config/navigation.ts");
   const titles = primaryNavigation.map((item) => item.title);
-  assert.deepEqual(titles, ["Dashboard", "Board", "Chat"]);
+  assert.deepEqual(titles, ["Dashboard", "Agents", "Chat", "Board"]);
 });
 
 test("Board nav item has correct href", async () => {

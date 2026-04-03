@@ -2,7 +2,7 @@ import { type AgentCatalog, type AgentSession, type AuthOverview, type PlaybookM
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/app/shell/AppHeader";
 import { AppSidebar } from "@/app/shell/AppSidebar";
-import { AgentsWorkspace } from "@/features/agents/components/AgentsWorkspace";
+import { SpecialistTeamBrowser } from "@/features/agents/components/SpecialistTeamBrowser";
 import { ChatWorkspace, evictChatSession, isActionSession, markActionSession } from "@/features/chat/components/ChatWorkspace";
 import type { ChatScope } from "@/features/chat/lib/chat-scope";
 import { ActionSessionView } from "@/features/action-session/components/ActionSessionView";
@@ -596,10 +596,8 @@ export function App() {
               }}
             />
           ) : (
-            <AgentsWorkspace
-              authOverview={authOverview}
+            <SpecialistTeamBrowser
               client={client}
-              createRequestToken={createAgentToken}
             />
           )}
         </div>

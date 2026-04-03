@@ -38,9 +38,9 @@ describe("Sidebar secondary navigation (Agents, Connections)", () => {
     expect(sidebarSrc).not.toMatch(/useState.*activeSidebar|useState.*lastActive/);
   });
 
-  // AC4: Secondary navigation config defines Agents and Connections with icons
-  it("navigation config defines Agents with BotIcon", () => {
-    expect(navigationSrc).toContain("BotIcon");
+  // AC4: Navigation config defines Agents (now in primary nav with UsersIcon)
+  it("navigation config defines Agents with UsersIcon", () => {
+    expect(navigationSrc).toContain("UsersIcon");
     expect(navigationSrc).toMatch(/title:\s*["']Agents["']/);
     expect(navigationSrc).toMatch(/href:\s*["']#agents["']/);
   });

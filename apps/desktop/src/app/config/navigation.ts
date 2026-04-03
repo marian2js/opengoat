@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BookOpenIcon,
-  BotIcon,
   BrainIcon,
   DatabaseIcon,
   LayoutDashboardIcon,
@@ -12,6 +11,7 @@ import {
   Settings2Icon,
   StoreIcon,
   TrendingUpIcon,
+  UsersIcon,
 } from "lucide-react";
 
 export interface NavigationItem {
@@ -28,14 +28,19 @@ export const primaryNavigation: NavigationItem[] = [
     icon: LayoutDashboardIcon,
   },
   {
-    title: "Board",
-    href: "#board",
-    icon: ListChecksIcon,
+    title: "Agents",
+    href: "#agents",
+    icon: UsersIcon,
   },
   {
     title: "Chat",
     href: "#chat",
     icon: MessageSquareIcon,
+  },
+  {
+    title: "Board",
+    href: "#board",
+    icon: ListChecksIcon,
   },
 ];
 
@@ -49,11 +54,6 @@ export const brainNavigation: NavigationItem[] = [
 ];
 
 export const secondaryNavigation: NavigationItem[] = [
-  {
-    title: "Agents",
-    href: "#agents",
-    icon: BotIcon,
-  },
   {
     title: "Connections",
     href: "#connections",
