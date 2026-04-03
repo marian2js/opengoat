@@ -4,6 +4,7 @@ import { AppHeader } from "@/app/shell/AppHeader";
 import { AppSidebar } from "@/app/shell/AppSidebar";
 import { SpecialistTeamBrowser } from "@/features/agents/components/SpecialistTeamBrowser";
 import { ChatWorkspace, evictChatSession, isActionSession, markActionSession } from "@/features/chat/components/ChatWorkspace";
+import { readHandoffContext, clearHandoffContext } from "@/features/chat/components/HandoffChip";
 import type { ChatScope } from "@/features/chat/lib/chat-scope";
 import { ActionSessionView } from "@/features/action-session/components/ActionSessionView";
 import {
@@ -79,6 +80,8 @@ export function App() {
   const [completedActions, setCompletedActions] = useState<Set<string>>(() => getCompletedActionIds());
   const [pendingChatScope, setPendingChatScope] = useState<ChatScope | null>(null);
   const [pendingActionTitle, setPendingActionTitle] = useState<string | null>(null);
+  const [currentSpecialistId, setCurrentSpecialistId] = useState<string | undefined>(() => readSpecialistFromHash());
+  const [pendingHandoffContext, setPendingHandoffContext] = useState<string | null>(null);
 
   const activeAgentId = resolveActiveAgentId(agentCatalog, selectedAgentId);
   const activeAgent = agentCatalog?.agents.find((a) => a.id === activeAgentId);
@@ -212,6 +215,19 @@ export function App() {
       setBrainSection(readBrainSectionFromHash());
       setObjectiveId(readObjectiveIdFromHash());
       setObjectiveTab(readObjectiveTabFromHash());
+
+      // Extract specialist from hash for chat navigation
+      const specialistId = readSpecialistFromHash();
+      setCurrentSpecialistId(specialistId);
+
+      // Check for handoff context when navigating to a specialist chat
+      if (specialistId && newView === "chat") {
+        const handoff = readHandoffContext();
+        if (handoff) {
+          setPendingHandoffContext(handoff.summary);
+          clearHandoffContext();
+        }
+      }
 
       // If the user explicitly navigates while bootstrap is showing,
       // clear the bootstrap context so they aren't trapped.
@@ -546,8 +562,13 @@ export function App() {
                 agentId={activeAgentId}
                 authOverview={authOverview}
                 client={client}
+                currentSpecialistId={currentSpecialistId}
+                currentSpecialistName={currentSpecialistId ? SPECIALIST_NAMES[currentSpecialistId] : undefined}
                 initialScope={pendingChatScope}
                 onBootstrap={handleBootstrap}
+                onHandoffContextConsumed={() => {
+                  setPendingHandoffContext(null);
+                }}
                 onInitialScopeConsumed={() => {
                   setPendingChatScope(null);
                 }}
@@ -558,6 +579,7 @@ export function App() {
                 }}
                 onSessionLabelUpdate={handleSessionLabelUpdate}
                 pendingActionPrompt={activeSessionId === actionSessionId ? pendingActionPrompt : null}
+                pendingHandoffContext={pendingHandoffContext}
                 sessionId={activeSessionId}
               />
           ) : currentView === "brain" ? (
@@ -677,3 +699,23 @@ function readObjectiveTabFromHash(): string | undefined {
   const parts = hash.slice("#objective/".length).split("/");
   return parts[1] || undefined;
 }
+
+function readSpecialistFromHash(): string | undefined {
+  const hash = window.location.hash;
+  if (!hash.startsWith("#chat?")) return undefined;
+  const params = new URLSearchParams(hash.slice("#chat?".length));
+  const specialist = params.get("specialist");
+  return specialist ?? undefined;
+}
+
+/** Known specialist ID → name mapping (matches specialist-registry.ts). */
+const SPECIALIST_NAMES: Record<string, string> = {
+  cmo: "CMO",
+  "market-intel": "Market Intel",
+  positioning: "Positioning",
+  "website-conversion": "Website Conversion",
+  "seo-aeo": "SEO/AEO",
+  distribution: "Distribution",
+  content: "Content",
+  outbound: "Outbound",
+};

@@ -66,10 +66,13 @@ import { SidecarClient } from "@/lib/sidecar/client";
 import { isUnnamedSession } from "@/lib/utils/unnamed-session";
 import { detectGoalIntent } from "@/features/chat/lib/goal-detection";
 import { detectMemoryCandidates } from "@/features/chat/lib/memory-detection";
+import { detectHandoffSuggestions } from "@/features/chat/lib/handoff-detector";
 import { useDismissedProposals } from "@/features/chat/hooks/useDismissedProposals";
 import { useDismissedMemories } from "@/features/chat/hooks/useDismissedMemories";
+import { useDismissedHandoffs } from "@/features/chat/hooks/useDismissedHandoffs";
 import { ProposalCard } from "@/features/chat/components/ProposalCard";
 import { MemoryCandidateChip } from "@/features/chat/components/MemoryCandidateChip";
+import { HandoffChip } from "@/features/chat/components/HandoffChip";
 
 /**
  * Cache of Chat instances keyed by session ID.
@@ -203,12 +206,16 @@ interface ChatWorkspaceProps {
   agentId?: string | undefined;
   authOverview: AuthOverview | null;
   client: SidecarClient | null;
+  currentSpecialistId?: string | undefined;
+  currentSpecialistName?: string | undefined;
   initialScope?: ChatScope | null | undefined;
   onBootstrap?: ((sessionId: string) => void) | undefined;
   onInitialScopeConsumed?: (() => void) | undefined;
   onPendingPromptConsumed?: (() => void) | undefined;
   onSessionLabelUpdate?: ((sessionId: string, label: string) => void) | undefined;
   pendingActionPrompt?: string | null | undefined;
+  pendingHandoffContext?: string | null | undefined;
+  onHandoffContextConsumed?: (() => void) | undefined;
   sessionId?: string | undefined;
 }
 
@@ -222,12 +229,16 @@ export function ChatWorkspace({
   agentId,
   authOverview,
   client,
+  currentSpecialistId,
+  currentSpecialistName,
   initialScope,
   onBootstrap,
+  onHandoffContextConsumed,
   onInitialScopeConsumed,
   onPendingPromptConsumed,
   onSessionLabelUpdate,
   pendingActionPrompt,
+  pendingHandoffContext,
   sessionId,
 }: ChatWorkspaceProps) {
   const [bootstrap, setBootstrap] = useState<ChatBootstrap | null>(null);
@@ -326,11 +337,15 @@ export function ChatWorkspace({
       authOverview={authOverview}
       bootstrap={bootstrap}
       client={client}
+      currentSpecialistId={currentSpecialistId}
+      currentSpecialistName={currentSpecialistName}
       initialScope={initialScope}
+      onHandoffContextConsumed={onHandoffContextConsumed}
       onInitialScopeConsumed={onInitialScopeConsumed}
       onPendingPromptConsumed={onPendingPromptConsumed}
       onSessionLabelUpdate={onSessionLabelUpdate}
       pendingActionPrompt={pendingActionPrompt}
+      pendingHandoffContext={pendingHandoffContext}
     />
   );
 }
@@ -348,21 +363,29 @@ function ChatSessionView({
   authOverview,
   bootstrap,
   client,
+  currentSpecialistId,
+  currentSpecialistName,
   initialScope,
+  onHandoffContextConsumed,
   onInitialScopeConsumed,
   onPendingPromptConsumed,
   onSessionLabelUpdate,
   pendingActionPrompt,
+  pendingHandoffContext,
 }: {
   agentId?: string | undefined;
   authOverview: AuthOverview | null;
   bootstrap: ChatBootstrap;
   client: SidecarClient | null;
+  currentSpecialistId?: string | undefined;
+  currentSpecialistName?: string | undefined;
   initialScope?: ChatScope | null | undefined;
+  onHandoffContextConsumed?: (() => void) | undefined;
   onInitialScopeConsumed?: (() => void) | undefined;
   onPendingPromptConsumed?: (() => void) | undefined;
   onSessionLabelUpdate?: ((sessionId: string, label: string) => void) | undefined;
   pendingActionPrompt?: string | null | undefined;
+  pendingHandoffContext?: string | null | undefined;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const hasCustomLabelRef = useRef(
@@ -370,6 +393,7 @@ function ChatSessionView({
   );
   const didMountRef = useRef(false);
   const pendingPromptSentRef = useRef(false);
+  const handoffContextSentRef = useRef(false);
   const initialScopeAppliedRef = useRef(false);
 
   // Auto-fix generic labels for existing sessions that already have messages
@@ -454,6 +478,17 @@ function ChatSessionView({
     onPendingPromptConsumed?.();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingActionPrompt]);
+
+  // Auto-send handoff context as first message when arriving from a handoff chip
+  useEffect(() => {
+    if (!pendingHandoffContext || handoffContextSentRef.current) {
+      return;
+    }
+    handoffContextSentRef.current = true;
+    void sendMessage({ text: pendingHandoffContext });
+    onHandoffContextConsumed?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingHandoffContext]);
 
   useEffect(() => {
     const list = listRef.current;
@@ -640,6 +675,8 @@ function ChatSessionView({
               client={client}
               agentId={agentId}
               sessionId={bootstrap.session.id}
+              currentSpecialistId={currentSpecialistId}
+              currentSpecialistName={currentSpecialistName}
             />
           ))
         )}
@@ -732,6 +769,8 @@ function ChatMessage({
   client,
   agentId,
   sessionId,
+  currentSpecialistId,
+  currentSpecialistName,
 }: {
   isStreaming: boolean;
   message: ChatUIMessage;
@@ -742,6 +781,8 @@ function ChatMessage({
   client?: SidecarClient | null | undefined;
   agentId?: string | undefined;
   sessionId?: string | undefined;
+  currentSpecialistId?: string | undefined;
+  currentSpecialistName?: string | undefined;
 }) {
   const activityParts = getActivityParts(message);
   const reasoningText = getReasoningText(message);
@@ -769,6 +810,11 @@ function ChatMessage({
     if (!shouldDetect) return [];
     return detectMemoryCandidates(fullText);
   }, [shouldDetect, fullText]);
+
+  const handoffSuggestions = useMemo(() => {
+    if (!shouldDetect) return [];
+    return detectHandoffSuggestions(fullText, currentSpecialistId);
+  }, [shouldDetect, fullText, currentSpecialistId]);
 
   if (message.role === "user") {
     const imageParts = fileParts.filter((f) => f.mediaType.startsWith("image/"));
@@ -865,6 +911,15 @@ function ChatMessage({
           agentId={agentId}
         />
       ) : null}
+
+      {/* Handoff suggestion chips */}
+      {handoffSuggestions.length > 0 && sessionId ? (
+        <ChatHandoffChipsWrapper
+          suggestions={handoffSuggestions}
+          sessionId={sessionId}
+          currentSpecialistName={currentSpecialistName}
+        />
+      ) : null}
     </Message>
   );
 }
@@ -931,6 +986,35 @@ function ChatMemoryCandidatesWrapper({
           client={client}
           agentId={agentId}
           onDismiss={dismiss}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Wrapper that uses the dismissed-handoffs hook (hooks can't be conditional). */
+function ChatHandoffChipsWrapper({
+  suggestions,
+  sessionId,
+  currentSpecialistName,
+}: {
+  suggestions: import("@/features/chat/lib/handoff-detector").HandoffSuggestion[];
+  sessionId: string;
+  currentSpecialistName?: string | undefined;
+}) {
+  const { dismissedIds, dismiss } = useDismissedHandoffs(sessionId);
+  const visible = suggestions.filter((s) => !dismissedIds.has(s.id));
+  if (visible.length === 0) return null;
+  return (
+    <div className="space-y-0">
+      {visible.map((suggestion) => (
+        <HandoffChip
+          key={suggestion.id}
+          specialistId={suggestion.specialistId}
+          specialistName={suggestion.specialistName}
+          reason={suggestion.reason}
+          currentSpecialistName={currentSpecialistName}
+          onDismiss={() => dismiss(suggestion.id)}
         />
       ))}
     </div>
