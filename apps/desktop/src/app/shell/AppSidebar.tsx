@@ -157,12 +157,15 @@ export function AppSidebar({
               className="h-11 data-[slot=sidebar-menu-button]:!p-1.5"
             >
               <a href="#dashboard">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-primary shadow-sm shadow-primary/20 text-primary-foreground">
                   <LayoutDashboardIcon className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
-                  <span className="font-display text-[13px] font-bold tracking-tight">
+                  <span className="font-display text-[14px] font-bold tracking-[-0.01em]">
                     OpenGoat
+                  </span>
+                  <span className="text-[10px] text-sidebar-foreground/40">
+                    AI Marketing
                   </span>
                 </div>
               </a>
@@ -176,12 +179,18 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               {/* Primary nav: Dashboard, Chat */}
-              {primaryNavigation.map((item) => (
+              {primaryNavigation.map((item) => {
+                const isItemActive = item.href.slice(1) === activeView;
+                return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
                     tooltip={item.title}
-                    isActive={item.href.slice(1) === activeView}
+                    isActive={isItemActive}
+                    className={cn(
+                      "relative",
+                      isItemActive && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary",
+                    )}
                   >
                     <a
                       href={item.href}
@@ -201,16 +210,22 @@ export function AppSidebar({
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              ))}
+                );
+              })}
 
               {/* Board — demoted, visually subdued */}
-              {demotedNavigation.map((item) => (
+              {demotedNavigation.map((item) => {
+                const isItemActive = item.href.slice(1) === activeView;
+                return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
                     tooltip={item.title}
-                    isActive={item.href.slice(1) === activeView}
-                    className="text-muted-foreground/70"
+                    isActive={isItemActive}
+                    className={cn(
+                      "relative text-muted-foreground/70",
+                      isItemActive && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary",
+                    )}
                   >
                     <a href={item.href}>
                       <item.icon />
@@ -218,7 +233,8 @@ export function AppSidebar({
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-              ))}
+                );
+              })}
 
               {/* Brain — collapsible */}
               <Collapsible
@@ -232,6 +248,10 @@ export function AppSidebar({
                       asChild
                       tooltip="Brain"
                       isActive={activeView === "brain"}
+                      className={cn(
+                        "relative",
+                        activeView === "brain" && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary",
+                      )}
                     >
                       <a href="#brain">
                         <BrainIcon />
@@ -275,12 +295,18 @@ export function AppSidebar({
               {/* Secondary nav: Agents, Connections (Settings excluded — in footer) */}
               {secondaryNavigation
                 .filter((item) => item.href !== "#settings")
-                .map((item) => (
+                .map((item) => {
+                  const isItemActive = item.href.slice(1) === activeView;
+                  return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       asChild
                       tooltip={item.title}
-                      isActive={item.href.slice(1) === activeView}
+                      isActive={isItemActive}
+                      className={cn(
+                        "relative",
+                        isItemActive && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary",
+                      )}
                     >
                       <a href={item.href}>
                         <item.icon />
@@ -288,7 +314,8 @@ export function AppSidebar({
                       </a>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                ))}
+                  );
+                })}
 
             </SidebarMenu>
           </SidebarGroupContent>
