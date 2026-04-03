@@ -21,6 +21,13 @@ import { useRuns } from "@/features/dashboard/hooks/useRuns";
 import { useRecentArtifacts } from "@/features/dashboard/hooks/useRecentArtifacts";
 import { useSpecialistRoster } from "@/features/dashboard/hooks/useSpecialistRoster";
 
+/** Extract sessionId from a contentRef like "session:{id}/message:{id}" */
+function parseSessionFromContentRef(ref: string | undefined): string | null {
+  if (!ref) return null;
+  const match = ref.match(/^session:([^/]+)/);
+  return match ? match[1] : null;
+}
+
 export interface DashboardWorkspaceProps {
   agent?: { id: string; name: string; description?: string | undefined } | undefined;
   agentId?: string | undefined;
@@ -138,6 +145,13 @@ function DashboardContent({
         onResumeRun?.(sessionId);
         return;
       }
+    }
+
+    // Fallback: parse sessionId from contentRef (format: "session:{id}/message:{id}")
+    const refSessionId = parseSessionFromContentRef(artifact.contentRef);
+    if (refSessionId) {
+      onResumeRun?.(refSessionId);
+      return;
     }
 
     // Fallback: navigate to specialist chat if createdBy matches a specialist
