@@ -137,6 +137,7 @@ export function createChatRoutes(
         const specialistName = specialist?.name ?? payload.specialistId;
 
         const specialistBlock = composeSpecialistContext({
+          instructionTemplate: specialist?.instructionTemplate,
           memories: specialistMemories,
           specialistName,
         });

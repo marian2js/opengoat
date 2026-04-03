@@ -172,6 +172,7 @@ export const agentSessionSchema = z.object({
   agentName: z.string().min(1),
   sessionKey: z.string().min(1),
   label: z.string().min(1).optional(),
+  specialistId: z.string().min(1).optional(),
   sessionFile: z.string().min(1),
   workspaceDir: z.string().min(1),
   createdAt: z.string().min(1),
@@ -193,6 +194,7 @@ export const createAgentSessionRequestSchema = z.object({
   agentId: z.string().min(1),
   internal: z.boolean().optional(),
   label: z.string().min(1).optional(),
+  specialistId: z.string().min(1).optional(),
   initialPrompt: z.string().min(1).optional(),
 });
 

@@ -1,18 +1,26 @@
 export interface SpecialistContextInput {
+  instructionTemplate?: string;
   memories: Array<{ content: string }>;
   specialistName: string;
 }
 
 export function composeSpecialistContext(input: SpecialistContextInput): string {
-  const { memories, specialistName } = input;
-  if (memories.length === 0) return "";
+  const { instructionTemplate, memories, specialistName } = input;
+  if (!instructionTemplate && memories.length === 0) return "";
 
-  const lines: string[] = [
-    `## Specialist Guidelines — ${specialistName}`,
-    "",
-  ];
-  for (const mem of memories) {
-    lines.push(`- ${mem.content}`);
+  const lines: string[] = [];
+
+  if (instructionTemplate) {
+    lines.push(`## Specialist Instructions — ${specialistName}`, "");
+    lines.push(instructionTemplate);
+  }
+
+  if (memories.length > 0) {
+    if (lines.length > 0) lines.push("");
+    lines.push(`## Specialist Guidelines — ${specialistName}`, "");
+    for (const mem of memories) {
+      lines.push(`- ${mem.content}`);
+    }
   }
 
   const body = lines.join("\n");

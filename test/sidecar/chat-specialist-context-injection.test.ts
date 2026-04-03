@@ -149,9 +149,9 @@ describe("Chat specialist context injection", () => {
     expect(textPart.text).toContain("Still send this");
   });
 
-  it("does not inject specialist context when no specialist memories exist", async () => {
+  it("injects instructionTemplate even when no specialist memories exist", async () => {
     const { runtime, mockStreamConversation } = createMockRuntime();
-    // memoryService returns empty array (default mock)
+    // memoryService returns empty array (default mock) — but specialist has instructionTemplate
     const app = buildApp(runtime);
 
     await app.request("/chat", {
@@ -159,16 +159,67 @@ describe("Chat specialist context injection", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         agentId: "goat",
-        message: "No context here",
+        message: "No memories here",
         sessionId: "sess-1",
-        specialistId: "outbound",
+        specialistId: "market-intel",
       }),
     });
 
     expect(mockStreamConversation).toHaveBeenCalledTimes(1);
     const callArgs = mockStreamConversation.mock.calls[0][0];
     const textPart = callArgs.message.parts.find((p: { type: string }) => p.type === "text");
-    expect(textPart.text).not.toContain("<specialist-context>");
-    expect(textPart.text).toBe("No context here");
+    // market-intel has an instructionTemplate in the registry, so specialist context should be injected
+    expect(textPart.text).toContain("<specialist-context>");
+    expect(textPart.text).toContain("Specialist Instructions");
+    expect(textPart.text).toContain("No memories here");
+  });
+
+  it("injects both instructionTemplate and memories when both exist", async () => {
+    const { runtime, mockStreamConversation } = createMockRuntime();
+    (runtime.memoryService.listMemories as ReturnType<typeof vi.fn>)
+      .mockResolvedValue(MOCK_SPECIALIST_MEMORIES);
+    const app = buildApp(runtime);
+
+    await app.request("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        agentId: "goat",
+        message: "SEO with context",
+        sessionId: "sess-1",
+        specialistId: "seo-aeo",
+      }),
+    });
+
+    expect(mockStreamConversation).toHaveBeenCalledTimes(1);
+    const callArgs = mockStreamConversation.mock.calls[0][0];
+    const textPart = callArgs.message.parts.find((p: { type: string }) => p.type === "text");
+    expect(textPart.text).toContain("<specialist-context>");
+    expect(textPart.text).toContain("Specialist Instructions");
+    expect(textPart.text).toContain("Specialist Guidelines");
+    expect(textPart.text).toContain("Prioritize long-tail keywords");
+    expect(textPart.text).toContain("SEO with context");
+  });
+
+  it("does not inject context for invalid specialistId (not in registry)", async () => {
+    const { runtime, mockStreamConversation } = createMockRuntime();
+    const app = buildApp(runtime);
+
+    await app.request("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        agentId: "goat",
+        message: "Unknown specialist",
+        sessionId: "sess-1",
+        specialistId: "nonexistent-specialist",
+      }),
+    });
+
+    expect(mockStreamConversation).toHaveBeenCalledTimes(1);
+    const callArgs = mockStreamConversation.mock.calls[0][0];
+    const textPart = callArgs.message.parts.find((p: { type: string }) => p.type === "text");
+    // No memories, no instructionTemplate (specialist not found → undefined)
+    expect(textPart.text).toBe("Unknown specialist");
   });
 });

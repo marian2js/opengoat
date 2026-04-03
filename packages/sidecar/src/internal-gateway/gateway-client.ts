@@ -475,6 +475,11 @@ function resolveSessionLabel(row: GatewaySessionRow, agentName: string): string 
   return undefined;
 }
 
+export function parseSpecialistFromKey(key: string): string | undefined {
+  const match = key.match(/:session:specialist:([^:]+):/);
+  return match?.[1];
+}
+
 function toAgentSession(params: {
   agent: Agent;
   paths: EmbeddedGatewayPaths;
@@ -486,12 +491,14 @@ function toAgentSession(params: {
   const sessionId = params.row.sessionId ?? params.row.key;
 
   const label = resolveSessionLabel(params.row, params.agent.name);
+  const specialistId = parseSpecialistFromKey(params.row.key);
   return {
     agentId: params.agent.id,
     agentName: params.agent.name,
     createdAt: updatedAt,
     id: sessionId,
     ...(label ? { label } : {}),
+    ...(specialistId ? { specialistId } : {}),
     sessionFile: resolveGatewaySessionFile(params.paths, params.agent.id, sessionId),
     sessionKey: params.row.key,
     updatedAt,
@@ -762,7 +769,9 @@ export class EmbeddedGatewayClient {
     });
     const sessionKey = payload.internal
       ? `agent:${agent.id}:session:internal:${randomUUID()}`
-      : `agent:${agent.id}:session:${randomUUID()}`;
+      : payload.specialistId
+        ? `agent:${agent.id}:session:specialist:${payload.specialistId}:${randomUUID()}`
+        : `agent:${agent.id}:session:${randomUUID()}`;
     const patch = await this.request<GatewaySessionsPatchResult>("sessions.patch", {
       key: sessionKey,
       ...(payload.label?.trim() ? { label: payload.label.trim() } : {}),
@@ -787,6 +796,7 @@ export class EmbeddedGatewayClient {
       createdAt: new Date(patch.entry.updatedAt ?? Date.now()).toISOString(),
       id: patch.entry.sessionId,
       ...(payload.label?.trim() ? { label: payload.label.trim() } : {}),
+      ...(payload.specialistId ? { specialistId: payload.specialistId } : {}),
       sessionFile: resolveGatewaySessionFile(this.#paths, agent.id, patch.entry.sessionId),
       sessionKey: patch.key,
       updatedAt: new Date(patch.entry.updatedAt ?? Date.now()).toISOString(),
