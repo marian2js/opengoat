@@ -92,7 +92,7 @@ export function CompanySummary({ data, domain, faviconSources, isLoading, error 
           {domain ?? "Project"}
         </span>
         {shortSummary ? (
-          <p className="mt-0.5 truncate text-[13px] leading-snug text-muted-foreground/60">
+          <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-zinc-500 dark:text-zinc-400">
             {shortSummary}
           </p>
         ) : null}
