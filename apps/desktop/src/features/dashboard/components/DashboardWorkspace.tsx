@@ -3,7 +3,6 @@ import type { AgentSession, ArtifactRecord } from "@opengoat/contracts";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
 import { getActionMapping } from "@/lib/utils/action-map";
-import { isActionSession } from "@/features/chat/components/ChatWorkspace";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
 import { ActiveWorkSection } from "@/features/dashboard/components/ActiveWorkSection";
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
@@ -136,11 +135,7 @@ function DashboardContent({
     if (artifact.runId) {
       const sessionId = getActionMapping(artifact.runId);
       if (sessionId) {
-        if (isActionSession(sessionId)) {
-          window.location.hash = "#action-session";
-        } else {
-          window.location.hash = "#chat";
-        }
+        onResumeRun?.(sessionId);
         return;
       }
     }
