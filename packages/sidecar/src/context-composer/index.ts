@@ -9,3 +9,8 @@ export {
   fetchObjectiveContext,
   type FetchableScope,
 } from "./objective-context-fetcher.ts";
+
+export {
+  composeSpecialistContext,
+  type SpecialistContextInput,
+} from "./specialist-context-composer.ts";

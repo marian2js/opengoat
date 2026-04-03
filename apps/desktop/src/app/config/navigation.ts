@@ -50,6 +50,7 @@ export const brainNavigation: NavigationItem[] = [
   { title: "Growth", href: "#brain/growth", icon: TrendingUpIcon },
   { title: "Company Context", href: "#brain/company-context", icon: BrainIcon },
   { title: "Saved Guidance", href: "#brain/saved-guidance", icon: DatabaseIcon },
+  { title: "Agent Guidelines", href: "#brain/specialist-context", icon: UsersIcon },
   { title: "Knowledge Base", href: "#brain/knowledge-base", icon: BookOpenIcon },
 ];
 

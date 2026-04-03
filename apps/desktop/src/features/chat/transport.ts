@@ -17,6 +17,7 @@ interface CreateChatTransportParams {
   agentId: string;
   client: SidecarClient | null;
   getScope?: () => ChatScopeForTransport | null;
+  specialistId?: string;
   sessionId: string;
 }
 
@@ -58,6 +59,7 @@ function createBrowserTransport(
           agentId: params.agentId,
           ...(latestMessage ? { message: latestMessage } : {}),
           ...(scope ? { scope } : {}),
+          ...(params.specialistId ? { specialistId: params.specialistId } : {}),
           sessionId: params.sessionId,
         },
       };
@@ -112,6 +114,7 @@ function createDesktopTransport(
               agentId: params.agentId,
               message: latestMessage,
               ...(scope ? { scope } : {}),
+              ...(params.specialistId ? { specialistId: params.specialistId } : {}),
               sessionId: params.sessionId,
             },
           }).catch((error: unknown) => {

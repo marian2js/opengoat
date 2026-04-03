@@ -7,8 +7,10 @@ import type { SidecarRuntime } from "../context.ts";
 import {
   fetchObjectiveContext,
   composeObjectiveContext,
+  composeSpecialistContext,
   type FetchableScope,
 } from "../../context-composer/index.ts";
+import { getSpecialistById } from "@opengoat/core";
 
 const textPartSchema = z.object({
   text: z.string(),
@@ -45,6 +47,7 @@ const chatRequestSchema = z.object({
     }),
   ]),
   scope: scopeSchema.optional(),
+  specialistId: z.string().min(1).optional(),
   sessionId: z.string().min(1).optional(),
 });
 
@@ -113,6 +116,45 @@ export function createChatRoutes(
         }
       } catch {
         // Context injection failed — continue without it
+      }
+    }
+
+    // Inject specialist context when specialistId is present
+    if (payload.specialistId && payload.agentId) {
+      try {
+        const specialistMemories = await runtime.memoryService.listMemories(
+          runtime.opengoatPaths,
+          {
+            projectId: payload.agentId,
+            category: "specialist_context",
+            specialistId: payload.specialistId,
+            scope: "project",
+            activeOnly: true,
+          },
+        );
+
+        const specialist = getSpecialistById(payload.specialistId);
+        const specialistName = specialist?.name ?? payload.specialistId;
+
+        const specialistBlock = composeSpecialistContext({
+          memories: specialistMemories,
+          specialistName,
+        });
+
+        if (specialistBlock) {
+          const textPartIndex = normalizedMessage.parts.findIndex(
+            (p) => p.type === "text",
+          );
+          if (textPartIndex >= 0) {
+            const textPart = normalizedMessage.parts[textPartIndex] as { text: string; type: "text" };
+            normalizedMessage.parts[textPartIndex] = {
+              text: `${specialistBlock}\n\n${textPart.text}`,
+              type: "text" as const,
+            };
+          }
+        }
+      } catch {
+        // Specialist context injection failed — continue without it
       }
     }
 

@@ -16,6 +16,7 @@ export function createMemoryRoutes(runtime: SidecarRuntime): Hono {
     }
 
     const objectiveId = context.req.query("objectiveId") || undefined;
+    const specialistId = context.req.query("specialistId") || undefined;
     const category = context.req.query("category") || undefined;
     const scope = context.req.query("scope") || undefined;
     const activeOnlyParam = context.req.query("activeOnly");
@@ -23,7 +24,7 @@ export function createMemoryRoutes(runtime: SidecarRuntime): Hono {
 
     const result = await runtime.memoryService.listMemories(
       runtime.opengoatPaths,
-      { projectId, objectiveId, category, scope, activeOnly },
+      { projectId, objectiveId, specialistId, category, scope, activeOnly },
     );
 
     return context.json(result);

@@ -832,6 +832,7 @@ export const projectMemoryCategorySchema = z.enum([
   "messaging_constraints",
   "legal_compliance",
   "team_process",
+  "specialist_context",
 ]);
 
 export const objectiveMemoryCategorySchema = z.enum([
@@ -856,6 +857,7 @@ export const memoryRecordSchema = z.object({
   memoryId: z.string().min(1),
   projectId: z.string().min(1),
   objectiveId: z.string().nullable(),
+  specialistId: z.string().nullable(),
   category: memoryCategorySchema,
   scope: memoryScopeSchema,
   content: z.string().min(1),
@@ -877,6 +879,7 @@ export const createMemoryRequestSchema = z.object({
   source: z.string().min(1),
   createdBy: z.string().min(1),
   objectiveId: z.string().min(1).optional(),
+  specialistId: z.string().min(1).optional(),
   confidence: z.number().min(0).max(1).optional(),
   userConfirmed: z.boolean().optional(),
   supersedes: z.string().min(1).optional(),
@@ -891,6 +894,7 @@ export const updateMemoryRequestSchema = z.object({
 export const listMemoriesQuerySchema = z.object({
   projectId: z.string().min(1),
   objectiveId: z.string().min(1).optional(),
+  specialistId: z.string().min(1).optional(),
   category: memoryCategorySchema.optional(),
   scope: memoryScopeSchema.optional(),
   activeOnly: z.boolean().optional(),

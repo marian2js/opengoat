@@ -18,6 +18,7 @@ import {
   StickyNoteIcon,
   StoreIcon,
   TrendingUpIcon,
+  UsersIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
@@ -25,6 +26,7 @@ import remarkGfm from "remark-gfm";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { isRefinableSection } from "@/features/brain/lib/refine-context-prompt";
 import { OperatingMemorySection } from "./OperatingMemorySection";
+import { SpecialistContextSection } from "./SpecialistContextSection";
 
 /**
  * Strip the leading h1 heading from markdown content.
@@ -285,6 +287,14 @@ Share product and market context that helps the AI provide more relevant assista
     placeholder: "",
   },
   {
+    id: "specialist-context",
+    label: "Agent Guidelines",
+    filename: "",
+    icon: UsersIcon,
+    description: "Shape how each specialist thinks, what it prioritizes, and what to avoid",
+    placeholder: "",
+  },
+  {
     id: "knowledge-base",
     label: "Knowledge Base",
     filename: "KNOWLEDGE.md",
@@ -333,6 +343,23 @@ export function BrainWorkspace({ agentId, client, onRefineContext, sectionId }: 
           </div>
         </div>
         <OperatingMemorySection agentId={agentId} client={client} />
+      </div>
+    );
+  }
+
+  if (section.id === "specialist-context") {
+    return (
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        <div className="flex items-center gap-3 border-b border-border/20 px-5 py-4 lg:px-6">
+          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+            <UsersIcon className="size-3.5 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-display text-sm font-bold tracking-tight">{section.label}</h2>
+            <p className="text-[11px] text-muted-foreground/70">{section.description}</p>
+          </div>
+        </div>
+        <SpecialistContextSection agentId={agentId} client={client} />
       </div>
     );
   }

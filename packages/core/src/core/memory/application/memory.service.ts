@@ -29,6 +29,7 @@ interface MemoryRow {
   memory_id: string;
   project_id: string;
   objective_id: string | null;
+  specialist_id: string | null;
   category: string;
   scope: string;
   content: string;
@@ -72,14 +73,15 @@ export class MemoryService {
     this.execute(
       db,
       `INSERT INTO memories (
-        memory_id, project_id, objective_id, category, scope,
+        memory_id, project_id, objective_id, specialist_id, category, scope,
         content, source, confidence, created_by,
         created_at, updated_at, user_confirmed, supersedes, replaced_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         memoryId,
         options.projectId,
         options.objectiveId ?? null,
+        options.specialistId ?? null,
         options.category,
         options.scope,
         options.content,
@@ -124,6 +126,10 @@ export class MemoryService {
     if (options.objectiveId !== undefined) {
       conditions.push("objective_id = ?");
       params.push(options.objectiveId);
+    }
+    if (options.specialistId !== undefined) {
+      conditions.push("specialist_id = ?");
+      params.push(options.specialistId);
     }
     if (options.category !== undefined) {
       conditions.push("category = ?");
@@ -295,6 +301,7 @@ export class MemoryService {
       memoryId: row.memory_id,
       projectId: row.project_id,
       objectiveId: row.objective_id ?? null,
+      specialistId: row.specialist_id ?? null,
       category: row.category as MemoryRecord["category"],
       scope: row.scope as MemoryRecord["scope"],
       content: row.content,
@@ -374,6 +381,19 @@ export class MemoryService {
       db,
       "CREATE INDEX IF NOT EXISTS idx_memories_active ON memories(project_id, scope, category, replaced_by);",
     );
+
+    // Migration: add specialist_id column if missing
+    const columns = this.queryAll<{ name: string }>(
+      db,
+      "PRAGMA table_info(memories)",
+    );
+    if (!columns.some((c) => c.name === "specialist_id")) {
+      this.execute(db, "ALTER TABLE memories ADD COLUMN specialist_id TEXT;");
+      this.execute(
+        db,
+        "CREATE INDEX IF NOT EXISTS idx_memories_specialist ON memories(project_id, specialist_id);",
+      );
+    }
 
     await this.persistDatabase(paths, db);
     return db;

@@ -445,6 +445,7 @@ function ChatSessionView({
         }
         return null;
       },
+      specialistId: currentSpecialistId,
       sessionId: bootstrap.session.id,
     });
     const instance = new Chat<ChatUIMessage>({

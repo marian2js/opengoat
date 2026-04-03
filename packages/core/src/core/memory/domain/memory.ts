@@ -10,6 +10,7 @@ export const PROJECT_MEMORY_CATEGORIES = [
   "messaging_constraints",
   "legal_compliance",
   "team_process",
+  "specialist_context",
 ] as const;
 
 export type ProjectMemoryCategory = (typeof PROJECT_MEMORY_CATEGORIES)[number];
@@ -35,6 +36,7 @@ export interface MemoryRecord {
   memoryId: string;
   projectId: string;
   objectiveId: string | null;
+  specialistId: string | null;
   category: MemoryCategory;
   scope: MemoryScope;
   content: string;
@@ -56,6 +58,7 @@ export interface CreateMemoryOptions {
   source: string;
   createdBy: string;
   objectiveId?: string;
+  specialistId?: string;
   confidence?: number;
   userConfirmed?: boolean;
   supersedes?: string;
@@ -70,6 +73,7 @@ export interface UpdateMemoryOptions {
 export interface ListMemoriesOptions {
   projectId: string;
   objectiveId?: string;
+  specialistId?: string;
   category?: MemoryCategory;
   scope?: MemoryScope;
   activeOnly?: boolean;

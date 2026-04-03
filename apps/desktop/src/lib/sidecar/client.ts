@@ -881,6 +881,7 @@ export class SidecarClient {
   async listMemories(params: {
     projectId: string;
     objectiveId?: string;
+    specialistId?: string;
     category?: string;
     scope?: string;
     activeOnly?: boolean;
@@ -889,6 +890,9 @@ export class SidecarClient {
     query.set("projectId", params.projectId);
     if (params.objectiveId) {
       query.set("objectiveId", params.objectiveId);
+    }
+    if (params.specialistId) {
+      query.set("specialistId", params.specialistId);
     }
     if (params.category) {
       query.set("category", params.category);
