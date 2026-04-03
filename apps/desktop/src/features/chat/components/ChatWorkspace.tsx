@@ -300,9 +300,11 @@ export function ChatWorkspace({
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <div className="flex flex-col items-center gap-2.5">
-          <LoaderCircleIcon className="size-5 animate-spin text-muted-foreground/50" />
-          <p className="text-sm text-muted-foreground">Loading chat</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-primary/8">
+            <LoaderCircleIcon className="size-5 animate-spin text-primary/60" />
+          </div>
+          <p className="text-[13px] text-muted-foreground/60">Loading conversation...</p>
         </div>
       </div>
     );
@@ -595,7 +597,7 @@ function ChatSessionView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Agent/provider bar */}
-      <div className="flex items-center gap-3 border-b border-border/20 bg-card/40 px-4 py-2.5 lg:px-6">
+      <div className="flex items-center gap-3 border-b border-border/20 bg-card/30 px-4 py-2 lg:px-6">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           {effectiveSpecialistMeta && effectiveSpecialistId ? (
             <SpecialistChatHeader
