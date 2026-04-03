@@ -191,6 +191,27 @@ void test("ArtifactCard: uses ArrowRight icon for preview action", () => {
   );
 });
 
+void test("ArtifactCard: strips markdown from title via stripMarkdown", () => {
+  assert.ok(
+    artifactCardSrc.includes("stripMarkdown(artifact.title)"),
+    "Expected stripMarkdown applied to artifact.title",
+  );
+});
+
+void test("ArtifactCard: strips markdown from summary via stripMarkdown", () => {
+  assert.ok(
+    artifactCardSrc.includes("stripMarkdown(artifact.summary)"),
+    "Expected stripMarkdown applied to artifact.summary",
+  );
+});
+
+void test("ArtifactCard: imports stripMarkdown utility", () => {
+  assert.ok(
+    artifactCardSrc.includes("import { stripMarkdown }"),
+    "Expected stripMarkdown import in ArtifactCard",
+  );
+});
+
 // ---------------------------------------------------------------------------
 // BundleCard — structure and design system validation
 // ---------------------------------------------------------------------------

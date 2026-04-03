@@ -2,6 +2,7 @@ import { ArrowRightIcon } from "lucide-react";
 import type { ArtifactRecord } from "@opengoat/contracts";
 import { getArtifactTypeConfig, getArtifactStatusConfig } from "@/features/dashboard/lib/artifact-type-config";
 import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
+import { stripMarkdown } from "@/features/dashboard/lib/strip-markdown";
 
 export interface ArtifactCardProps {
   artifact: ArtifactRecord;
@@ -59,13 +60,13 @@ export function ArtifactCard({ artifact, specialistName, onPreview, onNavigate, 
 
         {/* Title */}
         <h3 className="truncate text-sm font-medium text-foreground">
-          {artifact.title}
+          {stripMarkdown(artifact.title)}
         </h3>
 
         {/* Summary (optional) */}
         {artifact.summary ? (
           <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-            {artifact.summary}
+            {stripMarkdown(artifact.summary)}
           </p>
         ) : null}
 
