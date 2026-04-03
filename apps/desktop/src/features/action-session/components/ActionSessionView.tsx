@@ -30,6 +30,7 @@ import {
   clearPersistedActionContext,
   readPersistedActionContext,
 } from "../lib/action-session-persistence";
+import { useAutoArtifacts } from "@/features/chat/hooks/useAutoArtifacts";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -264,6 +265,17 @@ function ActionSessionInner({
   }, [bootstrap.session.id]);
 
   const { clearError, error: chatError, messages, sendMessage, status } = useChat<ChatUIMessage>({ chat });
+
+  // Auto-persist outputs as artifacts for the RECENT OUTPUTS dashboard section
+  useAutoArtifacts({
+    messages,
+    status,
+    client,
+    agentId,
+    specialistId: bootstrap.session.specialistId,
+    sessionId: bootstrap.session.id,
+    minContentLength: 80, // Action sessions always produce intentional outputs
+  });
 
   // Surface errors from the useChat hook (e.g., transport/streaming failures)
   useEffect(() => {

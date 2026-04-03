@@ -69,6 +69,7 @@ import { SpecialistChatHeader } from "@/features/chat/components/SpecialistChatH
 import { detectGoalIntent } from "@/features/chat/lib/goal-detection";
 import { detectMemoryCandidates } from "@/features/chat/lib/memory-detection";
 import { detectHandoffSuggestions } from "@/features/chat/lib/handoff-detector";
+import { useAutoArtifacts } from "@/features/chat/hooks/useAutoArtifacts";
 import { useDismissedProposals } from "@/features/chat/hooks/useDismissedProposals";
 import { useDismissedMemories } from "@/features/chat/hooks/useDismissedMemories";
 import { useDismissedHandoffs } from "@/features/chat/hooks/useDismissedHandoffs";
@@ -487,6 +488,16 @@ function ChatSessionView({
     status,
     stop,
   } = useChat<ChatUIMessage>({ chat });
+
+  // Auto-persist outputs as artifacts for the RECENT OUTPUTS dashboard section
+  useAutoArtifacts({
+    messages,
+    status,
+    client,
+    agentId,
+    specialistId: effectiveSpecialistId,
+    sessionId: bootstrap.session.id,
+  });
 
   // Auto-send hidden prompt for action card execution
   useEffect(() => {
