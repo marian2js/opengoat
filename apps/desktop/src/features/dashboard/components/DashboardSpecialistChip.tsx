@@ -16,7 +16,7 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
     <button
       type="button"
       className={cn(
-        "group/chip flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-all duration-100",
+        "group/chip flex w-full items-start gap-3 rounded-lg border p-3.5 text-left transition-all duration-100",
         "hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-black/20",
         isManager
           ? "border-primary/20 bg-primary/[0.03] hover:border-primary/35"
@@ -27,8 +27,8 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
       {/* Icon */}
       <div
         className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-md",
-          isManager ? "bg-primary/12" : "bg-muted/60",
+          "flex size-8 shrink-0 items-center justify-center rounded-lg",
+          isManager ? "bg-primary/12" : "bg-muted/50 dark:bg-white/[0.06]",
         )}
       >
         <Icon
@@ -51,29 +51,14 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
             </span>
           ) : null}
         </div>
-        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground line-clamp-1">
+        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground/70 line-clamp-2">
           {specialist.role}
         </p>
-
-        {/* Example jobs from outputTypes */}
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {specialist.outputTypes.slice(0, 2).map((output) => (
-            <span
-              key={output}
-              className="rounded bg-muted/40 px-1.5 py-px text-[10px] text-muted-foreground/70"
-            >
-              {output}
-            </span>
-          ))}
-        </div>
       </div>
 
-      {/* Chat shortcut */}
-      <div className="flex shrink-0 items-center self-center opacity-0 transition-opacity group-hover/chip:opacity-100">
-        <span className="flex items-center gap-1 rounded-md bg-primary/8 px-2 py-1 text-[10px] font-medium text-primary">
-          <MessageSquareIcon className="size-3" />
-          Chat
-        </span>
+      {/* Chat arrow — revealed on hover */}
+      <div className="flex shrink-0 items-center self-center text-muted-foreground/30 transition-all duration-100 group-hover/chip:text-primary">
+        <MessageSquareIcon className="size-3.5" />
       </div>
     </button>
   );

@@ -20,6 +20,9 @@ export function DashboardAgentRoster({ specialists, onChat }: DashboardAgentRost
           <UsersIcon className="size-3 text-primary" />
         </div>
         <h2 className="section-label">Your AI Team</h2>
+        <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+          {specialists.length}
+        </span>
       </div>
 
       {/* CMO — full-width hero position */}

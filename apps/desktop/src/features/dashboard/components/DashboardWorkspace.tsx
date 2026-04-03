@@ -158,19 +158,19 @@ function DashboardContent({
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
       <div className="mx-auto w-full max-w-[1000px]">
-      {/* ── Company context — compact strip ── */}
-      <div className="mb-6 pb-4">
-        <CompanySummary
-          data={data}
-          domain={domain}
-          faviconSources={faviconSources}
-          isLoading={isLoading}
-          error={error}
-        />
-      </div>
+      {/* ── Hero area — company context + free-text input ── */}
+      <div className="mb-8 pb-6 border-b border-border/30 dark:border-white/[0.04]">
+        <div className="mb-5">
+          <CompanySummary
+            data={data}
+            domain={domain}
+            faviconSources={faviconSources}
+            isLoading={isLoading}
+            error={error}
+          />
+        </div>
 
-      {/* Free-text input — always the primary entry point */}
-      <div className="mb-6">
+        {/* Free-text input — always the primary entry point */}
         <FreeTextInput onSubmit={handleFreeTextSubmit} />
       </div>
 
