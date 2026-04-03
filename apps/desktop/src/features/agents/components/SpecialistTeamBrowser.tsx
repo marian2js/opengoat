@@ -119,20 +119,15 @@ export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowser
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
       {/* Page header */}
-      <div className="flex items-center gap-3">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/8">
-          <UsersIcon className="size-4.5 text-primary" />
-        </div>
-        <div>
-          <h1 className="font-display text-[22px] font-bold tracking-tight text-foreground">
-            Your AI Marketing Team
-          </h1>
-          <p className="text-[13px] text-muted-foreground">
-            Browse specialists and start a conversation with the right expert.
-          </p>
-        </div>
+      <div>
+        <h1 className="font-display text-[28px] font-bold tracking-[-0.02em] text-foreground">
+          Your AI Marketing Team
+        </h1>
+        <p className="mt-1.5 text-[14px] leading-relaxed text-muted-foreground">
+          Each specialist owns a distinct area of marketing. Start a conversation with the right expert.
+        </p>
       </div>
 
       {/* Error state */}
@@ -172,18 +167,26 @@ export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowser
             </div>
           ) : null}
 
-          {/* Specialist grid — 2 columns */}
+          {/* Section label for specialists */}
           {operationalSpecialists.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              {operationalSpecialists.map((specialist) => (
-                <SpecialistCard
-                  key={specialist.id}
-                  specialist={specialist}
-                  onChat={handleChat}
-                  recentOutputs={recentOutputsMap[specialist.id]}
-                  onOutputNavigate={handleOutputNavigate}
-                />
-              ))}
+            <div>
+              <div className="mb-4 flex items-center gap-2.5">
+                <h2 className="section-label">Specialists</h2>
+                <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+                  {operationalSpecialists.length}
+                </span>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {operationalSpecialists.map((specialist) => (
+                  <SpecialistCard
+                    key={specialist.id}
+                    specialist={specialist}
+                    onChat={handleChat}
+                    recentOutputs={recentOutputsMap[specialist.id]}
+                    onOutputNavigate={handleOutputNavigate}
+                  />
+                ))}
+              </div>
             </div>
           ) : null}
         </>

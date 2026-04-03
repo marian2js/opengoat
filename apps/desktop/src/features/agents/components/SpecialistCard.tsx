@@ -20,104 +20,110 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
   return (
     <article
       className={cn(
-        "group/card relative flex flex-col rounded-xl border bg-card p-5 transition-all hover:border-primary/25 hover:shadow-sm",
+        "group/card relative flex flex-col rounded-xl border bg-card transition-all duration-150",
+        "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20",
         isManager
-          ? "border-primary/20 bg-primary/[0.02]"
-          : "border-border/50",
+          ? "border-primary/20 bg-primary/[0.02] hover:border-primary/30"
+          : "border-border/40 hover:border-primary/20 dark:border-white/[0.06]",
       )}
     >
-      {/* Header: icon + name + role */}
-      <div className="flex items-start gap-3">
-        <div
-          className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-lg",
-            isManager ? "bg-primary/12" : "bg-muted/60",
-          )}
-        >
-          <Icon
+      {/* Card body */}
+      <div className="flex flex-1 flex-col p-5">
+        {/* Header: icon + name + role */}
+        <div className="flex items-start gap-3.5">
+          <div
             className={cn(
-              "size-4.5",
-              isManager ? "text-primary" : "text-muted-foreground",
+              "flex size-10 shrink-0 items-center justify-center rounded-xl",
+              isManager ? "bg-primary/12" : "bg-muted/50 dark:bg-white/[0.06]",
             )}
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="font-display text-[15px] font-bold tracking-tight text-foreground">
-              {specialist.name}
-            </h3>
-            {isManager ? (
-              <span className="rounded-md bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-primary">
-                Lead
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
-            {specialist.role}
-          </p>
-        </div>
-      </div>
-
-      {/* Reason to exist */}
-      <p className="mt-3 text-[13px] leading-relaxed text-foreground/80">
-        {specialist.reasonToExist}
-      </p>
-
-      {/* Output types as deliverable chips */}
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {specialist.outputTypes.slice(0, 4).map((output) => (
-          <span
-            key={output}
-            className="rounded-md bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground"
           >
-            {output}
-          </span>
-        ))}
-      </div>
-
-      {/* Recent outputs — only shown when outputs exist */}
-      {outputs.length > 0 ? (
-        <div className="mt-3 flex flex-col gap-1">
-          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-            <PackageIcon className="size-3 shrink-0" />
-            Recent outputs
+            <Icon
+              className={cn(
+                "size-5",
+                isManager ? "text-primary" : "text-muted-foreground",
+              )}
+            />
           </div>
-          <div className="flex flex-col gap-0.5">
-            {outputs.map((artifact) => (
-              <div
-                key={artifact.artifactId}
-                role="button"
-                tabIndex={0}
-                className="group/output flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] transition-colors hover:bg-muted/40"
-                onClick={() => onOutputNavigate?.(artifact)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onOutputNavigate?.(artifact);
-                  }
-                }}
-              >
-                <span className="size-1 shrink-0 rounded-full bg-primary/40" />
-                <span className="min-w-0 flex-1 truncate text-foreground/70 group-hover/output:text-foreground">
-                  {humanizeOutputLabel(artifact.title)}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="font-display text-[16px] font-bold tracking-tight text-foreground">
+                {specialist.name}
+              </h3>
+              {isManager ? (
+                <span className="rounded-md bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-primary">
+                  Lead
                 </span>
-                <span className="shrink-0 text-muted-foreground/50">
-                  {formatRelativeTime(artifact.createdAt)}
-                </span>
-              </div>
-            ))}
+              ) : null}
+            </div>
+            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+              {specialist.role}
+            </p>
           </div>
         </div>
-      ) : null}
 
-      {/* CTA */}
-      <div className="mt-4 pt-3 border-t border-border/30">
+        {/* Reason to exist */}
+        <p className="mt-3.5 text-[13px] leading-[1.6] text-foreground/75">
+          {specialist.reasonToExist}
+        </p>
+
+        {/* Output types as deliverable chips */}
+        <div className="mt-3.5 flex flex-wrap gap-1.5">
+          {specialist.outputTypes.slice(0, 4).map((output) => (
+            <span
+              key={output}
+              className="rounded-md bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground/80 dark:bg-white/[0.04]"
+            >
+              {output}
+            </span>
+          ))}
+        </div>
+
+        {/* Recent outputs — only shown when outputs exist */}
+        {outputs.length > 0 ? (
+          <div className="mt-4 flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5">
+              <PackageIcon className="size-3 shrink-0 text-muted-foreground/50" />
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
+                Recent outputs
+              </span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              {outputs.map((artifact) => (
+                <div
+                  key={artifact.artifactId}
+                  role="button"
+                  tabIndex={0}
+                  className="group/output flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-muted/40 dark:hover:bg-white/[0.04]"
+                  onClick={() => onOutputNavigate?.(artifact)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onOutputNavigate?.(artifact);
+                    }
+                  }}
+                >
+                  <span className="size-1 shrink-0 rounded-full bg-primary/40" />
+                  <span className="min-w-0 flex-1 truncate text-foreground/70 group-hover/output:text-foreground">
+                    {humanizeOutputLabel(artifact.title)}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground/40">
+                    {formatRelativeTime(artifact.createdAt)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {/* CTA — separated footer */}
+      <div className="border-t border-border/20 px-5 py-3 dark:border-white/[0.04]">
         <Button
           size="sm"
           variant={isManager ? "default" : "outline"}
           className={cn(
-            "h-8 w-full rounded-md text-[12px] font-medium",
-            !isManager && "hover:border-primary/40 hover:text-primary",
+            "h-8 w-full rounded-lg text-[12px] font-medium",
+            !isManager && "border-border/40 hover:border-primary/40 hover:text-primary dark:border-white/[0.08]",
           )}
           onClick={() => onChat(specialist.id)}
         >
