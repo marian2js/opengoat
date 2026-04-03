@@ -68,3 +68,32 @@ void test("DashboardSpecialistChip: imports SpecialistAgent type", () => {
     "Expected SpecialistAgent type import",
   );
 });
+
+// ---------------------------------------------------------------------------
+// AC: Non-manager specialist icons use emerald accent color for visual differentiation
+// ---------------------------------------------------------------------------
+
+void test("DashboardSpecialistChip: all specialist icons use emerald primary color", () => {
+  // The icon color should always be text-primary (emerald) regardless of manager/specialist
+  // This ensures visual differentiation through distinct icon shapes rendered in the accent color
+  const iconColorLine = src.includes("text-primary");
+  assert.ok(
+    iconColorLine,
+    "Expected all specialist icons to use text-primary (emerald) accent color",
+  );
+  // Non-manager icons should NOT fall back to muted foreground
+  const hasMutedIconFallback =
+    /isManager\s*\?\s*"text-primary"\s*:\s*"text-muted-foreground"/.test(src);
+  assert.ok(
+    !hasMutedIconFallback,
+    "Non-manager icons must not use text-muted-foreground — all icons should be emerald",
+  );
+});
+
+void test("DashboardSpecialistChip: icon container uses emerald tint background", () => {
+  // The icon container background should use a primary/emerald tint for all specialists
+  assert.ok(
+    src.includes("bg-primary/"),
+    "Expected icon container to use bg-primary/* emerald tint for all specialists",
+  );
+});

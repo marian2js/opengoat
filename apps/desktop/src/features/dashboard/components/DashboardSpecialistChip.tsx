@@ -28,14 +28,11 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
       <div
         className={cn(
           "flex size-8 shrink-0 items-center justify-center rounded-lg",
-          isManager ? "bg-primary/12" : "bg-muted/50 dark:bg-white/[0.06]",
+          isManager ? "bg-primary/12" : "bg-primary/[0.08] dark:bg-primary/[0.08]",
         )}
       >
         <Icon
-          className={cn(
-            "size-3.5",
-            isManager ? "text-primary" : "text-muted-foreground",
-          )}
+          className="size-3.5 text-primary"
         />
       </div>
 

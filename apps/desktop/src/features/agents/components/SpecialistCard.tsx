@@ -34,14 +34,11 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
           <div
             className={cn(
               "flex size-10 shrink-0 items-center justify-center rounded-xl",
-              isManager ? "bg-primary/12" : "bg-muted/50 dark:bg-white/[0.06]",
+              isManager ? "bg-primary/12" : "bg-primary/[0.08] dark:bg-primary/[0.08]",
             )}
           >
             <Icon
-              className={cn(
-                "size-5",
-                isManager ? "text-primary" : "text-muted-foreground",
-              )}
+              className="size-5 text-primary"
             />
           </div>
           <div className="min-w-0 flex-1">

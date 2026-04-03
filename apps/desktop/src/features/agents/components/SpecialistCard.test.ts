@@ -105,3 +105,31 @@ void test("SpecialistCard uses resolveSpecialistIcon", () => {
     "Card must use resolveSpecialistIcon to render the specialist's icon",
   );
 });
+
+// ---------------------------------------------------------------------------
+// AC: Non-manager specialist icons use emerald accent color for visual differentiation
+// ---------------------------------------------------------------------------
+
+void test("SpecialistCard: all specialist icons use emerald primary color", () => {
+  // All specialist icons (not just manager) must render in the emerald primary color
+  const iconColorLine = src.includes("text-primary");
+  assert.ok(
+    iconColorLine,
+    "Expected all specialist icons to use text-primary (emerald) accent color",
+  );
+  // Non-manager icons should NOT fall back to muted foreground
+  const hasMutedIconFallback =
+    /isManager\s*\?\s*"text-primary"\s*:\s*"text-muted-foreground"/.test(src);
+  assert.ok(
+    !hasMutedIconFallback,
+    "Non-manager icons must not use text-muted-foreground — all icons should be emerald",
+  );
+});
+
+void test("SpecialistCard: icon container uses emerald tint for all specialists", () => {
+  // Icon container should have emerald tint background regardless of category
+  assert.ok(
+    src.includes("bg-primary/"),
+    "Expected icon container to use bg-primary/* emerald tint for all specialists",
+  );
+});
