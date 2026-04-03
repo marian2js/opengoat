@@ -181,9 +181,9 @@ describe("Dashboard simplification — Sprint 5 reset", () => {
       expect(src).toMatch(/output/);
     });
 
-    it("ActionCardGrid does not use 'Quick Actions' heading", () => {
+    it("ActionCardGrid uses 'Quick Actions' heading", () => {
       const src = readSrc("components/ActionCardGrid.tsx");
-      expect(src).not.toContain("Quick Actions");
+      expect(src).toContain("Quick Actions");
     });
   });
 
