@@ -28,6 +28,7 @@ import { SidecarClient } from "@/lib/sidecar/client";
 import { toast } from "sonner";
 import { deduplicateLabel } from "@/lib/utils/deduplicate-label";
 import { getActionMapping, getCompletedActionIds, setActionMapping } from "@/lib/utils/action-map";
+import { getSpecialistMeta } from "@/features/agents/specialist-meta";
 import {
   buildRefineContextPrompt,
   buildRefineContextLabel,
@@ -416,6 +417,36 @@ export function App() {
     [],
   );
 
+  // Auto-create a specialist session when navigating to #chat?specialist=<id>
+  const specialistCreatingRef = useRef(false);
+  useEffect(() => {
+    if (!currentSpecialistId || !client || !activeAgentId || hashView !== "chat") {
+      return;
+    }
+    if (specialistCreatingRef.current) {
+      return;
+    }
+    specialistCreatingRef.current = true;
+
+    void (async () => {
+      try {
+        const session = await client.createSession({
+          agentId: activeAgentId,
+          specialistId: currentSpecialistId,
+        });
+        setSessions((prev) => [session, ...prev]);
+        setActiveSessionId(session.id);
+        // Clean the hash to prevent duplicate creation on re-render
+        window.location.hash = "#chat";
+      } catch (error) {
+        console.error("Failed to create specialist session", error);
+        toast.error("Failed to start specialist chat. Please try again.");
+      } finally {
+        specialistCreatingRef.current = false;
+      }
+    })();
+  }, [currentSpecialistId, client, activeAgentId, hashView]);
+
   // Show onboarding if no provider selected, no agents exist, or user navigated to add connection.
   // Skip if bootstrap is already in progress (agent was just created, hydration may still be running).
   const needsOnboarding = !bootstrapContext && (!authOverview?.selectedProviderId || !activeAgentId);
@@ -563,7 +594,7 @@ export function App() {
                 authOverview={authOverview}
                 client={client}
                 currentSpecialistId={currentSpecialistId}
-                currentSpecialistName={currentSpecialistId ? SPECIALIST_NAMES[currentSpecialistId] : undefined}
+                currentSpecialistName={currentSpecialistId ? getSpecialistMeta(currentSpecialistId)?.name : undefined}
                 initialScope={pendingChatScope}
                 onBootstrap={handleBootstrap}
                 onHandoffContextConsumed={() => {
@@ -709,14 +740,3 @@ function readSpecialistFromHash(): string | undefined {
   return specialist ?? undefined;
 }
 
-/** Known specialist ID → name mapping (matches specialist-registry.ts). */
-const SPECIALIST_NAMES: Record<string, string> = {
-  cmo: "CMO",
-  "market-intel": "Market Intel",
-  positioning: "Positioning",
-  "website-conversion": "Website Conversion",
-  "seo-aeo": "SEO/AEO",
-  distribution: "Distribution",
-  content: "Content",
-  outbound: "Outbound",
-};

@@ -64,6 +64,8 @@ import { ScopeIndicator } from "@/features/chat/components/ScopeIndicator";
 import { ObjectiveBanner } from "@/features/chat/components/ObjectiveBanner";
 import { SidecarClient } from "@/lib/sidecar/client";
 import { isUnnamedSession } from "@/lib/utils/unnamed-session";
+import { getSpecialistMeta } from "@/features/agents/specialist-meta";
+import { SpecialistChatHeader } from "@/features/chat/components/SpecialistChatHeader";
 import { detectGoalIntent } from "@/features/chat/lib/goal-detection";
 import { detectMemoryCandidates } from "@/features/chat/lib/memory-detection";
 import { detectHandoffSuggestions } from "@/features/chat/lib/handoff-detector";
@@ -426,6 +428,12 @@ function ChatSessionView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialScope]);
 
+  // Effective specialist: prefer URL param, fall back to session metadata
+  const effectiveSpecialistId = currentSpecialistId ?? bootstrap.session.specialistId;
+  const effectiveSpecialistMeta = effectiveSpecialistId
+    ? getSpecialistMeta(effectiveSpecialistId)
+    : undefined;
+
   // Re-use existing Chat instance if one exists (preserves streaming state)
   const chat = useMemo(() => {
     const existing = chatCache.get(bootstrap.session.id);
@@ -445,7 +453,7 @@ function ChatSessionView({
         }
         return null;
       },
-      specialistId: currentSpecialistId,
+      specialistId: currentSpecialistId ?? bootstrap.session.specialistId,
       sessionId: bootstrap.session.id,
     });
     const instance = new Chat<ChatUIMessage>({
@@ -578,10 +586,19 @@ function ChatSessionView({
       {/* Agent/provider bar */}
       <div className="flex items-center gap-3 border-b border-border/20 bg-card/40 px-4 py-2.5 lg:px-6">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
-            <BotIcon className="size-3" />
-            {bootstrap.agent.name}
-          </span>
+          {effectiveSpecialistMeta && effectiveSpecialistId ? (
+            <SpecialistChatHeader
+              specialistId={effectiveSpecialistId}
+              specialistName={effectiveSpecialistMeta.name}
+              specialistRole={effectiveSpecialistMeta.role}
+              specialistIcon={effectiveSpecialistMeta.icon}
+            />
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+              <BotIcon className="size-3" />
+              {bootstrap.agent.name}
+            </span>
+          )}
           {providerName ? (
             <span className="rounded-md bg-muted/40 px-2 py-0.5 font-mono text-[10px] text-muted-foreground/50">
               {providerName}
@@ -637,7 +654,7 @@ function ChatSessionView({
                   Start a conversation
                 </h1>
                 <p className="text-[13px] leading-relaxed text-muted-foreground/60">
-                  Ask {bootstrap.agent.name} about marketing strategy, growth, and content.
+                  Ask {effectiveSpecialistMeta?.name ?? bootstrap.agent.name} about marketing strategy, growth, and content.
                 </p>
               </div>
             </div>
@@ -712,7 +729,7 @@ function ChatSessionView({
             <AttachmentPreviews />
           </PromptInputHeader>
           <PromptInputTextarea
-            placeholder={`Message ${bootstrap.agent.name}...`}
+            placeholder={`Message ${effectiveSpecialistMeta?.name ?? bootstrap.agent.name}...`}
           />
           <PromptInputFooter>
             <PromptInputActionMenu>

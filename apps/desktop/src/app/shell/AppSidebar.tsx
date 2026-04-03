@@ -38,6 +38,8 @@ import { getDeEmphasizedSessionIds } from "@/lib/utils/session-rerun";
 import { humanizeSessionLabel } from "@/lib/utils/session-label";
 import { isUnnamedSession } from "@/lib/utils/unnamed-session";
 import { cn } from "@/lib/utils";
+import { getSpecialistMeta } from "@/features/agents/specialist-meta";
+import { resolveSpecialistIcon } from "@/features/agents/specialist-icons";
 import {
   Collapsible,
   CollapsibleContent,
@@ -624,7 +626,12 @@ function SessionItem({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const label = formatSessionLabel(session);
   const unnamed = isUnnamedSession(session.label);
-  const Icon = isAction ? ZapIcon : MessageSquareIcon;
+  const specialistMeta = session.specialistId ? getSpecialistMeta(session.specialistId) : undefined;
+  const Icon = isAction
+    ? ZapIcon
+    : specialistMeta
+      ? resolveSpecialistIcon(specialistMeta.icon)
+      : MessageSquareIcon;
   const badge = isAction && actionMeta ? STATE_BADGE_MAP[actionMeta.state] : null;
 
   function commitRename(): void {
@@ -673,7 +680,7 @@ function SessionItem({
           unnamed && !isActive && "text-sidebar-foreground/50",
         )}
       >
-        <Icon className={cn("shrink-0", isAction && "text-primary")} />
+        <Icon className={cn("shrink-0", (isAction || specialistMeta) && "text-primary")} />
         <span className={cn(
           "truncate",
           unnamed
@@ -682,6 +689,11 @@ function SessionItem({
               ? "font-medium"
               : "font-normal",
         )}>{label}</span>
+        {specialistMeta && !isAction ? (
+          <span className="shrink-0 text-[10px] font-medium text-primary/50">
+            {specialistMeta.name}
+          </span>
+        ) : null}
         {timestamp ? <span className="shrink-0 text-[11px] font-normal text-sidebar-foreground/40"> · {timestamp}</span> : null}
         {badge ? (
           <span className={cn(
