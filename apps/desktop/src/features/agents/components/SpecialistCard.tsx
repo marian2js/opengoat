@@ -23,7 +23,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
         "group/card relative flex flex-col rounded-xl border bg-card transition-all duration-150",
         "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20",
         isManager
-          ? "border-primary/20 bg-primary/[0.02] hover:border-primary/30"
+          ? "border-primary/20 bg-primary/[0.02] ring-1 ring-primary/[0.06] hover:border-primary/30 hover:ring-primary/10"
           : "border-border/40 hover:border-primary/20 dark:border-white/[0.06]",
       )}
     >
@@ -33,8 +33,10 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
         <div className="flex items-start gap-3.5">
           <div
             className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-xl",
-              isManager ? "bg-primary/12" : "bg-primary/[0.08] dark:bg-primary/[0.08]",
+              "flex size-10 shrink-0 items-center justify-center rounded-xl shadow-sm",
+              isManager
+                ? "bg-primary/12 ring-1 ring-primary/15"
+                : "bg-primary/[0.08] dark:bg-primary/[0.08]",
             )}
           >
             <Icon
