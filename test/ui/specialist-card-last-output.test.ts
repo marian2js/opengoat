@@ -18,30 +18,26 @@ const teamBrowserSrc = readFileSync(
   "utf-8",
 );
 
-describe("SpecialistCard last output display", () => {
-  it("SpecialistCard accepts a lastOutput prop", () => {
-    expect(specialistCardSrc).toMatch(/lastOutput/);
+describe("SpecialistCard recent outputs display", () => {
+  it("SpecialistCard accepts a recentOutputs prop", () => {
+    expect(specialistCardSrc).toMatch(/recentOutputs/);
   });
 
-  it("renders last output title when provided", () => {
-    // Should display the output title in the card
-    expect(specialistCardSrc).toMatch(/lastOutput.*title|title.*lastOutput/s);
+  it("renders output titles from the array", () => {
+    expect(specialistCardSrc).toMatch(/recentOutputs.*map/s);
   });
 
-  it("renders relative time for last output", () => {
-    // Should display relative time (e.g., '2 hours ago')
-    expect(specialistCardSrc).toMatch(/lastOutput.*time|timeAgo|relativeTime|formatRelative/s);
+  it("renders relative time for each output", () => {
+    expect(specialistCardSrc).toMatch(/formatRelativeTime/);
   });
 
-  it("does not render output line when lastOutput is undefined", () => {
-    // Should conditionally render based on lastOutput presence
-    expect(specialistCardSrc).toMatch(/lastOutput\s*[?&]/);
+  it("does not render section when recentOutputs is empty", () => {
+    expect(specialistCardSrc).toMatch(/outputs\.length/);
   });
 });
 
 describe("SpecialistTeamBrowser passes output data", () => {
-  it("fetches or provides last output data to SpecialistCard", () => {
-    // The browser should pass lastOutput prop to SpecialistCard
-    expect(teamBrowserSrc).toMatch(/lastOutput/);
+  it("passes recentOutputs to SpecialistCard", () => {
+    expect(teamBrowserSrc).toMatch(/recentOutputs=/);
   });
 });

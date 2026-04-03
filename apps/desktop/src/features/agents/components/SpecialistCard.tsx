@@ -1,24 +1,21 @@
-import type { SpecialistAgent } from "@opengoat/contracts";
+import type { ArtifactRecord, SpecialistAgent } from "@opengoat/contracts";
 import { MessageSquareIcon, PackageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { resolveSpecialistIcon } from "@/features/agents/specialist-icons";
 import { humanizeOutputLabel, formatRelativeTime } from "@/lib/utils/output-labels";
 
-export interface SpecialistLastOutput {
-  title: string;
-  createdAt: string;
-}
-
 interface SpecialistCardProps {
   specialist: SpecialistAgent;
   onChat: (specialistId: string) => void;
-  lastOutput?: SpecialistLastOutput | null;
+  recentOutputs?: ArtifactRecord[];
+  onOutputNavigate?: (artifact: ArtifactRecord) => void;
 }
 
-export function SpecialistCard({ specialist, onChat, lastOutput }: SpecialistCardProps) {
+export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavigate }: SpecialistCardProps) {
   const Icon = resolveSpecialistIcon(specialist.icon);
   const isManager = specialist.category === "manager";
+  const outputs = recentOutputs?.length ? recentOutputs : [];
 
   return (
     <article
@@ -78,16 +75,38 @@ export function SpecialistCard({ specialist, onChat, lastOutput }: SpecialistCar
         ))}
       </div>
 
-      {/* Last output — only shown when available */}
-      {lastOutput ? (
-        <div className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <PackageIcon className="size-3 shrink-0" />
-          <span className="truncate">
-            {humanizeOutputLabel(lastOutput.title)}
-          </span>
-          <span className="shrink-0 text-muted-foreground/60">
-            — {formatRelativeTime(lastOutput.createdAt)}
-          </span>
+      {/* Recent outputs — only shown when outputs exist */}
+      {outputs.length > 0 ? (
+        <div className="mt-3 flex flex-col gap-1">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+            <PackageIcon className="size-3 shrink-0" />
+            Recent outputs
+          </div>
+          <div className="flex flex-col gap-0.5">
+            {outputs.map((artifact) => (
+              <div
+                key={artifact.artifactId}
+                role="button"
+                tabIndex={0}
+                className="group/output flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] transition-colors hover:bg-muted/40"
+                onClick={() => onOutputNavigate?.(artifact)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onOutputNavigate?.(artifact);
+                  }
+                }}
+              >
+                <span className="size-1 shrink-0 rounded-full bg-primary/40" />
+                <span className="min-w-0 flex-1 truncate text-foreground/70 group-hover/output:text-foreground">
+                  {humanizeOutputLabel(artifact.title)}
+                </span>
+                <span className="shrink-0 text-muted-foreground/50">
+                  {formatRelativeTime(artifact.createdAt)}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 

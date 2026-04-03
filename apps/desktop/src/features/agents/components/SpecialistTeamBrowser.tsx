@@ -2,8 +2,11 @@ import type { ArtifactRecord, SpecialistAgent } from "@opengoat/contracts";
 import { useEffect, useState } from "react";
 import { AlertCircleIcon, LoaderCircleIcon, UsersIcon } from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
+import { getActionMapping } from "@/lib/utils/action-map";
 import { SpecialistCard } from "./SpecialistCard";
-import type { SpecialistLastOutput } from "./SpecialistCard";
+
+/** Max recent outputs shown per specialist card */
+const MAX_OUTPUTS_PER_SPECIALIST = 3;
 
 interface SpecialistTeamBrowserProps {
   client: SidecarClient | null;
@@ -14,7 +17,7 @@ export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowser
   const [specialists, setSpecialists] = useState<SpecialistAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastOutputMap, setLastOutputMap] = useState<Record<string, SpecialistLastOutput>>({});
+  const [recentOutputsMap, setRecentOutputsMap] = useState<Record<string, ArtifactRecord[]>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -57,7 +60,7 @@ export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowser
     };
   }, [client]);
 
-  // Fetch recent artifacts and map to specialists by createdBy field
+  // Fetch recent artifacts and build per-specialist arrays
   useEffect(() => {
     if (!client || !agentId) return;
     let cancelled = false;
@@ -66,20 +69,20 @@ export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowser
       .listArtifacts({ projectId: agentId, limit: 30 })
       .then((page) => {
         if (cancelled) return;
-        const map: Record<string, SpecialistLastOutput> = {};
+        const map: Record<string, ArtifactRecord[]> = {};
         for (const artifact of page.items) {
           const specialistId = artifact.createdBy;
           if (!map[specialistId]) {
-            map[specialistId] = {
-              title: artifact.title,
-              createdAt: artifact.createdAt,
-            };
+            map[specialistId] = [];
+          }
+          if (map[specialistId].length < MAX_OUTPUTS_PER_SPECIALIST) {
+            map[specialistId].push(artifact);
           }
         }
-        setLastOutputMap(map);
+        setRecentOutputsMap(map);
       })
       .catch(() => {
-        // Silently ignore — last output is non-critical
+        // Silently ignore — recent outputs are non-critical
       });
 
     return () => { cancelled = true; };
@@ -87,6 +90,26 @@ export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowser
 
   function handleChat(specialistId: string): void {
     window.location.hash = `#chat?specialist=${encodeURIComponent(specialistId)}`;
+  }
+
+  function handleOutputNavigate(artifact: ArtifactRecord): void {
+    // Try to find the session via the run ID mapping
+    if (artifact.runId) {
+      const sessionId = getActionMapping(artifact.runId);
+      if (sessionId) {
+        window.location.hash = "#chat";
+        return;
+      }
+    }
+
+    // Fallback: navigate to specialist chat if createdBy matches
+    if (artifact.createdBy) {
+      window.location.hash = `#chat?specialist=${encodeURIComponent(artifact.createdBy)}`;
+      return;
+    }
+
+    // Last resort: go to general chat
+    window.location.hash = "#chat";
   }
 
   // Separate manager (CMO) from specialists for layout
@@ -140,7 +163,12 @@ export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowser
           {/* CMO / Manager card — full width hero */}
           {manager ? (
             <div>
-              <SpecialistCard specialist={manager} onChat={handleChat} lastOutput={lastOutputMap[manager.id]} />
+              <SpecialistCard
+                specialist={manager}
+                onChat={handleChat}
+                recentOutputs={recentOutputsMap[manager.id]}
+                onOutputNavigate={handleOutputNavigate}
+              />
             </div>
           ) : null}
 
@@ -152,7 +180,8 @@ export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowser
                   key={specialist.id}
                   specialist={specialist}
                   onChat={handleChat}
-                  lastOutput={lastOutputMap[specialist.id]}
+                  recentOutputs={recentOutputsMap[specialist.id]}
+                  onOutputNavigate={handleOutputNavigate}
                 />
               ))}
             </div>
