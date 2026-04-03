@@ -216,9 +216,10 @@ select {
 
 /* ─── Dashboard section — consistent rhythm between major sections ─── */
 .dashboard-section {
-  padding-top: 24px;
+  padding-top: 28px;
+  margin-top: 4px;
   border-top: 1px solid;
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.04);
 }
 
 :root[class~="light"] .dashboard-section,
