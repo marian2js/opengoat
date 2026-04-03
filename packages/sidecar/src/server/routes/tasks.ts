@@ -4,12 +4,13 @@ import {
   addTaskWorklogRequestSchema,
   createTaskFromRunRequestSchema,
   deleteTasksRequestSchema,
+  setLeadingTaskRequestSchema,
   updateTaskStatusRequestSchema,
 } from "@opengoat/contracts";
 import { Hono } from "hono";
 import type { SidecarRuntime } from "../context.ts";
 
-const DEFAULT_ACTOR_ID = "sidecar";
+const DEFAULT_ACTOR_ID = "goat";
 
 export function createTaskRoutes(runtime: SidecarRuntime): Hono {
   const app = new Hono();
@@ -33,6 +34,45 @@ export function createTaskRoutes(runtime: SidecarRuntime): Hono {
 
     return context.json(result);
   });
+
+  // ── Leading task ──────────────────────────────────────────────────
+  // These routes MUST appear before /:taskId to avoid being caught by it.
+
+  app.get("/leading", async (context) => {
+    const task = await runtime.boardService.getLeadingTask(
+      runtime.opengoatPaths,
+    );
+
+    if (!task) {
+      return context.body(null, 204);
+    }
+
+    return context.json(task);
+  });
+
+  app.put("/leading", async (context) => {
+    const body = setLeadingTaskRequestSchema.parse(await context.req.json());
+
+    try {
+      const task = await runtime.boardService.setLeadingTask(
+        runtime.opengoatPaths,
+        body.taskId,
+      );
+      return context.json(task);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("does not exist")) {
+        return context.json({ error: error.message }, 404);
+      }
+      throw error;
+    }
+  });
+
+  app.delete("/leading", async (context) => {
+    await runtime.boardService.clearLeadingTask(runtime.opengoatPaths);
+    return context.body(null, 204);
+  });
+
+  // ── Individual task routes ──────────────────────────────────────────
 
   app.get("/:taskId", async (context) => {
     const taskId = context.req.param("taskId");

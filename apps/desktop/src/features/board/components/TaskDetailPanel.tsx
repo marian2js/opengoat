@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskDetail } from "@/features/board/hooks/useTaskDetail";
 import { useLinkedEntities } from "@/features/board/hooks/useLinkedEntities";
@@ -52,12 +52,20 @@ export function TaskDetailPanel({
     [task, linked.artifacts],
   );
 
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const handleStatusChange = useCallback(
     async (status: string, reason?: string) => {
       if (!taskId) return;
-      await client.updateTaskStatus(taskId, status, reason, task?.owner);
-      refresh();
-      onTaskUpdated();
+      setActionError(null);
+      try {
+        await client.updateTaskStatus(taskId, status, reason, task?.owner);
+        refresh();
+        onTaskUpdated();
+      } catch (err) {
+        console.error("Failed to update task status:", err);
+        setActionError(err instanceof Error ? err.message : "Failed to update task status.");
+      }
     },
     [taskId, client, refresh, onTaskUpdated, task],
   );
@@ -65,9 +73,15 @@ export function TaskDetailPanel({
   const handleAddBlocker = useCallback(
     async (content: string) => {
       if (!taskId) return;
-      await client.addTaskBlocker(taskId, content, task?.owner);
-      refresh();
-      onTaskUpdated();
+      setActionError(null);
+      try {
+        await client.addTaskBlocker(taskId, content, task?.owner);
+        refresh();
+        onTaskUpdated();
+      } catch (err) {
+        console.error("Failed to add blocker:", err);
+        setActionError(err instanceof Error ? err.message : "Failed to add blocker.");
+      }
     },
     [taskId, client, refresh, onTaskUpdated, task],
   );
@@ -75,9 +89,15 @@ export function TaskDetailPanel({
   const handleAddArtifact = useCallback(
     async (content: string) => {
       if (!taskId) return;
-      await client.addTaskArtifact(taskId, content, task?.owner);
-      refresh();
-      onTaskUpdated();
+      setActionError(null);
+      try {
+        await client.addTaskArtifact(taskId, content, task?.owner);
+        refresh();
+        onTaskUpdated();
+      } catch (err) {
+        console.error("Failed to add artifact:", err);
+        setActionError(err instanceof Error ? err.message : "Failed to add artifact.");
+      }
     },
     [taskId, client, refresh, onTaskUpdated, task],
   );
@@ -85,12 +105,31 @@ export function TaskDetailPanel({
   const handleAddWorklog = useCallback(
     async (content: string) => {
       if (!taskId) return;
-      await client.addTaskWorklog(taskId, content, task?.owner);
-      refresh();
-      onTaskUpdated();
+      setActionError(null);
+      try {
+        await client.addTaskWorklog(taskId, content, task?.owner);
+        refresh();
+        onTaskUpdated();
+      } catch (err) {
+        console.error("Failed to add worklog:", err);
+        setActionError(err instanceof Error ? err.message : "Failed to add worklog.");
+      }
     },
     [taskId, client, refresh, onTaskUpdated, task],
   );
+
+  const handleDelete = useCallback(async () => {
+    if (!taskId) return;
+    setActionError(null);
+    try {
+      await client.deleteTasks([taskId]);
+      onClose();
+      onTaskUpdated();
+    } catch (err) {
+      console.error("Failed to delete task:", err);
+      setActionError(err instanceof Error ? err.message : "Failed to delete task.");
+    }
+  }, [taskId, client, onClose, onTaskUpdated]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -131,6 +170,15 @@ export function TaskDetailPanel({
               </DialogDescription>
             </DialogHeader>
 
+            {actionError && (
+              <div className="mx-4 mt-2 flex items-center justify-between rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                <span>{actionError}</span>
+                <button type="button" onClick={() => setActionError(null)} className="ml-2 shrink-0 font-medium underline hover:no-underline">
+                  Dismiss
+                </button>
+              </div>
+            )}
+
             <div className="flex-1 space-y-0 overflow-y-auto px-4 pb-4">
               {/* Description */}
               {task.description && (
@@ -158,6 +206,7 @@ export function TaskDetailPanel({
                 onAddBlocker={handleAddBlocker}
                 onAddArtifact={handleAddArtifact}
                 onAddWorklog={handleAddWorklog}
+                onDelete={handleDelete}
               />
             </DialogFooter>
           </>

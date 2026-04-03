@@ -6,6 +6,10 @@ import { AgentsWorkspace } from "@/features/agents/components/AgentsWorkspace";
 import { ChatWorkspace, evictChatSession, isActionSession, markActionSession } from "@/features/chat/components/ChatWorkspace";
 import type { ChatScope } from "@/features/chat/lib/chat-scope";
 import { ActionSessionView } from "@/features/action-session/components/ActionSessionView";
+import {
+  persistActionContext,
+  clearPersistedActionContext,
+} from "@/features/action-session/lib/action-session-persistence";
 import { setActionSessionMeta } from "@/features/action-session/lib/action-session-state";
 import { ConnectionsWorkspace } from "@/features/connections/components/ConnectionsWorkspace";
 import { AddProjectDialog } from "@/features/onboarding/components/AddProjectDialog";
@@ -181,20 +185,6 @@ export function App() {
     };
   }, [retryToken, selectedAgentId]);
 
-  useEffect(() => {
-    const onHashChange = (): void => {
-      setHashView(readViewFromHash());
-      setBrainSection(readBrainSectionFromHash());
-      setObjectiveId(readObjectiveIdFromHash());
-      setObjectiveTab(readObjectiveTabFromHash());
-    };
-
-    window.addEventListener("hashchange", onHashChange);
-    return () => {
-      window.removeEventListener("hashchange", onHashChange);
-    };
-  }, []);
-
   const refreshSessions = useCallback(async () => {
     if (!client || !activeAgentId) {
       return;
@@ -207,6 +197,36 @@ export function App() {
     }
   }, [client, activeAgentId]);
 
+  // Use refs to track bootstrapContext and refreshSessions inside the
+  // hashchange listener so the closure always sees the latest values.
+  const bootstrapContextRef = useRef(bootstrapContext);
+  bootstrapContextRef.current = bootstrapContext;
+
+  const refreshSessionsRef = useRef(refreshSessions);
+  refreshSessionsRef.current = refreshSessions;
+
+  useEffect(() => {
+    const onHashChange = (): void => {
+      const newView = readViewFromHash();
+      setHashView(newView);
+      setBrainSection(readBrainSectionFromHash());
+      setObjectiveId(readObjectiveIdFromHash());
+      setObjectiveTab(readObjectiveTabFromHash());
+
+      // If the user explicitly navigates while bootstrap is showing,
+      // clear the bootstrap context so they aren't trapped.
+      if (bootstrapContextRef.current) {
+        setBootstrapContext(null);
+        void refreshSessionsRef.current();
+      }
+    };
+
+    window.addEventListener("hashchange", onHashChange);
+    return () => {
+      window.removeEventListener("hashchange", onHashChange);
+    };
+  }, []);
+
   const handleNewChat = useCallback(async () => {
     if (!client || !activeAgentId) {
       return;
@@ -218,6 +238,7 @@ export function App() {
       window.location.hash = "#chat";
     } catch (error) {
       console.error("Failed to create new chat session", error);
+      toast.error("Failed to create chat. Please try again.");
     }
   }, [client, activeAgentId]);
 
@@ -245,6 +266,8 @@ export function App() {
           savedToBoard: false,
           startedAt: Date.now(),
         });
+        // Persist to sessionStorage so action survives HMR / page reload
+        persistActionContext(prompt, session.id, label);
         window.location.hash = "#action-session";
       } catch (error) {
         console.error("Failed to create action session", error);
@@ -278,6 +301,8 @@ export function App() {
       if (objectiveId) {
         setPendingChatScope({ type: "run", objectiveId, runId });
       }
+      // Persist to sessionStorage so action survives HMR / page reload
+      persistActionContext(prompt, session.id, session.label ?? "Action");
       window.location.hash = "#action-session";
     },
     [],
@@ -333,6 +358,7 @@ export function App() {
         handleSessionLabelUpdate(sessionId, label);
       } catch (error) {
         console.error("Failed to rename session", error);
+        toast.error("Failed to rename session. Please try again.");
       }
     },
     [client, handleSessionLabelUpdate],
@@ -350,6 +376,7 @@ export function App() {
         }
       } catch (error) {
         console.error("Failed to delete session", error);
+        toast.error("Failed to delete session. Please try again.");
       }
     },
     [activeSessionId, client],
@@ -495,7 +522,6 @@ export function App() {
           ) : currentView === "action-session" ? (
               <ActionSessionView
                 agentId={activeAgentId}
-                authOverview={authOverview}
                 client={client}
                 pendingActionPrompt={activeSessionId === actionSessionId ? pendingActionPrompt : null}
                 sessionId={activeSessionId}
@@ -504,12 +530,14 @@ export function App() {
                   setPendingActionPrompt(null);
                   setActionSessionId(null);
                   setPendingActionTitle(null);
+                  clearPersistedActionContext();
                 }}
                 onViewChat={(sid) => {
                   setActiveSessionId(sid);
                   window.location.hash = "#chat";
                 }}
                 onBackToDashboard={() => {
+                  clearPersistedActionContext();
                   window.location.hash = "#dashboard";
                 }}
               />
@@ -526,6 +554,7 @@ export function App() {
                 onPendingPromptConsumed={() => {
                   setPendingActionPrompt(null);
                   setActionSessionId(null);
+                  clearPersistedActionContext();
                 }}
                 onSessionLabelUpdate={handleSessionLabelUpdate}
                 pendingActionPrompt={activeSessionId === actionSessionId ? pendingActionPrompt : null}
@@ -610,15 +639,15 @@ function readViewFromHash(): AppView {
     return "settings";
   }
 
-  if (window.location.hash === "#action-session") {
+  if (window.location.hash.startsWith("#action-session")) {
     return "action-session";
   }
 
-  if (window.location.hash === "#chat") {
+  if (window.location.hash.startsWith("#chat")) {
     return "chat";
   }
 
-  if (window.location.hash === "#board") {
+  if (window.location.hash.startsWith("#board")) {
     return "board";
   }
 

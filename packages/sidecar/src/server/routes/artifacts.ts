@@ -7,7 +7,7 @@ import {
 import { Hono } from "hono";
 import type { SidecarRuntime } from "../context.ts";
 
-const DEFAULT_ACTOR_ID = "sidecar";
+const DEFAULT_ACTOR_ID = "goat";
 
 export function createArtifactRoutes(runtime: SidecarRuntime): Hono {
   const app = new Hono();

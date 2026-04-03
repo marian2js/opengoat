@@ -441,8 +441,9 @@ function WhatsAppConnectionDetail({
     try {
       await client.startWhatsAppSession(connection.connectionId);
       onReconnect();
-    } catch {
-      // Reconnect failure
+    } catch (error) {
+      console.error("Failed to reconnect WhatsApp session", error);
+      setQrError("Failed to reconnect. Please try again.");
     } finally {
       setIsReconnecting(false);
     }
@@ -453,8 +454,9 @@ function WhatsAppConnectionDetail({
     try {
       await client.stopWhatsAppSession(connection.connectionId);
       onReconnect();
-    } catch {
-      // Best effort
+    } catch (error) {
+      console.error("Failed to unlink WhatsApp session", error);
+      setQrError("Failed to unlink session. Please try again.");
     }
   }
 

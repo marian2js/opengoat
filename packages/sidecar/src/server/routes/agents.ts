@@ -21,6 +21,9 @@ import {
   workspaceFileContentSchema,
 } from "@opengoat/contracts";
 import {
+  BundledSkillProvisioner,
+  NodeFileSystem,
+  NodePathPort,
   deriveUniqueProjectId,
   listProjectCmoBootstrapPrompts,
   projectUrlToProjectId,
@@ -66,19 +69,58 @@ export function createAgentRoutes(runtime: SidecarRuntime): Hono {
     const workspaceDir = join(workspacesDir, projectId, agentId);
     const displayName = projectId.charAt(0).toUpperCase() + projectId.slice(1);
 
-    const agent = await runtime.embeddedGateway.createAgent({
-      id: agentId,
-      description: projectUrl,
-      instructions: "You are a helpful assistant.",
-      name: displayName,
-      setAsDefault: true,
-      workspaceDir,
-    } as CreateAgentRequest);
+    let agent;
+    try {
+      agent = await runtime.embeddedGateway.createAgent({
+        id: agentId,
+        description: projectUrl,
+        instructions: "You are a helpful assistant.",
+        name: displayName,
+        setAsDefault: true,
+        workspaceDir,
+      } as CreateAgentRequest);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("already exists")) {
+        return context.json({ error: `Agent "${agentId}" already exists.` }, 409);
+      }
+      throw error;
+    }
 
     // Sync auth profiles from the default agent directory to the new agent.
     // The auth service writes credentials to the DEFAULT_AGENT_ID agent dir,
     // but OpenClaw looks for auth-profiles.json per agent dir.
     syncAuthProfilesToAgent(runtime.gatewaySupervisor.paths, agentId);
+
+    // Provision bundled skills (marketing, personas) into the new workspace.
+    // Non-fatal: skills are optional — don't block project creation if provisioning fails.
+    try {
+      const provisioner = new BundledSkillProvisioner({
+        fileSystem: new NodeFileSystem(),
+        pathPort: new NodePathPort(),
+      });
+      await provisioner.provisionBundledSkills(workspaceDir);
+    } catch (skillError) {
+      console.warn("[agents/project] Failed to provision bundled skills:", skillError);
+    }
+
+    // Provision agent manifest in the OpenGoat agents dir so the board
+    // service can resolve this agent when creating/updating tasks.
+    try {
+      const agentManifestDir = join(runtime.opengoatPaths.agentsDir, agentId);
+      if (!existsSync(agentManifestDir)) {
+        mkdirSync(agentManifestDir, { recursive: true });
+        writeFileSync(
+          join(agentManifestDir, "config.json"),
+          JSON.stringify({
+            displayName,
+            description: projectUrl,
+            organization: { type: "main", reportsTo: null },
+          }, null, 2),
+        );
+      }
+    } catch (manifestError) {
+      console.warn("[agents/project] Failed to provision agent manifest:", manifestError);
+    }
 
     return context.json(agentSchema.parse(agent), 201);
   });
@@ -105,7 +147,15 @@ export function createAgentRoutes(runtime: SidecarRuntime): Hono {
       return context.json({ error: "Invalid filename." }, 400);
     }
 
-    const agent = await runtime.embeddedGateway.getAgent(agentId);
+    let agent;
+    try {
+      agent = await runtime.embeddedGateway.getAgent(agentId);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Unknown agent")) {
+        return context.json({ error: `Agent "${agentId}" not found.` }, 404);
+      }
+      throw error;
+    }
     const filePath = join(agent.workspaceDir, filename);
     const exists = existsSync(filePath);
 
@@ -120,7 +170,15 @@ export function createAgentRoutes(runtime: SidecarRuntime): Hono {
       return context.json({ error: "Invalid filename." }, 400);
     }
 
-    const agent = await runtime.embeddedGateway.getAgent(agentId);
+    let agent;
+    try {
+      agent = await runtime.embeddedGateway.getAgent(agentId);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Unknown agent")) {
+        return context.json({ error: `Agent "${agentId}" not found.` }, 404);
+      }
+      throw error;
+    }
     const filePath = join(agent.workspaceDir, filename);
     const exists = existsSync(filePath);
     const content = exists ? readFileSync(filePath, "utf8") : "";
@@ -139,7 +197,15 @@ export function createAgentRoutes(runtime: SidecarRuntime): Hono {
     const body = await context.req.json();
     const content = typeof body.content === "string" ? body.content : "";
 
-    const agent = await runtime.embeddedGateway.getAgent(agentId);
+    let agent;
+    try {
+      agent = await runtime.embeddedGateway.getAgent(agentId);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Unknown agent")) {
+        return context.json({ error: `Agent "${agentId}" not found.` }, 404);
+      }
+      throw error;
+    }
     const filePath = join(agent.workspaceDir, filename);
     mkdirSync(dirname(filePath), { recursive: true });
     writeFileSync(filePath, content, "utf8");

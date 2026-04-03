@@ -1,10 +1,16 @@
-import { memo, useState } from "react";
+import { memo, useRef, useState, useEffect } from "react";
 import { CheckIcon, CopyIcon, ChevronDownIcon, ChevronUpIcon, FileTextIcon } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
+import { cjk } from "@streamdown/cjk";
+import { math } from "@streamdown/math";
+import { mermaid } from "@streamdown/mermaid";
 import type { OutputBlock } from "../types";
 
-const streamdownPlugins = { code };
+const streamdownPlugins = { cjk, code, math, mermaid };
+
+/** Max collapsed height in pixels before "Show more" appears. */
+const COLLAPSED_MAX_HEIGHT = 320;
 
 interface ActionSessionOutputsProps {
   outputs: OutputBlock[];
@@ -47,11 +53,15 @@ RenderedMarkdown.displayName = "RenderedMarkdown";
 function OutputCard({ output }: { output: OutputBlock }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
-  const isLong = output.content.length > 800;
-  const displayContent = isLong && !expanded
-    ? output.content.slice(0, 800)
-    : output.content;
+  // Measure whether the rendered content exceeds the collapsed height.
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    setIsOverflowing(el.scrollHeight > COLLAPSED_MAX_HEIGHT);
+  }, [output.content]);
 
   function handleCopy() {
     void navigator.clipboard.writeText(output.content);
@@ -76,10 +86,28 @@ function OutputCard({ output }: { output: OutputBlock }) {
           )}
         </button>
       </div>
-      <div className="prose prose-sm max-w-none text-[13px] leading-relaxed text-foreground/80 dark:prose-invert">
-        <RenderedMarkdown content={displayContent} />
+
+      {/* Always render full markdown; clip visually when collapsed */}
+      <div className="relative">
+        <div
+          ref={contentRef}
+          className="prose prose-sm max-w-none overflow-hidden text-[13px] leading-relaxed text-foreground/80 dark:prose-invert"
+          style={
+            !expanded && isOverflowing
+              ? { maxHeight: COLLAPSED_MAX_HEIGHT }
+              : undefined
+          }
+        >
+          <RenderedMarkdown content={output.content} />
+        </div>
+
+        {/* Fade-out gradient when collapsed */}
+        {!expanded && isOverflowing && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-card/60 to-transparent" />
+        )}
       </div>
-      {isLong && (
+
+      {isOverflowing && (
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}

@@ -45,6 +45,7 @@ export function ObjectiveMemoryTab({ agentId, objectiveId, client }: ObjectiveMe
   const [conflictState, setConflictState] = useState<ConflictState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
+  const [operationError, setOperationError] = useState<string | null>(null);
 
   const handleCreate = useCallback(
     async (category: string, values: MemoryEntryFormValues) => {
@@ -84,6 +85,7 @@ export function ObjectiveMemoryTab({ agentId, objectiveId, client }: ObjectiveMe
         refresh();
       } catch (err) {
         console.error("Failed to create memory:", err);
+        setOperationError("Failed to create memory. Please try again.");
       } finally {
         setIsSubmitting(false);
       }
@@ -103,6 +105,7 @@ export function ObjectiveMemoryTab({ agentId, objectiveId, client }: ObjectiveMe
         refresh();
       } catch (err) {
         console.error("Failed to update memory:", err);
+        setOperationError("Failed to update memory. Please try again.");
       } finally {
         setIsSubmitting(false);
       }
@@ -119,6 +122,7 @@ export function ObjectiveMemoryTab({ agentId, objectiveId, client }: ObjectiveMe
       refresh();
     } catch (err) {
       console.error("Failed to delete memory:", err);
+      setOperationError("Failed to delete memory. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -154,6 +158,7 @@ export function ObjectiveMemoryTab({ agentId, objectiveId, client }: ObjectiveMe
       refresh();
     } catch (err) {
       console.error("Failed to resolve conflict:", err);
+      setOperationError("Failed to resolve conflict. Please try again.");
     } finally {
       setIsResolving(false);
     }
@@ -179,6 +184,7 @@ export function ObjectiveMemoryTab({ agentId, objectiveId, client }: ObjectiveMe
       refresh();
     } catch (err) {
       console.error("Failed to create memory:", err);
+      setOperationError("Failed to create memory. Please try again.");
     } finally {
       setIsResolving(false);
     }
@@ -226,6 +232,14 @@ export function ObjectiveMemoryTab({ agentId, objectiveId, client }: ObjectiveMe
 
   return (
     <div className="flex flex-col pb-5">
+      {operationError && (
+        <div className="mb-3 flex items-center justify-between rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <span>{operationError}</span>
+          <button type="button" onClick={() => setOperationError(null)} className="ml-2 font-medium underline hover:no-underline">
+            Dismiss
+          </button>
+        </div>
+      )}
       {/* All 8 categories rendered — populated ones with entries, empty ones with guidance */}
       {groupedEntries.map((group) => {
         const emptyMessage = OBJECTIVE_CATEGORY_EMPTY_PROMPTS[group.category];

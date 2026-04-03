@@ -88,6 +88,7 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
         await loadSkills();
       } catch (err) {
         console.error("Failed to remove skill", err);
+        setError("Failed to remove skill. Please try again.");
       } finally {
         setRemovingId(null);
       }

@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { AlertCircleIcon, ListChecksIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskList } from "@/features/board/hooks/useTaskList";
+import { useLeadingTask } from "@/features/board/hooks/useLeadingTask";
 import { useBoardFilters } from "@/features/board/hooks/useBoardFilters";
 import { TaskList, TaskListSkeleton } from "./TaskList";
 import { TaskDetailPanel } from "./TaskDetailPanel";
+import { LeadingTaskCard } from "./LeadingTaskCard";
 import { BoardToolbar } from "./BoardToolbar";
 
 export interface BoardWorkspaceProps {
@@ -49,6 +51,12 @@ function BoardContent({
 }) {
   const { tasks, isLoading, error, refresh } = useTaskList(agentId, client);
   const {
+    leadingTask,
+    setLeadingTask,
+    clearLeadingTask,
+    refresh: refreshLeading,
+  } = useLeadingTask(client);
+  const {
     filteredTasks,
     groupedTasks,
     grouping,
@@ -66,6 +74,30 @@ function BoardContent({
     activeFilterCount,
   } = useBoardFilters(tasks);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
+  const handleSetLeadingTask = useCallback(
+    async (taskId: string) => {
+      try {
+        await setLeadingTask(taskId);
+      } catch (err) {
+        console.error("Failed to set leading task:", err);
+      }
+    },
+    [setLeadingTask],
+  );
+
+  const handleClearLeadingTask = useCallback(async () => {
+    try {
+      await clearLeadingTask();
+    } catch (err) {
+      console.error("Failed to clear leading task:", err);
+    }
+  }, [clearLeadingTask]);
+
+  const handleTaskUpdated = useCallback(() => {
+    refresh();
+    refreshLeading();
+  }, [refresh, refreshLeading]);
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
@@ -91,6 +123,15 @@ function BoardContent({
             filteredCount={filteredTasks.length}
           />
         </div>
+      )}
+
+      {/* Leading task card */}
+      {!isLoading && leadingTask && (
+        <LeadingTaskCard
+          task={leadingTask}
+          onSelect={(id) => setSelectedTaskId(id)}
+          onClear={handleClearLeadingTask}
+        />
       )}
 
       {isLoading ? (
@@ -153,7 +194,9 @@ function BoardContent({
         <TaskList
           tasks={filteredTasks}
           groups={groupedTasks}
+          leadingTaskId={leadingTask?.taskId ?? null}
           onTaskSelect={(id) => setSelectedTaskId(id)}
+          onSetLeadingTask={handleSetLeadingTask}
         />
       )}
 
@@ -162,7 +205,7 @@ function BoardContent({
         client={client}
         open={!!selectedTaskId}
         onClose={() => setSelectedTaskId(null)}
-        onTaskUpdated={refresh}
+        onTaskUpdated={handleTaskUpdated}
       />
     </div>
   );

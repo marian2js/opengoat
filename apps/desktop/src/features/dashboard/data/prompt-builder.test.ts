@@ -26,7 +26,7 @@ function makeCard(overrides: Partial<ActionCard> = {}): ActionCard {
 // buildActionPrompt — full card with skills + persona
 // ---------------------------------------------------------------------------
 
-void test("buildActionPrompt: includes all 5 sections when skills and persona are present", () => {
+void test("buildActionPrompt: includes all sections when skills and persona are present", () => {
   const card = makeCard({
     skills: ["seo-audit", "page-cro"],
     persona: "seo-specialist",
@@ -34,12 +34,17 @@ void test("buildActionPrompt: includes all 5 sections when skills and persona ar
   });
   const result = buildActionPrompt(card);
 
-  // Skills section
+  // Missing-file preamble
+  assert.ok(result.includes("skip it silently"), "Should include missing-file preamble");
+
+  // Skills section (conditional wording)
   assert.ok(result.includes("./skills/marketing/seo-audit/SKILL.md"), "Should include seo-audit skill path");
   assert.ok(result.includes("./skills/marketing/page-cro/SKILL.md"), "Should include page-cro skill path");
+  assert.ok(result.includes("If it exists, read and follow"), "Skills should use conditional wording");
 
-  // Persona section
+  // Persona section (conditional wording)
   assert.ok(result.includes("./skills/personas/seo-specialist/SKILL.md"), "Should include persona path");
+  assert.ok(result.includes("If it exists, read ./skills/personas/"), "Persona should use conditional wording");
 
   // Context section
   assert.ok(result.includes("PRODUCT.md"), "Should reference PRODUCT.md");
@@ -48,6 +53,9 @@ void test("buildActionPrompt: includes all 5 sections when skills and persona ar
 
   // Task section
   assert.ok(result.includes("Analyze the landing page."), "Should include task prompt");
+
+  // Format instructions
+  assert.ok(result.includes("structured markdown"), "Should include format instructions");
 
   // Quality gate section
   assert.ok(result.includes("NEEDS IMPROVEMENT"), "Should include quality gate");
@@ -114,16 +122,20 @@ void test("buildActionPrompt: sections appear in correct order", () => {
   });
   const result = buildActionPrompt(card);
 
+  const missingFileIdx = result.indexOf("skip it silently");
   const skillIdx = result.indexOf("./skills/marketing/seo-audit/SKILL.md");
   const personaIdx = result.indexOf("./skills/personas/seo-specialist/SKILL.md");
   const contextIdx = result.indexOf("PRODUCT.md");
   const taskIdx = result.indexOf("TASK_MARKER_HERE");
+  const formatIdx = result.indexOf("structured markdown");
   const qualityIdx = result.indexOf("NEEDS IMPROVEMENT");
 
+  assert.ok(missingFileIdx < skillIdx, "Missing-file preamble before skills");
   assert.ok(skillIdx < personaIdx, "Skills before persona");
   assert.ok(personaIdx < contextIdx, "Persona before context");
   assert.ok(contextIdx < taskIdx, "Context before task");
-  assert.ok(taskIdx < qualityIdx, "Task before quality gate");
+  assert.ok(taskIdx < formatIdx, "Task before format instructions");
+  assert.ok(formatIdx < qualityIdx, "Format instructions before quality gate");
 });
 
 // ---------------------------------------------------------------------------

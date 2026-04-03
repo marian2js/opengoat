@@ -73,23 +73,23 @@ export function BoardSummary({ counts, isLoading, isEmpty, activeObjective }: Bo
   const total = counts.open + counts.blocked + counts.pending + counts.done;
 
   return (
-    <div className="relative z-10 rounded-lg border border-border/30 bg-card/50 px-4 py-3">
+    <div className="relative z-10 rounded-xl border border-border/20 bg-card/60 px-5 py-3.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
-              <ClipboardListIcon className="size-3.5 text-primary" />
+            <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/8">
+              <ClipboardListIcon className="size-3 text-primary" />
             </div>
             <h2 className="section-label">Board</h2>
-            <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+            <span className="rounded-full bg-muted/40 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground/70">
               {total}
             </span>
           </div>
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="hidden items-center gap-1.5 sm:flex">
             {pills.filter((pill) => pill.value > 0).map((pill) => (
               <span
                 key={pill.label}
-                className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-mono text-[10px] font-medium tracking-wider ${pill.className}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-medium tracking-wider ${pill.className}`}
               >
                 <span className="tabular-nums">{pill.value}</span>
                 <span>{pill.label}</span>
@@ -99,18 +99,18 @@ export function BoardSummary({ counts, isLoading, isEmpty, activeObjective }: Bo
         </div>
         <a
           href="#board"
-          className="group/link inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+          className="group/link inline-flex items-center gap-1 text-xs font-medium text-muted-foreground/70 transition-colors hover:text-primary"
         >
           View Board
-          <ArrowRightIcon className="size-3 transition-transform group-hover/link:translate-x-0.5" />
+          <ArrowRightIcon className="size-3 transition-transform duration-150 group-hover/link:translate-x-0.5" />
         </a>
       </div>
       {activeObjective && (
-        <div className="mt-2 flex items-center gap-2">
-          <TargetIcon className="size-3 text-primary/60" />
+        <div className="mt-2.5 flex items-center gap-2">
+          <TargetIcon className="size-3 text-primary/50" />
           <a
             href={`#board?objective=${activeObjective.objectiveId}`}
-            className="text-xs text-muted-foreground hover:text-primary transition-colors truncate"
+            className="truncate text-xs text-muted-foreground transition-colors hover:text-primary"
           >
             {activeObjective.title}
           </a>

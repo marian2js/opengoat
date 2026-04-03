@@ -13,6 +13,7 @@ import {
   ClockIcon,
   ChevronDownIcon,
   PlusIcon,
+  Trash2Icon,
 } from "lucide-react";
 
 const ALL_STATUSES = ["todo", "doing", "pending", "blocked", "done"] as const;
@@ -59,6 +60,7 @@ interface TaskQuickActionsProps {
   onAddBlocker: (content: string) => Promise<void>;
   onAddArtifact: (content: string) => Promise<void>;
   onAddWorklog: (content: string) => Promise<void>;
+  onDelete?: () => Promise<void>;
 }
 
 export function TaskQuickActions({
@@ -67,6 +69,7 @@ export function TaskQuickActions({
   onAddBlocker,
   onAddArtifact,
   onAddWorklog,
+  onDelete,
 }: TaskQuickActionsProps) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -211,6 +214,45 @@ export function TaskQuickActions({
     );
   }
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setIsUpdating(true);
+    try {
+      await onDelete();
+    } finally {
+      setIsUpdating(false);
+      setConfirmDelete(false);
+    }
+  };
+
+  if (confirmDelete) {
+    return (
+      <div className="flex w-full items-center gap-2">
+        <p className="flex-1 text-xs text-destructive dark:text-red-400">
+          Delete this task? This cannot be undone.
+        </p>
+        <Button
+          variant="destructive"
+          size="sm"
+          disabled={isUpdating}
+          onClick={() => void handleDelete()}
+        >
+          Delete
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={isUpdating}
+          onClick={() => setConfirmDelete(false)}
+        >
+          Cancel
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-full items-center justify-between">
       {/* Left: Status change dropdown */}
@@ -242,8 +284,18 @@ export function TaskQuickActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Right: Add entry buttons */}
+      {/* Right: Add entry + delete */}
       <div className="flex items-center gap-1">
+        {onDelete && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground hover:text-destructive dark:hover:text-red-400"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2Icon className="size-3.5" />
+          </Button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">

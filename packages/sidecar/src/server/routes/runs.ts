@@ -13,7 +13,8 @@ export function createRunRoutes(runtime: SidecarRuntime): Hono {
   app.get("/", async (context) => {
     const projectId = context.req.query("projectId") || undefined;
     const objectiveId = context.req.query("objectiveId") || undefined;
-    const status = context.req.query("status") || undefined;
+    const rawStatus = context.req.query("status") || undefined;
+    const status = rawStatus as "draft" | "running" | "waiting_review" | "blocked" | "completed" | "cancelled" | undefined;
     const limitParam = context.req.query("limit");
     const offsetParam = context.req.query("offset");
 
@@ -22,7 +23,7 @@ export function createRunRoutes(runtime: SidecarRuntime): Hono {
 
     const result = await runtime.runService.listRuns(
       runtime.opengoatPaths,
-      { projectId, objectiveId, status: status as undefined, limit, offset },
+      { projectId, objectiveId, status, limit, offset },
     );
 
     return context.json(result);

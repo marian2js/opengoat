@@ -30,7 +30,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && mkdir -p dist/core/templates/assets && cp -R src/core/templates/assets/. dist/core/templates/assets/",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && mkdir -p dist/core/templates/assets && cp -R src/core/templates/assets/. dist/core/templates/assets/ && mkdir -p dist/core/skills/bundled && cp -R src/core/skills/bundled/. dist/core/skills/bundled/ && cp src/core/skills/vendor-manifest.json dist/core/skills/vendor-manifest.json",
     "clean": "rm -rf dist",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit"

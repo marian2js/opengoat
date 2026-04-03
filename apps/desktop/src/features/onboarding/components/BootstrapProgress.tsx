@@ -184,10 +184,25 @@ export function BootstrapProgress({
     void start(agentId, projectUrl);
   }, [agentId, projectUrl, start]);
 
+  // Auto-collapse all steps when bootstrap finishes so the CTA is visible
+  const completedOnceRef = useRef(false);
+
   const isLoading = state.status === "idle" || state.status === "loading-prompts";
   const isRunning = state.status === "running";
   const isComplete = state.status === "completed";
   const isError = state.status === "error";
+
+  // Auto-transition to dashboard after a brief pause so the user sees the
+  // success state and doesn't get stuck looking for a button.
+  useEffect(() => {
+    if (isComplete && !completedOnceRef.current) {
+      completedOnceRef.current = true;
+      const timer = setTimeout(() => {
+        onComplete();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [isComplete, onComplete]);
 
   return (
     <div className="flex flex-1 items-center justify-center p-6">
@@ -246,13 +261,18 @@ export function BootstrapProgress({
         {/* Action buttons */}
         <div className="mt-6 flex justify-center">
           {isComplete && (
-            <button
-              type="button"
-              onClick={onComplete}
-              className="rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              Get started
-            </button>
+            <div className="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={onComplete}
+                className="rounded-lg bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Go to Dashboard →
+              </button>
+              <p className="text-xs text-muted-foreground/50">
+                Redirecting automatically…
+              </p>
+            </div>
           )}
 
           {isError && (

@@ -375,10 +375,95 @@ export class BoardService {
     );
     await this.persistDatabase(paths, db);
 
+    // Clear leading task if it was deleted
+    const currentLeading = this.queryOne<{ leading_task_id: string | null }>(
+      db,
+      `SELECT leading_task_id FROM boards WHERE board_id = ?`,
+      [INTERNAL_TASK_BUCKET_ID],
+    );
+    if (
+      currentLeading?.leading_task_id &&
+      seenTaskIds.has(currentLeading.leading_task_id)
+    ) {
+      this.execute(
+        db,
+        `UPDATE boards SET leading_task_id = NULL WHERE board_id = ?`,
+        [INTERNAL_TASK_BUCKET_ID],
+      );
+      await this.persistDatabase(paths, db);
+    }
+
     return {
       deletedTaskIds: resolvedTaskIds,
       deletedCount: resolvedTaskIds.length,
     };
+  }
+
+  public async getLeadingTask(
+    paths: OpenGoatPaths,
+  ): Promise<TaskRecord | null> {
+    const db = await this.getDatabase(paths);
+    const board = this.queryOne<{ leading_task_id: string | null }>(
+      db,
+      `SELECT leading_task_id FROM boards WHERE board_id = ?`,
+      [INTERNAL_TASK_BUCKET_ID],
+    );
+
+    if (!board?.leading_task_id) {
+      return null;
+    }
+
+    // Verify the task still exists
+    const row = this.queryOne<TaskRow>(
+      db,
+      `SELECT task_id, board_id, created_at, updated_at, status_updated_at, owner_agent_id, assigned_to_agent_id, title, description, status, status_reason, metadata, objective_id, run_id, source_type, source_id
+       FROM tasks
+       WHERE task_id = ?`,
+      [board.leading_task_id],
+    );
+
+    if (!row) {
+      // Task was deleted — clear the stale reference
+      this.execute(
+        db,
+        `UPDATE boards SET leading_task_id = NULL WHERE board_id = ?`,
+        [INTERNAL_TASK_BUCKET_ID],
+      );
+      await this.persistDatabase(paths, db);
+      return null;
+    }
+
+    return this.hydrateTaskRow(db, row);
+  }
+
+  public async setLeadingTask(
+    paths: OpenGoatPaths,
+    taskId: string,
+  ): Promise<TaskRecord> {
+    const db = await this.getDatabase(paths);
+    const resolvedTaskId = this.resolveTaskId(db, taskId);
+    const task = this.requireTask(db, resolvedTaskId);
+
+    this.execute(
+      db,
+      `UPDATE boards SET leading_task_id = ? WHERE board_id = ?`,
+      [resolvedTaskId, INTERNAL_TASK_BUCKET_ID],
+    );
+    await this.persistDatabase(paths, db);
+
+    return task;
+  }
+
+  public async clearLeadingTask(
+    paths: OpenGoatPaths,
+  ): Promise<void> {
+    const db = await this.getDatabase(paths);
+    this.execute(
+      db,
+      `UPDATE boards SET leading_task_id = NULL WHERE board_id = ?`,
+      [INTERNAL_TASK_BUCKET_ID],
+    );
+    await this.persistDatabase(paths, db);
   }
 
   public async updateTaskStatus(
@@ -774,6 +859,7 @@ export class BoardService {
        );`,
     );
     this.ensureBoardDefaultColumn(db);
+    this.ensureBoardLeadingTaskColumn(db);
     this.ensureInternalTaskBucket(db);
     this.execute(
       db,
@@ -1303,6 +1389,24 @@ export class BoardService {
     this.execute(
       db,
       "ALTER TABLE boards ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0;",
+    );
+  }
+
+  private ensureBoardLeadingTaskColumn(db: SqlJsDatabase): void {
+    const columns = this.queryAll<{ name: string }>(
+      db,
+      "PRAGMA table_info(boards);",
+    );
+    const hasColumn = columns.some(
+      (column) => column.name === "leading_task_id",
+    );
+    if (hasColumn) {
+      return;
+    }
+
+    this.execute(
+      db,
+      "ALTER TABLE boards ADD COLUMN leading_task_id TEXT;",
     );
   }
 

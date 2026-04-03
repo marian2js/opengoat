@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createAgentRoutes } from "./agents.ts";
 
 async function createStorePath(prefix: string): Promise<string> {
@@ -385,4 +386,155 @@ void test("workspace file check verifies each bootstrap file independently", asy
   }
 
   assert.deepEqual(results, [true, true, false]);
+});
+
+// ---------------------------------------------------------------------------
+// POST /project route — BundledSkillProvisioner integration
+// ---------------------------------------------------------------------------
+
+const routeSrc = readFileSync(
+  resolve(import.meta.dirname, "agents.ts"),
+  "utf-8",
+);
+
+void test("POST /project route source imports and calls BundledSkillProvisioner", () => {
+  assert.ok(
+    routeSrc.includes("BundledSkillProvisioner"),
+    "Expected BundledSkillProvisioner import in agents route",
+  );
+  assert.ok(
+    routeSrc.includes("new BundledSkillProvisioner("),
+    "Expected BundledSkillProvisioner instantiation in /project handler",
+  );
+  assert.ok(
+    routeSrc.includes("provisioner.provisionBundledSkills(workspaceDir)"),
+    "Expected provisionBundledSkills called with workspaceDir",
+  );
+});
+
+void test("POST /project route creates agent and returns 201", async (context) => {
+  const storePath = await createStorePath("opengoat-project-route");
+  const workspacesDir = await mkdtemp(join(tmpdir(), "opengoat-ws-"));
+  const stateDir = await mkdtemp(join(tmpdir(), "opengoat-state-"));
+  const agents = new Map<
+    string,
+    {
+      agentDir: string;
+      createdAt: string;
+      id: string;
+      instructions: string;
+      isDefault: boolean;
+      modelId?: string;
+      name: string;
+      providerId?: string;
+      updatedAt: string;
+      workspaceDir: string;
+    }
+  >();
+
+  // Skip bundled skill provisioning during tests (avoids needing bundled dir)
+  const origEnv = process.env.OPENGOAT_SKIP_BUNDLED_SKILLS;
+  process.env.OPENGOAT_SKIP_BUNDLED_SKILLS = "1";
+
+  const runtime = {
+    authSessions: {} as never,
+    authService: {} as never,
+    config: {
+      hostname: "127.0.0.1",
+      password: "password",
+      port: 3000,
+      username: "opengoat",
+    },
+    embeddedGateway: {
+      createAgent(payload: {
+        id?: string;
+        description?: string;
+        instructions?: string;
+        modelId?: string;
+        name: string;
+        providerId?: string;
+        setAsDefault?: boolean;
+        workspaceDir?: string;
+      }) {
+        const timestamp = new Date().toISOString();
+        const id = payload.id ?? payload.name.toLowerCase();
+        const agent = {
+          agentDir: `/tmp/${id}`,
+          createdAt: timestamp,
+          id,
+          instructions: payload.instructions ?? `You are ${payload.name}.`,
+          isDefault: payload.setAsDefault ?? false,
+          ...(payload.modelId ? { modelId: payload.modelId } : {}),
+          name: payload.name,
+          ...(payload.providerId ? { providerId: payload.providerId } : {}),
+          updatedAt: timestamp,
+          workspaceDir: payload.workspaceDir ?? `/tmp/${id}/workspace`,
+        };
+        agents.set(id, agent);
+        return agent;
+      },
+      getCatalog() {
+        return Promise.resolve({
+          agents: [...agents.values()],
+          defaultAgentId: "main",
+          storePath,
+        });
+      },
+    },
+    gatewaySupervisor: {
+      paths: {
+        configDir: stateDir,
+        configPath: join(stateDir, "config.json"),
+        deviceIdentityPath: join(stateDir, "device.json"),
+        logsDir: join(stateDir, "logs"),
+        metadataPath: join(stateDir, "metadata.json"),
+        oauthDir: join(stateDir, "oauth"),
+        rootDir: stateDir,
+        stateDir,
+        tokenPath: join(stateDir, "token"),
+        workspacesDir,
+      },
+    },
+    opengoatPaths: {
+      homeDir: stateDir,
+      agentsDir: join(stateDir, "opengoat-agents"),
+      workspacesDir,
+      projectsDir: join(stateDir, "projects"),
+      organizationDir: join(stateDir, "organization"),
+      skillsDir: join(stateDir, "skills"),
+      providersDir: join(stateDir, "providers"),
+      sessionsDir: join(stateDir, "sessions"),
+      runsDir: join(stateDir, "runs"),
+      globalConfigJsonPath: join(stateDir, "config.json"),
+      globalConfigMarkdownPath: join(stateDir, "CONFIG.md"),
+      agentsIndexJsonPath: join(stateDir, "agents.json"),
+    },
+    startedAt: Date.now(),
+    version: "0.1.0-test",
+  };
+
+  const app = createAgentRoutes(runtime as never);
+
+  context.after(async () => {
+    await rm(dirname(storePath), { force: true, recursive: true });
+    await rm(workspacesDir, { force: true, recursive: true });
+    await rm(stateDir, { force: true, recursive: true });
+    if (origEnv !== undefined) {
+      process.env.OPENGOAT_SKIP_BUNDLED_SKILLS = origEnv;
+    } else {
+      delete process.env.OPENGOAT_SKIP_BUNDLED_SKILLS;
+    }
+  });
+
+  const response = await app.request("/project", {
+    body: JSON.stringify({ projectUrl: "https://example.com" }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+
+  assert.equal(response.status, 201);
+  const agent = (await response.json()) as { id: string; name: string; workspaceDir: string };
+  assert.ok(agent.id, "Expected agent to have an id");
+  assert.ok(agent.id.endsWith("-main"), "Expected agent id to end with -main");
+  assert.ok(agent.name, "Expected agent to have a name");
 });

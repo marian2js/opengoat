@@ -76,7 +76,7 @@ interface AppSidebarProps {
   activeAgentId?: string | undefined;
   activeBrainSection?: string | undefined;
   activeSessionId?: string | undefined;
-  activeView: "dashboard" | "connections" | "chat" | "brain" | "agents" | "settings" | "board";
+  activeView: "dashboard" | "connections" | "chat" | "brain" | "agents" | "settings" | "board" | "action-session" | "objective";
   agentCatalog: AgentCatalog | null;
   isActionSession?: ((sessionId: string) => boolean) | undefined;
   onAddProject?: (() => void) | undefined;
@@ -180,7 +180,19 @@ export function AppSidebar({
                     tooltip={item.title}
                     isActive={item.href.slice(1) === activeView}
                   >
-                    <a href={item.href}>
+                    <a
+                      href={item.href}
+                      onClick={(e) => {
+                        // When clicking a nav item that's already active, the
+                        // hash doesn't change so no hashchange event fires.
+                        // Force a re-dispatch so App can react (e.g. clear
+                        // bootstrap overlay when clicking Dashboard).
+                        if (item.href.slice(1) === activeView) {
+                          e.preventDefault();
+                          window.dispatchEvent(new HashChangeEvent("hashchange"));
+                        }
+                      }}
+                    >
                       <item.icon />
                       <span>{item.title}</span>
                     </a>
@@ -262,7 +274,7 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {activeView === "chat" ? (
+        {activeView === "chat" || activeView === "action-session" ? (
           <SidebarGroup>
             <SidebarGroupLabel>Chats</SidebarGroupLabel>
             {onNewChat ? (

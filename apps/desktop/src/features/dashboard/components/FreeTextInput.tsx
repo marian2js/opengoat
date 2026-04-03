@@ -29,7 +29,7 @@ export function FreeTextInput({ onSubmit }: FreeTextInputProps) {
   }
 
   return (
-    <div className="relative rounded-xl border border-border/40 bg-card/60 shadow-sm transition-all focus-within:border-primary/40 focus-within:shadow-md focus-within:shadow-primary/5">
+    <div className="relative rounded-xl border border-white/[0.08] bg-[#18181B] shadow-md transition-all duration-150 focus-within:border-primary/40 focus-within:shadow-lg focus-within:shadow-primary/5">
       <textarea
         ref={textareaRef}
         value={value}
@@ -42,13 +42,13 @@ export function FreeTextInput({ onSubmit }: FreeTextInputProps) {
         }}
         placeholder="What do you want help with right now?"
         rows={1}
-        className="w-full resize-none rounded-xl border-0 bg-transparent px-4 py-3.5 pr-12 text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+        className="w-full resize-none rounded-xl border-0 bg-transparent px-5 py-4 pr-14 text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
       />
       <button
         type="button"
         onClick={handleSubmit}
         disabled={!value.trim()}
-        className="absolute right-2.5 bottom-2.5 rounded-lg p-2 text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+        className="absolute right-3 bottom-3 flex size-8 items-center justify-center rounded-lg text-muted-foreground/60 transition-all duration-100 hover:bg-primary/10 hover:text-primary disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
       >
         <ArrowRightIcon className="size-4" />
       </button>

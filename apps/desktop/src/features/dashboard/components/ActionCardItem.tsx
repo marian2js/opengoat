@@ -26,14 +26,14 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, 
 
   return (
     <Card
-      className={`group/action relative flex flex-col overflow-hidden border transition-all duration-100 ${
+      className={`group/action relative flex flex-col overflow-hidden transition-all duration-100 ease-out ${
         isHero ? "py-5" : ""
       } ${
         isLoading
-          ? "pointer-events-none border-border/50 bg-card/60 opacity-60"
+          ? "pointer-events-none border-border/30 bg-card/50 opacity-60"
           : isCompleted
-            ? "cursor-pointer border-primary/20 bg-card/90 hover:border-primary/30 hover:shadow-sm"
-            : "cursor-pointer border-border/50 bg-card/90 hover:-translate-y-px hover:border-primary/30 hover:shadow-md hover:shadow-primary/5"
+            ? "cursor-pointer border-primary/15 bg-card hover:border-primary/25 hover:shadow-sm"
+            : "cursor-pointer border-border/20 bg-card hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20"
       }`}
       onClick={() => {
         if (!isLoading) {
@@ -45,9 +45,7 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, 
         }
       }}
     >
-      {/* Category accent — thin left border, emerald on hover */}
-      <div className={`absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] bg-border/40 ${isCompleted ? "bg-primary/30" : "group-hover/action:bg-primary"} transition-colors`} />
-      <CardHeader className="flex-1 pl-5">
+      <CardHeader className="flex-1">
         <div className="flex items-center gap-2">
           <Badge variant="outline" className={`text-[10px] ${config.className}`}>
             {config.label}
@@ -62,11 +60,11 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, 
         <CardTitle className={`leading-snug transition-colors group-hover/action:text-primary ${isHero ? "text-base font-bold" : "text-sm"}`}>
           {card.title}
         </CardTitle>
-        <CardDescription className="text-xs line-clamp-2">
+        <CardDescription className="text-xs leading-relaxed line-clamp-2">
           {card.promise}
         </CardDescription>
         <CardAction>
-          <div className={`rounded-lg p-2 transition-all ${
+          <div className={`rounded-lg p-2 transition-all duration-100 ${
             isCompleted
               ? "bg-emerald-500/10 text-emerald-600 group-hover/action:bg-emerald-500 group-hover/action:text-white dark:text-emerald-400"
               : `${config.iconBg} ${config.iconText} ${config.iconHoverBg} ${config.iconHoverText}`
@@ -81,7 +79,7 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, 
           </div>
         </CardAction>
       </CardHeader>
-      <div className="flex items-center gap-3 border-t border-border/30 py-2.5 pl-5 pr-4">
+      <div className="flex items-center gap-3 border-t border-border/20 py-2.5 px-4">
         {isLoading ? (
           <span className="animate-pulse font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Starting...</span>
         ) : isCompleted ? (
@@ -104,19 +102,19 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, onClick, 
           </>
         ) : (
           <div className="flex flex-1 items-center justify-between">
-            <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 transition-colors group-hover/action:text-primary">
+            <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40 transition-colors group-hover/action:text-primary">
               Run
-              <ArrowRightIcon className="size-3 transition-transform group-hover/action:translate-x-0.5" />
+              <ArrowRightIcon className="size-3 transition-transform duration-150 group-hover/action:translate-x-0.5" />
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               {card.timeToFirstOutput && (
-                <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/40">
+                <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/30">
                   <ClockIcon className="size-2.5" />
                   {card.timeToFirstOutput}
                 </span>
               )}
               {card.createsTrackedWork && (
-                <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/40">
+                <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/30">
                   <ClipboardListIcon className="size-2.5" />
                   Board
                 </span>

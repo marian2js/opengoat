@@ -39,6 +39,7 @@ export function OperatingMemorySection({ agentId, client }: OperatingMemorySecti
   const [conflictState, setConflictState] = useState<ConflictState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
+  const [operationError, setOperationError] = useState<string | null>(null);
 
   const handleCreate = useCallback(
     async (category: string, values: MemoryEntryFormValues) => {
@@ -76,6 +77,7 @@ export function OperatingMemorySection({ agentId, client }: OperatingMemorySecti
         refresh();
       } catch (err) {
         console.error("Failed to create memory:", err);
+        setOperationError(err instanceof Error ? err.message : "Failed to create memory.");
       } finally {
         setIsSubmitting(false);
       }
@@ -95,6 +97,7 @@ export function OperatingMemorySection({ agentId, client }: OperatingMemorySecti
         refresh();
       } catch (err) {
         console.error("Failed to update memory:", err);
+        setOperationError(err instanceof Error ? err.message : "Failed to update memory.");
       } finally {
         setIsSubmitting(false);
       }
@@ -111,6 +114,7 @@ export function OperatingMemorySection({ agentId, client }: OperatingMemorySecti
       refresh();
     } catch (err) {
       console.error("Failed to delete memory:", err);
+      setOperationError(err instanceof Error ? err.message : "Failed to delete memory.");
     } finally {
       setIsSubmitting(false);
     }
@@ -145,6 +149,7 @@ export function OperatingMemorySection({ agentId, client }: OperatingMemorySecti
       refresh();
     } catch (err) {
       console.error("Failed to resolve conflict:", err);
+      setOperationError(err instanceof Error ? err.message : "Failed to resolve conflict.");
     } finally {
       setIsResolving(false);
     }
@@ -169,6 +174,7 @@ export function OperatingMemorySection({ agentId, client }: OperatingMemorySecti
       refresh();
     } catch (err) {
       console.error("Failed to create memory:", err);
+      setOperationError(err instanceof Error ? err.message : "Failed to create memory.");
     } finally {
       setIsResolving(false);
     }
@@ -228,6 +234,15 @@ export function OperatingMemorySection({ agentId, client }: OperatingMemorySecti
 
   return (
     <div className="flex flex-col px-5 pb-5 lg:px-6 lg:pb-6">
+      {/* Operation error banner */}
+      {operationError && (
+        <div className="mb-3 flex items-center justify-between rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <span>{operationError}</span>
+          <button type="button" onClick={() => setOperationError(null)} className="ml-2 font-medium underline hover:no-underline">
+            Dismiss
+          </button>
+        </div>
+      )}
       {/* Populated category groups */}
       {groupedEntries.map((group) => (
         <MemoryCategoryGroup

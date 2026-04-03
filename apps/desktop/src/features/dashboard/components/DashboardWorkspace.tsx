@@ -122,8 +122,9 @@ function DashboardContent({
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
+      <div className="mx-auto w-full max-w-[1000px]">
       {/* ── Company context — compact strip ── */}
-      <div className="mb-5 border-b border-border/20 pb-4">
+      <div className="mb-6 pb-4">
         <CompanySummary
           data={data}
           domain={domain}
@@ -134,12 +135,12 @@ function DashboardContent({
       </div>
 
       {/* Free-text input — always the primary entry point */}
-      <div className="mb-5">
+      <div className="mb-6">
         <FreeTextInput onSubmit={handleFreeTextSubmit} />
       </div>
 
       {/* Active work — always rendered, component self-manages visibility */}
-      <ActiveWorkSection onContinueSession={onResumeRun} />
+      <ActiveWorkSection onContinueSession={onResumeRun} onViewResults={onViewResults} />
 
       {hasActiveWork ? (
         /* ═══════════════════════════════════════════════════════
@@ -233,6 +234,7 @@ function DashboardContent({
           />
         </>
       )}
+      </div>
     </div>
   );
 }

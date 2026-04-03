@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { SidecarClient } from "@/lib/sidecar/client";
+import { toast } from "sonner";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
 import { SkillsSection } from "./SkillsSection";
 
@@ -146,6 +147,7 @@ export function ProjectSettings({
         onAgentUpdated(updated);
       } catch (err) {
         console.error("Failed to update provider", err);
+        toast.error("Failed to update provider. Please try again.");
       }
     },
     [agent.id, client, onAgentUpdated],
@@ -163,6 +165,7 @@ export function ProjectSettings({
         onAgentUpdated(updated);
       } catch (err) {
         console.error("Failed to update model", err);
+        toast.error("Failed to update model. Please try again.");
       }
     },
     [agent.id, client, onAgentUpdated, selectedProviderId],

@@ -40,6 +40,7 @@ export function ObjectiveQuickActions({
   onCreateTask,
 }: ObjectiveQuickActionsProps) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   async function handleStatusChange(newStatus: ObjectiveStatus): Promise<void> {
     if (newStatus === objective.status || isUpdating) return;
@@ -49,6 +50,7 @@ export function ObjectiveQuickActions({
       onStatusChanged();
     } catch (err) {
       console.error("Failed to update objective status", err);
+      setActionError("Failed to update objective status. Please try again.");
     } finally {
       setIsUpdating(false);
     }
@@ -56,6 +58,14 @@ export function ObjectiveQuickActions({
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
+      {actionError && (
+        <div className="mb-3 flex items-center justify-between rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <span>{actionError}</span>
+          <button type="button" onClick={() => setActionError(null)} className="ml-2 font-medium underline hover:no-underline">
+            Dismiss
+          </button>
+        </div>
+      )}
       {/* Status change buttons */}
       {STATUS_ACTIONS.map(({ status, label, icon: Icon, variant }) => (
         <Button

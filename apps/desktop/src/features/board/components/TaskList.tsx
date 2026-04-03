@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronRightIcon, CrosshairIcon } from "lucide-react";
 import type { TaskRecord } from "@opengoat/contracts";
 import {
   Table,
@@ -22,7 +22,9 @@ import type { TaskGroup } from "@/features/board/lib/board-grouping";
 
 interface TaskRowProps {
   task: TaskRecord;
+  isLeading: boolean;
   onSelect: (taskId: string) => void;
+  onSetLeadingTask?: (taskId: string) => void;
 }
 
 const STATUS_ACCENT: Record<string, string> = {
@@ -33,7 +35,7 @@ const STATUS_ACCENT: Record<string, string> = {
   done: "before:bg-success dark:before:bg-green-400",
 };
 
-function TaskRow({ task, onSelect }: TaskRowProps) {
+function TaskRow({ task, isLeading, onSelect, onSetLeadingTask }: TaskRowProps) {
   const artifactCount = task.artifacts?.length ?? 0;
   const blockerCount = task.blockers?.length ?? 0;
   const isReview = task.status === "pending";
@@ -47,6 +49,9 @@ function TaskRow({ task, onSelect }: TaskRowProps) {
       {/* Title */}
       <TableCell className={`relative max-w-[400px] py-3 pl-5 text-[13px] font-medium text-foreground/85 group-hover/row:text-foreground before:absolute before:inset-y-1 before:left-0 before:w-[3px] before:rounded-sm before:opacity-0 before:transition-opacity group-hover/row:before:opacity-100 ${accent}`}>
         <div className="flex items-center gap-1.5 overflow-hidden">
+          {isLeading && (
+            <CrosshairIcon className="size-3 shrink-0 text-primary" />
+          )}
           <span className="truncate">{task.title}</span>
         </div>
       </TableCell>
@@ -70,9 +75,26 @@ function TaskRow({ task, onSelect }: TaskRowProps) {
         {formatRelativeTime(task.updatedAt)}
       </TableCell>
 
-      {/* Owner */}
-      <TableCell className="py-3 font-mono text-[11px] text-muted-foreground/50 uppercase tracking-wider">
-        {task.owner || "\u2014"}
+      {/* Lead action / Owner */}
+      <TableCell className="py-3">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[11px] text-muted-foreground/50 uppercase tracking-wider">
+            {task.owner || "\u2014"}
+          </span>
+          {!isLeading && onSetLeadingTask && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSetLeadingTask(task.taskId);
+              }}
+              className="flex size-6 items-center justify-center rounded-md text-muted-foreground/30 opacity-0 transition-all hover:bg-primary/10 hover:text-primary group-hover/row:opacity-100"
+              title="Set as lead task"
+            >
+              <CrosshairIcon className="size-3" />
+            </button>
+          )}
+        </div>
       </TableCell>
     </TableRow>
   );
@@ -133,13 +155,17 @@ function GroupHeader({ label, count, isExpanded, onToggle }: GroupHeaderProps) {
 interface TaskListProps {
   tasks: TaskRecord[];
   groups?: TaskGroup[];
+  leadingTaskId?: string | null;
   onTaskSelect: (taskId: string) => void;
+  onSetLeadingTask?: (taskId: string) => void;
 }
 
 export function TaskList({
   tasks,
   groups,
+  leadingTaskId,
   onTaskSelect,
+  onSetLeadingTask,
 }: TaskListProps) {
   const isGrouped = groups && groups.length > 0 && !(groups.length === 1 && groups[0]!.key === "__all__");
 
@@ -161,7 +187,9 @@ export function TaskList({
               <GroupSection
                 key={group.key}
                 group={group}
+                leadingTaskId={leadingTaskId}
                 onTaskSelect={onTaskSelect}
+                onSetLeadingTask={onSetLeadingTask}
               />
             ))
           ) : (
@@ -169,7 +197,9 @@ export function TaskList({
               <TaskRow
                 key={task.taskId}
                 task={task}
+                isLeading={task.taskId === leadingTaskId}
                 onSelect={onTaskSelect}
+                onSetLeadingTask={onSetLeadingTask}
               />
             ))
           )}
@@ -185,10 +215,14 @@ export function TaskList({
 
 function GroupSection({
   group,
+  leadingTaskId,
   onTaskSelect,
+  onSetLeadingTask,
 }: {
   group: TaskGroup;
+  leadingTaskId?: string | null;
   onTaskSelect: (taskId: string) => void;
+  onSetLeadingTask?: (taskId: string) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -205,7 +239,9 @@ function GroupSection({
           <TaskRow
             key={task.taskId}
             task={task}
+            isLeading={task.taskId === leadingTaskId}
             onSelect={onTaskSelect}
+            onSetLeadingTask={onSetLeadingTask}
           />
         ))}
     </>

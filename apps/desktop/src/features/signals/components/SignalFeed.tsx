@@ -57,7 +57,7 @@ export function SignalFeed({
     client,
     mergedFilters,
   );
-  const { saveSignal, dismissSignal, promoteSignal, actionLoading } =
+  const { saveSignal, dismissSignal, promoteSignal, actionLoading, actionError, clearError } =
     useSignalActions(client, refresh);
 
   if (error) {
@@ -107,6 +107,16 @@ export function SignalFeed({
           </Select>
         </div>
       ) : null}
+
+      {/* Action error banner */}
+      {actionError && (
+        <div className="flex items-center justify-between rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <span>{actionError}</span>
+          <button type="button" onClick={clearError} className="ml-2 font-medium underline hover:no-underline">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Loading skeletons */}
       {isLoading ? (

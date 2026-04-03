@@ -70,29 +70,29 @@ export function CompanySummary({ data, domain, faviconSources, isLoading, error 
     : null;
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3.5">
       {/* Favicon */}
       {hasFavicon ? (
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-card ring-1 ring-border/40">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-card shadow-sm ring-1 ring-border/30">
           <FaviconIcon
             domain={domain}
             faviconSources={faviconSources}
-            className="size-4 rounded-sm"
+            className="size-5 rounded-sm"
           />
         </div>
       ) : (
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary">
-          <GlobeIcon className="size-3.5" />
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary">
+          <GlobeIcon className="size-4" />
         </div>
       )}
 
       {/* Domain + summary */}
       <div className="min-w-0 flex-1">
-        <span className="font-display text-sm font-bold tracking-tight text-foreground">
+        <span className="font-display text-[15px] font-bold tracking-tight text-foreground">
           {domain ?? "Project"}
         </span>
         {shortSummary ? (
-          <p className="truncate text-[12px] leading-snug text-muted-foreground/60">
+          <p className="truncate text-[13px] leading-snug text-muted-foreground/50">
             {shortSummary}
           </p>
         ) : null}

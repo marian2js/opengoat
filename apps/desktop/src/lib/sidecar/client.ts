@@ -507,6 +507,31 @@ export class SidecarClient {
   }
 
   // ---------------------------------------------------------------------------
+  // Leading task
+  // ---------------------------------------------------------------------------
+
+  async getLeadingTask(): Promise<TaskRecord | null> {
+    const response = await this.request("/tasks/leading");
+    if (response === null || response === undefined) {
+      return null;
+    }
+    return taskRecordSchema.parse(response);
+  }
+
+  async setLeadingTask(taskId: string): Promise<TaskRecord> {
+    return taskRecordSchema.parse(
+      await this.request("/tasks/leading", {
+        body: JSON.stringify({ taskId }),
+        method: "PUT",
+      }),
+    );
+  }
+
+  async clearLeadingTask(): Promise<void> {
+    await this.request("/tasks/leading", { method: "DELETE" });
+  }
+
+  // ---------------------------------------------------------------------------
   // Objectives
   // ---------------------------------------------------------------------------
 
@@ -701,11 +726,12 @@ export class SidecarClient {
     description: string;
     assignedTo?: string;
     status?: string;
-  }): Promise<TaskRecord> {
+  }, actorId?: string): Promise<TaskRecord> {
     return taskRecordSchema.parse(
       await this.request("/tasks/from-run", {
         body: JSON.stringify(payload),
         method: "POST",
+        ...(actorId ? { headers: { "x-actor-id": actorId } } : {}),
       }),
     );
   }

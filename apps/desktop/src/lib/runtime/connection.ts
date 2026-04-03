@@ -1,6 +1,6 @@
 import { sidecarConnectionSchema, type SidecarConnection } from "@opengoat/contracts";
 
-const DEV_DEFAULT_SIDECAR_URL = "";
+const DEV_DEFAULT_SIDECAR_URL = "http://127.0.0.1:19749";
 const DEV_DEFAULT_USERNAME = "opengoat";
 const DEV_DEFAULT_PASSWORD = "opengoat-dev-password";
 

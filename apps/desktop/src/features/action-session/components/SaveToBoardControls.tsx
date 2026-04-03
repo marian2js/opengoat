@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircleIcon, ClipboardListIcon, LoaderCircleIcon } from "lucide-react";
+import { AlertCircleIcon, CheckCircleIcon, ClipboardListIcon, LoaderCircleIcon } from "lucide-react";
 import type { OutputBlock } from "../types";
 import type { SidecarClient } from "@/lib/sidecar/client";
 
@@ -23,6 +23,7 @@ export function SaveToBoardControls({
   onSkip,
 }: SaveToBoardControlsProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(outputs.map((o) => o.id)),
   );
@@ -42,6 +43,7 @@ export function SaveToBoardControls({
   async function handleSave() {
     if (isSaving) return;
     setIsSaving(true);
+    setError(null);
 
     try {
       // Create a run for this action session
@@ -62,12 +64,13 @@ export function SaveToBoardControls({
           objectiveId: run.objectiveId,
           title: output.title,
           description: output.content.slice(0, 500),
-        });
+        }, agentId);
       }
 
       onSaved();
-    } catch (error) {
-      console.error("Failed to save to board", error);
+    } catch (err) {
+      console.error("Failed to save to board", err);
+      setError(err instanceof Error ? err.message : "Failed to save to board. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -101,6 +104,14 @@ export function SaveToBoardControls({
           </label>
         ))}
       </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="mb-3 flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <AlertCircleIcon className="mt-0.5 size-3 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex items-center gap-2">
