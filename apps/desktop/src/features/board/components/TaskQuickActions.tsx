@@ -76,6 +76,7 @@ export function TaskQuickActions({
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeEntry, setActiveEntry] = useState<EntryKind | null>(null);
   const [entryContent, setEntryContent] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const availableTransitions = ALL_STATUSES.filter(
     (s) => s !== currentStatus,
@@ -140,6 +141,17 @@ export function TaskQuickActions({
   const handleCancelEntry = () => {
     setActiveEntry(null);
     setEntryContent("");
+  };
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setIsUpdating(true);
+    try {
+      await onDelete();
+    } finally {
+      setIsUpdating(false);
+      setConfirmDelete(false);
+    }
   };
 
   // Inline input for reason or entry
@@ -213,19 +225,6 @@ export function TaskQuickActions({
       </div>
     );
   }
-
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const handleDelete = async () => {
-    if (!onDelete) return;
-    setIsUpdating(true);
-    try {
-      await onDelete();
-    } finally {
-      setIsUpdating(false);
-      setConfirmDelete(false);
-    }
-  };
 
   if (confirmDelete) {
     return (
