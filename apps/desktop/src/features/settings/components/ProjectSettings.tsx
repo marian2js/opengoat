@@ -204,7 +204,7 @@ export function ProjectSettings({
       </div>
 
       {/* ---- Model ---- */}
-      <Card className="border-border/40 transition-colors hover:border-border/60 dark:border-white/[0.06] dark:hover:border-white/[0.10]">
+      <Card className="border-border/40 transition-all duration-150 hover:border-border/60 hover:shadow-sm dark:border-white/[0.06] dark:hover:border-white/[0.10]">
         <CardHeader>
           <div className="flex items-center gap-2.5">
             <div className="flex size-7 items-center justify-center rounded-md bg-primary/8">
@@ -292,7 +292,7 @@ export function ProjectSettings({
       </Card>
 
       {/* ---- General ---- */}
-      <Card className="border-border/40 transition-colors hover:border-border/60 dark:border-white/[0.06] dark:hover:border-white/[0.10]">
+      <Card className="border-border/40 transition-all duration-150 hover:border-border/60 hover:shadow-sm dark:border-white/[0.06] dark:hover:border-white/[0.10]">
         <CardHeader>
           <div className="flex items-center gap-2.5">
             <div className="flex size-7 items-center justify-center rounded-md bg-primary/8">
@@ -329,8 +329,9 @@ export function ProjectSettings({
                 <GlobeIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/40" />
                 <Input
                   id="settings-website-url"
-                  className="h-9 pl-9 text-[13px] text-muted-foreground"
+                  className="h-9 cursor-default pl-9 text-[13px] text-muted-foreground bg-muted/30 dark:bg-white/[0.02] border-border/30 dark:border-white/[0.04]"
                   readOnly
+                  tabIndex={-1}
                   value={agent.description ?? domain}
                 />
               </div>
@@ -338,16 +339,18 @@ export function ProjectSettings({
           </div>
 
           {saveMessage ? (
-            <p
-              className={`text-[12px] ${
-                saveMessage.type === "success" ? "text-success" : "text-destructive"
+            <div
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] ${
+                saveMessage.type === "success"
+                  ? "bg-success/8 text-success dark:bg-success/[0.06]"
+                  : "bg-destructive/8 text-destructive dark:bg-destructive/[0.06]"
               }`}
             >
               {saveMessage.type === "success" ? (
-                <CheckIcon className="mr-1 inline-block size-3 align-[-2px]" />
+                <CheckIcon className="size-3 shrink-0" />
               ) : null}
               {saveMessage.text}
-            </p>
+            </div>
           ) : null}
 
           <div className="flex justify-end">
@@ -374,11 +377,11 @@ export function ProjectSettings({
       <SkillsSection agent={agent} client={client} />
 
       {/* ---- Danger zone ---- */}
-      <Card className="border-destructive/20">
+      <Card className="border-destructive/15 bg-destructive/[0.02] dark:border-destructive/10 dark:bg-destructive/[0.015]">
         <CardHeader>
           <div className="flex items-center gap-2.5">
-            <div className="flex size-7 items-center justify-center rounded-md bg-destructive/8">
-              <TrashIcon className="size-3.5 text-destructive/70" />
+            <div className="flex size-7 items-center justify-center rounded-md bg-destructive/10 ring-1 ring-destructive/10">
+              <TrashIcon className="size-3.5 text-destructive/80" />
             </div>
             <div>
               <CardTitle className="text-[14px] font-semibold text-destructive">Danger zone</CardTitle>
@@ -387,7 +390,7 @@ export function ProjectSettings({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-4 rounded-md border border-destructive/10 bg-destructive/[0.03] px-3.5 py-3 dark:border-destructive/[0.06] dark:bg-destructive/[0.02]">
             <div className="space-y-1">
               <p className="text-[13px] font-medium text-foreground">Delete this project</p>
               <p className="text-[12px] leading-relaxed text-muted-foreground">
