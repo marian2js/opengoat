@@ -135,7 +135,9 @@ function BoardContent({
       )}
 
       {isLoading ? (
-        <TaskListSkeleton />
+        <div className="overflow-hidden rounded-lg border border-border/40 dark:border-white/[0.06]">
+          <TaskListSkeleton />
+        </div>
       ) : error ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
           <div className="flex size-12 items-center justify-center rounded-xl bg-muted/50">
@@ -191,13 +193,15 @@ function BoardContent({
           </div>
         </div>
       ) : (
-        <TaskList
-          tasks={filteredTasks}
-          groups={groupedTasks}
-          leadingTaskId={leadingTask?.taskId ?? null}
-          onTaskSelect={(id) => setSelectedTaskId(id)}
-          onSetLeadingTask={handleSetLeadingTask}
-        />
+        <div className="overflow-hidden rounded-lg border border-border/40 dark:border-white/[0.06]">
+          <TaskList
+            tasks={filteredTasks}
+            groups={groupedTasks}
+            leadingTaskId={leadingTask?.taskId ?? null}
+            onTaskSelect={(id) => setSelectedTaskId(id)}
+            onSetLeadingTask={handleSetLeadingTask}
+          />
+        </div>
       )}
 
       <TaskDetailPanel
