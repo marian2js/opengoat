@@ -8,8 +8,8 @@ import { humanizeOutputLabel, formatRelativeTime } from "@/lib/utils/output-labe
 interface SpecialistCardProps {
   specialist: SpecialistAgent;
   onChat: (specialistId: string) => void;
-  recentOutputs?: ArtifactRecord[];
-  onOutputNavigate?: (artifact: ArtifactRecord) => void;
+  recentOutputs?: ArtifactRecord[] | undefined;
+  onOutputNavigate?: ((artifact: ArtifactRecord) => void) | undefined;
 }
 
 export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavigate }: SpecialistCardProps) {

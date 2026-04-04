@@ -10,14 +10,14 @@ import type { ChatUIMessage } from "./message-parts";
 interface ChatScopeForTransport {
   type: "objective" | "run";
   objectiveId: string;
-  runId?: string;
+  runId?: string | undefined;
 }
 
 interface CreateChatTransportParams {
   agentId: string;
   client: SidecarClient | null;
   getScope?: () => ChatScopeForTransport | null;
-  specialistId?: string;
+  specialistId?: string | undefined;
   sessionId: string;
 }
 

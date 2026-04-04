@@ -10,7 +10,7 @@ const MAX_OUTPUTS_PER_SPECIALIST = 3;
 
 interface SpecialistTeamBrowserProps {
   client: SidecarClient | null;
-  agentId?: string;
+  agentId?: string | undefined;
 }
 
 export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowserProps) {

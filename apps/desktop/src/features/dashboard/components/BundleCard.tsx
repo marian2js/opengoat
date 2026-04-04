@@ -7,9 +7,9 @@ import { getArtifactStatusConfig } from "@/features/dashboard/lib/artifact-type-
 
 export interface BundleCardProps {
   bundle: BundleGroup;
-  specialistName?: string;
-  onPreview?: (artifactId: string) => void;
-  onNavigate?: (artifact: ArtifactRecord) => void;
+  specialistName?: string | undefined;
+  onPreview?: ((artifactId: string) => void) | undefined;
+  onNavigate?: ((artifact: ArtifactRecord) => void) | undefined;
 }
 
 export function BundleCard({ bundle, specialistName, onPreview, onNavigate }: BundleCardProps) {

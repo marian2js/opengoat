@@ -6,10 +6,10 @@ import { stripMarkdown } from "@/features/dashboard/lib/strip-markdown";
 
 export interface ArtifactCardProps {
   artifact: ArtifactRecord;
-  specialistName?: string;
-  onPreview?: (artifactId: string) => void;
-  onNavigate?: (artifact: ArtifactRecord) => void;
-  compact?: boolean;
+  specialistName?: string | undefined;
+  onPreview?: ((artifactId: string) => void) | undefined;
+  onNavigate?: ((artifact: ArtifactRecord) => void) | undefined;
+  compact?: boolean | undefined;
 }
 
 export function ArtifactCard({ artifact, specialistName, onPreview, onNavigate, compact }: ArtifactCardProps) {

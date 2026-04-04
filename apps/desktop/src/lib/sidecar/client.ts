@@ -277,6 +277,7 @@ export class SidecarClient {
     agentId: string;
     internal?: boolean;
     label?: string;
+    specialistId?: string;
   }): Promise<AgentSession> {
     return agentSessionSchema.parse(
       await this.request("/agents/sessions", {

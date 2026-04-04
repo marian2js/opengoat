@@ -13,7 +13,7 @@ interface HandoffChipProps {
   specialistId: string;
   specialistName: string;
   reason: string;
-  currentSpecialistName?: string;
+  currentSpecialistName?: string | undefined;
   onDismiss: () => void;
 }
 
