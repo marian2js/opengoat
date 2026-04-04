@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { AlertCircleIcon, ListChecksIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
+import { AlertCircleIcon, ListChecksIcon, MessageSquareIcon, RefreshCwIcon, SearchIcon, SparklesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskList } from "@/features/board/hooks/useTaskList";
@@ -193,15 +193,32 @@ function BoardContent({
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border/40 dark:border-white/[0.06]">
-          <TaskList
-            tasks={filteredTasks}
-            groups={groupedTasks}
-            leadingTaskId={leadingTask?.taskId ?? null}
-            onTaskSelect={(id) => setSelectedTaskId(id)}
-            onSetLeadingTask={handleSetLeadingTask}
-          />
-        </div>
+        <>
+          <div className="overflow-hidden rounded-lg border border-border/40 dark:border-white/[0.06]">
+            <TaskList
+              tasks={filteredTasks}
+              groups={groupedTasks}
+              leadingTaskId={leadingTask?.taskId ?? null}
+              onTaskSelect={(id) => setSelectedTaskId(id)}
+              onSetLeadingTask={handleSetLeadingTask}
+            />
+          </div>
+          {filteredTasks.length <= 3 && (
+            <div className="mt-6 flex items-start gap-3 rounded-lg border border-dashed border-border/30 px-4 py-3.5 dark:border-white/[0.04]">
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+                <SparklesIcon className="size-3.5 text-primary/60" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[12px] font-medium text-foreground/70">
+                  Create tasks from chat or actions
+                </p>
+                <p className="text-[11px] leading-relaxed text-muted-foreground/50">
+                  Ask your CMO or specialists to plan work, and tasks will appear here automatically. You can also run actions from the dashboard.
+                </p>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <TaskDetailPanel
