@@ -1,5 +1,6 @@
 import { ArrowRightIcon, XIcon } from "lucide-react";
 import { resolveSpecialistIcon } from "@/features/agents/specialist-icons";
+import { getSpecialistColors } from "@/features/agents/specialist-meta";
 
 const HANDOFF_CONTEXT_KEY = "opengoat:handoffContext";
 
@@ -75,6 +76,7 @@ export function HandoffChip({
 }: HandoffChipProps) {
   const iconKey = SPECIALIST_ICON_MAP[specialistId] ?? "bot";
   const IconComponent = resolveSpecialistIcon(iconKey);
+  const colors = getSpecialistColors(specialistId);
 
   const handleClick = () => {
     const sourceName = currentSpecialistName ?? "Chat";
@@ -93,8 +95,8 @@ export function HandoffChip({
       className="group/handoff mt-2 flex w-full items-center gap-2.5 rounded-lg border border-border/30 bg-muted/15 px-3 py-2 text-left transition-all duration-150 hover:-translate-y-px hover:border-primary/25 hover:bg-muted/30 hover:shadow-sm"
       onClick={handleClick}
     >
-      <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/8 text-primary/60 transition-colors group-hover/handoff:bg-primary/15 group-hover/handoff:text-primary">
-        <IconComponent className="size-3.5" />
+      <div className={`flex size-6 shrink-0 items-center justify-center rounded-md transition-colors ${colors.iconBg}`}>
+        <IconComponent className={`size-3.5 ${colors.iconText}`} />
       </div>
       <div className="min-w-0 flex-1">
         <span className="text-[11px] font-semibold text-foreground/80 transition-colors group-hover/handoff:text-foreground">
