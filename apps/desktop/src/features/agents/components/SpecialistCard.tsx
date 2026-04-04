@@ -37,7 +37,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
               "flex size-10 shrink-0 items-center justify-center rounded-xl shadow-sm",
               isManager
                 ? "bg-primary/12 ring-1 ring-primary/15"
-                : "bg-primary/[0.08] dark:bg-primary/[0.08]",
+                : "bg-primary/[0.06] ring-1 ring-primary/[0.06] dark:bg-primary/[0.08] dark:ring-primary/[0.08]",
             )}
           >
             <Icon
@@ -71,7 +71,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
           {specialist.outputTypes.slice(0, 4).map((output) => (
             <span
               key={output}
-              className="rounded-md border border-border/20 bg-muted/30 px-2 py-0.5 text-[11px] text-muted-foreground/70 dark:border-white/[0.04] dark:bg-white/[0.03]"
+              className="rounded-md border border-border/30 bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground/80 dark:border-white/[0.06] dark:bg-white/[0.04]"
             >
               {output}
             </span>
@@ -80,8 +80,8 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
 
         {/* Recent outputs — only shown when outputs exist */}
         {outputs.length > 0 ? (
-          <div className="mt-4 flex flex-col gap-1.5">
-            <div className="flex items-center gap-1.5">
+          <div className="mt-4 rounded-lg border border-border/15 bg-muted/20 px-3 py-2.5 dark:border-white/[0.03] dark:bg-white/[0.02]">
+            <div className="mb-1.5 flex items-center gap-1.5">
               <PackageIcon className="size-3 shrink-0 text-muted-foreground/50" />
               <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
                 Recent outputs
@@ -93,7 +93,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
                   key={artifact.artifactId}
                   role="button"
                   tabIndex={0}
-                  className="group/output flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-muted/40 dark:hover:bg-white/[0.04]"
+                  className="group/output flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-card dark:hover:bg-white/[0.04]"
                   onClick={() => onOutputNavigate?.(artifact)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
