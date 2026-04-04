@@ -102,6 +102,8 @@ export interface SpecialistColorConfig {
   hoverIconBg: string;
   hoverIconText: string;
   dotColor: string;
+  /** Filled icon background on chat starter prompt hover (group-hover/starter). */
+  starterHoverIconBg: string;
 }
 
 export const SPECIALIST_COLORS: Record<string, SpecialistColorConfig> = {
@@ -113,6 +115,7 @@ export const SPECIALIST_COLORS: Record<string, SpecialistColorConfig> = {
     hoverIconBg: "group-hover/chip:bg-emerald-500/[0.06]",
     hoverIconText: "group-hover/chip:text-emerald-600 dark:group-hover/chip:text-emerald-400",
     dotColor: "bg-emerald-500/40",
+    starterHoverIconBg: "group-hover/starter:bg-emerald-500 dark:group-hover/starter:bg-emerald-500",
   },
   "market-intel": {
     iconBg: "bg-amber-500/10 dark:bg-amber-400/10",
@@ -122,6 +125,7 @@ export const SPECIALIST_COLORS: Record<string, SpecialistColorConfig> = {
     hoverIconBg: "group-hover/chip:bg-amber-500/[0.06]",
     hoverIconText: "group-hover/chip:text-amber-600 dark:group-hover/chip:text-amber-400",
     dotColor: "bg-amber-500/40",
+    starterHoverIconBg: "group-hover/starter:bg-amber-500 dark:group-hover/starter:bg-amber-500",
   },
   positioning: {
     iconBg: "bg-violet-500/10 dark:bg-violet-400/10",
@@ -131,6 +135,7 @@ export const SPECIALIST_COLORS: Record<string, SpecialistColorConfig> = {
     hoverIconBg: "group-hover/chip:bg-violet-500/[0.06]",
     hoverIconText: "group-hover/chip:text-violet-600 dark:group-hover/chip:text-violet-400",
     dotColor: "bg-violet-500/40",
+    starterHoverIconBg: "group-hover/starter:bg-violet-500 dark:group-hover/starter:bg-violet-500",
   },
   "website-conversion": {
     iconBg: "bg-sky-500/10 dark:bg-sky-400/10",
@@ -140,6 +145,7 @@ export const SPECIALIST_COLORS: Record<string, SpecialistColorConfig> = {
     hoverIconBg: "group-hover/chip:bg-sky-500/[0.06]",
     hoverIconText: "group-hover/chip:text-sky-600 dark:group-hover/chip:text-sky-400",
     dotColor: "bg-sky-500/40",
+    starterHoverIconBg: "group-hover/starter:bg-sky-500 dark:group-hover/starter:bg-sky-500",
   },
   "seo-aeo": {
     iconBg: "bg-blue-500/10 dark:bg-blue-400/10",
@@ -149,6 +155,7 @@ export const SPECIALIST_COLORS: Record<string, SpecialistColorConfig> = {
     hoverIconBg: "group-hover/chip:bg-blue-500/[0.06]",
     hoverIconText: "group-hover/chip:text-blue-600 dark:group-hover/chip:text-blue-400",
     dotColor: "bg-blue-500/40",
+    starterHoverIconBg: "group-hover/starter:bg-blue-500 dark:group-hover/starter:bg-blue-500",
   },
   distribution: {
     iconBg: "bg-teal-500/10 dark:bg-teal-400/10",
@@ -158,6 +165,7 @@ export const SPECIALIST_COLORS: Record<string, SpecialistColorConfig> = {
     hoverIconBg: "group-hover/chip:bg-teal-500/[0.06]",
     hoverIconText: "group-hover/chip:text-teal-600 dark:group-hover/chip:text-teal-400",
     dotColor: "bg-teal-500/40",
+    starterHoverIconBg: "group-hover/starter:bg-teal-500 dark:group-hover/starter:bg-teal-500",
   },
   content: {
     iconBg: "bg-rose-500/10 dark:bg-rose-400/10",
@@ -167,6 +175,7 @@ export const SPECIALIST_COLORS: Record<string, SpecialistColorConfig> = {
     hoverIconBg: "group-hover/chip:bg-rose-500/[0.06]",
     hoverIconText: "group-hover/chip:text-rose-600 dark:group-hover/chip:text-rose-400",
     dotColor: "bg-rose-500/40",
+    starterHoverIconBg: "group-hover/starter:bg-rose-500 dark:group-hover/starter:bg-rose-500",
   },
   outbound: {
     iconBg: "bg-orange-500/10 dark:bg-orange-400/10",
@@ -176,6 +185,7 @@ export const SPECIALIST_COLORS: Record<string, SpecialistColorConfig> = {
     hoverIconBg: "group-hover/chip:bg-orange-500/[0.06]",
     hoverIconText: "group-hover/chip:text-orange-600 dark:group-hover/chip:text-orange-400",
     dotColor: "bg-orange-500/40",
+    starterHoverIconBg: "group-hover/starter:bg-orange-500 dark:group-hover/starter:bg-orange-500",
   },
 };
 

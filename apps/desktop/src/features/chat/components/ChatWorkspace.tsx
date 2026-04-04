@@ -699,23 +699,36 @@ function ChatSessionView({
             </div>
 
             <div className="grid w-full gap-2.5 sm:grid-cols-2 sm:[&>:last-child:nth-child(2n+1)]:col-span-full">
-              {starterPrompts.map((prompt) => (
-                <button
-                  key={prompt.text}
-                  type="button"
-                  className="group/starter flex cursor-pointer items-start gap-3 rounded-xl border border-border/20 bg-card/40 px-4 py-3.5 text-left transition-all duration-100 hover:-translate-y-0.5 hover:border-primary/20 hover:bg-card/70 hover:shadow-md hover:shadow-black/5 dark:border-white/[0.04] dark:hover:border-primary/15 dark:hover:shadow-black/20"
-                  onClick={() => {
-                    void handleSubmit({ text: prompt.text });
-                  }}
-                >
-                  <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary/70 transition-colors group-hover/starter:bg-primary group-hover/starter:text-primary-foreground">
-                    <prompt.icon className="size-3.5" />
-                  </div>
-                  <span className="flex-1 text-[13px] font-medium leading-snug text-muted-foreground/70 transition-colors group-hover/starter:text-foreground">
-                    {prompt.text}
-                  </span>
-                </button>
-              ))}
+              {starterPrompts.map((prompt) => {
+                const specColors = effectiveSpecialistId ? getSpecialistColors(effectiveSpecialistId) : undefined;
+                return (
+                  <button
+                    key={prompt.text}
+                    type="button"
+                    className={cn(
+                      "group/starter flex cursor-pointer items-start gap-3 rounded-xl border bg-card/40 px-4 py-3.5 text-left transition-all duration-100 hover:-translate-y-0.5 hover:bg-card/70 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-black/20",
+                      specColors
+                        ? cn("border-border/20 dark:border-white/[0.04]", specColors.hoverBorder)
+                        : "border-border/20 hover:border-primary/20 dark:border-white/[0.04] dark:hover:border-primary/15",
+                    )}
+                    onClick={() => {
+                      void handleSubmit({ text: prompt.text });
+                    }}
+                  >
+                    <div className={cn(
+                      "flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors group-hover/starter:text-white",
+                      specColors
+                        ? cn(specColors.iconBg, specColors.iconText, specColors.starterHoverIconBg)
+                        : "bg-primary/8 text-primary/70 group-hover/starter:bg-primary group-hover/starter:text-primary-foreground",
+                    )}>
+                      <prompt.icon className="size-3.5" />
+                    </div>
+                    <span className="flex-1 text-[13px] font-medium leading-snug text-muted-foreground/70 transition-colors group-hover/starter:text-foreground">
+                      {prompt.text}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : (
