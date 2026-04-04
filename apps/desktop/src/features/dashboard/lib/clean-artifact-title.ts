@@ -1,5 +1,6 @@
 import { stripMarkdown } from "./strip-markdown";
 import { getArtifactTypeConfig } from "./artifact-type-config";
+import { normalizeQuotes } from "./normalize-quotes";
 
 /**
  * Regex matching first-person conversational preamble that should not
@@ -13,7 +14,7 @@ export const CONVERSATIONAL_PATTERN =
  * rather than a descriptive deliverable name.
  */
 export function isConversationalTitle(title: string): boolean {
-  return CONVERSATIONAL_PATTERN.test(title.trim());
+  return CONVERSATIONAL_PATTERN.test(normalizeQuotes(title.trim()));
 }
 
 /**

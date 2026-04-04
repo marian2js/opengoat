@@ -138,3 +138,48 @@ void test("cleanArtifactTitle: strips markdown from content heading", () => {
     "Bold Heading",
   );
 });
+
+// ---------------------------------------------------------------------------
+// Smart quote (Unicode U+2019) support
+// ---------------------------------------------------------------------------
+
+void test("isConversationalTitle: detects smart-quote I\u2019m prefix", () => {
+  assert.ok(isConversationalTitle("I\u2019m pulling the site copy"));
+});
+
+void test("isConversationalTitle: detects smart-quote I\u2019ll prefix", () => {
+  assert.ok(isConversationalTitle("I\u2019ll start by reviewing the homepage"));
+});
+
+void test("isConversationalTitle: detects smart-quote I\u2019ve prefix", () => {
+  assert.ok(isConversationalTitle("I\u2019ve finished the audit"));
+});
+
+void test("isConversationalTitle: detects smart-quote don\u2019t prefix", () => {
+  assert.ok(isConversationalTitle("I don\u2019t see any issues"));
+});
+
+void test("isConversationalTitle: detects smart-quote can\u2019t prefix", () => {
+  assert.ok(isConversationalTitle("I can\u2019t find the source"));
+});
+
+void test("cleanArtifactTitle: falls back to type label for smart-quote conversational title", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "I\u2019m still only seeing the handoff sentence, not the actua...",
+      type: "strategy_note",
+    }),
+    "Strategy Note",
+  );
+});
+
+void test("cleanArtifactTitle: extracts heading from content for smart-quote title", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "I\u2019m still only seeing the handoff sentence",
+      type: "strategy_note",
+      content: "# Positioning Strategy\n\nDetails...",
+    }),
+    "Positioning Strategy",
+  );
+});

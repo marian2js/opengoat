@@ -165,3 +165,42 @@ test("strips nested conversational prefix after 'OK,'", () => {
     "Put together the launch plan",
   );
 });
+
+// ---------------------------------------------------------------------------
+// Smart quote (Unicode U+2019) support
+// ---------------------------------------------------------------------------
+
+test("strips smart-quote I\u2019m prefix and capitalizes", () => {
+  assert.equal(
+    sanitizeTaskTitle("I\u2019m pulling the site copy/source so the recommendations are grounded"),
+    "Pulling the site copy/source so the recommendations are grounded",
+  );
+});
+
+test("strips smart-quote I\u2019ll prefix and capitalizes", () => {
+  assert.equal(
+    sanitizeTaskTitle("I\u2019ll start by putting together a launch plan for Product Hunt"),
+    "Start by putting together a launch plan for Product Hunt",
+  );
+});
+
+test("strips smart-quote I\u2019ve prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("I\u2019ve finished the competitive analysis"),
+    "Finished the competitive analysis",
+  );
+});
+
+test("strips smart-quote don\u2019t prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("I don\u2019t see any major issues with the copy"),
+    "See any major issues with the copy",
+  );
+});
+
+test("strips nested smart-quote prefix after 'OK,'", () => {
+  assert.equal(
+    sanitizeTaskTitle("OK, I\u2019ll put together the launch plan"),
+    "Put together the launch plan",
+  );
+});

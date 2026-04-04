@@ -1,4 +1,5 @@
 import { stripMarkdown } from "../../dashboard/lib/strip-markdown";
+import { normalizeQuotes } from "../../dashboard/lib/normalize-quotes";
 
 /**
  * Conversational prefixes that AI agents commonly start sentences with.
@@ -23,8 +24,8 @@ const NESTED_PREFIX =
 export function sanitizeTaskTitle(title: string): string {
   if (!title || !title.trim()) return "";
 
-  // Strip markdown first
-  let clean = stripMarkdown(title);
+  // Strip markdown first, then normalize smart quotes for regex matching
+  let clean = normalizeQuotes(stripMarkdown(title));
 
   // Strip outer conversational prefix
   clean = clean.replace(CONVERSATIONAL_PREFIX, "");
@@ -34,7 +35,7 @@ export function sanitizeTaskTitle(title: string): string {
 
   // Remove leading articles after stripping ("a ", "the ", "an ")
   // Only after conversational prefix was stripped, to make titles more concise
-  if (clean !== stripMarkdown(title)) {
+  if (clean !== normalizeQuotes(stripMarkdown(title))) {
     clean = clean.replace(/^(a |an |the )/i, "");
   }
 
