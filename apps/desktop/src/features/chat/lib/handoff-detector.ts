@@ -65,23 +65,28 @@ function generateDeterministicId(specialistId: string, reason: string): string {
 }
 
 function extractSentence(text: string, matchIndex: number): string {
-  // Find sentence boundaries around the match position
+  // Find sentence boundaries around the match position.
+  // Use only . ! ? as sentence terminators — NOT \n, which is a
+  // formatting character in markdown and would break cross-line detection.
   const beforeText = text.slice(0, matchIndex);
   const afterText = text.slice(matchIndex);
 
   // Find sentence start (look backwards for . ! ? or start of text)
-  const sentenceStartMatch = beforeText.match(/(?:.*[.!?\n]\s*)([^.!?\n]*)$/);
+  const sentenceStartMatch = beforeText.match(/(?:.*[.!?]\s*)([^.!?]*)$/);
   const sentenceStart = sentenceStartMatch
     ? matchIndex - sentenceStartMatch[1].length
     : 0;
 
   // Find sentence end (look forwards for . ! ? or end of text)
-  const sentenceEndMatch = afterText.match(/^[^.!?\n]*[.!?\n]?/);
+  const sentenceEndMatch = afterText.match(/^[^.!?]*[.!?]?/);
   const sentenceEnd = sentenceEndMatch
     ? matchIndex + sentenceEndMatch[0].length
     : text.length;
 
-  return text.slice(sentenceStart, sentenceEnd).trim();
+  // Cap at 500 characters to avoid matching the entire message
+  const MAX_SENTENCE_LEN = 500;
+  const raw = text.slice(sentenceStart, sentenceEnd).trim();
+  return raw.length > MAX_SENTENCE_LEN ? raw.slice(0, MAX_SENTENCE_LEN) : raw;
 }
 
 function hasHandoffIntent(sentence: string): boolean {

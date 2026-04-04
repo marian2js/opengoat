@@ -159,6 +159,47 @@ describe("detectHandoffSuggestions", () => {
     });
   });
 
+  describe("markdown-formatted text with cross-line detection", () => {
+    it("detects handoff when specialist name is on a heading line and intent phrase on next line", () => {
+      const text =
+        "## For the Positioning Agent\n**The Positioning Agent could help sharpen messaging based on these gaps.**";
+      const result = detectHandoffSuggestions(text);
+      expect(result.length).toBeGreaterThanOrEqual(1);
+      expect(result[0].specialistId).toBe("positioning");
+      expect(result[0].reason).toContain("could help");
+    });
+
+    it("detects handoff across newlines for Content Agent", () => {
+      const text =
+        "## For the Content Agent\n**The Content Agent could help turn these angles into blog outlines.**";
+      const result = detectHandoffSuggestions(text);
+      expect(result.length).toBeGreaterThanOrEqual(1);
+      expect(result[0].specialistId).toBe("content");
+    });
+
+    it("detects multiple handoffs in markdown-formatted response spanning lines", () => {
+      const text =
+        "## Next Steps\n\n" +
+        "### For the Positioning Agent\n" +
+        "**The Positioning Agent could help sharpen messaging based on these gaps.**\n\n" +
+        "### For the Content Agent\n" +
+        "**The Content Agent could help turn these angles into blog posts.**";
+      const result = detectHandoffSuggestions(text);
+      expect(result.length).toBe(2);
+      const ids = result.map((s) => s.specialistId);
+      expect(ids).toContain("positioning");
+      expect(ids).toContain("content");
+    });
+
+    it("still detects single-line sentences after fix", () => {
+      const result = detectHandoffSuggestions(
+        "The Positioning Agent could help with messaging.",
+      );
+      expect(result.length).toBeGreaterThanOrEqual(1);
+      expect(result[0].specialistId).toBe("positioning");
+    });
+  });
+
   describe("case insensitivity", () => {
     it("handles varied capitalization of specialist names", () => {
       const result = detectHandoffSuggestions(
