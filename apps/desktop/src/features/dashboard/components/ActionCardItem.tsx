@@ -103,24 +103,24 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
           </>
         ) : (
           <div className="flex flex-1 items-center justify-between">
-            <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40 transition-colors group-hover/action:text-primary">
+            <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 transition-colors group-hover/action:text-primary">
               Run
               <ArrowRightIcon className="size-3 transition-transform duration-150 group-hover/action:translate-x-0.5" />
             </span>
             <div className="flex items-center gap-2.5">
               {specialistName ? (
-                <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/40">
-                  {specialistName} Agent
+                <span className="inline-flex items-center gap-1 rounded bg-primary/[0.06] px-1.5 py-px font-mono text-[9px] text-primary/60 dark:bg-primary/[0.06]">
+                  {specialistName}
                 </span>
               ) : null}
               {card.timeToFirstOutput && (
-                <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/30">
+                <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/40">
                   <ClockIcon className="size-2.5" />
                   {card.timeToFirstOutput}
                 </span>
               )}
               {card.createsTrackedWork && (
-                <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/30">
+                <span className="inline-flex items-center gap-1 font-mono text-[9px] text-muted-foreground/40">
                   <ClipboardListIcon className="size-2.5" />
                   Board
                 </span>

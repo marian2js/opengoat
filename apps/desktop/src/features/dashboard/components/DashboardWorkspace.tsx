@@ -168,7 +168,7 @@ function DashboardContent({
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
       <div className="mx-auto w-full max-w-[1000px]">
       {/* ── Hero area — company context + free-text input ── */}
-      <div className="mb-8 pb-6 border-b border-border/30 dark:border-white/[0.04]">
+      <div className="mb-8 rounded-2xl border border-border/20 bg-gradient-to-b from-card/80 to-transparent p-6 dark:border-white/[0.04] dark:from-white/[0.03] dark:to-transparent">
         <div className="mb-5">
           <CompanySummary
             data={data}
