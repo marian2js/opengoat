@@ -12,6 +12,14 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { toast } from "sonner";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
@@ -213,31 +221,31 @@ export function ProjectSettings({
             <label htmlFor="settings-provider" className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
               Provider
             </label>
-            <select
-              id="settings-provider"
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-[13px] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            <Select
               value={selectedProviderId ?? ""}
-              onChange={(e) => {
-                const value = e.target.value;
+              onValueChange={(value) => {
                 if (value === "__add__") {
-                  // Reset select to current value so it doesn't show "+ Connect"
-                  e.target.value = selectedProviderId ?? "";
                   onAddConnection();
                 } else if (value) {
                   void handleProviderChange(value);
                 }
               }}
             >
-              <option value="" disabled>
-                Select provider
-              </option>
-              {connectedProviders.map((p) => (
-                <option key={p.providerId} value={p.providerId}>
-                  {p.displayName}
-                </option>
-              ))}
-              <option value="__add__">+ Connect new provider</option>
-            </select>
+              <SelectTrigger className="h-9 w-full text-[13px]">
+                <SelectValue placeholder="Select provider" />
+              </SelectTrigger>
+              <SelectContent>
+                {connectedProviders.map((p) => (
+                  <SelectItem key={p.providerId} value={p.providerId} className="text-[13px]">
+                    {p.displayName}
+                  </SelectItem>
+                ))}
+                <SelectSeparator />
+                <SelectItem value="__add__" className="text-[13px] text-primary">
+                  + Connect new provider
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
@@ -250,30 +258,34 @@ export function ProjectSettings({
                 Loading models...
               </div>
             ) : (
-              <select
-                id="settings-model"
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-[13px] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              <Select
                 value={selectedModelId ?? ""}
-                onChange={(e) => {
-                  const model = models.find((m) => m.modelId === e.target.value);
+                onValueChange={(value) => {
+                  const model = models.find((m) => m.modelId === value);
                   if (model) {
                     void handleModelSelect(model.modelRef);
                   }
                 }}
               >
-                {models.length === 0 ? (
-                  <option value="" disabled>
-                    {selectedProviderId ? "No models available" : "Select a provider first"}
-                  </option>
-                ) : null}
-                {models.map((model) => (
-                  <option key={model.modelId} value={model.modelId}>
-                    {model.label}
-                    {model.reasoning ? " (reasoning)" : ""}
-                    {model.contextWindow ? ` · ${Math.round(model.contextWindow / 1000)}k ctx` : ""}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="h-9 w-full text-[13px]">
+                  <SelectValue
+                    placeholder={
+                      selectedProviderId ? "No models available" : "Select a provider first"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {models.map((model) => (
+                    <SelectItem key={model.modelId} value={model.modelId} className="text-[13px]">
+                      {model.label}
+                      {model.reasoning ? " (reasoning)" : ""}
+                      {model.contextWindow
+                        ? ` \u00B7 ${Math.round(model.contextWindow / 1000)}k ctx`
+                        : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
         </CardContent>
