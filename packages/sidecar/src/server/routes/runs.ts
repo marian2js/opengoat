@@ -92,7 +92,10 @@ export function createRunRoutes(runtime: SidecarRuntime): Hono {
       return context.json(progress);
     } catch (error) {
       if (error instanceof Error) {
-        if (error.message.includes("not found")) {
+        if (
+          error.message.includes("not found") ||
+          error.message.includes("does not exist")
+        ) {
           return context.json({ error: error.message }, 404);
         }
         if (error.message.includes("not associated with a playbook")) {
