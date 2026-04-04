@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertCircleIcon, CheckCircleIcon, ClipboardListIcon, LoaderCircleIcon } from "lucide-react";
 import type { OutputBlock } from "../types";
 import type { SidecarClient } from "@/lib/sidecar/client";
+import { sanitizeTaskTitle } from "@/features/board/lib/sanitize-task-title";
 
 interface SaveToBoardControlsProps {
   outputs: OutputBlock[];
@@ -62,7 +63,7 @@ export function SaveToBoardControls({
         await client.createTaskFromRun({
           runId: run.runId,
           objectiveId: run.objectiveId,
-          title: output.title,
+          title: sanitizeTaskTitle(output.title),
           description: output.content.slice(0, 500),
         }, agentId);
       }

@@ -22,6 +22,7 @@ import { LinkedArtifactsSection } from "./LinkedArtifactsSection";
 import { SuggestedNextAction } from "./SuggestedNextAction";
 import { TaskQuickActions } from "./TaskQuickActions";
 import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
+import { sanitizeTaskTitle } from "@/features/board/lib/sanitize-task-title";
 import { AlertCircleIcon, RefreshCwIcon, UserIcon, CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -152,7 +153,7 @@ export function TaskDetailPanel({
                 )}
               </div>
               <DialogTitle className="pr-8 text-lg leading-snug">
-                {task.title}
+                {sanitizeTaskTitle(task.title)}
               </DialogTitle>
               <DialogDescription asChild>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/50">

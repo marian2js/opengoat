@@ -14,6 +14,7 @@ import { TaskStatusBadge } from "./TaskStatusBadge";
 import { ContextBadge } from "./ContextBadge";
 import { ReviewIndicator } from "./ReviewIndicator";
 import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
+import { sanitizeTaskTitle } from "@/features/board/lib/sanitize-task-title";
 import type { TaskGroup } from "@/features/board/lib/board-grouping";
 
 // ---------------------------------------------------------------------------
@@ -52,7 +53,7 @@ function TaskRow({ task, isLeading, onSelect, onSetLeadingTask }: TaskRowProps) 
           {isLeading && (
             <CrosshairIcon className="size-3 shrink-0 text-primary" />
           )}
-          <span className="truncate">{task.title}</span>
+          <span className="truncate">{sanitizeTaskTitle(task.title)}</span>
         </div>
       </TableCell>
 
