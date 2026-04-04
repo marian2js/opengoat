@@ -81,6 +81,28 @@ export function createRunRoutes(runtime: SidecarRuntime): Hono {
     }
   });
 
+  // GET /:runId/progress — get playbook run progress
+  app.get("/:runId/progress", async (context) => {
+    const runId = context.req.param("runId");
+    try {
+      const progress = await runtime.playbookExecutionService.getRunProgress(
+        runtime.opengoatPaths,
+        runId,
+      );
+      return context.json(progress);
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message.includes("not found")) {
+          return context.json({ error: error.message }, 404);
+        }
+        if (error.message.includes("not associated with a playbook")) {
+          return context.json({ error: error.message }, 400);
+        }
+      }
+      throw error;
+    }
+  });
+
   // POST /:runId/advance-phase — advance the run's phase
   app.post("/:runId/advance-phase", async (context) => {
     const runId = context.req.param("runId");

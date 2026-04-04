@@ -25,24 +25,28 @@ export const onboardingActivationPlaybook: PlaybookManifest = {
       description:
         "Walk through the signup and onboarding flow, identify friction points and drop-off risks.",
       expectedArtifacts: ["friction list"],
+      specialistId: "website-conversion",
     },
     {
       name: "Analyze",
       description:
         "Define the aha moment, map the activation path, and identify the shortest route to value.",
       expectedArtifacts: ["aha moment framing"],
+      specialistId: "website-conversion",
     },
     {
       name: "Draft",
       description:
         "Write specific onboarding copy fixes, empty-state improvements, and tooltip/guide suggestions.",
       expectedArtifacts: ["onboarding fixes"],
+      specialistId: "website-conversion",
     },
     {
       name: "Backlog",
       description:
         "Compile a prioritized activation task backlog with effort and impact estimates.",
       expectedArtifacts: ["activation task backlog"],
+      specialistId: "website-conversion",
     },
   ],
   artifactTypes: [

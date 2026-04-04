@@ -25,6 +25,7 @@ export const launchPackPlaybook: PlaybookManifest = {
       name: "Research",
       description: "Identify best-fit launch surfaces, audience, and timing.",
       expectedArtifacts: ["community shortlist", "launch timing plan"],
+      specialistId: "distribution",
     },
     {
       name: "Draft",
@@ -35,18 +36,21 @@ export const launchPackPlaybook: PlaybookManifest = {
         "FAQ pack",
         "community post angles",
       ],
+      specialistId: "distribution",
     },
     {
       name: "Review",
       description:
         "Present launch assets for founder review; incorporate feedback.",
       expectedArtifacts: ["revised launch copy"],
+      specialistId: "cmo",
     },
     {
       name: "Finalize",
       description:
         "Compile final launch checklist and asset inventory.",
       expectedArtifacts: ["launch checklist", "launch assets list"],
+      specialistId: "distribution",
     },
   ],
   artifactTypes: [

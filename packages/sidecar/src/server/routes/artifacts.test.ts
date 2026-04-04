@@ -70,6 +70,7 @@ function createMockRuntime(artifactServiceOverrides: Record<string, unknown> = {
     gatewaySupervisor: {} as never,
     objectiveService: {} as never,
     opengoatPaths: { agentsDir: "/tmp/agents", dataDir: "/tmp/data" },
+    playbookExecutionService: {} as never,
     playbookRegistryService: {} as never,
     runService: {} as never,
     skillService: {} as never,

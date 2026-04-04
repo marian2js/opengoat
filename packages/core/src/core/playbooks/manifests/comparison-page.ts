@@ -25,24 +25,28 @@ export const comparisonPagePlaybook: PlaybookManifest = {
       description:
         "Analyze competitor positioning, messaging themes, strengths, and weaknesses.",
       expectedArtifacts: ["competitor matrix"],
+      specialistId: "market-intel",
     },
     {
       name: "Analyze",
       description:
         "Identify messaging gaps, unoccupied positions, and counter-positioning opportunities.",
       expectedArtifacts: ["messaging gaps"],
+      specialistId: "positioning",
     },
     {
       name: "Draft",
       description:
         "Create comparison page outline with sections, copy angles, and proof points.",
       expectedArtifacts: ["comparison page outline"],
+      specialistId: "seo-aeo",
     },
     {
       name: "Prioritize",
       description:
         "Rank comparison targets by search volume, win rate impact, and content effort.",
       expectedArtifacts: ["priority comparison targets"],
+      specialistId: "seo-aeo",
     },
   ],
   artifactTypes: [

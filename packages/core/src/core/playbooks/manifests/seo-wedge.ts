@@ -25,24 +25,28 @@ export const seoWedgePlaybook: PlaybookManifest = {
       description:
         "Run technical SEO audit, assess current indexation, and identify quick wins.",
       expectedArtifacts: ["SEO audit report"],
+      specialistId: "seo-aeo",
     },
     {
       name: "Research",
       description:
         "Map keyword opportunities, competitor gaps, and AI search visibility.",
       expectedArtifacts: ["prioritized opportunity map"],
+      specialistId: "seo-aeo",
     },
     {
       name: "Draft",
       description:
         "Propose a content wedge strategy and initial topic cluster.",
       expectedArtifacts: ["content wedge proposal", "initial topic cluster"],
+      specialistId: "seo-aeo",
     },
     {
       name: "Refine",
       description:
         "Compile the technical fix backlog and finalize priorities.",
       expectedArtifacts: ["fix backlog"],
+      specialistId: "seo-aeo",
     },
   ],
   artifactTypes: [

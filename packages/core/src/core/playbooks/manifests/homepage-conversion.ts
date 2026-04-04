@@ -25,6 +25,7 @@ export const homepageConversionPlaybook: PlaybookManifest = {
       description:
         "Analyze homepage across 7 CRO dimensions: value prop clarity, headline effectiveness, CTA placement, visual hierarchy, trust signals, objection handling, friction points.",
       expectedArtifacts: ["CRO audit report"],
+      specialistId: "website-conversion",
     },
     {
       name: "Draft",
@@ -36,17 +37,20 @@ export const homepageConversionPlaybook: PlaybookManifest = {
         "trust section rewrite",
         "objection handling copy",
       ],
+      specialistId: "website-conversion",
     },
     {
       name: "Review",
       description:
         "Present options with before/after framing; collect founder preferences.",
+      specialistId: "cmo",
     },
     {
       name: "Refine",
       description:
         "Deliver final copy and a prioritized page recommendations backlog.",
       expectedArtifacts: ["page recommendations backlog"],
+      specialistId: "website-conversion",
     },
   ],
   artifactTypes: [

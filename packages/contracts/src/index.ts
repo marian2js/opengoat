@@ -505,6 +505,7 @@ export const playbookPhaseSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
   expectedArtifacts: z.array(z.string()).optional(),
+  specialistId: z.string().optional(),
 });
 
 export const playbookManifestSchema = z.object({

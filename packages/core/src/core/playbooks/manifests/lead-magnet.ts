@@ -26,24 +26,28 @@ export const leadMagnetPlaybook: PlaybookManifest = {
       description:
         "Generate 5–7 lead magnet options scored by audience fit, production effort, and conversion potential.",
       expectedArtifacts: ["lead magnet options"],
+      specialistId: "content",
     },
     {
       name: "Brief",
       description:
         "Write a detailed brief for the chosen lead magnet: outline, key sections, value hooks.",
       expectedArtifacts: ["chosen lead magnet brief"],
+      specialistId: "content",
     },
     {
       name: "Landing Page",
       description:
         "Draft a landing page outline with headline, value prop, social proof, and CTA.",
       expectedArtifacts: ["landing page outline"],
+      specialistId: "website-conversion",
     },
     {
       name: "Nurture",
       description:
         "Draft a 3–5 email nurture sequence for post-download engagement.",
       expectedArtifacts: ["nurture sequence draft"],
+      specialistId: "outbound",
     },
   ],
   artifactTypes: [

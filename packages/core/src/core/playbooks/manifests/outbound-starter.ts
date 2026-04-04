@@ -25,6 +25,7 @@ export const outboundStarterPlaybook: PlaybookManifest = {
       description:
         "Define targeting angle, ICP pain points, and differentiation hooks.",
       expectedArtifacts: ["targeting angle"],
+      specialistId: "outbound",
     },
     {
       name: "Draft",
@@ -35,17 +36,20 @@ export const outboundStarterPlaybook: PlaybookManifest = {
         "subject lines",
         "personalization framework",
       ],
+      specialistId: "outbound",
     },
     {
       name: "Review",
       description:
         "Review sequence for tone, specificity, and deliverability best practices.",
+      specialistId: "cmo",
     },
     {
       name: "Refine",
       description:
         "Finalize follow-up rules and timing recommendations.",
       expectedArtifacts: ["follow-up rules"],
+      specialistId: "outbound",
     },
   ],
   artifactTypes: [

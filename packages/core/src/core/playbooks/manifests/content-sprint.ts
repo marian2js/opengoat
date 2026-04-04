@@ -26,24 +26,28 @@ export const contentSprintPlaybook: PlaybookManifest = {
       description:
         "Define content pillars and research audience pain points, trending topics, and competitor gaps.",
       expectedArtifacts: ["content pillars"],
+      specialistId: "content",
     },
     {
       name: "Ideation",
       description:
         "Generate 10 ranked content ideas with channel, format, and impact reasoning.",
       expectedArtifacts: ["10 content ideas"],
+      specialistId: "content",
     },
     {
       name: "Draft",
       description:
         "Write 3 content briefs and 1 full draft for the highest-impact idea.",
       expectedArtifacts: ["3 content briefs", "1 full draft"],
+      specialistId: "content",
     },
     {
       name: "Repurpose",
       description:
         "Create a repurposing set showing how the draft can be adapted across channels.",
       expectedArtifacts: ["repurposing set"],
+      specialistId: "content",
     },
   ],
   artifactTypes: [

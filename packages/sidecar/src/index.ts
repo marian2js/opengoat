@@ -14,6 +14,7 @@ import {
   NodeOpenGoatPathsProvider,
   NodePathPort,
   ObjectiveService,
+  PlaybookExecutionService,
   PlaybookRegistryService,
   RunService,
   SkillService,
@@ -113,6 +114,12 @@ export async function startSidecarServer(
 
   const playbookRegistryService = new PlaybookRegistryService([...BUILTIN_PLAYBOOKS]);
 
+  const playbookExecutionService = new PlaybookExecutionService({
+    runService,
+    artifactService,
+    playbookRegistryService,
+  });
+
   const messagingConnectionService = new MessagingConnectionService({
     fileSystem,
     pathPort,
@@ -165,6 +172,7 @@ export async function startSidecarServer(
     messagingRouterService,
     objectiveService,
     opengoatPaths,
+    playbookExecutionService,
     playbookRegistryService,
     runService,
     signalService,
