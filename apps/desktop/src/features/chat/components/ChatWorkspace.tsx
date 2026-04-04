@@ -62,9 +62,11 @@ import type { ChatScope } from "@/features/chat/lib/chat-scope";
 import { useChatScope } from "@/features/chat/hooks/useChatScope";
 import { ScopeIndicator } from "@/features/chat/components/ScopeIndicator";
 import { ObjectiveBanner } from "@/features/chat/components/ObjectiveBanner";
+import { cn } from "@/lib/utils";
 import { SidecarClient } from "@/lib/sidecar/client";
 import { isUnnamedSession } from "@/lib/utils/unnamed-session";
-import { getSpecialistMeta } from "@/features/agents/specialist-meta";
+import { getSpecialistMeta, getSpecialistColors } from "@/features/agents/specialist-meta";
+import { resolveSpecialistIcon } from "@/features/agents/specialist-icons";
 import { SpecialistChatHeader } from "@/features/chat/components/SpecialistChatHeader";
 import { detectGoalIntent } from "@/features/chat/lib/goal-detection";
 import { detectMemoryCandidates } from "@/features/chat/lib/memory-detection";
@@ -670,9 +672,18 @@ function ChatSessionView({
         ) : visibleMessages.length === 0 && !isAction ? (
           <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-10 px-4 py-8 text-center">
             <div className="space-y-4">
-              <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/8 ring-1 ring-primary/10 text-primary">
-                <SparklesIcon className="size-5" />
-              </div>
+              {(() => {
+                const specColors = effectiveSpecialistId ? getSpecialistColors(effectiveSpecialistId) : undefined;
+                const SpecIcon = effectiveSpecialistMeta ? resolveSpecialistIcon(effectiveSpecialistMeta.icon) : SparklesIcon;
+                return (
+                  <div className={cn(
+                    "mx-auto flex size-12 items-center justify-center rounded-2xl ring-1",
+                    specColors ? cn(specColors.iconBg, specColors.iconText, "ring-black/[0.04] dark:ring-white/[0.06]") : "bg-primary/8 ring-primary/10 text-primary",
+                  )}>
+                    <SpecIcon className="size-5" />
+                  </div>
+                );
+              })()}
               <div className="space-y-2">
                 <h1 className="font-display text-[22px] font-bold tracking-[-0.01em] text-foreground">
                   {effectiveSpecialistMeta

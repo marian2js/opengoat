@@ -38,7 +38,7 @@ import { getDeEmphasizedSessionIds } from "@/lib/utils/session-rerun";
 import { humanizeSessionLabel } from "@/lib/utils/session-label";
 import { isUnnamedSession } from "@/lib/utils/unnamed-session";
 import { cn } from "@/lib/utils";
-import { getSpecialistMeta } from "@/features/agents/specialist-meta";
+import { getSpecialistMeta, getSpecialistColors } from "@/features/agents/specialist-meta";
 import { resolveSpecialistIcon } from "@/features/agents/specialist-icons";
 import {
   Collapsible,
@@ -654,6 +654,7 @@ function SessionItem({
   const label = formatSessionLabel(session);
   const unnamed = isUnnamedSession(session.label);
   const specialistMeta = session.specialistId ? getSpecialistMeta(session.specialistId) : undefined;
+  const specialistColors = session.specialistId ? getSpecialistColors(session.specialistId) : undefined;
   const Icon = isAction
     ? ZapIcon
     : specialistMeta
@@ -707,7 +708,7 @@ function SessionItem({
           unnamed && !isActive && "text-sidebar-foreground/50",
         )}
       >
-        <Icon className={cn("shrink-0", (isAction || specialistMeta) && "text-primary")} />
+        <Icon className={cn("shrink-0", isAction ? "text-primary" : specialistColors && specialistColors.iconText)} />
         <span className={cn(
           "truncate",
           unnamed
@@ -717,7 +718,10 @@ function SessionItem({
               : "font-normal",
         )}>{label}</span>
         {specialistMeta && !isAction ? (
-          <span className="shrink-0 rounded bg-primary/[0.08] px-1 py-px text-[10px] font-medium text-primary/60">
+          <span className={cn(
+            "shrink-0 rounded px-1 py-px text-[10px] font-medium",
+            specialistColors ? cn(specialistColors.iconBg, specialistColors.iconText, "opacity-70") : "bg-primary/[0.08] text-primary/60",
+          )}>
             {specialistMeta.name}
           </span>
         ) : null}
