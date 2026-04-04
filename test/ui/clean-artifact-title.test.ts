@@ -58,6 +58,49 @@ describe("clean-artifact-title utility", () => {
     expect(src).toMatch(/Sure/);
     expect(src).toMatch(/Hmm/);
   });
+
+  it("detects 'Absolutely' preamble pattern", () => {
+    const src = readFileSync(utilPath, "utf-8");
+    expect(src).toMatch(/Absolutely/);
+  });
+
+  it("detects 'Assuming ' preamble pattern", () => {
+    const src = readFileSync(utilPath, "utf-8");
+    expect(src).toMatch(/Assuming /);
+  });
+
+  it("detects 'Here\\'' (Here's) preamble pattern", () => {
+    const src = readFileSync(utilPath, "utf-8");
+    expect(src).toMatch(/Here'/);
+  });
+
+  it("detects 'I can ' preamble pattern", () => {
+    const src = readFileSync(utilPath, "utf-8");
+    expect(src).toMatch(/I can /);
+  });
+
+  it("desktop CONVERSATIONAL_PATTERN matches sidecar patterns", () => {
+    const src = readFileSync(utilPath, "utf-8");
+    const sidecarSrc = readFileSync(
+      resolve(__dirname, "../../packages/sidecar/src/artifact-extractor/title-cleaner.ts"),
+      "utf-8",
+    );
+
+    // Extract pattern alternatives from both files
+    const extractAlternatives = (source: string): string[] => {
+      const match = source.match(/CONVERSATIONAL_PATTERN\s*=\s*\/\^\(([^)]+)\)\//);
+      if (!match) return [];
+      return match[1].split("|").map((s) => s.trim()).sort();
+    };
+
+    const desktopAlts = extractAlternatives(src);
+    const sidecarAlts = extractAlternatives(sidecarSrc);
+
+    // Every sidecar pattern should be present in desktop
+    for (const pattern of sidecarAlts) {
+      expect(desktopAlts).toContain(pattern);
+    }
+  });
 });
 
 describe("ArtifactCard summary filtering", () => {
