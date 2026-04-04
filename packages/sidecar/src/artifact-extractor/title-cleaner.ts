@@ -3,7 +3,7 @@
  * appear as artifact titles. Case-insensitive, anchored to start.
  */
 const CONVERSATIONAL_PATTERN =
-  /^(I |I'm |I'll |I've |I don't|I can't|I can |I still|I checked|Got it|Let me|Here |Here'|Sure|OK |Okay|Well |So |Hmm|Based on |According to |After reviewing |After analyzing |Looking at |From the |From my |Given |Pulling |Checking |Reviewing |Analyzing |To help |In order to |For this |For your |As requested|Absolutely|Assuming )/i;
+  /^(I |I'm |I'll |I've |I don't|I can't|I can |I still|I checked|Got it|Let me|Here |Here'|Sure|OK |Okay|Well |So |Hmm|Based on |According to |After reviewing |After analyzing |Looking at |From the |From my |Given |Pulling |Checking |Reviewing |Analyzing |To help |In order to |For this |For your |As requested|Absolutely|Assuming |Saved |Short answer)/i;
 
 /**
  * Normalizes Unicode smart/curly quotes to ASCII equivalents

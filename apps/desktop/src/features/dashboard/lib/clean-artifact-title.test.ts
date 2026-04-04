@@ -312,3 +312,61 @@ void test("cleanArtifactTitle: extracts heading for 'Based on' title with conten
     "Top Competitors Analysis",
   );
 });
+
+// ---------------------------------------------------------------------------
+// "Saved " and "Short answer" preamble detection (task 0021)
+// ---------------------------------------------------------------------------
+
+void test("isConversationalTitle: detects 'Saved ' preamble", () => {
+  assert.ok(isConversationalTitle("Saved the audit here:"));
+});
+
+void test("isConversationalTitle: detects 'Short answer' preamble", () => {
+  assert.ok(isConversationalTitle("Short answer: the real competitive set"));
+});
+
+void test("cleanArtifactTitle: falls back to type label for 'Saved ' preamble", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "Saved the audit here:",
+      type: "strategy_note",
+    }),
+    "Strategy Note",
+  );
+});
+
+void test("cleanArtifactTitle: falls back to type label for 'Short answer' preamble", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "Short answer: the real competitive set",
+      type: "matrix",
+    }),
+    "Matrix",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Content heading fallback skips conversational headings (task 0021)
+// ---------------------------------------------------------------------------
+
+void test("cleanArtifactTitle: skips conversational content heading and uses next non-conversational heading", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "I still don't have the actual positioning thread 130",
+      type: "page_outline",
+      content: "## I'll start with the overview\n\nSome text\n\n## Positioning Page Outline\n\nDetails...",
+    }),
+    "Positioning Page Outline",
+  );
+});
+
+void test("cleanArtifactTitle: falls back to type label when all content headings are conversational", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "I still don't have the actual positioning thread",
+      type: "strategy_note",
+      content: "## I'll start with the overview\n\nSome text\n\n## Here is what I found\n\nMore text",
+    }),
+    "Strategy Note",
+  );
+});

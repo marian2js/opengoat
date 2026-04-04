@@ -161,3 +161,30 @@ More analysis below...`;
     ).toBe("Competitor Positioning Matrix");
   });
 });
+
+// ---------------------------------------------------------------------------
+// "Saved " and "Short answer" preamble detection (task 0021)
+// ---------------------------------------------------------------------------
+describe("isConversationalTitle — Saved / Short answer patterns", () => {
+  it("detects 'Saved ' preamble", () => {
+    expect(isConversationalTitle("Saved the audit here:")).toBe(true);
+  });
+
+  it("detects 'Short answer' preamble", () => {
+    expect(isConversationalTitle("Short answer: the real competitive set")).toBe(true);
+  });
+});
+
+describe("cleanSectionTitle — Saved / Short answer fallback", () => {
+  it("falls back to type label for 'Saved ' preamble without content headings", () => {
+    expect(
+      cleanSectionTitle("Saved the audit here:", "Just plain text.", "strategy_note"),
+    ).toBe("Strategy Note");
+  });
+
+  it("falls back to type label for 'Short answer' preamble without content headings", () => {
+    expect(
+      cleanSectionTitle("Short answer: the real competitive set", "Plain text.", "matrix"),
+    ).toBe("Matrix");
+  });
+});

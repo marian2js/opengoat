@@ -79,6 +79,22 @@ describe("clean-artifact-title utility", () => {
     expect(src).toMatch(/I can /);
   });
 
+  it("detects 'Saved ' preamble pattern", () => {
+    const src = readFileSync(utilPath, "utf-8");
+    expect(src).toMatch(/Saved /);
+  });
+
+  it("detects 'Short answer' preamble pattern", () => {
+    const src = readFileSync(utilPath, "utf-8");
+    expect(src).toMatch(/Short answer/);
+  });
+
+  it("content heading fallback loops and skips conversational headings", () => {
+    const src = readFileSync(utilPath, "utf-8");
+    // Should use a while loop or similar iteration over headings, not just the first match
+    expect(src).toMatch(/while/);
+  });
+
   it("desktop CONVERSATIONAL_PATTERN matches sidecar patterns", () => {
     const src = readFileSync(utilPath, "utf-8");
     const sidecarSrc = readFileSync(

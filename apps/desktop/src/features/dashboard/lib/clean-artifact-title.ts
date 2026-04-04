@@ -7,7 +7,7 @@ import { normalizeQuotes } from "./normalize-quotes";
  * appear as an artifact title. Case-insensitive.
  */
 export const CONVERSATIONAL_PATTERN =
-  /^(I |I'm |I'll |I've |I don't|I can't|I can |I still|I checked|Got it|Let me|Here |Here'|Sure|OK |Okay|Well |So |Hmm|Based on |According to |After reviewing |After analyzing |Looking at |From the |From my |Given |Pulling |Checking |Reviewing |Analyzing |To help |In order to |For this |For your |As requested|Absolutely|Assuming )/i;
+  /^(I |I'm |I'll |I've |I don't|I can't|I can |I still|I checked|Got it|Let me|Here |Here'|Sure|OK |Okay|Well |So |Hmm|Based on |According to |After reviewing |After analyzing |Looking at |From the |From my |Given |Pulling |Checking |Reviewing |Analyzing |To help |In order to |For this |For your |As requested|Absolutely|Assuming |Saved |Short answer)/i;
 
 /**
  * Returns true if the given title looks like AI conversational preamble
@@ -31,11 +31,15 @@ export function cleanArtifactTitle(
     return stripped;
   }
 
-  // Try to extract the first markdown heading from content
+  // Try to extract the first non-conversational markdown heading from content
   if (artifact.content) {
-    const headingMatch = artifact.content.match(/^#{1,6}\s+(.+)$/m);
-    if (headingMatch) {
-      return stripMarkdown(headingMatch[1].trim());
+    const headingRegex = /^#{1,6}\s+(.+)$/gm;
+    let headingMatch: RegExpExecArray | null;
+    while ((headingMatch = headingRegex.exec(artifact.content)) !== null) {
+      const candidate = stripMarkdown(headingMatch[1].trim());
+      if (!isConversationalTitle(candidate)) {
+        return candidate;
+      }
     }
   }
 
