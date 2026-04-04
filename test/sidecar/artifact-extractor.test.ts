@@ -798,6 +798,161 @@ Here's a detailed market brief with positioning opportunities and whitespace are
 });
 
 // ---------------------------------------------------------------------------
+// extractArtifacts: conversational preamble title cleaning
+// ---------------------------------------------------------------------------
+describe("extractArtifacts — conversational preamble cleaning", () => {
+  function createMockDeps() {
+    const createdArtifacts: unknown[] = [];
+    const artifactService = {
+      createArtifact: vi.fn().mockImplementation((_paths: unknown, opts: unknown) => {
+        const record = { artifactId: `art-${createdArtifacts.length + 1}`, ...(opts as object) };
+        createdArtifacts.push(record);
+        return Promise.resolve(record);
+      }),
+      createBundle: vi.fn().mockImplementation((_paths: unknown, opts: unknown) => {
+        return Promise.resolve({ bundleId: "bnd-mock-1", ...(opts as object) });
+      }),
+    };
+    const opengoatPaths = { homeDir: "/tmp/test" };
+    return { artifactService, opengoatPaths, createdArtifacts };
+  }
+
+  const baseContext: ExtractionContext = {
+    specialistId: "market-intel",
+    agentId: "proj-1",
+    sessionId: "sess-1",
+    messageIndex: 0,
+  };
+
+  it("strips conversational heading and uses content heading instead", async () => {
+    const { artifactService, opengoatPaths } = createMockDeps();
+    const text = `Some intro text
+
+## Here's a structured readout of the main messaging gaps
+
+After analyzing the competitive landscape, the key gaps are clear.
+
+### Messaging Gap Analysis
+
+| Gap Area | Your Position | Competitor Position |
+|---|---|---|
+| AI-native | Strong | Weak |
+| Developer DX | Moderate | Strong |
+
+This analysis shows significant opportunities in the AI-native space.
+`;
+
+    const specialist = {
+      id: "market-intel",
+      name: "Market Intel",
+      outputTypes: ["competitor messaging matrix", "community shortlist", "market brief"],
+    };
+
+    const result = await extractArtifacts(text, baseContext, {
+      artifactService: artifactService as any,
+      opengoatPaths: opengoatPaths as any,
+      specialist: specialist as any,
+    });
+
+    // The heading was conversational; should fall back to content heading or type
+    expect(result.artifacts).toHaveLength(1);
+    const callArgs = artifactService.createArtifact.mock.calls[0][1];
+    expect(callArgs.title).toBe("Messaging Gap Analysis");
+  });
+
+  it("falls back to humanized artifact type when no content heading exists", async () => {
+    const { artifactService, opengoatPaths } = createMockDeps();
+    // Heading is conversational but contains enough matching tokens ("competitor", "messaging")
+    const text = `## Here's the competitor messaging breakdown you asked for
+
+A detailed competitor messaging matrix showing positioning gaps across all major players in the B2B SaaS market for marketing intelligence tools.
+
+| Competitor | Positioning | Key Claim | Weakness |
+|---|---|---|---|
+| Acme Corp | "All-in-one platform" | Speed | No customization |
+| Beta Inc | "Enterprise-grade" | Security | Expensive |
+`;
+
+    const specialist = {
+      id: "market-intel",
+      name: "Market Intel",
+      outputTypes: ["competitor messaging matrix", "community shortlist"],
+    };
+
+    const result = await extractArtifacts(text, baseContext, {
+      artifactService: artifactService as any,
+      opengoatPaths: opengoatPaths as any,
+      specialist: specialist as any,
+    });
+
+    expect(result.artifacts).toHaveLength(1);
+    const callArgs = artifactService.createArtifact.mock.calls[0][1];
+    // No content heading and section heading is conversational → fallback to type label
+    expect(callArgs.title).toBe("Matrix");
+  });
+
+  it("preserves clean descriptive headings unchanged", async () => {
+    const { artifactService, opengoatPaths } = createMockDeps();
+    const text = `## Competitor Messaging Matrix
+
+| Competitor | Positioning | Key Claim | Weakness |
+|---|---|---|---|
+| Acme Corp | "All-in-one platform" | Speed | No customization |
+| Beta Inc | "Enterprise-grade" | Security | Expensive |
+
+Key gaps: None of your competitors emphasize the "AI-native" angle.
+`;
+
+    const specialist = {
+      id: "market-intel",
+      name: "Market Intel",
+      outputTypes: ["competitor messaging matrix", "community shortlist"],
+    };
+
+    const result = await extractArtifacts(text, baseContext, {
+      artifactService: artifactService as any,
+      opengoatPaths: opengoatPaths as any,
+      specialist: specialist as any,
+    });
+
+    expect(result.artifacts).toHaveLength(1);
+    const callArgs = artifactService.createArtifact.mock.calls[0][1];
+    expect(callArgs.title).toBe("Competitor Messaging Matrix");
+  });
+
+  it("strips markdown bold from heading", async () => {
+    const { artifactService, opengoatPaths } = createMockDeps();
+    const text = `## **Hero Rewrite Options**
+
+Here are three hero rewrite options for your landing page:
+
+1. **Option A** — "Ship faster with AI-powered workflows"
+2. **Option B** — "Your team's second brain for shipping"
+3. **Option C** — "From idea to production in minutes"
+`;
+
+    const specialist = {
+      id: "website-conversion",
+      name: "Website Conversion",
+      outputTypes: ["hero rewrite bundle", "CTA options"],
+    };
+
+    const result = await extractArtifacts(text, {
+      ...baseContext,
+      specialistId: "website-conversion",
+    }, {
+      artifactService: artifactService as any,
+      opengoatPaths: opengoatPaths as any,
+      specialist: specialist as any,
+    });
+
+    expect(result.artifacts).toHaveLength(1);
+    const callArgs = artifactService.createArtifact.mock.calls[0][1];
+    expect(callArgs.title).toBe("Hero Rewrite Options");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Manual extraction route: POST /extract
 // ---------------------------------------------------------------------------
 describe("POST /artifacts/extract", () => {

@@ -2,6 +2,7 @@ import type { ArtifactRecord, ArtifactService, ArtifactType, CreateArtifactOptio
 import type { OpenGoatPaths } from "@opengoat/core";
 import { detectSections, matchHeadingToOutputType } from "./content-detector.ts";
 import { mapOutputTypeToArtifactType } from "./output-type-mapper.ts";
+import { cleanSectionTitle } from "./title-cleaner.ts";
 
 export interface ExtractionContext {
   specialistId: string;
@@ -45,7 +46,7 @@ function deriveBundleTitle(specialistName: string, sections: MatchedSection[]): 
     return `${specialistName}: ${typeName} Bundle`;
   }
 
-  return `${specialistName}: ${sections[0].heading}`;
+  return `${specialistName}: ${cleanSectionTitle(sections[0].heading, sections[0].content, sections[0].artifactType)}`;
 }
 
 /**
@@ -102,9 +103,10 @@ export async function extractArtifacts(
   // Pass 2: Create artifacts with optional bundleId
   const artifacts: ArtifactRecord[] = [];
   for (const section of matched) {
+    const title = cleanSectionTitle(section.heading, section.content, section.artifactType);
     const options: CreateArtifactOptions = {
       projectId: context.agentId,
-      title: section.heading,
+      title,
       type: section.artifactType,
       format: "markdown",
       contentRef: `chat://${context.sessionId}/${context.messageIndex ?? 0}`,
