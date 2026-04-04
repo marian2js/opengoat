@@ -28,9 +28,11 @@ export interface ActionCard {
 }
 
 /**
- * Category config — monochrome neutral badges with emerald accent on hover.
- * DESIGN.md: "Nearly monochrome base. Color is rare and meaningful."
- * All categories share the same restrained styling; only hover uses emerald.
+ * Category config — subtle color-coded badges for scannability.
+ * Each category gets a distinct muted tint so users can quickly identify
+ * action types at a glance. Colors are kept low-opacity to maintain the
+ * "nearly monochrome" principle from DESIGN.md while adding functional
+ * differentiation.
  */
 export const categoryConfig: Record<
   ActionCategory,
@@ -39,62 +41,62 @@ export const categoryConfig: Record<
   conversion: {
     label: "Conversion",
     className:
-      "border-border/40 bg-muted/50 text-muted-foreground dark:text-zinc-400",
-    accentColor: "bg-primary/40",
-    iconBg: "bg-muted/60",
-    iconText: "text-muted-foreground dark:text-zinc-400",
-    iconHoverBg: "group-hover/action:bg-primary",
-    iconHoverText: "group-hover/action:text-primary-foreground",
+      "border-emerald-500/20 bg-emerald-500/[0.07] text-emerald-700 dark:border-emerald-400/15 dark:bg-emerald-400/[0.07] dark:text-emerald-400",
+    accentColor: "bg-emerald-500/40",
+    iconBg: "bg-emerald-500/10 dark:bg-emerald-400/10",
+    iconText: "text-emerald-600 dark:text-emerald-400",
+    iconHoverBg: "group-hover/action:bg-emerald-500",
+    iconHoverText: "group-hover/action:text-white",
   },
   distribution: {
     label: "Distribution",
     className:
-      "border-border/40 bg-muted/50 text-muted-foreground dark:text-zinc-400",
-    accentColor: "bg-primary/40",
-    iconBg: "bg-muted/60",
-    iconText: "text-muted-foreground dark:text-zinc-400",
-    iconHoverBg: "group-hover/action:bg-primary",
-    iconHoverText: "group-hover/action:text-primary-foreground",
+      "border-sky-500/20 bg-sky-500/[0.07] text-sky-700 dark:border-sky-400/15 dark:bg-sky-400/[0.07] dark:text-sky-400",
+    accentColor: "bg-sky-500/40",
+    iconBg: "bg-sky-500/10 dark:bg-sky-400/10",
+    iconText: "text-sky-600 dark:text-sky-400",
+    iconHoverBg: "group-hover/action:bg-sky-500",
+    iconHoverText: "group-hover/action:text-white",
   },
   growth: {
     label: "Growth",
     className:
-      "border-border/40 bg-muted/50 text-muted-foreground dark:text-zinc-400",
-    accentColor: "bg-primary/40",
-    iconBg: "bg-muted/60",
-    iconText: "text-muted-foreground dark:text-zinc-400",
-    iconHoverBg: "group-hover/action:bg-primary",
-    iconHoverText: "group-hover/action:text-primary-foreground",
+      "border-teal-500/20 bg-teal-500/[0.07] text-teal-700 dark:border-teal-400/15 dark:bg-teal-400/[0.07] dark:text-teal-400",
+    accentColor: "bg-teal-500/40",
+    iconBg: "bg-teal-500/10 dark:bg-teal-400/10",
+    iconText: "text-teal-600 dark:text-teal-400",
+    iconHoverBg: "group-hover/action:bg-teal-500",
+    iconHoverText: "group-hover/action:text-white",
   },
   messaging: {
     label: "Messaging",
     className:
-      "border-border/40 bg-muted/50 text-muted-foreground dark:text-zinc-400",
-    accentColor: "bg-primary/40",
-    iconBg: "bg-muted/60",
-    iconText: "text-muted-foreground dark:text-zinc-400",
-    iconHoverBg: "group-hover/action:bg-primary",
-    iconHoverText: "group-hover/action:text-primary-foreground",
+      "border-violet-500/20 bg-violet-500/[0.07] text-violet-700 dark:border-violet-400/15 dark:bg-violet-400/[0.07] dark:text-violet-400",
+    accentColor: "bg-violet-500/40",
+    iconBg: "bg-violet-500/10 dark:bg-violet-400/10",
+    iconText: "text-violet-600 dark:text-violet-400",
+    iconHoverBg: "group-hover/action:bg-violet-500",
+    iconHoverText: "group-hover/action:text-white",
   },
   research: {
     label: "Research",
     className:
-      "border-border/40 bg-muted/50 text-muted-foreground dark:text-zinc-400",
-    accentColor: "bg-primary/40",
-    iconBg: "bg-muted/60",
-    iconText: "text-muted-foreground dark:text-zinc-400",
-    iconHoverBg: "group-hover/action:bg-primary",
-    iconHoverText: "group-hover/action:text-primary-foreground",
+      "border-amber-500/20 bg-amber-500/[0.07] text-amber-700 dark:border-amber-400/15 dark:bg-amber-400/[0.07] dark:text-amber-400",
+    accentColor: "bg-amber-500/40",
+    iconBg: "bg-amber-500/10 dark:bg-amber-400/10",
+    iconText: "text-amber-600 dark:text-amber-400",
+    iconHoverBg: "group-hover/action:bg-amber-500",
+    iconHoverText: "group-hover/action:text-white",
   },
   seo: {
     label: "SEO",
     className:
-      "border-border/40 bg-muted/50 text-muted-foreground dark:text-zinc-400",
-    accentColor: "bg-primary/40",
-    iconBg: "bg-muted/60",
-    iconText: "text-muted-foreground dark:text-zinc-400",
-    iconHoverBg: "group-hover/action:bg-primary",
-    iconHoverText: "group-hover/action:text-primary-foreground",
+      "border-blue-500/20 bg-blue-500/[0.07] text-blue-700 dark:border-blue-400/15 dark:bg-blue-400/[0.07] dark:text-blue-400",
+    accentColor: "bg-blue-500/40",
+    iconBg: "bg-blue-500/10 dark:bg-blue-400/10",
+    iconText: "text-blue-600 dark:text-blue-400",
+    iconHoverBg: "group-hover/action:bg-blue-500",
+    iconHoverText: "group-hover/action:text-white",
   },
 };
 
