@@ -111,6 +111,25 @@ import {
 } from "@opengoat/contracts";
 import { z } from "zod";
 
+export interface PhaseProgressDetail {
+  name: string;
+  description: string;
+  status: "completed" | "current" | "upcoming";
+  specialistId?: string;
+  expectedArtifacts: string[];
+  matchedArtifacts: string[];
+  missingArtifacts: string[];
+}
+
+export interface PlaybookProgressResponse {
+  runId: string;
+  playbookId: string;
+  playbookTitle: string;
+  currentPhase: string;
+  runStatus: string;
+  phases: PhaseProgressDetail[];
+}
+
 export class SidecarClient {
   constructor(private readonly connection: SidecarConnection) {}
 
@@ -646,6 +665,18 @@ export class SidecarClient {
     );
   }
 
+  async startPlaybook(
+    playbookId: string,
+    payload: { projectId: string; objectiveId: string },
+  ): Promise<RunRecord> {
+    return runRecordSchema.parse(
+      await this.request(`/playbooks/${encodeURIComponent(playbookId)}/start`, {
+        body: JSON.stringify(payload),
+        method: "POST",
+      }),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Runs
   // ---------------------------------------------------------------------------
@@ -726,6 +757,11 @@ export class SidecarClient {
         method: "POST",
       }),
     );
+  }
+
+  async getRunProgress(runId: string): Promise<PlaybookProgressResponse> {
+    const raw = await this.request(`/runs/${encodeURIComponent(runId)}/progress`);
+    return raw as PlaybookProgressResponse;
   }
 
   async createTaskFromRun(payload: {

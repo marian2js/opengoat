@@ -1,5 +1,6 @@
 import { LayoutDashboardIcon } from "lucide-react";
-import type { AgentSession, ArtifactRecord } from "@opengoat/contracts";
+import { useCallback, useState } from "react";
+import type { AgentSession, ArtifactRecord, PlaybookManifest } from "@opengoat/contracts";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
 import { getActionMapping } from "@/lib/utils/action-map";
@@ -7,11 +8,14 @@ import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
 import { ActiveWorkSection } from "@/features/dashboard/components/ActiveWorkSection";
 import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
 import { DashboardAgentRoster } from "@/features/dashboard/components/DashboardAgentRoster";
+import { PlaybookInputForm } from "@/features/dashboard/components/PlaybookInputForm";
 import { SuggestedActionGrid } from "@/features/dashboard/components/SuggestedActionGrid";
 import { FreeTextInput } from "@/features/dashboard/components/FreeTextInput";
 import { NowWorkingOn, NowWorkingOnSkeleton } from "@/features/dashboard/components/NowWorkingOn";
 import { RecentOutputs } from "@/features/dashboard/components/RecentOutputs";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
+import { starterActions } from "@/features/dashboard/data/actions";
+import { buildRunPrompt } from "@/features/dashboard/lib/run-prompt-composer";
 import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSummary";
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
 import { useBoardSummary } from "@/features/dashboard/hooks/useBoardSummary";
@@ -20,6 +24,7 @@ import { useActionSessions } from "@/features/dashboard/hooks/useActionSessions"
 import { useRuns } from "@/features/dashboard/hooks/useRuns";
 import { useRecentArtifacts } from "@/features/dashboard/hooks/useRecentArtifacts";
 import { useSpecialistRoster } from "@/features/dashboard/hooks/useSpecialistRoster";
+import { toast } from "sonner";
 
 /** Extract sessionId from a contentRef like "session:{id}/message:{id}" */
 function parseSessionFromContentRef(ref: string | undefined): string | null {
@@ -48,6 +53,7 @@ export function DashboardWorkspace({
   isActionLoading,
   onActionClick,
   onViewResults,
+  onRunSessionCreated,
   onResumeRun,
 }: DashboardWorkspaceProps) {
   if (!agentId || !client) {
@@ -74,6 +80,7 @@ export function DashboardWorkspace({
       isActionLoading={isActionLoading}
       onActionClick={onActionClick}
       onViewResults={onViewResults}
+      onRunSessionCreated={onRunSessionCreated}
       onResumeRun={onResumeRun}
     />
   );
@@ -92,6 +99,7 @@ function DashboardContent({
   isActionLoading,
   onActionClick,
   onViewResults,
+  onRunSessionCreated,
   onResumeRun,
 }: {
   agentId: string;
@@ -102,6 +110,7 @@ function DashboardContent({
   isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
+  onRunSessionCreated?: ((session: AgentSession, prompt: string, runId: string, objectiveId?: string) => void) | undefined;
   onResumeRun?: ((sessionId: string) => void) | undefined;
 }) {
   const { data, files, isLoading, error } = useWorkspaceSummary(agentId, client);
@@ -113,6 +122,116 @@ function DashboardContent({
   const runsResult = useRuns(agentId, client);
   const recentArtifacts = useRecentArtifacts(agentId, client);
   const specialistRoster = useSpecialistRoster(client);
+
+  // ── Playbook launch state ──
+  const [playbookFormOpen, setPlaybookFormOpen] = useState(false);
+  const [pendingPlaybook, setPendingPlaybook] = useState<PlaybookManifest | null>(null);
+  const [pendingActionLabel, setPendingActionLabel] = useState<string>("");
+  const [isPlaybookStarting, setIsPlaybookStarting] = useState(false);
+
+  /**
+   * Full playbook launch: create objective → start playbook → create session → navigate
+   */
+  const launchPlaybook = useCallback(
+    async (manifest: PlaybookManifest, inputs: Record<string, string>, actionLabel: string) => {
+      if (!onRunSessionCreated) return;
+      setIsPlaybookStarting(true);
+      try {
+        // Build objective title from inputs or playbook title
+        const inputSummary = Object.values(inputs).filter(Boolean).join(" — ");
+        const objectiveTitle = inputSummary
+          ? `${manifest.title}: ${inputSummary.slice(0, 80)}`
+          : manifest.title;
+
+        // 1. Auto-create objective
+        const objective = await client.createObjective({
+          projectId: agentId,
+          title: objectiveTitle,
+          summary: `Auto-created from dashboard action: ${actionLabel}`,
+        });
+
+        const objectiveId = (objective as Record<string, unknown>).objectiveId as string;
+
+        // 2. Start playbook via API (creates run)
+        const run = await client.startPlaybook(manifest.playbookId, {
+          projectId: agentId,
+          objectiveId,
+        });
+
+        // 3. Create agent session
+        const session = await client.createSession({
+          agentId,
+          label: objectiveTitle,
+        });
+
+        // 4. Compose structured prompt with playbook + objective context
+        const composedPrompt = buildRunPrompt({
+          playbook: manifest,
+          objective: { title: objectiveTitle, summary: inputSummary || undefined },
+          phaseName: run.phase,
+        });
+
+        // Prepend user inputs to prompt for context
+        let finalPrompt = composedPrompt;
+        if (Object.keys(inputs).length > 0) {
+          const inputBlock = Object.entries(inputs)
+            .filter(([, v]) => v.trim())
+            .map(([k, v]) => `- **${k}**: ${v}`)
+            .join("\n");
+          finalPrompt = `## User Inputs\n${inputBlock}\n\n${composedPrompt}`;
+        }
+
+        // 5. Callback — App.tsx handles state + navigation
+        onRunSessionCreated(session, finalPrompt, run.runId, objectiveId);
+        setPlaybookFormOpen(false);
+      } catch (err) {
+        console.error("Failed to launch playbook", err);
+        toast.error("Failed to start playbook. Please try again.");
+      } finally {
+        setIsPlaybookStarting(false);
+      }
+    },
+    [agentId, client, onRunSessionCreated],
+  );
+
+  /**
+   * Intercepts action clicks: if the action has a playbookId, fetch manifest and show input form.
+   * Otherwise, fall through to the normal action handler.
+   */
+  const handleActionOrPlaybookClick = useCallback(
+    async (actionId: string, prompt: string, label: string) => {
+      // Find the action card to check for playbookId
+      const allActions = [...starterActions, ...suggestedActions];
+      const card = allActions.find((a) => a.id === actionId);
+      const playbookId = card?.playbookId;
+
+      if (!playbookId || !onRunSessionCreated) {
+        // No playbook — use existing generic action flow
+        onActionClick?.(actionId, prompt, label);
+        return;
+      }
+
+      try {
+        const manifest = await client.getPlaybook(playbookId);
+        const hasRequiredInputs = manifest.requiredInputs.length > 0;
+
+        if (hasRequiredInputs) {
+          // Show the input form
+          setPendingPlaybook(manifest);
+          setPendingActionLabel(label);
+          setPlaybookFormOpen(true);
+        } else {
+          // No inputs needed — launch immediately
+          await launchPlaybook(manifest, {}, label);
+        }
+      } catch (err) {
+        console.error("Failed to fetch playbook manifest", err);
+        // Fallback to generic action flow
+        onActionClick?.(actionId, prompt, label);
+      }
+    },
+    [client, suggestedActions, onActionClick, onRunSessionCreated, launchPlaybook],
+  );
 
   // Mode detection: Mode B when active work exists (action sessions OR API runs/objectives)
   const hasActiveWork =
@@ -126,9 +245,16 @@ function DashboardContent({
     recentArtifacts.bundleGroups[0]?.artifacts[0] ??
     null;
 
-  // Free-text submit handler — routes to chat via onActionClick
+  // Free-text submit handler — routes to chat via onActionClick (bypasses playbook check)
   function handleFreeTextSubmit(text: string) {
     onActionClick?.("free-text", text, text.slice(0, 50));
+  }
+
+  // Playbook input form submit handler
+  function handlePlaybookFormSubmit(inputs: Record<string, string>) {
+    if (pendingPlaybook) {
+      void launchPlaybook(pendingPlaybook, inputs, pendingActionLabel);
+    }
   }
 
   // Specialist chat handler — navigates to chat with specialist context
@@ -229,7 +355,7 @@ function DashboardContent({
               completedActions={completedActions}
               isLoading={isActionLoading}
               specialists={specialistRoster.specialists}
-              onActionClick={onActionClick}
+              onActionClick={(id, prompt, label) => { void handleActionOrPlaybookClick(id, prompt, label); }}
               onViewResults={onViewResults}
             />
           </div>
@@ -266,7 +392,7 @@ function DashboardContent({
               completedActions={completedActions}
               isLoading={isActionLoading}
               specialists={specialistRoster.specialists}
-              onActionClick={onActionClick}
+              onActionClick={(id, prompt, label) => { void handleActionOrPlaybookClick(id, prompt, label); }}
               onViewResults={onViewResults}
             />
           </div>
@@ -279,7 +405,7 @@ function DashboardContent({
               isGenerating={isSuggestedLoading}
               isActionLoading={isActionLoading}
               specialists={specialistRoster.specialists}
-              onActionClick={onActionClick}
+              onActionClick={(id, prompt, label) => { void handleActionOrPlaybookClick(id, prompt, label); }}
               onViewResults={onViewResults}
             />
           </div>
@@ -304,6 +430,25 @@ function DashboardContent({
         </>
       )}
       </div>
+
+      {/* Playbook input form dialog */}
+      {pendingPlaybook && (
+        <PlaybookInputForm
+          open={playbookFormOpen}
+          onOpenChange={(open) => {
+            setPlaybookFormOpen(open);
+            if (!open) {
+              setPendingPlaybook(null);
+              setPendingActionLabel("");
+            }
+          }}
+          playbookTitle={pendingPlaybook.title}
+          requiredInputs={pendingPlaybook.requiredInputs}
+          optionalInputs={pendingPlaybook.optionalInputs}
+          isSubmitting={isPlaybookStarting}
+          onSubmit={handlePlaybookFormSubmit}
+        />
+      )}
     </div>
   );
 }

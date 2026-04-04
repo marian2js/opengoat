@@ -20,6 +20,7 @@ export interface ActionCard {
   icon: LucideIcon;
   category: ActionCategory;
   specialistId?: string;
+  playbookId?: string;
   skills: string[];
   persona?: string;
   prompt: string;
@@ -110,6 +111,7 @@ export const starterActions: ActionCard[] = [
     icon: RocketIcon,
     category: "distribution",
     specialistId: "distribution",
+    playbookId: "launch-pack",
     skills: ["launch-strategy"],
     persona: "growth-hacker",
     prompt: `Use the Product Hunt section from launch-strategy — preparation, launch day, post-launch phases — and the case studies (SavvyCal, Reform) to create a complete launch package.
@@ -157,6 +159,7 @@ Produce:
     icon: MousePointerClickIcon,
     category: "conversion",
     specialistId: "website-conversion",
+    playbookId: "homepage-conversion-sprint",
     skills: ["page-cro"],
     persona: "ux-researcher",
     prompt: `Use page-cro's 7-dimension analysis framework: value proposition clarity, headline effectiveness, CTA placement, visual hierarchy, trust signals, objection handling, and friction points. Apply the page-type-specific frameworks (homepage, landing, pricing, feature, blog).
@@ -179,6 +182,7 @@ Produce:
     icon: MailIcon,
     category: "messaging",
     specialistId: "outbound",
+    playbookId: "outbound-starter",
     skills: ["cold-email", "email-sequence"],
     persona: "outbound-strategist",
     prompt: `Use cold-email's 11+ copy frameworks (PAS, BAB, QVC, AIDA, Star-Story-Solution, etc.), subject line patterns, personalization strategies, and follow-up sequences. Combine with email-sequence's timing and automation patterns.
@@ -201,6 +205,7 @@ Produce a 4-5 email sequence with:
     icon: GlobeIcon,
     category: "seo",
     specialistId: "seo-aeo",
+    playbookId: "seo-wedge-sprint",
     skills: ["seo-audit", "content-strategy"],
     persona: "seo-specialist",
     prompt: `Use seo-audit's framework to surface only quick wins — changes that can be implemented this week with high expected impact. Focus on: crawlability issues, missing meta tags, thin content, internal linking gaps, and low-hanging keyword opportunities. Combine with content-strategy's prioritization scoring.
@@ -222,6 +227,7 @@ Produce:
     icon: SearchIcon,
     category: "research",
     specialistId: "seo-aeo",
+    playbookId: "comparison-page-sprint",
     skills: ["competitor-alternatives", "marketing-psychology"],
     persona: "brand-guardian",
     prompt: `Use competitor-alternatives' 4 comparison page formats (alternative, alternatives, vs, competitor-vs-competitor) and content architecture. Apply marketing-psychology's behavioral science frameworks and mental models.
@@ -245,6 +251,7 @@ Produce:
     icon: LightbulbIcon,
     category: "growth",
     specialistId: "content",
+    playbookId: "content-sprint",
     skills: ["content-strategy", "marketing-ideas"],
     persona: "content-creator",
     prompt: `Use content-strategy's ideation sources (keyword data, call transcripts, forum research, competitor analysis) and prioritization framework. Combine with marketing-ideas' 139 categorized marketing tactics for creative angles.
@@ -270,6 +277,7 @@ Rank by impact. Call out 2-3 "low-effort, high-impact" quick wins.`,
     icon: FileTextIcon,
     category: "growth",
     specialistId: "content",
+    playbookId: "lead-magnet-sprint",
     skills: ["content-strategy", "page-cro"],
     persona: "growth-hacker",
     prompt: `Use content-strategy's audience-first ideation and page-cro's conversion principles to design lead magnets that attract and qualify your ideal customers.

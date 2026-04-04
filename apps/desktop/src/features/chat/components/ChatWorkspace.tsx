@@ -62,6 +62,7 @@ import type { ChatScope } from "@/features/chat/lib/chat-scope";
 import { useChatScope } from "@/features/chat/hooks/useChatScope";
 import { ScopeIndicator } from "@/features/chat/components/ScopeIndicator";
 import { ObjectiveBanner } from "@/features/chat/components/ObjectiveBanner";
+import { RunContextBanner } from "@/features/chat/components/RunContextBanner";
 import { cn } from "@/lib/utils";
 import { SidecarClient } from "@/lib/sidecar/client";
 import { isUnnamedSession } from "@/lib/utils/unnamed-session";
@@ -648,6 +649,14 @@ function ChatSessionView({
             agentId={agentId}
           />
         </div>
+      ) : null}
+
+      {/* Run context banner — playbook phase info for run-scoped chats */}
+      {client && scope.type === "run" ? (
+        <RunContextBanner
+          runId={scope.runId}
+          client={client}
+        />
       ) : null}
 
       {/* Messages area */}
