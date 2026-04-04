@@ -183,3 +183,39 @@ void test("cleanArtifactTitle: extracts heading from content for smart-quote tit
     "Positioning Strategy",
   );
 });
+
+// ---------------------------------------------------------------------------
+// isConversationalTitle — summary-specific conversational detection
+// ---------------------------------------------------------------------------
+
+void test("isConversationalTitle: detects conversational summary 'I still can't see...'", () => {
+  assert.ok(
+    isConversationalTitle(
+      "I still can't see the earlier positioning itself — only the handoff line. So rather than block you again, here's the use...",
+    ),
+  );
+});
+
+void test("isConversationalTitle: detects conversational summary 'I still don't have...'", () => {
+  assert.ok(
+    isConversationalTitle(
+      "I still don't have the actual positioning thread — only the quoted carry-over line...",
+    ),
+  );
+});
+
+void test("isConversationalTitle: detects conversational summary 'I'm still only seeing...'", () => {
+  assert.ok(
+    isConversationalTitle(
+      "I'm still only seeing the handoff sentence, not the actual positioning...",
+    ),
+  );
+});
+
+void test("isConversationalTitle: accepts descriptive summary 'Comprehensive analysis of...'", () => {
+  assert.ok(!isConversationalTitle("Comprehensive analysis of market positioning"));
+});
+
+void test("isConversationalTitle: accepts descriptive summary 'Top 5 recommendations...'", () => {
+  assert.ok(!isConversationalTitle("Top 5 recommendations for improving brand awareness"));
+});

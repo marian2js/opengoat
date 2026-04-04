@@ -7,6 +7,11 @@ const utilPath = resolve(
   "../../apps/desktop/src/features/dashboard/lib/clean-artifact-title.ts",
 );
 
+const artifactCardPath = resolve(
+  __dirname,
+  "../../apps/desktop/src/features/dashboard/components/ArtifactCard.tsx",
+);
+
 describe("clean-artifact-title utility", () => {
   it("utility file exists", () => {
     expect(existsSync(utilPath)).toBe(true);
@@ -52,5 +57,23 @@ describe("clean-artifact-title utility", () => {
     expect(src).toMatch(/Let me/);
     expect(src).toMatch(/Sure/);
     expect(src).toMatch(/Hmm/);
+  });
+});
+
+describe("ArtifactCard summary filtering", () => {
+  it("ArtifactCard imports isConversationalTitle", () => {
+    const src = readFileSync(artifactCardPath, "utf-8");
+    expect(src).toMatch(/isConversationalTitle/);
+  });
+
+  it("ArtifactCard filters summary with isConversationalTitle before rendering", () => {
+    const src = readFileSync(artifactCardPath, "utf-8");
+    // The summary render should check !isConversationalTitle(artifact.summary)
+    expect(src).toMatch(/!isConversationalTitle\(artifact\.summary\)/);
+  });
+
+  it("ArtifactCard still applies stripMarkdown to non-conversational summaries", () => {
+    const src = readFileSync(artifactCardPath, "utf-8");
+    expect(src).toMatch(/stripMarkdown\(artifact\.summary\)/);
   });
 });

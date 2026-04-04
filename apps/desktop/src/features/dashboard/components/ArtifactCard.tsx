@@ -3,7 +3,7 @@ import type { ArtifactRecord } from "@opengoat/contracts";
 import { getArtifactTypeConfig, getArtifactStatusConfig } from "@/features/dashboard/lib/artifact-type-config";
 import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
 import { stripMarkdown } from "@/features/dashboard/lib/strip-markdown";
-import { cleanArtifactTitle } from "@/features/dashboard/lib/clean-artifact-title";
+import { cleanArtifactTitle, isConversationalTitle } from "@/features/dashboard/lib/clean-artifact-title";
 import { getSpecialistColors } from "@/features/agents/specialist-meta";
 
 export interface ArtifactCardProps {
@@ -67,8 +67,8 @@ export function ArtifactCard({ artifact, specialistId, specialistName, onPreview
           {cleanArtifactTitle(artifact)}
         </h3>
 
-        {/* Summary (optional) */}
-        {artifact.summary ? (
+        {/* Summary (optional) — hide if conversational AI preamble */}
+        {artifact.summary && !isConversationalTitle(artifact.summary) ? (
           <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
             {stripMarkdown(artifact.summary)}
           </p>
