@@ -70,7 +70,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
           {specialist.outputTypes.slice(0, 4).map((output) => (
             <span
               key={output}
-              className="rounded-md bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground/80 dark:bg-white/[0.04]"
+              className="rounded-md border border-border/20 bg-muted/30 px-2 py-0.5 text-[11px] text-muted-foreground/70 dark:border-white/[0.04] dark:bg-white/[0.03]"
             >
               {output}
             </span>
@@ -116,13 +116,13 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
       </div>
 
       {/* CTA — separated footer */}
-      <div className="border-t border-border/20 px-5 py-3 dark:border-white/[0.04]">
+      <div className="border-t border-border/20 px-5 py-3.5 dark:border-white/[0.04]">
         <Button
           size="sm"
           variant={isManager ? "default" : "outline"}
           className={cn(
-            "h-8 w-full rounded-lg text-[12px] font-medium",
-            !isManager && "border-border/40 hover:border-primary/40 hover:text-primary dark:border-white/[0.08]",
+            "h-9 w-full rounded-lg text-[12px] font-medium",
+            !isManager && "border-border/40 hover:border-primary/40 hover:bg-primary/[0.04] hover:text-primary dark:border-white/[0.08]",
           )}
           onClick={() => onChat(specialist.id)}
         >

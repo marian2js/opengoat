@@ -121,13 +121,18 @@ export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowser
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
       {/* Page header */}
-      <div>
-        <h1 className="font-display text-[28px] font-bold tracking-[-0.02em] text-foreground">
-          Your AI Marketing Team
-        </h1>
-        <p className="mt-1.5 text-[14px] leading-relaxed text-muted-foreground">
-          Each specialist owns a distinct area of marketing. Start a conversation with the right expert.
-        </p>
+      <div className="flex items-start gap-4">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 shadow-sm ring-1 ring-primary/15">
+          <UsersIcon className="size-6 text-primary" />
+        </div>
+        <div>
+          <h1 className="font-display text-[28px] font-bold tracking-[-0.02em] text-foreground">
+            Your AI Marketing Team
+          </h1>
+          <p className="mt-1 text-[14px] leading-relaxed text-muted-foreground">
+            Each specialist owns a distinct area of marketing. Start a conversation with the right expert.
+          </p>
+        </div>
       </div>
 
       {/* Error state */}
