@@ -54,7 +54,7 @@ export function MemoryEntryCard({ entry, onEdit, onDelete }: MemoryEntryCardProp
 
   return (
     <div
-      className={`group rounded-lg border border-border/30 bg-elevated/50 p-3 transition-colors hover:border-border/50 ${
+      className={`group rounded-lg border border-border/30 bg-elevated/50 p-3 transition-all duration-100 hover:-translate-y-0.5 hover:border-border/50 hover:shadow-sm hover:shadow-black/5 dark:hover:shadow-black/20 ${
         isSuperseded ? "opacity-50" : ""
       }`}
     >

@@ -710,7 +710,7 @@ function MemoryEmptyState({
         {memorySubsections.map((sub) => (
           <div
             key={sub.title}
-            className="memory-subsection rounded-lg border border-dashed border-border/40 p-5 transition-colors"
+            className="memory-subsection rounded-lg border border-dashed border-border/40 p-5 transition-all duration-100 hover:-translate-y-0.5 hover:border-border/60 hover:shadow-sm hover:shadow-black/5 dark:hover:shadow-black/20"
           >
             <div className="flex items-start gap-3">
               <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-accent/50">
@@ -778,7 +778,7 @@ function KnowledgeEmptyState({
       <button
         type="button"
         onClick={onImport}
-        className="knowledge-subsection flex items-center gap-4 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-5 text-left transition-colors hover:border-primary/50 hover:bg-primary/10"
+        className="knowledge-subsection flex items-center gap-4 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-5 text-left transition-all duration-100 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/10 hover:shadow-md hover:shadow-primary/5"
       >
         <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
           <FileUpIcon className="size-5 text-primary" />
@@ -795,7 +795,7 @@ function KnowledgeEmptyState({
         {knowledgeSubsections.map((sub) => (
           <div
             key={sub.title}
-            className="knowledge-subsection rounded-lg border border-dashed border-border/40 p-5 transition-colors"
+            className="knowledge-subsection rounded-lg border border-dashed border-border/40 p-5 transition-all duration-100 hover:-translate-y-0.5 hover:border-border/60 hover:shadow-sm hover:shadow-black/5 dark:hover:shadow-black/20"
           >
             <div className="flex items-start gap-3">
               <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-accent/50">
