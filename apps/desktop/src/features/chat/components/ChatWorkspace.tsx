@@ -769,12 +769,12 @@ function ChatSessionView({
 
       {/* Chat input */}
       <div className="border-t border-border/30 bg-card/30 px-4 py-3.5 lg:px-6">
+        <div className="mx-auto max-w-3xl rounded-xl bg-gradient-to-r from-border/40 via-border/40 to-border/40 p-[1px] transition-all duration-200 hover:from-border/60 hover:via-border/60 hover:to-border/60 focus-within:from-primary/40 focus-within:via-primary/20 focus-within:to-primary/40 focus-within:shadow-lg focus-within:shadow-primary/10 dark:from-white/[0.06] dark:via-white/[0.06] dark:to-white/[0.06] dark:hover:from-white/[0.10] dark:hover:via-white/[0.10] dark:hover:to-white/[0.10] dark:focus-within:from-primary/40 dark:focus-within:via-primary/20 dark:focus-within:to-primary/40 [&_[data-slot=input-group]]:border-0 [&_[data-slot=input-group]]:rounded-[11px]">
         <PromptInput
           accept="image/*,.pdf,.txt,.md,.csv,.json,.js,.jsx,.ts,.tsx,.py,.rb,.go,.rs,.java,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.sh,.bash,.zsh,.yaml,.yml,.toml,.xml,.html,.css,.scss,.sql,.r,.lua,.php,.pl,.ex,.exs,.hs,.ml,.scala,.clj,.dart,.vue,.svelte,.astro,.log,.env,.ini,.cfg,.conf,.diff,.patch"
           globalDrop
           multiple
           onSubmit={handleSubmit}
-          className="mx-auto max-w-3xl"
         >
           <PromptInputHeader>
             <AttachmentPreviews />
@@ -797,6 +797,7 @@ function ChatSessionView({
             />
           </PromptInputFooter>
         </PromptInput>
+        </div>
       </div>
     </div>
   );
