@@ -16,6 +16,7 @@ interface HandoffChipProps {
   reason: string;
   currentSpecialistName?: string | undefined;
   onDismiss: () => void;
+  onNavigate?: ((specialistId: string) => void) | undefined;
 }
 
 /** Known specialist ID → icon key mapping (matches specialist-registry.ts). */
@@ -73,6 +74,7 @@ export function HandoffChip({
   reason,
   currentSpecialistName,
   onDismiss,
+  onNavigate,
 }: HandoffChipProps) {
   const iconKey = SPECIALIST_ICON_MAP[specialistId] ?? "bot";
   const IconComponent = resolveSpecialistIcon(iconKey);
@@ -86,7 +88,14 @@ export function HandoffChip({
       summary,
       timestamp: Date.now(),
     });
-    window.location.hash = `#chat?specialist=${encodeURIComponent(specialistId)}`;
+    if (onNavigate) {
+      onNavigate(specialistId);
+    } else {
+      console.warn(
+        `[HandoffChip] No onNavigate callback for specialist "${specialistId}", falling back to hash navigation`,
+      );
+      window.location.hash = `#chat?specialist=${encodeURIComponent(specialistId)}`;
+    }
   };
 
   return (

@@ -444,9 +444,42 @@ export function App() {
     [client, activeAgentId],
   );
 
+  // Direct specialist navigation from handoff chips. Avoids the fragile
+  // hash-based effect approach by creating the session directly (same pattern
+  // as handleSpecialistChat) and consuming handoff context from sessionStorage.
+  const handleHandoffNavigate = useCallback(
+    async (specialistId: string) => {
+      if (!client || !activeAgentId) {
+        return;
+      }
+      try {
+        const session = await client.createSession({
+          agentId: activeAgentId,
+          specialistId,
+        });
+        setSessions((prev) => [session, ...prev]);
+        setActiveSessionId(session.id);
+        setCurrentSpecialistId(specialistId);
+
+        // Read handoff context written by HandoffChip before navigation
+        const handoff = readHandoffContext();
+        if (handoff) {
+          setPendingHandoffContext(handoff.summary);
+          clearHandoffContext();
+        }
+
+        window.location.hash = "#chat";
+      } catch (error) {
+        console.error("Failed to create specialist session from handoff", error);
+        toast.error("Failed to start specialist chat. Please try again.");
+      }
+    },
+    [client, activeAgentId],
+  );
+
   // Auto-create a specialist session when navigating to #chat?specialist=<id>
-  // via hash-based navigation (e.g. dashboard specialist cards, handoff chips).
-  // For the Agents page, handleSpecialistChat above is used instead.
+  // via hash-based navigation (e.g. dashboard specialist cards).
+  // For handoff chips, handleHandoffNavigate above is used instead.
   const specialistCreatingRef = useRef(false);
   useEffect(() => {
     if (!currentSpecialistId || !client || !activeAgentId || hashView !== "chat") {
@@ -632,6 +665,7 @@ export function App() {
                 onInitialScopeConsumed={() => {
                   setPendingChatScope(null);
                 }}
+                onNavigate={handleHandoffNavigate}
                 onPendingPromptConsumed={() => {
                   setPendingActionPrompt(null);
                   setActionSessionId(null);

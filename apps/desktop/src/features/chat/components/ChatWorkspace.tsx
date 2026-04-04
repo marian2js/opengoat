@@ -217,6 +217,7 @@ interface ChatWorkspaceProps {
   initialScope?: ChatScope | null | undefined;
   onBootstrap?: ((sessionId: string) => void) | undefined;
   onInitialScopeConsumed?: (() => void) | undefined;
+  onNavigate?: ((specialistId: string) => void) | undefined;
   onPendingPromptConsumed?: (() => void) | undefined;
   onSessionLabelUpdate?: ((sessionId: string, label: string) => void) | undefined;
   pendingActionPrompt?: string | null | undefined;
@@ -241,6 +242,7 @@ export function ChatWorkspace({
   onBootstrap,
   onHandoffContextConsumed,
   onInitialScopeConsumed,
+  onNavigate,
   onPendingPromptConsumed,
   onSessionLabelUpdate,
   pendingActionPrompt,
@@ -350,6 +352,7 @@ export function ChatWorkspace({
       initialScope={initialScope}
       onHandoffContextConsumed={onHandoffContextConsumed}
       onInitialScopeConsumed={onInitialScopeConsumed}
+      onNavigate={onNavigate}
       onPendingPromptConsumed={onPendingPromptConsumed}
       onSessionLabelUpdate={onSessionLabelUpdate}
       pendingActionPrompt={pendingActionPrompt}
@@ -376,6 +379,7 @@ function ChatSessionView({
   initialScope,
   onHandoffContextConsumed,
   onInitialScopeConsumed,
+  onNavigate,
   onPendingPromptConsumed,
   onSessionLabelUpdate,
   pendingActionPrompt,
@@ -390,6 +394,7 @@ function ChatSessionView({
   initialScope?: ChatScope | null | undefined;
   onHandoffContextConsumed?: (() => void) | undefined;
   onInitialScopeConsumed?: (() => void) | undefined;
+  onNavigate?: ((specialistId: string) => void) | undefined;
   onPendingPromptConsumed?: (() => void) | undefined;
   onSessionLabelUpdate?: ((sessionId: string, label: string) => void) | undefined;
   pendingActionPrompt?: string | null | undefined;
@@ -755,6 +760,7 @@ function ChatSessionView({
               sessionId={bootstrap.session.id}
               currentSpecialistId={currentSpecialistId}
               currentSpecialistName={currentSpecialistName}
+              onNavigate={onNavigate}
             />
           ))
         )}
@@ -850,6 +856,7 @@ function ChatMessage({
   sessionId,
   currentSpecialistId,
   currentSpecialistName,
+  onNavigate,
 }: {
   isStreaming: boolean;
   message: ChatUIMessage;
@@ -862,6 +869,7 @@ function ChatMessage({
   sessionId?: string | undefined;
   currentSpecialistId?: string | undefined;
   currentSpecialistName?: string | undefined;
+  onNavigate?: ((specialistId: string) => void) | undefined;
 }) {
   const activityParts = getActivityParts(message);
   const reasoningText = getReasoningText(message);
@@ -1009,6 +1017,7 @@ function ChatMessage({
           suggestions={handoffSuggestions}
           sessionId={sessionId}
           currentSpecialistName={currentSpecialistName}
+          onNavigate={onNavigate}
         />
       ) : null}
     </Message>
@@ -1088,10 +1097,12 @@ function ChatHandoffChipsWrapper({
   suggestions,
   sessionId,
   currentSpecialistName,
+  onNavigate,
 }: {
   suggestions: import("@/features/chat/lib/handoff-detector").HandoffSuggestion[];
   sessionId: string;
   currentSpecialistName?: string | undefined;
+  onNavigate?: ((specialistId: string) => void) | undefined;
 }) {
   const { dismissedIds, dismiss } = useDismissedHandoffs(sessionId);
   const visible = suggestions.filter((s) => !dismissedIds.has(s.id));
@@ -1106,6 +1117,7 @@ function ChatHandoffChipsWrapper({
           reason={suggestion.reason}
           currentSpecialistName={currentSpecialistName}
           onDismiss={() => dismiss(suggestion.id)}
+          onNavigate={onNavigate}
         />
       ))}
     </div>
