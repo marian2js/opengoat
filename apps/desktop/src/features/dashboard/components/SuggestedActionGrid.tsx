@@ -62,6 +62,7 @@ export function SuggestedActionGrid({
               card={card}
               isCompleted={completedActions?.has(card.id)}
               isLoading={isActionLoading}
+              specialistId={card.specialistId}
               specialistName={specialists ? getSpecialistName(specialists, card.specialistId) : undefined}
               onClick={onActionClick}
               onViewResults={onViewResults}

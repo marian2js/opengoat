@@ -10,20 +10,23 @@ import {
 import type { ActionCard } from "@/features/dashboard/data/actions";
 import { categoryConfig } from "@/features/dashboard/data/actions";
 import { buildActionPrompt } from "@/features/dashboard/data/prompt-builder";
+import { getSpecialistColors } from "@/features/agents/specialist-meta";
 
 export interface ActionCardItemProps {
   card: ActionCard;
   isCompleted?: boolean | undefined;
   isHero?: boolean | undefined;
   isLoading?: boolean | undefined;
+  specialistId?: string | undefined;
   specialistName?: string | undefined;
   onClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
 }
 
-export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialistName, onClick, onViewResults }: ActionCardItemProps) {
+export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialistId, specialistName, onClick, onViewResults }: ActionCardItemProps) {
   const Icon = card.icon;
   const config = categoryConfig[card.category];
+  const specColors = specialistId ? getSpecialistColors(specialistId) : undefined;
 
   return (
     <Card
@@ -109,7 +112,7 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
             </span>
             <div className="flex items-center gap-2.5">
               {specialistName ? (
-                <span className="inline-flex items-center gap-1 rounded bg-primary/[0.06] px-1.5 py-px font-mono text-[9px] text-primary/60 dark:bg-primary/[0.06]">
+                <span className={`inline-flex items-center gap-1 rounded px-1.5 py-px font-mono text-[9px] ${specColors ? `${specColors.iconBg} ${specColors.iconText} opacity-70` : "bg-primary/[0.06] text-primary/60"}`}>
                   {specialistName}
                 </span>
               ) : null}

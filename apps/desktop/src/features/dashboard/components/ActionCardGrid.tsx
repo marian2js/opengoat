@@ -29,6 +29,7 @@ export function ActionCardGrid({ completedActions, isLoading, specialists, onAct
             isCompleted={completedActions?.has(card.id)}
             isHero={index < 3}
             isLoading={isLoading}
+            specialistId={card.specialistId}
             specialistName={specialists ? getSpecialistName(specialists, card.specialistId) : undefined}
             onClick={onActionClick}
             onViewResults={onViewResults}
