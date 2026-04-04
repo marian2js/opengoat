@@ -3,7 +3,8 @@ import { MessageSquareIcon, PackageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { resolveSpecialistIcon } from "@/features/agents/specialist-icons";
-import { humanizeOutputLabel, formatRelativeTime } from "@/lib/utils/output-labels";
+import { formatRelativeTime } from "@/lib/utils/output-labels";
+import { cleanArtifactTitle } from "@/features/dashboard/lib/clean-artifact-title";
 
 interface SpecialistCardProps {
   specialist: SpecialistAgent;
@@ -103,7 +104,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
                 >
                   <span className="size-1 shrink-0 rounded-full bg-primary/40" />
                   <span className="min-w-0 flex-1 truncate text-foreground/70 group-hover/output:text-foreground">
-                    {humanizeOutputLabel(artifact.title)}
+                    {cleanArtifactTitle(artifact)}
                   </span>
                   <span className="shrink-0 text-muted-foreground/40">
                     {formatRelativeTime(artifact.createdAt)}

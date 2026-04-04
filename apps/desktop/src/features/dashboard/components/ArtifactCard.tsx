@@ -3,6 +3,7 @@ import type { ArtifactRecord } from "@opengoat/contracts";
 import { getArtifactTypeConfig, getArtifactStatusConfig } from "@/features/dashboard/lib/artifact-type-config";
 import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
 import { stripMarkdown } from "@/features/dashboard/lib/strip-markdown";
+import { cleanArtifactTitle } from "@/features/dashboard/lib/clean-artifact-title";
 
 export interface ArtifactCardProps {
   artifact: ArtifactRecord;
@@ -60,7 +61,7 @@ export function ArtifactCard({ artifact, specialistName, onPreview, onNavigate, 
 
         {/* Title */}
         <h3 className="truncate text-sm font-medium text-foreground">
-          {stripMarkdown(artifact.title)}
+          {cleanArtifactTitle(artifact)}
         </h3>
 
         {/* Summary (optional) */}

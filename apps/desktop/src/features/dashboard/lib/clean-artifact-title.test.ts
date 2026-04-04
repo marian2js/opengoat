@@ -1,0 +1,140 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { cleanArtifactTitle, isConversationalTitle } from "./clean-artifact-title.js";
+
+// ---------------------------------------------------------------------------
+// isConversationalTitle — detects AI conversational preamble
+// ---------------------------------------------------------------------------
+
+void test("isConversationalTitle: detects 'I still' prefix", () => {
+  assert.ok(isConversationalTitle("I still don't have the actual positioning thread"));
+});
+
+void test("isConversationalTitle: detects 'I checked' prefix", () => {
+  assert.ok(isConversationalTitle("I checked your saved memory and there's no recorded marke..."));
+});
+
+void test("isConversationalTitle: detects 'I ' prefix", () => {
+  assert.ok(isConversationalTitle("I found three main issues with your copy"));
+});
+
+void test("isConversationalTitle: detects 'Let me' prefix", () => {
+  assert.ok(isConversationalTitle("Let me analyze your positioning strategy"));
+});
+
+void test("isConversationalTitle: detects 'Here ' prefix", () => {
+  assert.ok(isConversationalTitle("Here are the top five recommendations"));
+});
+
+void test("isConversationalTitle: detects 'Sure' prefix", () => {
+  assert.ok(isConversationalTitle("Sure, I can help with that"));
+});
+
+void test("isConversationalTitle: detects 'Got it' prefix", () => {
+  assert.ok(isConversationalTitle("Got it, let me work on this"));
+});
+
+void test("isConversationalTitle: detects 'OK ' prefix", () => {
+  assert.ok(isConversationalTitle("OK so here's what I found"));
+});
+
+void test("isConversationalTitle: detects 'Hmm' prefix", () => {
+  assert.ok(isConversationalTitle("Hmm, this is tricky"));
+});
+
+void test("isConversationalTitle: accepts good title 'Tagline Variants'", () => {
+  assert.ok(!isConversationalTitle("Tagline Variants"));
+});
+
+void test("isConversationalTitle: accepts good title 'Five highest-impact quick fixes'", () => {
+  assert.ok(!isConversationalTitle("Five highest-impact quick fixes"));
+});
+
+void test("isConversationalTitle: accepts 'Marketing Priorities Overview'", () => {
+  assert.ok(!isConversationalTitle("Marketing Priorities Overview"));
+});
+
+void test("isConversationalTitle: is case-insensitive", () => {
+  assert.ok(isConversationalTitle("i still need more info"));
+});
+
+// ---------------------------------------------------------------------------
+// cleanArtifactTitle — returns clean display titles
+// ---------------------------------------------------------------------------
+
+void test("cleanArtifactTitle: preserves good titles", () => {
+  assert.equal(
+    cleanArtifactTitle({ title: "Tagline Variants", type: "copy_draft" }),
+    "Tagline Variants",
+  );
+});
+
+void test("cleanArtifactTitle: preserves good titles with markdown stripped", () => {
+  assert.equal(
+    cleanArtifactTitle({ title: "## Tagline Variants", type: "copy_draft" }),
+    "Tagline Variants",
+  );
+});
+
+void test("cleanArtifactTitle: extracts heading from content for conversational titles", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "I still don't have the actual positioning thread",
+      type: "page_outline",
+      content: "# Positioning Page Outline\n\nHere is the outline...",
+    }),
+    "Positioning Page Outline",
+  );
+});
+
+void test("cleanArtifactTitle: extracts h2 heading from content", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "I checked your saved memory and there's no recorded",
+      type: "strategy_note",
+      content: "Some preamble text\n\n## Marketing Priorities Overview\n\nDetails...",
+    }),
+    "Marketing Priorities Overview",
+  );
+});
+
+void test("cleanArtifactTitle: falls back to type label when no heading in content", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "I still don't have the actual positioning thread",
+      type: "page_outline",
+      content: "No headings here, just plain text about positioning.",
+    }),
+    "Page Outline",
+  );
+});
+
+void test("cleanArtifactTitle: falls back to type label when no content", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "I checked your saved memory and there's no recorded",
+      type: "research_brief",
+    }),
+    "Research Brief",
+  );
+});
+
+void test("cleanArtifactTitle: falls back to type label for unknown type", () => {
+  const result = cleanArtifactTitle({
+    title: "Let me think about this",
+    type: "some_unknown_type" as never,
+  });
+  // Should fall back to the default "Artifact" label
+  assert.equal(result, "Artifact");
+});
+
+void test("cleanArtifactTitle: strips markdown from content heading", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "Here is what I found",
+      type: "checklist",
+      content: "# **Bold Heading**\n\nContent...",
+    }),
+    "Bold Heading",
+  );
+});
