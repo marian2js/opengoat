@@ -278,7 +278,7 @@ function ConnectionRow({
   const modelLabel = resolveModelDisplayLabel(modelCatalog, connection.activeModelId);
 
   return (
-    <TableRow className="border-border/60 transition-colors hover:bg-muted/20">
+    <TableRow className="border-border/60 transition-all hover:bg-muted/20">
       <TableCell className="text-[12px] font-medium">{cleanProviderName(connection.providerName)}</TableCell>
       <TableCell>
         <div className="flex items-center gap-1.5">

@@ -100,7 +100,7 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
   const managedSkills = skills.filter((s) => s.source === "managed");
 
   return (
-    <Card className="border-border/50">
+    <Card className="border-border/40 transition-colors hover:border-border/60 dark:border-white/[0.06] dark:hover:border-white/[0.10]">
       <CardHeader>
         <div className="flex items-center gap-2.5">
           <div className="flex size-7 items-center justify-center rounded-md bg-primary/8">
