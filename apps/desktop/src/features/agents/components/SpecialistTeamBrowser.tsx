@@ -5,6 +5,7 @@ import type { SidecarClient } from "@/lib/sidecar/client";
 import { getActionMapping } from "@/lib/utils/action-map";
 import { deduplicateSpecialistOutputs } from "../lib/deduplicate-specialist-outputs";
 import { SpecialistCard } from "./SpecialistCard";
+import type { SpecialistBundleGroup } from "./SpecialistCard";
 
 /** Max recent outputs shown per specialist card */
 const MAX_OUTPUTS_PER_SPECIALIST = 3;
@@ -15,11 +16,22 @@ interface SpecialistTeamBrowserProps {
   onSpecialistChat?: ((specialistId: string) => void) | undefined;
 }
 
+function deriveBundleTitleFromArtifacts(artifacts: ArtifactRecord[]): string {
+  if (artifacts.length === 0) return "Bundle";
+  const types = new Set(artifacts.map((a) => a.type));
+  if (types.size === 1) {
+    const type = artifacts[0]!.type;
+    return type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) + " Bundle";
+  }
+  return artifacts[0]!.title.split(" — ")[0] ?? "Bundle";
+}
+
 export function SpecialistTeamBrowser({ client, agentId, onSpecialistChat }: SpecialistTeamBrowserProps) {
   const [specialists, setSpecialists] = useState<SpecialistAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recentOutputsMap, setRecentOutputsMap] = useState<Record<string, ArtifactRecord[]>>({});
+  const [recentBundlesMap, setRecentBundlesMap] = useState<Record<string, SpecialistBundleGroup[]>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -74,18 +86,79 @@ export function SpecialistTeamBrowser({ client, agentId, onSpecialistChat }: Spe
         // Group all artifacts by specialist
         const raw: Record<string, ArtifactRecord[]> = {};
         for (const artifact of page.items) {
-          const specialistId = artifact.createdBy;
-          if (!raw[specialistId]) {
-            raw[specialistId] = [];
+          const sid = artifact.createdBy;
+          if (!raw[sid]) {
+            raw[sid] = [];
           }
-          raw[specialistId].push(artifact);
+          raw[sid].push(artifact);
         }
-        // Deduplicate by case-insensitive title, then limit per specialist
-        const map: Record<string, ArtifactRecord[]> = {};
-        for (const [specialistId, artifacts] of Object.entries(raw)) {
-          map[specialistId] = deduplicateSpecialistOutputs(artifacts).slice(0, MAX_OUTPUTS_PER_SPECIALIST);
+
+        // For each specialist, separate bundled from standalone artifacts
+        const standaloneMap: Record<string, ArtifactRecord[]> = {};
+        const bundlesMap: Record<string, SpecialistBundleGroup[]> = {};
+
+        for (const [sid, artifacts] of Object.entries(raw)) {
+          const bundleArtifacts = new Map<string, ArtifactRecord[]>();
+          const standalone: ArtifactRecord[] = [];
+
+          for (const artifact of artifacts) {
+            if (artifact.bundleId) {
+              const existing = bundleArtifacts.get(artifact.bundleId) ?? [];
+              existing.push(artifact);
+              bundleArtifacts.set(artifact.bundleId, existing);
+            } else {
+              standalone.push(artifact);
+            }
+          }
+
+          // Build bundle groups
+          const groups: SpecialistBundleGroup[] = Array.from(bundleArtifacts.entries()).map(
+            ([bundleId, arts]) => {
+              const sorted = arts.sort(
+                (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+              );
+              return {
+                bundleId,
+                title: deriveBundleTitleFromArtifacts(sorted),
+                artifacts: sorted,
+                createdAt: sorted[0]!.createdAt,
+              };
+            },
+          );
+
+          // Deduplicate standalone, then combine and limit total to MAX_OUTPUTS_PER_SPECIALIST
+          const dedupedStandalone = deduplicateSpecialistOutputs(standalone).slice(0, MAX_OUTPUTS_PER_SPECIALIST);
+
+          // Merge bundles + standalone sorted by time, then limit
+          type Entry =
+            | { kind: "bundle"; group: SpecialistBundleGroup; ts: number }
+            | { kind: "standalone"; artifact: ArtifactRecord; ts: number };
+
+          const entries: Entry[] = [
+            ...groups.map((g) => ({ kind: "bundle" as const, group: g, ts: new Date(g.createdAt).getTime() })),
+            ...dedupedStandalone.map((a) => ({ kind: "standalone" as const, artifact: a, ts: new Date(a.createdAt).getTime() })),
+          ];
+          entries.sort((a, b) => b.ts - a.ts);
+
+          const limitedStandalone: ArtifactRecord[] = [];
+          const limitedBundles: SpecialistBundleGroup[] = [];
+          let count = 0;
+          for (const entry of entries) {
+            if (count >= MAX_OUTPUTS_PER_SPECIALIST) break;
+            if (entry.kind === "bundle") {
+              limitedBundles.push(entry.group);
+            } else {
+              limitedStandalone.push(entry.artifact);
+            }
+            count++;
+          }
+
+          standaloneMap[sid] = limitedStandalone;
+          bundlesMap[sid] = limitedBundles;
         }
-        setRecentOutputsMap(map);
+
+        setRecentOutputsMap(standaloneMap);
+        setRecentBundlesMap(bundlesMap);
       })
       .catch(() => {
         // Silently ignore — recent outputs are non-critical
@@ -180,6 +253,7 @@ export function SpecialistTeamBrowser({ client, agentId, onSpecialistChat }: Spe
                 specialist={manager}
                 onChat={handleChat}
                 recentOutputs={recentOutputsMap[manager.id]}
+                recentBundles={recentBundlesMap[manager.id]}
                 onOutputNavigate={handleOutputNavigate}
               />
             </div>
@@ -201,6 +275,7 @@ export function SpecialistTeamBrowser({ client, agentId, onSpecialistChat }: Spe
                     specialist={specialist}
                     onChat={handleChat}
                     recentOutputs={recentOutputsMap[specialist.id]}
+                    recentBundles={recentBundlesMap[specialist.id]}
                     onOutputNavigate={handleOutputNavigate}
                   />
                 ))}

@@ -173,6 +173,9 @@ describe("extractArtifacts", () => {
         createdArtifacts.push(record);
         return Promise.resolve(record);
       }),
+      createBundle: vi.fn().mockImplementation((_paths: unknown, opts: unknown) => {
+        return Promise.resolve({ bundleId: "bnd-mock-1", ...(opts as object) });
+      }),
     };
     const opengoatPaths = { homeDir: "/tmp/test" };
     return { artifactService, opengoatPaths, createdArtifacts };
@@ -203,6 +206,7 @@ Each option targets your developer ICP with action-oriented language.
 
     const specialist = {
       id: "website-conversion",
+      name: "Website Conversion",
       outputTypes: ["hero rewrite bundle", "CTA options", "trust/proof suggestions", "page-level recommendations", "landing-page improvements"],
     };
 
@@ -245,6 +249,7 @@ Body: Hi {{firstName}}, I've reached out a couple times...
 
     const specialist = {
       id: "outbound",
+      name: "Outbound",
       outputTypes: ["cold email sequences", "subject lines", "segment-angle maps", "founder outreach drafts", "partnership outreach drafts"],
     };
 
@@ -289,6 +294,7 @@ Key gaps: None of your competitors emphasize the "AI-native" angle.
 
     const specialist = {
       id: "market-intel",
+      name: "Market Intel",
       outputTypes: ["competitor messaging matrix", "community shortlist", "customer-language themes", "market brief", "launch-surface recommendations"],
     };
 
@@ -312,6 +318,19 @@ Key gaps: None of your competitors emphasize the "AI-native" angle.
     const secondCall = artifactService.createArtifact.mock.calls[1][1];
     expect(secondCall.type).toBe("dataset_list");
     expect(secondCall.title).toBe("Community Shortlist");
+
+    // Bundle should have been created for multi-artifact session
+    expect(artifactService.createBundle).toHaveBeenCalledTimes(1);
+    const bundleCallArgs = artifactService.createBundle.mock.calls[0][1];
+    expect(bundleCallArgs.projectId).toBe("proj-1");
+    expect(bundleCallArgs.title).toContain("Market Intel");
+
+    // Both artifacts should have bundleId set
+    expect(firstCall.bundleId).toBe("bnd-mock-1");
+    expect(secondCall.bundleId).toBe("bnd-mock-1");
+
+    // ExtractionResult should carry the bundleId
+    expect(result.bundleId).toBe("bnd-mock-1");
   });
 
   // Edge case: no extractable sections
@@ -321,6 +340,7 @@ Key gaps: None of your competitors emphasize the "AI-native" angle.
 
     const specialist = {
       id: "cmo",
+      name: "CMO",
       outputTypes: ["prioritized recommendations", "cross-functional plans"],
     };
 
@@ -356,6 +376,7 @@ Here are several CTA options for your landing page that target different convers
 
     const specialist = {
       id: "website-conversion",
+      name: "Website Conversion",
       outputTypes: ["hero rewrite bundle", "CTA options", "trust/proof suggestions"],
     };
 
@@ -387,6 +408,7 @@ Here's your comprehensive launch checklist:
 
     const specialist = {
       id: "distribution",
+      name: "Distribution",
       outputTypes: ["Product Hunt launch pack", "launch checklist", "community-post angles", "channel recommendations", "launch sequencing plan"],
     };
 
@@ -420,6 +442,9 @@ describe("extractArtifacts — run-scoped linking", () => {
         createdArtifacts.push(record);
         return Promise.resolve(record);
       }),
+      createBundle: vi.fn().mockImplementation((_paths: unknown, opts: unknown) => {
+        return Promise.resolve({ bundleId: "bnd-mock-1", ...(opts as object) });
+      }),
     };
     const opengoatPaths = { homeDir: "/tmp/test" };
     return { artifactService, opengoatPaths, createdArtifacts };
@@ -427,6 +452,7 @@ describe("extractArtifacts — run-scoped linking", () => {
 
   const specialist = {
     id: "distribution",
+    name: "Distribution",
     outputTypes: ["launch checklist", "community shortlist", "channel recommendations"],
   };
 
@@ -479,6 +505,181 @@ Here's your comprehensive launch checklist:
     const callArgs = artifactService.createArtifact.mock.calls[0][1];
     expect(callArgs.objectiveId).toBeUndefined();
     expect(callArgs.runId).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractArtifacts: output bundles
+// ---------------------------------------------------------------------------
+describe("extractArtifacts — output bundles", () => {
+  function createMockDeps() {
+    const createdArtifacts: unknown[] = [];
+    const artifactService = {
+      createArtifact: vi.fn().mockImplementation((_paths: unknown, opts: unknown) => {
+        const record = { artifactId: `art-${createdArtifacts.length + 1}`, ...(opts as object) };
+        createdArtifacts.push(record);
+        return Promise.resolve(record);
+      }),
+      createBundle: vi.fn().mockImplementation((_paths: unknown, opts: unknown) => {
+        return Promise.resolve({ bundleId: "bnd-mock-1", ...(opts as object) });
+      }),
+    };
+    const opengoatPaths = { homeDir: "/tmp/test" };
+    return { artifactService, opengoatPaths, createdArtifacts };
+  }
+
+  const baseContext: ExtractionContext = {
+    specialistId: "market-intel",
+    agentId: "proj-1",
+    sessionId: "sess-1",
+    messageIndex: 0,
+  };
+
+  it("does not create a bundle for single-artifact sessions", async () => {
+    const { artifactService, opengoatPaths } = createMockDeps();
+    const text = `## Competitor Messaging Matrix
+
+| Competitor | Positioning | Key Claim | Weakness |
+|---|---|---|---|
+| Acme Corp | "All-in-one platform" | Speed | No customization |
+| Beta Inc | "Enterprise-grade" | Security | Expensive |
+
+Key gaps: None of your competitors emphasize the "AI-native" angle.
+`;
+
+    const specialist = {
+      id: "market-intel",
+      name: "Market Intel",
+      outputTypes: ["competitor messaging matrix", "community shortlist"],
+    };
+
+    const result = await extractArtifacts(text, baseContext, {
+      artifactService: artifactService as any,
+      opengoatPaths: opengoatPaths as any,
+      specialist: specialist as any,
+    });
+
+    expect(result.artifacts).toHaveLength(1);
+    expect(artifactService.createBundle).not.toHaveBeenCalled();
+    expect(result.bundleId).toBeUndefined();
+    // Artifact should not have a bundleId
+    const callArgs = artifactService.createArtifact.mock.calls[0][1];
+    expect(callArgs.bundleId).toBeUndefined();
+  });
+
+  it("creates a bundle with specialist name in title for multi-artifact sessions", async () => {
+    const { artifactService, opengoatPaths } = createMockDeps();
+    const text = `## Competitor Messaging Matrix
+
+| Competitor | Positioning | Key Claim | Weakness |
+|---|---|---|---|
+| Acme Corp | "All-in-one platform" | Speed | No customization |
+| Beta Inc | "Enterprise-grade" | Security | Expensive |
+
+Key gaps: None of your competitors emphasize the "AI-native" angle.
+
+## Community Shortlist
+
+1. **Hacker News** — High developer density, good for launches
+2. **Reddit r/SaaS** — Active founder community
+3. **IndieHackers** — Early adopter audience
+4. **Dev.to** — Technical content distribution
+`;
+
+    const specialist = {
+      id: "market-intel",
+      name: "Market Intel",
+      outputTypes: ["competitor messaging matrix", "community shortlist"],
+    };
+
+    const result = await extractArtifacts(text, baseContext, {
+      artifactService: artifactService as any,
+      opengoatPaths: opengoatPaths as any,
+      specialist: specialist as any,
+    });
+
+    expect(result.artifacts).toHaveLength(2);
+    expect(artifactService.createBundle).toHaveBeenCalledTimes(1);
+
+    const bundleArgs = artifactService.createBundle.mock.calls[0][1];
+    expect(bundleArgs.title).toContain("Market Intel");
+    expect(bundleArgs.projectId).toBe("proj-1");
+
+    // Both artifacts should reference the bundle
+    for (const call of artifactService.createArtifact.mock.calls) {
+      expect(call[1].bundleId).toBe("bnd-mock-1");
+    }
+
+    expect(result.bundleId).toBe("bnd-mock-1");
+  });
+
+  it("derives bundle title from specialist name and first heading when types differ", async () => {
+    const { artifactService, opengoatPaths } = createMockDeps();
+    const text = `## Competitor Messaging Matrix
+
+| Competitor | Positioning | Key Claim | Weakness |
+|---|---|---|---|
+| Acme Corp | "All-in-one platform" | Speed | No customization |
+| Beta Inc | "Enterprise-grade" | Security | Expensive |
+
+Key gaps: None of your competitors emphasize the "AI-native" angle.
+
+## Community Shortlist
+
+1. **Hacker News** — High developer density, good for launches
+2. **Reddit r/SaaS** — Active founder community
+3. **IndieHackers** — Early adopter audience
+4. **Dev.to** — Technical content distribution
+`;
+
+    const specialist = {
+      id: "market-intel",
+      name: "Market Intel",
+      outputTypes: ["competitor messaging matrix", "community shortlist"],
+    };
+
+    await extractArtifacts(text, baseContext, {
+      artifactService: artifactService as any,
+      opengoatPaths: opengoatPaths as any,
+      specialist: specialist as any,
+    });
+
+    const bundleArgs = artifactService.createBundle.mock.calls[0][1];
+    // Mixed types — title should use first heading
+    expect(bundleArgs.title).toBe("Market Intel: Competitor Messaging Matrix");
+  });
+
+  it("ExtractionResult.bundleId is undefined when no bundle is created", async () => {
+    const { artifactService, opengoatPaths } = createMockDeps();
+    const text = `## Launch Checklist
+
+Here's your comprehensive launch checklist:
+
+- [ ] Set up Product Hunt page
+- [ ] Prepare social media posts
+- [ ] Line up beta testers for upvotes
+- [ ] Draft Show HN post
+- [ ] Schedule email blast
+`;
+
+    const specialist = {
+      id: "distribution",
+      name: "Distribution",
+      outputTypes: ["launch checklist", "channel recommendations"],
+    };
+
+    const result = await extractArtifacts(text, {
+      specialistId: "distribution",
+      agentId: "proj-1",
+      sessionId: "sess-1",
+    }, {
+      artifactService: artifactService as any,
+      opengoatPaths: opengoatPaths as any,
+      specialist: specialist as any,
+    });
+
+    expect(result.artifacts).toHaveLength(1);
+    expect(result.bundleId).toBeUndefined();
   });
 });
 

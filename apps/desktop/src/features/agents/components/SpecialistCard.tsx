@@ -7,18 +7,28 @@ import { getSpecialistColors } from "@/features/agents/specialist-meta";
 import { formatRelativeTime } from "@/lib/utils/output-labels";
 import { cleanArtifactTitle } from "@/features/dashboard/lib/clean-artifact-title";
 
+export interface SpecialistBundleGroup {
+  bundleId: string;
+  title: string;
+  artifacts: ArtifactRecord[];
+  createdAt: string;
+}
+
 interface SpecialistCardProps {
   specialist: SpecialistAgent;
   onChat: (specialistId: string) => void;
   recentOutputs?: ArtifactRecord[] | undefined;
+  recentBundles?: SpecialistBundleGroup[] | undefined;
   onOutputNavigate?: ((artifact: ArtifactRecord) => void) | undefined;
 }
 
-export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavigate }: SpecialistCardProps) {
+export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundles, onOutputNavigate }: SpecialistCardProps) {
   const Icon = resolveSpecialistIcon(specialist.icon);
   const isManager = specialist.category === "manager";
   const colors = getSpecialistColors(specialist.id);
   const outputs = recentOutputs?.length ? recentOutputs : [];
+  const bundles = recentBundles?.length ? recentBundles : [];
+  const hasOutputs = outputs.length > 0 || bundles.length > 0;
 
   return (
     <article
@@ -83,8 +93,8 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
           ))}
         </div>
 
-        {/* Recent outputs — only shown when outputs exist */}
-        {outputs.length > 0 ? (
+        {/* Recent outputs — bundles and standalone artifacts */}
+        {hasOutputs ? (
           <div className="mt-4 rounded-lg border border-border/15 bg-muted/20 px-3 py-2.5 dark:border-white/[0.03] dark:bg-white/[0.02]">
             <div className="mb-1.5 flex items-center gap-1.5">
               <PackageIcon className="size-3 shrink-0 text-muted-foreground/50" />
@@ -93,6 +103,36 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
               </span>
             </div>
             <div className="flex flex-col gap-0.5">
+              {/* Bundle rows */}
+              {bundles.map((bundle) => (
+                <div
+                  key={bundle.bundleId}
+                  role="button"
+                  tabIndex={0}
+                  className="group/output flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-card dark:hover:bg-white/[0.04]"
+                  onClick={() => {
+                    if (bundle.artifacts[0]) onOutputNavigate?.(bundle.artifacts[0]);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      if (bundle.artifacts[0]) onOutputNavigate?.(bundle.artifacts[0]);
+                    }
+                  }}
+                >
+                  <PackageIcon className={cn("size-3 shrink-0", colors.iconText || "text-primary")} />
+                  <span className="min-w-0 flex-1 truncate font-medium text-foreground/70 group-hover/output:text-foreground">
+                    {bundle.title}
+                  </span>
+                  <span className="shrink-0 rounded-full bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+                    {bundle.artifacts.length}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground/40">
+                    {formatRelativeTime(bundle.createdAt)}
+                  </span>
+                </div>
+              ))}
+              {/* Standalone artifact rows */}
               {outputs.map((artifact) => (
                 <div
                   key={artifact.artifactId}
