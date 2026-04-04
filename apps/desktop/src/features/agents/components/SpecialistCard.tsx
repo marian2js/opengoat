@@ -3,6 +3,7 @@ import { MessageSquareIcon, PackageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { resolveSpecialistIcon } from "@/features/agents/specialist-icons";
+import { getSpecialistColors } from "@/features/agents/specialist-meta";
 import { formatRelativeTime } from "@/lib/utils/output-labels";
 import { cleanArtifactTitle } from "@/features/dashboard/lib/clean-artifact-title";
 
@@ -16,6 +17,7 @@ interface SpecialistCardProps {
 export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavigate }: SpecialistCardProps) {
   const Icon = resolveSpecialistIcon(specialist.icon);
   const isManager = specialist.category === "manager";
+  const colors = getSpecialistColors(specialist.id);
   const outputs = recentOutputs?.length ? recentOutputs : [];
 
   return (
@@ -25,7 +27,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
         "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20",
         isManager
           ? "border-primary/20 bg-primary/[0.02] ring-1 ring-primary/[0.06] hover:border-primary/30 hover:ring-primary/10"
-          : "border-border/40 hover:border-primary/20 dark:border-white/[0.06]",
+          : cn("dark:border-white/[0.06]", colors.chipBorder, colors.hoverBorder),
       )}
     >
       {/* Card body */}
@@ -37,11 +39,14 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
               "flex size-10 shrink-0 items-center justify-center rounded-xl shadow-sm",
               isManager
                 ? "bg-primary/12 ring-1 ring-primary/15"
-                : "bg-primary/[0.06] ring-1 ring-primary/[0.06] dark:bg-primary/[0.08] dark:ring-primary/[0.08]",
+                : cn("ring-1 ring-black/[0.04] dark:ring-white/[0.06]", colors.iconBg),
             )}
           >
             <Icon
-              className="size-5 text-primary"
+              className={cn(
+                "size-5",
+                isManager ? "text-primary" : colors.iconText,
+              )}
             />
           </div>
           <div className="min-w-0 flex-1">
@@ -102,7 +107,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
                     }
                   }}
                 >
-                  <span className="size-1 shrink-0 rounded-full bg-primary/40" />
+                  <span className={cn("size-1 shrink-0 rounded-full", colors.dotColor)} />
                   <span className="min-w-0 flex-1 truncate text-foreground/70 group-hover/output:text-foreground">
                     {cleanArtifactTitle(artifact)}
                   </span>
