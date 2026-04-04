@@ -418,6 +418,7 @@ function ActionSessionInner({
         <ActionSessionProgress
           state={sessionState}
           hasOutputs={outputs.length > 0}
+          outputCount={outputs.length}
         />
 
         {/* Error banner when sendMessage fails */}

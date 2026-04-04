@@ -30,9 +30,25 @@ export function ActionSessionOutputs({ outputs }: ActionSessionOutputsProps) {
           {outputs.length}
         </span>
       </div>
-      {outputs.map((output) => (
-        <OutputCard key={output.id} output={output} />
-      ))}
+      <div className="relative">
+        {outputs.map((output, index) => (
+          <div key={output.id} className="relative flex gap-4">
+            {/* Timeline spine */}
+            <div className="flex flex-col items-center pt-5">
+              <div className="relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-primary/30 bg-card text-primary">
+                <span className="font-mono text-[10px] font-bold">{index + 1}</span>
+              </div>
+              {index < outputs.length - 1 && (
+                <div className="w-px flex-1 bg-border/40 dark:bg-white/[0.06]" />
+              )}
+            </div>
+            {/* Output card */}
+            <div className="min-w-0 flex-1 pb-4">
+              <OutputCard output={output} />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

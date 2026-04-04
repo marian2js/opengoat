@@ -4,6 +4,7 @@ import type { ActionSessionState } from "../types";
 interface ActionSessionProgressProps {
   state: ActionSessionState;
   hasOutputs: boolean;
+  outputCount?: number;
 }
 
 /** Indeterminate progress bar with shimmer animation */
@@ -36,6 +37,7 @@ function ProgressBar({ variant = "primary" }: { variant?: "primary" | "amber" })
 export function ActionSessionProgress({
   state,
   hasOutputs,
+  outputCount = 0,
 }: ActionSessionProgressProps) {
   if (state === "ready-to-review" || state === "saved-to-board" || state === "done") {
     return null;
@@ -71,6 +73,11 @@ export function ActionSessionProgress({
           <p className="text-sm text-muted-foreground">
             {hasOutputs ? "Generating more outputs…" : "Working on your request…"}
           </p>
+          {outputCount > 0 && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-primary">
+              {outputCount} generated
+            </span>
+          )}
         </div>
         <ProgressBar />
       </div>
