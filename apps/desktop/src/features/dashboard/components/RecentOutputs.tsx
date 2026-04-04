@@ -72,15 +72,9 @@ export function RecentOutputs({ agentId, client, onPreview, onNavigate }: Recent
 
       {/* Empty state */}
       {isEmpty ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border/40 py-8 text-center">
-          <PackageIcon className="size-6 text-muted-foreground/30" />
-          <p className="text-sm text-muted-foreground">
-            No outputs yet
-          </p>
-          <p className="text-xs text-muted-foreground/60">
-            Run an action above to get started
-          </p>
-        </div>
+        <p className="text-xs text-muted-foreground/50 ml-9">
+          No outputs yet — run an action above to get started
+        </p>
       ) : (
         /* Outputs list */
         <div className="space-y-3">

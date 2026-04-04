@@ -16,7 +16,7 @@ const bundleCardSrc = readSrc("components/BundleCard.tsx");
 const dashboardSrc = readSrc("components/DashboardWorkspace.tsx");
 
 // ---------------------------------------------------------------------------
-// RecentOutputs — empty state
+// RecentOutputs — empty state (compact inline)
 // ---------------------------------------------------------------------------
 describe("RecentOutputs empty state", () => {
   it("shows 'No outputs yet' message when empty", () => {
@@ -30,8 +30,17 @@ describe("RecentOutputs empty state", () => {
     ).toBe(true);
   });
 
-  it("renders empty state container with dashed border", () => {
-    expect(componentSrc).toContain("border-dashed");
+  it("uses compact inline text instead of tall dashed-border card", () => {
+    // Should NOT have the old tall dashed-border empty state container
+    expect(componentSrc).not.toContain("border-dashed");
+    // Should NOT have the stacked vertical layout with centered icon
+    expect(componentSrc).not.toContain("flex-col items-center gap-2");
+    expect(componentSrc).not.toContain("py-8");
+  });
+
+  it("renders empty state as a single muted paragraph", () => {
+    // The empty state should be a compact <p> with muted styling
+    expect(componentSrc).toMatch(/isEmpty[\s\S]*?<p\s+className="[^"]*text-muted-foreground/);
   });
 });
 
