@@ -667,7 +667,7 @@ function ChatSessionView({
       {/* Messages area */}
       <div
         ref={listRef}
-        className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 py-6 lg:px-6"
+        className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 pt-6 pb-36 lg:px-6"
       >
         {visibleMessages.length === 0 && isAction ? (
           <div className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-6 py-8 text-center">
@@ -1108,7 +1108,7 @@ function ChatHandoffChipsWrapper({
   const visible = suggestions.filter((s) => !dismissedIds.has(s.id));
   if (visible.length === 0) return null;
   return (
-    <div className="space-y-0">
+    <div className="relative z-10 space-y-0">
       {visible.map((suggestion) => (
         <HandoffChip
           key={suggestion.id}
