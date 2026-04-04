@@ -717,7 +717,7 @@ function SessionItem({
               : "font-normal",
         )}>{label}</span>
         {specialistMeta && !isAction ? (
-          <span className="shrink-0 text-[10px] font-medium text-primary/50">
+          <span className="shrink-0 rounded bg-primary/[0.08] px-1 py-px text-[10px] font-medium text-primary/60">
             {specialistMeta.name}
           </span>
         ) : null}

@@ -71,7 +71,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, onOutputNavi
           {specialist.outputTypes.slice(0, 4).map((output) => (
             <span
               key={output}
-              className="rounded-md border border-border/30 bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground/80 dark:border-white/[0.06] dark:bg-white/[0.04]"
+              className="rounded-md border border-border/40 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-zinc-400"
             >
               {output}
             </span>
