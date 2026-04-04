@@ -392,6 +392,42 @@ export class ArtifactService {
     return rows.map(toArtifactRecord);
   }
 
+  public async listUnbundledArtifacts(
+    paths: OpenGoatPaths,
+    projectId: string,
+  ): Promise<ArtifactRecord[]> {
+    const db = await this.getDatabase(paths);
+
+    const rows = this.queryAll<ArtifactRow>(
+      db,
+      "SELECT * FROM artifacts WHERE project_id = ? AND bundle_id IS NULL ORDER BY created_at DESC",
+      [projectId],
+    );
+
+    return rows.map(toArtifactRecord);
+  }
+
+  public async assignBundle(
+    paths: OpenGoatPaths,
+    artifactIds: string[],
+    bundleId: string,
+  ): Promise<void> {
+    if (artifactIds.length === 0) return;
+
+    const db = await this.getDatabase(paths);
+    const now = this.nowIso();
+
+    for (const artifactId of artifactIds) {
+      this.execute(
+        db,
+        "UPDATE artifacts SET bundle_id = ?, updated_at = ? WHERE artifact_id = ?",
+        [bundleId, now, artifactId],
+      );
+    }
+
+    await this.persistDatabase(paths, db);
+  }
+
   // ---------------------------------------------------------------------------
   // Private database helpers
   // ---------------------------------------------------------------------------

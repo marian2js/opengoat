@@ -7,7 +7,7 @@ import {
 import { getSpecialistById } from "@opengoat/core";
 import { Hono } from "hono";
 import { z } from "zod";
-import { extractArtifacts } from "../../artifact-extractor/index.ts";
+import { extractArtifacts, bundleUnbundledArtifacts } from "../../artifact-extractor/index.ts";
 import type { SidecarRuntime } from "../context.ts";
 
 const extractRequestSchema = z.object({
@@ -184,6 +184,18 @@ export function createBundleRoutes(runtime: SidecarRuntime): Hono {
     );
 
     return context.json(bundle);
+  });
+
+  app.post("/group-unbundled", async (context) => {
+    const body = z.object({ projectId: z.string().min(1) }).parse(await context.req.json());
+
+    const result = await bundleUnbundledArtifacts(runtime.opengoatPaths, body.projectId, {
+      artifactService: runtime.artifactService,
+      opengoatPaths: runtime.opengoatPaths,
+      specialistLookup: (id) => getSpecialistById(id)?.name ?? id,
+    });
+
+    return context.json(result);
   });
 
   app.get("/:bundleId", async (context) => {

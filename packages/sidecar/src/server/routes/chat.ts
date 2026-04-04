@@ -3,7 +3,7 @@ import { chatBootstrapSchema } from "@opengoat/contracts";
 import { validateUIMessages } from "ai";
 import { Hono } from "hono";
 import { z } from "zod";
-import { extractArtifacts } from "../../artifact-extractor/index.ts";
+import { extractArtifacts, bundleUnbundledArtifacts } from "../../artifact-extractor/index.ts";
 import { accumulateMemories } from "../../memory-accumulator/index.ts";
 import type { SidecarRuntime } from "../context.ts";
 import {
@@ -214,6 +214,15 @@ export function createChatRoutes(
               artifactService: runtime.artifactService,
               opengoatPaths: runtime.opengoatPaths,
               specialist,
+            });
+
+            // Post-hoc bundle grouping: group same-session artifacts across extractors
+            bundleUnbundledArtifacts(runtime.opengoatPaths, agentId, {
+              artifactService: runtime.artifactService,
+              opengoatPaths: runtime.opengoatPaths,
+              specialistLookup: (id) => getSpecialistById(id)?.name ?? id,
+            }).catch(() => {
+              // Bundle grouping is best-effort — must not affect chat
             });
 
             // Check phase progress after extraction when run-scoped (fire-and-forget)
