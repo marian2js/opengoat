@@ -46,22 +46,25 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
         <div className="flex items-start gap-3.5">
           <div
             className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-xl shadow-sm",
+              "flex shrink-0 items-center justify-center rounded-xl shadow-sm",
               isManager
-                ? "bg-primary/12 ring-1 ring-primary/15"
-                : cn("ring-1 ring-black/[0.04] dark:ring-white/[0.06]", colors.iconBg),
+                ? "size-11 bg-primary/12 ring-1 ring-primary/15"
+                : cn("size-10 ring-1 ring-black/[0.04] dark:ring-white/[0.06]", colors.iconBg),
             )}
           >
             <Icon
               className={cn(
-                "size-5",
+                isManager ? "size-5" : "size-4.5",
                 isManager ? "text-primary" : colors.iconText,
               )}
             />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-display text-[16px] font-bold tracking-tight text-foreground">
+              <h3 className={cn(
+                "font-display font-bold tracking-tight text-foreground",
+                isManager ? "text-[18px]" : "text-[15px]",
+              )}>
                 {specialist.name}
               </h3>
               {isManager ? (
@@ -70,23 +73,34 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
                 </span>
               ) : null}
             </div>
-            <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+            <p className={cn(
+              "mt-0.5 leading-relaxed text-muted-foreground",
+              isManager ? "text-[13px]" : "text-[12px]",
+            )}>
               {specialist.role}
             </p>
           </div>
         </div>
 
         {/* Reason to exist */}
-        <p className="mt-3.5 text-[13px] leading-[1.6] text-foreground/75">
+        <p className={cn(
+          "mt-3.5 leading-[1.6] text-foreground/75",
+          isManager ? "text-[14px]" : "text-[13px]",
+        )}>
           {specialist.reasonToExist}
         </p>
 
         {/* Output types as deliverable chips */}
-        <div className="mt-3.5 flex flex-wrap gap-1.5">
+        <div className="mt-4 flex flex-wrap gap-1.5">
           {specialist.outputTypes.slice(0, 4).map((output) => (
             <span
               key={output}
-              className="rounded-md border border-border/40 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-zinc-400"
+              className={cn(
+                "rounded-md px-2 py-0.5 text-[11px] font-medium",
+                isManager
+                  ? "border border-primary/15 bg-primary/[0.05] text-primary/80 dark:border-primary/10 dark:text-primary/70"
+                  : "border border-border/40 bg-muted/50 text-muted-foreground dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-zinc-400",
+              )}
             >
               {output}
             </span>
@@ -162,7 +176,10 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
       </div>
 
       {/* CTA — separated footer */}
-      <div className="border-t border-border/20 px-5 py-3.5 dark:border-white/[0.04]">
+      <div className={cn(
+        "border-t px-5 py-3.5",
+        isManager ? "border-primary/10 bg-primary/[0.02] dark:border-primary/[0.06]" : "border-border/20 dark:border-white/[0.04]",
+      )}>
         <Button
           size="sm"
           variant={isManager ? "default" : "outline"}
