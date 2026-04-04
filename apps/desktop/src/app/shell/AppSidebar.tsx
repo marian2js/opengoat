@@ -238,7 +238,7 @@ export function AppSidebar({
 
               {/* Brain — collapsible */}
               <Collapsible
-                defaultOpen={activeView === "brain"}
+                open={activeView === "brain"}
                 asChild
                 className="group/collapsible"
               >

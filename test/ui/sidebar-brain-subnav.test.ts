@@ -68,4 +68,16 @@ describe("Sidebar Brain sub-navigation", () => {
     // The sidebar should use sidebar- prefixed tokens which adapt to theme
     expect(sidebarSrc).toMatch(/sidebar-accent|sidebar-foreground|sidebar-primary/);
   });
+
+  // AC6: Brain sub-menu collapses when navigating away from Brain page
+  it("uses controlled open prop derived from activeView, not defaultOpen", () => {
+    // The Collapsible wrapping the Brain section must use the controlled `open`
+    // prop so that expand/collapse state tracks the current route, collapsing
+    // when the user navigates away from Brain pages.
+    // It should NOT use defaultOpen (which only sets initial state and then
+    // Radix manages it internally, causing the menu to stay open on all pages).
+    expect(sidebarSrc).toMatch(/open=\{activeView\s*===\s*["']brain["']\}/);
+    // Ensure defaultOpen is NOT used for the Brain collapsible
+    expect(sidebarSrc).not.toMatch(/defaultOpen=\{activeView\s*===\s*["']brain["']\}/);
+  });
 });
