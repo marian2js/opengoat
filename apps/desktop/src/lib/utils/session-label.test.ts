@@ -114,3 +114,42 @@ void test("does not truncate labels at exactly 55 chars", () => {
   const result = humanizeSessionLabel(label, "2026-03-22T10:00:00Z");
   assert.equal(result, label);
 });
+
+// ---------------------------------------------------------------------------
+// truncateSessionLabel — API-safe truncation for gateway limits
+// ---------------------------------------------------------------------------
+
+import { truncateSessionLabel } from "./session-label";
+
+void test("returns short labels unchanged", () => {
+  assert.equal(truncateSessionLabel("Launch Pack"), "Launch Pack");
+});
+
+void test("returns labels at exactly 60 chars unchanged", () => {
+  const label = "A".repeat(60);
+  assert.equal(truncateSessionLabel(label), label);
+});
+
+void test("truncates labels longer than 60 chars with ellipsis", () => {
+  const label = "Launch Pack: Bullaware - AI-powered competitor intelligence for SaaS teams — 2026-04-15 — Product Hunt";
+  const result = truncateSessionLabel(label);
+  assert.ok(result.length <= 60, `Expected <= 60 chars, got ${result.length}`);
+  assert.ok(result.endsWith("…"), "Expected ellipsis at end");
+});
+
+void test("preserves the playbook title prefix when truncating", () => {
+  const label = "Launch Pack: Bullaware - AI-powered competitor intelligence for SaaS teams — 2026-04-15 — Product Hunt";
+  const result = truncateSessionLabel(label);
+  assert.ok(result.startsWith("Launch Pack: Bullaware"), `Expected prefix preserved, got: ${result}`);
+});
+
+void test("handles empty string", () => {
+  assert.equal(truncateSessionLabel(""), "");
+});
+
+void test("uses custom maxLength when provided", () => {
+  const label = "A very long label that exceeds a short limit";
+  const result = truncateSessionLabel(label, 20);
+  assert.ok(result.length <= 20, `Expected <= 20 chars, got ${result.length}`);
+  assert.ok(result.endsWith("…"));
+});

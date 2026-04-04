@@ -223,6 +223,39 @@ describe("ChatWorkspace — RunContextBanner integration", () => {
   });
 });
 
+describe("DashboardWorkspace — session label truncation (0008 fix)", () => {
+  it("imports truncateSessionLabel utility", () => {
+    expect(dashboardSrc).toContain("truncateSessionLabel");
+  });
+
+  it("applies truncateSessionLabel to the session label in createSession", () => {
+    expect(dashboardSrc).toContain("label: truncateSessionLabel(objectiveTitle)");
+  });
+
+  it("still uses full objectiveTitle for objective creation", () => {
+    expect(dashboardSrc).toContain("title: objectiveTitle");
+  });
+});
+
+describe("truncateSessionLabel utility", () => {
+  const sessionLabelSrc = readFileSync(
+    resolve(__dirname, "../../apps/desktop/src/lib/utils/session-label.ts"),
+    "utf-8",
+  );
+
+  it("exports truncateSessionLabel function", () => {
+    expect(sessionLabelSrc).toContain("export function truncateSessionLabel");
+  });
+
+  it("defaults to 60-character max", () => {
+    expect(sessionLabelSrc).toContain("maxLength = 60");
+  });
+
+  it("uses ellipsis character for truncation", () => {
+    expect(sessionLabelSrc).toContain("…");
+  });
+});
+
 describe("App.tsx — handleRunSessionCreated", () => {
   it("has handleRunSessionCreated callback", () => {
     expect(appSrc).toContain("handleRunSessionCreated");

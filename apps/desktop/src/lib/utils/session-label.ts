@@ -43,3 +43,16 @@ export function humanizeSessionLabel(
   // Truncate long labels
   return `${trimmed.slice(0, 52)}...`;
 }
+
+/**
+ * Truncate a session label for the gateway API which rejects labels
+ * exceeding ~60-80 characters. Uses a single "…" character so the
+ * truncated label clearly indicates there's more text.
+ *
+ * The full (untruncated) string should still be used for objective titles
+ * or anywhere the gateway limit doesn't apply.
+ */
+export function truncateSessionLabel(label: string, maxLength = 60): string {
+  if (label.length <= maxLength) return label;
+  return `${label.slice(0, maxLength - 1)}…`;
+}

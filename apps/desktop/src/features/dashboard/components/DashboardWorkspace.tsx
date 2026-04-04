@@ -24,6 +24,7 @@ import { useActionSessions } from "@/features/dashboard/hooks/useActionSessions"
 import { useRuns } from "@/features/dashboard/hooks/useRuns";
 import { useRecentArtifacts } from "@/features/dashboard/hooks/useRecentArtifacts";
 import { useSpecialistRoster } from "@/features/dashboard/hooks/useSpecialistRoster";
+import { truncateSessionLabel } from "@/lib/utils/session-label";
 import { toast } from "sonner";
 
 /** Extract sessionId from a contentRef like "session:{id}/message:{id}" */
@@ -158,10 +159,10 @@ function DashboardContent({
           objectiveId,
         });
 
-        // 3. Create agent session
+        // 3. Create agent session (label truncated to avoid gateway 500)
         const session = await client.createSession({
           agentId,
-          label: objectiveTitle,
+          label: truncateSessionLabel(objectiveTitle),
         });
 
         // 4. Compose structured prompt with playbook + objective context
