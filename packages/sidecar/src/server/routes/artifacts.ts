@@ -4,8 +4,18 @@ import {
   updateArtifactRequestSchema,
   updateArtifactStatusRequestSchema,
 } from "@opengoat/contracts";
+import { getSpecialistById } from "@opengoat/core";
 import { Hono } from "hono";
+import { z } from "zod";
+import { extractArtifacts } from "../../artifact-extractor/index.ts";
 import type { SidecarRuntime } from "../context.ts";
+
+const extractRequestSchema = z.object({
+  sessionId: z.string().min(1),
+  messageIndex: z.number().int().min(0),
+  specialistId: z.string().min(1),
+  agentId: z.string().min(1),
+});
 
 const DEFAULT_ACTOR_ID = "goat";
 
@@ -65,6 +75,44 @@ export function createArtifactRoutes(runtime: SidecarRuntime): Hono {
       }
       throw error;
     }
+  });
+
+  app.post("/extract", async (context) => {
+    const body = extractRequestSchema.parse(await context.req.json());
+    const specialist = getSpecialistById(body.specialistId);
+    if (!specialist) {
+      return context.json({ error: `Specialist "${body.specialistId}" not found` }, 400);
+    }
+
+    const bootstrap = await runtime.embeddedGateway.bootstrapConversation(
+      body.agentId,
+      body.sessionId,
+    );
+
+    const message = bootstrap.messages[body.messageIndex];
+    if (!message) {
+      return context.json({ error: `Message at index ${body.messageIndex} not found` }, 400);
+    }
+    if (message.role !== "assistant") {
+      return context.json({ error: "Message at specified index is not an assistant message" }, 400);
+    }
+
+    const text = "text" in message && typeof message.text === "string"
+      ? message.text
+      : "";
+
+    const result = await extractArtifacts(text, {
+      specialistId: body.specialistId,
+      agentId: body.agentId,
+      sessionId: body.sessionId,
+      messageIndex: body.messageIndex,
+    }, {
+      artifactService: runtime.artifactService,
+      opengoatPaths: runtime.opengoatPaths,
+      specialist,
+    });
+
+    return context.json(result);
   });
 
   app.post("/", async (context) => {

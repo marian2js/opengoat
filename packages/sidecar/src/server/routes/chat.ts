@@ -3,6 +3,7 @@ import { chatBootstrapSchema } from "@opengoat/contracts";
 import { validateUIMessages } from "ai";
 import { Hono } from "hono";
 import { z } from "zod";
+import { extractArtifacts } from "../../artifact-extractor/index.ts";
 import type { SidecarRuntime } from "../context.ts";
 import {
   fetchObjectiveContext,
@@ -167,10 +168,36 @@ export function createChatRoutes(
       throw new Error("Chat message cannot be empty.");
     }
 
+    // Build onComplete callback for artifact extraction when specialist is active
+    let onComplete: ((text: string) => Promise<void>) | undefined;
+    if (payload.specialistId && payload.agentId) {
+      const specialist = getSpecialistById(payload.specialistId);
+      if (specialist) {
+        const agentId = payload.agentId;
+        const sessionId = payload.sessionId ?? "";
+        onComplete = async (text: string) => {
+          try {
+            await extractArtifacts(text, {
+              specialistId: specialist.id,
+              agentId,
+              sessionId,
+            }, {
+              artifactService: runtime.artifactService,
+              opengoatPaths: runtime.opengoatPaths,
+              specialist,
+            });
+          } catch {
+            // Fire-and-forget: extraction must not affect the chat response
+          }
+        };
+      }
+    }
+
     return createChatService().streamConversation({
       ...(payload.agentId ? { agentId: payload.agentId } : {}),
       message,
       ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
+      ...(onComplete ? { onComplete } : {}),
     });
   });
 

@@ -897,6 +897,7 @@ export class EmbeddedGatewayClient {
     agentId?: string;
     message: UIMessage;
     sessionId?: string;
+    onComplete?: (text: string) => void | Promise<void>;
   }): Promise<Response> {
     const agent = params.agentId
       ? await this.getAgent(params.agentId)
@@ -1099,6 +1100,13 @@ export class EmbeddedGatewayClient {
           );
           runId = ack.runId;
           await finished;
+          if (params.onComplete) {
+            try {
+              await params.onComplete(currentAssistantText);
+            } catch {
+              // Fire-and-forget: extraction errors must not break the stream
+            }
+          }
         } finally {
           streamClient.stop();
         }
