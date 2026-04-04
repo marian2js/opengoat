@@ -420,22 +420,22 @@ export function AppSidebar({
                                 );
                               })}
                               {hiddenCount > 0 && (
-                                <li className="px-3 py-1.5">
+                                <li className="px-3 py-1">
                                   <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); setExpandedGroups((prev) => { const next = new Set(prev); next.add(group.label); return next; }); }}
-                                    className="text-[11px] text-sidebar-foreground/50 hover:text-sidebar-foreground/80 transition-colors"
+                                    className="rounded-md px-1.5 py-0.5 text-[11px] text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground/80"
                                   >
                                     Show {hiddenCount} more
                                   </button>
                                 </li>
                               )}
                               {isGroupExpanded && group.sessions.length > MAX_VISIBLE && (
-                                <li className="px-3 py-1.5">
+                                <li className="px-3 py-1">
                                   <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); setExpandedGroups((prev) => { const next = new Set(prev); next.delete(group.label); return next; }); }}
-                                    className="text-[11px] text-sidebar-foreground/50 hover:text-sidebar-foreground/80 transition-colors"
+                                    className="rounded-md px-1.5 py-0.5 text-[11px] text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground/80"
                                   >
                                     Show less
                                   </button>
@@ -704,7 +704,7 @@ function SessionItem({
         }}
         className={cn(
           isActive && "border-l-2 border-primary bg-primary/5",
-          deEmphasized && !isActive && "opacity-45",
+          deEmphasized && !isActive && "opacity-50",
           unnamed && !isActive && "text-sidebar-foreground/50",
         )}
       >
@@ -720,7 +720,7 @@ function SessionItem({
         {specialistMeta && !isAction ? (
           <span className={cn(
             "shrink-0 rounded px-1 py-px text-[10px] font-medium",
-            specialistColors ? cn(specialistColors.iconBg, specialistColors.iconText, "opacity-70") : "bg-primary/[0.08] text-primary/60",
+            specialistColors ? cn(specialistColors.iconBg, specialistColors.iconText) : "bg-primary/[0.08] text-primary/60",
           )}>
             {specialistMeta.name}
           </span>
