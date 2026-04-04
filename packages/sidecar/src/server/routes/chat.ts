@@ -4,6 +4,7 @@ import { validateUIMessages } from "ai";
 import { Hono } from "hono";
 import { z } from "zod";
 import { extractArtifacts } from "../../artifact-extractor/index.ts";
+import { accumulateMemories } from "../../memory-accumulator/index.ts";
 import type { SidecarRuntime } from "../context.ts";
 import {
   fetchObjectiveContext,
@@ -199,6 +200,49 @@ export function createChatRoutes(
       ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
       ...(onComplete ? { onComplete } : {}),
     });
+  });
+
+  const endSessionSchema = z.object({
+    agentId: z.string().min(1),
+    specialistId: z.string().min(1),
+    sessionId: z.string().min(1),
+  });
+
+  app.post("/end-session", async (context) => {
+    const body = endSessionSchema.safeParse(await context.req.json());
+    if (!body.success) {
+      return context.json({ error: "agentId, specialistId, and sessionId are required" }, 400);
+    }
+
+    const { agentId, specialistId, sessionId } = body.data;
+    const specialist = getSpecialistById(specialistId);
+    if (!specialist) {
+      return context.json({ error: `Unknown specialist: ${specialistId}` }, 400);
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    const model = process.env.GEMINI_MODEL;
+    if (!apiKey || !model) {
+      return context.json({ created: 0, updated: 0, superseded: 0, skipped: 0 });
+    }
+
+    try {
+      const result = await accumulateMemories(
+        { agentId, specialistId, sessionId },
+        {
+          memoryService: runtime.memoryService,
+          embeddedGateway: runtime.embeddedGateway,
+          opengoatPaths: runtime.opengoatPaths,
+          apiKey,
+          model,
+          specialistName: specialist.name,
+        },
+      );
+      return context.json(result);
+    } catch (error) {
+      console.error("Memory accumulation failed:", error);
+      return context.json({ created: 0, updated: 0, superseded: 0, skipped: 0 });
+    }
   });
 
   return app;
