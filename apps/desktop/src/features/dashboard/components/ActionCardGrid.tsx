@@ -13,6 +13,9 @@ export interface ActionCardGridProps {
 }
 
 export function ActionCardGrid({ completedActions, isLoading, specialists, onActionClick, onViewResults }: ActionCardGridProps) {
+  const heroActions = starterActions.slice(0, 3);
+  const remainingActions = starterActions.slice(3);
+
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center gap-2.5">
@@ -21,13 +24,15 @@ export function ActionCardGrid({ completedActions, isLoading, specialists, onAct
         </div>
         <h2 className="section-label">Quick Actions</h2>
       </div>
-      <div className="grid justify-items-stretch gap-3 sm:grid-cols-2 sm:[&>:last-child:nth-child(2n+1)]:col-span-full">
-        {starterActions.map((card, index) => (
+
+      {/* Hero row — top 3 actions in a prominent row */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        {heroActions.map((card) => (
           <ActionCardItem
             key={card.id}
             card={card}
             isCompleted={completedActions?.has(card.id)}
-            isHero={index < 3}
+            isHero
             isLoading={isLoading}
             specialistId={card.specialistId}
             specialistName={specialists ? getSpecialistName(specialists, card.specialistId) : undefined}
@@ -36,6 +41,24 @@ export function ActionCardGrid({ completedActions, isLoading, specialists, onAct
           />
         ))}
       </div>
+
+      {/* Remaining actions — standard 2-col grid */}
+      {remainingActions.length > 0 ? (
+        <div className="grid justify-items-stretch gap-3 sm:grid-cols-2 sm:[&>:last-child:nth-child(2n+1)]:col-span-full">
+          {remainingActions.map((card) => (
+            <ActionCardItem
+              key={card.id}
+              card={card}
+              isCompleted={completedActions?.has(card.id)}
+              isLoading={isLoading}
+              specialistId={card.specialistId}
+              specialistName={specialists ? getSpecialistName(specialists, card.specialistId) : undefined}
+              onClick={onActionClick}
+              onViewResults={onViewResults}
+            />
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

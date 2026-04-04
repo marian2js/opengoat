@@ -31,13 +31,15 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
   return (
     <Card
       className={`group/action relative flex flex-col overflow-hidden transition-all duration-100 ease-out ${
-        isHero ? "py-5" : ""
+        isHero ? "py-1" : ""
       } ${
         isLoading
           ? "pointer-events-none border-border/30 bg-card/50 opacity-60"
           : isCompleted
             ? "cursor-pointer border-primary/15 bg-card hover:border-primary/25 hover:shadow-sm"
-            : "cursor-pointer border-border/20 bg-card hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20"
+            : isHero
+              ? "cursor-pointer border-border/30 bg-card hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-black/5 dark:border-white/[0.08] dark:hover:shadow-black/20"
+              : "cursor-pointer border-border/20 bg-card hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20"
       }`}
       onClick={() => {
         if (!isLoading) {
@@ -49,6 +51,10 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
         }
       }}
     >
+      {/* Accent left bar for hero cards */}
+      {isHero && !isLoading && !isCompleted ? (
+        <div className={`absolute inset-y-0 left-0 w-[2px] rounded-l-[inherit] transition-colors ${config.accentColor} group-hover/action:opacity-100 opacity-60`} />
+      ) : null}
       <CardHeader className="flex-1">
         <div className="flex items-center gap-2">
           <Badge variant="outline" className={`text-[10px] ${config.className}`}>
@@ -61,10 +67,10 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
             </span>
           ) : null}
         </div>
-        <CardTitle className={`leading-snug transition-colors group-hover/action:text-primary ${isHero ? "text-base font-bold" : "text-sm"}`}>
+        <CardTitle className={`leading-snug transition-colors group-hover/action:text-primary ${isHero ? "text-[15px] font-bold" : "text-sm"}`}>
           {card.title}
         </CardTitle>
-        <CardDescription className="text-xs leading-relaxed line-clamp-2">
+        <CardDescription className={`leading-relaxed line-clamp-2 ${isHero ? "text-[13px] text-muted-foreground/70" : "text-xs"}`}>
           {card.promise}
         </CardDescription>
         <CardAction>
@@ -78,12 +84,12 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
             ) : isCompleted ? (
               <CheckCircleIcon className="size-4" />
             ) : (
-              <Icon className="size-4" />
+              <Icon className={isHero ? "size-5" : "size-4"} />
             )}
           </div>
         </CardAction>
       </CardHeader>
-      <div className="flex items-center gap-3 border-t border-border/20 py-2.5 px-4">
+      <div className={`flex items-center gap-3 border-t py-2.5 px-4 ${isHero ? "border-border/30 dark:border-white/[0.06]" : "border-border/20"}`}>
         {isLoading ? (
           <span className="animate-pulse font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Starting...</span>
         ) : isCompleted ? (
@@ -106,7 +112,7 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
           </>
         ) : (
           <div className="flex flex-1 items-center justify-between">
-            <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 transition-colors group-hover/action:text-primary">
+            <span className={`flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors group-hover/action:text-primary ${isHero ? "text-muted-foreground/60" : "text-muted-foreground/50"}`}>
               Run
               <ArrowRightIcon className="size-3 transition-transform duration-150 group-hover/action:translate-x-0.5" />
             </span>
