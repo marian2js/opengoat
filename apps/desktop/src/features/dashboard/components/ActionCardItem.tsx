@@ -19,14 +19,17 @@ export interface ActionCardItemProps {
   isLoading?: boolean | undefined;
   specialistId?: string | undefined;
   specialistName?: string | undefined;
+  /** "primary" (default) = full-weight card; "secondary" = lighter, muted card */
+  variant?: "primary" | "secondary" | undefined;
   onClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
 }
 
-export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialistId, specialistName, onClick, onViewResults }: ActionCardItemProps) {
+export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialistId, specialistName, variant = "primary", onClick, onViewResults }: ActionCardItemProps) {
   const Icon = card.icon;
   const config = categoryConfig[card.category];
   const specColors = specialistId ? getSpecialistColors(specialistId) : undefined;
+  const isSecondary = variant === "secondary";
 
   return (
     <Card
@@ -37,9 +40,11 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
           ? "pointer-events-none border-border/30 bg-card/50 opacity-60"
           : isCompleted
             ? "cursor-pointer border-primary/15 bg-card hover:border-primary/25 hover:shadow-sm"
-            : isHero
-              ? "cursor-pointer border-border/30 bg-card hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-black/5 dark:border-white/[0.08] dark:hover:shadow-black/20"
-              : "cursor-pointer border-border/20 bg-card hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20"
+            : isSecondary
+              ? "cursor-pointer border-border/10 bg-card/50 hover:border-border/25 hover:bg-card hover:shadow-sm dark:border-white/[0.04] dark:hover:border-white/[0.08]"
+              : isHero
+                ? "cursor-pointer border-border/30 bg-card hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-black/5 dark:border-white/[0.08] dark:hover:shadow-black/20"
+                : "cursor-pointer border-border/20 bg-card hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20"
       }`}
       onClick={() => {
         if (!isLoading) {
@@ -51,13 +56,13 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
         }
       }}
     >
-      {/* Accent left bar for hero cards */}
-      {isHero && !isLoading && !isCompleted ? (
+      {/* Accent left bar for hero cards only (not secondary) */}
+      {isHero && !isSecondary && !isLoading && !isCompleted ? (
         <div className={`absolute inset-y-0 left-0 w-[2px] rounded-l-[inherit] transition-colors ${config.accentColor} group-hover/action:opacity-100 opacity-60`} />
       ) : null}
       <CardHeader className="flex-1">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className={`text-[10px] ${config.className}`}>
+          <Badge variant="outline" className={`text-[10px] ${isSecondary ? "opacity-60" : ""} ${config.className}`}>
             {config.label}
           </Badge>
           {isCompleted ? (
@@ -67,7 +72,7 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
             </span>
           ) : null}
         </div>
-        <CardTitle className={`leading-snug transition-colors group-hover/action:text-primary ${isHero ? "text-[15px] font-bold" : "text-sm"}`}>
+        <CardTitle className={`leading-snug transition-colors ${isSecondary ? "group-hover/action:text-foreground" : "group-hover/action:text-primary"} ${isHero ? "text-[15px] font-bold" : "text-sm"}`}>
           {card.title}
         </CardTitle>
         <CardDescription className={`leading-relaxed line-clamp-2 ${isHero ? "text-[13px] text-muted-foreground/70" : "text-xs"}`}>
@@ -77,7 +82,9 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
           <div className={`rounded-lg p-2 transition-all duration-100 ${
             isCompleted
               ? "bg-emerald-500/10 text-emerald-600 group-hover/action:bg-emerald-500 group-hover/action:text-white dark:text-emerald-400"
-              : `${config.iconBg} ${config.iconText} ${config.iconHoverBg} ${config.iconHoverText}`
+              : isSecondary
+                ? `${config.iconBg} ${config.iconText} opacity-50 group-hover/action:opacity-75`
+                : `${config.iconBg} ${config.iconText} ${config.iconHoverBg} ${config.iconHoverText}`
           }`}>
             {isLoading ? (
               <LoaderCircleIcon className="size-4 animate-spin" />
@@ -89,7 +96,7 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
           </div>
         </CardAction>
       </CardHeader>
-      <div className={`flex items-center gap-3 border-t py-2.5 px-4 ${isHero ? "border-border/30 dark:border-white/[0.06]" : "border-border/20"}`}>
+      <div className={`flex items-center gap-3 border-t py-2.5 px-4 ${isSecondary ? "border-border/10 dark:border-white/[0.03]" : isHero ? "border-border/30 dark:border-white/[0.06]" : "border-border/20"}`}>
         {isLoading ? (
           <span className="animate-pulse font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Starting...</span>
         ) : isCompleted ? (
@@ -112,7 +119,7 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
           </>
         ) : (
           <div className="flex flex-1 items-center justify-between">
-            <span className={`flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors group-hover/action:text-primary ${isHero ? "text-muted-foreground/60" : "text-muted-foreground/50"}`}>
+            <span className={`flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors ${isSecondary ? "text-muted-foreground/35 group-hover/action:text-muted-foreground/60" : `group-hover/action:text-primary ${isHero ? "text-muted-foreground/60" : "text-muted-foreground/50"}`}`}>
               Run
               <ArrowRightIcon className="size-3 transition-transform duration-150 group-hover/action:translate-x-0.5" />
             </span>
