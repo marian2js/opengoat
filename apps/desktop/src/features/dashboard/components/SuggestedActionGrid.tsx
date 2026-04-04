@@ -1,12 +1,15 @@
 import { WandSparklesIcon } from "lucide-react";
+import type { SpecialistAgent } from "@opengoat/contracts";
 import type { ActionCard } from "@/features/dashboard/data/actions";
 import { ActionCardItem } from "@/features/dashboard/components/ActionCardItem";
+import { getSpecialistName } from "@/features/dashboard/hooks/useSpecialistRoster";
 
 export interface SuggestedActionGridProps {
   actions: ActionCard[];
   completedActions?: Set<string> | undefined;
   isGenerating?: boolean | undefined;
   isActionLoading?: boolean | undefined;
+  specialists?: SpecialistAgent[] | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
 }
@@ -29,6 +32,7 @@ export function SuggestedActionGrid({
   completedActions,
   isGenerating,
   isActionLoading,
+  specialists,
   onActionClick,
   onViewResults,
 }: SuggestedActionGridProps) {
@@ -58,6 +62,7 @@ export function SuggestedActionGrid({
               card={card}
               isCompleted={completedActions?.has(card.id)}
               isLoading={isActionLoading}
+              specialistName={specialists ? getSpecialistName(specialists, card.specialistId) : undefined}
               onClick={onActionClick}
               onViewResults={onViewResults}
             />

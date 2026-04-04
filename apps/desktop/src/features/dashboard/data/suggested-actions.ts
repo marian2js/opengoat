@@ -50,6 +50,19 @@ const CATEGORY_ICONS: Record<ActionCategory, LucideIcon> = {
 
 const FALLBACK_ICON: LucideIcon = SparklesIcon;
 
+// ---------------------------------------------------------------------------
+// Category → Specialist mapping
+// ---------------------------------------------------------------------------
+
+export const CATEGORY_TO_SPECIALIST: Record<ActionCategory, string> = {
+  conversion: "website-conversion",
+  distribution: "distribution",
+  seo: "seo-aeo",
+  messaging: "positioning",
+  research: "market-intel",
+  growth: "content",
+};
+
 /** Maps a category string to a Lucide icon component. */
 export function resolveIcon(category: string): LucideIcon {
   return CATEGORY_ICONS[category as ActionCategory] ?? FALLBACK_ICON;
@@ -114,6 +127,9 @@ export function toActionCard(data: SuggestedActionData): ActionCard {
     ...data,
     skills: data.skills ?? [],
     icon: resolveIcon(data.category),
+    specialistId: CATEGORY_TO_SPECIALIST[data.category],
+    timeToFirstOutput: "30\u201390s",
+    createsTrackedWork: false,
   };
 }
 

@@ -6,6 +6,7 @@ import {
   toActionCard,
   SUGGESTED_ACTIONS_PROMPT,
   SUGGESTED_ACTIONS_FILENAME,
+  CATEGORY_TO_SPECIALIST,
 } from "./suggested-actions";
 
 // ---------------------------------------------------------------------------
@@ -258,3 +259,54 @@ void test("toActionCard: preserves skills when present", () => {
   const card = toActionCard(data);
   assert.deepEqual(card.skills, ["referral-program", "lead-magnets"]);
 });
+
+// ---------------------------------------------------------------------------
+// Category-to-specialist mapping & time estimate
+// ---------------------------------------------------------------------------
+
+void test("toActionCard: adds specialistId from category mapping", () => {
+  const mappings: Array<{ category: import("./actions").ActionCategory; expectedSpecialistId: string }> = [
+    { category: "conversion", expectedSpecialistId: "website-conversion" },
+    { category: "distribution", expectedSpecialistId: "distribution" },
+    { category: "seo", expectedSpecialistId: "seo-aeo" },
+    { category: "messaging", expectedSpecialistId: "positioning" },
+    { category: "research", expectedSpecialistId: "market-intel" },
+    { category: "growth", expectedSpecialistId: "content" },
+  ];
+  for (const { category, expectedSpecialistId } of mappings) {
+    const data = {
+      id: `test-${category}`,
+      title: "Test",
+      promise: "p",
+      description: "d",
+      category,
+      skills: [],
+      prompt: "pr",
+    };
+    const card = toActionCard(data);
+    assert.equal(card.specialistId, expectedSpecialistId, `Category "${category}" should map to specialist "${expectedSpecialistId}"`);
+  }
+});
+
+void test("toActionCard: adds default timeToFirstOutput", () => {
+  const data = {
+    id: "time-test",
+    title: "Test",
+    promise: "p",
+    description: "d",
+    category: "seo" as const,
+    skills: [],
+    prompt: "pr",
+  };
+  const card = toActionCard(data);
+  assert.ok(card.timeToFirstOutput, "Should have a timeToFirstOutput value");
+  assert.equal(card.timeToFirstOutput, "30\u201390s");
+});
+
+void test("CATEGORY_TO_SPECIALIST: exports mapping for all 6 categories", () => {
+  const categories = ["conversion", "distribution", "growth", "messaging", "research", "seo"];
+  for (const cat of categories) {
+    assert.ok(CATEGORY_TO_SPECIALIST[cat as import("./actions").ActionCategory], `Should have mapping for ${cat}`);
+  }
+});
+

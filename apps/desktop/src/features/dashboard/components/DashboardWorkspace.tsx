@@ -278,6 +278,7 @@ function DashboardContent({
               completedActions={completedActions}
               isGenerating={isSuggestedLoading}
               isActionLoading={isActionLoading}
+              specialists={specialistRoster.specialists}
               onActionClick={onActionClick}
               onViewResults={onViewResults}
             />
