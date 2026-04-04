@@ -96,4 +96,13 @@ describe("SpecialistTeamBrowser recent outputs data", () => {
     // Should navigate to specialist chat if no action mapping found
     expect(teamBrowserSrc).toContain("specialist=");
   });
+
+  it("imports and uses deduplicateSpecialistOutputs before slicing", () => {
+    expect(teamBrowserSrc).toContain("deduplicateSpecialistOutputs");
+  });
+
+  it("applies dedup before limiting to MAX_OUTPUTS_PER_SPECIALIST", () => {
+    // Should call dedup then slice, not limit first
+    expect(teamBrowserSrc).toMatch(/deduplicateSpecialistOutputs.*slice/s);
+  });
 });

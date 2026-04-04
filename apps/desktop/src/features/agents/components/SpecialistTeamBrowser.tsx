@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AlertCircleIcon, LoaderCircleIcon, UsersIcon } from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { getActionMapping } from "@/lib/utils/action-map";
+import { deduplicateSpecialistOutputs } from "../lib/deduplicate-specialist-outputs";
 import { SpecialistCard } from "./SpecialistCard";
 
 /** Max recent outputs shown per specialist card */
@@ -69,15 +70,19 @@ export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowser
       .listArtifacts({ projectId: agentId, limit: 30 })
       .then((page) => {
         if (cancelled) return;
-        const map: Record<string, ArtifactRecord[]> = {};
+        // Group all artifacts by specialist
+        const raw: Record<string, ArtifactRecord[]> = {};
         for (const artifact of page.items) {
           const specialistId = artifact.createdBy;
-          if (!map[specialistId]) {
-            map[specialistId] = [];
+          if (!raw[specialistId]) {
+            raw[specialistId] = [];
           }
-          if (map[specialistId].length < MAX_OUTPUTS_PER_SPECIALIST) {
-            map[specialistId].push(artifact);
-          }
+          raw[specialistId].push(artifact);
+        }
+        // Deduplicate by case-insensitive title, then limit per specialist
+        const map: Record<string, ArtifactRecord[]> = {};
+        for (const [specialistId, artifacts] of Object.entries(raw)) {
+          map[specialistId] = deduplicateSpecialistOutputs(artifacts).slice(0, MAX_OUTPUTS_PER_SPECIALIST);
         }
         setRecentOutputsMap(map);
       })
