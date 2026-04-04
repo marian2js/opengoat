@@ -182,7 +182,7 @@ export function ConnectionsWorkspace({
         {storedConnections.length === 0 ? (
           <div className="border-t border-border/60 px-4 py-8 lg:px-5">
             <div className="flex flex-col items-center gap-4 text-center">
-              <div className="flex size-12 items-center justify-center rounded-xl bg-primary/8">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-primary/8 ring-1 ring-primary/10">
                 <Link2Icon className="size-6 text-primary/50" />
               </div>
               <div className="space-y-1">
@@ -242,7 +242,7 @@ export function ConnectionsWorkspace({
             onClick={onAddConnection}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onAddConnection(); } }}
           >
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-dashed border-muted-foreground/20 text-muted-foreground/40 transition-colors group-hover/cta:border-primary/30 group-hover/cta:text-primary">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-dashed border-muted-foreground/20 text-muted-foreground/40 transition-all group-hover/cta:border-primary/30 group-hover/cta:bg-primary/[0.04] group-hover/cta:text-primary">
               <PlusIcon className="size-3.5" />
             </div>
             <div className="flex-1">
@@ -278,7 +278,7 @@ function ConnectionRow({
   const modelLabel = resolveModelDisplayLabel(modelCatalog, connection.activeModelId);
 
   return (
-    <TableRow className="border-border/60 transition-all hover:bg-muted/20">
+    <TableRow className="border-border/60 transition-all hover:bg-muted/30 dark:hover:bg-muted/20">
       <TableCell className="text-[12px] font-medium">{cleanProviderName(connection.providerName)}</TableCell>
       <TableCell>
         <div className="flex items-center gap-1.5">
@@ -365,12 +365,15 @@ function MessageBanner({
   return (
     <div
       className={cn(
-        "rounded-lg border px-3.5 py-2.5 text-[13px]",
+        "flex items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-[13px]",
         tone === "error"
           ? "border-warning/20 bg-warning/8 text-warning-foreground"
           : "border-success/20 bg-success/8 text-success",
       )}
     >
+      {tone === "success" ? (
+        <CheckIcon className="size-3.5 shrink-0" />
+      ) : null}
       {children}
     </div>
   );

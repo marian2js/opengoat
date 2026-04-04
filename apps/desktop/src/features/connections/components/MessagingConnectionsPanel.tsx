@@ -207,7 +207,7 @@ export function MessagingConnectionsPanel({
       {!isLoading && connections.length === 0 ? (
         <div className="border-t border-border/60 px-4 py-8 lg:px-5">
           <div className="flex flex-col items-center gap-4 text-center">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-primary/8">
+            <div className="flex size-12 items-center justify-center rounded-xl bg-primary/8 ring-1 ring-primary/10">
               <MessageSquareIcon className="size-6 text-primary/50" />
             </div>
             <div className="space-y-1">
