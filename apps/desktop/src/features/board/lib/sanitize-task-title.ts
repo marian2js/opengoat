@@ -39,6 +39,14 @@ export function sanitizeTaskTitle(title: string): string {
     clean = clean.replace(/^(a |an |the )/i, "");
   }
 
+  // Truncate at purpose/intent clause boundaries
+  const PURPOSE_CLAUSE =
+    /\s+(so (?:the|that|it|we|you|I)|because |in order to |for (?:the|this|a |an )|to (?:make|ensure|get|help|allow|enable|improve|provide) )/i;
+  const purposeMatch = clean.match(PURPOSE_CLAUSE);
+  if (purposeMatch && purposeMatch.index && purposeMatch.index >= 10) {
+    clean = clean.slice(0, purposeMatch.index);
+  }
+
   // Capitalize first letter
   if (clean.length > 0) {
     clean = clean.charAt(0).toUpperCase() + clean.slice(1);

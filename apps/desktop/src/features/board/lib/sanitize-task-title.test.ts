@@ -9,7 +9,7 @@ import { sanitizeTaskTitle } from "./sanitize-task-title.js";
 test("strips 'I'm' prefix and gerund process-description fully", () => {
   assert.equal(
     sanitizeTaskTitle("I'm pulling the site copy/source so the recommendations are grounded"),
-    "Site copy/source so the recommendations are grounded",
+    "Site copy/source",
   );
 });
 
@@ -173,7 +173,7 @@ test("strips nested conversational prefix after 'OK,'", () => {
 test("strips smart-quote I\u2019m prefix and gerund process-description fully", () => {
   assert.equal(
     sanitizeTaskTitle("I\u2019m pulling the site copy/source so the recommendations are grounded"),
-    "Site copy/source so the recommendations are grounded",
+    "Site copy/source",
   );
 });
 
@@ -296,7 +296,7 @@ test("strips 'Creating' gerund prefix", () => {
 test("strips 'Drafting' gerund prefix", () => {
   assert.equal(
     sanitizeTaskTitle("Drafting the email copy for the campaign"),
-    "Email copy for the campaign",
+    "Email copy",
   );
 });
 
@@ -304,5 +304,79 @@ test("strips 'Starting with' gerund prefix", () => {
   assert.equal(
     sanitizeTaskTitle("Starting with a review of the current messaging"),
     "Review of the current messaging",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Purpose-clause truncation (task 0033)
+// ---------------------------------------------------------------------------
+
+test("truncates at 'so the' purpose clause", () => {
+  assert.equal(
+    sanitizeTaskTitle("Pulling the site copy/source so the recommendations are more specific"),
+    "Site copy/source",
+  );
+});
+
+test("truncates at 'so that' purpose clause", () => {
+  assert.equal(
+    sanitizeTaskTitle("Checking competitor pages so that we can compare positioning"),
+    "Competitor pages",
+  );
+});
+
+test("truncates at 'because' purpose clause", () => {
+  assert.equal(
+    sanitizeTaskTitle("Getting the pricing data because we need to benchmark"),
+    "Pricing data",
+  );
+});
+
+test("truncates at 'in order to' purpose clause", () => {
+  assert.equal(
+    sanitizeTaskTitle("Reviewing the SEO metrics in order to prioritize fixes"),
+    "SEO metrics",
+  );
+});
+
+test("truncates at 'for the' purpose clause", () => {
+  assert.equal(
+    sanitizeTaskTitle("Building the comparison matrix for the executive presentation"),
+    "Comparison matrix",
+  );
+});
+
+test("truncates at 'to make' purpose clause", () => {
+  assert.equal(
+    sanitizeTaskTitle("Analyzing the homepage copy to make it more compelling"),
+    "Homepage copy",
+  );
+});
+
+test("truncates at 'to ensure' purpose clause", () => {
+  assert.equal(
+    sanitizeTaskTitle("Checking the launch checklist to ensure nothing is missed"),
+    "Launch checklist",
+  );
+});
+
+test("does not truncate when purpose clause is too early (< 10 chars)", () => {
+  assert.equal(
+    sanitizeTaskTitle("Fix it so the tests pass"),
+    "Fix it so the tests pass",
+  );
+});
+
+test("does not truncate titles without purpose clauses", () => {
+  assert.equal(
+    sanitizeTaskTitle("Competitive messaging analysis across channels"),
+    "Competitive messaging analysis across channels",
+  );
+});
+
+test("truncates at 'so we' purpose clause", () => {
+  assert.equal(
+    sanitizeTaskTitle("Pulling the analytics data so we can see the trends"),
+    "Analytics data",
   );
 });
