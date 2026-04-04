@@ -4,15 +4,17 @@ import type { ArtifactRecord } from "@opengoat/contracts";
 import type { BundleGroup } from "@/features/dashboard/hooks/useRecentArtifacts";
 import { ArtifactCard } from "@/features/dashboard/components/ArtifactCard";
 import { getArtifactStatusConfig } from "@/features/dashboard/lib/artifact-type-config";
+import { getSpecialistColors } from "@/features/agents/specialist-meta";
 
 export interface BundleCardProps {
   bundle: BundleGroup;
+  specialistId?: string | undefined;
   specialistName?: string | undefined;
   onPreview?: ((artifactId: string) => void) | undefined;
   onNavigate?: ((artifact: ArtifactRecord) => void) | undefined;
 }
 
-export function BundleCard({ bundle, specialistName, onPreview, onNavigate }: BundleCardProps) {
+export function BundleCard({ bundle, specialistId, specialistName, onPreview, onNavigate }: BundleCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   // Compute status summary counts
@@ -50,7 +52,7 @@ export function BundleCard({ bundle, specialistName, onPreview, onNavigate }: Bu
 
         {/* Specialist attribution */}
         {specialistName ? (
-          <span className="shrink-0 rounded-full bg-primary/8 px-2 py-0.5 font-mono text-[10px] font-medium text-primary">
+          <span className={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-medium ${specialistId ? `${getSpecialistColors(specialistId).iconBg} ${getSpecialistColors(specialistId).iconText}` : "bg-primary/8 text-primary"}`}>
             {specialistName}
           </span>
         ) : null}
@@ -79,6 +81,7 @@ export function BundleCard({ bundle, specialistName, onPreview, onNavigate }: Bu
             <ArtifactCard
               key={artifact.artifactId}
               artifact={artifact}
+              specialistId={specialistId}
               specialistName={specialistName}
               onPreview={onPreview}
               onNavigate={onNavigate}

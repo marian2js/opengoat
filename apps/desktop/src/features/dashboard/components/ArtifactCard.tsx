@@ -4,18 +4,21 @@ import { getArtifactTypeConfig, getArtifactStatusConfig } from "@/features/dashb
 import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
 import { stripMarkdown } from "@/features/dashboard/lib/strip-markdown";
 import { cleanArtifactTitle } from "@/features/dashboard/lib/clean-artifact-title";
+import { getSpecialistColors } from "@/features/agents/specialist-meta";
 
 export interface ArtifactCardProps {
   artifact: ArtifactRecord;
+  specialistId?: string | undefined;
   specialistName?: string | undefined;
   onPreview?: ((artifactId: string) => void) | undefined;
   onNavigate?: ((artifact: ArtifactRecord) => void) | undefined;
   compact?: boolean | undefined;
 }
 
-export function ArtifactCard({ artifact, specialistName, onPreview, onNavigate, compact }: ArtifactCardProps) {
+export function ArtifactCard({ artifact, specialistId, specialistName, onPreview, onNavigate, compact }: ArtifactCardProps) {
   const typeConfig = getArtifactTypeConfig(artifact.type);
   const statusConfig = getArtifactStatusConfig(artifact.status);
+  const specColors = specialistId ? getSpecialistColors(specialistId) : undefined;
 
   const handleClick = () => {
     if (onNavigate) {
@@ -53,7 +56,7 @@ export function ArtifactCard({ artifact, specialistName, onPreview, onNavigate, 
             {statusConfig.label}
           </span>
           {specialistName ? (
-            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary/8 px-2 py-0.5 font-mono text-[10px] font-medium text-primary">
+            <span className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[10px] font-medium ${specColors ? `${specColors.iconBg} ${specColors.iconText}` : "bg-primary/8 text-primary"}`}>
               {specialistName}
             </span>
           ) : null}

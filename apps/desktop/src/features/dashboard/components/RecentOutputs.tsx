@@ -87,6 +87,7 @@ export function RecentOutputs({ agentId, client, onPreview, onNavigate }: Recent
                 <BundleCard
                   key={entry.bundleGroup.bundleId}
                   bundle={entry.bundleGroup}
+                  specialistId={entry.bundleGroup.artifacts[0]?.createdBy}
                   specialistName={specialistName}
                   onPreview={onPreview}
                   onNavigate={onNavigate}
@@ -98,6 +99,7 @@ export function RecentOutputs({ agentId, client, onPreview, onNavigate }: Recent
               <ArtifactCard
                 key={entry.artifact.artifactId}
                 artifact={entry.artifact}
+                specialistId={entry.artifact.createdBy}
                 specialistName={specialistName}
                 onPreview={onPreview}
                 onNavigate={onNavigate}
