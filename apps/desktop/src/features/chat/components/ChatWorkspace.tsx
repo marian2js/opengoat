@@ -890,9 +890,21 @@ function ChatMessage({
     return detectMemoryCandidates(fullText);
   }, [shouldDetect, fullText]);
 
-  const handoffSuggestions = useMemo(() => {
-    if (!shouldDetect) return [];
-    return detectHandoffSuggestions(fullText, currentSpecialistId);
+  // Handoff detection uses useEffect + useState instead of useMemo to guarantee
+  // detection runs after React commits the render with final streaming state.
+  // useMemo can miss the shouldDetect transition when useSyncExternalStore
+  // updates status and messages in separate microtasks.
+  const [handoffSuggestions, setHandoffSuggestions] = useState<
+    import("@/features/chat/lib/handoff-detector").HandoffSuggestion[]
+  >([]);
+  useEffect(() => {
+    if (!shouldDetect) {
+      setHandoffSuggestions((prev) => (prev.length > 0 ? [] : prev));
+      return;
+    }
+    setHandoffSuggestions(
+      detectHandoffSuggestions(fullText, currentSpecialistId),
+    );
   }, [shouldDetect, fullText, currentSpecialistId]);
 
   if (message.role === "user") {

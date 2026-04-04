@@ -49,11 +49,19 @@ const HANDOFF_INTENT_PATTERNS = [
 
 const MAX_SUGGESTIONS = 2;
 
-let suggestionCounter = 0;
-
-function generateId(): string {
-  suggestionCounter += 1;
-  return `handoff-${Date.now()}-${String(suggestionCounter)}`;
+/**
+ * Generate a deterministic ID for a handoff suggestion based on the specialist
+ * and surrounding text. Stable across re-renders for the same input, which
+ * prevents dismissal state from being lost when React re-computes suggestions.
+ */
+function generateDeterministicId(specialistId: string, reason: string): string {
+  let hash = 0;
+  const key = `${specialistId}:${reason.slice(0, 120)}`;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash << 5) - hash + key.charCodeAt(i);
+    hash |= 0;
+  }
+  return `handoff-${specialistId}-${Math.abs(hash).toString(36)}`;
 }
 
 function extractSentence(text: string, matchIndex: number): string {
@@ -117,7 +125,7 @@ export function detectHandoffSuggestions(
 
     matchedSpecialistIds.add(spec.id);
     suggestions.push({
-      id: generateId(),
+      id: generateDeterministicId(spec.id, sentence),
       specialistId: spec.id,
       specialistName: spec.name,
       reason: sentence,
