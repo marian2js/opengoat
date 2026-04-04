@@ -7,7 +7,7 @@ import { normalizeQuotes } from "./normalize-quotes";
  * appear as an artifact title. Case-insensitive.
  */
 export const CONVERSATIONAL_PATTERN =
-  /^(I |I'm |I'll |I've |I don't|I can't|I still|I checked|Got it|Let me|Here |Sure|OK |Okay|Well |So |Hmm)/i;
+  /^(I |I'm |I'll |I've |I don't|I can't|I still|I checked|Got it|Let me|Here |Sure|OK |Okay|Well |So |Hmm|Based on |According to |After reviewing |After analyzing |Looking at |From the |From my |Given |Pulling |Checking |Reviewing |Analyzing |To help |In order to |For this |For your |As requested)/i;
 
 /**
  * Returns true if the given title looks like AI conversational preamble

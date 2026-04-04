@@ -219,3 +219,96 @@ void test("isConversationalTitle: accepts descriptive summary 'Comprehensive ana
 void test("isConversationalTitle: accepts descriptive summary 'Top 5 recommendations...'", () => {
   assert.ok(!isConversationalTitle("Top 5 recommendations for improving brand awareness"));
 });
+
+// ---------------------------------------------------------------------------
+// Impersonal AI preamble detection (task 0032)
+// ---------------------------------------------------------------------------
+
+void test("isConversationalTitle: detects 'Based on' preamble", () => {
+  assert.ok(isConversationalTitle("Based on the market notes in this workspace, your top com..."));
+});
+
+void test("isConversationalTitle: detects 'According to' preamble", () => {
+  assert.ok(isConversationalTitle("According to the latest data, your positioning is strong"));
+});
+
+void test("isConversationalTitle: detects 'After reviewing' preamble", () => {
+  assert.ok(isConversationalTitle("After reviewing your homepage copy, here are the issues"));
+});
+
+void test("isConversationalTitle: detects 'After analyzing' preamble", () => {
+  assert.ok(isConversationalTitle("After analyzing the competitor landscape, three gaps emerge"));
+});
+
+void test("isConversationalTitle: detects 'Looking at' preamble", () => {
+  assert.ok(isConversationalTitle("Looking at the brand guidelines, I see several issues"));
+});
+
+void test("isConversationalTitle: detects 'From the' preamble", () => {
+  assert.ok(isConversationalTitle("From the data provided, engagement metrics are declining"));
+});
+
+void test("isConversationalTitle: detects 'From my' preamble", () => {
+  assert.ok(isConversationalTitle("From my analysis, the strongest positioning angle is"));
+});
+
+void test("isConversationalTitle: detects 'Given' preamble", () => {
+  assert.ok(isConversationalTitle("Given your current market position, I recommend"));
+});
+
+void test("isConversationalTitle: detects 'Pulling' preamble", () => {
+  assert.ok(isConversationalTitle("Pulling the site copy to ground recommendations"));
+});
+
+void test("isConversationalTitle: detects 'Checking' preamble", () => {
+  assert.ok(isConversationalTitle("Checking the latest analytics data now"));
+});
+
+void test("isConversationalTitle: detects 'Reviewing' preamble", () => {
+  assert.ok(isConversationalTitle("Reviewing your brand guidelines for consistency"));
+});
+
+void test("isConversationalTitle: detects 'Analyzing' preamble", () => {
+  assert.ok(isConversationalTitle("Analyzing competitor messaging across channels"));
+});
+
+void test("isConversationalTitle: detects 'To help' preamble", () => {
+  assert.ok(isConversationalTitle("To help with your launch, here's a timeline"));
+});
+
+void test("isConversationalTitle: detects 'In order to' preamble", () => {
+  assert.ok(isConversationalTitle("In order to improve SEO, you should focus on"));
+});
+
+void test("isConversationalTitle: detects 'For this' preamble", () => {
+  assert.ok(isConversationalTitle("For this analysis, I focused on direct competitors"));
+});
+
+void test("isConversationalTitle: detects 'For your' preamble", () => {
+  assert.ok(isConversationalTitle("For your review, the updated copy deck is attached"));
+});
+
+void test("isConversationalTitle: detects 'As requested' preamble", () => {
+  assert.ok(isConversationalTitle("As requested, the competitive matrix is ready"));
+});
+
+void test("cleanArtifactTitle: falls back to type label for 'Based on' preamble", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "Based on the market notes in this workspace, your top com...",
+      type: "competitor_matrix",
+    }),
+    "Competitor Matrix",
+  );
+});
+
+void test("cleanArtifactTitle: extracts heading for 'Based on' title with content", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "Based on the market notes in this workspace",
+      type: "research_brief",
+      content: "# Top Competitors Analysis\n\nHere are the findings...",
+    }),
+    "Top Competitors Analysis",
+  );
+});

@@ -6,10 +6,10 @@ import { sanitizeTaskTitle } from "./sanitize-task-title.js";
 // Conversational prefix stripping
 // ---------------------------------------------------------------------------
 
-test("strips 'I'm' prefix and capitalizes", () => {
+test("strips 'I'm' prefix and gerund process-description fully", () => {
   assert.equal(
     sanitizeTaskTitle("I'm pulling the site copy/source so the recommendations are grounded"),
-    "Pulling the site copy/source so the recommendations are grounded",
+    "Site copy/source so the recommendations are grounded",
   );
 });
 
@@ -48,10 +48,10 @@ test("strips 'OK,' prefix and capitalizes", () => {
   );
 });
 
-test("strips 'Got it' prefix and capitalizes", () => {
+test("strips 'Got it' prefix and nested gerund", () => {
   assert.equal(
     sanitizeTaskTitle("Got it, reviewing the brand guidelines now"),
-    "Reviewing the brand guidelines now",
+    "Brand guidelines now",
   );
 });
 
@@ -73,10 +73,10 @@ test("strips 'Here's' prefix and capitalizes", () => {
 // Case-insensitivity
 // ---------------------------------------------------------------------------
 
-test("handles case-insensitive prefix matching", () => {
+test("handles case-insensitive prefix matching and strips nested gerund", () => {
   assert.equal(
     sanitizeTaskTitle("i'm working on the SEO audit"),
-    "Working on the SEO audit",
+    "SEO audit",
   );
 });
 
@@ -170,10 +170,10 @@ test("strips nested conversational prefix after 'OK,'", () => {
 // Smart quote (Unicode U+2019) support
 // ---------------------------------------------------------------------------
 
-test("strips smart-quote I\u2019m prefix and capitalizes", () => {
+test("strips smart-quote I\u2019m prefix and gerund process-description fully", () => {
   assert.equal(
     sanitizeTaskTitle("I\u2019m pulling the site copy/source so the recommendations are grounded"),
-    "Pulling the site copy/source so the recommendations are grounded",
+    "Site copy/source so the recommendations are grounded",
   );
 });
 
@@ -202,5 +202,107 @@ test("strips nested smart-quote prefix after 'OK,'", () => {
   assert.equal(
     sanitizeTaskTitle("OK, I\u2019ll put together the launch plan"),
     "Put together the launch plan",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Gerund process-description stripping (task 0032)
+// ---------------------------------------------------------------------------
+
+test("strips 'Pulling' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Pulling the latest analytics data for review"),
+    "Latest analytics data for review",
+  );
+});
+
+test("strips 'Checking' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Checking the competitor sites for pricing info"),
+    "Competitor sites for pricing info",
+  );
+});
+
+test("strips 'Looking' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Looking at the homepage for copy issues"),
+    "Homepage for copy issues",
+  );
+});
+
+test("strips 'Reviewing' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Reviewing the brand guidelines now"),
+    "Brand guidelines now",
+  );
+});
+
+test("strips 'Analyzing' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Analyzing competitor messaging across channels"),
+    "Competitor messaging across channels",
+  );
+});
+
+test("strips 'Working on' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Working on the SEO recommendations"),
+    "SEO recommendations",
+  );
+});
+
+test("strips 'Going to' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Going to draft the email sequence now"),
+    "Draft the email sequence now",
+  );
+});
+
+test("strips 'Trying to' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Trying to find the best positioning angle"),
+    "Find the best positioning angle",
+  );
+});
+
+test("strips 'Getting' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Getting the latest data from your analytics"),
+    "Latest data from your analytics",
+  );
+});
+
+test("strips 'Running' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Running a quick audit of the landing page"),
+    "Quick audit of the landing page",
+  );
+});
+
+test("strips 'Building' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Building the competitor comparison matrix"),
+    "Competitor comparison matrix",
+  );
+});
+
+test("strips 'Creating' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Creating a draft of the launch announcement"),
+    "Draft of the launch announcement",
+  );
+});
+
+test("strips 'Drafting' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Drafting the email copy for the campaign"),
+    "Email copy for the campaign",
+  );
+});
+
+test("strips 'Starting with' gerund prefix", () => {
+  assert.equal(
+    sanitizeTaskTitle("Starting with a review of the current messaging"),
+    "Review of the current messaging",
   );
 });

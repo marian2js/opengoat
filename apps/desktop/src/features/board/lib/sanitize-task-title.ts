@@ -6,14 +6,14 @@ import { normalizeQuotes } from "../../dashboard/lib/normalize-quotes";
  * Matched case-insensitively at the start of the title.
  */
 const CONVERSATIONAL_PREFIX =
-  /^(I'm |I'll |I will |I am |I have |I've |I don't |I can't |I still |I checked |Got it,?\s*|Let me |Here is |Here's |Here are |Sure,?\s*|OK,?\s*|Okay,?\s*|Alright,?\s*|Well,?\s*|So,?\s*|Hmm,?\s*)/i;
+  /^(I'm |I'll |I will |I am |I have |I've |I don't |I can't |I still |I checked |Got it,?\s*|Let me |Here is |Here's |Here are |Sure,?\s*|OK,?\s*|Okay,?\s*|Alright,?\s*|Well,?\s*|So,?\s*|Hmm,?\s*|Pulling |Checking |Looking at |Looking |Reviewing |Analyzing |Working on |Starting with |Going to |Trying to |Getting |Running |Building |Creating |Drafting )/i;
 
 /**
  * Second-pass prefix for nested conversational fragments
  * e.g. after stripping "Sure," we might still have "let me" or "I'll".
  */
 const NESTED_PREFIX =
-  /^(I'm |I'll |I will |I am |I have |I've |I can |I don't |I can't |Let me |let me |Here is |Here's |Here are |here is |here's |here are )/i;
+  /^(I'm |I'll |I will |I am |I have |I've |I can |I don't |I can't |Let me |let me |Here is |Here's |Here are |here is |here's |here are |Pulling |Checking |Looking at |Looking |Reviewing |Analyzing |Working on |Starting with |Going to |Trying to |Getting |Running |Building |Creating |Drafting )/i;
 
 /**
  * Sanitizes a board task title by stripping AI conversational preamble,
