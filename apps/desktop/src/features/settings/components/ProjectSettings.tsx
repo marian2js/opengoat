@@ -181,18 +181,22 @@ export function ProjectSettings({
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
-            <Settings2Icon className="size-3.5 text-primary" />
-          </div>
-          <h1 className="section-label">Project Settings</h1>
+      <div className="flex items-start gap-4">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 shadow-sm ring-1 ring-primary/15">
+          <Settings2Icon className="size-5 text-primary" />
         </div>
-        <span className="font-mono text-[11px] text-muted-foreground/40">{domain}</span>
+        <div>
+          <h1 className="font-display text-[22px] font-bold tracking-[-0.01em] text-foreground">
+            Project Settings
+          </h1>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            {domain}
+          </p>
+        </div>
       </div>
 
       {/* ---- Model ---- */}
-      <Card className="border-border/50">
+      <Card className="border-border/40 transition-colors hover:border-border/60 dark:border-white/[0.06] dark:hover:border-white/[0.10]">
         <CardHeader>
           <div className="flex items-center gap-2.5">
             <div className="flex size-7 items-center justify-center rounded-md bg-primary/8">
@@ -276,7 +280,7 @@ export function ProjectSettings({
       </Card>
 
       {/* ---- General ---- */}
-      <Card className="border-border/50">
+      <Card className="border-border/40 transition-colors hover:border-border/60 dark:border-white/[0.06] dark:hover:border-white/[0.10]">
         <CardHeader>
           <div className="flex items-center gap-2.5">
             <div className="flex size-7 items-center justify-center rounded-md bg-primary/8">
