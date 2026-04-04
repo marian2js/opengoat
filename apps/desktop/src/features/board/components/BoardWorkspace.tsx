@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { AlertCircleIcon, ListChecksIcon, MessageSquareIcon, RefreshCwIcon, SearchIcon, SparklesIcon } from "lucide-react";
+import { AlertCircleIcon, ListChecksIcon, MessageSquareIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskList } from "@/features/board/hooks/useTaskList";
@@ -135,7 +135,7 @@ function BoardContent({
       )}
 
       {isLoading ? (
-        <div className="overflow-hidden rounded-lg border border-border/40 dark:border-white/[0.06]">
+        <div className="overflow-hidden rounded-lg border border-border/50 shadow-sm dark:border-white/[0.08] dark:shadow-none">
           <TaskListSkeleton />
         </div>
       ) : error ? (
@@ -194,7 +194,7 @@ function BoardContent({
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-lg border border-border/40 dark:border-white/[0.06]">
+          <div className="overflow-hidden rounded-lg border border-border/50 shadow-sm dark:border-white/[0.08] dark:shadow-none">
             <TaskList
               tasks={filteredTasks}
               groups={groupedTasks}
@@ -204,15 +204,15 @@ function BoardContent({
             />
           </div>
           {filteredTasks.length <= 3 && (
-            <div className="mt-6 flex items-start gap-3 rounded-lg border border-dashed border-border/30 px-4 py-3.5 dark:border-white/[0.04]">
-              <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
-                <SparklesIcon className="size-3.5 text-primary/60" />
+            <div className="mt-6 flex items-start gap-3 rounded-lg border border-primary/10 bg-primary/[0.02] px-4 py-3.5 dark:border-primary/[0.06] dark:bg-primary/[0.015]">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/8 ring-1 ring-primary/10">
+                <MessageSquareIcon className="size-4 text-primary/70" />
               </div>
               <div className="space-y-1">
-                <p className="text-[12px] font-medium text-foreground/70">
+                <p className="text-[12px] font-medium text-foreground/80">
                   Create tasks from chat or actions
                 </p>
-                <p className="text-[11px] leading-relaxed text-muted-foreground/50">
+                <p className="text-[11px] leading-relaxed text-muted-foreground/60">
                   Ask your CMO or specialists to plan work, and tasks will appear here automatically. You can also run actions from the dashboard.
                 </p>
               </div>

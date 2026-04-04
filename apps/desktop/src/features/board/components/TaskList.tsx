@@ -44,7 +44,7 @@ function TaskRow({ task, isLeading, onSelect, onSetLeadingTask }: TaskRowProps) 
 
   return (
     <TableRow
-      className="group/row cursor-pointer border-border/20 transition-colors hover:bg-primary/[0.04] even:bg-muted/[0.03]"
+      className="group/row cursor-pointer border-border/20 transition-colors hover:bg-primary/[0.05] even:bg-muted/[0.03] dark:hover:bg-primary/[0.04]"
       onClick={() => onSelect(task.taskId)}
     >
       {/* Title */}
@@ -174,7 +174,7 @@ export function TaskList({
     <div className="flex-1 overflow-y-auto">
       <Table>
         <TableHeader>
-          <TableRow className="border-b border-border/30 bg-muted/30 hover:bg-muted/30 dark:border-white/[0.04] dark:bg-white/[0.02]">
+          <TableRow className="border-b border-border/40 bg-muted/40 hover:bg-muted/40 dark:border-white/[0.06] dark:bg-white/[0.025]">
             <TableHead className="w-[40%] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Title</TableHead>
             <TableHead className="w-[120px] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Status</TableHead>
             <TableHead className="w-[100px] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Context</TableHead>
@@ -258,7 +258,7 @@ export function TaskListSkeleton() {
     <div className="flex-1 overflow-y-auto">
       <Table>
         <TableHeader>
-          <TableRow className="border-b border-border/30 bg-muted/30 hover:bg-muted/30 dark:border-white/[0.04] dark:bg-white/[0.02]">
+          <TableRow className="border-b border-border/40 bg-muted/40 hover:bg-muted/40 dark:border-white/[0.06] dark:bg-white/[0.025]">
             <TableHead className="w-[40%] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Title</TableHead>
             <TableHead className="w-[120px] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Status</TableHead>
             <TableHead className="w-[100px] py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Context</TableHead>
