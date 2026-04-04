@@ -417,7 +417,36 @@ export function App() {
     [],
   );
 
+  // Directly create a specialist session and navigate to the chat view.
+  // This is called from the Agents page specialist buttons and avoids the
+  // fragile effect-based approach that was unreliable with React StrictMode
+  // double-invocation (the ref-based mutex could get stuck, causing non-CMO
+  // specialist buttons to silently fail at runtime).
+  const handleSpecialistChat = useCallback(
+    async (specialistId: string) => {
+      if (!client || !activeAgentId) {
+        return;
+      }
+      try {
+        const session = await client.createSession({
+          agentId: activeAgentId,
+          specialistId,
+        });
+        setSessions((prev) => [session, ...prev]);
+        setActiveSessionId(session.id);
+        setCurrentSpecialistId(specialistId);
+        window.location.hash = "#chat";
+      } catch (error) {
+        console.error("Failed to create specialist session", error);
+        toast.error("Failed to start specialist chat. Please try again.");
+      }
+    },
+    [client, activeAgentId],
+  );
+
   // Auto-create a specialist session when navigating to #chat?specialist=<id>
+  // via hash-based navigation (e.g. dashboard specialist cards, handoff chips).
+  // For the Agents page, handleSpecialistChat above is used instead.
   const specialistCreatingRef = useRef(false);
   useEffect(() => {
     if (!currentSpecialistId || !client || !activeAgentId || hashView !== "chat") {
@@ -652,6 +681,7 @@ export function App() {
             <SpecialistTeamBrowser
               client={client}
               agentId={activeAgentId}
+              onSpecialistChat={handleSpecialistChat}
             />
           )}
         </div>

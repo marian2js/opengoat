@@ -12,9 +12,10 @@ const MAX_OUTPUTS_PER_SPECIALIST = 3;
 interface SpecialistTeamBrowserProps {
   client: SidecarClient | null;
   agentId?: string | undefined;
+  onSpecialistChat?: ((specialistId: string) => void) | undefined;
 }
 
-export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowserProps) {
+export function SpecialistTeamBrowser({ client, agentId, onSpecialistChat }: SpecialistTeamBrowserProps) {
   const [specialists, setSpecialists] = useState<SpecialistAgent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +95,13 @@ export function SpecialistTeamBrowser({ client, agentId }: SpecialistTeamBrowser
   }, [client, agentId]);
 
   function handleChat(specialistId: string): void {
+    if (onSpecialistChat) {
+      // Directly create session and navigate — avoids the fragile
+      // hash-based effect chain that could fail under StrictMode.
+      void onSpecialistChat(specialistId);
+      return;
+    }
+    // Fallback to hash-based navigation (used when rendered without callback)
     window.location.hash = `#chat?specialist=${encodeURIComponent(specialistId)}`;
   }
 
