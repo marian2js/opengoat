@@ -67,11 +67,21 @@ function tokenize(text: string): string[] {
 }
 
 /**
+ * Check if two tokens share a common stem (first N characters).
+ * Requires both tokens to be at least 4 chars and share a prefix of at least 6 chars.
+ */
+function sharesStem(a: string, b: string): boolean {
+  const stemLen = Math.min(a.length, b.length, 7);
+  return stemLen >= 6 && a.slice(0, stemLen) === b.slice(0, stemLen);
+}
+
+/**
  * Matches a heading string against a list of specialist outputTypes
- * using keyword token overlap. Returns the best match or null.
+ * using keyword token overlap with keyword-based fallback.
  *
- * Conservative: requires at least 50% of the outputType's tokens
- * to appear in the heading.
+ * Primary: requires at least 30% of the outputType's tokens to appear in the heading.
+ * Fallback: if no match via token overlap, checks if any heading token shares
+ * a stem with a significant outputType keyword (length >= 4).
  */
 export function matchHeadingToOutputType(
   heading: string,
@@ -88,12 +98,26 @@ export function matchHeadingToOutputType(
     const overlap = outputTokens.filter((t) => headingTokens.has(t)).length;
     const score = overlap / outputTokens.length;
 
-    // Require at least 50% token overlap
-    if (score >= 0.5 && score > bestScore) {
+    // Require at least 30% token overlap
+    if (score >= 0.3 && score > bestScore) {
       bestScore = score;
       bestMatch = outputType;
     }
   }
 
-  return bestMatch;
+  if (bestMatch) return bestMatch;
+
+  // Keyword-based fallback: match via stem overlap with outputType keywords
+  for (const outputType of outputTypes) {
+    const keywords = tokenize(outputType).filter((t) => t.length >= 4);
+    for (const keyword of keywords) {
+      for (const ht of headingTokens) {
+        if (ht.length >= 4 && sharesStem(ht, keyword)) {
+          return outputType;
+        }
+      }
+    }
+  }
+
+  return null;
 }

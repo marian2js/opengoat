@@ -110,6 +110,42 @@ describe("matchHeadingToOutputType", () => {
     const result = matchHeadingToOutputType("Content Ideas for Your Blog", outputTypes);
     expect(result).toBe("content ideas");
   });
+
+  it("matches at 30% token overlap threshold (lowered from 50%)", () => {
+    // "page" overlaps → 1/3 = 33%, which is above 30% but below 50%
+    const outputTypes = ["landing-page improvements", "hero rewrite bundle"];
+    const result = matchHeadingToOutputType("Page Layout Optimization", outputTypes);
+    expect(result).toBe("landing-page improvements");
+  });
+
+  it("matches creative heading via keyword stem fallback", () => {
+    // "competitive" shares stem "competi" with "competitor"
+    const outputTypes = ["competitor messaging matrix", "community shortlist", "market brief"];
+    const result = matchHeadingToOutputType(
+      "Short answer: the real competitive set",
+      outputTypes,
+    );
+    expect(result).toBe("competitor messaging matrix");
+  });
+
+  it("matches heading with keyword present in outputType via stem", () => {
+    // "positioning" shares stem "positi" with an outputType containing "position"
+    const outputTypes = ["position statements", "messaging matrix"];
+    const result = matchHeadingToOutputType(
+      "The biggest positioning gaps in the market",
+      outputTypes,
+    );
+    expect(result).toBe("position statements");
+  });
+
+  it("does not match unrelated headings via keyword fallback", () => {
+    const outputTypes = ["competitor messaging matrix", "community shortlist"];
+    const result = matchHeadingToOutputType(
+      "Tips for improving your daily routine",
+      outputTypes,
+    );
+    expect(result).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -680,6 +716,84 @@ Here's your comprehensive launch checklist:
 
     expect(result.artifacts).toHaveLength(1);
     expect(result.bundleId).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractArtifacts: creative headings produce bundles via keyword fallback
+// ---------------------------------------------------------------------------
+describe("extractArtifacts — creative headings bundle creation", () => {
+  function createMockDeps() {
+    const createdArtifacts: unknown[] = [];
+    const artifactService = {
+      createArtifact: vi.fn().mockImplementation((_paths: unknown, opts: unknown) => {
+        const record = { artifactId: `art-${createdArtifacts.length + 1}`, ...(opts as object) };
+        createdArtifacts.push(record);
+        return Promise.resolve(record);
+      }),
+      createBundle: vi.fn().mockImplementation((_paths: unknown, opts: unknown) => {
+        return Promise.resolve({ bundleId: "bnd-creative-1", ...(opts as object) });
+      }),
+    };
+    const opengoatPaths = { homeDir: "/tmp/test" };
+    return { artifactService, opengoatPaths, createdArtifacts };
+  }
+
+  it("creates a bundle from Market Intel response with creative descriptive headings", async () => {
+    const { artifactService, opengoatPaths } = createMockDeps();
+    // Real-world creative headings that don't exactly match outputTypes
+    const text = `Here's my analysis of your competitive landscape:
+
+## Short answer: the real competitive set
+
+After reviewing the market, here are the key competitors you need to watch. Each one positions differently, and there are clear gaps in their messaging:
+
+| Competitor | Positioning | Key Claim | Weakness |
+|---|---|---|---|
+| Acme Corp | "All-in-one platform" | Speed | No customization |
+| Beta Inc | "Enterprise-grade" | Security | Expensive |
+| Gamma Co | "Developer-first" | DX | Limited integrations |
+
+## The biggest positioning gaps in the market
+
+Looking at the broader market landscape, the biggest gaps are around AI-native workflows and developer experience. No one is owning the "ship faster with AI" narrative convincingly.
+
+Here's a detailed market brief with positioning opportunities and whitespace areas your product can exploit.
+`;
+
+    const specialist = {
+      id: "market-intel",
+      name: "Market Intel",
+      outputTypes: [
+        "competitor messaging matrix",
+        "community shortlist",
+        "customer-language themes",
+        "market brief",
+        "launch-surface recommendations",
+      ],
+    };
+
+    const result = await extractArtifacts(text, {
+      specialistId: "market-intel",
+      agentId: "proj-1",
+      sessionId: "sess-creative",
+      messageIndex: 1,
+    }, {
+      artifactService: artifactService as any,
+      opengoatPaths: opengoatPaths as any,
+      specialist: specialist as any,
+    });
+
+    // Both creative headings should match via keyword fallback/lowered threshold
+    expect(result.artifacts.length).toBeGreaterThanOrEqual(2);
+    // A bundle should have been created
+    expect(artifactService.createBundle).toHaveBeenCalledTimes(1);
+    expect(result.bundleId).toBe("bnd-creative-1");
+
+    // Both artifacts should be linked to the bundle
+    for (const call of artifactService.createArtifact.mock.calls) {
+      expect(call[1].bundleId).toBe("bnd-creative-1");
+    }
   });
 });
 
