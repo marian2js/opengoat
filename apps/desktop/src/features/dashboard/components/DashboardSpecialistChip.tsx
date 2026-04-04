@@ -29,15 +29,15 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
       {/* Icon */}
       <div
         className={cn(
-          "flex shrink-0 items-center justify-center rounded-lg",
+          "flex shrink-0 items-center justify-center rounded-lg shadow-sm",
           isManager
-            ? "size-9 bg-primary/12 ring-1 ring-primary/15"
-            : cn("size-8", colors.iconBg),
+            ? "size-10 bg-primary/12 ring-1 ring-primary/15"
+            : cn("size-8 ring-1 ring-black/[0.03] dark:ring-white/[0.06]", colors.iconBg),
         )}
       >
         <Icon
           className={cn(
-            isManager ? "size-4 text-primary" : cn("size-3.5", colors.iconText),
+            isManager ? "size-4.5 text-primary" : cn("size-3.5", colors.iconText),
           )}
         />
       </div>
@@ -69,7 +69,7 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
       <div className={cn(
         "flex shrink-0 items-center self-center rounded-md p-1.5 text-muted-foreground/20 transition-all duration-100",
         isManager
-          ? "group-hover/chip:bg-primary/[0.06] group-hover/chip:text-primary"
+          ? "group-hover/chip:bg-primary/[0.08] group-hover/chip:text-primary"
           : cn(colors.hoverIconBg, colors.hoverIconText),
       )}>
         <MessageSquareIcon className="size-3.5" />

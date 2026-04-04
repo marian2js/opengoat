@@ -50,7 +50,7 @@ export function FreeTextInput({ onSubmit }: FreeTextInputProps) {
           }}
           placeholder="Ask CMO — What do you want help with right now?"
           rows={1}
-          className="w-full resize-none rounded-[11px] border-0 bg-transparent px-5 pt-2 pb-4 pr-14 text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+          className="w-full resize-none rounded-[11px] border-0 bg-transparent px-5 pt-2.5 pb-4 pr-14 text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/35 focus:outline-none"
         />
         <button
           type="button"
