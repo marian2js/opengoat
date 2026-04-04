@@ -10,6 +10,7 @@ import {
   fetchObjectiveContext,
   composeObjectiveContext,
   composeSpecialistContext,
+  composePlaybookPhaseContext,
   type FetchableScope,
 } from "../../context-composer/index.ts";
 import { getSpecialistById } from "@opengoat/core";
@@ -116,6 +117,27 @@ export function createChatRoutes(
             };
           }
         }
+
+        // Inject playbook phase context when run is scoped to a playbook
+        if (contextInput.playbook && contextInput.run) {
+          const phaseBlock = composePlaybookPhaseContext({
+            run: contextInput.run,
+            playbook: contextInput.playbook,
+            artifacts: contextInput.artifacts,
+          });
+          if (phaseBlock) {
+            const textPartIndex = normalizedMessage.parts.findIndex(
+              (p) => p.type === "text",
+            );
+            if (textPartIndex >= 0) {
+              const textPart = normalizedMessage.parts[textPartIndex] as { text: string; type: "text" };
+              normalizedMessage.parts[textPartIndex] = {
+                text: `${phaseBlock}\n\n${textPart.text}`,
+                type: "text" as const,
+              };
+            }
+          }
+        }
       } catch {
         // Context injection failed — continue without it
       }
@@ -176,17 +198,33 @@ export function createChatRoutes(
       if (specialist) {
         const agentId = payload.agentId;
         const sessionId = payload.sessionId ?? "";
+        const scopeObjectiveId = payload.scope?.type === "objective" || payload.scope?.type === "run"
+          ? payload.scope.objectiveId
+          : undefined;
+        const scopeRunId = payload.scope?.type === "run" ? payload.scope.runId : undefined;
         onComplete = async (text: string) => {
           try {
-            await extractArtifacts(text, {
+            const result = await extractArtifacts(text, {
               specialistId: specialist.id,
               agentId,
               sessionId,
+              objectiveId: scopeObjectiveId,
+              runId: scopeRunId,
             }, {
               artifactService: runtime.artifactService,
               opengoatPaths: runtime.opengoatPaths,
               specialist,
             });
+
+            // Check phase progress after extraction when run-scoped (fire-and-forget)
+            if (scopeRunId && result.artifacts.length > 0) {
+              runtime.playbookExecutionService.checkPhaseProgress(
+                runtime.opengoatPaths,
+                scopeRunId,
+              ).catch(() => {
+                // Phase check is best-effort — must not affect chat
+              });
+            }
           } catch {
             // Fire-and-forget: extraction must not affect the chat response
           }

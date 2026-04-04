@@ -8,6 +8,8 @@ export interface ExtractionContext {
   agentId: string;
   sessionId: string;
   messageIndex?: number;
+  objectiveId?: string;
+  runId?: string;
 }
 
 export interface ExtractionResult {
@@ -60,6 +62,8 @@ export async function extractArtifacts(
       contentRef: `chat://${context.sessionId}/${context.messageIndex ?? 0}`,
       createdBy: context.specialistId,
       content: section.content,
+      ...(context.objectiveId ? { objectiveId: context.objectiveId } : {}),
+      ...(context.runId ? { runId: context.runId } : {}),
     };
 
     const record = await deps.artifactService.createArtifact(

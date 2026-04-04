@@ -409,6 +409,80 @@ Here's your comprehensive launch checklist:
 });
 
 // ---------------------------------------------------------------------------
+// extractArtifacts: run-scoped artifact linking
+// ---------------------------------------------------------------------------
+describe("extractArtifacts — run-scoped linking", () => {
+  function createMockDeps() {
+    const createdArtifacts: unknown[] = [];
+    const artifactService = {
+      createArtifact: vi.fn().mockImplementation((_paths: unknown, opts: unknown) => {
+        const record = { artifactId: `art-${createdArtifacts.length + 1}`, ...(opts as object) };
+        createdArtifacts.push(record);
+        return Promise.resolve(record);
+      }),
+    };
+    const opengoatPaths = { homeDir: "/tmp/test" };
+    return { artifactService, opengoatPaths, createdArtifacts };
+  }
+
+  const specialist = {
+    id: "distribution",
+    outputTypes: ["launch checklist", "community shortlist", "channel recommendations"],
+  };
+
+  const text = `## Launch Checklist
+
+Here's your comprehensive launch checklist:
+
+- [ ] Set up Product Hunt page
+- [ ] Prepare social media posts
+- [ ] Line up beta testers for upvotes
+- [ ] Draft Show HN post
+- [ ] Schedule email blast
+`;
+
+  it("passes objectiveId and runId to createArtifact when provided in context", async () => {
+    const { artifactService, opengoatPaths } = createMockDeps();
+
+    await extractArtifacts(text, {
+      specialistId: "distribution",
+      agentId: "proj-1",
+      sessionId: "sess-1",
+      objectiveId: "obj-1",
+      runId: "run-1",
+    }, {
+      artifactService: artifactService as any,
+      opengoatPaths: opengoatPaths as any,
+      specialist: specialist as any,
+    });
+
+    expect(artifactService.createArtifact).toHaveBeenCalledTimes(1);
+    const callArgs = artifactService.createArtifact.mock.calls[0][1];
+    expect(callArgs.objectiveId).toBe("obj-1");
+    expect(callArgs.runId).toBe("run-1");
+  });
+
+  it("does not set objectiveId/runId when not provided in context", async () => {
+    const { artifactService, opengoatPaths } = createMockDeps();
+
+    await extractArtifacts(text, {
+      specialistId: "distribution",
+      agentId: "proj-1",
+      sessionId: "sess-1",
+    }, {
+      artifactService: artifactService as any,
+      opengoatPaths: opengoatPaths as any,
+      specialist: specialist as any,
+    });
+
+    expect(artifactService.createArtifact).toHaveBeenCalledTimes(1);
+    const callArgs = artifactService.createArtifact.mock.calls[0][1];
+    expect(callArgs.objectiveId).toBeUndefined();
+    expect(callArgs.runId).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Manual extraction route: POST /extract
 // ---------------------------------------------------------------------------
 describe("POST /artifacts/extract", () => {

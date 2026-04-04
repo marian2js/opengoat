@@ -54,11 +54,22 @@ export async function fetchObjectiveContext(
       runPromise,
     ]);
 
+  // Fetch playbook manifest when run has a playbookId (synchronous, in-memory registry)
+  let playbook: ObjectiveContextInput["playbook"] = null;
+  if (run?.playbookId) {
+    try {
+      playbook = runtime.playbookRegistryService.getPlaybook(run.playbookId);
+    } catch {
+      // Playbook not found — continue without it
+    }
+  }
+
   return {
     objective,
     objectiveMemories,
     projectMemories,
     run,
     artifacts,
+    playbook,
   };
 }

@@ -81,6 +81,7 @@ function makeInput(overrides: Partial<ObjectiveContextInput> = {}): ObjectiveCon
     projectMemories: [baseMemory],
     run: null,
     artifacts: [],
+    playbook: null,
     ...overrides,
   };
 }

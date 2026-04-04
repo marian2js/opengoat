@@ -42,8 +42,12 @@ export function RunContextBanner({ runId, client }: RunContextBannerProps) {
 
   if (isLoading || !progress) return null;
 
-  const currentPhase = progress.phases.find((p) => p.status === "current");
+  const currentPhaseIndex = progress.phases.findIndex((p) => p.status === "current");
+  const currentPhase = currentPhaseIndex >= 0 ? progress.phases[currentPhaseIndex] : undefined;
   const deliverables = currentPhase?.expectedArtifacts ?? [];
+  const phaseLabel = currentPhase
+    ? `Phase ${currentPhaseIndex + 1}/${progress.phases.length}: ${currentPhase.name}`
+    : undefined;
 
   return (
     <div className="border-b border-primary/10 bg-primary/[0.03] px-4 py-2 lg:px-6">
@@ -52,6 +56,14 @@ export function RunContextBanner({ runId, client }: RunContextBannerProps) {
         <span className="text-[11px] font-semibold text-foreground/80">
           {progress.playbookTitle}
         </span>
+        {phaseLabel && (
+          <>
+            <span className="text-[10px] text-muted-foreground/40">|</span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-primary/60">
+              {phaseLabel}
+            </span>
+          </>
+        )}
         <span className="text-[10px] text-muted-foreground/40">|</span>
         <PhaseStepper phases={progress.phases} />
       </div>

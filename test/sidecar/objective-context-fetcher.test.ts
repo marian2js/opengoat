@@ -38,6 +38,7 @@ const MOCK_RUN = {
   runId: "run-1",
   projectId: "proj-1",
   objectiveId: "obj-1",
+  playbookId: "launch-pack",
   title: "Sprint 1",
   status: "running",
   phase: "research",
@@ -46,6 +47,31 @@ const MOCK_RUN = {
   agentId: "goat",
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+const MOCK_PLAYBOOK = {
+  playbookId: "launch-pack",
+  title: "Launch Pack",
+  description: "End-to-end launch preparation.",
+  idealFor: "Teams preparing to launch.",
+  goalTypes: ["launch"],
+  requiredInputs: ["product name"],
+  optionalInputs: [],
+  skillRefs: [],
+  defaultPhases: [
+    {
+      name: "Research",
+      description: "Research phase.",
+      expectedArtifacts: ["community shortlist"],
+      specialistId: "distribution",
+    },
+  ],
+  artifactTypes: ["community shortlist"],
+  taskPolicy: "One task per surface.",
+  approvalPolicy: "Founder approval.",
+  evaluationRubric: "Specificity.",
+  version: "1.0.0",
+  source: "builtin" as const,
 };
 
 const MOCK_ARTIFACT = {
@@ -81,6 +107,10 @@ function createMockRuntime(overrides: Record<string, unknown> = {}) {
     artifactService: {
       listArtifacts: vi.fn().mockResolvedValue({ items: [MOCK_ARTIFACT], total: 1 }),
       ...overrides.artifactService as object,
+    },
+    playbookRegistryService: {
+      getPlaybook: vi.fn().mockReturnValue(MOCK_PLAYBOOK),
+      ...overrides.playbookRegistryService as object,
     },
   } as unknown as SidecarRuntime;
 }
@@ -188,5 +218,60 @@ describe("fetchObjectiveContext", () => {
     });
 
     expect(runtime.runService.getRun).not.toHaveBeenCalled();
+  });
+
+  describe("playbook manifest fetching", () => {
+    it("fetches playbook manifest when scope is run and run has playbookId", async () => {
+      const runtime = createMockRuntime();
+      const result = await fetchObjectiveContext(runtime, {
+        type: "run",
+        objectiveId: "obj-1",
+        runId: "run-1",
+      }, "proj-1");
+
+      expect(result.playbook).toEqual(MOCK_PLAYBOOK);
+      expect(runtime.playbookRegistryService.getPlaybook).toHaveBeenCalledWith("launch-pack");
+    });
+
+    it("sets playbook to null when scope is objective", async () => {
+      const runtime = createMockRuntime();
+      const result = await fetchObjectiveContext(runtime, {
+        type: "objective",
+        objectiveId: "obj-1",
+      }, "proj-1");
+
+      expect(result.playbook).toBeNull();
+    });
+
+    it("sets playbook to null when run has no playbookId", async () => {
+      const runWithoutPlaybook = { ...MOCK_RUN, playbookId: undefined };
+      const runtime = createMockRuntime({
+        runService: { getRun: vi.fn().mockResolvedValue(runWithoutPlaybook) },
+      });
+      const result = await fetchObjectiveContext(runtime, {
+        type: "run",
+        objectiveId: "obj-1",
+        runId: "run-1",
+      }, "proj-1");
+
+      expect(result.playbook).toBeNull();
+    });
+
+    it("sets playbook to null when getPlaybook throws", async () => {
+      const runtime = createMockRuntime({
+        playbookRegistryService: {
+          getPlaybook: vi.fn().mockImplementation(() => {
+            throw new Error("Playbook not found");
+          }),
+        },
+      });
+      const result = await fetchObjectiveContext(runtime, {
+        type: "run",
+        objectiveId: "obj-1",
+        runId: "run-1",
+      }, "proj-1");
+
+      expect(result.playbook).toBeNull();
+    });
   });
 });

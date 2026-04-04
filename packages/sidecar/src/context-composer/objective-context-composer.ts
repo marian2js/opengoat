@@ -2,6 +2,7 @@ import type { ObjectiveRecord } from "@opengoat/core/core/objectives/domain/obje
 import type { MemoryRecord } from "@opengoat/core/core/memory/domain/memory.js";
 import type { RunRecord } from "@opengoat/core/core/runs/domain/run.js";
 import type { ArtifactRecord } from "@opengoat/core/core/artifacts/domain/artifact.js";
+import type { PlaybookManifest } from "@opengoat/core/core/playbooks/domain/playbook.js";
 
 export interface ObjectiveContextInput {
   objective: ObjectiveRecord | null;
@@ -9,6 +10,7 @@ export interface ObjectiveContextInput {
   projectMemories: MemoryRecord[];
   run: RunRecord | null;
   artifacts: ArtifactRecord[];
+  playbook: PlaybookManifest | null;
 }
 
 export interface ContextComposerOptions {
