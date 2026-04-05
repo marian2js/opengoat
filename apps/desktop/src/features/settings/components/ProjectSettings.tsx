@@ -1,6 +1,5 @@
 import type { Agent, AuthOverview, ProviderModelOption } from "@opengoat/contracts";
 import {
-  CheckIcon,
   CpuIcon,
   GlobeIcon,
   LoaderCircleIcon,
@@ -73,27 +72,24 @@ export function ProjectSettings({
   // ---- General form state ----
   const [name, setName] = useState(agent.name);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Sync form when agent changes (e.g. switching projects)
   useEffect(() => {
     setName(agent.name);
-    setSaveMessage(null);
   }, [agent.id, agent.name]);
 
   const hasGeneralChanges = name !== agent.name;
 
   const handleSaveGeneral = useCallback(async () => {
     setIsSaving(true);
-    setSaveMessage(null);
 
     try {
       const updated = await client.updateAgent(agent.id, { name });
       onAgentUpdated(updated);
-      setSaveMessage({ type: "success", text: "Settings saved." });
+      toast.success("Settings saved.");
     } catch (err) {
       console.error("Failed to save settings", err);
-      setSaveMessage({ type: "error", text: "Failed to save. Please try again." });
+      toast.error("Failed to save. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -314,10 +310,7 @@ export function ProjectSettings({
                 id="settings-name"
                 className="h-9 text-[13px]"
                 value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  if (saveMessage) setSaveMessage(null);
-                }}
+                onChange={(e) => setName(e.target.value)}
               />
             </div>
 
@@ -337,21 +330,6 @@ export function ProjectSettings({
               </div>
             </div>
           </div>
-
-          {saveMessage ? (
-            <div
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] ${
-                saveMessage.type === "success"
-                  ? "bg-success/8 text-success dark:bg-success/[0.06]"
-                  : "bg-destructive/8 text-destructive dark:bg-destructive/[0.06]"
-              }`}
-            >
-              {saveMessage.type === "success" ? (
-                <CheckIcon className="size-3 shrink-0" />
-              ) : null}
-              {saveMessage.text}
-            </div>
-          ) : null}
 
           <div className="flex justify-end">
             <Button
