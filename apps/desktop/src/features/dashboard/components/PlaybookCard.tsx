@@ -64,7 +64,7 @@ export function PlaybookCard({ playbook, onClick }: PlaybookCardProps) {
 
   return (
     <Card
-      className="group/playbook relative flex flex-col overflow-hidden border border-border/50 bg-card/90 transition-all duration-100 cursor-pointer hover:-translate-y-px hover:border-primary/30 hover:shadow-md hover:shadow-primary/5"
+      className="group/playbook relative flex flex-col overflow-hidden border border-border/50 bg-card/90 transition-all duration-100 ease-out cursor-pointer hover:-translate-y-px hover:border-primary/25 hover:shadow-md"
       onClick={() => onClick?.(playbook)}
     >
       {/* Goal type accent — thin left border */}

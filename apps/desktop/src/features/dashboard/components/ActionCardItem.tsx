@@ -39,12 +39,12 @@ export function ActionCardItem({ card, isCompleted, isHero, isLoading, specialis
         isLoading
           ? "pointer-events-none border-border/30 bg-card/50 opacity-60"
           : isCompleted
-            ? "cursor-pointer border-primary/15 bg-card hover:border-primary/25 hover:shadow-sm"
+            ? "cursor-pointer border-primary/15 bg-card hover:-translate-y-px hover:border-primary/25 hover:shadow-md"
             : isSecondary
-              ? "cursor-pointer border-border/10 bg-card/50 hover:border-border/25 hover:bg-card hover:shadow-sm dark:border-white/[0.04] dark:hover:border-white/[0.08]"
+              ? "cursor-pointer border-border/10 bg-card/50 hover:-translate-y-px hover:border-primary/25 hover:bg-card hover:shadow-md dark:border-white/[0.04]"
               : isHero
-                ? "cursor-pointer border-border/30 bg-card hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-black/5 dark:border-white/[0.08] dark:hover:shadow-black/20"
-                : "cursor-pointer border-border/20 bg-card hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20"
+                ? "cursor-pointer border-border/30 bg-card hover:-translate-y-px hover:border-primary/25 hover:shadow-md dark:border-white/[0.08]"
+                : "cursor-pointer border-border/20 bg-card hover:-translate-y-px hover:border-primary/25 hover:shadow-md"
       }`}
       onClick={() => {
         if (!isLoading) {

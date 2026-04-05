@@ -24,7 +24,7 @@ export function BundleCard({ bundle, specialistId, specialistName, onPreview, on
   }
 
   return (
-    <div className="relative rounded-lg border transition-all duration-100 hover:border-primary/30">
+    <div className="relative rounded-lg border transition-all duration-100 ease-out hover:-translate-y-px hover:border-primary/25 hover:shadow-md">
       {/* Left accent bar — primary emerald for bundles */}
       <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] bg-primary opacity-60 transition-opacity hover:opacity-100" />
 

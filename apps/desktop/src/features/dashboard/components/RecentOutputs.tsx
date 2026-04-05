@@ -103,7 +103,7 @@ export function RecentOutputs({ agentId, client, onPreview, onNavigate, onSpecia
                 <button
                   key={example.name}
                   type="button"
-                  className="group/example flex flex-col items-start gap-2 rounded-lg border border-border/20 bg-card/50 p-3 text-left transition-all duration-100 hover:-translate-y-px hover:border-primary/20 hover:bg-card hover:shadow-sm dark:border-white/[0.04] dark:hover:border-primary/15 dark:hover:bg-white/[0.03]"
+                  className="group/example flex flex-col items-start gap-2 rounded-lg border border-border/20 bg-card/50 p-3 text-left transition-all duration-100 ease-out hover:-translate-y-px hover:border-primary/25 hover:bg-card hover:shadow-md dark:border-white/[0.04]"
                   onClick={() => onSpecialistChat?.(example.specialistId)}
                 >
                   {/* Type badge */}

@@ -33,11 +33,11 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
   return (
     <article
       className={cn(
-        "group/card relative flex flex-col rounded-xl border bg-card transition-all duration-150",
-        "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 dark:hover:shadow-black/20",
+        "group/card relative flex flex-col rounded-xl border bg-card transition-all duration-100 ease-out",
+        "hover:-translate-y-px hover:shadow-md hover:border-primary/25",
         isManager
-          ? "border-primary/20 bg-primary/[0.02] ring-1 ring-primary/[0.06] hover:border-primary/30 hover:ring-primary/10"
-          : cn("dark:border-white/[0.06]", colors.chipBorder, colors.hoverBorder),
+          ? "border-primary/20 bg-primary/[0.02] ring-1 ring-primary/[0.06] hover:ring-primary/10"
+          : cn("dark:border-white/[0.06]", colors.chipBorder),
       )}
     >
       {/* Card body */}

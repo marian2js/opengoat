@@ -16,8 +16,8 @@ export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardP
       type="button"
       className={`group/job relative flex flex-col items-start gap-2.5 overflow-hidden rounded-xl border bg-card text-left transition-all duration-100 ease-out ${
         isHero
-          ? "border-primary/15 p-5 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 dark:border-primary/10 dark:hover:border-primary/25 dark:hover:shadow-primary/5"
-          : "border-border/20 p-4 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md hover:shadow-black/5 dark:border-white/[0.06] dark:hover:shadow-black/20"
+          ? "border-primary/15 p-5 hover:-translate-y-px hover:border-primary/25 hover:shadow-md dark:border-primary/10"
+          : "border-border/20 p-4 hover:-translate-y-px hover:border-primary/25 hover:shadow-md dark:border-white/[0.06]"
       }`}
       onClick={() => onClick?.(job.id, buildActionPrompt(job), job.title)}
     >

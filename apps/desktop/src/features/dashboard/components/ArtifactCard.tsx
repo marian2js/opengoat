@@ -32,7 +32,7 @@ export function ArtifactCard({ artifact, specialistId, specialistName, onPreview
       tabIndex={onNavigate ? 0 : undefined}
       onClick={onNavigate ? handleClick : undefined}
       onKeyDown={onNavigate ? (e) => { if (e.key === "Enter" || e.key === " ") handleClick(); } : undefined}
-      className={`group/artifact relative rounded-lg border transition-all duration-100 hover:-translate-y-px hover:border-primary/30 hover:shadow-sm ${onNavigate ? "cursor-pointer" : ""} ${compact ? "p-2" : "p-3"}`}
+      className={`group/artifact relative rounded-lg border transition-all duration-100 ease-out hover:-translate-y-px hover:border-primary/25 hover:shadow-md ${onNavigate ? "cursor-pointer" : ""} ${compact ? "p-2" : "p-3"}`}
     >
       {/* Left accent bar */}
       <div

@@ -20,7 +20,7 @@ export function HeroRecommendedMove({
       <button
         type="button"
         onClick={() => onActionClick?.(recommendation.actionId)}
-        className="group/move mt-2.5 flex w-full items-center gap-3 rounded-xl border border-primary/15 bg-primary/[0.03] px-4 py-3.5 text-left transition-all duration-100 hover:-translate-y-px hover:border-primary/30 hover:bg-primary/[0.06] hover:shadow-sm hover:shadow-primary/5 dark:border-primary/10 dark:bg-primary/[0.03] dark:hover:border-primary/25 dark:hover:bg-primary/[0.06]"
+        className="group/move mt-2.5 flex w-full items-center gap-3 rounded-xl border border-primary/15 bg-primary/[0.03] px-4 py-3.5 text-left transition-all duration-100 ease-out hover:-translate-y-px hover:border-primary/25 hover:bg-primary/[0.06] hover:shadow-md dark:border-primary/10 dark:bg-primary/[0.03]"
       >
         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary transition-colors duration-100 group-hover/move:bg-primary group-hover/move:text-white">
           <ZapIcon className="size-3.5" />

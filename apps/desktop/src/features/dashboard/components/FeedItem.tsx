@@ -23,7 +23,7 @@ export function FeedItemCard({ item }: FeedItemCardProps) {
   const Icon = item.icon;
 
   return (
-    <div className="group/feed relative flex flex-col overflow-hidden rounded-lg border border-border/50 bg-card/80 transition-all duration-150 hover:-translate-y-px hover:border-primary/30 hover:shadow-sm">
+    <div className="group/feed relative flex flex-col overflow-hidden rounded-lg border border-border/50 bg-card/80 transition-all duration-100 ease-out hover:-translate-y-px hover:border-primary/25 hover:shadow-md">
       <div
         className={`absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] ${item.accentColor} opacity-50 transition-opacity group-hover/feed:opacity-100`}
       />

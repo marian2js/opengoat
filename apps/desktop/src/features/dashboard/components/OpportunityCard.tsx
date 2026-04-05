@@ -31,7 +31,7 @@ export function OpportunityCard({ completedActions, opportunity, onActionClick, 
     <div
       role="button"
       tabIndex={0}
-      className="group/insight relative flex flex-col overflow-hidden rounded-lg border border-border/50 bg-card/80 transition-all duration-150 hover:-translate-y-px hover:border-primary/30 hover:shadow-sm cursor-pointer"
+      className="group/insight relative flex flex-col overflow-hidden rounded-lg border border-border/50 bg-card/80 transition-all duration-100 ease-out hover:-translate-y-px hover:border-primary/25 hover:shadow-md cursor-pointer"
       onClick={handleCardClick}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleCardClick(); } }}
     >
