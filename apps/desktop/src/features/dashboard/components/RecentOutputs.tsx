@@ -1,16 +1,32 @@
-import { PackageIcon } from "lucide-react";
+import { ArrowRightIcon, PackageIcon } from "lucide-react";
 import type { ArtifactRecord } from "@opengoat/contracts";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useRecentArtifacts } from "@/features/dashboard/hooks/useRecentArtifacts";
 import { ArtifactCard } from "@/features/dashboard/components/ArtifactCard";
 import { BundleCard } from "@/features/dashboard/components/BundleCard";
 import { getSpecialistMeta, SPECIALIST_META } from "@/features/agents/specialist-meta";
+import { getSpecialistColors } from "@/features/agents/specialist-meta";
+import { getArtifactTypeConfig } from "@/features/dashboard/lib/artifact-type-config";
+
+const EXAMPLE_OUTPUTS: Array<{
+  name: string;
+  type: string;
+  specialistId: string;
+}> = [
+  { name: "Hero Rewrite Draft",          type: "copy_draft",       specialistId: "website-conversion" },
+  { name: "SEO Opportunity Map",         type: "research_brief",   specialistId: "seo-aeo" },
+  { name: "Competitor Messaging Matrix",  type: "matrix",           specialistId: "market-intel" },
+  { name: "Product Hunt Launch Pack",    type: "launch_pack",      specialistId: "distribution" },
+  { name: "Content Ideas Bundle",        type: "content_calendar", specialistId: "content" },
+  { name: "Cold Email Sequence",         type: "email_sequence",   specialistId: "outbound" },
+];
 
 export interface RecentOutputsProps {
   agentId: string;
   client: SidecarClient;
   onPreview?: (artifactId: string) => void;
   onNavigate?: (artifact: ArtifactRecord) => void;
+  onSpecialistChat?: (specialistId: string) => void;
 }
 
 /** Resolve a specialist display name from an artifact's createdBy field. */
@@ -27,7 +43,7 @@ function resolveSpecialistName(createdBy: string): string | undefined {
   return undefined;
 }
 
-export function RecentOutputs({ agentId, client, onPreview, onNavigate }: RecentOutputsProps) {
+export function RecentOutputs({ agentId, client, onPreview, onNavigate, onSpecialistChat }: RecentOutputsProps) {
   const { standaloneArtifacts, bundleGroups, isLoading, isEmpty } = useRecentArtifacts(agentId, client);
 
   // Avoid layout flash — return null while loading
@@ -70,11 +86,53 @@ export function RecentOutputs({ agentId, client, onPreview, onNavigate }: Recent
         ) : null}
       </div>
 
-      {/* Empty state */}
+      {/* Empty state — proof-of-value gallery */}
       {isEmpty ? (
-        <p className="text-xs text-muted-foreground/50 ml-9">
-          No outputs yet — run an action above to get started
-        </p>
+        <div className="ml-9">
+          <p className="mb-3 text-[13px] font-medium text-muted-foreground">
+            Your team can produce:
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {EXAMPLE_OUTPUTS.map((example, idx) => {
+              const typeConfig = getArtifactTypeConfig(example.type);
+              const specialist = getSpecialistMeta(example.specialistId);
+              const colors = getSpecialistColors(example.specialistId);
+              const isStartCard = idx === 0;
+
+              return (
+                <button
+                  key={example.name}
+                  type="button"
+                  className="group/example flex flex-col items-start gap-1.5 rounded-lg border border-dashed border-border/40 p-3 text-left transition-colors hover:border-border/70 hover:bg-muted/30"
+                  onClick={() => onSpecialistChat?.(example.specialistId)}
+                >
+                  {/* Type badge */}
+                  <span className={`inline-block rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${typeConfig.badgeClassName}`}>
+                    {typeConfig.label}
+                  </span>
+
+                  {/* Output name */}
+                  <span className="text-[13px] font-medium leading-tight text-foreground">
+                    {example.name}
+                  </span>
+
+                  {/* Specialist attribution */}
+                  <span className={`text-[11px] ${colors.iconText}`}>
+                    {specialist?.name}
+                  </span>
+
+                  {/* Start CTA — first card only */}
+                  {isStartCard && (
+                    <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-primary opacity-70 transition-opacity group-hover/example:opacity-100">
+                      Start here
+                      <ArrowRightIcon className="size-3 transition-transform group-hover/example:translate-x-0.5" />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       ) : (
         /* Outputs list */
         <div className="space-y-3">

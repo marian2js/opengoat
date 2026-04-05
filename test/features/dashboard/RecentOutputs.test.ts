@@ -16,31 +16,25 @@ const bundleCardSrc = readSrc("components/BundleCard.tsx");
 const dashboardSrc = readSrc("components/DashboardWorkspace.tsx");
 
 // ---------------------------------------------------------------------------
-// RecentOutputs — empty state (compact inline)
+// RecentOutputs — empty state (proof-of-value gallery)
 // ---------------------------------------------------------------------------
 describe("RecentOutputs empty state", () => {
-  it("shows 'No outputs yet' message when empty", () => {
-    expect(componentSrc).toContain("No outputs yet");
+  it("shows proof-of-value gallery heading when empty", () => {
+    expect(componentSrc).toContain("Your team can produce");
   });
 
-  it("suggests running an action to get started", () => {
-    expect(
-      componentSrc.includes("run an action") ||
-        componentSrc.includes("get started"),
-    ).toBe(true);
+  it("shows example output names in empty state gallery", () => {
+    expect(componentSrc).toContain("Hero Rewrite Draft");
+    expect(componentSrc).toContain("SEO Opportunity Map");
+    expect(componentSrc).toContain("Competitor Messaging Matrix");
   });
 
-  it("uses compact inline text instead of tall dashed-border card", () => {
-    // Should NOT have the old tall dashed-border empty state container
-    expect(componentSrc).not.toContain("border-dashed");
-    // Should NOT have the stacked vertical layout with centered icon
-    expect(componentSrc).not.toContain("flex-col items-center gap-2");
-    expect(componentSrc).not.toContain("py-8");
+  it("uses 2-column grid layout for example outputs", () => {
+    expect(componentSrc).toContain("grid-cols-2");
   });
 
-  it("renders empty state as a single muted paragraph", () => {
-    // The empty state should be a compact <p> with muted styling
-    expect(componentSrc).toMatch(/isEmpty[\s\S]*?<p\s+className="[^"]*text-muted-foreground/);
+  it("includes a Start CTA for routing to specialist", () => {
+    expect(componentSrc).toContain("Start here");
   });
 });
 

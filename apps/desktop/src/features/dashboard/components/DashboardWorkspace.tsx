@@ -372,6 +372,7 @@ function DashboardContent({
             agentId={agentId}
             client={client}
             onNavigate={handleOutputNavigate}
+            onSpecialistChat={handleSpecialistChat}
           />
 
           {/* Action cards — secondary in Mode B */}
@@ -436,6 +437,7 @@ function DashboardContent({
             agentId={agentId}
             client={client}
             onNavigate={handleOutputNavigate}
+            onSpecialistChat={handleSpecialistChat}
           />
 
           {/* Board summary — bottom, only if tasks exist */}
