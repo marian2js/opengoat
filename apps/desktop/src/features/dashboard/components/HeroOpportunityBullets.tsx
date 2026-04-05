@@ -43,7 +43,7 @@ export function HeroOpportunityBullets({
   if (bullets.length === 0) return null;
 
   return (
-    <div>
+    <div className="rounded-xl border border-border/20 bg-card/40 px-4 py-3.5 dark:border-white/[0.04] dark:bg-white/[0.02]">
       <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
         WHAT MATTERS NOW
       </span>

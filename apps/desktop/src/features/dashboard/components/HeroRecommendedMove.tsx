@@ -13,7 +13,7 @@ export function HeroRecommendedMove({
   if (!recommendation) return null;
 
   return (
-    <div>
+    <div className="rounded-xl border border-primary/10 bg-primary/[0.015] px-4 py-3.5 dark:border-primary/[0.06] dark:bg-primary/[0.02]">
       <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
         BEST FIRST MOVE
       </span>
