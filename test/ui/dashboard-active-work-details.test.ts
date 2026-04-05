@@ -8,7 +8,7 @@ const readFile = (relPath: string) =>
 
 // ═══════════════════════════════════════════════════════
 // 1. ActionSessionMeta includes latestOutput field
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════���═══════════════════════════════
 
 describe("ActionSessionMeta latestOutput field", () => {
   it("types.ts includes latestOutput on ActionSessionMeta", () => {
@@ -22,9 +22,9 @@ describe("ActionSessionMeta latestOutput field", () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════��═══════════════════════
 // 2. Persistence layer supports latestOutput
-// ═══════════════════════════════════════════════════════
+// ════��══════════════════════════════════════════════════
 
 describe("action-session-state persistence supports latestOutput", () => {
   it("updateActionSessionLatestOutput function is exported", () => {
@@ -38,9 +38,9 @@ describe("action-session-state persistence supports latestOutput", () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════
+// ═════════════��═════════════════════════════════════════
 // 3. ActionSessionView persists latestOutput
-// ═══════════════════════════════════════════════════════
+// ═══════���═══════════════════════════════════════════════
 
 describe("ActionSessionView persists latestOutput", () => {
   it("imports updateActionSessionLatestOutput", () => {
@@ -54,14 +54,13 @@ describe("ActionSessionView persists latestOutput", () => {
     const src = readFile(
       "features/action-session/components/ActionSessionView.tsx",
     );
-    // Should have an effect or call that persists the latest output
     expect(src).toContain("updateActionSessionLatestOutput");
   });
 });
 
-// ═══════════════════════════════════════════════════════
+// ══════���════════════════════════════════════���═══════════
 // 4. useActionSessions includes latestOutput in entries
-// ═══════════════════════════════════════════════════════
+// ══════════���════════════════════════════════════════════
 
 describe("useActionSessions exposes latestOutput", () => {
   it("ActionSessionEntry interface includes latestOutput", () => {
@@ -71,90 +70,39 @@ describe("useActionSessions exposes latestOutput", () => {
 
   it("maps latestOutput from meta store", () => {
     const src = readFile("features/dashboard/hooks/useActionSessions.ts");
-    // The mapping should include latestOutput
     expect(src).toMatch(/latestOutput.*meta\.latestOutput/s);
   });
 });
 
 // ═══════════════════════════════════════════════════════
-// 5. ActiveWorkSection shows output preview
-// ═══════════════════════════════════════════════════════
+// 5. ContinueWhereYouLeftOff — compact continue section
+// ══════════════════���════════════════════════════════════
 
-describe("ActiveWorkSection output preview", () => {
-  const componentPath = "features/dashboard/components/ActiveWorkSection.tsx";
+describe("ContinueWhereYouLeftOff compact section", () => {
+  const componentPath = "features/dashboard/components/ContinueWhereYouLeftOff.tsx";
 
-  it("renders latestOutput preview text", () => {
-    const src = readFile(componentPath);
-    expect(src).toContain("latestOutput");
+  it("exists as a component file", () => {
+    expect(existsSync(resolve(desktopSrc, componentPath))).toBe(true);
   });
 
-  it("truncates output preview with line-clamp", () => {
+  it("shows continue CTA for items", () => {
     const src = readFile(componentPath);
-    expect(src).toContain("line-clamp");
-  });
-});
-
-// ═══════════════════════════════════════════════════════
-// 6. ActiveWorkSection has Continue button on recent items
-// ═══════════════════════════════════════════════════════
-
-describe("ActiveWorkSection Continue button on recent items", () => {
-  const componentPath = "features/dashboard/components/ActiveWorkSection.tsx";
-
-  it("recent variant has Continue button", () => {
-    const src = readFile(componentPath);
-    // The recent variant code should contain a Continue action
-    // Check that "recent" variant section also has Continue
-    const recentSectionStart = src.indexOf('variant === "recent"');
-    expect(recentSectionStart).toBeGreaterThan(-1);
-    const recentSection = src.slice(recentSectionStart, recentSectionStart + 1500);
-    expect(recentSection).toContain("Continue");
-  });
-});
-
-// ═══════════════════════════════════════════════════════
-// 7. ActiveWorkSection has Open Board button
-// ═══════════════════════════════════════════════════════
-
-describe("ActiveWorkSection Open Board button", () => {
-  const componentPath = "features/dashboard/components/ActiveWorkSection.tsx";
-
-  it("has Open Board quick action", () => {
-    const src = readFile(componentPath);
-    expect(src).toContain("Open Board");
+    expect(src).toContain("Continue");
+    expect(src).toContain("onContinue");
   });
 
-  it("Open Board links to #board", () => {
+  it("uses compact layout", () => {
     const src = readFile(componentPath);
-    expect(src).toContain("#board");
+    expect(src).toContain("border-border/20");
   });
 
-  it("Open Board uses LayoutDashboard or similar board icon", () => {
-    const src = readFile(componentPath);
-    // Should have an icon for board navigation
-    expect(src).toContain("LayoutDashboardIcon");
-  });
-});
-
-// ═══════════════════════════════════════════════════════
-// 8. Section remains compact
-// ═══════════════════════════════════════════════════════
-
-describe("Section compactness", () => {
-  const componentPath = "features/dashboard/components/ActiveWorkSection.tsx";
-
-  it("still limits recent sessions to 5", () => {
-    const src = readFile(componentPath);
-    expect(src).toContain("slice(0, 5)");
-  });
-
-  it("still returns null when no active work", () => {
-    const src = readFile(componentPath);
-    expect(src).toContain("return null");
-  });
-
-  it("uses section-label for headings", () => {
+  it("uses section-label for heading", () => {
     const src = readFile(componentPath);
     expect(src).toContain("section-label");
+  });
+
+  it("returns null when no items", () => {
+    const src = readFile(componentPath);
+    expect(src).toContain("return null");
   });
 });

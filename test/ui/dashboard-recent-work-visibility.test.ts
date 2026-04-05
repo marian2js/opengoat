@@ -7,76 +7,58 @@ const readFile = (relPath: string) =>
   readFileSync(resolve(desktopSrc, relPath), "utf-8");
 
 // ═══════════════════════════════════════════════════════
-// 1. ActiveWorkSection renders outside Mode A/B split
+// 1. ContinueWhereYouLeftOff renders in both Mode A and Mode B
 // ═══════════════════════════════════════════════════════
 
-describe("ActiveWorkSection renders independently of Mode A/B", () => {
-  it("ActiveWorkSection appears before the Mode A/B conditional", () => {
+describe("ContinueWhereYouLeftOff renders in both modes", () => {
+  it("ContinueWhereYouLeftOff appears in both Mode A and Mode B branches", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
-    // ActiveWorkSection should be rendered BEFORE the hasActiveWork ternary
-    const activeWorkPos = src.indexOf("<ActiveWorkSection");
-    const modeConditionalPos = src.indexOf("{hasActiveWork ?");
-    expect(activeWorkPos).toBeGreaterThan(-1);
-    expect(modeConditionalPos).toBeGreaterThan(-1);
-    expect(activeWorkPos).toBeLessThan(modeConditionalPos);
+    const matches = src.match(/<ContinueWhereYouLeftOff/g);
+    expect(matches).not.toBeNull();
+    expect(matches!.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("ActiveWorkSection is not inside the Mode B branch", () => {
-    const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
-    // The Mode B branch starts with the hasActiveWork ternary
-    const modeBStart = src.indexOf("{hasActiveWork ?");
-    const modeBEnd = src.indexOf("Mode A", modeBStart);
-    if (modeBStart > -1 && modeBEnd > -1) {
-      const modeBContent = src.slice(modeBStart, modeBEnd);
-      expect(modeBContent).not.toContain("<ActiveWorkSection");
-    }
-  });
-
-  it("ActiveWorkSection is not wrapped in actionSessions.hasActiveWork guard", () => {
-    const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
-    // Should not have the double-gate pattern
-    expect(src).not.toContain("actionSessions.hasActiveWork && (");
-  });
-});
-
-// ═══════════════════════════════════════════════════════
-// 2. ActiveWorkSection handles its own visibility
-// ═══════════════════════════════════════════════════════
-
-describe("ActiveWorkSection self-manages visibility", () => {
-  it("returns null when no sessions exist", () => {
-    const src = readFile("features/dashboard/components/ActiveWorkSection.tsx");
+  it("ContinueWhereYouLeftOff self-hides when items are empty", () => {
+    const src = readFile("features/dashboard/components/ContinueWhereYouLeftOff.tsx");
     expect(src).toContain("return null");
   });
+});
 
-  it("uses useActionSessions for data", () => {
-    const src = readFile("features/dashboard/components/ActiveWorkSection.tsx");
-    expect(src).toContain("useActionSessions");
+// ═══════════════════════════════════════════════════════
+// 2. Mode detection uses useMeaningfulWork
+// ═══════════════════════════════════════════════════════
+
+describe("Mode detection uses meaningful work filtering", () => {
+  it("uses useMeaningfulWork hook", () => {
+    const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
+    expect(src).toContain("useMeaningfulWork");
   });
 
-  it("checks hasActiveWork before rendering", () => {
-    const src = readFile("features/dashboard/components/ActiveWorkSection.tsx");
-    expect(src).toContain("hasActiveWork");
+  it("uses hasMeaningfulWork for hasActiveWork", () => {
+    const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
+    expect(src).toContain("meaningfulWork.hasMeaningfulWork");
+  });
+
+  it("does not use raw activeObjective or raw runs for mode detection", () => {
+    const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
+    expect(src).not.toContain("activeObjective.objective !== null");
+    expect(src).not.toContain("runsResult.runs.length > 0");
   });
 });
 
 // ═══════════════════════════════════════════════════════
-// 3. Dashboard layout order: Company → FreeText → ActiveWork → Mode split
+// 3. Dashboard layout order: Company → Mode split (with ContinueWhereYouLeftOff inside)
 // ═══════════════════════════════════════════════════════
 
 describe("Dashboard layout order", () => {
-  it("renders CompanyUnderstandingHero, ActiveWorkSection in order before mode split", () => {
+  it("renders CompanyUnderstandingHero before mode split", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
     const heroPos = src.indexOf("<CompanyUnderstandingHero");
-    const activeWorkPos = src.indexOf("<ActiveWorkSection");
     const modeSplitPos = src.indexOf("{hasActiveWork ?");
 
     expect(heroPos).toBeGreaterThan(-1);
-    expect(activeWorkPos).toBeGreaterThan(-1);
     expect(modeSplitPos).toBeGreaterThan(-1);
-
-    expect(heroPos).toBeLessThan(activeWorkPos);
-    expect(activeWorkPos).toBeLessThan(modeSplitPos);
+    expect(heroPos).toBeLessThan(modeSplitPos);
   });
 });
 

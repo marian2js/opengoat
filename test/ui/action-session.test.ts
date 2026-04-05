@@ -500,10 +500,10 @@ describe("Free-text routing through action session", () => {
 });
 
 // ═══════════════════════════════════════════════════════
-// 12. NowWorkingOn resume routes to action-session
+// 12. Resume routes to action-session
 // ═══════════════════════════════════════════════════════
 
-describe("NowWorkingOn resume uses action-session view", () => {
+describe("Resume routes to action-session view", () => {
   it("App.tsx handleResumeRun checks for action sessions", () => {
     const src = appSrc();
     expect(src).toContain("isActionSession");

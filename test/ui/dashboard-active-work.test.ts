@@ -7,9 +7,9 @@ const desktopSrc = resolve(__dirname, "../../apps/desktop/src");
 const readFile = (relPath: string) =>
   readFileSync(resolve(desktopSrc, relPath), "utf-8");
 
-// ═══════════════════════════════════════════════════════
+// ═════════���══════════════════════════���══════════════════
 // 1. getAllActionSessionMetas — data layer
-// ═══════════════════════════════════════════════════════
+// ═════════��════════════��══════════════════════════════���═
 
 describe("getAllActionSessionMetas", () => {
   it("is exported from action-session-state.ts", () => {
@@ -24,9 +24,9 @@ describe("getAllActionSessionMetas", () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════
+// ══���═══��════════════════════════════════════════════════
 // 2. useActionSessions hook
-// ═══════════════════════════════════════════════════════
+// ══════════════════════���═════════════════════════════��══
 
 describe("useActionSessions hook", () => {
   const hookPath = "features/dashboard/hooks/useActionSessions.ts";
@@ -63,118 +63,73 @@ describe("useActionSessions hook", () => {
   });
 });
 
-// ═══════════════════════════════════════════════════════
-// 3. ActiveWorkSection component
-// ═══════════════════════════════════════════════════════
+// ═════════════════════════���═════════════════════════════
+// 3. ContinueWhereYouLeftOff replaces ActiveWorkSection
+// ═════════════════════════════════════════���═════════════
 
-describe("ActiveWorkSection component", () => {
-  const componentPath = "features/dashboard/components/ActiveWorkSection.tsx";
+describe("ContinueWhereYouLeftOff component", () => {
+  const componentPath = "features/dashboard/components/ContinueWhereYouLeftOff.tsx";
 
   it("exists as a component file", () => {
     expect(existsSync(resolve(desktopSrc, componentPath))).toBe(true);
   });
 
-  it("imports useActionSessions hook", () => {
+  it('uses "Continue where you left off" label', () => {
     const src = readFile(componentPath);
-    expect(src).toContain("useActionSessions");
+    expect(src).toMatch(/continue where you left off/i);
   });
 
-  it("renders 'Now working on' section for active sessions", () => {
-    const src = readFile(componentPath);
-    expect(src).toContain("Now working on");
-  });
-
-  it("renders 'Recent work' section for completed sessions", () => {
-    const src = readFile(componentPath);
-    expect(src).toContain("Recent work");
-  });
-
-  it("shows action title for each session", () => {
-    const src = readFile(componentPath);
-    expect(src).toContain("actionTitle");
-  });
-
-  it("shows session state/status", () => {
-    const src = readFile(componentPath);
-    expect(src).toContain("state");
-  });
-
-  it("has continue quick action button", () => {
+  it("has continue action for items", () => {
     const src = readFile(componentPath);
     expect(src).toContain("Continue");
+    expect(src).toContain("onContinue");
   });
 
-  it("has review quick action button", () => {
+  it("returns null when no items", () => {
     const src = readFile(componentPath);
-    expect(src).toContain("Review");
-  });
-
-  it("calls onContinueSession when continue is clicked", () => {
-    const src = readFile(componentPath);
-    expect(src).toContain("onContinueSession");
-  });
-
-  it("returns null when no active or recent work exists", () => {
-    const src = readFile(componentPath);
-    // Should check for empty state and return null
     expect(src).toContain("return null");
   });
 
-  it("uses section-label styling for headings", () => {
+  it("uses section-label styling for heading", () => {
     const src = readFile(componentPath);
     expect(src).toContain("section-label");
   });
-
-  it("uses primary color for section icon", () => {
-    const src = readFile(componentPath);
-    expect(src).toContain("text-primary");
-  });
 });
 
-// ═══════════════════════════════════════════════════════
+// ��═══════════��═══════════════════════════════════��══════
 // 4. DashboardWorkspace integration
-// ═══════════════════════════════════════════════════════
+// ═══��═══════════════════════════════════════════════════
 
 describe("DashboardWorkspace active work integration", () => {
-  it("imports ActiveWorkSection", () => {
+  it("imports ContinueWhereYouLeftOff", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
-    expect(src).toContain("ActiveWorkSection");
+    expect(src).toContain("ContinueWhereYouLeftOff");
   });
 
-  it("renders ActiveWorkSection in dashboard", () => {
+  it("renders ContinueWhereYouLeftOff in dashboard", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
-    expect(src).toContain("<ActiveWorkSection");
+    expect(src).toContain("<ContinueWhereYouLeftOff");
   });
 
-  it("uses useActionSessions for mode detection", () => {
+  it("uses useMeaningfulWork for mode detection", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
-    expect(src).toContain("useActionSessions");
+    expect(src).toContain("useMeaningfulWork");
+    expect(src).toContain("meaningfulWork");
   });
 
-  it("passes onContinueSession to ActiveWorkSection", () => {
+  it("passes onContinue to ContinueWhereYouLeftOff", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
-    expect(src).toContain("onContinueSession");
+    expect(src).toContain("onContinue");
   });
 });
 
-// ═══════════════════════════════════════════════════════
-// 5. Mode A stays clean — no active work section when empty
-// ═══════════════════════════════════════════════════════
+// ═══��═══════════════════════════════���═══════════════════
+// 5. Mode A stays clean — no continue section when no meaningful work
+// ═════════════════════��═══════════════════════���═════════
 
 describe("Mode A stays clean", () => {
-  it("ActiveWorkSection returns null when no sessions", () => {
-    const src = readFile("features/dashboard/components/ActiveWorkSection.tsx");
-    // The component should have early return null when both lists are empty
+  it("ContinueWhereYouLeftOff returns null when items is empty", () => {
+    const src = readFile("features/dashboard/components/ContinueWhereYouLeftOff.tsx");
     expect(src).toContain("return null");
-  });
-
-  it("ActiveWorkSection renders before Mode A/B split and self-manages visibility", () => {
-    const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
-    // ActiveWorkSection is rendered outside Mode A/B split — it handles its own visibility
-    const activeWorkPos = src.indexOf("<ActiveWorkSection");
-    const modeSplitPos = src.indexOf("{hasActiveWork ?");
-    expect(activeWorkPos).toBeGreaterThan(-1);
-    expect(modeSplitPos).toBeGreaterThan(-1);
-    expect(activeWorkPos).toBeLessThan(modeSplitPos);
   });
 });

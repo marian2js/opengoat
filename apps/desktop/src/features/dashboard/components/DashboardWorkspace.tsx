@@ -5,12 +5,12 @@ import type { SidecarClient } from "@/lib/sidecar/client";
 import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
 import { getActionMapping } from "@/lib/utils/action-map";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
-import { ActiveWorkSection } from "@/features/dashboard/components/ActiveWorkSection";
+import { ContinueWhereYouLeftOff } from "@/features/dashboard/components/ContinueWhereYouLeftOff";
 import { CompanyUnderstandingHero } from "@/features/dashboard/components/CompanyUnderstandingHero";
 import { DashboardAgentRoster } from "@/features/dashboard/components/DashboardAgentRoster";
 import { PlaybookInputForm } from "@/features/dashboard/components/PlaybookInputForm";
 import { RecommendedJobs } from "@/features/dashboard/components/RecommendedJobs";
-import { NowWorkingOn, NowWorkingOnSkeleton } from "@/features/dashboard/components/NowWorkingOn";
+import { useMeaningfulWork } from "@/features/dashboard/hooks/useMeaningfulWork";
 import { RecentOutputs } from "@/features/dashboard/components/RecentOutputs";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
 import { starterActions } from "@/features/dashboard/data/actions";
@@ -21,10 +21,8 @@ import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSumm
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
 import { useRecommendedJobs } from "@/features/dashboard/hooks/useRecommendedJobs";
 import { useBoardSummary } from "@/features/dashboard/hooks/useBoardSummary";
-import { useActiveObjective } from "@/features/dashboard/hooks/useActiveObjective";
 import { useActionSessions } from "@/features/dashboard/hooks/useActionSessions";
 import { useRuns } from "@/features/dashboard/hooks/useRuns";
-import { useRecentArtifacts } from "@/features/dashboard/hooks/useRecentArtifacts";
 import { useSpecialistRoster } from "@/features/dashboard/hooks/useSpecialistRoster";
 import { truncateSessionLabel } from "@/lib/utils/session-label";
 import { toast } from "sonner";
@@ -120,12 +118,11 @@ function DashboardContent({
   const workspaceReady = !isLoading && files !== null;
   const { suggestedActions, isLoading: isSuggestedLoading } = useSuggestedActions(agentId, client, workspaceReady);
   const boardSummary = useBoardSummary(agentId, client);
-  const activeObjective = useActiveObjective(agentId, client);
   const actionSessions = useActionSessions();
   const runsResult = useRuns(agentId, client);
-  const recentArtifacts = useRecentArtifacts(agentId, client);
   const specialistRoster = useSpecialistRoster(client);
   const recommendedJobs = useRecommendedJobs(suggestedActions, isSuggestedLoading, specialistRoster.specialists);
+  const meaningfulWork = useMeaningfulWork(runsResult.runs, runsResult.isLoading, actionSessions);
 
   // ── Hero data: opportunities + recommended first move ──
   const opportunities = useMemo(
@@ -247,17 +244,8 @@ function DashboardContent({
     [client, suggestedActions, onActionClick, onRunSessionCreated, launchPlaybook],
   );
 
-  // Mode detection: Mode B when active work exists (action sessions OR API runs/objectives)
-  const hasActiveWork =
-    actionSessions.hasActiveWork ||
-    (!activeObjective.isLoading && activeObjective.objective !== null) ||
-    (!runsResult.isLoading && runsResult.runs.length > 0);
-
-  // Latest artifact for NowWorkingOn preview
-  const latestArtifact =
-    recentArtifacts.standaloneArtifacts[0] ??
-    recentArtifacts.bundleGroups[0]?.artifacts[0] ??
-    null;
+  // Mode detection: Mode B only when meaningful, user-owned work exists
+  const hasActiveWork = meaningfulWork.hasMeaningfulWork;
 
   // Free-text submit handler — routes to chat via onActionClick (bypasses playbook check)
   function handleFreeTextSubmit(text: string) {
@@ -325,9 +313,6 @@ function DashboardContent({
         }}
       />
 
-      {/* Active work — always rendered, component self-manages visibility */}
-      <ActiveWorkSection onContinueSession={onResumeRun} onViewResults={onViewResults} />
-
       {hasActiveWork ? (
         /* ═══════════════════════════════════════════════════════
          * Mode B — Active work exists
@@ -342,21 +327,6 @@ function DashboardContent({
             />
           </div>
 
-          {/* Now working on — latest run + output preview + quick actions */}
-          {runsResult.isLoading ? (
-            <div className="dashboard-section pb-4">
-              <NowWorkingOnSkeleton />
-            </div>
-          ) : runsResult.runs.length > 0 ? (
-            <div className="dashboard-section pb-4">
-              <NowWorkingOn
-                runs={runsResult.runs}
-                latestArtifact={latestArtifact}
-                onResumeRun={onResumeRun}
-              />
-            </div>
-          ) : null}
-
           {/* Agent Roster — compact in Mode B */}
           {!specialistRoster.isLoading && specialistRoster.specialists.length > 0 && (
             <div className="dashboard-section">
@@ -366,6 +336,13 @@ function DashboardContent({
               />
             </div>
           )}
+
+          {/* Continue where you left off — compact strip, self-hides when empty */}
+          <ContinueWhereYouLeftOff
+            items={meaningfulWork.items}
+            onContinue={onResumeRun}
+            onViewResults={onViewResults}
+          />
 
           {/* Compact recent work list */}
           <RecentOutputs
@@ -438,6 +415,13 @@ function DashboardContent({
             client={client}
             onNavigate={handleOutputNavigate}
             onSpecialistChat={handleSpecialistChat}
+          />
+
+          {/* Continue where you left off — self-hides when empty */}
+          <ContinueWhereYouLeftOff
+            items={meaningfulWork.items}
+            onContinue={onResumeRun}
+            onViewResults={onViewResults}
           />
 
           {/* Board summary — bottom, only if tasks exist */}

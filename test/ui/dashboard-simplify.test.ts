@@ -39,7 +39,7 @@ describe("Dashboard simplification — Sprint 5 reset", () => {
     });
 
     it("does not render WorkInProgress directly", () => {
-      // WorkInProgress section is replaced by NowWorkingOn in Mode B
+      // WorkInProgress section was replaced by ContinueWhereYouLeftOff
       expect(workspaceSrc).not.toContain("<WorkInProgress");
     });
   });
@@ -78,8 +78,8 @@ describe("Dashboard simplification — Sprint 5 reset", () => {
   describe("AC3: Mode B — active work exists layout", () => {
     const workspaceSrc = readSrc("components/DashboardWorkspace.tsx");
 
-    it("renders NowWorkingOn component", () => {
-      expect(workspaceSrc).toContain("<NowWorkingOn");
+    it("renders ContinueWhereYouLeftOff component", () => {
+      expect(workspaceSrc).toContain("<ContinueWhereYouLeftOff");
     });
 
     it("renders BoardSummary", () => {
@@ -207,27 +207,27 @@ describe("Dashboard simplification — Sprint 5 reset", () => {
     });
   });
 
-  // NowWorkingOn component
-  describe("NowWorkingOn component", () => {
-    it("NowWorkingOn component exists", () => {
+  // ContinueWhereYouLeftOff component (replaced NowWorkingOn)
+  describe("ContinueWhereYouLeftOff component", () => {
+    it("ContinueWhereYouLeftOff component exists", () => {
       expect(
-        existsSync(resolve(dashDir, "components/NowWorkingOn.tsx")),
+        existsSync(resolve(dashDir, "components/ContinueWhereYouLeftOff.tsx")),
       ).toBe(true);
     });
 
-    it("shows 'Now working on' label", () => {
-      const src = readSrc("components/NowWorkingOn.tsx");
-      expect(src).toMatch(/Now working on/i);
+    it("shows 'Continue where you left off' label", () => {
+      const src = readSrc("components/ContinueWhereYouLeftOff.tsx");
+      expect(src).toMatch(/continue where you left off/i);
     });
 
-    it("has quick action buttons", () => {
-      const src = readSrc("components/NowWorkingOn.tsx");
+    it("has continue action", () => {
+      const src = readSrc("components/ContinueWhereYouLeftOff.tsx");
       expect(src).toContain("Continue");
     });
 
-    it("has review and board links", () => {
-      const src = readSrc("components/NowWorkingOn.tsx");
-      expect(src).toContain("Open Board");
+    it("returns null when items is empty", () => {
+      const src = readSrc("components/ContinueWhereYouLeftOff.tsx");
+      expect(src).toContain("return null");
     });
   });
 });
