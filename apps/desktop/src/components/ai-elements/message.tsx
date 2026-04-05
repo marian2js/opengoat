@@ -68,7 +68,7 @@ export const MessageAvatar = ({
 }: MessageAvatarProps) => (
   <div
     className={cn(
-      "flex size-6 shrink-0 items-center justify-center rounded-full",
+      "flex size-7 shrink-0 items-center justify-center rounded-full",
       from === "user"
         ? "bg-secondary text-muted-foreground"
         : "bg-primary/10 text-primary",
@@ -77,9 +77,9 @@ export const MessageAvatar = ({
     {...props}
   >
     {from === "user" ? (
-      <UserIcon className="size-3.5" />
+      <UserIcon className="size-4" />
     ) : (
-      <SparklesIcon className="size-3.5" />
+      <SparklesIcon className="size-4" />
     )}
   </div>
 );
