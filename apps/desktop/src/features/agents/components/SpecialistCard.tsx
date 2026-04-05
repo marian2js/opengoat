@@ -99,7 +99,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
                 "rounded-md px-2 py-0.5 text-[11px] font-medium",
                 isManager
                   ? "border border-primary/15 bg-primary/[0.05] text-primary/80 dark:border-primary/10 dark:text-primary/70"
-                  : "border border-border/40 bg-muted/50 text-muted-foreground dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-zinc-400",
+                  : cn("border bg-muted/30 dark:bg-white/[0.03]", colors.chipBorder, "text-muted-foreground dark:text-zinc-400"),
               )}
             >
               {output}
@@ -177,15 +177,19 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
 
       {/* CTA — separated footer */}
       <div className={cn(
-        "border-t px-5 py-3.5",
+        "border-t px-5 py-3",
         isManager ? "border-primary/10 bg-primary/[0.02] dark:border-primary/[0.06]" : "border-border/20 dark:border-white/[0.04]",
       )}>
         <Button
           size="sm"
-          variant={isManager ? "default" : "outline"}
+          variant={isManager ? "default" : "ghost"}
           className={cn(
-            "h-9 w-full rounded-lg text-[12px] font-medium",
-            !isManager && "border-border/40 hover:border-primary/40 hover:bg-primary/[0.04] hover:text-primary dark:border-white/[0.08]",
+            "h-8 w-full rounded-lg text-[12px] font-medium",
+            isManager && "shadow-sm shadow-primary/20",
+            !isManager && cn(
+              "text-muted-foreground hover:text-primary hover:bg-primary/[0.05]",
+              "dark:text-zinc-400 dark:hover:text-primary dark:hover:bg-primary/[0.06]",
+            ),
           )}
           onClick={() => onChat(specialist.id)}
         >
