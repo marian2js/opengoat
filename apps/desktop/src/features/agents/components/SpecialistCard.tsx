@@ -187,8 +187,8 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
             "h-8 w-full rounded-lg text-[12px] font-medium",
             isManager && "shadow-sm shadow-primary/20",
             !isManager && cn(
-              "text-muted-foreground hover:text-primary hover:bg-primary/[0.05]",
-              "dark:text-zinc-400 dark:hover:text-primary dark:hover:bg-primary/[0.06]",
+              "border border-border/30 text-muted-foreground hover:border-primary/25 hover:text-primary hover:bg-primary/[0.05]",
+              "dark:border-white/[0.06] dark:text-zinc-400 dark:hover:border-primary/20 dark:hover:text-primary dark:hover:bg-primary/[0.06]",
             ),
           )}
           onClick={() => onChat(specialist.id)}
