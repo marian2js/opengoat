@@ -20,7 +20,7 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
     <button
       type="button"
       className={cn(
-        "group/chip flex w-full flex-col gap-2.5 rounded-xl border p-4 text-left transition-all duration-100",
+        "group/chip relative flex w-full flex-col gap-2.5 overflow-hidden rounded-xl border p-4 text-left transition-all duration-100",
         "hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-black/20",
         isManager
           ? "border-primary/25 bg-primary/[0.03] ring-1 ring-primary/[0.08] hover:border-primary/40 hover:ring-primary/15"
@@ -28,13 +28,18 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
       )}
       onClick={() => onChat(specialist.id)}
     >
+      {/* Left color accent bar */}
+      {!isManager && (
+        <div className={cn("absolute inset-y-0 left-0 w-[2px] opacity-40 transition-opacity group-hover/chip:opacity-80", colors.dotColor.replace("/40", ""))} />
+      )}
+
       {/* Header: icon + name + badge */}
       <div className="flex items-center gap-3">
         <div
           className={cn(
-            "flex shrink-0 items-center justify-center rounded-lg shadow-sm",
+            "flex shrink-0 items-center justify-center rounded-lg",
             isManager
-              ? "size-10 bg-primary/12 ring-1 ring-primary/15"
+              ? "size-10 bg-primary/12 ring-1 ring-primary/15 shadow-sm"
               : cn("size-8 ring-1 ring-black/[0.03] dark:ring-white/[0.06]", colors.iconBg),
           )}
         >
@@ -47,7 +52,7 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className={cn(
-              "font-semibold leading-tight text-foreground",
+              "font-display font-bold leading-tight text-foreground",
               isManager ? "text-[14px]" : "text-[13px]",
             )}>
               {specialist.name}
