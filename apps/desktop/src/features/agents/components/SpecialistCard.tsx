@@ -34,6 +34,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
     <article
       className={cn(
         "group/card relative flex flex-col rounded-xl border bg-card transition-all duration-100 ease-out",
+        "shadow-sm shadow-black/[0.02] dark:shadow-black/15",
         "hover:-translate-y-px hover:shadow-md hover:border-primary/25",
         isManager
           ? "border-primary/20 bg-primary/[0.02] ring-1 ring-primary/[0.06] hover:ring-primary/10"

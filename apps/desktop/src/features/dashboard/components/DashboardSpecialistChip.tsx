@@ -21,6 +21,7 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
       type="button"
       className={cn(
         "group/chip relative flex w-full flex-col gap-2.5 overflow-hidden rounded-xl border p-4 text-left transition-all duration-100",
+        "shadow-sm shadow-black/[0.02] dark:shadow-black/15",
         "hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-black/20",
         isManager
           ? "border-primary/25 bg-primary/[0.03] ring-1 ring-primary/[0.08] hover:border-primary/40 hover:ring-primary/15"
