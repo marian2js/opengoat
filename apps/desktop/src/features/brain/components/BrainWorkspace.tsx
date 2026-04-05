@@ -24,7 +24,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { SidecarClient } from "@/lib/sidecar/client";
+import { formatRelativeTime } from "@/lib/utils/output-labels";
 import { isRefinableSection } from "@/features/brain/lib/refine-context-prompt";
+import {
+  getSectionTimestamp,
+  setSectionTimestamp,
+  setContentHash,
+  hasContentChanged,
+} from "@/features/brain/lib/brain-section-timestamps";
 import { OperatingMemorySection } from "./OperatingMemorySection";
 import { SpecialistContextSection } from "./SpecialistContextSection";
 
@@ -395,6 +402,7 @@ function BrainEditor({
   const [isEditing, setIsEditing] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [fileExists, setFileExists] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -419,6 +427,21 @@ function BrainEditor({
           }
         }
 
+        // Detect external changes (e.g. from Refine context) and update timestamp
+        if (result.exists && loaded) {
+          if (hasContentChanged(agentId, section.filename, loaded)) {
+            const existing = getSectionTimestamp(agentId, section.filename);
+            if (existing) {
+              // Content changed externally — update timestamp
+              setSectionTimestamp(agentId, section.filename);
+            }
+            setContentHash(agentId, section.filename, loaded);
+          }
+          setLastUpdated(getSectionTimestamp(agentId, section.filename));
+        } else {
+          setLastUpdated(null);
+        }
+
         setContent(loaded);
         setFileExists(result.exists);
         setIsLoading(false);
@@ -427,12 +450,13 @@ function BrainEditor({
         if (cancelled) return;
         setContent("");
         setFileExists(false);
+        setLastUpdated(null);
         setIsLoading(false);
       },
     );
 
     return () => { cancelled = true; };
-  }, [agentId, client, section.filename]);
+  }, [agentId, client, section.filename, section.id]);
 
   // Focus textarea when entering edit mode
   useEffect(() => {
@@ -453,6 +477,9 @@ function BrainEditor({
           () => {
             setFileExists(true);
             setSaveState("saved");
+            setSectionTimestamp(agentId, section.filename);
+            setContentHash(agentId, section.filename, value);
+            setLastUpdated(getSectionTimestamp(agentId, section.filename));
             savedTimerRef.current = setTimeout(() => setSaveState("idle"), 2000);
           },
           () => {
@@ -492,6 +519,9 @@ function BrainEditor({
         () => {
           setFileExists(true);
           setSaveState("saved");
+          setSectionTimestamp(agentId, section.filename);
+          setContentHash(agentId, section.filename, content);
+          setLastUpdated(getSectionTimestamp(agentId, section.filename));
           savedTimerRef.current = setTimeout(() => setSaveState("idle"), 2000);
         },
         () => setSaveState("idle"),
@@ -544,7 +574,7 @@ function BrainEditor({
 
     return (
       <div className="flex flex-1 flex-col overflow-y-auto">
-        <SectionHeader section={section} saveState={saveState} fileExists={fileExists}>
+        <SectionHeader section={section} saveState={saveState} fileExists={fileExists} lastUpdated={lastUpdated}>
           {section.id === "knowledge-base" ? (
             <ImportButton fileInputRef={fileInputRef} onImport={handleImport} onFileSelected={handleFileSelected} />
           ) : null}
@@ -597,7 +627,7 @@ function BrainEditor({
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      <SectionHeader section={section} saveState={saveState} fileExists={fileExists}>
+      <SectionHeader section={section} saveState={saveState} fileExists={fileExists} lastUpdated={lastUpdated}>
         {section.id === "knowledge" ? (
           <ImportButton fileInputRef={fileInputRef} onImport={handleImport} onFileSelected={handleFileSelected} />
         ) : null}
@@ -1148,11 +1178,13 @@ function SectionHeader({
   section,
   saveState,
   fileExists,
+  lastUpdated,
   children,
 }: {
   section: BrainSection;
   saveState: "idle" | "saving" | "saved";
   fileExists: boolean;
+  lastUpdated?: string | null;
   children?: React.ReactNode;
 }) {
   return (
@@ -1162,7 +1194,14 @@ function SectionHeader({
           <section.icon className="size-3.5 text-primary" />
         </div>
         <div>
-          <h2 className="font-display text-sm font-bold tracking-tight">{section.label}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-display text-sm font-bold tracking-tight">{section.label}</h2>
+            {lastUpdated && (
+              <span className="text-[11px] font-mono text-muted-foreground/60 tabular-nums">
+                Updated {formatRelativeTime(lastUpdated)}
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-muted-foreground/70">{section.description}</p>
         </div>
       </div>
