@@ -131,8 +131,8 @@ describe("ArtifactCard summary filtering", () => {
     expect(src).toMatch(/!isConversationalTitle\(artifact\.summary\)/);
   });
 
-  it("ArtifactCard still applies stripMarkdown to non-conversational summaries", () => {
+  it("ArtifactCard strips title echo from summary via stripTitleFromPreview", () => {
     const src = readFileSync(artifactCardPath, "utf-8");
-    expect(src).toMatch(/stripMarkdown\(artifact\.summary\)/);
+    expect(src).toMatch(/stripTitleFromPreview\(/);
   });
 });
