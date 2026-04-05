@@ -20,20 +20,20 @@ export function HeroRecommendedMove({
       <button
         type="button"
         onClick={() => onActionClick?.(recommendation.actionId)}
-        className="group/move mt-2 flex w-full items-center gap-3 rounded-lg border border-border/40 bg-card/60 px-4 py-3 text-left transition-all duration-100 hover:border-primary/25 hover:bg-primary/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02] dark:hover:border-primary/20 dark:hover:bg-primary/[0.04]"
+        className="group/move mt-2.5 flex w-full items-center gap-3 rounded-xl border border-primary/15 bg-primary/[0.03] px-4 py-3.5 text-left transition-all duration-100 hover:-translate-y-px hover:border-primary/30 hover:bg-primary/[0.06] hover:shadow-sm hover:shadow-primary/5 dark:border-primary/10 dark:bg-primary/[0.03] dark:hover:border-primary/25 dark:hover:bg-primary/[0.06]"
       >
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary transition-colors duration-100 group-hover/move:bg-primary group-hover/move:text-white">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary transition-colors duration-100 group-hover/move:bg-primary group-hover/move:text-white">
           <ZapIcon className="size-3.5" />
         </div>
         <div className="min-w-0 flex-1">
-          <span className="text-[14px] font-medium text-foreground">
+          <span className="text-[14px] font-semibold text-foreground">
             {recommendation.actionTitle}
           </span>
-          <span className="ml-2 text-[13px] text-zinc-500 dark:text-zinc-400">
+          <p className="mt-0.5 text-[12px] text-zinc-500 dark:text-zinc-400">
             with {recommendation.specialistName}
-          </span>
+          </p>
         </div>
-        <ArrowRightIcon className="size-4 text-muted-foreground/30 transition-all duration-100 group-hover/move:translate-x-0.5 group-hover/move:text-primary" />
+        <ArrowRightIcon className="size-4 text-primary/30 transition-all duration-100 group-hover/move:translate-x-0.5 group-hover/move:text-primary" />
       </button>
     </div>
   );

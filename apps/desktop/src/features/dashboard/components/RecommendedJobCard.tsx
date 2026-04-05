@@ -14,13 +14,18 @@ export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardP
   return (
     <button
       type="button"
-      className={`group/job flex flex-col items-start gap-3 rounded-xl border bg-card p-4 text-left transition-all duration-100 ease-out ${
+      className={`group/job relative flex flex-col items-start gap-2.5 overflow-hidden rounded-xl border bg-card text-left transition-all duration-100 ease-out ${
         isHero
-          ? "border-border/30 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-black/5 dark:border-white/[0.08] dark:hover:shadow-black/20"
-          : "border-border/20 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md hover:shadow-black/5 dark:border-white/[0.06] dark:hover:shadow-black/20"
+          ? "border-primary/15 p-5 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 dark:border-primary/10 dark:hover:border-primary/25 dark:hover:shadow-primary/5"
+          : "border-border/20 p-4 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md hover:shadow-black/5 dark:border-white/[0.06] dark:hover:shadow-black/20"
       }`}
       onClick={() => onClick?.(job.id, buildActionPrompt(job), job.title)}
     >
+      {/* Left accent bar for hero card */}
+      {isHero && (
+        <div className="absolute inset-y-0 left-0 w-[3px] bg-primary/40 transition-colors group-hover/job:bg-primary" />
+      )}
+
       {/* Specialist attribution */}
       {job.specialistName && (
         <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
@@ -32,7 +37,7 @@ export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardP
       {/* Job title */}
       <h3
         className={`font-display leading-snug font-bold transition-colors group-hover/job:text-primary ${
-          isHero ? "text-[15px]" : "text-sm"
+          isHero ? "text-[16px]" : "text-sm"
         }`}
       >
         {job.title}
@@ -44,7 +49,9 @@ export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardP
       </p>
 
       {/* CTA */}
-      <span className="mt-auto inline-flex items-center gap-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40 transition-colors group-hover/job:text-primary">
+      <span className={`mt-auto inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors group-hover/job:text-primary ${
+        isHero ? "text-primary/50" : "text-muted-foreground/40"
+      }`}>
         Start
         <ArrowRightIcon className="size-3 transition-transform duration-150 group-hover/job:translate-x-0.5" />
       </span>

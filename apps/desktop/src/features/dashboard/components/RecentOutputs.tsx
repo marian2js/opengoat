@@ -89,10 +89,10 @@ export function RecentOutputs({ agentId, client, onPreview, onNavigate, onSpecia
       {/* Empty state — proof-of-value gallery */}
       {isEmpty ? (
         <div className="ml-9">
-          <p className="mb-3 text-[13px] font-medium text-muted-foreground">
+          <p className="mb-3 text-[13px] text-muted-foreground">
             Your team can produce:
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
             {EXAMPLE_OUTPUTS.map((example, idx) => {
               const typeConfig = getArtifactTypeConfig(example.type);
               const specialist = getSpecialistMeta(example.specialistId);
@@ -103,7 +103,7 @@ export function RecentOutputs({ agentId, client, onPreview, onNavigate, onSpecia
                 <button
                   key={example.name}
                   type="button"
-                  className="group/example flex flex-col items-start gap-1.5 rounded-lg border border-dashed border-border/40 p-3 text-left transition-colors hover:border-border/70 hover:bg-muted/30"
+                  className="group/example flex flex-col items-start gap-2 rounded-lg border border-border/20 bg-card/50 p-3 text-left transition-all duration-100 hover:-translate-y-px hover:border-primary/20 hover:bg-card hover:shadow-sm dark:border-white/[0.04] dark:hover:border-primary/15 dark:hover:bg-white/[0.03]"
                   onClick={() => onSpecialistChat?.(example.specialistId)}
                 >
                   {/* Type badge */}
@@ -117,13 +117,16 @@ export function RecentOutputs({ agentId, client, onPreview, onNavigate, onSpecia
                   </span>
 
                   {/* Specialist attribution */}
-                  <span className={`text-[11px] ${colors.iconText}`}>
-                    {specialist?.name}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-block size-1.5 rounded-full ${colors.dotColor}`} />
+                    <span className="text-[11px] text-muted-foreground/70">
+                      {specialist?.name}
+                    </span>
+                  </div>
 
                   {/* Start CTA — first card only */}
                   {isStartCard && (
-                    <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-primary opacity-70 transition-opacity group-hover/example:opacity-100">
+                    <span className="mt-auto inline-flex items-center gap-1 text-[11px] font-medium text-primary opacity-70 transition-opacity group-hover/example:opacity-100">
                       Start here
                       <ArrowRightIcon className="size-3 transition-transform group-hover/example:translate-x-0.5" />
                     </span>

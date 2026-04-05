@@ -95,15 +95,15 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
       ) : null}
 
       {/* Chat CTA — always visible, more prominent on hover */}
-      <div className="flex justify-end pt-0.5">
+      <div className="mt-auto flex justify-end pt-1">
         <span className={cn(
-          "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors duration-100",
+          "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-all duration-100",
           isManager
-            ? "text-primary/60 group-hover/chip:bg-primary/[0.08] group-hover/chip:text-primary"
-            : cn("text-muted-foreground/40", colors.hoverIconBg, colors.hoverIconText),
+            ? "bg-primary/[0.06] text-primary/70 group-hover/chip:bg-primary/[0.12] group-hover/chip:text-primary"
+            : cn("bg-muted/30 text-muted-foreground/50 dark:bg-white/[0.03]", colors.hoverIconBg, colors.hoverIconText),
         )}>
-          Chat
           <MessageSquareIcon className="size-3" />
+          Chat
         </span>
       </div>
     </button>

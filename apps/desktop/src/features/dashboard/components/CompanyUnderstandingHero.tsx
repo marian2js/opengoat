@@ -79,7 +79,8 @@ export function CompanyUnderstandingHero({
 }: CompanyUnderstandingHeroProps) {
   if (isLoading) {
     return (
-      <div className="mb-8 rounded-2xl border border-border/40 bg-gradient-to-b from-card to-background/60 p-6 shadow-sm dark:border-white/[0.06] dark:from-white/[0.03] dark:to-transparent dark:shadow-none">
+      <div className="relative mb-8 overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-b from-card to-background/60 p-7 shadow-sm dark:border-white/[0.06] dark:from-white/[0.03] dark:to-transparent dark:shadow-none">
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
         <HeroSkeleton />
       </div>
     );
@@ -89,36 +90,39 @@ export function CompanyUnderstandingHero({
   const hasFavicon = domain && faviconSources && faviconSources.length > 0;
 
   return (
-    <div className="mb-8 rounded-2xl border border-border/40 bg-gradient-to-b from-card to-background/60 p-6 shadow-sm dark:border-white/[0.06] dark:from-white/[0.03] dark:to-transparent dark:shadow-none">
+    <div className="relative mb-8 overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-card via-card to-primary/[0.02] p-7 shadow-sm dark:border-white/[0.06] dark:from-white/[0.03] dark:via-white/[0.02] dark:to-primary/[0.03] dark:shadow-none">
+      {/* Top accent line */}
+      <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+
       {/* ── Company identity ── */}
       <div className="flex items-center gap-4">
         {hasFavicon ? (
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-card shadow-sm ring-1 ring-border/30 dark:bg-white/[0.06] dark:ring-white/[0.08]">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-card shadow-sm ring-1 ring-border/30 dark:bg-white/[0.06] dark:ring-white/[0.08]">
             <FaviconIcon
               domain={domain}
               faviconSources={faviconSources}
-              className="size-6 rounded-sm"
+              className="size-7 rounded-sm"
             />
           </div>
         ) : (
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary">
             <GlobeIcon className="size-5" />
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <h2 className="font-display text-[22px] font-bold tracking-[-0.01em] text-foreground">
+          <h2 className="font-display text-[24px] font-bold tracking-[-0.02em] text-foreground">
             {domain ?? "Project"}
           </h2>
           {hasAnyData && data?.productSummary ? (
-            <p className="mt-0.5 line-clamp-3 text-[15px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 line-clamp-3 text-[15px] leading-relaxed text-zinc-500 dark:text-zinc-400">
               {data.productSummary}
             </p>
           ) : error ? (
-            <p className="mt-0.5 text-[13px] text-muted-foreground">
+            <p className="mt-1 text-[13px] text-muted-foreground">
               Unable to load project context
             </p>
           ) : (
-            <p className="mt-0.5 text-[13px] text-muted-foreground">
+            <p className="mt-1 text-[13px] text-muted-foreground">
               No project context yet
             </p>
           )}
@@ -127,7 +131,7 @@ export function CompanyUnderstandingHero({
 
       {/* ── Opportunity bullets + Recommended move ── */}
       {hasAnyData && (
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <HeroOpportunityBullets
             opportunities={opportunities}
             mainRisk={data?.mainRisk ?? null}
@@ -141,7 +145,7 @@ export function CompanyUnderstandingHero({
       )}
 
       {/* ── CMO input embedded in hero ── */}
-      <div className="mt-5">
+      <div className="mt-6">
         <FreeTextInput onSubmit={onFreeTextSubmit} />
       </div>
     </div>

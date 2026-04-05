@@ -47,7 +47,7 @@ export function HeroOpportunityBullets({
       <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-primary">
         WHAT MATTERS NOW
       </span>
-      <ul className="mt-2 space-y-1.5">
+      <ul className="mt-2.5 space-y-2">
         {bullets.map((bullet) => (
           <li key={bullet.key} className="flex items-start gap-2.5">
             {bullet.isRisk ? (
