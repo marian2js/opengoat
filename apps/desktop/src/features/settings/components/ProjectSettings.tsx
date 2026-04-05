@@ -200,10 +200,11 @@ export function ProjectSettings({
       </div>
 
       {/* ---- Model ---- */}
-      <Card className="border-border/40 transition-all duration-150 hover:border-border/60 hover:shadow-sm dark:border-white/[0.06] dark:hover:border-white/[0.10]">
+      <Card className="relative overflow-hidden border-primary/15 bg-primary/[0.015] transition-all duration-150 hover:border-primary/25 hover:shadow-sm dark:border-primary/[0.08] dark:bg-primary/[0.01] dark:hover:border-primary/[0.15]">
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
         <CardHeader>
           <div className="flex items-center gap-2.5">
-            <div className="flex size-7 items-center justify-center rounded-md bg-primary/8">
+            <div className="flex size-7 items-center justify-center rounded-md bg-primary/12 ring-1 ring-primary/10">
               <CpuIcon className="size-3.5 text-primary" />
             </div>
             <div>
