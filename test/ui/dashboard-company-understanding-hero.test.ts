@@ -191,6 +191,22 @@ describe("HeroOpportunityBullets", () => {
     const src = readSrc("components/HeroOpportunityBullets.tsx");
     expect(src).toContain("if (bullets.length === 0) return null");
   });
+
+  it("does not use JS character truncation on risk text", () => {
+    const src = readSrc("components/HeroOpportunityBullets.tsx");
+    expect(src).not.toContain(".slice(0, 77)");
+    expect(src).not.toContain('+ "..."');
+  });
+
+  it("uses CSS line-clamp-2 for risk bullet text", () => {
+    const src = readSrc("components/HeroOpportunityBullets.tsx");
+    expect(src).toContain("line-clamp-2");
+  });
+
+  it("provides full text via title attribute for hover tooltip", () => {
+    const src = readSrc("components/HeroOpportunityBullets.tsx");
+    expect(src).toContain("title={bullet.text}");
+  });
 });
 
 // ═══════════════════════════════════════════════════════

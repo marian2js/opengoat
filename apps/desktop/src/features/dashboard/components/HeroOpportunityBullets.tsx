@@ -35,7 +35,7 @@ export function HeroOpportunityBullets({
     bullets.push({
       key: "main-risk",
       color: "bg-amber-500",
-      text: mainRisk.length > 80 ? mainRisk.slice(0, 77) + "..." : mainRisk,
+      text: mainRisk,
       isRisk: true,
     });
   }
@@ -57,7 +57,10 @@ export function HeroOpportunityBullets({
                 className={`mt-[7px] block size-1.5 shrink-0 rounded-full ${bullet.color}`}
               />
             )}
-            <span className="text-[13px] leading-snug text-zinc-600 dark:text-zinc-400">
+            <span
+              className={`text-[13px] leading-snug text-zinc-600 dark:text-zinc-400${bullet.isRisk ? " line-clamp-2" : ""}`}
+              title={bullet.text}
+            >
               {bullet.text}
             </span>
           </li>
