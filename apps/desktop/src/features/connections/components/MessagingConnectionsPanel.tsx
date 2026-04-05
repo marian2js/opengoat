@@ -219,6 +219,15 @@ export function MessagingConnectionsPanel({
                 messaging apps.
               </p>
             </div>
+            <Button
+              type="button"
+              size="sm"
+              className="mt-1 h-8 rounded-md bg-primary px-4 text-[12px] font-medium text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90"
+              onClick={() => setShowTypeSelector(true)}
+            >
+              <PlusIcon className="size-3.5" />
+              Add channel
+            </Button>
           </div>
         </div>
       ) : null}
