@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { AlertCircleIcon, LayoutDashboardIcon, ListChecksIcon, MessageCircleIcon, MessageSquareIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
+import { AlertCircleIcon, LayoutDashboardIcon, ListChecksIcon, MessageSquareIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskList } from "@/features/board/hooks/useTaskList";
@@ -160,17 +160,16 @@ function BoardContent({
         </div>
       ) : tasks.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center text-muted-foreground">
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-muted/50">
-              <ListChecksIcon className="size-6 text-muted-foreground/50" />
+          <div className="flex flex-col items-center gap-5">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/8 ring-1 ring-primary/10">
+              <ListChecksIcon className="size-6 text-primary/60" />
             </div>
             <div className="flex flex-col items-center gap-1.5">
-              <h3 className="text-sm font-medium text-foreground">
+              <h3 className="font-display text-[15px] font-bold tracking-tight text-foreground">
                 No tasks yet
               </h3>
-              <p className="max-w-[280px] text-center text-xs leading-relaxed text-muted-foreground/70">
-                Tasks will appear here when created through actions or
-                chat.
+              <p className="max-w-[300px] text-center text-[13px] leading-relaxed text-muted-foreground/70">
+                Tasks appear here when specialists create follow-up items from actions or chat conversations.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -182,7 +181,7 @@ function BoardContent({
               </Button>
               <Button asChild variant="outline" size="sm">
                 <a href="#chat">
-                  <MessageCircleIcon data-icon="inline-start" className="size-3.5" />
+                  <MessageSquareIcon data-icon="inline-start" className="size-3.5" />
                   Start a Chat
                 </a>
               </Button>
