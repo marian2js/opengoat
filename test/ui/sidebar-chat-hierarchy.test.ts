@@ -23,11 +23,11 @@ describe("Chat sidebar visual hierarchy", () => {
     expect(sidebarSrc).toMatch(/tracking-\[0\.1em\]/);
   });
 
-  // AC2: Active conversation has a clear visual indicator (teal accent)
-  it("active conversation has a teal left border indicator", () => {
+  // AC2: Active conversation has a clear visual indicator (emerald accent)
+  it("active conversation has a left border indicator with primary color", () => {
     expect(sidebarSrc).toMatch(/border-l.*primary|border-primary/);
-    // The active state should reference isActive for the teal border
-    expect(sidebarSrc).toMatch(/isActive.*border-l|border-l.*isActive/);
+    // The active state controls the border color (primary vs transparent)
+    expect(sidebarSrc).toMatch(/isActive.*border-primary/);
   });
 
   // AC3: Message counts as badges (not inline parenthetical)

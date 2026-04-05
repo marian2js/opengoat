@@ -703,7 +703,8 @@ function SessionItem({
           onSelect?.(session.id);
         }}
         className={cn(
-          isActive && "border-l-2 border-primary bg-primary/[0.08] font-medium",
+          "border-l-2",
+          isActive ? "border-primary bg-primary/[0.08] font-medium" : "border-transparent",
           deEmphasized && !isActive && "opacity-50",
           unnamed && !isActive && "text-sidebar-foreground/50",
         )}
