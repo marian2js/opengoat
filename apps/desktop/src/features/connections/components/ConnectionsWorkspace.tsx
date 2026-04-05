@@ -131,6 +131,21 @@ export function ConnectionsWorkspace({
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4">
+      {/* Page header */}
+      <div className="flex items-start gap-4">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 shadow-sm ring-1 ring-primary/15">
+          <Link2Icon className="size-6 text-primary" />
+        </div>
+        <div>
+          <h1 className="font-display text-[26px] font-bold tracking-[-0.02em] text-foreground">
+            Connections
+          </h1>
+          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+            Manage your AI provider connections and messaging integrations.
+          </p>
+        </div>
+      </div>
+
       {errorMessage ? (
         <MessageBanner tone="error">{errorMessage}</MessageBanner>
       ) : null}
@@ -145,7 +160,7 @@ export function ConnectionsWorkspace({
             <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
               <Link2Icon className="size-3.5 text-primary" />
             </div>
-            <h2 className="section-label">Connections</h2>
+            <h2 className="section-label">AI Providers</h2>
             <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
               {storedConnections.length}
             </span>
