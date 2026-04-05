@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cleanProviderName } from "@/features/agents/display-helpers";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { toast } from "sonner";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
@@ -101,7 +102,10 @@ export function ProjectSettings({
   const [models, setModels] = useState<ProviderModelOption[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
 
-  // Build provider list: connected provider IDs with display names from the providers catalog
+  // Build provider list: connected provider IDs with human-readable display names
+  const connectionNameMap = new Map(
+    (authOverview?.connections ?? []).map((c) => [c.providerId, c.providerName]),
+  );
   const providerNameMap = new Map(
     (authOverview?.providers ?? []).map((p) => [p.id, p.name]),
   );
@@ -110,7 +114,7 @@ export function ProjectSettings({
     : [];
   const connectedProviders = connectedProviderIds.map((pid) => ({
     providerId: pid,
-    displayName: providerNameMap.get(pid) ?? pid,
+    displayName: cleanProviderName(connectionNameMap.get(pid) ?? providerNameMap.get(pid) ?? pid),
   }));
 
   // Load model catalog when provider changes
