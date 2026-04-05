@@ -397,7 +397,7 @@ export function AppSidebar({
                                   markActionSession(session.id); // backfill localStorage
                                 }
                                 const label = formatSessionLabel(session);
-                                const timestamp = duplicateLabels.has(baseLabel(label))
+                                const timestamp = (isRecent || duplicateLabels.has(baseLabel(label)))
                                   ? formatShortTime(session.createdAt)
                                   : undefined;
                                 return (
