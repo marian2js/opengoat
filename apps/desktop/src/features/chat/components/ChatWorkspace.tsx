@@ -11,6 +11,7 @@ import {
   TrendingUpIcon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AuthOverview, ChatBootstrap } from "@/app/types";
 import {
@@ -446,6 +447,18 @@ function ChatSessionView({
     ? getSpecialistMeta(effectiveSpecialistId)
     : undefined;
 
+  // Specialist-colored avatar for streaming indicator
+  const streamingSpecialistAvatar = useMemo(() => {
+    if (!effectiveSpecialistId) return undefined;
+    const colors = getSpecialistColors(effectiveSpecialistId);
+    const SpecIcon = effectiveSpecialistMeta ? resolveSpecialistIcon(effectiveSpecialistMeta.icon) : SparklesIcon;
+    return (
+      <div className={cn("flex size-7 shrink-0 items-center justify-center rounded-full", colors.iconBg)}>
+        <SpecIcon className={cn("size-4", colors.iconText)} />
+      </div>
+    );
+  }, [effectiveSpecialistId, effectiveSpecialistMeta]);
+
   // Starter prompts: specialist-specific or default CMO starters
   const starterPrompts = useMemo(() => {
     if (!effectiveSpecialistId) return DEFAULT_STARTER_PROMPTS;
@@ -761,6 +774,7 @@ function ChatSessionView({
               sessionId={bootstrap.session.id}
               currentSpecialistId={currentSpecialistId}
               currentSpecialistName={currentSpecialistName}
+              specialistAvatar={streamingSpecialistAvatar}
               onNavigate={onNavigate}
             />
           ))
@@ -768,7 +782,7 @@ function ChatSessionView({
 
         {isStreaming && latestMessage?.role === "user" ? (
           isAction && visibleMessages.length === 0 ? null : (
-            <Message from="assistant">
+            <Message from="assistant" avatar={streamingSpecialistAvatar}>
               <Reasoning isStreaming>
                 <ReasoningTrigger />
               </Reasoning>
@@ -857,6 +871,7 @@ function ChatMessage({
   sessionId,
   currentSpecialistId,
   currentSpecialistName,
+  specialistAvatar,
   onNavigate,
 }: {
   isStreaming: boolean;
@@ -870,6 +885,7 @@ function ChatMessage({
   sessionId?: string | undefined;
   currentSpecialistId?: string | undefined;
   currentSpecialistName?: string | undefined;
+  specialistAvatar?: ReactNode | undefined;
   onNavigate?: ((specialistId: string) => void) | undefined;
 }) {
   const activityParts = getActivityParts(message);
@@ -968,7 +984,7 @@ function ChatMessage({
   }
 
   return (
-    <Message from="assistant">
+    <Message from="assistant" avatar={specialistAvatar}>
       {activityParts.length > 0 || isThinking ? (
         <Reasoning isStreaming={isThinking} defaultOpen={false}>
           <ReasoningTrigger />

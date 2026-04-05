@@ -24,7 +24,7 @@ import {
   SparklesIcon,
   UserIcon,
 } from "lucide-react";
-import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
+import type { ComponentProps, HTMLAttributes, ReactElement, ReactNode } from "react";
 import {
   createContext,
   memo,
@@ -38,9 +38,10 @@ import { Streamdown } from "streamdown";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
+  avatar?: ReactNode;
 };
 
-export const Message = ({ className, from, children, ...props }: MessageProps) => (
+export const Message = ({ className, from, avatar, children, ...props }: MessageProps) => (
   <div
     className={cn(
       "group flex w-full max-w-[95%] items-start gap-2",
@@ -51,7 +52,7 @@ export const Message = ({ className, from, children, ...props }: MessageProps) =
     )}
     {...props}
   >
-    <MessageAvatar from={from} />
+    {avatar ?? <MessageAvatar from={from} />}
     <div className="flex min-w-0 max-w-full flex-1 flex-col gap-2">
       {children}
     </div>
