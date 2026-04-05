@@ -65,20 +65,17 @@ describe("ActiveWorkSection self-manages visibility", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("Dashboard layout order", () => {
-  it("renders CompanySummary, FreeTextInput, ActiveWorkSection in order before mode split", () => {
+  it("renders CompanyUnderstandingHero, ActiveWorkSection in order before mode split", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
-    const companySummaryPos = src.indexOf("<CompanySummary");
-    const freeTextPos = src.indexOf("<FreeTextInput");
+    const heroPos = src.indexOf("<CompanyUnderstandingHero");
     const activeWorkPos = src.indexOf("<ActiveWorkSection");
     const modeSplitPos = src.indexOf("{hasActiveWork ?");
 
-    expect(companySummaryPos).toBeGreaterThan(-1);
-    expect(freeTextPos).toBeGreaterThan(-1);
+    expect(heroPos).toBeGreaterThan(-1);
     expect(activeWorkPos).toBeGreaterThan(-1);
     expect(modeSplitPos).toBeGreaterThan(-1);
 
-    expect(companySummaryPos).toBeLessThan(freeTextPos);
-    expect(freeTextPos).toBeLessThan(activeWorkPos);
+    expect(heroPos).toBeLessThan(activeWorkPos);
     expect(activeWorkPos).toBeLessThan(modeSplitPos);
   });
 });

@@ -40,12 +40,11 @@ void test("DashboardWorkspace: imports ObjectiveCreationSheet component", () => 
   );
 });
 
-void test("DashboardWorkspace: renders objective section before company summary", () => {
-  const objectiveJsxIdx = src.indexOf("<ActiveObjectiveSection");
-  const companyJsxIdx = src.indexOf("<CompanySummary");
+void test("DashboardWorkspace: renders CompanyUnderstandingHero", () => {
+  const heroIdx = src.indexOf("<CompanyUnderstandingHero");
   assert.ok(
-    objectiveJsxIdx > 0 && companyJsxIdx > 0 && objectiveJsxIdx < companyJsxIdx,
-    "Expected objective section JSX to render above company summary JSX",
+    heroIdx > 0,
+    "Expected CompanyUnderstandingHero JSX in DashboardWorkspace",
   );
 });
 

@@ -1,21 +1,22 @@
 import { LayoutDashboardIcon } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { AgentSession, ArtifactRecord, PlaybookManifest } from "@opengoat/contracts";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
 import { getActionMapping } from "@/lib/utils/action-map";
 import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
 import { ActiveWorkSection } from "@/features/dashboard/components/ActiveWorkSection";
-import { CompanySummary } from "@/features/dashboard/components/CompanySummary";
+import { CompanyUnderstandingHero } from "@/features/dashboard/components/CompanyUnderstandingHero";
 import { DashboardAgentRoster } from "@/features/dashboard/components/DashboardAgentRoster";
 import { PlaybookInputForm } from "@/features/dashboard/components/PlaybookInputForm";
 import { SuggestedActionGrid } from "@/features/dashboard/components/SuggestedActionGrid";
-import { FreeTextInput } from "@/features/dashboard/components/FreeTextInput";
 import { NowWorkingOn, NowWorkingOnSkeleton } from "@/features/dashboard/components/NowWorkingOn";
 import { RecentOutputs } from "@/features/dashboard/components/RecentOutputs";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
 import { starterActions } from "@/features/dashboard/data/actions";
+import { extractOpportunities } from "@/features/dashboard/data/opportunities";
 import { buildRunPrompt } from "@/features/dashboard/lib/run-prompt-composer";
+import { pickBestFirstMove } from "@/features/dashboard/lib/hero-recommendation";
 import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSummary";
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
 import { useBoardSummary } from "@/features/dashboard/hooks/useBoardSummary";
@@ -123,6 +124,16 @@ function DashboardContent({
   const runsResult = useRuns(agentId, client);
   const recentArtifacts = useRecentArtifacts(agentId, client);
   const specialistRoster = useSpecialistRoster(client);
+
+  // ── Hero data: opportunities + recommended first move ──
+  const opportunities = useMemo(
+    () => (files ? extractOpportunities(files) : []),
+    [files],
+  );
+  const heroRecommendation = useMemo(
+    () => pickBestFirstMove(opportunities, starterActions, specialistRoster.specialists),
+    [opportunities, specialistRoster.specialists],
+  );
 
   // ── Playbook launch state ──
   const [playbookFormOpen, setPlaybookFormOpen] = useState(false);
@@ -294,21 +305,23 @@ function DashboardContent({
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
       <div className="mx-auto w-full max-w-[1000px]">
-      {/* ── Hero area — company context + free-text input ── */}
-      <div className="mb-8 rounded-2xl border border-border/40 bg-gradient-to-b from-card to-background/60 p-6 shadow-sm dark:border-white/[0.06] dark:from-white/[0.03] dark:to-transparent dark:shadow-none">
-        <div className="mb-5">
-          <CompanySummary
-            data={data}
-            domain={domain}
-            faviconSources={faviconSources}
-            isLoading={isLoading}
-            error={error}
-          />
-        </div>
-
-        {/* Free-text input — always the primary entry point */}
-        <FreeTextInput onSubmit={handleFreeTextSubmit} />
-      </div>
+      {/* ── Hero area — company understanding + opportunities + CMO input ── */}
+      <CompanyUnderstandingHero
+        domain={domain}
+        faviconSources={faviconSources}
+        data={data}
+        opportunities={opportunities}
+        recommendation={heroRecommendation}
+        isLoading={isLoading}
+        error={error}
+        onFreeTextSubmit={handleFreeTextSubmit}
+        onActionClick={(actionId) => {
+          const action = starterActions.find((a) => a.id === actionId);
+          if (action) {
+            void handleActionOrPlaybookClick(actionId, action.prompt, action.title);
+          }
+        }}
+      />
 
       {/* Active work — always rendered, component self-manages visibility */}
       <ActiveWorkSection onContinueSession={onResumeRun} onViewResults={onViewResults} />

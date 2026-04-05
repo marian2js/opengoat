@@ -52,16 +52,17 @@ describe("Dashboard simplification — Sprint 5 reset", () => {
       expect(workspaceSrc).toContain("hasActiveWork");
     });
 
-    it("renders CompanySummary", () => {
-      expect(workspaceSrc).toContain("<CompanySummary");
+    it("renders CompanyUnderstandingHero", () => {
+      expect(workspaceSrc).toContain("<CompanyUnderstandingHero");
     });
 
     it("renders ActionCardGrid", () => {
       expect(workspaceSrc).toContain("<ActionCardGrid");
     });
 
-    it("renders FreeTextInput", () => {
-      expect(workspaceSrc).toContain("<FreeTextInput");
+    it("FreeTextInput is embedded inside CompanyUnderstandingHero", () => {
+      const heroSrc = readSrc("components/CompanyUnderstandingHero.tsx");
+      expect(heroSrc).toContain("<FreeTextInput");
     });
 
     it("renders SuggestedActionGrid", () => {
