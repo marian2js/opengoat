@@ -9,7 +9,7 @@ export interface RecommendedJobCardProps {
 }
 
 export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardProps) {
-  const { dotColor } = job.specialistColors;
+  const { dotColor, iconBg, iconText } = job.specialistColors;
 
   return (
     <button
@@ -26,9 +26,9 @@ export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardP
         <div className="absolute inset-y-0 left-0 w-[3px] bg-primary/40 transition-colors group-hover/job:bg-primary" />
       )}
 
-      {/* Specialist attribution */}
+      {/* Specialist attribution — colored chip with specialist identity */}
       {job.specialistName && (
-        <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+        <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider ${iconBg} ${iconText}`}>
           <span className={`inline-block size-1.5 shrink-0 rounded-full ${dotColor}`} />
           {job.specialistName}
         </span>
