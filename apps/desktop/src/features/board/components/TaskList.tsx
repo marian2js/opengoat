@@ -44,7 +44,7 @@ function TaskRow({ task, isLeading, onSelect, onSetLeadingTask }: TaskRowProps) 
 
   return (
     <TableRow
-      className="group/row cursor-pointer border-border/20 transition-colors hover:bg-primary/[0.05] even:bg-muted/[0.03] dark:hover:bg-primary/[0.04]"
+      className="group/row cursor-pointer border-border/20 transition-colors hover:bg-primary/[0.08] even:bg-muted/[0.03] dark:hover:bg-primary/[0.04]"
       onClick={() => onSelect(task.taskId)}
     >
       {/* Title */}
