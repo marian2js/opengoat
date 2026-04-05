@@ -16,29 +16,22 @@ const readComponent = () => readFileSync(componentPath, "utf-8");
 describe("handleOutputNavigate uses contentRef fallback", () => {
   it("references artifact.contentRef in the handler", () => {
     const src = readComponent();
-    const handler = src.slice(
-      src.indexOf("function handleOutputNavigate"),
-      src.indexOf("function handleOutputNavigate") + 800,
-    );
-    expect(handler).toContain("artifact.contentRef");
+    const handlerStart = src.indexOf("function handleOutputNavigate");
+    const handler = src.slice(handlerStart, handlerStart + 600);
+    expect(handler).toContain("contentRef");
   });
 
   it("parses session ID from contentRef format 'session:{id}/message:{id}'", () => {
     const src = readComponent();
-    const handler = src.slice(
-      src.indexOf("function handleOutputNavigate"),
-      src.indexOf("function handleOutputNavigate") + 800,
-    );
-    // Should contain a regex or string operation to extract session ID from contentRef
-    expect(handler).toMatch(/session:/);
+    // parseSessionFromContentRef is defined in the same file and used by the handler
+    expect(src).toContain("parseSessionFromContentRef");
+    expect(src).toMatch(/session:([^/]+)/);
   });
 
   it("calls onResumeRun with the parsed session ID from contentRef", () => {
     const src = readComponent();
-    const handler = src.slice(
-      src.indexOf("function handleOutputNavigate"),
-      src.indexOf("function handleOutputNavigate") + 800,
-    );
+    const handlerStart = src.indexOf("function handleOutputNavigate");
+    const handler = src.slice(handlerStart, handlerStart + 600);
     // After parsing contentRef, it should call onResumeRun
     // Count occurrences of onResumeRun — should appear at least twice
     // (once for runId path, once for contentRef path)
@@ -53,14 +46,12 @@ describe("handleOutputNavigate uses contentRef fallback", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("runId lookup still takes priority over contentRef", () => {
-  it("checks artifact.runId before artifact.contentRef", () => {
+  it("checks artifact.runId before contentRef parsing", () => {
     const src = readComponent();
-    const handler = src.slice(
-      src.indexOf("function handleOutputNavigate"),
-      src.indexOf("function handleOutputNavigate") + 800,
-    );
+    const handlerStart = src.indexOf("function handleOutputNavigate");
+    const handler = src.slice(handlerStart, handlerStart + 600);
     const runIdPos = handler.indexOf("artifact.runId");
-    const contentRefPos = handler.indexOf("artifact.contentRef");
+    const contentRefPos = handler.indexOf("parseSessionFromContentRef");
     expect(runIdPos).toBeGreaterThan(-1);
     expect(contentRefPos).toBeGreaterThan(-1);
     expect(runIdPos).toBeLessThan(contentRefPos);
@@ -74,21 +65,17 @@ describe("runId lookup still takes priority over contentRef", () => {
 describe("Specialist fallback still exists", () => {
   it("still has specialist fallback using artifact.createdBy", () => {
     const src = readComponent();
-    const handler = src.slice(
-      src.indexOf("function handleOutputNavigate"),
-      src.indexOf("function handleOutputNavigate") + 800,
-    );
+    const handlerStart = src.indexOf("function handleOutputNavigate");
+    const handler = src.slice(handlerStart, handlerStart + 600);
     expect(handler).toContain("artifact.createdBy");
     expect(handler).toContain("specialist=");
   });
 
   it("specialist fallback comes after contentRef check", () => {
     const src = readComponent();
-    const handler = src.slice(
-      src.indexOf("function handleOutputNavigate"),
-      src.indexOf("function handleOutputNavigate") + 800,
-    );
-    const contentRefPos = handler.indexOf("artifact.contentRef");
+    const handlerStart = src.indexOf("function handleOutputNavigate");
+    const handler = src.slice(handlerStart, handlerStart + 600);
+    const contentRefPos = handler.indexOf("parseSessionFromContentRef");
     const specialistPos = handler.indexOf("specialist=");
     expect(contentRefPos).toBeGreaterThan(-1);
     expect(specialistPos).toBeGreaterThan(-1);

@@ -10,12 +10,12 @@ const readFile = (relPath: string) =>
 // 1. ContinueWhereYouLeftOff renders in both Mode A and Mode B
 // ═══════════════════════════════════════════════════════
 
-describe("ContinueWhereYouLeftOff renders in both modes", () => {
-  it("ContinueWhereYouLeftOff appears in both Mode A and Mode B branches", () => {
+describe("ContinueWhereYouLeftOff renders in unified layout", () => {
+  it("ContinueWhereYouLeftOff appears in the unified layout", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
     const matches = src.match(/<ContinueWhereYouLeftOff/g);
     expect(matches).not.toBeNull();
-    expect(matches!.length).toBeGreaterThanOrEqual(2);
+    expect(matches!.length).toBeGreaterThanOrEqual(1);
   });
 
   it("ContinueWhereYouLeftOff self-hides when items are empty", () => {
@@ -28,15 +28,16 @@ describe("ContinueWhereYouLeftOff renders in both modes", () => {
 // 2. Mode detection uses useMeaningfulWork
 // ═══════════════════════════════════════════════════════
 
-describe("Mode detection uses meaningful work filtering", () => {
+describe("Maturity detection uses meaningful work filtering", () => {
   it("uses useMeaningfulWork hook", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
     expect(src).toContain("useMeaningfulWork");
   });
 
-  it("uses hasMeaningfulWork for hasActiveWork", () => {
+  it("uses useProjectMaturity for layout decisions", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
-    expect(src).toContain("meaningfulWork.hasMeaningfulWork");
+    expect(src).toContain("useProjectMaturity");
+    expect(src).toContain("maturity");
   });
 
   it("does not use raw activeObjective or raw runs for mode detection", () => {
@@ -51,14 +52,14 @@ describe("Mode detection uses meaningful work filtering", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("Dashboard layout order", () => {
-  it("renders CompanyUnderstandingHero before mode split", () => {
+  it("renders CompanyUnderstandingHero before other sections in unified layout", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
     const heroPos = src.indexOf("<CompanyUnderstandingHero");
-    const modeSplitPos = src.indexOf("{hasActiveWork ?");
+    const continuePos = src.indexOf("<ContinueWhereYouLeftOff");
 
     expect(heroPos).toBeGreaterThan(-1);
-    expect(modeSplitPos).toBeGreaterThan(-1);
-    expect(heroPos).toBeLessThan(modeSplitPos);
+    expect(continuePos).toBeGreaterThan(-1);
+    expect(heroPos).toBeLessThan(continuePos);
   });
 });
 

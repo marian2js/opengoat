@@ -1,10 +1,11 @@
 import { LayoutDashboardIcon } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
-import type { AgentSession, ArtifactRecord, PlaybookManifest } from "@opengoat/contracts";
+import { useMemo } from "react";
+import type { AgentSession, ArtifactRecord } from "@opengoat/contracts";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
 import { getActionMapping } from "@/lib/utils/action-map";
-import { ActionCardGrid } from "@/features/dashboard/components/ActionCardGrid";
+import { useProjectMaturity } from "@/features/dashboard/hooks/useProjectMaturity";
+import { usePlaybookLauncher } from "@/features/dashboard/hooks/usePlaybookLauncher";
 import { ContinueWhereYouLeftOff } from "@/features/dashboard/components/ContinueWhereYouLeftOff";
 import { CompanyUnderstandingHero } from "@/features/dashboard/components/CompanyUnderstandingHero";
 import { DashboardAgentRoster } from "@/features/dashboard/components/DashboardAgentRoster";
@@ -15,7 +16,6 @@ import { RecentOutputs } from "@/features/dashboard/components/RecentOutputs";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
 import { starterActions } from "@/features/dashboard/data/actions";
 import { extractOpportunities } from "@/features/dashboard/data/opportunities";
-import { buildRunPrompt } from "@/features/dashboard/lib/run-prompt-composer";
 import { pickBestFirstMove } from "@/features/dashboard/lib/hero-recommendation";
 import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSummary";
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
@@ -24,8 +24,6 @@ import { useBoardSummary } from "@/features/dashboard/hooks/useBoardSummary";
 import { useActionSessions } from "@/features/dashboard/hooks/useActionSessions";
 import { useRuns } from "@/features/dashboard/hooks/useRuns";
 import { useSpecialistRoster } from "@/features/dashboard/hooks/useSpecialistRoster";
-import { truncateSessionLabel } from "@/lib/utils/session-label";
-import { toast } from "sonner";
 
 /** Extract sessionId from a contentRef like "session:{id}/message:{id}" */
 function parseSessionFromContentRef(ref: string | undefined): string | null {
@@ -50,8 +48,6 @@ export function DashboardWorkspace({
   agent,
   agentId,
   client,
-  completedActions,
-  isActionLoading,
   onActionClick,
   onViewResults,
   onRunSessionCreated,
@@ -75,10 +71,8 @@ export function DashboardWorkspace({
     <DashboardContent
       agentId={agentId}
       client={client}
-      completedActions={completedActions}
       domain={domain}
       faviconSources={faviconSources}
-      isActionLoading={isActionLoading}
       onActionClick={onActionClick}
       onViewResults={onViewResults}
       onRunSessionCreated={onRunSessionCreated}
@@ -94,10 +88,8 @@ export function DashboardWorkspace({
 function DashboardContent({
   agentId,
   client,
-  completedActions,
   domain,
   faviconSources,
-  isActionLoading,
   onActionClick,
   onViewResults,
   onRunSessionCreated,
@@ -105,10 +97,8 @@ function DashboardContent({
 }: {
   agentId: string;
   client: SidecarClient;
-  completedActions?: Set<string> | undefined;
   domain?: string | undefined;
   faviconSources?: string[] | undefined;
-  isActionLoading?: boolean | undefined;
   onActionClick?: ((actionId: string, prompt: string, label: string) => void) | undefined;
   onViewResults?: ((actionId: string) => void) | undefined;
   onRunSessionCreated?: ((session: AgentSession, prompt: string, runId: string, objectiveId?: string) => void) | undefined;
@@ -134,168 +124,45 @@ function DashboardContent({
     [opportunities, specialistRoster.specialists],
   );
 
-  // ── Playbook launch state ──
-  const [playbookFormOpen, setPlaybookFormOpen] = useState(false);
-  const [pendingPlaybook, setPendingPlaybook] = useState<PlaybookManifest | null>(null);
-  const [pendingActionLabel, setPendingActionLabel] = useState<string>("");
-  const [isPlaybookStarting, setIsPlaybookStarting] = useState(false);
+  // ── Playbook launcher ──
+  const playbook = usePlaybookLauncher({
+    agentId,
+    client,
+    starterActions,
+    suggestedActions,
+    onActionClick,
+    onRunSessionCreated,
+  });
 
-  /**
-   * Full playbook launch: create objective → start playbook → create session → navigate
-   */
-  const launchPlaybook = useCallback(
-    async (manifest: PlaybookManifest, inputs: Record<string, string>, actionLabel: string) => {
-      if (!onRunSessionCreated) return;
-      setIsPlaybookStarting(true);
-      try {
-        // Build objective title from inputs or playbook title
-        const inputSummary = Object.values(inputs).filter(Boolean).join(" — ");
-        const objectiveTitle = inputSummary
-          ? `${manifest.title}: ${inputSummary.slice(0, 80)}`
-          : manifest.title;
+  // ── Maturity detection: controls section visibility ──
+  const maturity = useProjectMaturity(meaningfulWork, runsResult, boardSummary, actionSessions);
 
-        // 1. Auto-create objective
-        const objective = await client.createObjective({
-          projectId: agentId,
-          title: objectiveTitle,
-          summary: `Auto-created from dashboard action: ${actionLabel}`,
-        });
-
-        const objectiveId = (objective as Record<string, unknown>).objectiveId as string;
-
-        // 2. Start playbook via API (creates run)
-        const run = await client.startPlaybook(manifest.playbookId, {
-          projectId: agentId,
-          objectiveId,
-        });
-
-        // 3. Create agent session (label truncated to avoid gateway 500)
-        const session = await client.createSession({
-          agentId,
-          label: truncateSessionLabel(objectiveTitle),
-        });
-
-        // 4. Compose structured prompt with playbook + objective context
-        const composedPrompt = buildRunPrompt({
-          playbook: manifest,
-          objective: { title: objectiveTitle, summary: inputSummary || undefined },
-          phaseName: run.phase,
-        });
-
-        // Prepend user inputs to prompt for context
-        let finalPrompt = composedPrompt;
-        if (Object.keys(inputs).length > 0) {
-          const inputBlock = Object.entries(inputs)
-            .filter(([, v]) => v.trim())
-            .map(([k, v]) => `- **${k}**: ${v}`)
-            .join("\n");
-          finalPrompt = `## User Inputs\n${inputBlock}\n\n${composedPrompt}`;
-        }
-
-        // 5. Callback — App.tsx handles state + navigation
-        onRunSessionCreated(session, finalPrompt, run.runId, objectiveId);
-        setPlaybookFormOpen(false);
-      } catch (err) {
-        console.error("Failed to launch playbook", err);
-        toast.error("Failed to start playbook. Please try again.");
-      } finally {
-        setIsPlaybookStarting(false);
-      }
-    },
-    [agentId, client, onRunSessionCreated],
-  );
-
-  /**
-   * Intercepts action clicks: if the action has a playbookId, fetch manifest and show input form.
-   * Otherwise, fall through to the normal action handler.
-   */
-  const handleActionOrPlaybookClick = useCallback(
-    async (actionId: string, prompt: string, label: string) => {
-      // Find the action card to check for playbookId
-      const allActions = [...starterActions, ...suggestedActions];
-      const card = allActions.find((a) => a.id === actionId);
-      const playbookId = card?.playbookId;
-
-      if (!playbookId || !onRunSessionCreated) {
-        // No playbook — use existing generic action flow
-        onActionClick?.(actionId, prompt, label);
-        return;
-      }
-
-      try {
-        const manifest = await client.getPlaybook(playbookId);
-        const hasRequiredInputs = manifest.requiredInputs.length > 0;
-
-        if (hasRequiredInputs) {
-          // Show the input form
-          setPendingPlaybook(manifest);
-          setPendingActionLabel(label);
-          setPlaybookFormOpen(true);
-        } else {
-          // No inputs needed — launch immediately
-          await launchPlaybook(manifest, {}, label);
-        }
-      } catch (err) {
-        console.error("Failed to fetch playbook manifest", err);
-        // Fallback to generic action flow
-        onActionClick?.(actionId, prompt, label);
-      }
-    },
-    [client, suggestedActions, onActionClick, onRunSessionCreated, launchPlaybook],
-  );
-
-  // Mode detection: Mode B only when meaningful, user-owned work exists
-  const hasActiveWork = meaningfulWork.hasMeaningfulWork;
-
-  // Free-text submit handler — routes to chat via onActionClick (bypasses playbook check)
   function handleFreeTextSubmit(text: string) {
     onActionClick?.("free-text", text, text.slice(0, 50));
   }
 
-  // Playbook input form submit handler
-  function handlePlaybookFormSubmit(inputs: Record<string, string>) {
-    if (pendingPlaybook) {
-      void launchPlaybook(pendingPlaybook, inputs, pendingActionLabel);
-    }
-  }
-
-  // Specialist chat handler — navigates to chat with specialist context
   function handleSpecialistChat(specialistId: string) {
     window.location.hash = `#chat?specialist=${specialistId}`;
   }
 
-  // Navigate to the session that produced an artifact output
   function handleOutputNavigate(artifact: ArtifactRecord) {
-    // Try to find the session via the run ID mapping
     if (artifact.runId) {
       const sessionId = getActionMapping(artifact.runId);
-      if (sessionId) {
-        onResumeRun?.(sessionId);
-        return;
-      }
+      if (sessionId) { onResumeRun?.(sessionId); return; }
     }
-
-    // Fallback: parse sessionId from contentRef (format: "session:{id}/message:{id}")
     const refSessionId = parseSessionFromContentRef(artifact.contentRef);
-    if (refSessionId) {
-      onResumeRun?.(refSessionId);
-      return;
-    }
-
-    // Fallback: navigate to specialist chat if createdBy matches a specialist
+    if (refSessionId) { onResumeRun?.(refSessionId); return; }
     if (artifact.createdBy) {
       window.location.hash = `#chat?specialist=${encodeURIComponent(artifact.createdBy)}`;
       return;
     }
-
-    // Last resort: go to general chat
     window.location.hash = "#chat";
   }
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
       <div className="mx-auto w-full max-w-[1000px]">
-      {/* ── Hero area — company understanding + opportunities + CMO input ── */}
+      {/* 1. Company Understanding Hero */}
       <CompanyUnderstandingHero
         domain={domain}
         faviconSources={faviconSources}
@@ -308,152 +175,69 @@ function DashboardContent({
         onActionClick={(actionId) => {
           const action = starterActions.find((a) => a.id === actionId);
           if (action) {
-            void handleActionOrPlaybookClick(actionId, action.prompt, action.title);
+            void playbook.handleActionOrPlaybookClick(actionId, action.prompt, action.title);
           }
         }}
       />
 
-      {hasActiveWork ? (
-        /* ═══════════════════════════════════════════════════════
-         * Mode B — Active work exists
-         * ═══════════════════════════════════════════════════════ */
-        <>
-          {/* Recommended jobs — lighter treatment in Mode B */}
-          <div className="dashboard-section">
-            <RecommendedJobs
-              jobs={recommendedJobs.jobs}
-              isLoading={recommendedJobs.isLoading}
-              onActionClick={(id, prompt, label) => { void handleActionOrPlaybookClick(id, prompt, label); }}
-            />
-          </div>
+      {/* 2. Recommended starting jobs */}
+      <div className="dashboard-section">
+        <RecommendedJobs
+          jobs={recommendedJobs.jobs}
+          isLoading={recommendedJobs.isLoading}
+          onActionClick={(id, prompt, label) => { void playbook.handleActionOrPlaybookClick(id, prompt, label); }}
+        />
+      </div>
 
-          {/* Agent Roster — compact in Mode B */}
-          {!specialistRoster.isLoading && specialistRoster.specialists.length > 0 && (
-            <div className="dashboard-section">
-              <DashboardAgentRoster
-                specialists={specialistRoster.specialists}
-                onChat={handleSpecialistChat}
-              />
-            </div>
-          )}
-
-          {/* Continue where you left off — compact strip, self-hides when empty */}
-          <ContinueWhereYouLeftOff
-            items={meaningfulWork.items}
-            onContinue={onResumeRun}
-            onViewResults={onViewResults}
+      {/* 3. Specialist roster */}
+      {!specialistRoster.isLoading && specialistRoster.specialists.length > 0 && (
+        <div className="dashboard-section">
+          <DashboardAgentRoster
+            specialists={specialistRoster.specialists}
+            onChat={handleSpecialistChat}
           />
+        </div>
+      )}
 
-          {/* Compact recent work list */}
-          <RecentOutputs
-            agentId={agentId}
-            client={client}
-            onNavigate={handleOutputNavigate}
-            onSpecialistChat={handleSpecialistChat}
+      {/* 4. Recent outputs — self-manages empty state with gallery */}
+      <RecentOutputs
+        agentId={agentId}
+        client={client}
+        onNavigate={handleOutputNavigate}
+        onSpecialistChat={handleSpecialistChat}
+      />
+
+      {/* 5. Continue where you left off — self-hides when no items */}
+      <ContinueWhereYouLeftOff
+        items={meaningfulWork.items}
+        onContinue={onResumeRun}
+        onViewResults={onViewResults}
+      />
+
+      {/* 6. Board summary — hidden for new projects */}
+      {maturity !== "new" && !boardSummary.isLoading && !boardSummary.isEmpty && (
+        <div className="dashboard-section">
+          <BoardSummary
+            counts={boardSummary.counts}
+            isLoading={boardSummary.isLoading}
+            isEmpty={boardSummary.isEmpty}
           />
-
-          {/* Action cards — secondary in Mode B */}
-          <div className="dashboard-section">
-            <ActionCardGrid
-              completedActions={completedActions}
-              isLoading={isActionLoading}
-              specialists={specialistRoster.specialists}
-              onActionClick={(id, prompt, label) => { void handleActionOrPlaybookClick(id, prompt, label); }}
-              onViewResults={onViewResults}
-            />
-          </div>
-
-          {/* Board summary — bottom, only if tasks exist */}
-          {!boardSummary.isLoading && !boardSummary.isEmpty && (
-            <div className="dashboard-section">
-              <BoardSummary
-                counts={boardSummary.counts}
-                isLoading={boardSummary.isLoading}
-                isEmpty={boardSummary.isEmpty}
-              />
-            </div>
-          )}
-        </>
-      ) : (
-        /* ═══════════════════════════════════════════════════════
-         * Mode A — No active work
-         * ═══════════════════════════════════════════════════════ */
-        <>
-          {/* Recommended starting jobs — curated top 3-5 */}
-          <div className="dashboard-section">
-            <RecommendedJobs
-              jobs={recommendedJobs.jobs}
-              isLoading={recommendedJobs.isLoading}
-              onActionClick={(id, prompt, label) => { void handleActionOrPlaybookClick(id, prompt, label); }}
-            />
-          </div>
-
-          {/* Agent Roster — prominent in Mode A */}
-          {!specialistRoster.isLoading && specialistRoster.specialists.length > 0 && (
-            <div className="dashboard-section">
-              <DashboardAgentRoster
-                specialists={specialistRoster.specialists}
-                onChat={handleSpecialistChat}
-              />
-            </div>
-          )}
-
-          {/* Starter actions — full list with specialist attribution */}
-          <div className="dashboard-section">
-            <ActionCardGrid
-              completedActions={completedActions}
-              isLoading={isActionLoading}
-              specialists={specialistRoster.specialists}
-              onActionClick={(id, prompt, label) => { void handleActionOrPlaybookClick(id, prompt, label); }}
-              onViewResults={onViewResults}
-            />
-          </div>
-
-          {/* Recent outputs — optional, only if outputs exist */}
-          <RecentOutputs
-            agentId={agentId}
-            client={client}
-            onNavigate={handleOutputNavigate}
-            onSpecialistChat={handleSpecialistChat}
-          />
-
-          {/* Continue where you left off — self-hides when empty */}
-          <ContinueWhereYouLeftOff
-            items={meaningfulWork.items}
-            onContinue={onResumeRun}
-            onViewResults={onViewResults}
-          />
-
-          {/* Board summary — bottom, only if tasks exist */}
-          {!boardSummary.isLoading && !boardSummary.isEmpty && (
-            <div className="dashboard-section">
-              <BoardSummary
-                counts={boardSummary.counts}
-                isLoading={boardSummary.isLoading}
-                isEmpty={boardSummary.isEmpty}
-              />
-            </div>
-          )}
-        </>
+        </div>
       )}
       </div>
 
       {/* Playbook input form dialog */}
-      {pendingPlaybook && (
+      {playbook.pendingPlaybook && (
         <PlaybookInputForm
-          open={playbookFormOpen}
+          open={playbook.playbookFormOpen}
           onOpenChange={(open) => {
-            setPlaybookFormOpen(open);
-            if (!open) {
-              setPendingPlaybook(null);
-              setPendingActionLabel("");
-            }
+            if (!open) playbook.closePlaybookForm();
           }}
-          playbookTitle={pendingPlaybook.title}
-          requiredInputs={pendingPlaybook.requiredInputs}
-          optionalInputs={pendingPlaybook.optionalInputs}
-          isSubmitting={isPlaybookStarting}
-          onSubmit={handlePlaybookFormSubmit}
+          playbookTitle={playbook.pendingPlaybook.title}
+          requiredInputs={playbook.pendingPlaybook.requiredInputs}
+          optionalInputs={playbook.pendingPlaybook.optionalInputs}
+          isSubmitting={playbook.isPlaybookStarting}
+          onSubmit={playbook.handlePlaybookFormSubmit}
         />
       )}
     </div>

@@ -175,10 +175,10 @@ describe("DashboardWorkspace integration with continue section", () => {
     expect(src).toContain("useMeaningfulWork");
   });
 
-  it("uses hasMeaningfulWork for mode detection instead of raw hasActiveWork", () => {
+  it("uses meaningfulWork for maturity detection instead of raw hasActiveWork", () => {
     const src = readFile(DASHBOARD_PATH);
     expect(src).toContain("meaningfulWork");
-    expect(src).toContain("hasMeaningfulWork");
+    expect(src).toContain("useProjectMaturity");
   });
 
   it("renders ContinueWhereYouLeftOff component", () => {

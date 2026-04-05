@@ -44,20 +44,17 @@ describe("Dashboard simplification — Sprint 5 reset", () => {
     });
   });
 
-  // AC2: Mode A (no active work)
-  describe("AC2: Mode A — no active work layout", () => {
+  // AC2: Unified layout with maturity detection
+  describe("AC2: Unified layout with maturity detection", () => {
     const workspaceSrc = readSrc("components/DashboardWorkspace.tsx");
 
-    it("has mode detection logic using hasActiveWork", () => {
-      expect(workspaceSrc).toContain("hasActiveWork");
+    it("has maturity detection logic using useProjectMaturity", () => {
+      expect(workspaceSrc).toContain("useProjectMaturity");
+      expect(workspaceSrc).toContain("maturity");
     });
 
     it("renders CompanyUnderstandingHero", () => {
       expect(workspaceSrc).toContain("<CompanyUnderstandingHero");
-    });
-
-    it("renders ActionCardGrid", () => {
-      expect(workspaceSrc).toContain("<ActionCardGrid");
     });
 
     it("FreeTextInput is embedded inside CompanyUnderstandingHero", () => {
@@ -74,8 +71,8 @@ describe("Dashboard simplification — Sprint 5 reset", () => {
     });
   });
 
-  // AC3: Mode B (active work exists)
-  describe("AC3: Mode B — active work exists layout", () => {
+  // AC3: Unified layout includes ContinueWhereYouLeftOff and BoardSummary
+  describe("AC3: Unified layout sections", () => {
     const workspaceSrc = readSrc("components/DashboardWorkspace.tsx");
 
     it("renders ContinueWhereYouLeftOff component", () => {

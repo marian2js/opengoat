@@ -12,6 +12,11 @@ const dashboardSrc = readFileSync(
   "utf-8",
 );
 
+const playbookLauncherSrc = readFileSync(
+  resolve(__dirname, "../../apps/desktop/src/features/dashboard/hooks/usePlaybookLauncher.ts"),
+  "utf-8",
+);
+
 const actionsSrc = readFileSync(
   resolve(__dirname, "../../apps/desktop/src/features/dashboard/data/actions.ts"),
   "utf-8",
@@ -123,57 +128,57 @@ describe("PlaybookInputForm component", () => {
   });
 });
 
-describe("DashboardWorkspace — playbook launch flow", () => {
-  it("imports PlaybookInputForm", () => {
+describe("Playbook launch flow (usePlaybookLauncher hook)", () => {
+  it("DashboardWorkspace imports PlaybookInputForm", () => {
     expect(dashboardSrc).toContain("PlaybookInputForm");
   });
 
   it("has playbook form state", () => {
-    expect(dashboardSrc).toContain("playbookFormOpen");
-    expect(dashboardSrc).toContain("pendingPlaybook");
+    expect(playbookLauncherSrc).toContain("playbookFormOpen");
+    expect(playbookLauncherSrc).toContain("pendingPlaybook");
   });
 
   it("has launchPlaybook handler that creates objective", () => {
-    expect(dashboardSrc).toContain("launchPlaybook");
-    expect(dashboardSrc).toContain("createObjective");
+    expect(playbookLauncherSrc).toContain("launchPlaybook");
+    expect(playbookLauncherSrc).toContain("createObjective");
   });
 
   it("calls startPlaybook on the client", () => {
-    expect(dashboardSrc).toContain("client.startPlaybook");
+    expect(playbookLauncherSrc).toContain("client.startPlaybook");
   });
 
   it("calls createSession for the new run", () => {
-    expect(dashboardSrc).toContain("client.createSession");
+    expect(playbookLauncherSrc).toContain("client.createSession");
   });
 
   it("composes a run prompt with playbook context", () => {
-    expect(dashboardSrc).toContain("buildRunPrompt");
+    expect(playbookLauncherSrc).toContain("buildRunPrompt");
   });
 
   it("calls onRunSessionCreated after launch", () => {
-    expect(dashboardSrc).toContain("onRunSessionCreated(session, finalPrompt, run.runId, objectiveId)");
+    expect(playbookLauncherSrc).toContain("onRunSessionCreated(session, finalPrompt, run.runId, objectiveId)");
   });
 
   it("intercepts action clicks to check for playbookId", () => {
-    expect(dashboardSrc).toContain("handleActionOrPlaybookClick");
-    expect(dashboardSrc).toContain("card?.playbookId");
+    expect(playbookLauncherSrc).toContain("handleActionOrPlaybookClick");
+    expect(playbookLauncherSrc).toContain("card?.playbookId");
   });
 
   it("fetches playbook manifest to get required inputs", () => {
-    expect(dashboardSrc).toContain("client.getPlaybook(playbookId)");
+    expect(playbookLauncherSrc).toContain("client.getPlaybook(playbookId)");
   });
 
   it("shows input form when playbook has required inputs", () => {
-    expect(dashboardSrc).toContain("setPlaybookFormOpen(true)");
+    expect(playbookLauncherSrc).toContain("setPlaybookFormOpen(true)");
   });
 
   it("launches immediately when no inputs required", () => {
-    expect(dashboardSrc).toContain("launchPlaybook(manifest, {}, label)");
+    expect(playbookLauncherSrc).toContain("launchPlaybook(manifest, {}, label)");
   });
 
   it("falls back to generic action flow on error", () => {
     // On fetch failure, falls back to onActionClick
-    expect(dashboardSrc).toContain("onActionClick?.(actionId, prompt, label)");
+    expect(playbookLauncherSrc).toContain("onActionClick?.(actionId, prompt, label)");
   });
 });
 
@@ -223,17 +228,17 @@ describe("ChatWorkspace — RunContextBanner integration", () => {
   });
 });
 
-describe("DashboardWorkspace — session label truncation (0008 fix)", () => {
+describe("usePlaybookLauncher — session label truncation (0008 fix)", () => {
   it("imports truncateSessionLabel utility", () => {
-    expect(dashboardSrc).toContain("truncateSessionLabel");
+    expect(playbookLauncherSrc).toContain("truncateSessionLabel");
   });
 
   it("applies truncateSessionLabel to the session label in createSession", () => {
-    expect(dashboardSrc).toContain("label: truncateSessionLabel(objectiveTitle)");
+    expect(playbookLauncherSrc).toContain("label: truncateSessionLabel(objectiveTitle)");
   });
 
   it("still uses full objectiveTitle for objective creation", () => {
-    expect(dashboardSrc).toContain("title: objectiveTitle");
+    expect(playbookLauncherSrc).toContain("title: objectiveTitle");
   });
 });
 

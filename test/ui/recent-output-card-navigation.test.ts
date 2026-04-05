@@ -15,20 +15,17 @@ describe("handleOutputNavigate routes through onResumeRun", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
     // The handler should call onResumeRun with the sessionId when found
     expect(src).toContain("onResumeRun");
-    // It should use onResumeRun inside handleOutputNavigate, not just window.location.hash
+    // It should use onResumeRun inside handleOutputNavigate
     const handlerStart = src.indexOf("function handleOutputNavigate");
-    const handlerEnd = src.indexOf("}", src.indexOf("// Last resort", handlerStart));
-    const handlerBody = src.slice(handlerStart, handlerEnd);
+    const handlerBody = src.slice(handlerStart, handlerStart + 600);
     expect(handlerBody).toContain("onResumeRun");
   });
 
   it("does not navigate via raw window.location.hash when sessionId is found", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
     const handlerStart = src.indexOf("function handleOutputNavigate");
-    const handlerEnd = src.indexOf("}", src.indexOf("// Last resort", handlerStart));
-    const handlerBody = src.slice(handlerStart, handlerEnd);
-    // When sessionId is found, should use onResumeRun, not direct hash set
-    // The only direct hash sets should be for the fallback paths
+    const handlerBody = src.slice(handlerStart, handlerStart + 600);
+    // When sessionId is found via action map, should use onResumeRun, not direct hash set
     const sessionIdBlock = handlerBody.slice(
       handlerBody.indexOf("if (sessionId)"),
       handlerBody.indexOf("return;", handlerBody.indexOf("if (sessionId)")) + 7,
@@ -46,8 +43,7 @@ describe("handleOutputNavigate fallback to specialist chat", () => {
   it("falls back to specialist chat when no session mapping exists", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
     const handlerStart = src.indexOf("function handleOutputNavigate");
-    const handlerEnd = src.indexOf("}", src.indexOf("// Last resort", handlerStart));
-    const handlerBody = src.slice(handlerStart, handlerEnd);
+    const handlerBody = src.slice(handlerStart, handlerStart + 600);
     expect(handlerBody).toContain("specialist=");
     expect(handlerBody).toContain("artifact.createdBy");
   });
@@ -55,8 +51,7 @@ describe("handleOutputNavigate fallback to specialist chat", () => {
   it("has a last resort fallback to general chat", () => {
     const src = readFile("features/dashboard/components/DashboardWorkspace.tsx");
     const handlerStart = src.indexOf("function handleOutputNavigate");
-    const handlerEnd = src.indexOf("}", src.indexOf("// Last resort", handlerStart));
-    const handlerBody = src.slice(handlerStart, handlerEnd);
+    const handlerBody = src.slice(handlerStart, handlerStart + 600);
     expect(handlerBody).toContain('window.location.hash = "#chat"');
   });
 });

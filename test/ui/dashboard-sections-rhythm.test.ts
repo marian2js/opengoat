@@ -18,14 +18,6 @@ const suggestedSrc = readFileSync(
   "utf-8",
 );
 
-const actionGridSrc = readFileSync(
-  resolve(
-    __dirname,
-    "../../apps/desktop/src/features/dashboard/components/ActionCardGrid.tsx",
-  ),
-  "utf-8",
-);
-
 const boardSummarySrc = readFileSync(
   resolve(
     __dirname,
@@ -37,19 +29,14 @@ const boardSummarySrc = readFileSync(
 describe("Dashboard sections rhythm — visual separation and spacing", () => {
   // AC1: Clear visual separation between Dashboard sections via dashboard-section dividers
   describe("Section dividers", () => {
-    it("wraps ActionCardGrid in a dashboard-section divider", () => {
-      // The ActionCardGrid wrapper should use dashboard-section for consistent dividers
-      expect(dashboardSrc).toMatch(/dashboard-section[\s\S]*ActionCardGrid/);
-    });
-
     it("wraps BoardSummary in a dashboard-section divider", () => {
       // Board summary should be wrapped in dashboard-section for separation
       expect(dashboardSrc).toMatch(/dashboard-section[\s\S]*BoardSummary/);
     });
 
-    it("wraps RecentOutputs in a dashboard-section divider", () => {
-      // Recent outputs section should be wrapped in dashboard-section for separation
-      expect(dashboardSrc).toMatch(/dashboard-section[\s\S]*RecentOutputs/);
+    it("wraps RecommendedJobs in a dashboard-section divider", () => {
+      // Recommended jobs section should be wrapped in dashboard-section for separation
+      expect(dashboardSrc).toMatch(/dashboard-section[\s\S]*RecommendedJobs/);
     });
   });
 
@@ -78,10 +65,6 @@ describe("Dashboard sections rhythm — visual separation and spacing", () => {
 
   // AC4: All section labels follow DESIGN.md section-label pattern
   describe("Section label consistency", () => {
-    it("ActionCardGrid uses section-label class", () => {
-      expect(actionGridSrc).toContain("section-label");
-    });
-
     it("SuggestedActionGrid uses section-label class", () => {
       expect(suggestedSrc).toContain("section-label");
     });
