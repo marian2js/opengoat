@@ -65,8 +65,8 @@ describe("Dashboard simplification — Sprint 5 reset", () => {
       expect(heroSrc).toContain("<FreeTextInput");
     });
 
-    it("renders SuggestedActionGrid", () => {
-      expect(workspaceSrc).toContain("<SuggestedActionGrid");
+    it("renders RecommendedJobs (replaces SuggestedActionGrid)", () => {
+      expect(workspaceSrc).toContain("<RecommendedJobs");
     });
 
     it("renders RecentOutputs", () => {

@@ -9,7 +9,7 @@ import { ActiveWorkSection } from "@/features/dashboard/components/ActiveWorkSec
 import { CompanyUnderstandingHero } from "@/features/dashboard/components/CompanyUnderstandingHero";
 import { DashboardAgentRoster } from "@/features/dashboard/components/DashboardAgentRoster";
 import { PlaybookInputForm } from "@/features/dashboard/components/PlaybookInputForm";
-import { SuggestedActionGrid } from "@/features/dashboard/components/SuggestedActionGrid";
+import { RecommendedJobs } from "@/features/dashboard/components/RecommendedJobs";
 import { NowWorkingOn, NowWorkingOnSkeleton } from "@/features/dashboard/components/NowWorkingOn";
 import { RecentOutputs } from "@/features/dashboard/components/RecentOutputs";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
@@ -19,6 +19,7 @@ import { buildRunPrompt } from "@/features/dashboard/lib/run-prompt-composer";
 import { pickBestFirstMove } from "@/features/dashboard/lib/hero-recommendation";
 import { useWorkspaceSummary } from "@/features/dashboard/hooks/useWorkspaceSummary";
 import { useSuggestedActions } from "@/features/dashboard/hooks/useSuggestedActions";
+import { useRecommendedJobs } from "@/features/dashboard/hooks/useRecommendedJobs";
 import { useBoardSummary } from "@/features/dashboard/hooks/useBoardSummary";
 import { useActiveObjective } from "@/features/dashboard/hooks/useActiveObjective";
 import { useActionSessions } from "@/features/dashboard/hooks/useActionSessions";
@@ -124,6 +125,7 @@ function DashboardContent({
   const runsResult = useRuns(agentId, client);
   const recentArtifacts = useRecentArtifacts(agentId, client);
   const specialistRoster = useSpecialistRoster(client);
+  const recommendedJobs = useRecommendedJobs(suggestedActions, isSuggestedLoading, specialistRoster.specialists);
 
   // ── Hero data: opportunities + recommended first move ──
   const opportunities = useMemo(
@@ -331,6 +333,15 @@ function DashboardContent({
          * Mode B — Active work exists
          * ═══════════════════════════════════════════════════════ */
         <>
+          {/* Recommended jobs — lighter treatment in Mode B */}
+          <div className="dashboard-section">
+            <RecommendedJobs
+              jobs={recommendedJobs.jobs}
+              isLoading={recommendedJobs.isLoading}
+              onActionClick={(id, prompt, label) => { void handleActionOrPlaybookClick(id, prompt, label); }}
+            />
+          </div>
+
           {/* Now working on — latest run + output preview + quick actions */}
           {runsResult.isLoading ? (
             <div className="dashboard-section pb-4">
@@ -390,6 +401,15 @@ function DashboardContent({
          * Mode A — No active work
          * ═══════════════════════════════════════════════════════ */
         <>
+          {/* Recommended starting jobs — curated top 3-5 */}
+          <div className="dashboard-section">
+            <RecommendedJobs
+              jobs={recommendedJobs.jobs}
+              isLoading={recommendedJobs.isLoading}
+              onActionClick={(id, prompt, label) => { void handleActionOrPlaybookClick(id, prompt, label); }}
+            />
+          </div>
+
           {/* Agent Roster — prominent in Mode A */}
           {!specialistRoster.isLoading && specialistRoster.specialists.length > 0 && (
             <div className="dashboard-section">
@@ -400,24 +420,11 @@ function DashboardContent({
             </div>
           )}
 
-          {/* Starter actions — with specialist attribution */}
+          {/* Starter actions — full list with specialist attribution */}
           <div className="dashboard-section">
             <ActionCardGrid
               completedActions={completedActions}
               isLoading={isActionLoading}
-              specialists={specialistRoster.specialists}
-              onActionClick={(id, prompt, label) => { void handleActionOrPlaybookClick(id, prompt, label); }}
-              onViewResults={onViewResults}
-            />
-          </div>
-
-          {/* AI-suggested actions */}
-          <div className="dashboard-section">
-            <SuggestedActionGrid
-              actions={suggestedActions}
-              completedActions={completedActions}
-              isGenerating={isSuggestedLoading}
-              isActionLoading={isActionLoading}
               specialists={specialistRoster.specialists}
               onActionClick={(id, prompt, label) => { void handleActionOrPlaybookClick(id, prompt, label); }}
               onViewResults={onViewResults}
