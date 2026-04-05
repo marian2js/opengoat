@@ -126,11 +126,16 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
           ))}
         </div>
 
-        {/* Unused specialist prompt */}
+        {/* Suggested first action for idle specialists */}
         {!hasOutputs && !isManager ? (
-          <p className="mt-4 font-mono text-[11px] text-muted-foreground/40">
-            Start your first conversation
-          </p>
+          <button
+            type="button"
+            onClick={() => onChat(specialist.id)}
+            className="mt-4 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground/50 transition-colors hover:text-primary"
+          >
+            <span>Try:</span>
+            <span className="font-medium">{specialist.outputTypes[0]}</span>
+          </button>
         ) : null}
 
         {/* Recent outputs — bundles and standalone artifacts */}

@@ -45,20 +45,21 @@ describe("SpecialistCard activity status badge", () => {
 // Activity status — "Start your first conversation" for unused specialists
 // ---------------------------------------------------------------------------
 describe("SpecialistCard unused specialist prompt", () => {
-  it("renders a prompt for unused specialists", () => {
-    expect(specialistCardSrc).toMatch(/Start your first conversation/i);
+  it("renders a suggested first action for idle specialists", () => {
+    expect(specialistCardSrc).toMatch(/Try:/);
+    expect(specialistCardSrc).toMatch(/specialist\.outputTypes\[0\]/);
   });
 
-  it("uses muted styling for the unused prompt", () => {
+  it("uses muted styling for the idle suggestion", () => {
     // Should use muted-foreground or similar subdued styling
     expect(specialistCardSrc).toMatch(/text-muted-foreground/);
   });
 
-  it("uses monospace font for the unused prompt", () => {
-    expect(specialistCardSrc).toMatch(/font-mono.*Start your first conversation|Start your first conversation.*font-mono/si);
+  it("uses monospace font for the idle suggestion", () => {
+    expect(specialistCardSrc).toMatch(/font-mono.*Try:|Try:.*font-mono/si);
   });
 
-  it("only shows unused prompt when there are no outputs (not on managers)", () => {
+  it("only shows idle suggestion when there are no outputs (not on managers)", () => {
     // Should conditionally render based on hasOutputs being false
     expect(specialistCardSrc).toMatch(/!hasOutputs|hasOutputs.*false/s);
   });
