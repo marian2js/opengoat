@@ -262,7 +262,7 @@ export function SpecialistTeamBrowser({ client, agentId, onSpecialistChat }: Spe
           {/* Section label for specialists */}
           {operationalSpecialists.length > 0 ? (
             <div>
-              <div className="mb-5 flex items-center gap-2.5 border-t border-border/20 pt-6 dark:border-white/[0.04]">
+              <div className="relative mb-5 flex items-center gap-2.5 pt-6 before:absolute before:top-0 before:left-[10%] before:right-[10%] before:h-px before:bg-gradient-to-r before:from-transparent before:via-border/40 before:to-transparent dark:before:via-white/[0.06]">
                 <h2 className="section-label">Specialists</h2>
                 <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
                   {operationalSpecialists.length}
