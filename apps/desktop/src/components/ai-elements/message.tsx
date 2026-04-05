@@ -11,6 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatMessageTimestamp } from "@/lib/format-message-timestamp";
 import { cn } from "@/lib/utils";
 import { cjk } from "@streamdown/cjk";
 import { createCodePlugin } from "@streamdown/code";
@@ -83,6 +84,32 @@ export const MessageAvatar = ({
     )}
   </div>
 );
+
+export type MessageTimestampProps = HTMLAttributes<HTMLSpanElement> & {
+  date: Date | string | number | null | undefined;
+};
+
+export const MessageTimestamp = ({
+  date,
+  className,
+  ...props
+}: MessageTimestampProps) => {
+  if (!date) return null;
+  const formatted = formatMessageTimestamp(date);
+  if (!formatted) return null;
+
+  return (
+    <span
+      className={cn(
+        "text-[11px] font-mono text-muted-foreground/60 tabular-nums leading-none",
+        className,
+      )}
+      {...props}
+    >
+      {formatted}
+    </span>
+  );
+};
 
 export type MessageContentProps = HTMLAttributes<HTMLDivElement>;
 

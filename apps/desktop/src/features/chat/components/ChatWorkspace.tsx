@@ -24,6 +24,7 @@ import {
   MessageActions,
   MessageContent,
   MessageResponse,
+  MessageTimestamp,
   MessageToolbar,
 } from "@/components/ai-elements/message";
 import {
@@ -876,6 +877,7 @@ function ChatMessage({
   const textParts = getTextParts(message);
   const fileParts = getFileParts(message);
   const fullText = textParts.join("\n\n");
+  const createdAt = (message.metadata as { createdAt?: string } | undefined)?.createdAt;
   const isThinking =
     message.role === "assistant" &&
     isStreaming &&
@@ -953,11 +955,14 @@ function ChatMessage({
             </p>
           ))}
         </MessageContent>
-        {fullText ? (
-          <div className="flex justify-end opacity-0 transition-opacity group-hover:opacity-100">
-            <CopyAction text={fullText} />
-          </div>
-        ) : null}
+        <div className="flex items-center justify-end gap-2">
+          <MessageTimestamp date={createdAt} />
+          {fullText ? (
+            <div className="opacity-0 transition-opacity group-hover:opacity-100">
+              <CopyAction text={fullText} />
+            </div>
+          ) : null}
+        </div>
       </Message>
     );
   }
@@ -984,6 +989,7 @@ function ChatMessage({
             <MessageActions>
               <CopyAction text={fullText} />
             </MessageActions>
+            {!isStreaming && <MessageTimestamp date={createdAt} />}
           </MessageToolbar>
         </MessageContent>
       ) : null}
