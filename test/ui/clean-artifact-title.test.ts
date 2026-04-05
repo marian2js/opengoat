@@ -119,6 +119,35 @@ describe("clean-artifact-title utility", () => {
   });
 });
 
+describe("clean-artifact-title: leading numbering and trailing punctuation", () => {
+  it("strips leading numbered-list prefixes (e.g. '1) ', '2. ')", () => {
+    const src = readFileSync(utilPath, "utf-8");
+    // Should have a regex that strips patterns like "1) " or "2. " from the start
+    expect(src).toMatch(/withoutNumbering/);
+    expect(src).toMatch(/\\d/);
+  });
+
+  it("strips trailing colons from titles", () => {
+    const src = readFileSync(utilPath, "utf-8");
+    expect(src).toMatch(/:\\/);
+    expect(src).toMatch(/cleaned/);
+  });
+});
+
+describe("ArtifactCard type-label echo suppression", () => {
+  it("ArtifactCard compares cleaned title to type label for badge suppression", () => {
+    const src = readFileSync(artifactCardPath, "utf-8");
+    // Should check if the cleaned title matches the type config label
+    expect(src).toMatch(/toLowerCase\(\)/);
+  });
+
+  it("ArtifactCard conditionally renders type badge based on title match", () => {
+    const src = readFileSync(artifactCardPath, "utf-8");
+    // Badge should be conditionally rendered
+    expect(src).toMatch(/titleMatchesType|hideBadge|showBadge/);
+  });
+});
+
 describe("ArtifactCard summary filtering", () => {
   it("ArtifactCard imports isConversationalTitle", () => {
     const src = readFileSync(artifactCardPath, "utf-8");

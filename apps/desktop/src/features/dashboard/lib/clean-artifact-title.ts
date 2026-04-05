@@ -27,8 +27,14 @@ export function cleanArtifactTitle(
 ): string {
   const stripped = stripMarkdown(artifact.title);
 
-  if (!isConversationalTitle(stripped)) {
-    return stripped;
+  // Strip leading list numbering: "1) ...", "2. ...", etc.
+  const withoutNumbering = stripped.replace(/^\d+[.)]\s+/, "");
+
+  // Strip trailing colons from sentence-fragment titles
+  const cleaned = withoutNumbering.replace(/:\s*$/, "");
+
+  if (!isConversationalTitle(cleaned)) {
+    return cleaned;
   }
 
   // Try to extract the first non-conversational markdown heading from content

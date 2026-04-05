@@ -19,6 +19,8 @@ export function ArtifactCard({ artifact, specialistId, specialistName, onPreview
   const typeConfig = getArtifactTypeConfig(artifact.type);
   const statusConfig = getArtifactStatusConfig(artifact.status);
   const specColors = specialistId ? getSpecialistColors(specialistId) : undefined;
+  const displayTitle = cleanArtifactTitle(artifact);
+  const titleMatchesType = displayTitle.toLowerCase() === typeConfig.label.toLowerCase();
 
   const handleClick = () => {
     if (onNavigate) {
@@ -42,11 +44,13 @@ export function ArtifactCard({ artifact, specialistId, specialistName, onPreview
       <div className="pl-3">
         {/* Top row: type badge + status badge + specialist attribution */}
         <div className="mb-1.5 flex items-center gap-2">
-          <span
-            className={`inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider ${typeConfig.badgeClassName}`}
-          >
-            {typeConfig.label}
-          </span>
+          {!titleMatchesType && (
+            <span
+              className={`inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider ${typeConfig.badgeClassName}`}
+            >
+              {typeConfig.label}
+            </span>
+          )}
           <span
             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${statusConfig.className}`}
           >
@@ -64,13 +68,13 @@ export function ArtifactCard({ artifact, specialistId, specialistName, onPreview
 
         {/* Title */}
         <h3 className="truncate text-sm font-medium text-foreground">
-          {cleanArtifactTitle(artifact)}
+          {displayTitle}
         </h3>
 
         {/* Summary (optional) — hide if conversational AI preamble; strip title echo */}
         {artifact.summary && !isConversationalTitle(artifact.summary) ? (
           <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-            {stripTitleFromPreview(cleanArtifactTitle(artifact), artifact.summary)}
+            {stripTitleFromPreview(displayTitle, artifact.summary)}
           </p>
         ) : null}
 

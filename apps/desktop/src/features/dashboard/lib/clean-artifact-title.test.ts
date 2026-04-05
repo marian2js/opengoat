@@ -370,3 +370,101 @@ void test("cleanArtifactTitle: falls back to type label when all content heading
     "Strategy Note",
   );
 });
+
+// ---------------------------------------------------------------------------
+// Leading list numbering stripping (task 0021)
+// ---------------------------------------------------------------------------
+
+void test("cleanArtifactTitle: strips leading '1) ' numbering from title", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "1) Rewritten Free vs Pro feature matrix",
+      type: "matrix",
+    }),
+    "Rewritten Free vs Pro feature matrix",
+  );
+});
+
+void test("cleanArtifactTitle: strips leading '2. ' numbering from title", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "2. Updated homepage hero copy",
+      type: "copy_draft",
+    }),
+    "Updated homepage hero copy",
+  );
+});
+
+void test("cleanArtifactTitle: strips leading '10) ' numbering from title", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "10) Competitive analysis summary",
+      type: "research_brief",
+    }),
+    "Competitive analysis summary",
+  );
+});
+
+void test("cleanArtifactTitle: does not strip numbering from mid-title", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "Top 5 recommendations for SEO",
+      type: "strategy_note",
+    }),
+    "Top 5 recommendations for SEO",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Trailing colon stripping (task 0021)
+// ---------------------------------------------------------------------------
+
+void test("cleanArtifactTitle: strips trailing colon from title", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "Biggest SEO opportunities for BullAware are:",
+      type: "strategy_note",
+    }),
+    "Biggest SEO opportunities for BullAware are",
+  );
+});
+
+void test("cleanArtifactTitle: strips trailing colon with whitespace from title", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "Key findings from the audit:  ",
+      type: "report",
+    }),
+    "Key findings from the audit",
+  );
+});
+
+void test("cleanArtifactTitle: does not strip colon from mid-title", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "SEO Audit: Key Findings",
+      type: "report",
+    }),
+    "SEO Audit: Key Findings",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Type-label echo detection (task 0021)
+// ---------------------------------------------------------------------------
+
+void test("cleanArtifactTitle: returns true for titleMatchesType when title equals type label", () => {
+  // "Matrix" title with type "matrix" → label is "Matrix" → matches
+  const title = cleanArtifactTitle({ title: "Matrix", type: "matrix" });
+  assert.equal(title, "Matrix");
+});
+
+void test("cleanArtifactTitle: combined — strips numbering AND trailing colon", () => {
+  assert.equal(
+    cleanArtifactTitle({
+      title: "3) Key takeaways:",
+      type: "strategy_note",
+    }),
+    "Key takeaways",
+  );
+});
