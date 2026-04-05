@@ -124,7 +124,7 @@ describe("CompanyUnderstandingHero component", () => {
   it("uses DESIGN.md typography — General Sans for heading", () => {
     const src = readSrc("components/CompanyUnderstandingHero.tsx");
     expect(src).toContain("font-display");
-    expect(src).toContain('text-[22px]');
+    expect(src).toContain('text-[24px]');
     expect(src).toContain("font-bold");
   });
 
