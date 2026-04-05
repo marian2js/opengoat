@@ -22,6 +22,18 @@ interface SpecialistCardProps {
   onOutputNavigate?: ((artifact: ArtifactRecord) => void) | undefined;
 }
 
+/** Check if any output or bundle was created within the last 24 hours. */
+function hasRecentActivity(outputs: ArtifactRecord[], bundles: SpecialistBundleGroup[]): boolean {
+  const threshold = Date.now() - 24 * 60 * 60 * 1000;
+  for (const a of outputs) {
+    if (new Date(a.createdAt).getTime() >= threshold) return true;
+  }
+  for (const b of bundles) {
+    if (new Date(b.createdAt).getTime() >= threshold) return true;
+  }
+  return false;
+}
+
 export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundles, onOutputNavigate }: SpecialistCardProps) {
   const Icon = resolveSpecialistIcon(specialist.icon);
   const isManager = specialist.category === "manager";
@@ -29,6 +41,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
   const outputs = recentOutputs?.length ? recentOutputs : [];
   const bundles = recentBundles?.length ? recentBundles : [];
   const hasOutputs = outputs.length > 0 || bundles.length > 0;
+  const isActive = hasOutputs && hasRecentActivity(outputs, bundles);
 
   return (
     <article
@@ -73,6 +86,11 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
                   Lead
                 </span>
               ) : null}
+              {!isManager && isActive ? (
+                <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400">
+                  ACTIVE
+                </span>
+              ) : null}
             </div>
             <p className={cn(
               "mt-0.5 leading-relaxed text-muted-foreground",
@@ -107,6 +125,13 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
             </span>
           ))}
         </div>
+
+        {/* Unused specialist prompt */}
+        {!hasOutputs && !isManager ? (
+          <p className="mt-4 font-mono text-[11px] text-muted-foreground/40">
+            Start your first conversation
+          </p>
+        ) : null}
 
         {/* Recent outputs — bundles and standalone artifacts */}
         {hasOutputs ? (
