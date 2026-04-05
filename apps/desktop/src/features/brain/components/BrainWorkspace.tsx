@@ -646,9 +646,7 @@ function BrainEditor({
         ) : section.id === "company-context" ? (
           <MemoryContentView content={content} onEdit={() => setIsEditing(true)} />
         ) : (
-          <div className={KNOWLEDGE_PROSE_CLASSES}>
-            <Markdown remarkPlugins={[remarkGfm]}>{stripLeadingH1(content)}</Markdown>
-          </div>
+          <SectionedMarkdownView content={content} />
         )}
       </div>
     </div>
@@ -848,6 +846,72 @@ function KnowledgeEmptyState({
 
 const KNOWLEDGE_PROSE_CLASSES =
   "prose prose-sm dark:prose-invert max-w-prose [&>h1:first-child]:hidden [&_h1]:text-lg [&_h1]:font-display [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-0 [&_h2]:font-mono [&_h2]:text-[11px] [&_h2]:font-semibold [&_h2]:uppercase [&_h2]:tracking-[0.08em] [&_h2]:text-primary [&_h2]:mb-4 [&_h2]:mt-10 [&_h2]:pt-6 [&_h2]:border-t [&_h2]:border-border/20 [&_h3]:text-[14px] [&_h3]:font-display [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:mb-2 [&_h3]:mt-6 [&_h4]:text-[13px] [&_h4]:font-semibold [&_h4]:mb-2 [&_h4]:mt-6 [&_p]:text-[13px] [&_p]:leading-relaxed [&_p]:text-foreground/80 [&_p]:mb-3 [&_ul]:text-[13px] [&_ul]:text-foreground/80 [&_ul]:mb-3 [&_ul]:pl-4 [&_ol]:text-[13px] [&_ol]:text-foreground/80 [&_ol]:mb-3 [&_ol]:pl-4 [&_li]:mb-1.5 [&_li]:leading-relaxed [&_strong]:text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_code]:text-[11px] [&_code]:font-mono [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:text-[11px] [&_pre]:font-mono [&_pre]:overflow-x-auto [&_hr]:border-border/30 [&_hr]:my-6 [&_table]:w-full [&_th]:text-left [&_th]:font-mono [&_th]:text-[10px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-muted-foreground [&_th]:pb-2 [&_th]:border-b [&_td]:text-[13px] [&_td]:py-1.5 [&_td]:border-b [&_td]:border-border/20 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/30 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground";
+
+/** Prose classes for card-wrapped sections — no h2 top border/margin since each card is self-contained */
+const SECTION_CARD_PROSE_CLASSES =
+  "prose prose-sm dark:prose-invert max-w-none [&>h1:first-child]:hidden [&_h1]:text-lg [&_h1]:font-display [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:mt-0 [&_h2]:font-mono [&_h2]:text-[11px] [&_h2]:font-semibold [&_h2]:uppercase [&_h2]:tracking-[0.08em] [&_h2]:text-primary [&_h2]:mb-3 [&_h2]:mt-0 [&_h3]:text-[14px] [&_h3]:font-display [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:mb-2 [&_h3]:mt-4 [&_h4]:text-[13px] [&_h4]:font-semibold [&_h4]:mb-2 [&_h4]:mt-4 [&_p]:text-[13px] [&_p]:leading-relaxed [&_p]:text-foreground/80 [&_p]:mb-3 [&_ul]:text-[13px] [&_ul]:text-foreground/80 [&_ul]:mb-3 [&_ul]:pl-4 [&_ol]:text-[13px] [&_ol]:text-foreground/80 [&_ol]:mb-3 [&_ol]:pl-4 [&_li]:mb-1.5 [&_li]:leading-relaxed [&_strong]:text-foreground [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_code]:text-[11px] [&_code]:font-mono [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-muted [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:text-[11px] [&_pre]:font-mono [&_pre]:overflow-x-auto [&_hr]:border-border/30 [&_hr]:my-4 [&_table]:w-full [&_th]:text-left [&_th]:font-mono [&_th]:text-[10px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-muted-foreground [&_th]:pb-2 [&_th]:border-b [&_td]:text-[13px] [&_td]:py-1.5 [&_td]:border-b [&_td]:border-border/20 [&_blockquote]:border-l-2 [&_blockquote]:border-primary/30 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground";
+
+// ---------------------------------------------------------------------------
+// Sectioned markdown view — splits content by h2 and wraps each in a card
+// ---------------------------------------------------------------------------
+
+function SectionedMarkdownView({ content }: { content: string }) {
+  const stripped = stripLeadingH1(content);
+
+  // Split content into h2 sections
+  const sections: Array<{ heading: string | null; body: string }> = [];
+  const lines = stripped.split("\n");
+  let currentHeading: string | null = null;
+  let currentBody: string[] = [];
+
+  for (const line of lines) {
+    const h2Match = line.match(/^##\s+(.+)/);
+    if (h2Match) {
+      sections.push({ heading: currentHeading, body: currentBody.join("\n") });
+      currentHeading = h2Match[1]!;
+      currentBody = [];
+    } else {
+      currentBody.push(line);
+    }
+  }
+  sections.push({ heading: currentHeading, body: currentBody.join("\n") });
+
+  // Filter out empty preamble sections
+  const nonEmpty = sections.filter(
+    (sec) => sec.heading || sec.body.trim(),
+  );
+
+  // If there are no h2 sections, render as a single card
+  if (nonEmpty.length <= 1 && !nonEmpty[0]?.heading) {
+    return (
+      <div className="rounded-lg border border-border/50 bg-card p-5">
+        <div className={SECTION_CARD_PROSE_CLASSES}>
+          <Markdown remarkPlugins={[remarkGfm]}>{stripped}</Markdown>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {nonEmpty.map((sec, i) => {
+        const md = sec.heading
+          ? `## ${sec.heading}\n${sec.body}`
+          : sec.body;
+        return (
+          <div
+            key={sec.heading ?? `section-${i}`}
+            className="rounded-lg border border-border/50 bg-card p-5"
+          >
+            <div className={SECTION_CARD_PROSE_CLASSES}>
+              <Markdown remarkPlugins={[remarkGfm]}>{md}</Markdown>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function KnowledgeInlineEmpty({
   icon: Icon,
