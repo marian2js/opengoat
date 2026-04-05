@@ -216,15 +216,36 @@ select {
 
 /* ─── Dashboard section — consistent rhythm between major sections ─── */
 .dashboard-section {
+  position: relative;
   padding-top: 32px;
   margin-top: 8px;
-  border-top: 1px solid;
-  border-color: rgba(255, 255, 255, 0.04);
 }
 
-:root[class~="light"] .dashboard-section,
-:root:not(.dark) .dashboard-section {
-  border-color: rgba(0, 0, 0, 0.06);
+.dashboard-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(255, 255, 255, 0.06) 30%,
+    rgba(255, 255, 255, 0.06) 70%,
+    transparent
+  );
+}
+
+:root[class~="light"] .dashboard-section::before,
+:root:not(.dark) .dashboard-section::before {
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(0, 0, 0, 0.08) 30%,
+    rgba(0, 0, 0, 0.08) 70%,
+    transparent
+  );
 }
 
 /* Custom scrollbar — nearly invisible until hovered */
