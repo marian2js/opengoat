@@ -189,7 +189,7 @@ export function AppSidebar({
                     isActive={isItemActive}
                     className={cn(
                       "relative",
-                      isItemActive && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary",
+                      isItemActive && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:bg-primary/12 group-data-[collapsible=icon]:ring-1 group-data-[collapsible=icon]:ring-primary/20",
                     )}
                   >
                     <a
@@ -224,7 +224,7 @@ export function AppSidebar({
                     isActive={isItemActive}
                     className={cn(
                       "relative text-muted-foreground/70",
-                      isItemActive && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary",
+                      isItemActive && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:bg-primary/12 group-data-[collapsible=icon]:ring-1 group-data-[collapsible=icon]:ring-primary/20",
                     )}
                   >
                     <a href={item.href}>
@@ -250,7 +250,7 @@ export function AppSidebar({
                       isActive={activeView === "brain"}
                       className={cn(
                         "relative",
-                        activeView === "brain" && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary",
+                        activeView === "brain" && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:bg-primary/12 group-data-[collapsible=icon]:ring-1 group-data-[collapsible=icon]:ring-primary/20",
                       )}
                     >
                       <a href="#brain">
@@ -305,7 +305,7 @@ export function AppSidebar({
                       isActive={isItemActive}
                       className={cn(
                         "relative",
-                        isItemActive && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary",
+                        isItemActive && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:bg-primary/12 group-data-[collapsible=icon]:ring-1 group-data-[collapsible=icon]:ring-primary/20",
                       )}
                     >
                       <a href={item.href}>
