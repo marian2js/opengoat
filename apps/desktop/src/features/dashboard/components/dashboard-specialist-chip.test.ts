@@ -97,3 +97,40 @@ void test("DashboardSpecialistChip: icon container uses emerald tint background"
     "Expected icon container to use bg-primary/* emerald tint for all specialists",
   );
 });
+
+// ---------------------------------------------------------------------------
+// AC: Redesigned card uses getSpecialistMeta for outcome-focused bestAt text
+// ---------------------------------------------------------------------------
+
+void test("DashboardSpecialistChip: uses getSpecialistMeta for bestAt descriptions", () => {
+  assert.ok(
+    src.includes("getSpecialistMeta"),
+    "Expected getSpecialistMeta import/usage for bestAt outcome-focused descriptions",
+  );
+  assert.ok(
+    src.includes("bestAt"),
+    "Expected bestAt field to be rendered on the card",
+  );
+});
+
+void test("DashboardSpecialistChip: renders outputTypes with slice/map pattern", () => {
+  assert.ok(
+    src.includes("outputTypes") && src.includes("slice"),
+    "Expected outputTypes to be sliced and mapped for example job rendering",
+  );
+});
+
+void test("DashboardSpecialistChip: has explicit Chat text label", () => {
+  // The word "Chat" must appear as visible text in JSX, not just in comments or prop names
+  assert.ok(
+    />\s*Chat\s*</.test(src) || /["']Chat["']/.test(src) || />\n\s*Chat/.test(src),
+    "Expected explicit 'Chat' text label visible on the card",
+  );
+});
+
+void test("DashboardSpecialistChip: CMO card has Lead badge markup", () => {
+  assert.ok(
+    src.includes("Lead"),
+    "Expected 'Lead' badge text for CMO card",
+  );
+});

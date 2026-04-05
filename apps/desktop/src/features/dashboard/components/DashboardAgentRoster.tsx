@@ -30,8 +30,8 @@ export function DashboardAgentRoster({ specialists, onChat }: DashboardAgentRost
         <DashboardSpecialistChip specialist={manager} onChat={onChat} />
       ) : null}
 
-      {/* Operational specialists — 2-column grid for better readability */}
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {/* Operational specialists — 2-column grid, wider cards for action-first layout */}
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
         {operationalSpecialists.map((specialist) => (
           <DashboardSpecialistChip
             key={specialist.id}
