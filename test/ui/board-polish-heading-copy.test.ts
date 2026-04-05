@@ -64,7 +64,7 @@ describe("Board polish – heading, empty state copy, task count", () => {
 
     it("shows a helpful description without repeating the title", () => {
       expect(boardWorkspaceSrc).toContain(
-        "Tasks will appear here when created through",
+        "Tasks appear here when specialists create follow-up items",
       );
     });
   });
