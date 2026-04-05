@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { AlertCircleIcon, ListChecksIcon, MessageSquareIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
+import { AlertCircleIcon, LayoutDashboardIcon, ListChecksIcon, MessageCircleIcon, MessageSquareIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskList } from "@/features/board/hooks/useTaskList";
@@ -173,6 +173,20 @@ function BoardContent({
                 chat.
               </p>
             </div>
+            <div className="flex items-center gap-2">
+              <Button asChild size="sm">
+                <a href="#dashboard">
+                  <LayoutDashboardIcon data-icon="inline-start" className="size-3.5" />
+                  Go to Dashboard
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <a href="#chat">
+                  <MessageCircleIcon data-icon="inline-start" className="size-3.5" />
+                  Start a Chat
+                </a>
+              </Button>
+            </div>
           </div>
         </div>
       ) : filteredTasks.length === 0 ? (
@@ -215,6 +229,18 @@ function BoardContent({
                 <p className="text-[11px] leading-relaxed text-muted-foreground/60">
                   Ask your CMO or specialists to plan work, and tasks will appear here automatically. You can also run actions from the dashboard.
                 </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <Button asChild size="xs">
+                    <a href="#dashboard">
+                      Go to Dashboard
+                    </a>
+                  </Button>
+                  <Button asChild variant="ghost" size="xs">
+                    <a href="#chat">
+                      Start a Chat
+                    </a>
+                  </Button>
+                </div>
               </div>
             </div>
           )}
