@@ -6,6 +6,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
+import { cn } from "@/lib/utils";
 import {
   Collapsible,
   CollapsibleContent,
@@ -20,6 +21,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useSpecialistContext } from "@/features/brain/hooks/useSpecialistContext";
+import { resolveSpecialistIcon } from "@/features/agents/specialist-icons";
+import { getSpecialistColors } from "@/features/agents/specialist-meta";
 import { MemoryEntryCard } from "./MemoryEntryCard";
 import { MemoryEntryForm, type MemoryEntryFormValues } from "./MemoryEntryForm";
 
@@ -137,32 +140,54 @@ export function SpecialistContextSection({ agentId, client }: SpecialistContextS
 
   // Empty state
   if (isEmpty && !creatingForSpecialist) {
+    const operationalSpecs = specialists.filter((s) => s.category !== "manager");
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-5 py-10">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-muted/60">
-          <UsersIcon className="size-5 text-muted-foreground/40" />
+      <div className="flex flex-1 flex-col px-5 py-6 lg:px-6">
+        <div className="mb-5 text-center">
+          <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-lg bg-muted/60">
+            <UsersIcon className="size-5 text-muted-foreground/40" />
+          </div>
+          <h3 className="font-display text-sm font-bold tracking-tight text-foreground/80">
+            No agent guidelines yet
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground/50">
+            Tell each specialist what to prioritize, what to avoid, and how to think about your business.
+          </p>
         </div>
-        <h3 className="mt-3 font-display text-sm font-bold tracking-tight text-foreground/80">
-          No agent guidelines yet
-        </h3>
-        <p className="mt-1 max-w-[300px] text-center text-xs leading-relaxed text-muted-foreground/50">
-          Shape how each specialist thinks, what it should prioritize, and what to avoid.
-        </p>
-        {specialists.length > 0 && (
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {specialists
-              .filter((s) => s.category !== "manager")
-              .map((s) => (
+        {operationalSpecs.length > 0 && (
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {operationalSpecs.map((s) => {
+              const Icon = resolveSpecialistIcon(s.icon);
+              const colors = getSpecialistColors(s.id);
+              return (
                 <button
                   key={s.id}
                   type="button"
                   onClick={() => setCreatingForSpecialist(s.id)}
-                  className="flex items-center gap-1 rounded-md border border-dashed border-border/30 px-2.5 py-1.5 text-[11px] text-muted-foreground/50 transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+                  className={cn(
+                    "group/spec flex items-start gap-3 rounded-xl border border-dashed px-3.5 py-3 text-left transition-all",
+                    "border-border/30 hover:border-primary/30 hover:bg-primary/[0.02]",
+                    "dark:border-white/[0.05] dark:hover:border-primary/20 dark:hover:bg-primary/[0.015]",
+                  )}
                 >
-                  <PlusIcon className="size-3" />
-                  {s.name}
+                  <div className={cn(
+                    "flex size-8 shrink-0 items-center justify-center rounded-lg ring-1 ring-black/[0.04] transition-colors dark:ring-white/[0.06]",
+                    colors.iconBg,
+                  )}>
+                    <Icon className={cn("size-4", colors.iconText)} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[12px] font-medium text-foreground/80 transition-colors group-hover/spec:text-foreground">
+                      {s.name}
+                    </span>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground/50">
+                      {s.role}
+                    </p>
+                  </div>
+                  <PlusIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/30 transition-colors group-hover/spec:text-primary" />
                 </button>
-              ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -229,24 +254,40 @@ export function SpecialistContextSection({ agentId, client }: SpecialistContextS
       {/* Add guidelines for other specialists */}
       {emptySpecialists.length > 0 && (
         <div className="mt-4 border-t border-border/10 pt-4">
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground/40">
+          <div className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground/40">
             Add guidelines for
           </div>
-          <div className="flex flex-wrap gap-2">
-            {emptySpecialists.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => {
-                  setCreatingForSpecialist(s.id);
-                  setEditingId(null);
-                }}
-                className="flex items-center gap-1 rounded-md border border-dashed border-border/30 px-2.5 py-1.5 text-[11px] text-muted-foreground/50 transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
-              >
-                <PlusIcon className="size-3" />
-                {s.name}
-              </button>
-            ))}
+          <div className="grid gap-2 sm:grid-cols-2">
+            {emptySpecialists.map((s) => {
+              const Icon = resolveSpecialistIcon(s.icon);
+              const colors = getSpecialistColors(s.id);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    setCreatingForSpecialist(s.id);
+                    setEditingId(null);
+                  }}
+                  className={cn(
+                    "group/spec flex items-center gap-2.5 rounded-lg border border-dashed px-3 py-2 text-left transition-all",
+                    "border-border/30 hover:border-primary/30 hover:bg-primary/[0.02]",
+                    "dark:border-white/[0.05] dark:hover:border-primary/20 dark:hover:bg-primary/[0.015]",
+                  )}
+                >
+                  <div className={cn(
+                    "flex size-6 shrink-0 items-center justify-center rounded-md ring-1 ring-black/[0.04] dark:ring-white/[0.06]",
+                    colors.iconBg,
+                  )}>
+                    <Icon className={cn("size-3", colors.iconText)} />
+                  </div>
+                  <span className="flex-1 text-[11px] font-medium text-muted-foreground/60 transition-colors group-hover/spec:text-foreground">
+                    {s.name}
+                  </span>
+                  <PlusIcon className="size-3 shrink-0 text-muted-foreground/30 transition-colors group-hover/spec:text-primary" />
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
