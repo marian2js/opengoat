@@ -87,9 +87,11 @@ describe("Brain simplified terminology — OperatingMemorySection", () => {
     expect(src).toMatch(/Help|stay aligned|optional|not required/);
   });
 
-  it('CTA button says "Add your first entry" not "Add your first memory"', () => {
-    expect(src).toContain("Add your first entry");
+  it("empty state CTA does not use memory jargon", () => {
+    // The empty state now uses category cards instead of a single "Add your first entry" button,
+    // but it must still avoid "memory" terminology
     expect(src).not.toMatch(/Add your first memory/);
+    expect(src).not.toMatch(/Create.*memory/);
   });
 
   it('delete dialog title says "Delete entry" not "Delete memory entry"', () => {

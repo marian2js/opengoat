@@ -1,7 +1,15 @@
 import { useCallback, useState } from "react";
 import type { MemoryRecord } from "@opengoat/contracts";
-import { DatabaseIcon, PlusIcon } from "lucide-react";
+import {
+  DatabaseIcon,
+  MicIcon,
+  PackageIcon,
+  UsersIcon,
+  ShieldIcon,
+  PlusIcon,
+} from "lucide-react";
 import type { SidecarClient } from "@/lib/sidecar/client";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -196,38 +204,87 @@ export function OperatingMemorySection({ agentId, client }: OperatingMemorySecti
 
   // Empty state
   if (isEmpty && !creatingCategory) {
+    const starterCategories: Array<{
+      category: string;
+      label: string;
+      description: string;
+      icon: typeof MicIcon;
+      example: string;
+    }> = [
+      {
+        category: "brand_voice",
+        label: "Brand Voice",
+        description: "Tone, personality, and language rules",
+        icon: MicIcon,
+        example: "e.g. \"Direct, no fluff. Technical but approachable.\"",
+      },
+      {
+        category: "product_facts",
+        label: "Product Facts",
+        description: "Key features, pricing, or positioning",
+        icon: PackageIcon,
+        example: "e.g. \"Free tier has 3 portfolios. Pro is $9/mo.\"",
+      },
+      {
+        category: "icp_facts",
+        label: "ICP Facts",
+        description: "Who your ideal customers are",
+        icon: UsersIcon,
+        example: "e.g. \"Active eToro users who copy trade.\"",
+      },
+      {
+        category: "messaging_constraints",
+        label: "Constraints",
+        description: "Topics or phrasing to avoid",
+        icon: ShieldIcon,
+        example: "e.g. \"Never mention competitor X by name.\"",
+      },
+    ];
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-5 py-10">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-muted/60">
-          <DatabaseIcon className="size-5 text-muted-foreground/40" />
-        </div>
-        <h3 className="mt-3 font-display text-sm font-bold tracking-tight text-foreground/80">
-          No saved guidance yet
-        </h3>
-        <p className="mt-1 max-w-[300px] text-center text-xs leading-relaxed text-muted-foreground/50">
-          Help the system stay aligned with your brand voice, preferences, and constraints.
-        </p>
-        <button
-          type="button"
-          onClick={() => setCreatingCategory(CATEGORY_ORDER[0]!)}
-          className="mt-4 flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
-        >
-          <PlusIcon className="size-3.5" />
-          Add your first entry
-        </button>
-
-        {creatingCategory && (
-          <div className="mt-4 w-full max-w-md">
-            <MemoryCategoryGroupInline
-              category={creatingCategory}
-              agentId={agentId}
-              client={client}
-              isSubmitting={isSubmitting}
-              onCreate={handleCreate}
-              onCancel={() => setCreatingCategory(null)}
-            />
+      <div className="flex flex-1 flex-col px-5 py-6 lg:px-6">
+        <div className="mb-5 text-center">
+          <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-lg bg-muted/60">
+            <DatabaseIcon className="size-5 text-muted-foreground/40" />
           </div>
-        )}
+          <h3 className="font-display text-sm font-bold tracking-tight text-foreground/80">
+            No saved guidance yet
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground/50">
+            Help specialists stay aligned with your brand, product, and preferences.
+          </p>
+        </div>
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          {starterCategories.map(({ category, label, description, icon: CatIcon, example }) => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => setCreatingCategory(category)}
+              className={cn(
+                "group/cat flex flex-col gap-2 rounded-xl border border-dashed px-4 py-3.5 text-left transition-all",
+                "border-border/30 hover:border-primary/30 hover:bg-primary/[0.02]",
+                "dark:border-white/[0.05] dark:hover:border-primary/20 dark:hover:bg-primary/[0.015]",
+              )}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/50 transition-colors group-hover/cat:bg-primary/10">
+                  <CatIcon className="size-3.5 text-muted-foreground/50 transition-colors group-hover/cat:text-primary" />
+                </div>
+                <span className="text-[12px] font-medium text-foreground/80 transition-colors group-hover/cat:text-foreground">
+                  {label}
+                </span>
+                <PlusIcon className="ml-auto size-3 shrink-0 text-muted-foreground/25 transition-colors group-hover/cat:text-primary" />
+              </div>
+              <div className="pl-[38px]">
+                <p className="text-[11px] leading-relaxed text-muted-foreground/50">
+                  {description}
+                </p>
+                <p className="mt-0.5 font-mono text-[10px] text-muted-foreground/30">
+                  {example}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     );
   }
