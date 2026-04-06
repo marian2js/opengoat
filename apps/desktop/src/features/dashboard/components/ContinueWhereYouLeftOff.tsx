@@ -26,7 +26,7 @@ export function ContinueWhereYouLeftOff({
   if (items.length === 0) return null;
 
   return (
-    <section className="mb-5 rounded-lg border border-border/20 bg-card/50 px-4 py-3">
+    <section className="mb-5 rounded-xl border border-primary/10 bg-primary/[0.015] px-4 py-3 dark:border-primary/[0.06] dark:bg-primary/[0.01]">
       {/* Section label */}
       <div className="mb-2.5 flex items-center gap-2">
         <CornerDownLeftIcon className="size-3 text-primary/60" />
@@ -34,7 +34,7 @@ export function ContinueWhereYouLeftOff({
       </div>
 
       {/* Compact item rows */}
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {items.map((item) => {
           const handleClick = () => {
             if (item.sessionId && onContinue) {
@@ -49,27 +49,27 @@ export function ContinueWhereYouLeftOff({
               key={item.id}
               type="button"
               onClick={handleClick}
-              className="group flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-white/[0.03]"
+              className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all duration-100 hover:bg-primary/[0.06] dark:hover:bg-primary/[0.04]"
             >
               {/* Status dot */}
               <span
-                className={`size-1.5 shrink-0 rounded-full ${
+                className={`size-2 shrink-0 rounded-full ring-2 ${
                   item.needsInput
-                    ? "bg-amber-500"
-                    : "bg-primary/50"
+                    ? "bg-amber-500 ring-amber-500/20"
+                    : "bg-primary/60 ring-primary/15"
                 }`}
               />
 
               {/* Title */}
-              <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">
+              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground/90 group-hover:text-foreground">
                 {item.title}
               </span>
 
               {/* Status badge */}
               <span
-                className={`shrink-0 font-mono text-[10px] font-medium uppercase tracking-wider ${
+                className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider ${
                   item.needsInput
-                    ? "text-amber-500"
+                    ? "bg-amber-500/10 text-amber-500"
                     : "text-muted-foreground/50"
                 }`}
               >

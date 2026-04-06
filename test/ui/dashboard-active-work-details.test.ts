@@ -93,7 +93,7 @@ describe("ContinueWhereYouLeftOff compact section", () => {
 
   it("uses compact layout", () => {
     const src = readFile(componentPath);
-    expect(src).toContain("border-border/20");
+    expect(src).toMatch(/border-border\/20|border-primary\/10/);
   });
 
   it("uses section-label for heading", () => {

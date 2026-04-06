@@ -139,7 +139,7 @@ describe("ContinueWhereYouLeftOff component", () => {
   it("uses compact layout (not prominent cards)", () => {
     const src = readFile(COMPONENT_PATH);
     // Should use a lighter border style, not full card
-    expect(src).toContain("border-border/20");
+    expect(src).toMatch(/border-border\/20|border-primary\/10/);
   });
 
   it("shows status dot for each item", () => {
