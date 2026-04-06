@@ -30,7 +30,7 @@ describe("Brain section card backgrounds — visual separation", () => {
     const fnStart = src.indexOf("function SectionedMarkdownView");
     const fnEnd = src.indexOf("\nfunction ", fnStart + 1);
     const fnBody = src.slice(fnStart, fnEnd > 0 ? fnEnd : undefined);
-    expect(fnBody).toContain("rounded-lg");
+    expect(fnBody).toMatch(/rounded-lg|rounded-xl/);
   });
 
   it("section cards have a border", () => {

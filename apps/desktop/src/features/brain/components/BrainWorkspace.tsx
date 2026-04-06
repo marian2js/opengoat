@@ -24,6 +24,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { SidecarClient } from "@/lib/sidecar/client";
+import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils/output-labels";
 import { isRefinableSection } from "@/features/brain/lib/refine-context-prompt";
 import {
@@ -914,7 +915,7 @@ function SectionedMarkdownView({ content }: { content: string }) {
   // If there are no h2 sections, render as a single card
   if (nonEmpty.length <= 1 && !nonEmpty[0]?.heading) {
     return (
-      <div className="rounded-lg border border-border/50 bg-card p-5">
+      <div className="rounded-xl border border-border/50 bg-card p-5 transition-all duration-100 hover:border-border/70 hover:shadow-sm dark:hover:border-white/[0.10]">
         <div className={SECTION_CARD_PROSE_CLASSES}>
           <Markdown remarkPlugins={[remarkGfm]}>{stripped}</Markdown>
         </div>
@@ -923,18 +924,29 @@ function SectionedMarkdownView({ content }: { content: string }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {nonEmpty.map((sec, i) => {
         const md = sec.heading
           ? `## ${sec.heading}\n${sec.body}`
           : sec.body;
+        const isFirst = i === 0;
         return (
           <div
             key={sec.heading ?? `section-${i}`}
-            className="rounded-lg border border-border/50 bg-card p-5"
+            className={cn(
+              "relative rounded-xl border p-5 transition-all duration-100",
+              isFirst
+                ? "border-primary/15 bg-primary/[0.015] hover:border-primary/25 hover:shadow-sm dark:border-primary/[0.08] dark:bg-primary/[0.01] dark:hover:border-primary/[0.15]"
+                : "border-border/50 bg-card hover:border-border/70 hover:shadow-sm dark:hover:border-white/[0.10]",
+            )}
           >
-            <div className={SECTION_CARD_PROSE_CLASSES}>
-              <Markdown remarkPlugins={[remarkGfm]}>{md}</Markdown>
+            {isFirst && (
+              <div className="absolute inset-y-0 left-0 w-[2px] rounded-l-xl bg-primary/40" />
+            )}
+            <div className={isFirst ? "pl-2" : undefined}>
+              <div className={SECTION_CARD_PROSE_CLASSES}>
+                <Markdown remarkPlugins={[remarkGfm]}>{md}</Markdown>
+              </div>
             </div>
           </div>
         );
