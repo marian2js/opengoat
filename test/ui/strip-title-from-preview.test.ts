@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { stripTitleFromPreview } from "../../apps/desktop/src/features/dashboard/lib/strip-title-from-preview";
 
 const utilPath = resolve(
   __dirname,
@@ -48,6 +49,54 @@ describe("strip-title-from-preview utility", () => {
     const src = readFileSync(utilPath, "utf-8");
     // Should guard against empty/missing summary
     expect(src).toMatch(/!summary|summary\s*===?\s*""/);
+  });
+});
+
+describe("stripTitleFromPreview — behavioral", () => {
+  it("returns empty string for empty summary", () => {
+    expect(stripTitleFromPreview("Some title", "")).toBe("");
+  });
+
+  it("strips title prefix from summary", () => {
+    expect(
+      stripTitleFromPreview(
+        "Feature matrix",
+        "Feature matrix with grouped rows by use case",
+      ),
+    ).toBe("with grouped rows by use case");
+  });
+
+  it("returns full summary when title is not a prefix", () => {
+    expect(
+      stripTitleFromPreview("Unrelated title", "Some preview text here"),
+    ).toBe("Some preview text here");
+  });
+
+  it("strips leading numbering from preview before title comparison", () => {
+    expect(
+      stripTitleFromPreview(
+        "Rewritten Free vs Pro feature matrix with grouped rows by",
+        "1) Rewritten Free vs Pro feature matrix with grouped rows by use case > Important framing",
+      ),
+    ).toBe("use case > Important framing");
+  });
+
+  it("strips '2. ' numbering prefix from preview before title comparison", () => {
+    expect(
+      stripTitleFromPreview(
+        "Updated homepage hero copy",
+        "2. Updated homepage hero copy: new version with better CTA",
+      ),
+    ).toBe("new version with better CTA");
+  });
+
+  it("handles preview without numbering as before", () => {
+    expect(
+      stripTitleFromPreview(
+        "SEO Audit Key Findings",
+        "SEO Audit Key Findings — detailed breakdown follows",
+      ),
+    ).toBe("detailed breakdown follows");
   });
 });
 

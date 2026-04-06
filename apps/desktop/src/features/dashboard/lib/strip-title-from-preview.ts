@@ -9,7 +9,11 @@ export function stripTitleFromPreview(title: string, summary: string): string {
 
   const stripped = stripMarkdown(summary);
   const normalizedTitle = title.replace(/\s+/g, " ").trim().toLowerCase();
-  const normalizedStripped = stripped.replace(/\s+/g, " ").trim();
+
+  // Strip leading list numbering (e.g. "1) ", "2. ") to match cleanArtifactTitle behavior
+  const withoutNumbering = stripped.replace(/^\d+[.)]\s+/, "");
+
+  const normalizedStripped = withoutNumbering.replace(/\s+/g, " ").trim();
   const normalizedStrippedLower = normalizedStripped.toLowerCase();
 
   if (normalizedTitle && normalizedStrippedLower.startsWith(normalizedTitle)) {
