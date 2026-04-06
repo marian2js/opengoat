@@ -167,7 +167,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
                 >
                   <PackageIcon className={cn("size-3 shrink-0", colors.iconText || "text-primary")} />
                   <span className="min-w-0 flex-1 truncate font-medium text-foreground/70 group-hover/output:text-foreground">
-                    {bundle.title}
+                    {cleanArtifactTitle({ title: bundle.title, type: bundle.artifacts[0]?.type ?? 'draft', content: bundle.artifacts[0]?.content })}
                   </span>
                   <span className="shrink-0 rounded-full bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
                     {bundle.artifacts.length}

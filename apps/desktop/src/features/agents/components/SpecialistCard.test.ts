@@ -133,3 +133,4 @@ void test("SpecialistCard: icon container uses emerald tint for all specialists"
     "Expected icon container to use bg-primary/* emerald tint for all specialists",
   );
 });
+
