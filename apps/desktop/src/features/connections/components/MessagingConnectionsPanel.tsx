@@ -205,29 +205,51 @@ export function MessagingConnectionsPanel({
       ) : null}
 
       {!isLoading && connections.length === 0 ? (
-        <div className="border-t border-border/60 px-4 py-8 lg:px-5">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-primary/8 ring-1 ring-primary/10">
-              <MessageSquareIcon className="size-6 text-primary/50" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium text-foreground">
-                No messaging channels
-              </h3>
-              <p className="max-w-[340px] text-[12px] leading-relaxed text-muted-foreground/70">
-                Connect Telegram or WhatsApp to chat with your AI CMO from
-                messaging apps.
-              </p>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              className="mt-1 h-8 rounded-md bg-primary px-4 text-[12px] font-medium text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90"
-              onClick={() => setShowTypeSelector(true)}
-            >
-              <PlusIcon className="size-3.5" />
-              Add channel
-            </Button>
+        <div className="border-t border-border/60 px-4 py-6 lg:px-5">
+          <p className="mb-4 text-center text-[12px] leading-relaxed text-muted-foreground/70">
+            Chat with your AI CMO directly from your messaging apps.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(["telegram", "whatsapp"] as const).map((type) => {
+              const meta = TYPE_META[type]!;
+              const Icon = meta.icon;
+              const descriptions: Record<string, string> = {
+                telegram: "Create a bot with BotFather and connect it to your CMO.",
+                whatsapp: "Link your WhatsApp via QR code to message your CMO.",
+              };
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  className={cn(
+                    "group/platform flex flex-col items-center gap-3 rounded-xl border border-dashed px-4 py-5 text-center transition-all",
+                    "border-border/40 hover:border-primary/30 hover:bg-primary/[0.03]",
+                    "dark:border-white/[0.06] dark:hover:border-primary/20 dark:hover:bg-primary/[0.02]",
+                  )}
+                  onClick={() => void handleCreate(type)}
+                >
+                  <div className={cn(
+                    "flex size-10 items-center justify-center rounded-xl transition-colors",
+                    type === "telegram"
+                      ? "bg-blue-400/10 ring-1 ring-blue-400/15 group-hover/platform:bg-blue-400/15"
+                      : "bg-emerald-400/10 ring-1 ring-emerald-400/15 group-hover/platform:bg-emerald-400/15",
+                  )}>
+                    <Icon className={cn("size-5", meta.color)} />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[13px] font-medium text-foreground">
+                      {meta.label}
+                    </span>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground/60">
+                      {descriptions[type]}
+                    </p>
+                  </div>
+                  <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-primary/60 transition-colors group-hover/platform:text-primary">
+                    Connect
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : null}
