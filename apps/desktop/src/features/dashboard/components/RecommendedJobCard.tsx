@@ -4,22 +4,43 @@ import { buildActionPrompt } from "@/features/dashboard/data/prompt-builder";
 
 export interface RecommendedJobCardProps {
   job: RecommendedJob;
-  isHero?: boolean;
+  tier: "hero" | "primary" | "secondary";
   onClick?: (actionId: string, prompt: string, label: string) => void;
 }
 
-export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardProps) {
+export function RecommendedJobCard({ job, tier, onClick }: RecommendedJobCardProps) {
   const { dotColor, iconBg, iconText } = job.specialistColors;
   const ctaText = job.ctaLabel ?? "Start";
+
+  const isHero = tier === "hero";
+  const isPrimary = tier === "primary";
+  const isSecondary = tier === "secondary";
+
+  // ── Tier-driven style tokens ──
+  const containerClasses = isHero
+    ? "gap-3 border-primary/15 p-6 shadow-sm shadow-black/[0.03] hover:-translate-y-px hover:border-primary/30 hover:shadow-lg dark:border-primary/10 dark:bg-gradient-to-br dark:from-[#18181B] dark:to-primary/[0.03] dark:shadow-black/20"
+    : isPrimary
+      ? "gap-2.5 border-primary/10 p-4 shadow-sm shadow-black/[0.02] hover:-translate-y-px hover:border-primary/25 hover:shadow-md dark:border-primary/8 dark:shadow-black/15"
+      : "gap-2 border-border/15 p-3 shadow-sm shadow-black/[0.01] hover:-translate-y-px hover:border-border/30 hover:shadow-sm dark:border-white/[0.03] dark:shadow-black/10";
+
+  const titleSize = isHero ? "text-lg" : isPrimary ? "text-[15px]" : "text-sm";
+
+  const promiseClasses = isHero
+    ? "text-[13px] line-clamp-3"
+    : isPrimary
+      ? "text-xs line-clamp-2"
+      : "text-xs line-clamp-1";
+
+  const ctaClasses = isHero
+    ? "text-primary/70"
+    : isPrimary
+      ? "text-muted-foreground/60"
+      : "text-muted-foreground/30";
 
   return (
     <button
       type="button"
-      className={`group/job relative flex flex-col items-start overflow-hidden rounded-xl border bg-card text-left transition-all duration-100 ease-out ${
-        isHero
-          ? "gap-3 border-primary/15 p-6 shadow-sm shadow-black/[0.03] hover:-translate-y-px hover:border-primary/30 hover:shadow-lg dark:border-primary/10 dark:bg-gradient-to-br dark:from-[#18181B] dark:to-primary/[0.03] dark:shadow-black/20"
-          : "gap-2.5 border-border/20 p-4 shadow-sm shadow-black/[0.02] hover:-translate-y-px hover:border-primary/25 hover:shadow-md dark:border-white/[0.06] dark:shadow-black/15"
-      }`}
+      className={`group/job relative flex flex-col items-start overflow-hidden rounded-xl border bg-card text-left transition-all duration-100 ease-out ${containerClasses}`}
       onClick={() => onClick?.(job.id, buildActionPrompt(job), job.title)}
     >
       {/* Left accent bar for hero card */}
@@ -37,9 +58,13 @@ export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardP
           </span>
         )}
 
-        {/* Output-type tag — inline with specialist for compact layout */}
+        {/* Output-type tag — inline for primary/secondary */}
         {job.outputType && !isHero && (
-          <span className="inline-flex items-center gap-1 rounded-md border border-border/20 bg-muted/30 px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wider text-muted-foreground/60 dark:border-white/[0.04] dark:bg-white/[0.02]">
+          <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wider ${
+            isPrimary
+              ? "border-primary/10 bg-primary/[0.04] text-muted-foreground/60 dark:border-primary/8 dark:bg-primary/[0.03]"
+              : "border-border/20 bg-muted/30 text-muted-foreground/40 dark:border-white/[0.04] dark:bg-white/[0.02]"
+          }`}>
             <PackageIcon className="size-2.5" />
             {job.outputType}
           </span>
@@ -48,9 +73,7 @@ export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardP
 
       {/* Job title */}
       <h3
-        className={`font-display leading-snug font-bold transition-colors group-hover/job:text-primary ${
-          isHero ? "text-lg" : "text-[15px]"
-        }`}
+        className={`font-display leading-snug font-bold transition-colors group-hover/job:text-primary ${titleSize}`}
       >
         {job.title}
       </h3>
@@ -64,7 +87,7 @@ export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardP
       )}
 
       {/* Promise — what the user gets / why it matters */}
-      <p className={`leading-relaxed text-muted-foreground/70 ${isHero ? "text-[13px] line-clamp-3" : "text-xs line-clamp-2"}`}>
+      <p className={`leading-relaxed text-muted-foreground/70 ${promiseClasses}`}>
         {job.promise}
       </p>
 
@@ -76,9 +99,7 @@ export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardP
       )}
 
       {/* Outcome CTA */}
-      <span className={`mt-auto inline-flex items-center gap-1.5 pt-1 font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors group-hover/job:text-primary ${
-        isHero ? "text-primary/70" : "text-muted-foreground/40"
-      }`}>
+      <span className={`mt-auto inline-flex items-center gap-1.5 pt-1 font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors group-hover/job:text-primary ${ctaClasses}`}>
         {ctaText}
         <ArrowRightIcon className="size-3 transition-transform duration-150 group-hover/job:translate-x-0.5" />
       </span>

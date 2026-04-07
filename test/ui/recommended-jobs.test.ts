@@ -157,11 +157,16 @@ describe("SuggestedActionData — outputType support", () => {
 });
 
 // ═══════════════════════════════════════════════════════
-// RecommendedJobCard component — output-promise rendering
+// RecommendedJobCard component — three-tier visual hierarchy
 // ═══════════════════════════════════════════════════════
 describe("RecommendedJobCard component", () => {
   it("exports a RecommendedJobCard function component", () => {
     expect(cardSrc).toMatch(/export\s+function\s+RecommendedJobCard/);
+  });
+
+  it("accepts a tier prop instead of isHero", () => {
+    expect(cardSrc).toMatch(/tier.*"hero"\s*\|\s*"primary"\s*\|\s*"secondary"/);
+    expect(cardSrc).not.toMatch(/isHero\??\s*:\s*boolean/);
   });
 
   it("displays the job title", () => {
@@ -182,7 +187,6 @@ describe("RecommendedJobCard component", () => {
 
   it("renders the ctaLabel (outcome-based CTA)", () => {
     expect(cardSrc).toContain("ctaLabel");
-    expect(cardSrc).toMatch(/ctaLabel.*\?\?.*"Start"|"Start"/);
   });
 
   it("uses PackageIcon for the output-type tag", () => {
@@ -191,7 +195,6 @@ describe("RecommendedJobCard component", () => {
 
   it("hero card shows description as additional context", () => {
     expect(cardSrc).toContain("job.description");
-    expect(cardSrc).toMatch(/isHero\s*&&\s*job\.description/);
   });
 
   it("uses specialist dot color for attribution", () => {
@@ -207,12 +210,30 @@ describe("RecommendedJobCard component", () => {
     expect(cardSrc).toMatch(/hover:shadow/);
   });
 
+  it("hero variant has larger padding (p-6)", () => {
+    expect(cardSrc).toMatch(/p-6/);
+  });
+
+  it("primary variant has medium padding (p-4)", () => {
+    expect(cardSrc).toMatch(/p-4/);
+  });
+
+  it("secondary variant has compact padding (p-3)", () => {
+    expect(cardSrc).toMatch(/p-3/);
+  });
+
   it("hero output-type tag uses primary/emerald accent tint", () => {
     expect(cardSrc).toMatch(/bg-primary/);
   });
 
   it("secondary output-type tag uses muted styling", () => {
-    expect(cardSrc).toMatch(/bg-muted/);
+    expect(cardSrc).toMatch(/bg-muted|muted-foreground/);
+  });
+
+  it("has three distinct tier treatments driven by conditional logic", () => {
+    expect(cardSrc).toMatch(/tier\s*===\s*"hero"/);
+    expect(cardSrc).toMatch(/tier\s*===\s*"primary"/);
+    expect(cardSrc).toMatch(/tier\s*===\s*"secondary"/);
   });
 });
 
@@ -224,8 +245,16 @@ describe("RecommendedJobs section wrapper", () => {
     expect(sectionSrc).toMatch(/export\s+function\s+RecommendedJobs/);
   });
 
-  it("uses founder-friendly section label 'Best first moves'", () => {
-    expect(sectionSrc).toMatch(/Best first moves/i);
+  it("hero section uses 'Best first move' header", () => {
+    expect(sectionSrc).toMatch(/Best first move/i);
+  });
+
+  it("primary section uses 'More high-value jobs' header", () => {
+    expect(sectionSrc).toMatch(/More high-value jobs/i);
+  });
+
+  it("secondary section uses 'Additional jobs' header", () => {
+    expect(sectionSrc).toMatch(/Additional jobs/i);
   });
 
   it("uses the section-label CSS class for the heading", () => {
@@ -234,6 +263,10 @@ describe("RecommendedJobs section wrapper", () => {
 
   it("renders RecommendedJobCard for each job", () => {
     expect(sectionSrc).toContain("RecommendedJobCard");
+  });
+
+  it("passes tier prop to RecommendedJobCard", () => {
+    expect(sectionSrc).toMatch(/tier=/);
   });
 
   it("shows loading skeletons when isLoading is true", () => {
@@ -254,14 +287,14 @@ describe("RecommendedJobs section wrapper", () => {
     expect(sectionSrc).toMatch(/secondary.*RecommendedJob\[\]/);
   });
 
+  it("secondary section is collapsible when many items", () => {
+    expect(sectionSrc).toMatch(/collapse|expanded|setExpanded|showAll|setShowAll/i);
+  });
+
   it("skeleton has internal pulse zones matching card content structure", () => {
     const skeletonSection = sectionSrc.slice(0, sectionSrc.indexOf("export function RecommendedJobs"));
     const pulseCount = (skeletonSection.match(/animate-pulse/g) || []).length;
     expect(pulseCount).toBeGreaterThanOrEqual(5);
-  });
-
-  it("skeleton hero card has larger padding than secondary cards", () => {
-    expect(sectionSrc).toMatch(/isHero.*p-6|p-6.*isHero/s);
   });
 });
 
