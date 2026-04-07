@@ -1,0 +1,213 @@
+name: Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version to publish (for example 2026.4.7)
+        required: true
+        type: string
+      prerelease:
+        description: Publish this release as a prerelease
+        required: true
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare release tag
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release_meta.outputs.tag }}
+      version: ${{ steps.release_meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - id: release_meta
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          version="${INPUT_VERSION#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if tag already exists
+        env:
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "::error::Release tag $RELEASE_TAG already exists on origin. Use a new version or recreate the tag deliberately before releasing."
+            exit 1
+          fi
+
+      - name: Sync repository versions
+        env:
+          RELEASE_VERSION: ${{ steps.release_meta.outputs.version }}
+        run: node scripts/sync-version.mjs --set "$RELEASE_VERSION"
+
+      - name: Commit release metadata
+        env:
+          RELEASE_VERSION: ${{ steps.release_meta.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION Cargo.lock Cargo.toml package.json apps/desktop/package.json apps/desktop/src-tauri/tauri.conf.json packages/contracts/package.json packages/core/package.json packages/sidecar/package.json packages/cli/package.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): cut v$RELEASE_VERSION"
+          fi
+
+      - name: Create release tag
+        env:
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
+        run: git tag "$RELEASE_TAG"
+
+      - name: Push release commit and tag
+        env:
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
+          RELEASE_BRANCH: ${{ github.ref_name }}
+        run: |
+          git push origin "HEAD:$RELEASE_BRANCH"
+          git push origin "$RELEASE_TAG"
+
+  release-info:
+    name: Resolve release metadata
+    needs: [prepare]
+    if: always() && (github.event_name == 'push' || needs.prepare.result == 'success')
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      ref: ${{ steps.meta.outputs.ref }}
+    steps:
+      - id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_TAG: ${{ github.ref_name }}
+          PUSH_REF: ${{ github.ref }}
+          INPUT_PRERELEASE: ${{ github.event.inputs.prerelease }}
+          PREPARED_TAG: ${{ needs.prepare.outputs.tag }}
+          PREPARED_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="$PREPARED_TAG"
+            version="$PREPARED_VERSION"
+            prerelease="$INPUT_PRERELEASE"
+            case "$version" in
+              *-*) prerelease="true" ;;
+            esac
+            ref="refs/tags/$tag"
+          else
+            tag="$PUSH_TAG"
+            version="${PUSH_TAG#v}"
+            case "$version" in
+              *-*) prerelease="true" ;;
+              *) prerelease="false" ;;
+            esac
+            ref="$PUSH_REF"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+  create-release:
+    name: Create GitHub release
+    needs: [release-info]
+    if: always() && needs.release-info.result == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+    steps:
+      - id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.release-info.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.release-info.outputs.version }}
+          RELEASE_PRERELEASE: ${{ needs.release-info.outputs.prerelease }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            release_id="$(gh release view "$RELEASE_TAG" --json databaseId --jq '.databaseId')"
+          else
+            args=(
+              release create "$RELEASE_TAG"
+              --title "OpenGoat v$RELEASE_VERSION"
+              --generate-notes
+              --notes "Download the installer for your platform from the assets below."
+            )
+            if [ "$RELEASE_PRERELEASE" = "true" ]; then
+              args+=(--prerelease)
+            fi
+            gh "${args[@]}"
+            release_id="$(gh release view "$RELEASE_TAG" --json databaseId --jq '.databaseId')"
+          fi
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Build and publish desktop bundles
+    needs: [release-info, create-release]
+    if: always() && needs.release-info.result == 'success' && needs.create-release.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.release-info.outputs.ref }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release version sync
+        run: pnpm release:check-version
+
+      - uses: tauri-apps/tauri-action@v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ./apps/desktop
+          tauriScript: pnpm tauri
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          tagName: ${{ needs.release-info.outputs.tag }}
+          args: --target ${{ matrix.target }} --ci
+          retryAttempts: 2
+          includeUpdaterJson: false
+          assetNamePattern: OpenGoat_[version]_[platform]_[arch][_setup].[ext]

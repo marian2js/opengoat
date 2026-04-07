@@ -106,7 +106,7 @@ jobs:
         if: steps.check_changesets.outputs.has_changesets == 'true'
         run: |
           VERSION="$(node -p "require('./packages/cli/package.json').version")"
-          git add packages/contracts/package.json packages/core/package.json packages/cli/package.json CHANGELOG.md .changeset
+          git add VERSION Cargo.lock Cargo.toml package.json apps/desktop/package.json apps/desktop/src-tauri/tauri.conf.json packages/contracts/package.json packages/core/package.json packages/sidecar/package.json packages/cli/package.json CHANGELOG.md .changeset
           git commit -m "chore: release ${VERSION}"
           git tag "v${VERSION}"
           git push
@@ -131,4 +131,8 @@ jobs:
             exit 1
           fi
 
-          gh release create "v${VERSION}" --title "v${VERSION}" --notes-file "$NOTES_FILE"
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            gh release edit "v${VERSION}" --title "v${VERSION}" --notes-file "$NOTES_FILE"
+          else
+            gh release create "v${VERSION}" --title "v${VERSION}" --notes-file "$NOTES_FILE"
+          fi

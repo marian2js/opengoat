@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "OpenGoat",
-  "version": "0.1.0",
+  "version": "2026.2.23",
   "identifier": "com.opengoat.app",
   "build": {
     "beforeDevCommand": "pnpm --dir ../../ desktop:frontend:dev",
     "devUrl": "http://localhost:1430",
-    "beforeBuildCommand": "pnpm --dir ../../ desktop:frontend:build && pnpm --dir ../../ sidecar:bundle",
+    "beforeBuildCommand": "pnpm --dir ../../ desktop:frontend:release-build && pnpm --dir ../../ sidecar:bundle",
     "frontendDist": "../dist"
   },
   "app": {
@@ -27,6 +27,9 @@
   },
   "bundle": {
     "active": true,
+    "macOS": {
+      "signingIdentity": "-"
+    },
     "resources": {
       "../../../packages/sidecar/.bundle/": "sidecar/"
     },

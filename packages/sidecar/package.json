@@ -1,7 +1,7 @@
 {
   "name": "@opengoat/sidecar",
   "private": true,
-  "version": "0.1.0",
+  "version": "2026.2.23",
   "type": "module",
   "exports": {
     ".": {
