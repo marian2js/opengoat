@@ -157,7 +157,7 @@ export function ConnectionsWorkspace({
       <section className="min-w-0 overflow-hidden rounded-xl border border-border/40 bg-card/80 shadow-sm shadow-black/[0.02] transition-colors hover:border-border/60 dark:border-white/[0.06] dark:shadow-black/10 dark:hover:border-white/[0.10]">
         <div className="flex items-center justify-between gap-3 px-4 py-3.5 lg:px-5">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 shadow-sm ring-1 ring-primary/10">
               <Link2Icon className="size-3.5 text-primary" />
             </div>
             <h2 className="section-label">AI Providers</h2>
@@ -195,16 +195,16 @@ export function ConnectionsWorkspace({
         </div>
 
         {storedConnections.length === 0 ? (
-          <div className="border-t border-border/60 px-4 py-8 lg:px-5">
+          <div className="border-t border-border/40 px-4 py-10 dark:border-white/[0.04] lg:px-5">
             <div className="flex flex-col items-center gap-4 text-center">
-              <div className="flex size-12 items-center justify-center rounded-xl bg-primary/8 ring-1 ring-primary/10">
-                <Link2Icon className="size-6 text-primary/50" />
+              <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/8 shadow-sm ring-1 ring-primary/10">
+                <Link2Icon className="size-7 text-primary/60" />
               </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-medium text-foreground">
+              <div className="space-y-1.5">
+                <h3 className="font-display text-[15px] font-bold tracking-tight text-foreground">
                   No connections yet
                 </h3>
-                <p className="max-w-[300px] text-[12px] leading-relaxed text-muted-foreground/70">
+                <p className="max-w-[320px] text-[12px] leading-relaxed text-muted-foreground/60">
                   Connect an AI provider to start using agents and chat.
                 </p>
               </div>
@@ -222,7 +222,7 @@ export function ConnectionsWorkspace({
             </div>
           </div>
         ) : (
-          <div className="overflow-hidden border-t border-border/60">
+          <div className="overflow-hidden border-t border-border/40 dark:border-white/[0.04]">
             <Table>
               <TableHeader>
                 <TableRow className="border-border/40 hover:bg-transparent">
