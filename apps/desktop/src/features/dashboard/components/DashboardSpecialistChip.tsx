@@ -75,14 +75,14 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
           </span>
         </div>
 
-        {/* Produces — compact inline pills */}
+        {/* Produces — compact inline pills with breathing room */}
         {meta?.produces && meta.produces.length > 0 ? (
-          <div className="mt-1.5 flex flex-wrap gap-1">
+          <div className="mt-2 flex flex-wrap gap-1.5">
             {meta.produces.map((output) => (
               <span
                 key={output}
                 className={cn(
-                  "inline-flex items-center gap-1 rounded px-1.5 py-px text-[10px] font-medium leading-tight",
+                  "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium leading-tight",
                   isManager
                     ? "bg-primary/[0.06] text-primary/70"
                     : cn("bg-muted/20 dark:bg-white/[0.03]", colors.iconText, "opacity-70"),
