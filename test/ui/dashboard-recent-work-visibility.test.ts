@@ -18,9 +18,10 @@ describe("ContinueWhereYouLeftOff renders in unified layout", () => {
     expect(matches!.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("ContinueWhereYouLeftOff self-hides when items are empty", () => {
+  it("ContinueWhereYouLeftOff shows nudge when items are empty", () => {
     const src = readFile("features/dashboard/components/ContinueWhereYouLeftOff.tsx");
-    expect(src).toContain("return null");
+    expect(src).toContain("items.length === 0");
+    expect(src).toMatch(/start.*job|progress.*appear/i);
   });
 });
 

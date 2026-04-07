@@ -1,4 +1,4 @@
-import { CornerDownLeftIcon, ArrowRightIcon } from "lucide-react";
+import { CornerDownLeftIcon, ArrowRightIcon, PlayIcon } from "lucide-react";
 import type { MeaningfulWorkItem } from "@/features/dashboard/hooks/useMeaningfulWork";
 
 export interface ContinueWhereYouLeftOffProps {
@@ -23,7 +23,18 @@ export function ContinueWhereYouLeftOff({
   onContinue,
   onViewResults,
 }: ContinueWhereYouLeftOffProps) {
-  if (items.length === 0) return null;
+  if (items.length === 0) {
+    return (
+      <section className="mb-5 rounded-xl border border-border/20 bg-card/30 px-4 py-3 dark:border-white/[0.03] dark:bg-white/[0.01]">
+        <div className="flex items-center gap-2.5">
+          <PlayIcon className="size-3 text-muted-foreground/40" />
+          <p className="text-[13px] text-muted-foreground/60">
+            Start a job above — your progress will appear here
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="mb-5 rounded-xl border border-primary/10 bg-primary/[0.015] px-4 py-3 dark:border-primary/[0.06] dark:bg-primary/[0.01]">

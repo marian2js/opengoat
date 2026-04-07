@@ -35,14 +35,14 @@ describe("RecentOutputs proof-of-value empty state", () => {
     expect(src).toContain("EXAMPLE_OUTPUTS");
   });
 
-  it("includes all 6 human-readable example output names", () => {
+  it("includes all 6 human-readable example output names matching spec §9.3", () => {
     const src = readFile(COMPONENT_PATH);
-    expect(src).toContain("Hero Rewrite Draft");
+    expect(src).toContain("Hero Rewrite Bundle");
     expect(src).toContain("Competitor Messaging Matrix");
     expect(src).toContain("SEO Opportunity Map");
     expect(src).toContain("Product Hunt Launch Pack");
-    expect(src).toContain("Content Ideas Bundle");
-    expect(src).toContain("Cold Email Sequence");
+    expect(src).toContain("Launch Surface Shortlist");
+    expect(src).toContain("Comparison Page Backlog");
   });
 
   it("imports getArtifactTypeConfig for type badge colors", () => {
@@ -73,6 +73,14 @@ describe("RecentOutputs proof-of-value empty state", () => {
   it("shows 'Your team can produce' heading", () => {
     const src = readFile(COMPONENT_PATH);
     expect(src).toContain("Your team can produce");
+  });
+
+  it("includes an 'EXAMPLE' visual distinction badge on each card", () => {
+    const src = readFile(COMPONENT_PATH);
+    // Each example card should have a visible "EXAMPLE" label to distinguish from real outputs
+    expect(src).toMatch(/EXAMPLE/);
+    // Badge should use monospace styling consistent with design system
+    expect(src).toMatch(/font-mono.*EXAMPLE|EXAMPLE.*font-mono/s);
   });
 });
 

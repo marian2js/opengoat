@@ -109,9 +109,12 @@ describe("ContinueWhereYouLeftOff component", () => {
     expect(src).toContain("export function ContinueWhereYouLeftOff");
   });
 
-  it("returns null when items is empty", () => {
+  it("shows a lightweight first-run nudge when items is empty instead of returning null", () => {
     const src = readFile(COMPONENT_PATH);
-    expect(src).toContain("return null");
+    // Should NOT return null on empty — should show a helpful nudge
+    expect(src).toContain("items.length === 0");
+    // Should contain nudge text guiding user to start a job
+    expect(src).toMatch(/start.*job|progress.*appear/i);
   });
 
   it('uses "Continue where you left off" label text', () => {

@@ -13,12 +13,12 @@ const EXAMPLE_OUTPUTS: Array<{
   type: string;
   specialistId: string;
 }> = [
-  { name: "Hero Rewrite Draft",          type: "copy_draft",       specialistId: "website-conversion" },
+  { name: "Hero Rewrite Bundle",         type: "copy_draft",       specialistId: "website-conversion" },
   { name: "SEO Opportunity Map",         type: "research_brief",   specialistId: "seo-aeo" },
   { name: "Competitor Messaging Matrix",  type: "matrix",           specialistId: "market-intel" },
   { name: "Product Hunt Launch Pack",    type: "launch_pack",      specialistId: "distribution" },
-  { name: "Content Ideas Bundle",        type: "content_calendar", specialistId: "content" },
-  { name: "Cold Email Sequence",         type: "email_sequence",   specialistId: "outbound" },
+  { name: "Launch Surface Shortlist",    type: "dataset_list",     specialistId: "content" },
+  { name: "Comparison Page Backlog",     type: "backlog",          specialistId: "outbound" },
 ];
 
 export interface RecentOutputsProps {
@@ -109,10 +109,15 @@ export function RecentOutputs({ agentId, client, onPreview, onNavigate, onSpecia
                   {/* Left specialist color accent bar */}
                   <div className={`absolute inset-y-0 left-0 w-[2px] opacity-50 transition-opacity group-hover/example:opacity-90 ${colors.dotColor.replace("/40", "")}`} />
 
-                  {/* Type badge */}
-                  <span className={`inline-block rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${typeConfig.badgeClassName}`}>
-                    {typeConfig.label}
-                  </span>
+                  {/* Type badge + Example indicator */}
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-block rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${typeConfig.badgeClassName}`}>
+                      {typeConfig.label}
+                    </span>
+                    <span className="inline-block rounded border border-border/30 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/50 dark:border-white/[0.06]">
+                      EXAMPLE
+                    </span>
+                  </div>
 
                   {/* Output name */}
                   <span className="text-[13px] font-medium leading-tight text-foreground">

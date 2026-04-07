@@ -85,9 +85,10 @@ describe("ContinueWhereYouLeftOff component", () => {
     expect(src).toContain("onContinue");
   });
 
-  it("returns null when no items", () => {
+  it("shows a first-run nudge when no items", () => {
     const src = readFile(componentPath);
-    expect(src).toContain("return null");
+    expect(src).toContain("items.length === 0");
+    expect(src).toMatch(/start.*job|progress.*appear/i);
   });
 
   it("uses section-label styling for heading", () => {
@@ -128,8 +129,9 @@ describe("DashboardWorkspace active work integration", () => {
 // ═════════════════════��═══════════════════════���═════════
 
 describe("Mode A stays clean", () => {
-  it("ContinueWhereYouLeftOff returns null when items is empty", () => {
+  it("ContinueWhereYouLeftOff shows nudge when items is empty", () => {
     const src = readFile("features/dashboard/components/ContinueWhereYouLeftOff.tsx");
-    expect(src).toContain("return null");
+    expect(src).toContain("items.length === 0");
+    expect(src).toMatch(/start.*job|progress.*appear/i);
   });
 });

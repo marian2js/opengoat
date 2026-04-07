@@ -24,7 +24,7 @@ describe("RecentOutputs empty state", () => {
   });
 
   it("shows example output names in empty state gallery", () => {
-    expect(componentSrc).toContain("Hero Rewrite Draft");
+    expect(componentSrc).toContain("Hero Rewrite Bundle");
     expect(componentSrc).toContain("SEO Opportunity Map");
     expect(componentSrc).toContain("Competitor Messaging Matrix");
   });
