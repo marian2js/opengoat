@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { SidecarClient } from "@/lib/sidecar/client";
+import { MESSAGING_CHANNEL_DESCRIPTIONS } from "./messaging-channel-descriptions";
 import { TelegramSetupFlow } from "./TelegramSetupFlow";
 import { WhatsAppSetupFlow } from "./WhatsAppSetupFlow";
 
@@ -213,10 +214,7 @@ export function MessagingConnectionsPanel({
             {(["telegram", "whatsapp"] as const).map((type) => {
               const meta = TYPE_META[type]!;
               const Icon = meta.icon;
-              const descriptions: Record<string, string> = {
-                telegram: "Create a bot with BotFather and connect it to your CMO.",
-                whatsapp: "Link your WhatsApp via QR code to message your CMO.",
-              };
+              const descriptions = MESSAGING_CHANNEL_DESCRIPTIONS;
               return (
                 <button
                   key={type}
