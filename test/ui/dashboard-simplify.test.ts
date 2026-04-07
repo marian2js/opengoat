@@ -57,9 +57,9 @@ describe("Dashboard simplification — Sprint 5 reset", () => {
       expect(workspaceSrc).toContain("<CompanyUnderstandingHero");
     });
 
-    it("FreeTextInput is embedded inside CompanyUnderstandingHero", () => {
+    it("FreeTextInput is not embedded inside CompanyUnderstandingHero (moved to standalone)", () => {
       const heroSrc = readSrc("components/CompanyUnderstandingHero.tsx");
-      expect(heroSrc).toContain("<FreeTextInput");
+      expect(heroSrc).not.toContain("<FreeTextInput");
     });
 
     it("renders RecommendedJobs (replaces SuggestedActionGrid)", () => {

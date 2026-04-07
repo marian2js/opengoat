@@ -63,10 +63,10 @@ describe("pickBestFirstMove", () => {
 });
 
 // ═══════════════════════════════════════════════════════
-// 2. CompanyUnderstandingHero — main component
+// 2. CompanyUnderstandingHero — compact strip
 // ═══════════════════════════════════════════════════════
 
-describe("CompanyUnderstandingHero component", () => {
+describe("CompanyUnderstandingHero compact strip", () => {
   const heroPath = resolve(dashDir, "components/CompanyUnderstandingHero.tsx");
 
   it("exists", () => {
@@ -83,26 +83,50 @@ describe("CompanyUnderstandingHero component", () => {
     expect(src).toContain("<FaviconIcon");
   });
 
-  it("renders full productSummary paragraph (not truncated to one sentence)", () => {
+  it("renders productSummary", () => {
     const src = readSrc("components/CompanyUnderstandingHero.tsx");
-    // Should show full productSummary, not split on first sentence
     expect(src).toContain("data.productSummary");
-    expect(src).not.toContain("split(/\\.\\s/)");
   });
 
-  it("renders HeroOpportunityBullets sub-component", () => {
+  it("renders targetAudience as ICP/buyer hint", () => {
     const src = readSrc("components/CompanyUnderstandingHero.tsx");
-    expect(src).toContain("<HeroOpportunityBullets");
+    expect(src).toContain("data.targetAudience");
   });
 
-  it("renders HeroRecommendedMove sub-component", () => {
+  it("renders topOpportunity as an inline bullet", () => {
     const src = readSrc("components/CompanyUnderstandingHero.tsx");
-    expect(src).toContain("<HeroRecommendedMove");
+    expect(src).toContain("data.topOpportunity");
   });
 
-  it("embeds FreeTextInput inside the hero", () => {
+  it("renders mainRisk as an inline bullet", () => {
     const src = readSrc("components/CompanyUnderstandingHero.tsx");
-    expect(src).toContain("<FreeTextInput");
+    expect(src).toContain("data.mainRisk");
+  });
+
+  it("does NOT import HeroOpportunityBullets", () => {
+    const src = readSrc("components/CompanyUnderstandingHero.tsx");
+    expect(src).not.toContain("HeroOpportunityBullets");
+  });
+
+  it("does NOT import HeroRecommendedMove", () => {
+    const src = readSrc("components/CompanyUnderstandingHero.tsx");
+    expect(src).not.toContain("HeroRecommendedMove");
+  });
+
+  it("does NOT import FreeTextInput", () => {
+    const src = readSrc("components/CompanyUnderstandingHero.tsx");
+    expect(src).not.toContain("FreeTextInput");
+  });
+
+  it("has compact strip styling (not large hero)", () => {
+    const src = readSrc("components/CompanyUnderstandingHero.tsx");
+    // Compact padding and border radius
+    expect(src).toContain("px-5");
+    expect(src).toContain("py-4");
+    expect(src).toContain("rounded-xl");
+    // Should NOT have large hero padding
+    expect(src).not.toContain("p-7");
+    expect(src).not.toContain("rounded-2xl");
   });
 
   it("has loading skeleton state", () => {
@@ -124,24 +148,37 @@ describe("CompanyUnderstandingHero component", () => {
   it("uses DESIGN.md typography — General Sans for heading", () => {
     const src = readSrc("components/CompanyUnderstandingHero.tsx");
     expect(src).toContain("font-display");
-    expect(src).toContain('text-[24px]');
     expect(src).toContain("font-bold");
   });
 
-  it("uses DESIGN.md body text — 15px for summary", () => {
+  it("uses DESIGN.md secondary text size for buyer hint", () => {
     const src = readSrc("components/CompanyUnderstandingHero.tsx");
-    expect(src).toContain("text-[15px]");
+    expect(src).toContain("text-[13px]");
   });
 
-  it("stays under 200 lines", () => {
+  it("does not have gradient background", () => {
+    const src = readSrc("components/CompanyUnderstandingHero.tsx");
+    expect(src).not.toContain("bg-gradient-to-br");
+    expect(src).not.toContain("bg-gradient-to-b");
+  });
+
+  it("does not have opportunities or recommendation props", () => {
+    const src = readSrc("components/CompanyUnderstandingHero.tsx");
+    expect(src).not.toContain("opportunities:");
+    expect(src).not.toContain("recommendation:");
+    expect(src).not.toContain("onFreeTextSubmit:");
+    expect(src).not.toContain("onActionClick?:");
+  });
+
+  it("stays under 150 lines", () => {
     const src = readSrc("components/CompanyUnderstandingHero.tsx");
     const lineCount = src.split("\n").length;
-    expect(lineCount).toBeLessThanOrEqual(200);
+    expect(lineCount).toBeLessThanOrEqual(150);
   });
 });
 
 // ═══════════════════════════════════════════════════════
-// 3. HeroOpportunityBullets — sub-component
+// 3. HeroOpportunityBullets — sub-component (still exists)
 // ═══════════════════════════════════════════════════════
 
 describe("HeroOpportunityBullets", () => {
@@ -210,7 +247,7 @@ describe("HeroOpportunityBullets", () => {
 });
 
 // ═══════════════════════════════════════════════════════
-// 4. HeroRecommendedMove — sub-component
+// 4. HeroRecommendedMove — sub-component (still exists)
 // ═══════════════════════════════════════════════════════
 
 describe("HeroRecommendedMove", () => {
@@ -284,14 +321,13 @@ describe("DashboardWorkspace hero wiring", () => {
     expect(src).toContain("pickBestFirstMove(opportunities");
   });
 
-  it("passes opportunities and recommendation to hero", () => {
-    expect(src).toContain("opportunities={opportunities}");
-    expect(src).toContain("recommendation={heroRecommendation}");
+  it("does not pass opportunities or recommendation to hero", () => {
+    // These props are removed from the compact strip
+    expect(src).not.toContain("opportunities={opportunities}");
+    expect(src).not.toContain("recommendation={heroRecommendation}");
   });
 
-  it("does not render FreeTextInput directly (now inside hero)", () => {
-    // FreeTextInput should only appear inside CompanyUnderstandingHero
-    const directFreeTextRender = src.match(/<FreeTextInput/g);
-    expect(directFreeTextRender).toBeNull();
+  it("does not pass onFreeTextSubmit to hero", () => {
+    expect(src).not.toContain("onFreeTextSubmit={");
   });
 });

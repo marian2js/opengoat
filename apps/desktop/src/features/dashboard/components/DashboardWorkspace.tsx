@@ -162,22 +162,13 @@ function DashboardContent({
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
       <div className="mx-auto w-full max-w-[1000px]">
-      {/* 1. Company Understanding Hero */}
+      {/* 1. Company Understanding Strip */}
       <CompanyUnderstandingHero
         domain={domain}
         faviconSources={faviconSources}
         data={data}
-        opportunities={opportunities}
-        recommendation={heroRecommendation}
         isLoading={isLoading}
         error={error}
-        onFreeTextSubmit={handleFreeTextSubmit}
-        onActionClick={(actionId) => {
-          const action = starterActions.find((a) => a.id === actionId);
-          if (action) {
-            void playbook.handleActionOrPlaybookClick(actionId, action.prompt, action.title);
-          }
-        }}
       />
 
       {/* 2. Recommended starting jobs */}
