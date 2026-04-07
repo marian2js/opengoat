@@ -3,6 +3,7 @@ import type { ActionCard } from "@/features/dashboard/data/actions";
 import { starterActions } from "@/features/dashboard/data/actions";
 import { getIntakeFields, type IntakeFieldSet } from "@/features/dashboard/data/intake-fields";
 import { buildActionPromptWithIntake } from "@/features/dashboard/data/prompt-builder";
+import { persistActionOutputPromise } from "@/features/action-session/lib/action-session-persistence";
 
 export interface UseIntakeFormOptions {
   suggestedActions: ActionCard[];
@@ -37,6 +38,9 @@ export function useIntakeForm({
       if (!pendingIntakeAction) return;
       const enrichedPrompt = buildActionPromptWithIntake(pendingIntakeAction, values);
       closeIntakeForm();
+      if (pendingIntakeAction.promise && pendingIntakeAction.outputType) {
+        persistActionOutputPromise(pendingIntakeAction.promise, pendingIntakeAction.outputType);
+      }
       void onSubmitAction(pendingIntakeAction.id, enrichedPrompt, pendingIntakeAction.title);
     },
     [pendingIntakeAction, onSubmitAction, closeIntakeForm],
@@ -56,6 +60,11 @@ export function useIntakeForm({
           setIntakeFormOpen(true);
           return;
         }
+      }
+
+      // Persist output promise for the action session loading state
+      if (card?.promise && card?.outputType) {
+        persistActionOutputPromise(card.promise, card.outputType);
       }
 
       void onSubmitAction(actionId, prompt, label);

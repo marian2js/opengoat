@@ -5,6 +5,10 @@ interface ActionSessionProgressProps {
   state: ActionSessionState;
   hasOutputs: boolean;
   outputCount?: number;
+  /** Output promise text from the job card, e.g. "Tagline, one-liner, launch post draft, checklist" */
+  actionPromise?: string | undefined;
+  /** Short deliverable label from the job card, e.g. "Launch copy bundle" */
+  actionOutputType?: string | undefined;
 }
 
 /** Indeterminate progress bar with shimmer animation */
@@ -38,6 +42,8 @@ export function ActionSessionProgress({
   state,
   hasOutputs,
   outputCount = 0,
+  actionPromise,
+  actionOutputType,
 }: ActionSessionProgressProps) {
   if (state === "ready-to-review" || state === "saved-to-board" || state === "done") {
     return null;
@@ -53,8 +59,15 @@ export function ActionSessionProgress({
           </div>
           <div className="flex-1 space-y-0.5">
             <p className="text-sm font-medium text-foreground">
-              Analyzing your company and preparing outputs…
+              {actionOutputType
+                ? `Preparing your ${actionOutputType.toLowerCase()}…`
+                : "Analyzing your company and preparing outputs…"}
             </p>
+            {actionPromise && (
+              <p className="text-xs text-muted-foreground/70">
+                {actionPromise}
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               First output in ~30–90s
             </p>

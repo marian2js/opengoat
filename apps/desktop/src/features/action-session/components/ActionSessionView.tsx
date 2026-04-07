@@ -29,6 +29,7 @@ import { ActionSessionFooter } from "./ActionSessionFooter";
 import {
   clearPersistedActionContext,
   readPersistedActionContext,
+  readActionOutputPromise,
 } from "../lib/action-session-persistence";
 import { useAutoArtifacts } from "@/features/chat/hooks/useAutoArtifacts";
 
@@ -75,6 +76,9 @@ export function ActionSessionView({
   const effectiveSessionId = sessionId ?? recovered?.sessionId;
   const effectivePrompt = pendingActionPrompt ?? recovered?.prompt ?? null;
   const effectiveTitle = actionTitle ?? recovered?.title ?? "Action";
+
+  // Read output promise data from sessionStorage (persisted by useIntakeForm)
+  const outputPromise = useMemo(() => readActionOutputPromise(), []);
 
   // If there's absolutely no session ID (no props AND nothing persisted),
   // redirect to dashboard — we can't render an action session without one.
@@ -174,6 +178,8 @@ export function ActionSessionView({
       client={client}
       pendingActionPrompt={effectivePrompt}
       actionTitle={effectiveTitle}
+      actionPromise={outputPromise?.promise}
+      actionOutputType={outputPromise?.outputType}
       onPendingPromptConsumed={() => {
         clearPersistedActionContext();
         onPendingPromptConsumed?.();
@@ -197,6 +203,8 @@ function ActionSessionInner({
   client,
   pendingActionPrompt,
   actionTitle,
+  actionPromise,
+  actionOutputType,
   onPendingPromptConsumed,
   onViewChat,
   onBackToDashboard,
@@ -206,6 +214,8 @@ function ActionSessionInner({
   client: SidecarClient | null;
   pendingActionPrompt?: string | null | undefined;
   actionTitle: string;
+  actionPromise?: string | undefined;
+  actionOutputType?: string | undefined;
   onPendingPromptConsumed?: (() => void) | undefined;
   onViewChat: (sessionId: string) => void;
   onBackToDashboard: () => void;
@@ -419,6 +429,8 @@ function ActionSessionInner({
           state={sessionState}
           hasOutputs={outputs.length > 0}
           outputCount={outputs.length}
+          actionPromise={actionPromise}
+          actionOutputType={actionOutputType}
         />
 
         {/* Error banner when sendMessage fails */}
