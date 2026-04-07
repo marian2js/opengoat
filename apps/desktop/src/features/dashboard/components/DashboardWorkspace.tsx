@@ -204,9 +204,10 @@ function DashboardContent({
         onSpecialistChat={handleSpecialistChat}
       />
 
-      {/* 5. Continue where you left off — self-hides when no items */}
+      {/* 5. Continue where you left off — demoted, hides when empty */}
       <ContinueWhereYouLeftOff
         items={meaningfulWork.items}
+        maturity={maturity}
         onContinue={onResumeRun}
         onViewResults={onViewResults}
       />

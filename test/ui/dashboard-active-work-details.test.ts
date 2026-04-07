@@ -101,9 +101,9 @@ describe("ContinueWhereYouLeftOff compact section", () => {
     expect(src).toContain("section-label");
   });
 
-  it("shows nudge when no items", () => {
+  it("hides when no items (returns null)", () => {
     const src = readFile(componentPath);
     expect(src).toContain("items.length === 0");
-    expect(src).toMatch(/start.*job|progress.*appear/i);
+    expect(src).toMatch(/return\s+null/);
   });
 });

@@ -103,10 +103,11 @@ describe("DashboardWorkspace unified layout", () => {
     expect(src).not.toContain("ActionCardGrid");
   });
 
-  it("renders sections in correct order: Hero, Jobs, Roster, Outputs, Continue, Board", () => {
+  it("renders sections in correct order: Hero, Jobs, Input, Roster, Outputs, Continue, Board", () => {
     const src = readFile(dashPath);
     const heroIdx = src.indexOf("<CompanyUnderstandingHero");
     const jobsIdx = src.indexOf("<RecommendedJobs");
+    const inputIdx = src.indexOf("<JobOrientedInput");
     const rosterIdx = src.indexOf("<DashboardAgentRoster");
     const outputsIdx = src.indexOf("<RecentOutputs");
     const continueIdx = src.indexOf("<ContinueWhereYouLeftOff");
@@ -114,7 +115,8 @@ describe("DashboardWorkspace unified layout", () => {
 
     expect(heroIdx).toBeGreaterThan(-1);
     expect(jobsIdx).toBeGreaterThan(heroIdx);
-    expect(rosterIdx).toBeGreaterThan(jobsIdx);
+    expect(inputIdx).toBeGreaterThan(jobsIdx);
+    expect(rosterIdx).toBeGreaterThan(inputIdx);
     expect(outputsIdx).toBeGreaterThan(rosterIdx);
     expect(continueIdx).toBeGreaterThan(outputsIdx);
     expect(boardIdx).toBeGreaterThan(continueIdx);
@@ -130,6 +132,7 @@ describe("DashboardWorkspace unified layout", () => {
     };
     expect(countOccurrences(src, "<CompanyUnderstandingHero")).toBe(1);
     expect(countOccurrences(src, "<RecommendedJobs")).toBe(1);
+    expect(countOccurrences(src, "<JobOrientedInput")).toBe(1);
     expect(countOccurrences(src, "<DashboardAgentRoster")).toBe(1);
     expect(countOccurrences(src, "<RecentOutputs")).toBe(1);
     expect(countOccurrences(src, "<ContinueWhereYouLeftOff")).toBe(1);

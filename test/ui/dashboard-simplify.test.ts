@@ -222,10 +222,10 @@ describe("Dashboard simplification — Sprint 5 reset", () => {
       expect(src).toContain("Continue");
     });
 
-    it("shows nudge when items is empty", () => {
+    it("hides when items is empty (returns null)", () => {
       const src = readSrc("components/ContinueWhereYouLeftOff.tsx");
       expect(src).toContain("items.length === 0");
-      expect(src).toMatch(/start.*job|progress.*appear/i);
+      expect(src).toMatch(/return\s+null/);
     });
   });
 });

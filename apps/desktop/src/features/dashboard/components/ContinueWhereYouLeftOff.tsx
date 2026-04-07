@@ -1,8 +1,10 @@
-import { CornerDownLeftIcon, ArrowRightIcon, PlayIcon } from "lucide-react";
+import { CornerDownLeftIcon, ArrowRightIcon } from "lucide-react";
 import type { MeaningfulWorkItem } from "@/features/dashboard/hooks/useMeaningfulWork";
+import type { ProjectMaturity } from "@/features/dashboard/hooks/useProjectMaturity";
 
 export interface ContinueWhereYouLeftOffProps {
   items: MeaningfulWorkItem[];
+  maturity: ProjectMaturity;
   onContinue?: (sessionId: string) => void;
   onViewResults?: (actionId: string) => void;
 }
@@ -20,27 +22,20 @@ function formatTimeAgo(ts: number): string {
 
 export function ContinueWhereYouLeftOff({
   items,
+  maturity,
   onContinue,
   onViewResults,
 }: ContinueWhereYouLeftOffProps) {
+  // Hide entirely when no items — empty state adds no value for any maturity tier
   if (items.length === 0) {
-    return (
-      <section className="mb-5 rounded-xl border border-border/20 bg-card/30 px-4 py-3 dark:border-white/[0.03] dark:bg-white/[0.01]">
-        <div className="flex items-center gap-2.5">
-          <PlayIcon className="size-3 text-muted-foreground/40" />
-          <p className="text-[13px] text-muted-foreground/60">
-            Start a job above — your progress will appear here
-          </p>
-        </div>
-      </section>
-    );
+    return null;
   }
 
   return (
-    <section className="mb-5 rounded-xl border border-primary/10 bg-primary/[0.015] px-4 py-3 dark:border-primary/[0.06] dark:bg-primary/[0.01]">
+    <section className="mb-5 rounded-xl border border-border/20 bg-card/30 px-4 py-3 dark:border-white/[0.04] dark:bg-white/[0.015]">
       {/* Section label */}
       <div className="mb-2.5 flex items-center gap-2">
-        <CornerDownLeftIcon className="size-3 text-primary/60" />
+        <CornerDownLeftIcon className="size-3 text-muted-foreground/50" />
         <h2 className="section-label">Continue where you left off</h2>
       </div>
 
@@ -60,14 +55,14 @@ export function ContinueWhereYouLeftOff({
               key={item.id}
               type="button"
               onClick={handleClick}
-              className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all duration-100 hover:bg-primary/[0.06] dark:hover:bg-primary/[0.04]"
+              className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all duration-100 hover:bg-muted/40 dark:hover:bg-white/[0.03]"
             >
               {/* Status dot */}
               <span
                 className={`size-2 shrink-0 rounded-full ring-2 ${
                   item.needsInput
                     ? "bg-amber-500 ring-amber-500/20"
-                    : "bg-primary/60 ring-primary/15"
+                    : "bg-muted-foreground/40 ring-muted-foreground/10"
                 }`}
               />
 
@@ -93,7 +88,7 @@ export function ContinueWhereYouLeftOff({
               </span>
 
               {/* Continue CTA */}
-              <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground/40 transition-colors group-hover:text-primary">
+              <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground/40 transition-colors group-hover:text-foreground/70">
                 Continue
                 <ArrowRightIcon className="size-2.5" />
               </span>
