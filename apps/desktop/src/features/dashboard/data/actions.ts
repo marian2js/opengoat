@@ -32,6 +32,8 @@ export interface ActionCard {
   ctaLabel?: string;
   /** Key into intakeFieldRegistry — when set, clicking the job opens a structured intake form */
   intakeFields?: string;
+  /** Job tier for ranking: hero (best first move), primary (high-value), secondary (useful but less essential) */
+  tier?: "hero" | "primary" | "secondary";
 }
 
 /**
@@ -115,6 +117,7 @@ export const starterActions: ActionCard[] = [
     outputType: "Launch copy bundle",
     ctaLabel: "Build launch pack",
     intakeFields: "launch-product-hunt",
+    tier: "secondary",
     description:
       "Creates ready-to-use Product Hunt launch assets including tagline options, description variants, first comment drafts, and maker story angles.",
     icon: RocketIcon,
@@ -143,6 +146,7 @@ Produce:
     outputType: "3 hero rewrites",
     ctaLabel: "Get rewrites",
     intakeFields: "rewrite-homepage-hero",
+    tier: "secondary",
     description:
       "Analyzes your current homepage hero section and generates improved headline, subheadline, and CTA variants that better communicate your value proposition.",
     icon: MessageSquareIcon,
@@ -168,6 +172,7 @@ Produce:
     promise: "Top blockers, rewrite suggestions, CTA fixes, and proof recommendations",
     outputType: "CRO audit + fixes",
     ctaLabel: "Run audit",
+    tier: "secondary",
     description:
       "Performs a systematic conversion rate optimization analysis across 7 dimensions with prioritized recommendations, copy alternatives, and test ideas.",
     icon: MousePointerClickIcon,
@@ -194,6 +199,7 @@ Produce:
     outputType: "4-email sequence",
     ctaLabel: "Build sequence",
     intakeFields: "build-outbound-sequence",
+    tier: "secondary",
     description:
       "Creates a complete cold email outreach sequence using proven copy frameworks, with subject lines, body copy, follow-up timing, and personalization strategies.",
     icon: MailIcon,
@@ -219,6 +225,7 @@ Produce a 4-5 email sequence with:
     promise: "Prioritized opportunities, quick fixes, and 5 content targets",
     outputType: "SEO opportunity map",
     ctaLabel: "Find opportunities",
+    tier: "primary",
     description:
       "Performs a focused SEO audit to surface the highest-impact quick wins: technical fixes, on-page improvements, and content opportunities you can act on this week.",
     icon: GlobeIcon,
@@ -243,6 +250,7 @@ Produce:
     promise: "Competitor differences, page structure, and messaging gaps",
     outputType: "Comparison page draft",
     ctaLabel: "Draft page",
+    tier: "primary",
     description:
       "Performs a structured analysis of competitor positioning and creates an outline for a comparison page that highlights your differentiation.",
     icon: SearchIcon,
@@ -269,6 +277,7 @@ Produce:
     promise: "Topics, hooks, post outlines, and repurposing ideas",
     outputType: "8–12 content ideas",
     ctaLabel: "Get ideas",
+    tier: "primary",
     description:
       "Produces specific, ranked content ideas for founder-led marketing — LinkedIn posts, Twitter threads, blog topics, and newsletter angles tailored to your positioning.",
     icon: LightbulbIcon,
@@ -297,6 +306,7 @@ Rank by impact. Call out 2-3 "low-effort, high-impact" quick wins.`,
     promise: "3 lead magnet concepts, ICP fit, and landing page angle",
     outputType: "3 lead magnet concepts",
     ctaLabel: "Get concepts",
+    tier: "secondary",
     description:
       "Generates lead magnet concepts tailored to your ICP, with positioning rationale, content outlines, and landing page copy angles for each concept.",
     icon: FileTextIcon,

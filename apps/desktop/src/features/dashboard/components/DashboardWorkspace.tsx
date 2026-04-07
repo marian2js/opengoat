@@ -184,7 +184,9 @@ function DashboardContent({
       {/* 2. Recommended starting jobs */}
       <div className="dashboard-section">
         <RecommendedJobs
-          jobs={recommendedJobs.jobs}
+          hero={recommendedJobs.hero}
+          primary={recommendedJobs.primary}
+          secondary={recommendedJobs.secondary}
           isLoading={recommendedJobs.isLoading}
           onActionClick={intake.handleJobCardClick}
         />

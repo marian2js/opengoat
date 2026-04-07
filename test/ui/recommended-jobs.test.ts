@@ -57,24 +57,31 @@ describe("useRecommendedJobs hook", () => {
     expect(hookSrc).toContain("getSpecialistColors");
   });
 
-  it("caps output at 5 jobs maximum", () => {
-    // The hook should limit results to 5
-    expect(hookSrc).toMatch(/\.slice\(0,\s*5\)/);
+  it("returns grouped tiers (hero, primary, secondary) instead of flat array", () => {
+    expect(hookSrc).toMatch(/hero:/);
+    expect(hookSrc).toMatch(/primary:/);
+    expect(hookSrc).toMatch(/secondary:/);
+    expect(hookSrc).toMatch(/isLoading:/);
+  });
+
+  it("imports and uses groupAndRankJobs for tiering", () => {
+    expect(hookSrc).toContain("groupAndRankJobs");
+  });
+
+  it("does not cap output at 5 jobs (no .slice(0, 5))", () => {
+    expect(hookSrc).not.toMatch(/\.slice\(0,\s*5\)/);
   });
 
   it("prefers suggested actions when available", () => {
-    // suggestedActions should come first in the merge order
     expect(hookSrc).toContain("suggestedActions");
   });
 
-  it("returns jobs and isLoading state", () => {
-    expect(hookSrc).toMatch(/jobs/);
-    expect(hookSrc).toMatch(/isLoading/);
+  it("de-duplicates actions by id", () => {
+    expect(hookSrc).toMatch(/seen|Set|has\(|filter/);
   });
 
-  it("de-duplicates actions by id", () => {
-    // Should track seen IDs to avoid duplication
-    expect(hookSrc).toMatch(/seen|Set|has\(|filter/);
+  it("RecommendedJob includes a tier field", () => {
+    expect(hookSrc).toMatch(/tier:\s*["']hero["']\s*\|\s*["']primary["']\s*\|\s*["']secondary["']/);
   });
 });
 
@@ -90,10 +97,12 @@ describe("ActionCard data model — output-promise fields", () => {
     expect(actionsSrc).toMatch(/ctaLabel\??\s*:\s*string/);
   });
 
+  it("ActionCard interface includes tier field", () => {
+    expect(actionsSrc).toMatch(/tier\??\s*:/);
+  });
+
   it("all starter actions have outputType defined", () => {
-    // Each starter action entry should have an outputType line
     const outputTypeCount = (actionsSrc.match(/outputType:\s*"/g) || []).length;
-    // There are 8 starter actions
     expect(outputTypeCount).toBeGreaterThanOrEqual(8);
   });
 
@@ -102,8 +111,12 @@ describe("ActionCard data model — output-promise fields", () => {
     expect(ctaLabelCount).toBeGreaterThanOrEqual(8);
   });
 
+  it("all starter actions have tier defined", () => {
+    const tierCount = (actionsSrc.match(/tier:\s*"/g) || []).length;
+    expect(tierCount).toBeGreaterThanOrEqual(8);
+  });
+
   it("outputType values use concrete output language, not vague process language", () => {
-    // Should NOT contain vague words like "analysis", "strategy help", "workflow result"
     const outputTypes = [...actionsSrc.matchAll(/outputType:\s*"([^"]+)"/g)].map(m => m[1]);
     for (const ot of outputTypes) {
       expect(ot.toLowerCase()).not.toMatch(/^analysis$/);
@@ -135,7 +148,6 @@ describe("SuggestedActionData — outputType support", () => {
   });
 
   it("toActionCard passes outputType through", () => {
-    // toActionCard should include outputType in the returned object
     expect(suggestedSrc).toMatch(/outputType:\s*data\.outputType/);
   });
 
@@ -170,7 +182,6 @@ describe("RecommendedJobCard component", () => {
 
   it("renders the ctaLabel (outcome-based CTA)", () => {
     expect(cardSrc).toContain("ctaLabel");
-    // Should fall back to "Start" when ctaLabel is not set
     expect(cardSrc).toMatch(/ctaLabel.*\?\?.*"Start"|"Start"/);
   });
 
@@ -180,7 +191,6 @@ describe("RecommendedJobCard component", () => {
 
   it("hero card shows description as additional context", () => {
     expect(cardSrc).toContain("job.description");
-    // Description should only show on hero
     expect(cardSrc).toMatch(/isHero\s*&&\s*job\.description/);
   });
 
@@ -238,10 +248,14 @@ describe("RecommendedJobs section wrapper", () => {
     expect(sectionSrc).toMatch(/grid/);
   });
 
+  it("accepts hero, primary, secondary props instead of flat jobs array", () => {
+    expect(sectionSrc).toMatch(/hero.*RecommendedJob\s*\|\s*null/);
+    expect(sectionSrc).toMatch(/primary.*RecommendedJob\[\]/);
+    expect(sectionSrc).toMatch(/secondary.*RecommendedJob\[\]/);
+  });
+
   it("skeleton has internal pulse zones matching card content structure", () => {
-    // Skeleton should have distinct zones: chip, title, output tag, text, CTA
     const skeletonSection = sectionSrc.slice(0, sectionSrc.indexOf("export function RecommendedJobs"));
-    // Multiple animate-pulse zones inside each skeleton card
     const pulseCount = (skeletonSection.match(/animate-pulse/g) || []).length;
     expect(pulseCount).toBeGreaterThanOrEqual(5);
   });
@@ -264,13 +278,16 @@ describe("DashboardWorkspace integration", () => {
   });
 
   it("renders RecommendedJobs in Mode A (after hero)", () => {
-    // RecommendedJobs should appear in the Mode A section
     expect(dashboardSrc).toMatch(/RecommendedJobs/);
   });
 
+  it("passes hero, primary, secondary props to RecommendedJobs", () => {
+    expect(dashboardSrc).toMatch(/hero={recommendedJobs\.hero}/);
+    expect(dashboardSrc).toMatch(/primary={recommendedJobs\.primary}/);
+    expect(dashboardSrc).toMatch(/secondary={recommendedJobs\.secondary}/);
+  });
+
   it("removes SuggestedActionGrid from Mode A", () => {
-    // SuggestedActionGrid should no longer be rendered in Mode A
-    // It may still be imported but should not be rendered
     const modeASection = dashboardSrc.split("Mode A")[1];
     if (modeASection) {
       expect(modeASection).not.toMatch(/<SuggestedActionGrid/);

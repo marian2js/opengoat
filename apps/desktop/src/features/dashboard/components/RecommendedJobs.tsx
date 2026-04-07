@@ -3,7 +3,9 @@ import type { RecommendedJob } from "@/features/dashboard/hooks/useRecommendedJo
 import { RecommendedJobCard } from "@/features/dashboard/components/RecommendedJobCard";
 
 export interface RecommendedJobsProps {
-  jobs: RecommendedJob[];
+  hero: RecommendedJob | null;
+  primary: RecommendedJob[];
+  secondary: RecommendedJob[];
   isLoading?: boolean;
   onActionClick?: (actionId: string, prompt: string, label: string) => void;
 }
@@ -40,11 +42,9 @@ function RecommendedJobsSkeleton() {
   );
 }
 
-export function RecommendedJobs({ jobs, isLoading, onActionClick }: RecommendedJobsProps) {
-  if (!isLoading && jobs.length === 0) return null;
-
-  const heroJob = jobs[0];
-  const secondaryJobs = jobs.slice(1);
+export function RecommendedJobs({ hero, primary, secondary, isLoading, onActionClick }: RecommendedJobsProps) {
+  const hasJobs = hero || primary.length > 0 || secondary.length > 0;
+  if (!isLoading && !hasJobs) return null;
 
   return (
     <section className="flex flex-col gap-4">
@@ -60,18 +60,27 @@ export function RecommendedJobs({ jobs, isLoading, onActionClick }: RecommendedJ
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {/* Hero job — full width */}
-          {heroJob && (
+          {hero && (
             <div className="sm:col-span-2">
               <RecommendedJobCard
-                job={heroJob}
+                job={hero}
                 isHero
                 onClick={onActionClick}
               />
             </div>
           )}
 
+          {/* Primary jobs — 2-col grid */}
+          {primary.map((job) => (
+            <RecommendedJobCard
+              key={job.id}
+              job={job}
+              onClick={onActionClick}
+            />
+          ))}
+
           {/* Secondary jobs — 2-col grid */}
-          {secondaryJobs.map((job) => (
+          {secondary.map((job) => (
             <RecommendedJobCard
               key={job.id}
               job={job}
