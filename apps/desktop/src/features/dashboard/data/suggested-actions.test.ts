@@ -182,8 +182,8 @@ void test("parseSuggestedActions: accepts conversion and growth categories", () 
 });
 
 void test("SUGGESTED_ACTIONS_PROMPT lists fixed card titles", () => {
-  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("Find launch communities"));
-  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("Draft Product Hunt launch"));
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("Launch on Product Hunt"));
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("Find SEO quick wins"));
 });
 
 // ---------------------------------------------------------------------------
@@ -308,5 +308,101 @@ void test("CATEGORY_TO_SPECIALIST: exports mapping for all 6 categories", () => 
   for (const cat of categories) {
     assert.ok(CATEGORY_TO_SPECIALIST[cat as import("./actions").ActionCategory], `Should have mapping for ${cat}`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Tier & outputPromise validation
+// ---------------------------------------------------------------------------
+
+void test("parseSuggestedActions: accepts actions with valid tier field", () => {
+  for (const tier of ["hero", "primary", "secondary"]) {
+    const input = JSON.stringify([
+      { id: "tiered", title: "Tiered", promise: "p", description: "d", category: "seo", skills: [], prompt: "pr", tier },
+    ]);
+    const result = parseSuggestedActions(input);
+    assert.equal(result.length, 1, `Should accept tier="${tier}"`);
+    assert.equal((result[0] as Record<string, unknown>).tier, tier);
+  }
+});
+
+void test("parseSuggestedActions: rejects actions with invalid tier value", () => {
+  const input = JSON.stringify([
+    { id: "bad-tier", title: "Bad", promise: "p", description: "d", category: "seo", skills: [], prompt: "pr", tier: "invalid" },
+  ]);
+  const result = parseSuggestedActions(input);
+  assert.equal(result.length, 0);
+});
+
+void test("parseSuggestedActions: accepts actions without tier field (backward compat)", () => {
+  const input = JSON.stringify([
+    { id: "no-tier", title: "No Tier", promise: "p", description: "d", category: "seo", skills: [], prompt: "pr" },
+  ]);
+  const result = parseSuggestedActions(input);
+  assert.equal(result.length, 1);
+  assert.equal(result[0]!.id, "no-tier");
+});
+
+void test("parseSuggestedActions: accepts actions with valid outputPromise field", () => {
+  const input = JSON.stringify([
+    { id: "op", title: "Op", promise: "p", description: "d", category: "seo", skills: [], prompt: "pr", outputPromise: "5 search wedges + page angles" },
+  ]);
+  const result = parseSuggestedActions(input);
+  assert.equal(result.length, 1);
+  assert.equal((result[0] as Record<string, unknown>).outputPromise, "5 search wedges + page angles");
+});
+
+void test("parseSuggestedActions: rejects actions with empty outputPromise string", () => {
+  const input = JSON.stringify([
+    { id: "empty-op", title: "Empty", promise: "p", description: "d", category: "seo", skills: [], prompt: "pr", outputPromise: "" },
+  ]);
+  const result = parseSuggestedActions(input);
+  assert.equal(result.length, 0);
+});
+
+void test("toActionCard: preserves tier and outputPromise when present", () => {
+  const data = {
+    id: "full-card",
+    title: "Full",
+    promise: "p",
+    description: "d",
+    category: "research" as const,
+    skills: ["seo-audit"],
+    prompt: "pr",
+    tier: "hero" as const,
+    outputPromise: "5 search wedges + page angles",
+  };
+  const card = toActionCard(data);
+  assert.equal((card as Record<string, unknown>).tier, "hero");
+  assert.equal((card as Record<string, unknown>).outputPromise, "5 search wedges + page angles");
+});
+
+// ---------------------------------------------------------------------------
+// Updated prompt content assertions
+// ---------------------------------------------------------------------------
+
+void test("SUGGESTED_ACTIONS_PROMPT: requests 4-6 actions", () => {
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("4-6"), "Should request 4-6 actions");
+  assert.ok(!SUGGESTED_ACTIONS_PROMPT.includes("suggest 2-3"), "Should no longer request 2-3 actions");
+});
+
+void test("SUGGESTED_ACTIONS_PROMPT: includes leverage criteria keywords", () => {
+  const lower = SUGGESTED_ACTIONS_PROMPT.toLowerCase();
+  assert.ok(lower.includes("outside-in"), "Should include outside-in");
+  assert.ok(lower.includes("revenue-adjacent"), "Should include revenue-adjacent");
+  assert.ok(lower.includes("unknown-before-use"), "Should include unknown-before-use");
+  assert.ok(lower.includes("hard-to-do-manually"), "Should include hard-to-do-manually");
+});
+
+void test("SUGGESTED_ACTIONS_PROMPT: includes demotion rules", () => {
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.toLowerCase().includes("demote") || SUGGESTED_ACTIONS_PROMPT.toLowerCase().includes("avoid"), "Should include demotion guidance");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes("internal cleanup") || SUGGESTED_ACTIONS_PROMPT.includes("good hygiene"), "Should mention weak job types to avoid");
+});
+
+void test("SUGGESTED_ACTIONS_PROMPT: includes tier and outputPromise in JSON schema", () => {
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes('"tier"'), "Should include tier field in schema");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes('"outputPromise"'), "Should include outputPromise field in schema");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes('"hero"'), "Should mention hero tier");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes('"primary"'), "Should mention primary tier");
+  assert.ok(SUGGESTED_ACTIONS_PROMPT.includes('"secondary"'), "Should mention secondary tier");
 });
 
