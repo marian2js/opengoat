@@ -141,7 +141,7 @@ function BoardContent({
       )}
 
       {isLoading ? (
-        <div className="overflow-hidden rounded-lg border border-border/50 shadow-sm dark:border-white/[0.08] dark:shadow-none">
+        <div className="overflow-hidden rounded-xl border border-border/50 shadow-sm shadow-black/[0.02] dark:border-white/[0.08] dark:shadow-black/10">
           <TaskListSkeleton />
         </div>
       ) : error ? (
@@ -213,7 +213,7 @@ function BoardContent({
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-lg border border-border/50 shadow-sm dark:border-white/[0.08] dark:shadow-none">
+          <div className="overflow-hidden rounded-xl border border-border/50 shadow-sm shadow-black/[0.02] dark:border-white/[0.08] dark:shadow-black/10">
             <TaskList
               tasks={filteredTasks}
               groups={groupedTasks}
@@ -224,7 +224,7 @@ function BoardContent({
             />
           </div>
           {filteredTasks.length <= 3 && (
-            <div className="mt-6 flex items-start gap-3 rounded-lg border border-primary/10 bg-primary/[0.02] px-4 py-3.5 dark:border-primary/[0.06] dark:bg-primary/[0.015]">
+            <div className="mt-6 flex items-start gap-3 rounded-xl border border-primary/10 bg-primary/[0.02] px-4 py-3.5 dark:border-primary/[0.06] dark:bg-primary/[0.015]">
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/8 ring-1 ring-primary/10">
                 <ListChecksIcon className="size-4 text-primary/70" />
               </div>
