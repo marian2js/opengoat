@@ -341,13 +341,13 @@ export function BrainWorkspace({ agentId, client, onRefineContext, sectionId }: 
   if (section.id === "saved-guidance") {
     return (
       <div className="flex flex-1 flex-col overflow-y-auto">
-        <div className="flex items-center gap-3 border-b border-border/20 px-5 py-4 lg:px-6">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
-            <DatabaseIcon className="size-3.5 text-primary" />
+        <div className="flex items-center gap-3 border-b border-border/20 bg-card/30 px-5 py-4 lg:px-6 dark:bg-white/[0.01]">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 shadow-sm ring-1 ring-primary/10">
+            <DatabaseIcon className="size-4 text-primary" />
           </div>
           <div>
-            <h2 className="font-display text-sm font-bold tracking-tight">{section.label}</h2>
-            <p className="text-[11px] text-muted-foreground/70">{section.description}</p>
+            <h2 className="font-display text-[15px] font-bold tracking-tight">{section.label}</h2>
+            <p className="text-[11px] text-muted-foreground/60">{section.description}</p>
           </div>
         </div>
         <OperatingMemorySection agentId={agentId} client={client} />
@@ -358,13 +358,13 @@ export function BrainWorkspace({ agentId, client, onRefineContext, sectionId }: 
   if (section.id === "specialist-context") {
     return (
       <div className="flex flex-1 flex-col overflow-y-auto">
-        <div className="flex items-center gap-3 border-b border-border/20 px-5 py-4 lg:px-6">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
-            <UsersIcon className="size-3.5 text-primary" />
+        <div className="flex items-center gap-3 border-b border-border/20 bg-card/30 px-5 py-4 lg:px-6 dark:bg-white/[0.01]">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 shadow-sm ring-1 ring-primary/10">
+            <UsersIcon className="size-4 text-primary" />
           </div>
           <div>
-            <h2 className="font-display text-sm font-bold tracking-tight">{section.label}</h2>
-            <p className="text-[11px] text-muted-foreground/70">{section.description}</p>
+            <h2 className="font-display text-[15px] font-bold tracking-tight">{section.label}</h2>
+            <p className="text-[11px] text-muted-foreground/60">{section.description}</p>
           </div>
         </div>
         <SpecialistContextSection agentId={agentId} client={client} />
@@ -915,7 +915,7 @@ function SectionedMarkdownView({ content }: { content: string }) {
   // If there are no h2 sections, render as a single card
   if (nonEmpty.length <= 1 && !nonEmpty[0]?.heading) {
     return (
-      <div className="rounded-xl border border-border/50 bg-card p-5 transition-all duration-100 hover:border-border/70 hover:shadow-sm dark:hover:border-white/[0.10]">
+      <div className="rounded-xl border border-border/40 bg-card p-5 shadow-sm shadow-black/[0.02] transition-all duration-100 hover:border-border/60 hover:shadow-md dark:border-white/[0.06] dark:shadow-black/10 dark:hover:border-white/[0.10]">
         <div className={SECTION_CARD_PROSE_CLASSES}>
           <Markdown remarkPlugins={[remarkGfm]}>{stripped}</Markdown>
         </div>
@@ -936,8 +936,8 @@ function SectionedMarkdownView({ content }: { content: string }) {
             className={cn(
               "relative rounded-xl border p-5 transition-all duration-100",
               isFirst
-                ? "border-primary/15 bg-primary/[0.015] hover:border-primary/25 hover:shadow-sm dark:border-primary/[0.08] dark:bg-primary/[0.01] dark:hover:border-primary/[0.15]"
-                : "border-border/50 bg-card hover:border-border/70 hover:shadow-sm dark:hover:border-white/[0.10]",
+                ? "border-primary/15 bg-primary/[0.015] shadow-sm shadow-black/[0.02] hover:border-primary/25 hover:shadow-md dark:border-primary/[0.08] dark:bg-primary/[0.01] dark:shadow-black/10 dark:hover:border-primary/[0.15]"
+                : "border-border/40 bg-card shadow-sm shadow-black/[0.02] hover:border-border/60 hover:shadow-md dark:border-white/[0.06] dark:shadow-black/10 dark:hover:border-white/[0.10]",
             )}
           >
             {isFirst && (
@@ -1200,21 +1200,21 @@ function SectionHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-border/20 px-5 py-4 lg:px-6">
+    <div className="flex items-center justify-between border-b border-border/20 bg-card/30 px-5 py-4 lg:px-6 dark:bg-white/[0.01]">
       <div className="flex items-center gap-3">
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
-          <section.icon className="size-3.5 text-primary" />
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 shadow-sm ring-1 ring-primary/10">
+          <section.icon className="size-4 text-primary" />
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="font-display text-sm font-bold tracking-tight">{section.label}</h2>
+            <h2 className="font-display text-[15px] font-bold tracking-tight">{section.label}</h2>
             {lastUpdated && (
-              <span className="text-[11px] font-mono text-muted-foreground/60 tabular-nums">
+              <span className="text-[11px] font-mono text-muted-foreground/50 tabular-nums">
                 Updated {formatRelativeTime(lastUpdated)}
               </span>
             )}
           </div>
-          <p className="text-[11px] text-muted-foreground/70">{section.description}</p>
+          <p className="text-[11px] text-muted-foreground/60">{section.description}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
