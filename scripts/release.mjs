@@ -5,26 +5,13 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 
 const CWD = process.cwd();
 const CHANGESET_DIR = join(CWD, ".changeset");
-const VERSION_PATH = join(CWD, "VERSION");
-const ROOT_PACKAGE_JSON_PATH = join(CWD, "package.json");
-const DESKTOP_PACKAGE_JSON_PATH = join(CWD, "apps", "desktop", "package.json");
-const SIDECAR_PACKAGE_JSON_PATH = join(CWD, "packages", "sidecar", "package.json");
 const CLI_PACKAGE_JSON_PATH = join(CWD, "packages", "cli", "package.json");
 const CORE_PACKAGE_JSON_PATH = join(CWD, "packages", "core", "package.json");
-const CONTRACTS_PACKAGE_JSON_PATH = join(CWD, "packages", "contracts", "package.json");
-const TAURI_CONFIG_PATH = join(
-  CWD,
-  "apps",
-  "desktop",
-  "src-tauri",
-  "tauri.conf.json",
-);
-const CARGO_TOML_PATH = join(CWD, "Cargo.toml");
-const CARGO_LOCK_PATH = join(CWD, "Cargo.lock");
 const CHANGELOG_PATH = join(CWD, "CHANGELOG.md");
 
 function run() {
@@ -38,13 +25,8 @@ function run() {
   }
 
   // 2. Determine target version
-  const rootPkg = JSON.parse(readFileSync(ROOT_PACKAGE_JSON_PATH, "utf8"));
-  const desktopPkg = JSON.parse(readFileSync(DESKTOP_PACKAGE_JSON_PATH, "utf8"));
-  const sidecarPkg = JSON.parse(readFileSync(SIDECAR_PACKAGE_JSON_PATH, "utf8"));
   const cliPkg = JSON.parse(readFileSync(CLI_PACKAGE_JSON_PATH, "utf8"));
   const corePkg = JSON.parse(readFileSync(CORE_PACKAGE_JSON_PATH, "utf8"));
-  const contractsPkg = JSON.parse(readFileSync(CONTRACTS_PACKAGE_JSON_PATH, "utf8"));
-  const tauriConfig = JSON.parse(readFileSync(TAURI_CONFIG_PATH, "utf8"));
 
   const date = new Date();
   const year = date.getFullYear();
@@ -84,50 +66,11 @@ function run() {
   }
   changelogEntry += "\n";
 
-  // 4. Update files
-  // Update package.json
-  rootPkg.version = nextVer;
-  desktopPkg.version = nextVer;
-  sidecarPkg.version = nextVer;
-  cliPkg.version = nextVer;
-  corePkg.version = nextVer;
-  contractsPkg.version = nextVer;
-  tauriConfig.version = nextVer;
-
-  writeFileSync(VERSION_PATH, `${nextVer}\n`);
-  writeFileSync(ROOT_PACKAGE_JSON_PATH, JSON.stringify(rootPkg, null, 2) + "\n");
-  writeFileSync(
-    DESKTOP_PACKAGE_JSON_PATH,
-    JSON.stringify(desktopPkg, null, 2) + "\n",
-  );
-  writeFileSync(
-    SIDECAR_PACKAGE_JSON_PATH,
-    JSON.stringify(sidecarPkg, null, 2) + "\n",
-  );
-  writeFileSync(CLI_PACKAGE_JSON_PATH, JSON.stringify(cliPkg, null, 2) + "\n");
-  writeFileSync(
-    CORE_PACKAGE_JSON_PATH,
-    JSON.stringify(corePkg, null, 2) + "\n",
-  );
-  writeFileSync(
-    CONTRACTS_PACKAGE_JSON_PATH,
-    JSON.stringify(contractsPkg, null, 2) + "\n",
-  );
-  writeFileSync(TAURI_CONFIG_PATH, JSON.stringify(tauriConfig, null, 2) + "\n");
-  writeFileSync(
-    CARGO_TOML_PATH,
-    readFileSync(CARGO_TOML_PATH, "utf8").replace(
-      /(\[workspace\.package\][\s\S]*?\r?\nversion = ")([^"]+)(")/,
-      `$1${nextVer}$3`,
-    ),
-  );
-  writeFileSync(
-    CARGO_LOCK_PATH,
-    readFileSync(CARGO_LOCK_PATH, "utf8").replace(
-      /(\[\[package\]\]\r?\nname = "opengoat-desktop"\r?\nversion = ")([^"]+)(")/,
-      `$1${nextVer}$3`,
-    ),
-  );
+  // 4. Update versioned files via the shared sync script.
+  execFileSync(process.execPath, ["scripts/sync-version.mjs", "--set", nextVer], {
+    cwd: CWD,
+    stdio: "inherit",
+  });
 
   // Update CHANGELOG.md
   const currentLog = existsSync(CHANGELOG_PATH)

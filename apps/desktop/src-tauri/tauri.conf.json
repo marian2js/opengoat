@@ -30,6 +30,11 @@
     "macOS": {
       "signingIdentity": "-"
     },
+    "windows": {
+      "wix": {
+        "version": "26.4.7.3"
+      }
+    },
     "resources": {
       "../../../packages/sidecar/.bundle/": "sidecar/"
     },
