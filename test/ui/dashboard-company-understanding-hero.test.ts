@@ -88,19 +88,17 @@ describe("CompanyUnderstandingHero compact strip", () => {
     expect(src).toContain("data.productSummary");
   });
 
-  it("renders targetAudience as ICP/buyer hint", () => {
+  it("renders ICP line with fallback to targetAudience", () => {
     const src = readSrc("components/CompanyUnderstandingHero.tsx");
-    expect(src).toContain("data.targetAudience");
+    expect(src).toContain("data?.icp");
+    expect(src).toContain("data?.targetAudience");
   });
 
-  it("renders topOpportunity as an inline bullet", () => {
+  it("renders opportunities array with fallback to legacy fields", () => {
     const src = readSrc("components/CompanyUnderstandingHero.tsx");
-    expect(src).toContain("data.topOpportunity");
-  });
-
-  it("renders mainRisk as an inline bullet", () => {
-    const src = readSrc("components/CompanyUnderstandingHero.tsx");
-    expect(src).toContain("data.mainRisk");
+    expect(src).toContain("data?.opportunities");
+    expect(src).toContain("data?.topOpportunity");
+    expect(src).toContain("data?.mainRisk");
   });
 
   it("does NOT import HeroOpportunityBullets", () => {
@@ -161,9 +159,8 @@ describe("CompanyUnderstandingHero compact strip", () => {
     expect(src).toContain("bg-gradient-to-br");
   });
 
-  it("does not have opportunities or recommendation props", () => {
+  it("does not have recommendation or callback props", () => {
     const src = readSrc("components/CompanyUnderstandingHero.tsx");
-    expect(src).not.toContain("opportunities:");
     expect(src).not.toContain("recommendation:");
     expect(src).not.toContain("onFreeTextSubmit:");
     expect(src).not.toContain("onActionClick?:");

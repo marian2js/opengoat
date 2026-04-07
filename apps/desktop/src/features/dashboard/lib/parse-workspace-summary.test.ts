@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   extractSection,
+  extractBullets,
   firstParagraphOrBullet,
   parseWorkspaceSummary,
 } from "./parse-workspace-summary";
@@ -138,6 +139,21 @@ const SAMPLE_PRODUCT = `# PRODUCT
 - Main value props: simplicity, speed, async-first
 `;
 
+const SAMPLE_MARKET = `# MARKET
+
+## ICP hypotheses
+- Remote-first engineering teams of 10-50 at seed/Series A startups that outgrew Notion for sprint planning.
+- Secondary: product managers at mid-market SaaS companies needing async standup visibility.
+
+## Personas
+- VP Engineering at a Series A startup managing 3 squads across timezones.
+- Product manager juggling roadmap alignment across engineering, design, and GTM.
+
+## Main customer pains
+- Scattered async communication across Slack, Notion, and Linear causes dropped context.
+- Standup meetings waste 30+ min/day for distributed teams with no persistent record.
+`;
+
 const SAMPLE_GROWTH = `# GROWTH
 
 ## Strategic summary
@@ -161,8 +177,8 @@ const SAMPLE_GROWTH = `# GROWTH
 - Run a Product Hunt launch within 30 days
 `;
 
-void test("parseWorkspaceSummary extracts all 5 data points", () => {
-  const result = parseWorkspaceSummary(SAMPLE_PRODUCT, null, SAMPLE_GROWTH);
+void test("parseWorkspaceSummary extracts all data points including icp and opportunities", () => {
+  const result = parseWorkspaceSummary(SAMPLE_PRODUCT, SAMPLE_MARKET, SAMPLE_GROWTH);
 
   assert.ok(result.productSummary, "productSummary should be extracted");
   assert.ok(
@@ -193,6 +209,15 @@ void test("parseWorkspaceSummary extracts all 5 data points", () => {
     result.topOpportunity.includes("community") || result.topOpportunity.includes("Reddit"),
     "topOpportunity should capture an experiment or strategy",
   );
+
+  assert.ok(result.icp, "icp should be extracted from MARKET.md");
+  assert.ok(
+    result.icp.includes("engineering teams") || result.icp.includes("Remote-first"),
+    "icp should describe ideal customer",
+  );
+
+  assert.ok(result.opportunities.length >= 2, "opportunities should have at least 2 bullets");
+  assert.ok(result.opportunities.length <= 3, "opportunities should have at most 3 bullets");
 });
 
 void test("parseWorkspaceSummary returns nulls for missing files", () => {
@@ -202,6 +227,8 @@ void test("parseWorkspaceSummary returns nulls for missing files", () => {
   assert.equal(result.valueProposition, null);
   assert.equal(result.mainRisk, null);
   assert.equal(result.topOpportunity, null);
+  assert.equal(result.icp, null);
+  assert.deepEqual(result.opportunities, []);
 });
 
 void test("parseWorkspaceSummary handles partial data (only product)", () => {
@@ -211,6 +238,9 @@ void test("parseWorkspaceSummary handles partial data (only product)", () => {
   assert.ok(result.valueProposition);
   assert.equal(result.mainRisk, null);
   assert.equal(result.topOpportunity, null);
+  // ICP falls back to PRODUCT.md targetAudience when no MARKET.md
+  assert.ok(result.icp, "icp should fall back to product target users");
+  assert.deepEqual(result.opportunities, []);
 });
 
 void test("parseWorkspaceSummary handles partial data (only growth)", () => {
@@ -220,6 +250,8 @@ void test("parseWorkspaceSummary handles partial data (only growth)", () => {
   assert.equal(result.valueProposition, null);
   assert.ok(result.mainRisk);
   assert.ok(result.topOpportunity);
+  assert.equal(result.icp, null);
+  assert.ok(result.opportunities.length > 0, "opportunities from GROWTH.md");
 });
 
 // ---------------------------------------------------------------------------
@@ -308,4 +340,75 @@ void test("parseWorkspaceSummary never throws on malformed input", () => {
   // Extremely nested markdown
   const r3 = parseWorkspaceSummary("### Sub\n#### Deep\n##### Deeper", null, null);
   assert.equal(r3.productSummary, null);
+});
+
+// ---------------------------------------------------------------------------
+// extractBullets
+// ---------------------------------------------------------------------------
+
+void test("extractBullets extracts up to max bullets from section text", () => {
+  const section = "- First bullet here.\n- Second bullet here.\n- Third bullet here.\n- Fourth bullet here.";
+  const result = extractBullets(section, 3);
+  assert.equal(result.length, 3);
+  assert.ok(result[0].startsWith("First"));
+  assert.ok(result[2].startsWith("Third"));
+});
+
+void test("extractBullets returns empty array for empty input", () => {
+  assert.deepEqual(extractBullets("", 3), []);
+  assert.deepEqual(extractBullets("  ", 3), []);
+});
+
+void test("extractBullets stops at sub-headings", () => {
+  const section = "- First bullet.\n### Sub heading\n- Second bullet.";
+  const result = extractBullets(section, 3);
+  assert.equal(result.length, 1);
+});
+
+void test("extractBullets skips label-like lines", () => {
+  const section = "Key opportunity\n- Actual bullet with real content here.\n- Another real bullet with details.";
+  const result = extractBullets(section, 3);
+  assert.ok(result.length >= 1);
+  assert.ok(result[0].includes("Actual bullet"));
+});
+
+// ---------------------------------------------------------------------------
+// ICP extraction
+// ---------------------------------------------------------------------------
+
+void test("parseWorkspaceSummary extracts ICP from MARKET.md 'ICP hypotheses'", () => {
+  const result = parseWorkspaceSummary(null, SAMPLE_MARKET, null);
+  assert.ok(result.icp, "icp should be extracted from MARKET.md");
+  assert.ok(
+    result.icp.includes("engineering teams") || result.icp.includes("Remote-first"),
+    "icp should describe the ideal customer",
+  );
+});
+
+void test("parseWorkspaceSummary ICP falls back to MARKET.md 'Personas' heading", () => {
+  const marketMd = `# MARKET\n\n## Personas\n- DevOps leads at mid-size SaaS companies managing CI/CD pipelines.\n`;
+  const result = parseWorkspaceSummary(null, marketMd, null);
+  assert.ok(result.icp, "icp should fall back to Personas heading");
+  assert.ok(result.icp.includes("DevOps"));
+});
+
+void test("parseWorkspaceSummary ICP falls back to PRODUCT.md when MARKET.md is null", () => {
+  const result = parseWorkspaceSummary(SAMPLE_PRODUCT, null, null);
+  assert.ok(result.icp, "icp should fall back to product target users");
+  assert.ok(result.icp.includes("Remote-first") || result.icp.includes("startup"));
+});
+
+// ---------------------------------------------------------------------------
+// Opportunities extraction
+// ---------------------------------------------------------------------------
+
+void test("parseWorkspaceSummary extracts opportunities from GROWTH.md", () => {
+  const result = parseWorkspaceSummary(null, null, SAMPLE_GROWTH);
+  assert.ok(result.opportunities.length >= 2, "should extract at least 2 opportunity bullets");
+  assert.ok(result.opportunities.length <= 3, "should extract at most 3 opportunity bullets");
+});
+
+void test("parseWorkspaceSummary returns empty opportunities when GROWTH.md is null", () => {
+  const result = parseWorkspaceSummary(SAMPLE_PRODUCT, null, null);
+  assert.deepEqual(result.opportunities, []);
 });

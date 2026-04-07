@@ -12,6 +12,8 @@ export interface CompanySummaryData {
   valueProposition: string | null;
   mainRisk: string | null;
   topOpportunity: string | null;
+  icp: string | null;
+  opportunities: string[];
 }
 
 /**
@@ -82,6 +84,24 @@ export function firstParagraphOrBullet(section: string): string | null {
 }
 
 /**
+ * Extracts up to `max` concise bullet strings from a markdown section.
+ * Strips bullet prefixes, skips label-like lines, and stops at sub-headings.
+ */
+export function extractBullets(section: string, max = 3): string[] {
+  if (!section) return [];
+  const lines = section.split("\n").map((l) => l.trim()).filter(Boolean);
+  const result: string[] = [];
+  for (const line of lines) {
+    if (line.startsWith("###")) break;
+    const cleaned = line.replace(/^[-*]\s+/, "");
+    if (isLabelLine(cleaned)) continue;
+    if (cleaned) result.push(cleaned);
+    if (result.length >= max) break;
+  }
+  return result;
+}
+
+/**
  * Tries multiple heading variants and returns the first matching section content.
  */
 function extractFirstMatch(markdown: string, headings: string[]): string | null {
@@ -93,12 +113,12 @@ function extractFirstMatch(markdown: string, headings: string[]): string | null 
 }
 
 /**
- * Extracts the 5 company summary data points from raw markdown content.
+ * Extracts company summary data points from raw markdown content.
  * Resilient to heading variations in AI-generated markdown.
  */
 export function parseWorkspaceSummary(
   productMd: string | null,
-  _marketMd: string | null,
+  marketMd: string | null,
   growthMd: string | null,
 ): CompanySummaryData {
   const result: CompanySummaryData = {
@@ -107,6 +127,8 @@ export function parseWorkspaceSummary(
     valueProposition: null,
     mainRisk: null,
     topOpportunity: null,
+    icp: null,
+    opportunities: [],
   };
 
   try {
@@ -142,6 +164,25 @@ export function parseWorkspaceSummary(
         : null;
     }
 
+    // ICP extraction: prefer MARKET.md, fallback to PRODUCT.md
+    if (marketMd) {
+      const icpSection = extractFirstMatch(marketMd, [
+        "ICP hypotheses",
+        "Personas",
+        "Ideal customer profile",
+        "Target buyer",
+      ]);
+      result.icp = icpSection ? firstParagraphOrBullet(icpSection) : null;
+    }
+    if (!result.icp && productMd) {
+      const icpFallback = extractFirstMatch(productMd, [
+        "Target users",
+        "Target audience",
+        "Ideal customer",
+      ]);
+      result.icp = icpFallback ? firstParagraphOrBullet(icpFallback) : null;
+    }
+
     if (growthMd) {
       const risks = extractFirstMatch(growthMd, [
         "Risks and constraints",
@@ -161,6 +202,30 @@ export function parseWorkspaceSummary(
       result.topOpportunity = opportunity
         ? firstParagraphOrBullet(opportunity)
         : null;
+
+      // Opportunities: collect 2-3 sharp bullets from multiple GROWTH.md sections
+      const seen = new Set<string>();
+      const opps: string[] = [];
+      const oppSections = [
+        "Strategic summary",
+        "Experiment ideas",
+        "Channel priorities",
+        "Risks and constraints",
+      ];
+      for (const heading of oppSections) {
+        if (opps.length >= 3) break;
+        const section = extractSection(growthMd, heading);
+        if (!section) continue;
+        const bullets = extractBullets(section, 2);
+        for (const b of bullets) {
+          if (opps.length >= 3) break;
+          const key = b.toLowerCase().slice(0, 40);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          opps.push(b);
+        }
+      }
+      result.opportunities = opps;
     }
   } catch (err: unknown) {
     console.error("parseWorkspaceSummary: unexpected error during parsing:", err);

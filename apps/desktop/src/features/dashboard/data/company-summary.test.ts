@@ -125,8 +125,23 @@ const REALISTIC_GROWTH = `# GROWTH
 - Is the freemium ceiling limiting revenue per user?
 `;
 
-void test("realistic bootstrap output: all 5 summary points extracted", () => {
-  const result = parseWorkspaceSummary(REALISTIC_PRODUCT, null, REALISTIC_GROWTH);
+const REALISTIC_MARKET = `# MARKET
+
+## ICP hypotheses
+- Mid-market sales teams (50-500 employees) booking 20+ external meetings/week, currently losing deals to scheduling friction.
+- Secondary: recruiting teams at high-growth startups running 30+ candidate interviews per week.
+
+## Personas
+- VP Sales at a Series B SaaS company managing 15 AEs across US and EMEA timezones.
+- Head of Talent at a 200-person startup scaling from 5 to 20 hires per quarter.
+
+## Main customer pains
+- Sales reps waste 17 min per meeting coordinating schedules, adding up to 3+ hours/week of lost selling time.
+- No-show rates spike when booking confirmation and reminders are manual.
+`;
+
+void test("realistic bootstrap output: all summary points extracted including ICP and opportunities", () => {
+  const result = parseWorkspaceSummary(REALISTIC_PRODUCT, REALISTIC_MARKET, REALISTIC_GROWTH);
 
   assert.ok(result.productSummary, "productSummary should be present");
   assert.ok(
@@ -149,18 +164,26 @@ void test("realistic bootstrap output: all 5 summary points extracted", () => {
   );
 
   assert.ok(result.topOpportunity, "topOpportunity should be present");
+
+  assert.ok(result.icp, "icp should be present");
+  assert.ok(
+    result.icp.includes("sales") || result.icp.includes("Sales") || result.icp.includes("Mid-market"),
+    "icp should describe ideal customer segment",
+  );
+
+  assert.ok(result.opportunities.length >= 2, "opportunities should have at least 2 bullets");
+  assert.ok(result.opportunities.length <= 3, "opportunities should have at most 3 bullets");
 });
 
 void test("summary data points are concise (under 300 chars each)", () => {
-  const result = parseWorkspaceSummary(REALISTIC_PRODUCT, null, REALISTIC_GROWTH);
+  const result = parseWorkspaceSummary(REALISTIC_PRODUCT, REALISTIC_MARKET, REALISTIC_GROWTH);
 
   for (const [key, value] of Object.entries(result)) {
-    if (value !== null) {
-      assert.ok(
-        value.length <= 300,
-        `${key} is ${value.length} chars, should be ≤300 for compact display`,
-      );
-    }
+    if (value === null || Array.isArray(value)) continue;
+    assert.ok(
+      value.length <= 300,
+      `${key} is ${value.length} chars, should be ≤300 for compact display`,
+    );
   }
 });
 
@@ -188,13 +211,15 @@ void test("extractSection handles real GROWTH.md Experiment ideas heading", () =
   assert.ok(section.includes("LinkedIn") || section.includes("video") || section.includes("Product Hunt"));
 });
 
-void test("CompanySummaryData type shape has exactly 5 fields", () => {
+void test("CompanySummaryData type shape has exactly 7 fields", () => {
   const empty: CompanySummaryData = {
     productSummary: null,
     targetAudience: null,
     valueProposition: null,
     mainRisk: null,
     topOpportunity: null,
+    icp: null,
+    opportunities: [],
   };
-  assert.equal(Object.keys(empty).length, 5);
+  assert.equal(Object.keys(empty).length, 7);
 });

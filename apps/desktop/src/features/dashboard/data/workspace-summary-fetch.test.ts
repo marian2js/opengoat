@@ -121,8 +121,10 @@ void test("CompanySummary contract: empty data shows error state, not null", () 
     valueProposition: null,
     mainRisk: null,
     topOpportunity: null,
+    icp: null,
+    opportunities: [] as string[],
   };
-  const hasAnyData = data ? Object.values(data).some(Boolean) : false;
+  const hasAnyData = data ? Object.values(data).some((v) => Array.isArray(v) ? v.length > 0 : Boolean(v)) : false;
   assert.equal(hasAnyData, false, "No data points present");
 
   // The component should always show the error card when hasAnyData is false

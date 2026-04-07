@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangleIcon, GlobeIcon, TrendingUpIcon, UsersIcon } from "lucide-react";
+import { GlobeIcon, TargetIcon, TrendingUpIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { CompanySummaryData } from "@/features/dashboard/lib/parse-workspace-summary";
 
@@ -39,11 +39,15 @@ function FaviconIcon({
 
 function HeroSkeleton() {
   return (
-    <div className="flex items-center gap-3">
-      <Skeleton className="size-8 shrink-0 rounded-lg" />
-      <div className="flex-1 space-y-1.5">
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <Skeleton className="size-8 shrink-0 rounded-lg" />
         <Skeleton className="h-5 w-36" />
+      </div>
+      <div className="space-y-1.5 pl-[54px]">
         <Skeleton className="h-3.5 w-full max-w-sm" />
+        <Skeleton className="h-3 w-48" />
+        <Skeleton className="h-3 w-56" />
       </div>
     </div>
   );
@@ -64,17 +68,16 @@ export function CompanyUnderstandingHero({
     );
   }
 
-  const hasAnyData = data ? Object.values(data).some(Boolean) : false;
+  const hasAnyData = data ? Object.values(data).some((v) => Array.isArray(v) ? v.length > 0 : Boolean(v)) : false;
   const hasFavicon = domain && faviconSources && faviconSources.length > 0;
 
-  // Build inline bullets from available data
-  const bullets: { key: string; icon: "opportunity" | "risk"; text: string }[] = [];
-  if (data?.topOpportunity) {
-    bullets.push({ key: "opportunity", icon: "opportunity", text: data.topOpportunity });
-  }
-  if (data?.mainRisk) {
-    bullets.push({ key: "risk", icon: "risk", text: data.mainRisk });
-  }
+  // ICP line: prefer data.icp, fall back to data.targetAudience
+  const icpLine = data?.icp ?? data?.targetAudience ?? null;
+
+  // Opportunity bullets: prefer data.opportunities array, fall back to legacy fields
+  const oppBullets: string[] = data?.opportunities && data.opportunities.length > 0
+    ? data.opportunities
+    : [data?.topOpportunity, data?.mainRisk].filter((b): b is string => Boolean(b));
 
   return (
     <div className="mb-6 overflow-hidden rounded-xl border border-border/30 bg-gradient-to-br from-card via-card to-primary/[0.02] shadow-sm dark:border-white/[0.06] dark:from-[#18181B] dark:via-[#18181B] dark:to-primary/[0.03]">
@@ -101,17 +104,29 @@ export function CompanyUnderstandingHero({
           </div>
         </div>
 
-        {/* ── Summary + ICP hint ── */}
+        {/* ── Summary + ICP + Opportunities ── */}
         {hasAnyData && data?.productSummary ? (
           <div className="mt-3 pl-[54px]">
             <p className="line-clamp-2 text-[14px] leading-[1.6] text-zinc-500 dark:text-zinc-400">
               {data.productSummary}
             </p>
-            {data.targetAudience && (
+            {icpLine && (
               <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-zinc-400 dark:text-zinc-500">
-                <UsersIcon className="size-3 shrink-0" />
-                <span className="line-clamp-1">{data.targetAudience}</span>
+                <TargetIcon className="size-3 shrink-0" />
+                <span className="line-clamp-1">{icpLine}</span>
               </p>
+            )}
+            {oppBullets.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {oppBullets.slice(0, 3).map((text) => (
+                  <li key={text} className="flex items-start gap-1.5">
+                    <TrendingUpIcon className="mt-[3px] size-3 shrink-0 text-primary/60" />
+                    <span className="line-clamp-1 text-[13px] leading-snug text-zinc-500 dark:text-zinc-400">
+                      {text}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         ) : error ? (
@@ -122,24 +137,6 @@ export function CompanyUnderstandingHero({
           <p className="mt-3 pl-[54px] text-[13px] text-muted-foreground">
             No project context yet
           </p>
-        )}
-
-        {/* ── Inline opportunity/risk bullets ── */}
-        {bullets.length > 0 && (
-          <ul className="mt-3 space-y-1.5 pl-[54px]">
-            {bullets.map((b) => (
-              <li key={b.key} className="flex items-start gap-2">
-                {b.icon === "risk" ? (
-                  <AlertTriangleIcon className="mt-[3px] size-3 shrink-0 text-amber-500" />
-                ) : (
-                  <TrendingUpIcon className="mt-[3px] size-3 shrink-0 text-primary" />
-                )}
-                <span className="line-clamp-1 text-[13px] leading-snug text-zinc-500 dark:text-zinc-400">
-                  {b.text}
-                </span>
-              </li>
-            ))}
-          </ul>
         )}
       </div>
     </div>
