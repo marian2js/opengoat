@@ -20,13 +20,13 @@ export function ActionSessionOutputs({ outputs }: ActionSessionOutputsProps) {
   if (outputs.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-3 px-5 py-3">
+    <div className="flex flex-col gap-3 px-5 py-4">
       <div className="flex items-center gap-2.5">
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+        <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 shadow-sm ring-1 ring-primary/10">
           <FileTextIcon className="size-3.5 text-primary" />
         </div>
         <h2 className="section-label">Outputs</h2>
-        <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+        <span className="rounded-full bg-primary/8 px-2.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-primary ring-1 ring-primary/10">
           {outputs.length}
         </span>
       </div>
@@ -35,11 +35,11 @@ export function ActionSessionOutputs({ outputs }: ActionSessionOutputsProps) {
           <div key={output.id} className="relative flex gap-4">
             {/* Timeline spine */}
             <div className="flex flex-col items-center pt-5">
-              <div className="relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-primary/30 bg-card text-primary">
+              <div className="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-primary/25 bg-card shadow-sm text-primary dark:border-primary/20 dark:bg-card/80">
                 <span className="font-mono text-[10px] font-bold">{index + 1}</span>
               </div>
               {index < outputs.length - 1 && (
-                <div className="w-px flex-1 bg-border/40 dark:bg-white/[0.06]" />
+                <div className="w-px flex-1 bg-gradient-to-b from-primary/20 via-border/30 to-border/10 dark:from-primary/15 dark:via-white/[0.04] dark:to-transparent" />
               )}
             </div>
             {/* Output card */}
@@ -86,13 +86,13 @@ function OutputCard({ output }: { output: OutputBlock }) {
   }
 
   return (
-    <div className="group relative rounded-lg border border-border/40 bg-card/60 p-5 transition-colors hover:border-border/60">
+    <div className="group relative rounded-xl border border-border/40 bg-card/60 p-5 shadow-sm shadow-black/[0.02] transition-all duration-150 hover:border-border/60 hover:shadow-md hover:shadow-black/[0.04] dark:border-white/[0.06] dark:shadow-black/10 dark:hover:border-white/[0.10] dark:hover:shadow-black/15">
       <div className="mb-3 flex items-start justify-between">
-        <h3 className="text-[14px] font-semibold text-foreground">{output.title}</h3>
+        <h3 className="font-display text-[15px] font-bold tracking-tight text-foreground">{output.title}</h3>
         <button
           type="button"
           onClick={handleCopy}
-          className="shrink-0 rounded-md p-1.5 text-muted-foreground/50 opacity-0 transition-all hover:bg-muted/50 hover:text-muted-foreground group-hover:opacity-100"
+          className="shrink-0 rounded-md p-1.5 text-muted-foreground/40 opacity-0 transition-all duration-100 hover:bg-primary/8 hover:text-primary group-hover:opacity-100"
           aria-label={copied ? "Copied" : "Copy output"}
         >
           {copied ? (
@@ -127,7 +127,7 @@ function OutputCard({ output }: { output: OutputBlock }) {
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="mt-3 inline-flex items-center gap-1 rounded-md border border-border/30 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/5"
+          className="mt-3 inline-flex items-center gap-1 rounded-lg border border-primary/15 bg-primary/[0.04] px-3 py-1.5 text-[11px] font-medium text-primary transition-all duration-100 hover:border-primary/25 hover:bg-primary/[0.08]"
         >
           {expanded ? (
             <>

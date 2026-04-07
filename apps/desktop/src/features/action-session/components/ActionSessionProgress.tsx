@@ -51,24 +51,24 @@ export function ActionSessionProgress({
 
   if (state === "starting") {
     return (
-      <div className="space-y-3 px-5 py-4">
+      <div className="mx-5 mt-4 space-y-3 rounded-xl border border-border/30 bg-card/50 p-4 dark:border-white/[0.04] dark:bg-white/[0.015]">
         <div className="flex items-center gap-3">
-          <div className="relative flex size-5 items-center justify-center">
-            <span className="absolute size-5 animate-ping rounded-full bg-primary/20" />
-            <span className="relative size-2.5 rounded-full bg-primary" />
+          <div className="relative flex size-6 items-center justify-center">
+            <span className="absolute size-6 animate-ping rounded-full bg-primary/15" />
+            <span className="relative size-3 rounded-full bg-primary shadow-sm shadow-primary/30" />
           </div>
           <div className="flex-1 space-y-0.5">
-            <p className="text-sm font-medium text-foreground">
+            <p className="text-[14px] font-medium text-foreground">
               {actionOutputType
                 ? `Preparing your ${actionOutputType.toLowerCase()}…`
                 : "Analyzing your company and preparing outputs…"}
             </p>
             {actionPromise && (
-              <p className="text-xs text-muted-foreground/70">
+              <p className="text-[12px] leading-relaxed text-muted-foreground/60">
                 {actionPromise}
               </p>
             )}
-            <p className="text-xs text-muted-foreground">
+            <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/50">
               First output in ~30–90s
             </p>
           </div>
@@ -80,14 +80,14 @@ export function ActionSessionProgress({
 
   if (state === "working") {
     return (
-      <div className="space-y-2.5 px-5 py-3">
+      <div className="mx-5 space-y-2.5 rounded-xl border border-primary/15 bg-primary/[0.03] p-4 dark:border-primary/10 dark:bg-primary/[0.02]">
         <div className="flex items-center gap-3">
           <LoaderCircleIcon className="size-4 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">
+          <p className="text-[13px] font-medium text-foreground/80">
             {hasOutputs ? "Generating more outputs…" : "Working on your request…"}
           </p>
           {outputCount > 0 && (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-primary">
+            <span className="rounded-full bg-primary/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-primary ring-1 ring-primary/10">
               {outputCount} generated
             </span>
           )}
@@ -99,10 +99,10 @@ export function ActionSessionProgress({
 
   if (state === "needs-input") {
     return (
-      <div className="space-y-2.5 px-5 py-3">
+      <div className="mx-5 space-y-2.5 rounded-xl border border-amber-500/15 bg-amber-500/[0.03] p-4 dark:border-amber-500/10 dark:bg-amber-500/[0.02]">
         <div className="flex items-center gap-3">
           <PauseCircleIcon className="size-4 text-amber-500" />
-          <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+          <p className="text-[13px] font-medium text-amber-600 dark:text-amber-400">
             Waiting for your input to continue
           </p>
         </div>

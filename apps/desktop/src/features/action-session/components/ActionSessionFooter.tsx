@@ -12,11 +12,11 @@ export function ActionSessionFooter({
   onNewAction,
 }: ActionSessionFooterProps) {
   return (
-    <div className="flex items-center justify-between border-t border-border/30 px-5 py-3">
+    <div className="flex items-center justify-between border-t border-border/30 bg-card/20 px-5 py-3 dark:border-white/[0.04] dark:bg-white/[0.01]">
       <button
         type="button"
         onClick={onBackToDashboard}
-        className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground/70 transition-colors duration-100 hover:bg-muted/30 hover:text-foreground"
       >
         <ArrowLeftIcon className="size-3" />
         Back to dashboard
@@ -25,7 +25,7 @@ export function ActionSessionFooter({
         <button
           type="button"
           onClick={onViewChat}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border/50 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-all duration-100 hover:border-border/70 hover:bg-muted/20 hover:text-foreground dark:border-white/[0.06] dark:hover:border-white/[0.12]"
         >
           <MessageSquareIcon className="size-3" />
           View full chat
@@ -33,7 +33,7 @@ export function ActionSessionFooter({
         <button
           type="button"
           onClick={onNewAction}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[11px] font-medium text-primary-foreground shadow-sm shadow-primary/20 transition-all duration-100 hover:bg-primary/90 hover:shadow-md hover:shadow-primary/25"
         >
           <PlusIcon className="size-3" />
           New action

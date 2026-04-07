@@ -504,13 +504,16 @@ function ActionSessionInner({
         )}
 
         {sessionState === "saved-to-board" && (
-          <div className="mx-5 flex items-center gap-2 rounded-lg bg-primary/5 px-4 py-3">
-            <span className="text-sm font-medium text-primary">
+          <div className="mx-5 flex items-center gap-2.5 rounded-xl border border-primary/15 bg-primary/[0.04] px-4 py-3 dark:border-primary/10 dark:bg-primary/[0.03]">
+            <div className="flex size-5 items-center justify-center rounded-full bg-primary/15">
+              <span className="size-2 rounded-full bg-primary" />
+            </div>
+            <span className="text-[13px] font-medium text-primary">
               Saved to Board
             </span>
             <a
               href="#board"
-              className="text-xs font-medium text-primary/70 underline underline-offset-2 hover:text-primary"
+              className="rounded-md bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/15"
             >
               Open Board
             </a>
