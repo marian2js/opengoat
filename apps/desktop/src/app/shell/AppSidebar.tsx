@@ -154,17 +154,17 @@ export function AppSidebar({
             <SidebarMenuButton
               asChild
               size="lg"
-              className="h-11 data-[slot=sidebar-menu-button]:!p-1.5"
+              className="h-12 data-[slot=sidebar-menu-button]:!p-1.5 hover:bg-sidebar-accent/60 transition-colors duration-100"
             >
               <a href="#dashboard">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-primary shadow-sm shadow-primary/20 text-primary-foreground">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-primary shadow-sm shadow-primary/25 ring-1 ring-primary/15 text-primary-foreground">
                   <LayoutDashboardIcon className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
-                  <span className="font-display text-[14px] font-bold tracking-[-0.01em]">
+                  <span className="font-display text-[14px] font-bold tracking-[-0.02em]">
                     OpenGoat
                   </span>
-                  <span className="text-[10px] text-sidebar-foreground/40">
+                  <span className="font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-sidebar-foreground/35">
                     AI Marketing
                   </span>
                 </div>
@@ -178,7 +178,7 @@ export function AppSidebar({
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {/* Primary nav: Dashboard, Chat */}
+              {/* Primary nav: Dashboard, Agents, Chat */}
               {primaryNavigation.map((item) => {
                 const isItemActive = item.href.slice(1) === activeView;
                 return (
@@ -188,17 +188,15 @@ export function AppSidebar({
                     tooltip={item.title}
                     isActive={isItemActive}
                     className={cn(
-                      "relative",
-                      isItemActive && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:bg-primary/12 group-data-[collapsible=icon]:ring-1 group-data-[collapsible=icon]:ring-primary/20",
+                      "relative transition-colors duration-100",
+                      isItemActive
+                        ? "bg-primary/[0.08] font-medium text-foreground before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:bg-primary/12 group-data-[collapsible=icon]:ring-1 group-data-[collapsible=icon]:ring-primary/20"
+                        : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60",
                     )}
                   >
                     <a
                       href={item.href}
                       onClick={(e) => {
-                        // When clicking a nav item that's already active, the
-                        // hash doesn't change so no hashchange event fires.
-                        // Force a re-dispatch so App can react (e.g. clear
-                        // bootstrap overlay when clicking Dashboard).
                         if (item.href.slice(1) === activeView) {
                           e.preventDefault();
                           window.dispatchEvent(new HashChangeEvent("hashchange"));
@@ -223,8 +221,10 @@ export function AppSidebar({
                     tooltip={item.title}
                     isActive={isItemActive}
                     className={cn(
-                      "relative text-muted-foreground/70",
-                      isItemActive && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:bg-primary/12 group-data-[collapsible=icon]:ring-1 group-data-[collapsible=icon]:ring-primary/20",
+                      "relative transition-colors duration-100",
+                      isItemActive
+                        ? "bg-primary/[0.08] font-medium text-foreground before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:bg-primary/12 group-data-[collapsible=icon]:ring-1 group-data-[collapsible=icon]:ring-primary/20"
+                        : "text-muted-foreground/60 hover:text-sidebar-foreground/70 hover:bg-sidebar-accent/40",
                     )}
                   >
                     <a href={item.href}>
@@ -249,8 +249,10 @@ export function AppSidebar({
                       tooltip="Brain"
                       isActive={activeView === "brain"}
                       className={cn(
-                        "relative",
-                        activeView === "brain" && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:bg-primary/12 group-data-[collapsible=icon]:ring-1 group-data-[collapsible=icon]:ring-primary/20",
+                        "relative transition-colors duration-100",
+                        activeView === "brain"
+                          ? "bg-primary/[0.08] font-medium text-foreground before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:bg-primary/12 group-data-[collapsible=icon]:ring-1 group-data-[collapsible=icon]:ring-primary/20"
+                          : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60",
                       )}
                     >
                       <a href="#brain">
@@ -272,8 +274,10 @@ export function AppSidebar({
                               asChild
                               isActive={isSubActive}
                               className={cn(
-                                isSubActive &&
-                                  "border-l-2 border-primary font-medium",
+                                "transition-colors duration-100",
+                                isSubActive
+                                  ? "border-l-2 border-primary bg-primary/[0.06] font-medium text-foreground"
+                                  : "text-sidebar-foreground/60 hover:text-sidebar-foreground/80",
                               )}
                             >
                               <a href={item.href}>
@@ -290,9 +294,9 @@ export function AppSidebar({
               </Collapsible>
 
               {/* Divider before secondary nav */}
-              <div className="mx-2 my-1 h-px bg-sidebar-border/60" />
+              <div className="mx-3 my-2 h-px bg-sidebar-border/80 dark:bg-white/[0.06]" />
 
-              {/* Secondary nav: Agents, Connections (Settings excluded — in footer) */}
+              {/* Secondary nav: Connections (Settings excluded — in footer) */}
               {secondaryNavigation
                 .filter((item) => item.href !== "#settings")
                 .map((item) => {
@@ -304,8 +308,10 @@ export function AppSidebar({
                       tooltip={item.title}
                       isActive={isItemActive}
                       className={cn(
-                        "relative",
-                        isItemActive && "before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:bg-primary/12 group-data-[collapsible=icon]:ring-1 group-data-[collapsible=icon]:ring-primary/20",
+                        "relative transition-colors duration-100",
+                        isItemActive
+                          ? "bg-primary/[0.08] font-medium text-foreground before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary group-data-[collapsible=icon]:before:hidden group-data-[collapsible=icon]:bg-primary/12 group-data-[collapsible=icon]:ring-1 group-data-[collapsible=icon]:ring-primary/20"
+                          : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/60",
                       )}
                     >
                       <a href={item.href}>
@@ -333,13 +339,13 @@ export function AppSidebar({
             <SidebarGroupContent>
               <div className="px-2 pb-1">
                 <div className="relative">
-                  <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-sidebar-foreground/40" />
+                  <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3 -translate-y-1/2 text-sidebar-foreground/30" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search chats…"
-                    className="h-7 w-full rounded-md border border-sidebar-border bg-sidebar pl-7 pr-2 text-[13px] text-sidebar-foreground placeholder:text-sidebar-foreground/40 outline-none focus:ring-1 focus:ring-primary/40"
+                    className="h-7 w-full rounded-lg border border-sidebar-border/60 bg-sidebar-accent/40 pl-7 pr-2 text-[12px] text-sidebar-foreground placeholder:text-sidebar-foreground/30 outline-none transition-colors duration-100 focus:border-primary/30 focus:bg-sidebar focus:ring-1 focus:ring-primary/20 dark:border-white/[0.04] dark:bg-white/[0.02] dark:focus:border-primary/25"
                   />
                 </div>
               </div>
