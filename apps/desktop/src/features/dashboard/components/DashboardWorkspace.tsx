@@ -11,6 +11,7 @@ import { CompanyUnderstandingHero } from "@/features/dashboard/components/Compan
 import { DashboardAgentRoster } from "@/features/dashboard/components/DashboardAgentRoster";
 import { PlaybookInputForm } from "@/features/dashboard/components/PlaybookInputForm";
 import { RecommendedJobs } from "@/features/dashboard/components/RecommendedJobs";
+import { JobOrientedInput } from "@/features/dashboard/components/JobOrientedInput";
 import { useMeaningfulWork } from "@/features/dashboard/hooks/useMeaningfulWork";
 import { RecentOutputs } from "@/features/dashboard/components/RecentOutputs";
 import { BoardSummary } from "@/features/dashboard/components/BoardSummary";
@@ -178,6 +179,11 @@ function DashboardContent({
           isLoading={recommendedJobs.isLoading}
           onActionClick={(id, prompt, label) => { void playbook.handleActionOrPlaybookClick(id, prompt, label); }}
         />
+      </div>
+
+      {/* 2.5 Job-oriented free input */}
+      <div className="dashboard-section">
+        <JobOrientedInput onSubmit={handleFreeTextSubmit} />
       </div>
 
       {/* 3. Specialist roster */}
