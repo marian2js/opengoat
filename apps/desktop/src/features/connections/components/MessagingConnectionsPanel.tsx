@@ -124,7 +124,7 @@ export function MessagingConnectionsPanel({
   }
 
   return (
-    <section className="min-w-0 rounded-lg border border-border/40 bg-card/80 transition-colors hover:border-border/60 dark:border-white/[0.06] dark:hover:border-white/[0.10]">
+    <section className="min-w-0 overflow-hidden rounded-xl border border-border/40 bg-card/80 shadow-sm shadow-black/[0.02] transition-colors hover:border-border/60 dark:border-white/[0.06] dark:shadow-black/10 dark:hover:border-white/[0.10]">
       <div className="flex items-center justify-between gap-3 px-4 py-3.5 lg:px-5">
         <div className="flex items-center gap-2.5">
           <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">

@@ -154,7 +154,7 @@ export function ConnectionsWorkspace({
         <MessageBanner tone="success">{feedback}</MessageBanner>
       ) : null}
 
-      <section className="min-w-0 rounded-lg border border-border/40 bg-card/80 transition-colors hover:border-border/60 dark:border-white/[0.06] dark:hover:border-white/[0.10]">
+      <section className="min-w-0 overflow-hidden rounded-xl border border-border/40 bg-card/80 shadow-sm shadow-black/[0.02] transition-colors hover:border-border/60 dark:border-white/[0.06] dark:shadow-black/10 dark:hover:border-white/[0.10]">
         <div className="flex items-center justify-between gap-3 px-4 py-3.5 lg:px-5">
           <div className="flex items-center gap-2.5">
             <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
@@ -226,10 +226,10 @@ export function ConnectionsWorkspace({
             <Table>
               <TableHeader>
                 <TableRow className="border-border/40 hover:bg-transparent">
-                  <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Provider</TableHead>
-                  <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Connection</TableHead>
-                  <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Model</TableHead>
-                  <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Updated</TableHead>
+                  <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Provider</TableHead>
+                  <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Connection</TableHead>
+                  <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Model</TableHead>
+                  <TableHead className="py-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">Updated</TableHead>
                   <TableHead className="py-2.5 text-right font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -251,7 +251,7 @@ export function ConnectionsWorkspace({
 
         {storedConnections.length > 0 && onAddConnection ? (
           <div
-            className="group/cta flex cursor-pointer items-center gap-4 border-t border-dashed border-border/40 px-4 py-3.5 transition-all hover:bg-primary/[0.03] lg:px-5"
+            className="group/cta flex cursor-pointer items-center gap-4 border-t border-dashed border-border/30 px-4 py-3.5 transition-all hover:bg-primary/[0.04] lg:px-5"
             role="button"
             tabIndex={0}
             onClick={onAddConnection}
@@ -293,7 +293,10 @@ function ConnectionRow({
   const modelLabel = resolveModelDisplayLabel(modelCatalog, connection.activeModelId);
 
   return (
-    <TableRow className="border-border/60 transition-all hover:bg-muted/30 dark:hover:bg-muted/20">
+    <TableRow className={cn(
+      "border-border/60 transition-all hover:bg-muted/40 dark:hover:bg-muted/25",
+      connection.isDefault && "bg-primary/[0.02] dark:bg-primary/[0.015]",
+    )}>
       <TableCell className="text-[12px] font-medium">{cleanProviderName(connection.providerName)}</TableCell>
       <TableCell>
         <div className="flex items-center gap-1.5">
