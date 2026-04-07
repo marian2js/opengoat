@@ -23,6 +23,16 @@ const dashboardSrc = readFileSync(
   "utf-8",
 );
 
+const actionsSrc = readFileSync(
+  resolve(__dirname, "../../apps/desktop/src/features/dashboard/data/actions.ts"),
+  "utf-8",
+);
+
+const suggestedSrc = readFileSync(
+  resolve(__dirname, "../../apps/desktop/src/features/dashboard/data/suggested-actions.ts"),
+  "utf-8",
+);
+
 // ═══════════════════════════════════════════════════════
 // useRecommendedJobs hook
 // ═══════════════════════════════════════════════════════
@@ -69,7 +79,73 @@ describe("useRecommendedJobs hook", () => {
 });
 
 // ═══════════════════════════════════════════════════════
-// RecommendedJobCard component
+// ActionCard data model — output-promise fields
+// ═══════════════════════════════════════════════════════
+describe("ActionCard data model — output-promise fields", () => {
+  it("ActionCard interface includes outputType field", () => {
+    expect(actionsSrc).toMatch(/outputType\??\s*:\s*string/);
+  });
+
+  it("ActionCard interface includes ctaLabel field", () => {
+    expect(actionsSrc).toMatch(/ctaLabel\??\s*:\s*string/);
+  });
+
+  it("all starter actions have outputType defined", () => {
+    // Each starter action entry should have an outputType line
+    const outputTypeCount = (actionsSrc.match(/outputType:\s*"/g) || []).length;
+    // There are 8 starter actions
+    expect(outputTypeCount).toBeGreaterThanOrEqual(8);
+  });
+
+  it("all starter actions have ctaLabel defined", () => {
+    const ctaLabelCount = (actionsSrc.match(/ctaLabel:\s*"/g) || []).length;
+    expect(ctaLabelCount).toBeGreaterThanOrEqual(8);
+  });
+
+  it("outputType values use concrete output language, not vague process language", () => {
+    // Should NOT contain vague words like "analysis", "strategy help", "workflow result"
+    const outputTypes = [...actionsSrc.matchAll(/outputType:\s*"([^"]+)"/g)].map(m => m[1]);
+    for (const ot of outputTypes) {
+      expect(ot.toLowerCase()).not.toMatch(/^analysis$/);
+      expect(ot.toLowerCase()).not.toMatch(/^strategy help$/);
+      expect(ot.toLowerCase()).not.toMatch(/^workflow result$/);
+    }
+    expect(outputTypes.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("ctaLabel values are outcome-based, not generic 'Start'", () => {
+    const ctaLabels = [...actionsSrc.matchAll(/ctaLabel:\s*"([^"]+)"/g)].map(m => m[1]);
+    for (const label of ctaLabels) {
+      expect(label).not.toBe("Start");
+    }
+    expect(ctaLabels.length).toBeGreaterThanOrEqual(8);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// SuggestedActionData — outputType support
+// ═══════════════════════════════════════════════════════
+describe("SuggestedActionData — outputType support", () => {
+  it("SuggestedActionData interface includes outputType field", () => {
+    expect(suggestedSrc).toMatch(/outputType\??\s*:\s*string/);
+  });
+
+  it("isValidSuggestedAction validates outputType when present", () => {
+    expect(suggestedSrc).toContain("outputType");
+  });
+
+  it("toActionCard passes outputType through", () => {
+    // toActionCard should include outputType in the returned object
+    expect(suggestedSrc).toMatch(/outputType:\s*data\.outputType/);
+  });
+
+  it("SUGGESTED_ACTIONS_PROMPT includes outputType in schema", () => {
+    expect(suggestedSrc).toMatch(/outputType.*deliverable/i);
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// RecommendedJobCard component — output-promise rendering
 // ═══════════════════════════════════════════════════════
 describe("RecommendedJobCard component", () => {
   it("exports a RecommendedJobCard function component", () => {
@@ -88,9 +164,24 @@ describe("RecommendedJobCard component", () => {
     expect(cardSrc).toContain("promise");
   });
 
-  it("has a CTA to start the job", () => {
-    // Should have a Start or Run CTA
-    expect(cardSrc).toMatch(/Start|Run/);
+  it("renders the outputType tag", () => {
+    expect(cardSrc).toContain("job.outputType");
+  });
+
+  it("renders the ctaLabel (outcome-based CTA)", () => {
+    expect(cardSrc).toContain("ctaLabel");
+    // Should fall back to "Start" when ctaLabel is not set
+    expect(cardSrc).toMatch(/ctaLabel.*\?\?.*"Start"|"Start"/);
+  });
+
+  it("uses PackageIcon for the output-type tag", () => {
+    expect(cardSrc).toContain("PackageIcon");
+  });
+
+  it("hero card shows description as additional context", () => {
+    expect(cardSrc).toContain("job.description");
+    // Description should only show on hero
+    expect(cardSrc).toMatch(/isHero\s*&&\s*job\.description/);
   });
 
   it("uses specialist dot color for attribution", () => {
@@ -104,6 +195,14 @@ describe("RecommendedJobCard component", () => {
   it("applies hover lift per DESIGN.md (translateY, shadow)", () => {
     expect(cardSrc).toMatch(/hover:-translate-y/);
     expect(cardSrc).toMatch(/hover:shadow/);
+  });
+
+  it("hero output-type tag uses primary/emerald accent tint", () => {
+    expect(cardSrc).toMatch(/bg-primary/);
+  });
+
+  it("secondary output-type tag uses muted styling", () => {
+    expect(cardSrc).toMatch(/bg-muted/);
   });
 });
 
@@ -137,6 +236,18 @@ describe("RecommendedJobs section wrapper", () => {
 
   it("uses a grid layout for job cards", () => {
     expect(sectionSrc).toMatch(/grid/);
+  });
+
+  it("skeleton has internal pulse zones matching card content structure", () => {
+    // Skeleton should have distinct zones: chip, title, output tag, text, CTA
+    const skeletonSection = sectionSrc.slice(0, sectionSrc.indexOf("export function RecommendedJobs"));
+    // Multiple animate-pulse zones inside each skeleton card
+    const pulseCount = (skeletonSection.match(/animate-pulse/g) || []).length;
+    expect(pulseCount).toBeGreaterThanOrEqual(5);
+  });
+
+  it("skeleton hero card has larger padding than secondary cards", () => {
+    expect(sectionSrc).toMatch(/isHero.*p-6|p-6.*isHero/s);
   });
 });
 

@@ -26,6 +26,10 @@ export interface ActionCard {
   prompt: string;
   timeToFirstOutput: string;
   createsTrackedWork: boolean;
+  /** Short scannable deliverable label, e.g. "3 hero rewrites" */
+  outputType?: string;
+  /** Outcome-based CTA text, e.g. "Get rewrites". Falls back to "Start". */
+  ctaLabel?: string;
 }
 
 /**
@@ -106,6 +110,8 @@ export const starterActions: ActionCard[] = [
     id: "launch-product-hunt",
     title: "Launch on Product Hunt",
     promise: "Tagline, one-liner, launch post draft, checklist, and outreach angles",
+    outputType: "Launch copy bundle",
+    ctaLabel: "Build launch pack",
     description:
       "Creates ready-to-use Product Hunt launch assets including tagline options, description variants, first comment drafts, and maker story angles.",
     icon: RocketIcon,
@@ -131,6 +137,8 @@ Produce:
     id: "rewrite-homepage-hero",
     title: "Rewrite homepage hero",
     promise: "3 hero variants, CTA options, and trust copy ideas",
+    outputType: "3 hero rewrites",
+    ctaLabel: "Get rewrites",
     description:
       "Analyzes your current homepage hero section and generates improved headline, subheadline, and CTA variants that better communicate your value proposition.",
     icon: MessageSquareIcon,
@@ -154,6 +162,8 @@ Produce:
     id: "improve-homepage-conversion",
     title: "Improve homepage conversion",
     promise: "Top blockers, rewrite suggestions, CTA fixes, and proof recommendations",
+    outputType: "CRO audit + fixes",
+    ctaLabel: "Run audit",
     description:
       "Performs a systematic conversion rate optimization analysis across 7 dimensions with prioritized recommendations, copy alternatives, and test ideas.",
     icon: MousePointerClickIcon,
@@ -177,6 +187,8 @@ Produce:
     id: "build-outbound-sequence",
     title: "Build outbound sequence",
     promise: "Audience angle, email sequence, subject lines, and follow-up ideas",
+    outputType: "4-email sequence",
+    ctaLabel: "Build sequence",
     description:
       "Creates a complete cold email outreach sequence using proven copy frameworks, with subject lines, body copy, follow-up timing, and personalization strategies.",
     icon: MailIcon,
@@ -200,6 +212,8 @@ Produce a 4-5 email sequence with:
     id: "find-seo-quick-wins",
     title: "Find SEO quick wins",
     promise: "Prioritized opportunities, quick fixes, and 5 content targets",
+    outputType: "SEO opportunity map",
+    ctaLabel: "Find opportunities",
     description:
       "Performs a focused SEO audit to surface the highest-impact quick wins: technical fixes, on-page improvements, and content opportunities you can act on this week.",
     icon: GlobeIcon,
@@ -222,6 +236,8 @@ Produce:
     id: "create-comparison-page-outline",
     title: "Create comparison page outline",
     promise: "Competitor differences, page structure, and messaging gaps",
+    outputType: "Comparison page draft",
+    ctaLabel: "Draft page",
     description:
       "Performs a structured analysis of competitor positioning and creates an outline for a comparison page that highlights your differentiation.",
     icon: SearchIcon,
@@ -246,6 +262,8 @@ Produce:
     id: "generate-founder-content-ideas",
     title: "Generate founder content ideas",
     promise: "Topics, hooks, post outlines, and repurposing ideas",
+    outputType: "8–12 content ideas",
+    ctaLabel: "Get ideas",
     description:
       "Produces specific, ranked content ideas for founder-led marketing — LinkedIn posts, Twitter threads, blog topics, and newsletter angles tailored to your positioning.",
     icon: LightbulbIcon,
@@ -272,6 +290,8 @@ Rank by impact. Call out 2-3 "low-effort, high-impact" quick wins.`,
     id: "create-lead-magnet-ideas",
     title: "Create lead magnet ideas",
     promise: "3 lead magnet concepts, ICP fit, and landing page angle",
+    outputType: "3 lead magnet concepts",
+    ctaLabel: "Get concepts",
     description:
       "Generates lead magnet concepts tailored to your ICP, with positioning rationale, content outlines, and landing page copy angles for each concept.",
     icon: FileTextIcon,

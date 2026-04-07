@@ -27,6 +27,8 @@ export interface SuggestedActionData {
   category: ActionCategory;
   skills: string[];
   prompt: string;
+  /** Short scannable deliverable label, e.g. "3 hero rewrites" */
+  outputType?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +86,8 @@ function isValidSuggestedAction(item: unknown): item is SuggestedActionData {
     typeof obj.description === "string" && obj.description.length > 0 &&
     typeof obj.category === "string" && VALID_CATEGORIES.has(obj.category) &&
     (obj.skills === undefined || (Array.isArray(obj.skills) && obj.skills.every((s: unknown) => typeof s === "string"))) &&
-    typeof obj.prompt === "string" && obj.prompt.length > 0
+    typeof obj.prompt === "string" && obj.prompt.length > 0 &&
+    (obj.outputType === undefined || (typeof obj.outputType === "string" && obj.outputType.length > 0))
   );
 }
 
@@ -130,6 +133,7 @@ export function toActionCard(data: SuggestedActionData): ActionCard {
     specialistId: CATEGORY_TO_SPECIALIST[data.category],
     timeToFirstOutput: "30\u201390s",
     createsTrackedWork: false,
+    outputType: data.outputType,
   };
 }
 
@@ -178,7 +182,8 @@ Each object must have these exact fields:
   "description": "2-3 sentence description of what this action produces",
   "category": "conversion" | "distribution" | "growth" | "messaging" | "research" | "seo",
   "skills": ["skill-id-1", "skill-id-2"],
-  "prompt": "Full detailed prompt that will be sent to the AI agent. Must reference PRODUCT.md, MARKET.md, and GROWTH.md workspace files. Must produce a concrete, useful output."
+  "prompt": "Full detailed prompt that will be sent to the AI agent. Must reference PRODUCT.md, MARKET.md, and GROWTH.md workspace files. Must produce a concrete, useful output.",
+  "outputType": "Short deliverable label (under 30 chars) — e.g. '3 hero rewrites', 'Launch copy bundle', 'SEO opportunity map'. Must describe the tangible output the user receives."
 }
 
 EXAMPLES OF GOOD SUGGESTIONS (for a product analytics tool):
@@ -190,7 +195,8 @@ EXAMPLES OF GOOD SUGGESTIONS (for a product analytics tool):
     "description": "Designs a referral program tailored to this product using viral loop mechanics, incentive structures, and tracking setup.",
     "category": "growth",
     "skills": ["referral-program"],
-    "prompt": "Read PRODUCT.md, MARKET.md, and GROWTH.md. Design a complete referral program with incentive structure, viral mechanics, referral flow, tracking setup, and launch plan."
+    "prompt": "Read PRODUCT.md, MARKET.md, and GROWTH.md. Design a complete referral program with incentive structure, viral mechanics, referral flow, tracking setup, and launch plan.",
+    "outputType": "Referral program blueprint"
   },
   {
     "id": "draft-comparison-vs-mixpanel",
@@ -199,7 +205,8 @@ EXAMPLES OF GOOD SUGGESTIONS (for a product analytics tool):
     "description": "Analyzes Mixpanel's positioning and creates a comparison page draft that highlights your unique advantages, addresses common switching objections, and targets users searching for alternatives.",
     "category": "messaging",
     "skills": ["competitor-alternatives", "copywriting"],
-    "prompt": "Read PRODUCT.md, MARKET.md, and GROWTH.md. Then create a detailed comparison page draft of our product vs Mixpanel..."
+    "prompt": "Read PRODUCT.md, MARKET.md, and GROWTH.md. Then create a detailed comparison page draft of our product vs Mixpanel...",
+    "outputType": "Comparison page draft"
   }
 ]
 

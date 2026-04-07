@@ -11,14 +11,31 @@ export interface RecommendedJobsProps {
 function RecommendedJobsSkeleton() {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      {[1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className={`animate-pulse rounded-xl border border-border/20 bg-card/50 dark:border-white/[0.04] ${
-            i === 1 ? "sm:col-span-2 h-[120px]" : "h-[140px]"
-          }`}
-        />
-      ))}
+      {(["hero", "secondary-a", "secondary-b"] as const).map((slot) => {
+        const isHero = slot === "hero";
+        return (
+          <div
+            key={slot}
+            className={`flex flex-col gap-3 rounded-xl border border-border/20 bg-card/50 dark:border-white/[0.04] ${
+              isHero ? "sm:col-span-2 p-6" : "p-4"
+            }`}
+          >
+            {/* Specialist chip */}
+            <div className="h-5 w-24 animate-pulse rounded-md bg-muted/40" />
+            {/* Title */}
+            <div className={`animate-pulse rounded bg-muted/50 ${isHero ? "h-6 w-3/5" : "h-5 w-4/5"}`} />
+            {/* Output-type tag */}
+            <div className={`animate-pulse rounded-md bg-muted/30 ${isHero ? "h-7 w-40" : "h-5 w-32"}`} />
+            {/* Promise text */}
+            <div className="flex flex-col gap-1.5">
+              <div className="h-3.5 w-full animate-pulse rounded bg-muted/25" />
+              <div className="h-3.5 w-2/3 animate-pulse rounded bg-muted/25" />
+            </div>
+            {/* CTA */}
+            <div className="mt-auto h-4 w-20 animate-pulse rounded bg-muted/20" />
+          </div>
+        );
+      })}
     </div>
   );
 }
