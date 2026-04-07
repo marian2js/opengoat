@@ -83,7 +83,7 @@ async function readCargoVersion() {
   const absolutePath = resolve(workspaceRoot, cargoTomlFile);
   const raw = await readFile(absolutePath, "utf8");
   const match = raw.match(
-    /(\[workspace\.package\][\s\S]*?\nversion = ")([^"]+)(")/,
+    /(\[workspace\.package\][\s\S]*?\r?\nversion = ")([^"]+)(")/,
   );
 
   if (!match) {
@@ -98,7 +98,7 @@ async function readCargoVersion() {
 async function writeCargoVersion(version) {
   const absolutePath = resolve(workspaceRoot, cargoTomlFile);
   const raw = await readFile(absolutePath, "utf8");
-  const pattern = /(\[workspace\.package\][\s\S]*?\nversion = ")([^"]+)(")/;
+  const pattern = /(\[workspace\.package\][\s\S]*?\r?\nversion = ")([^"]+)(")/;
   const match = raw.match(pattern);
 
   if (!match) {
@@ -115,7 +115,7 @@ async function readCargoLockVersion() {
   const absolutePath = resolve(workspaceRoot, cargoLockFile);
   const raw = await readFile(absolutePath, "utf8");
   const match = raw.match(
-    /(\[\[package\]\]\nname = "opengoat-desktop"\nversion = ")([^"]+)(")/,
+    /(\[\[package\]\]\r?\nname = "opengoat-desktop"\r?\nversion = ")([^"]+)(")/,
   );
 
   if (!match) {
@@ -131,7 +131,7 @@ async function writeCargoLockVersion(version) {
   const absolutePath = resolve(workspaceRoot, cargoLockFile);
   const raw = await readFile(absolutePath, "utf8");
   const pattern =
-    /(\[\[package\]\]\nname = "opengoat-desktop"\nversion = ")([^"]+)(")/;
+    /(\[\[package\]\]\r?\nname = "opengoat-desktop"\r?\nversion = ")([^"]+)(")/;
   const match = raw.match(pattern);
 
   if (!match) {

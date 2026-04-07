@@ -117,14 +117,14 @@ function run() {
   writeFileSync(
     CARGO_TOML_PATH,
     readFileSync(CARGO_TOML_PATH, "utf8").replace(
-      /(\[workspace\.package\][\s\S]*?\nversion = ")([^"]+)(")/,
+      /(\[workspace\.package\][\s\S]*?\r?\nversion = ")([^"]+)(")/,
       `$1${nextVer}$3`,
     ),
   );
   writeFileSync(
     CARGO_LOCK_PATH,
     readFileSync(CARGO_LOCK_PATH, "utf8").replace(
-      /(\[\[package\]\]\nname = "opengoat-desktop"\nversion = ")([^"]+)(")/,
+      /(\[\[package\]\]\r?\nname = "opengoat-desktop"\r?\nversion = ")([^"]+)(")/,
       `$1${nextVer}$3`,
     ),
   );
