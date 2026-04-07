@@ -24,24 +24,24 @@ export function BundleCard({ bundle, specialistId, specialistName, onPreview, on
   }
 
   return (
-    <div className="relative rounded-lg border transition-all duration-100 ease-out hover:-translate-y-px hover:border-primary/25 hover:shadow-md">
+    <div className="relative overflow-hidden rounded-xl border border-border/20 bg-card shadow-sm shadow-black/[0.02] transition-all duration-100 ease-out hover:-translate-y-px hover:border-primary/25 hover:shadow-md dark:border-white/[0.06] dark:shadow-black/15">
       {/* Left accent bar — primary emerald for bundles */}
-      <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] bg-primary opacity-60 transition-opacity hover:opacity-100" />
+      <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-xl bg-primary opacity-50 transition-opacity hover:opacity-100" />
 
       {/* Header — clickable to toggle */}
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
-        className="flex w-full items-center gap-3 px-3 py-3 pl-5 text-left"
+        className="flex w-full items-center gap-3 px-3.5 py-3.5 pl-5 text-left"
       >
         <ChevronRightIcon
-          className={`size-4 shrink-0 text-muted-foreground transition-transform duration-150 ${expanded ? "rotate-90" : ""}`}
+          className={`size-4 shrink-0 text-muted-foreground/50 transition-transform duration-150 ${expanded ? "rotate-90" : ""}`}
         />
 
         <PackageIcon className="size-3.5 shrink-0 text-primary" />
 
         {/* Bundle title */}
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground">
           {bundle.title}
         </span>
 
@@ -52,7 +52,7 @@ export function BundleCard({ bundle, specialistId, specialistName, onPreview, on
 
         {/* Specialist attribution */}
         {specialistName ? (
-          <span className={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-medium ${specialistId ? `${getSpecialistColors(specialistId).iconBg} ${getSpecialistColors(specialistId).iconText}` : "bg-primary/8 text-primary"}`}>
+          <span className={`shrink-0 rounded-md px-2 py-0.5 font-mono text-[10px] font-medium ${specialistId ? `${getSpecialistColors(specialistId).iconBg} ${getSpecialistColors(specialistId).iconText}` : "bg-primary/8 text-primary"}`}>
             {specialistName}
           </span>
         ) : null}
@@ -76,7 +76,7 @@ export function BundleCard({ bundle, specialistId, specialistName, onPreview, on
 
       {/* Expanded content */}
       {expanded ? (
-        <div className="mx-3 mb-3 space-y-2 border-t border-border/30 pt-2 pl-5">
+        <div className="mx-3.5 mb-3.5 space-y-2 border-t border-border/20 pt-2.5 pl-5 dark:border-white/[0.04]">
           {bundle.artifacts.map((artifact) => (
             <ArtifactCard
               key={artifact.artifactId}

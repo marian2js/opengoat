@@ -74,9 +74,9 @@ export function RecentOutputs({ agentId, client, onPreview, onNavigate, onSpecia
   return (
     <div className="dashboard-section py-5">
       {/* Section header */}
-      <div className="mb-3 flex items-center gap-2.5">
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
-          <PackageIcon className="size-3.5 text-primary" />
+      <div className="mb-4 flex items-center gap-2.5">
+        <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/8">
+          <PackageIcon className="size-3 text-primary" />
         </div>
         <h2 className="section-label">Recent outputs</h2>
         {totalCount > 0 ? (
@@ -146,7 +146,7 @@ export function RecentOutputs({ agentId, client, onPreview, onNavigate, onSpecia
         </div>
       ) : (
         /* Outputs list */
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {entries.map((entry) => {
             if (entry.kind === "bundle") {
               const specialistName = resolveSpecialistName(
