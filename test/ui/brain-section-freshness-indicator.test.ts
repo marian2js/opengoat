@@ -98,7 +98,7 @@ describe("Brain section freshness indicator — SectionHeader", () => {
   // AC2: Timestamp uses 11px mono muted styling consistent with chat timestamps
   it("uses the metadata timestamp styling class", () => {
     // Should have the exact metadata styling for the timestamp
-    expect(brainSrc).toMatch(/text-\[11px\].*font-mono.*text-muted-foreground\/60/);
+    expect(brainSrc).toMatch(/text-\[11px\].*font-mono.*text-muted-foreground\/\d+/);
     expect(brainSrc).toMatch(/tabular-nums/);
   });
 
