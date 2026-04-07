@@ -49,7 +49,7 @@ export function RecommendedJobs({ jobs, isLoading, onActionClick }: RecommendedJ
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center gap-2.5">
-        <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/8">
+        <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 ring-1 ring-primary/10">
           <ZapIcon className="size-3 text-primary" />
         </div>
         <h2 className="section-label">Best first moves</h2>

@@ -75,7 +75,7 @@ export function RecentOutputs({ agentId, client, onPreview, onNavigate, onSpecia
     <div className="dashboard-section py-5">
       {/* Section header */}
       <div className="mb-4 flex items-center gap-2.5">
-        <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/8">
+        <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 ring-1 ring-primary/10">
           <PackageIcon className="size-3 text-primary" />
         </div>
         <h2 className="section-label">Recent outputs</h2>
