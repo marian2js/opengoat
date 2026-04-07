@@ -280,7 +280,7 @@ export function AgentsWorkspace({
       ) : null}
 
       {isCreateOpen ? (
-        <Card className="rounded-lg border-border/60">
+        <Card className="overflow-hidden rounded-xl border-border/40 shadow-sm shadow-black/[0.02] dark:border-white/[0.06] dark:shadow-black/10">
           <CardHeader className="gap-0.5 pb-4">
             <CardTitle className="text-[14px]">Create agent</CardTitle>
             <CardDescription className="text-[12px]">
@@ -344,7 +344,7 @@ export function AgentsWorkspace({
               </select>
             </label>
           </CardContent>
-          <CardFooter className="flex flex-col items-stretch gap-2.5 border-t border-border/60 bg-muted/20 sm:flex-row sm:items-center sm:justify-between">
+          <CardFooter className="flex flex-col items-stretch gap-2.5 border-t border-border/30 bg-muted/15 dark:border-white/[0.04] dark:bg-white/[0.01] sm:flex-row sm:items-center sm:justify-between">
             <p className="text-[12px] text-muted-foreground">
               Uses {selectedProviderName}.
             </p>
@@ -384,10 +384,10 @@ export function AgentsWorkspace({
         </Card>
       ) : null}
 
-      <section className="rounded-lg border border-border/40 bg-card/80 transition-colors hover:border-border/60 dark:border-white/[0.06] dark:hover:border-white/[0.10]">
-        <div className="flex items-center justify-between gap-3 px-4 py-3.5 lg:px-5">
+      <section className="overflow-hidden rounded-xl border border-border/40 bg-card/80 shadow-sm shadow-black/[0.02] transition-colors hover:border-border/60 dark:border-white/[0.06] dark:shadow-black/10 dark:hover:border-white/[0.10]">
+        <div className="flex items-center justify-between gap-3 px-4 py-4 lg:px-5">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 shadow-sm ring-1 ring-primary/10">
               <BotIcon className="size-3.5 text-primary" />
             </div>
             <h2 className="section-label">Agent Library</h2>
@@ -399,7 +399,7 @@ export function AgentsWorkspace({
             <Button
               variant="outline"
               size="sm"
-              className="h-7 rounded-md text-[11px]"
+              className="h-7 rounded-lg text-[11px]"
               onClick={() => {
                 setFeedback(null);
                 setErrorMessage(null);
@@ -412,7 +412,7 @@ export function AgentsWorkspace({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 rounded-md text-[11px] text-muted-foreground"
+              className="h-7 rounded-lg text-[11px] text-muted-foreground"
               onClick={() => {
                 void refreshAgents();
               }}
@@ -432,23 +432,23 @@ export function AgentsWorkspace({
               </div>
             </div>
           ) : agents.length === 0 ? (
-            <div className="border-t border-border/60 px-4 py-8 lg:px-5">
+            <div className="border-t border-border/40 px-4 py-10 dark:border-white/[0.04] lg:px-5">
               <div className="flex flex-col items-center gap-4 text-center">
-                <div className="flex size-12 items-center justify-center rounded-xl bg-primary/8">
-                  <BotIcon className="size-6 text-primary/50" />
+                <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/8 shadow-sm ring-1 ring-primary/10">
+                  <BotIcon className="size-7 text-primary/60" />
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-medium text-foreground">
+                <div className="space-y-1.5">
+                  <h3 className="font-display text-[15px] font-bold tracking-tight text-foreground">
                     No agents yet
                   </h3>
-                  <p className="max-w-[300px] text-[12px] leading-relaxed text-muted-foreground/70">
+                  <p className="max-w-[320px] text-[12px] leading-relaxed text-muted-foreground/60">
                     Create your first agent with its own provider, model, and instructions.
                   </p>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="mt-1 h-8 rounded-md text-[12px]"
+                  className="mt-1 h-8 rounded-lg text-[12px] shadow-sm"
                   onClick={() => {
                     setFeedback(null);
                     setErrorMessage(null);
@@ -469,9 +469,9 @@ export function AgentsWorkspace({
                 : undefined;
 
               return (
-                <div className="border-t border-border/60 px-4 py-5 lg:px-5">
-                  <article className="group/agent relative overflow-hidden rounded-xl border border-border/60 bg-card p-6 transition-colors hover:border-primary/20">
-                    <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] bg-border/40 transition-colors group-hover/agent:bg-primary" />
+                <div className="border-t border-border/40 px-4 py-5 dark:border-white/[0.04] lg:px-5">
+                  <article className="group/agent relative overflow-hidden rounded-xl border border-border/50 bg-card p-6 shadow-sm shadow-black/[0.02] transition-all duration-150 hover:border-primary/20 hover:shadow-md hover:shadow-black/[0.04] dark:border-white/[0.06] dark:shadow-black/10 dark:hover:border-primary/15 dark:hover:shadow-black/15">
+                    <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit] bg-primary/20 transition-colors group-hover/agent:bg-primary" />
                     <div className="flex items-start gap-4 pl-1">
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                         <BotIcon className="size-5 text-primary" />
@@ -563,7 +563,7 @@ export function AgentsWorkspace({
                     </div>
                   </article>
 
-                  <div className="group/cta mt-4 flex cursor-pointer items-center gap-4 rounded-lg border border-dashed border-border/40 px-5 py-4 transition-all hover:border-primary/30 hover:bg-primary/[0.03]"
+                  <div className="group/cta mt-4 flex cursor-pointer items-center gap-4 rounded-xl border border-dashed border-border/30 px-5 py-4 transition-all duration-150 hover:border-primary/25 hover:bg-primary/[0.03] dark:border-white/[0.04] dark:hover:border-primary/20"
                     role="button"
                     tabIndex={0}
                     onClick={() => {
@@ -599,7 +599,7 @@ export function AgentsWorkspace({
                 <article
                   key={agent.id}
                   className={cn(
-                    "grid gap-3 border-t border-border/60 px-4 py-3.5 transition-colors hover:bg-muted/20 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.8fr)_auto] lg:items-center lg:px-5",
+                    "grid gap-3 border-t border-border/40 px-4 py-3.5 transition-colors duration-100 hover:bg-muted/20 dark:border-white/[0.04] lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.8fr)_auto] lg:items-center lg:px-5",
                   )}
                 >
                   <div className="space-y-0.5">
@@ -678,8 +678,8 @@ export function AgentsWorkspace({
         </div>
 
         {!isLoading && agents.length > 1 ? (
-          <div className="border-t border-dashed border-border/40 px-4 py-4 lg:px-5">
-            <p className="text-[12px] leading-relaxed text-muted-foreground">
+          <div className="border-t border-dashed border-border/30 px-4 py-4 dark:border-white/[0.04] lg:px-5">
+            <p className="text-[11px] leading-relaxed text-muted-foreground/60">
               Add another agent to expand your library. Connect to different
               providers or configure specialized models for each workflow.
             </p>
