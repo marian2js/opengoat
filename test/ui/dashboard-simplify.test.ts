@@ -168,9 +168,9 @@ describe("Dashboard simplification — Sprint 5 reset", () => {
       expect(src).not.toContain("Recent Deliverables");
     });
 
-    it("ArtifactCard uses 'View output' instead of 'Preview artifact'", () => {
+    it("ArtifactCard uses 'Open' instead of 'Preview artifact'", () => {
       const src = readSrc("components/ArtifactCard.tsx");
-      expect(src).toContain("View output");
+      expect(src).toContain("Open");
       expect(src).not.toContain("Preview artifact");
     });
 

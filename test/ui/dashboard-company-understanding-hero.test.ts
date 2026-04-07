@@ -156,10 +156,9 @@ describe("CompanyUnderstandingHero compact strip", () => {
     expect(src).toContain("text-[13px]");
   });
 
-  it("does not have gradient background", () => {
+  it("uses subtle gradient for premium surface", () => {
     const src = readSrc("components/CompanyUnderstandingHero.tsx");
-    expect(src).not.toContain("bg-gradient-to-br");
-    expect(src).not.toContain("bg-gradient-to-b");
+    expect(src).toContain("bg-gradient-to-br");
   });
 
   it("does not have opportunities or recommendation props", () => {

@@ -15,25 +15,36 @@ export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardP
   return (
     <button
       type="button"
-      className={`group/job relative flex flex-col items-start gap-3 overflow-hidden rounded-xl border bg-card text-left transition-all duration-100 ease-out ${
+      className={`group/job relative flex flex-col items-start overflow-hidden rounded-xl border bg-card text-left transition-all duration-100 ease-out ${
         isHero
-          ? "border-primary/15 p-6 shadow-sm shadow-black/[0.03] hover:-translate-y-px hover:border-primary/25 hover:shadow-md dark:border-primary/10 dark:shadow-black/20"
-          : "border-border/20 p-4 shadow-sm shadow-black/[0.02] hover:-translate-y-px hover:border-primary/25 hover:shadow-md dark:border-white/[0.06] dark:shadow-black/15"
+          ? "gap-3 border-primary/15 p-6 shadow-sm shadow-black/[0.03] hover:-translate-y-px hover:border-primary/30 hover:shadow-lg dark:border-primary/10 dark:bg-gradient-to-br dark:from-[#18181B] dark:to-primary/[0.03] dark:shadow-black/20"
+          : "gap-2.5 border-border/20 p-4 shadow-sm shadow-black/[0.02] hover:-translate-y-px hover:border-primary/25 hover:shadow-md dark:border-white/[0.06] dark:shadow-black/15"
       }`}
       onClick={() => onClick?.(job.id, buildActionPrompt(job), job.title)}
     >
       {/* Left accent bar for hero card */}
       {isHero && (
-        <div className="absolute inset-y-0 left-0 w-[3px] bg-primary/40 transition-colors group-hover/job:bg-primary" />
+        <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-xl bg-primary/50 transition-colors group-hover/job:bg-primary" />
       )}
 
-      {/* Specialist attribution — colored chip with specialist identity */}
-      {job.specialistName && (
-        <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider ${iconBg} ${iconText}`}>
-          <span className={`inline-block size-1.5 shrink-0 rounded-full ${dotColor}`} />
-          {job.specialistName}
-        </span>
-      )}
+      {/* Top row: specialist chip + output type */}
+      <div className="flex items-center gap-2">
+        {/* Specialist attribution */}
+        {job.specialistName && (
+          <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider ${iconBg} ${iconText}`}>
+            <span className={`inline-block size-1.5 shrink-0 rounded-full ${dotColor}`} />
+            {job.specialistName}
+          </span>
+        )}
+
+        {/* Output-type tag — inline with specialist for compact layout */}
+        {job.outputType && !isHero && (
+          <span className="inline-flex items-center gap-1 rounded-md border border-border/20 bg-muted/30 px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase tracking-wider text-muted-foreground/60 dark:border-white/[0.04] dark:bg-white/[0.02]">
+            <PackageIcon className="size-2.5" />
+            {job.outputType}
+          </span>
+        )}
+      </div>
 
       {/* Job title */}
       <h3
@@ -44,14 +55,10 @@ export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardP
         {job.title}
       </h3>
 
-      {/* Output-type tag — scannable deliverable label */}
-      {job.outputType && (
-        <span className={`inline-flex items-center gap-1.5 rounded-md border font-mono uppercase tracking-wider ${
-          isHero
-            ? "border-primary/15 bg-primary/[0.06] px-2.5 py-1 text-[11px] font-semibold text-primary dark:border-primary/10 dark:bg-primary/[0.08]"
-            : "border-border/30 bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground dark:border-white/[0.06] dark:bg-white/[0.03]"
-        }`}>
-          <PackageIcon className={isHero ? "size-3" : "size-2.5"} />
+      {/* Output-type tag — hero only, larger treatment */}
+      {job.outputType && isHero && (
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-primary/15 bg-primary/[0.06] px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-primary dark:border-primary/10 dark:bg-primary/[0.08]">
+          <PackageIcon className="size-3" />
           {job.outputType}
         </span>
       )}
@@ -69,8 +76,8 @@ export function RecommendedJobCard({ job, isHero, onClick }: RecommendedJobCardP
       )}
 
       {/* Outcome CTA */}
-      <span className={`mt-auto inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors group-hover/job:text-primary ${
-        isHero ? "text-primary/60" : "text-muted-foreground/40"
+      <span className={`mt-auto inline-flex items-center gap-1.5 pt-1 font-mono text-[10px] font-semibold uppercase tracking-wider transition-colors group-hover/job:text-primary ${
+        isHero ? "text-primary/70" : "text-muted-foreground/40"
       }`}>
         {ctaText}
         <ArrowRightIcon className="size-3 transition-transform duration-150 group-hover/job:translate-x-0.5" />

@@ -77,69 +77,71 @@ export function CompanyUnderstandingHero({
   }
 
   return (
-    <div className="mb-6 rounded-xl border border-border/40 px-5 py-4 dark:border-white/[0.06]">
-      {/* ── Company identity row ── */}
-      <div className="flex items-center gap-3">
-        {hasFavicon ? (
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-card ring-1 ring-border/30 dark:bg-white/[0.06] dark:ring-white/[0.08]">
-            <FaviconIcon
-              domain={domain}
-              faviconSources={faviconSources}
-              className="size-5 rounded-sm"
-            />
-          </div>
-        ) : (
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary">
-            <GlobeIcon className="size-4" />
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <h2 className="font-display text-[18px] font-bold tracking-[-0.01em] text-foreground">
-            {domain ?? "Project"}
-          </h2>
-        </div>
-      </div>
-
-      {/* ── Summary + ICP hint ── */}
-      {hasAnyData && data?.productSummary ? (
-        <div className="mt-2 pl-11">
-          <p className="line-clamp-2 text-[14px] leading-snug text-zinc-500 dark:text-zinc-400">
-            {data.productSummary}
-          </p>
-          {data.targetAudience && (
-            <p className="mt-1 flex items-center gap-1.5 text-[13px] text-zinc-400 dark:text-zinc-500">
-              <UsersIcon className="size-3 shrink-0" />
-              <span className="line-clamp-1">{data.targetAudience}</span>
-            </p>
+    <div className="mb-6 overflow-hidden rounded-xl border border-border/30 bg-gradient-to-br from-card via-card to-primary/[0.02] shadow-sm dark:border-white/[0.06] dark:from-[#18181B] dark:via-[#18181B] dark:to-primary/[0.03]">
+      <div className="px-5 py-4">
+        {/* ── Company identity row ── */}
+        <div className="flex items-center gap-3.5">
+          {hasFavicon ? (
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-card shadow-sm ring-1 ring-border/20 dark:bg-white/[0.08] dark:ring-white/[0.10]">
+              <FaviconIcon
+                domain={domain}
+                faviconSources={faviconSources}
+                className="size-6 rounded-sm"
+              />
+            </div>
+          ) : (
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 shadow-sm ring-1 ring-primary/15 text-primary">
+              <GlobeIcon className="size-5" />
+            </div>
           )}
+          <div className="min-w-0 flex-1">
+            <h2 className="font-display text-[20px] font-bold tracking-[-0.02em] text-foreground">
+              {domain ?? "Project"}
+            </h2>
+          </div>
         </div>
-      ) : error ? (
-        <p className="mt-2 pl-11 text-[13px] text-muted-foreground">
-          Unable to load project context
-        </p>
-      ) : (
-        <p className="mt-2 pl-11 text-[13px] text-muted-foreground">
-          No project context yet
-        </p>
-      )}
 
-      {/* ── Inline opportunity/risk bullets ── */}
-      {bullets.length > 0 && (
-        <ul className="mt-2.5 space-y-1 pl-11">
-          {bullets.map((b) => (
-            <li key={b.key} className="flex items-start gap-2">
-              {b.icon === "risk" ? (
-                <AlertTriangleIcon className="mt-[3px] size-3 shrink-0 text-amber-500" />
-              ) : (
-                <TrendingUpIcon className="mt-[3px] size-3 shrink-0 text-primary" />
-              )}
-              <span className="line-clamp-1 text-[13px] leading-snug text-zinc-500 dark:text-zinc-400">
-                {b.text}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+        {/* ── Summary + ICP hint ── */}
+        {hasAnyData && data?.productSummary ? (
+          <div className="mt-3 pl-[54px]">
+            <p className="line-clamp-2 text-[14px] leading-[1.6] text-zinc-500 dark:text-zinc-400">
+              {data.productSummary}
+            </p>
+            {data.targetAudience && (
+              <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-zinc-400 dark:text-zinc-500">
+                <UsersIcon className="size-3 shrink-0" />
+                <span className="line-clamp-1">{data.targetAudience}</span>
+              </p>
+            )}
+          </div>
+        ) : error ? (
+          <p className="mt-3 pl-[54px] text-[13px] text-muted-foreground">
+            Unable to load project context
+          </p>
+        ) : (
+          <p className="mt-3 pl-[54px] text-[13px] text-muted-foreground">
+            No project context yet
+          </p>
+        )}
+
+        {/* ── Inline opportunity/risk bullets ── */}
+        {bullets.length > 0 && (
+          <ul className="mt-3 space-y-1.5 pl-[54px]">
+            {bullets.map((b) => (
+              <li key={b.key} className="flex items-start gap-2">
+                {b.icon === "risk" ? (
+                  <AlertTriangleIcon className="mt-[3px] size-3 shrink-0 text-amber-500" />
+                ) : (
+                  <TrendingUpIcon className="mt-[3px] size-3 shrink-0 text-primary" />
+                )}
+                <span className="line-clamp-1 text-[13px] leading-snug text-zinc-500 dark:text-zinc-400">
+                  {b.text}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

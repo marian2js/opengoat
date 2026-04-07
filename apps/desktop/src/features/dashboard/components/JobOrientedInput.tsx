@@ -33,8 +33,8 @@ export function JobOrientedInput({ onSubmit }: JobOrientedInputProps) {
         <PenLineIcon className="size-3.5 text-primary" />
         <span className="section-label text-primary">YOUR NEXT MOVE</span>
       </div>
-      <div className="group/input rounded-xl bg-gradient-to-r from-border/40 via-border/40 to-border/40 p-[1px] transition-all duration-200 hover:from-border/60 hover:via-border/60 hover:to-border/60 focus-within:from-primary/30 focus-within:via-primary/15 focus-within:to-primary/30 focus-within:shadow-md focus-within:shadow-primary/5 dark:from-white/[0.06] dark:via-white/[0.06] dark:to-white/[0.06] dark:hover:from-white/[0.10] dark:hover:via-white/[0.10] dark:hover:to-white/[0.10] dark:focus-within:from-primary/30 dark:focus-within:via-primary/15 dark:focus-within:to-primary/30">
-        <div className="relative rounded-[11px] bg-card shadow-sm dark:bg-[#18181B]">
+      <div className="group/input rounded-xl bg-gradient-to-r from-border/30 via-border/30 to-border/30 p-[1px] transition-all duration-200 hover:from-border/50 hover:via-border/50 hover:to-border/50 focus-within:from-primary/25 focus-within:via-primary/10 focus-within:to-primary/25 focus-within:shadow-lg focus-within:shadow-primary/5 dark:from-white/[0.05] dark:via-white/[0.05] dark:to-white/[0.05] dark:hover:from-white/[0.08] dark:hover:via-white/[0.08] dark:hover:to-white/[0.08] dark:focus-within:from-primary/25 dark:focus-within:via-primary/10 dark:focus-within:to-primary/25">
+        <div className="relative rounded-[11px] bg-card shadow-sm dark:bg-[#15151A]">
           <textarea
             ref={textareaRef}
             value={value}

@@ -19,7 +19,7 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
     <button
       type="button"
       className={cn(
-        "group/chip relative flex w-full flex-col gap-2.5 overflow-hidden rounded-xl border p-4 text-left transition-all duration-100",
+        "group/chip relative flex w-full items-start gap-3 overflow-hidden rounded-xl border p-3.5 text-left transition-all duration-100",
         "shadow-sm shadow-black/[0.02] dark:shadow-black/15",
         "hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-black/20",
         isManager
@@ -33,78 +33,75 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
         <div className={cn("absolute inset-y-0 left-0 w-[2px] opacity-40 transition-opacity group-hover/chip:opacity-80", colors.dotColor.replace("/40", ""))} />
       )}
 
-      {/* Header: icon + name + badge */}
-      <div className="flex items-center gap-3">
-        <div
+      {/* Icon */}
+      <div
+        className={cn(
+          "flex shrink-0 items-center justify-center rounded-lg",
+          isManager
+            ? "size-9 bg-primary/12 ring-1 ring-primary/15 shadow-sm"
+            : cn("size-8 ring-1 ring-black/[0.03] dark:ring-white/[0.06]", colors.iconBg),
+        )}
+      >
+        <Icon
           className={cn(
-            "flex shrink-0 items-center justify-center rounded-lg",
-            isManager
-              ? "size-10 bg-primary/12 ring-1 ring-primary/15 shadow-sm"
-              : cn("size-8 ring-1 ring-black/[0.03] dark:ring-white/[0.06]", colors.iconBg),
+            isManager ? "size-4 text-primary" : cn("size-3.5", colors.iconText),
           )}
-        >
-          <Icon
-            className={cn(
-              isManager ? "size-4.5 text-primary" : cn("size-3.5", colors.iconText),
-            )}
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className={cn(
-              "font-display font-bold leading-tight text-foreground",
-              isManager ? "text-[14px]" : "text-[13px]",
-            )}>
-              {specialist.name}
-            </span>
-            {isManager ? (
-              <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-primary">
-                Lead
-              </span>
-            ) : null}
-          </div>
-        </div>
+        />
       </div>
 
-      {/* Produces — concrete output pills (outcome-first) */}
-      {meta?.produces && meta.produces.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {meta.produces.map((output) => (
-            <span
-              key={output}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium leading-tight",
-                isManager
-                  ? "bg-primary/[0.06] text-primary/80"
-                  : cn("bg-muted/30 dark:bg-white/[0.04]", colors.iconText, "opacity-80"),
-              )}
-            >
-              <span className={cn("size-1 shrink-0 rounded-full", colors.dotColor)} />
-              {output}
+      {/* Content */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className={cn(
+            "font-display font-bold leading-tight text-foreground",
+            isManager ? "text-[14px]" : "text-[13px]",
+          )}>
+            {specialist.name}
+          </span>
+          {isManager ? (
+            <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-primary">
+              Lead
             </span>
-          ))}
+          ) : null}
+          {/* Chat CTA — inline, compact */}
+          <span className={cn(
+            "ml-auto flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium transition-all duration-100",
+            isManager
+              ? "bg-primary/[0.06] text-primary/70 group-hover/chip:bg-primary/[0.12] group-hover/chip:text-primary"
+              : cn("bg-muted/30 text-muted-foreground/50 dark:bg-white/[0.03]", colors.hoverIconBg, colors.hoverIconText),
+          )}>
+            <MessageSquareIcon className="size-2.5" />
+            Chat
+          </span>
         </div>
-      ) : null}
 
-      {/* Role — demoted to subtle secondary text */}
-      <p className={cn(
-        "leading-snug text-muted-foreground/50 line-clamp-1",
-        isManager ? "text-[11px]" : "text-[10px]",
-      )}>
-        {specialist.role}
-      </p>
+        {/* Produces — compact inline pills */}
+        {meta?.produces && meta.produces.length > 0 ? (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {meta.produces.map((output) => (
+              <span
+                key={output}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded px-1.5 py-px text-[10px] font-medium leading-tight",
+                  isManager
+                    ? "bg-primary/[0.06] text-primary/70"
+                    : cn("bg-muted/20 dark:bg-white/[0.03]", colors.iconText, "opacity-70"),
+                )}
+              >
+                <span className={cn("size-1 shrink-0 rounded-full", colors.dotColor)} />
+                {output}
+              </span>
+            ))}
+          </div>
+        ) : null}
 
-      {/* Chat CTA — always visible, more prominent on hover */}
-      <div className="mt-auto flex justify-end pt-1">
-        <span className={cn(
-          "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-all duration-100",
-          isManager
-            ? "bg-primary/[0.06] text-primary/70 group-hover/chip:bg-primary/[0.12] group-hover/chip:text-primary"
-            : cn("bg-muted/30 text-muted-foreground/50 dark:bg-white/[0.03]", colors.hoverIconBg, colors.hoverIconText),
+        {/* Role — demoted to subtle secondary text */}
+        <p className={cn(
+          "mt-1 leading-snug text-muted-foreground/40 line-clamp-1",
+          isManager ? "text-[11px]" : "text-[10px]",
         )}>
-          <MessageSquareIcon className="size-3" />
-          Chat
-        </span>
+          {specialist.role}
+        </p>
       </div>
     </button>
   );
