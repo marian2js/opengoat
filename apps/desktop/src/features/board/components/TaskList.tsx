@@ -16,6 +16,7 @@ import { ReviewIndicator } from "./ReviewIndicator";
 import { formatRelativeTime } from "@/features/board/lib/format-relative-time";
 import { sanitizeTaskTitle } from "@/features/board/lib/sanitize-task-title";
 import type { TaskGroup } from "@/features/board/lib/board-grouping";
+import { GHOST_TASK_PREFIX } from "@/features/board/lib/ghost-tasks";
 
 // ---------------------------------------------------------------------------
 // TaskRow (simplified)
@@ -102,6 +103,48 @@ function TaskRow({ task, isLeading, onSelect, onSetLeadingTask }: TaskRowProps) 
 }
 
 // ---------------------------------------------------------------------------
+// GhostRow (preview example rows)
+// ---------------------------------------------------------------------------
+
+function GhostRow({ task }: { task: TaskRecord }) {
+  return (
+    <TableRow className="pointer-events-none border-border/10">
+      {/* Title */}
+      <TableCell className="max-w-[400px] py-3 pl-5 text-[13px] font-medium text-foreground/25">
+        <div className="flex items-center gap-2 overflow-hidden">
+          <span className="truncate">{sanitizeTaskTitle(task.title)}</span>
+          <span className="inline-flex shrink-0 items-center rounded-sm border border-dashed border-primary/20 bg-primary/[0.04] px-1.5 py-px font-mono text-[9px] font-semibold uppercase tracking-widest text-primary/40">
+            EXAMPLE
+          </span>
+        </div>
+      </TableCell>
+
+      {/* Status */}
+      <TableCell className="py-3 opacity-25">
+        <TaskStatusBadge status={task.status} />
+      </TableCell>
+
+      {/* Context */}
+      <TableCell className="py-3">
+        <span className="text-muted-foreground/15">&mdash;</span>
+      </TableCell>
+
+      {/* Updated */}
+      <TableCell className="py-3 font-mono text-[11px] text-muted-foreground/15 tabular-nums">
+        &mdash;
+      </TableCell>
+
+      {/* Owner */}
+      <TableCell className="py-3">
+        <span className="font-mono text-[11px] text-muted-foreground/20 uppercase tracking-wider">
+          {task.owner || "\u2014"}
+        </span>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // GroupHeader
 // ---------------------------------------------------------------------------
 
@@ -156,6 +199,7 @@ function GroupHeader({ label, count, isExpanded, onToggle }: GroupHeaderProps) {
 interface TaskListProps {
   tasks: TaskRecord[];
   groups?: TaskGroup[];
+  ghostTasks?: TaskRecord[];
   leadingTaskId?: string | null;
   onTaskSelect: (taskId: string) => void;
   onSetLeadingTask?: (taskId: string) => void;
@@ -164,11 +208,13 @@ interface TaskListProps {
 export function TaskList({
   tasks,
   groups,
+  ghostTasks,
   leadingTaskId,
   onTaskSelect,
   onSetLeadingTask,
 }: TaskListProps) {
   const isGrouped = groups && groups.length > 0 && !(groups.length === 1 && groups[0]!.key === "__all__");
+  const showGhosts = ghostTasks && ghostTasks.length > 0 && !isGrouped;
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -204,6 +250,10 @@ export function TaskList({
               />
             ))
           )}
+          {showGhosts &&
+            ghostTasks.map((ghost) => (
+              <GhostRow key={ghost.taskId} task={ghost} />
+            ))}
         </TableBody>
       </Table>
     </div>

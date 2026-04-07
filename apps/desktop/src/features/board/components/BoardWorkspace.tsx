@@ -1,10 +1,11 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AlertCircleIcon, LayoutDashboardIcon, ListChecksIcon, MessageSquareIcon, RefreshCwIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { useTaskList } from "@/features/board/hooks/useTaskList";
 import { useLeadingTask } from "@/features/board/hooks/useLeadingTask";
 import { useBoardFilters } from "@/features/board/hooks/useBoardFilters";
+import { getGhostTasks } from "@/features/board/lib/ghost-tasks";
 import { TaskList, TaskListSkeleton } from "./TaskList";
 import { TaskDetailPanel } from "./TaskDetailPanel";
 import { LeadingTaskCard } from "./LeadingTaskCard";
@@ -98,6 +99,11 @@ function BoardContent({
     refresh();
     refreshLeading();
   }, [refresh, refreshLeading]);
+
+  const ghostTasks = useMemo(
+    () => getGhostTasks(filteredTasks.length),
+    [filteredTasks.length],
+  );
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto p-5 lg:p-6">
@@ -211,6 +217,7 @@ function BoardContent({
             <TaskList
               tasks={filteredTasks}
               groups={groupedTasks}
+              ghostTasks={ghostTasks}
               leadingTaskId={leadingTask?.taskId ?? null}
               onTaskSelect={(id) => setSelectedTaskId(id)}
               onSetLeadingTask={handleSetLeadingTask}
@@ -219,14 +226,14 @@ function BoardContent({
           {filteredTasks.length <= 3 && (
             <div className="mt-6 flex items-start gap-3 rounded-lg border border-primary/10 bg-primary/[0.02] px-4 py-3.5 dark:border-primary/[0.06] dark:bg-primary/[0.015]">
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/8 ring-1 ring-primary/10">
-                <MessageSquareIcon className="size-4 text-primary/70" />
+                <ListChecksIcon className="size-4 text-primary/70" />
               </div>
               <div className="space-y-1">
                 <p className="text-[12px] font-medium text-foreground/80">
-                  Create tasks from chat or actions
+                  Your follow-up tasks appear here
                 </p>
                 <p className="text-[11px] leading-relaxed text-muted-foreground/60">
-                  Ask your CMO or specialists to plan work, and tasks will appear here automatically. You can also run actions from the dashboard.
+                  As you run marketing jobs, follow-up tasks appear here for review and action. Run a job from the dashboard or ask a specialist in chat.
                 </p>
                 <div className="mt-2 flex items-center gap-2">
                   <Button asChild size="xs">

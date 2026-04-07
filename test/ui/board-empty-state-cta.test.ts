@@ -78,7 +78,7 @@ describe("Board empty state CTA buttons", () => {
   describe("CTA in promotional banner", () => {
     it("promotional banner also includes action links", () => {
       const bannerTextIdx = boardWorkspaceSrc.indexOf(
-        "Create tasks from chat or actions",
+        "Your follow-up tasks appear here",
       );
       expect(bannerTextIdx).toBeGreaterThan(-1);
       // After the banner text, there should be CTA buttons before the section closes
