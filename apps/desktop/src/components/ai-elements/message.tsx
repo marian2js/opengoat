@@ -123,7 +123,7 @@ export const MessageContent = ({
     className={cn(
       "is-user:dark flex w-fit min-w-0 max-w-full flex-col gap-2 overflow-hidden text-sm",
       "group-[.is-user]:ml-auto group-[.is-user]:rounded-2xl group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground group-[.is-user]:shadow-sm group-[.is-user]:shadow-black/[0.03] dark:group-[.is-user]:shadow-black/10",
-      "group-[.is-assistant]:text-foreground",
+      "group-[.is-assistant]:w-full group-[.is-assistant]:rounded-xl group-[.is-assistant]:border group-[.is-assistant]:border-border/10 group-[.is-assistant]:bg-card/40 group-[.is-assistant]:px-4 group-[.is-assistant]:py-3.5 group-[.is-assistant]:text-foreground group-[.is-assistant]:shadow-sm group-[.is-assistant]:shadow-black/[0.02] dark:group-[.is-assistant]:border-white/[0.04] dark:group-[.is-assistant]:bg-white/[0.02]",
       className
     )}
     {...props}

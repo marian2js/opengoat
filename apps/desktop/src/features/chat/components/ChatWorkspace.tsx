@@ -697,27 +697,27 @@ function ChatSessionView({
             </div>
           </div>
         ) : visibleMessages.length === 0 && !isAction ? (
-          <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-10 px-4 py-8 text-center">
-            <div className="space-y-4">
+          <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-12 px-4 py-12 text-center">
+            <div className="space-y-5">
               {(() => {
                 const specColors = effectiveSpecialistId ? getSpecialistColors(effectiveSpecialistId) : undefined;
                 const SpecIcon = effectiveSpecialistMeta ? resolveSpecialistIcon(effectiveSpecialistMeta.icon) : SparklesIcon;
                 return (
                   <div className={cn(
-                    "mx-auto flex size-12 items-center justify-center rounded-2xl ring-1",
+                    "mx-auto flex size-14 items-center justify-center rounded-2xl shadow-sm ring-1",
                     specColors ? cn(specColors.iconBg, specColors.iconText, "ring-black/[0.04] dark:ring-white/[0.06]") : "bg-primary/8 ring-primary/10 text-primary",
                   )}>
-                    <SpecIcon className="size-5" />
+                    <SpecIcon className="size-6" />
                   </div>
                 );
               })()}
-              <div className="space-y-2">
-                <h1 className="font-display text-[22px] font-bold tracking-[-0.01em] text-foreground">
+              <div className="space-y-2.5">
+                <h1 className="font-display text-[24px] font-bold tracking-[-0.02em] text-foreground">
                   {effectiveSpecialistMeta
                     ? `Chat with ${effectiveSpecialistMeta.name}`
                     : "Start a conversation"}
                 </h1>
-                <p className="mx-auto max-w-sm text-[13px] leading-relaxed text-muted-foreground/50">
+                <p className="mx-auto max-w-sm text-[13px] leading-relaxed text-muted-foreground/60">
                   {effectiveSpecialistMeta
                     ? effectiveSpecialistMeta.role
                     : "Get marketing deliverables, strategy recommendations, and competitive insights."}
@@ -725,37 +725,40 @@ function ChatSessionView({
               </div>
             </div>
 
-            <div className="grid w-full gap-2.5 sm:grid-cols-2 sm:[&>:last-child:nth-child(2n+1)]:col-span-full">
-              {starterPrompts.map((prompt) => {
-                const specColors = effectiveSpecialistId ? getSpecialistColors(effectiveSpecialistId) : undefined;
-                return (
-                  <button
-                    key={prompt.text}
-                    type="button"
-                    className={cn(
-                      "group/starter flex cursor-pointer items-start gap-3 rounded-xl border bg-card/40 px-4 py-3.5 text-left transition-all duration-100 hover:-translate-y-0.5 hover:bg-card/70 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-black/20",
-                      specColors
-                        ? cn("border-border/20 dark:border-white/[0.04]", specColors.hoverBorder)
-                        : "border-border/20 hover:border-primary/20 dark:border-white/[0.04] dark:hover:border-primary/15",
-                    )}
-                    onClick={() => {
-                      void handleSubmit({ text: prompt.text });
-                    }}
-                  >
-                    <div className={cn(
-                      "flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors group-hover/starter:text-white",
-                      specColors
-                        ? cn(specColors.iconBg, specColors.iconText, specColors.starterHoverIconBg)
-                        : "bg-primary/8 text-primary/70 group-hover/starter:bg-primary group-hover/starter:text-primary-foreground",
-                    )}>
-                      <prompt.icon className="size-3.5" />
-                    </div>
-                    <span className="flex-1 text-[13px] font-medium leading-snug text-muted-foreground/70 transition-colors group-hover/starter:text-foreground">
-                      {prompt.text}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="w-full space-y-3">
+              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/40">Try asking</p>
+              <div className="grid w-full gap-2.5 sm:grid-cols-2 sm:[&>:last-child:nth-child(2n+1)]:col-span-full">
+                {starterPrompts.map((prompt) => {
+                  const specColors = effectiveSpecialistId ? getSpecialistColors(effectiveSpecialistId) : undefined;
+                  return (
+                    <button
+                      key={prompt.text}
+                      type="button"
+                      className={cn(
+                        "group/starter flex cursor-pointer items-start gap-3 rounded-xl border bg-card/50 px-4 py-3.5 text-left transition-all duration-100 hover:-translate-y-0.5 hover:bg-card/80 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-black/20",
+                        specColors
+                          ? cn("border-border/20 dark:border-white/[0.04]", specColors.hoverBorder)
+                          : "border-border/20 hover:border-primary/20 dark:border-white/[0.04] dark:hover:border-primary/15",
+                      )}
+                      onClick={() => {
+                        void handleSubmit({ text: prompt.text });
+                      }}
+                    >
+                      <div className={cn(
+                        "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors group-hover/starter:text-white",
+                        specColors
+                          ? cn(specColors.iconBg, specColors.iconText, specColors.starterHoverIconBg)
+                          : "bg-primary/8 text-primary/70 group-hover/starter:bg-primary group-hover/starter:text-primary-foreground",
+                      )}>
+                        <prompt.icon className="size-4" />
+                      </div>
+                      <span className="flex-1 text-[13px] font-medium leading-snug text-muted-foreground/70 transition-colors group-hover/starter:text-foreground">
+                        {prompt.text}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         ) : (
