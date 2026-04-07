@@ -100,7 +100,7 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
   const managedSkills = skills.filter((s) => s.source === "managed");
 
   return (
-    <Card className="border-border/40 transition-colors hover:border-border/60 dark:border-white/[0.06] dark:hover:border-white/[0.10]">
+    <Card className="overflow-hidden rounded-xl border-border/40 shadow-sm shadow-black/[0.02] transition-all duration-150 hover:border-border/60 hover:shadow-md dark:border-white/[0.06] dark:shadow-black/10 dark:hover:border-white/[0.10]">
       <CardHeader>
         <div className="flex items-center gap-2.5">
           <div className="flex size-7 items-center justify-center rounded-md bg-primary/8">
@@ -135,7 +135,7 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
           <>
             {/* Bundled skills summary */}
             {managedSkills.length > 0 ? (
-              <div className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2.5">
+              <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2.5 dark:bg-white/[0.02]">
                 <SparklesIcon className="size-4 shrink-0 text-primary/70" />
                 <p className="text-[13px] text-muted-foreground">
                   <span className="font-medium text-foreground">{managedSkills.length} bundled marketing skills active</span>
@@ -150,7 +150,7 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
                 <span className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60" role="heading" aria-level={3}>
                   Installed skills
                 </span>
-                <div className="divide-y divide-border rounded-md border">
+                <div className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/40 dark:divide-white/[0.04] dark:border-white/[0.06]">
                   {extraSkills.map((skill) => (
                     <div
                       key={skill.id}
@@ -193,7 +193,7 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
                 <span className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60" role="heading" aria-level={3}>
                   Built-in skills
                 </span>
-                <div className="divide-y divide-border rounded-md border">
+                <div className="divide-y divide-border/40 overflow-hidden rounded-lg border border-border/40 dark:divide-white/[0.04] dark:border-white/[0.06]">
                   {managedSkills.map((skill) => (
                     <div
                       key={skill.id}
@@ -219,8 +219,8 @@ export function SkillsSection({ agent, client }: SkillsSectionProps) {
 
             {/* Empty state — only for custom/extra skills */}
             {extraSkills.length === 0 ? (
-              <div className="flex items-center gap-3 rounded-lg border border-dashed border-border/40 px-4 py-4">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted/50">
+              <div className="flex items-center gap-3 rounded-xl border border-dashed border-border/30 px-4 py-4 dark:border-white/[0.04]">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/40 dark:bg-white/[0.03]">
                   <SparklesIcon className="size-4 text-muted-foreground/40" />
                 </div>
                 <div>
