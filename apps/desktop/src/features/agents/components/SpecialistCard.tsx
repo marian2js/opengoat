@@ -46,14 +46,19 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
   return (
     <article
       className={cn(
-        "group/card relative flex flex-col rounded-xl border bg-card transition-all duration-100 ease-out",
+        "group/card relative flex flex-col overflow-hidden rounded-xl border bg-card transition-all duration-100 ease-out",
         "shadow-sm shadow-black/[0.02] dark:shadow-black/15",
         "hover:-translate-y-px hover:shadow-md hover:border-primary/25",
         isManager
-          ? "border-primary/20 bg-primary/[0.02] ring-1 ring-primary/[0.06] hover:ring-primary/10"
+          ? "border-primary/20 bg-gradient-to-br from-card via-card to-primary/[0.03] ring-1 ring-primary/[0.06] hover:ring-primary/10 dark:from-[#18181B] dark:via-[#18181B] dark:to-primary/[0.04]"
           : cn("dark:border-white/[0.06]", colors.chipBorder),
       )}
     >
+      {/* Left accent bar for non-manager cards */}
+      {!isManager && (
+        <div className={cn("absolute inset-y-0 left-0 w-[2px] opacity-40 transition-opacity group-hover/card:opacity-80", colors.dotColor.replace("/40", ""))} />
+      )}
+
       {/* Card body */}
       <div className="flex flex-1 flex-col p-5">
         {/* Header: icon + name + role */}
@@ -63,12 +68,12 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
               "flex shrink-0 items-center justify-center rounded-xl shadow-sm",
               isManager
                 ? "size-11 bg-primary/12 ring-1 ring-primary/15"
-                : cn("size-10 ring-1 ring-black/[0.04] dark:ring-white/[0.06]", colors.iconBg),
+                : cn("size-9 ring-1 ring-black/[0.04] dark:ring-white/[0.06]", colors.iconBg),
             )}
           >
             <Icon
               className={cn(
-                isManager ? "size-5" : "size-4.5",
+                isManager ? "size-5" : "size-4",
                 isManager ? "text-primary" : colors.iconText,
               )}
             />
@@ -103,14 +108,14 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
 
         {/* Reason to exist */}
         <p className={cn(
-          "mt-3.5 leading-[1.6] text-foreground/75",
+          "mt-3 leading-[1.6] text-foreground/70",
           isManager ? "text-[14px]" : "text-[13px]",
         )}>
           {specialist.reasonToExist}
         </p>
 
         {/* Output types as deliverable chips */}
-        <div className="mt-4 flex flex-wrap gap-1.5">
+        <div className="mt-3.5 flex flex-wrap gap-1.5">
           {specialist.outputTypes.slice(0, 4).map((output) => (
             <span
               key={output}
@@ -131,7 +136,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
           <button
             type="button"
             onClick={() => onChat(specialist.id)}
-            className="mt-4 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground/50 transition-colors hover:text-primary"
+            className="mt-3.5 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground/50 transition-colors hover:text-primary"
           >
             <span>Try:</span>
             <span className="font-medium">{specialist.outputTypes[0]}</span>
@@ -140,10 +145,10 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
 
         {/* Recent outputs — bundles and standalone artifacts */}
         {hasOutputs ? (
-          <div className="mt-4 rounded-lg border border-border/15 bg-muted/20 px-3 py-2.5 dark:border-white/[0.03] dark:bg-white/[0.02]">
+          <div className="mt-3.5 rounded-lg border border-border/10 bg-muted/15 px-3 py-2.5 dark:border-white/[0.03] dark:bg-white/[0.02]">
             <div className="mb-1.5 flex items-center gap-1.5">
-              <PackageIcon className="size-3 shrink-0 text-muted-foreground/50" />
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
+              <PackageIcon className="size-3 shrink-0 text-muted-foreground/40" />
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/40">
                 Recent outputs
               </span>
             </div>
@@ -209,7 +214,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
       {/* CTA — separated footer */}
       <div className={cn(
         "border-t px-5 py-3",
-        isManager ? "border-primary/10 bg-primary/[0.02] dark:border-primary/[0.06]" : "border-border/20 dark:border-white/[0.04]",
+        isManager ? "border-primary/10 bg-primary/[0.01] dark:border-primary/[0.06]" : "border-border/15 dark:border-white/[0.04]",
       )}>
         <Button
           size="sm"
@@ -218,7 +223,7 @@ export function SpecialistCard({ specialist, onChat, recentOutputs, recentBundle
             "h-8 w-full rounded-lg text-[12px] font-medium",
             isManager && "shadow-sm shadow-primary/20",
             !isManager && cn(
-              "border border-border/30 text-muted-foreground hover:border-primary/25 hover:text-primary hover:bg-primary/[0.05]",
+              "border border-border/20 text-muted-foreground hover:border-primary/25 hover:text-primary hover:bg-primary/[0.05]",
               "dark:border-white/[0.06] dark:text-zinc-400 dark:hover:border-primary/20 dark:hover:text-primary dark:hover:bg-primary/[0.06]",
             ),
           )}

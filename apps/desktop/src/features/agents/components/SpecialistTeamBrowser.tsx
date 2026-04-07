@@ -215,7 +215,7 @@ export function SpecialistTeamBrowser({ client, agentId, onSpecialistChat }: Spe
           <h1 className="font-display text-[26px] font-bold tracking-[-0.02em] text-foreground">
             Your AI Marketing Team
           </h1>
-          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+          <p className="mt-1.5 max-w-md text-[13px] leading-relaxed text-muted-foreground/80">
             Each specialist owns a distinct area of marketing. Start a conversation with the right expert.
           </p>
         </div>
