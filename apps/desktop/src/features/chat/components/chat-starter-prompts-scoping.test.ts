@@ -66,8 +66,8 @@ void test("DEFAULT_STARTER_PROMPTS contains generic CMO starters", () => {
     "Default starters must include generic CMO prompt about highest-leverage move",
   );
   assert.ok(
-    src.includes("Which specialist should I start with"),
-    "Default starters must include prompt about which specialist to start with",
+    src.includes("first marketing deliverable I should create"),
+    "Default starters must include job-oriented prompt about first deliverable",
   );
   assert.ok(
     src.includes("Summarize opportunities"),

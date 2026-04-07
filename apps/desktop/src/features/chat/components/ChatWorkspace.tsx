@@ -2,7 +2,6 @@ import { Chat, useChat } from "@ai-sdk/react";
 import {
   ArrowRightIcon,
   BotIcon,
-  CalendarIcon,
   CopyIcon,
   CrosshairIcon,
   FileTextIcon,
@@ -230,7 +229,7 @@ interface ChatWorkspaceProps {
 
 const DEFAULT_STARTER_PROMPTS: { icon: LucideIcon; text: string }[] = [
   { icon: TrendingUpIcon, text: "What's the highest-leverage marketing move for my company right now?" },
-  { icon: CalendarIcon, text: "Which specialist should I start with?" },
+  { icon: FileTextIcon, text: "What's the first marketing deliverable I should create?" },
   { icon: CrosshairIcon, text: "Summarize opportunities across all marketing channels." },
 ];
 
@@ -721,7 +720,7 @@ function ChatSessionView({
                 <p className="mx-auto max-w-sm text-[13px] leading-relaxed text-muted-foreground/50">
                   {effectiveSpecialistMeta
                     ? effectiveSpecialistMeta.role
-                    : "Ask your AI CMO about marketing strategy, growth, and content."}
+                    : "Get marketing deliverables, strategy recommendations, and competitive insights."}
                 </p>
               </div>
             </div>
