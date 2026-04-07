@@ -7,7 +7,7 @@ authors = ["OpenGoat"]
 edition = "2024"
 license = "Proprietary"
 rust-version = "1.94"
-version = "2026.4.7"
+version = "2026.4.7-2"
 
 [workspace.dependencies]
 reqwest = { version = "0.13.2", default-features = false, features = ["http2", "json", "rustls"] }

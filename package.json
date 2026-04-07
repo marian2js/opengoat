@@ -1,6 +1,6 @@
 {
   "name": "@opengoat/opengoat-monorepo",
-  "version": "2026.4.7",
+  "version": "2026.4.7-2",
   "private": true,
   "description": "OpenGoat monorepo workspace",
   "type": "module",
