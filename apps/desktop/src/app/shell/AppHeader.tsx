@@ -33,16 +33,16 @@ export function AppHeader({
                     : "Chat";
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border/30 bg-background/80 backdrop-blur-xl dark:border-white/[0.04]">
+    <header className="sticky top-0 z-20 border-b border-border/20 bg-background/85 backdrop-blur-xl dark:border-white/[0.03] dark:bg-background/80">
       <div className="flex h-11 items-center gap-3 px-4 lg:px-5">
-        <SidebarTrigger className="-ml-1 text-muted-foreground/40 hover:text-foreground" />
+        <SidebarTrigger className="-ml-1 text-muted-foreground/30 transition-colors duration-100 hover:text-foreground" />
         <Separator
           orientation="vertical"
           className="hidden data-[orientation=vertical]:h-3.5 sm:block"
         />
 
         <div className="min-w-0 flex-1">
-          <h1 className="font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/60">
+          <h1 className="font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
             {pageTitle}
           </h1>
         </div>
