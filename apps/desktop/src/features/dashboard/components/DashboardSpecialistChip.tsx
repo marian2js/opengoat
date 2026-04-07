@@ -14,7 +14,6 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
   const isManager = specialist.category === "manager";
   const colors = getSpecialistColors(specialist.id);
   const meta = getSpecialistMeta(specialist.id);
-  const exampleJobs = specialist.outputTypes?.slice(0, 2) ?? [];
 
   return (
     <button
@@ -64,41 +63,36 @@ export function DashboardSpecialistChip({ specialist, onChat }: DashboardSpecial
               </span>
             ) : null}
           </div>
-          <p className={cn(
-            "mt-0.5 leading-snug text-muted-foreground/70 line-clamp-1",
-            isManager ? "text-[12px]" : "text-[11px]",
-          )}>
-            {specialist.role}
-          </p>
         </div>
       </div>
 
-      {/* Best at — outcome-focused description */}
-      {meta?.bestAt ? (
-        <p className={cn(
-          "leading-relaxed text-muted-foreground",
-          isManager ? "text-[13px]" : "text-[12px]",
-        )}>
-          {meta.bestAt}
-        </p>
-      ) : null}
-
-      {/* Example jobs from outputTypes */}
-      {exampleJobs.length > 0 ? (
-        <div className={cn(
-          "flex gap-x-4 gap-y-1.5 rounded-lg border border-border/15 bg-muted/15 px-3 py-2 dark:border-white/[0.03] dark:bg-white/[0.015]",
-          isManager ? "flex-wrap" : "flex-col",
-        )}>
-          {exampleJobs.map((job) => (
-            <div key={job} className="flex items-center gap-2">
-              <span className={cn("size-1.5 shrink-0 rounded-full", colors.dotColor)} />
-              <span className="text-[11px] font-medium leading-tight text-muted-foreground">
-                {job}
-              </span>
-            </div>
+      {/* Produces — concrete output pills (outcome-first) */}
+      {meta?.produces && meta.produces.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {meta.produces.map((output) => (
+            <span
+              key={output}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium leading-tight",
+                isManager
+                  ? "bg-primary/[0.06] text-primary/80"
+                  : cn("bg-muted/30 dark:bg-white/[0.04]", colors.iconText, "opacity-80"),
+              )}
+            >
+              <span className={cn("size-1 shrink-0 rounded-full", colors.dotColor)} />
+              {output}
+            </span>
           ))}
         </div>
       ) : null}
+
+      {/* Role — demoted to subtle secondary text */}
+      <p className={cn(
+        "leading-snug text-muted-foreground/50 line-clamp-1",
+        isManager ? "text-[11px]" : "text-[10px]",
+      )}>
+        {specialist.role}
+      </p>
 
       {/* Chat CTA — always visible, more prominent on hover */}
       <div className="mt-auto flex justify-end pt-1">

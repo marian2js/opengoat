@@ -22,7 +22,7 @@ void test("DashboardAgentRoster: accepts specialists and onChat props", () => {
 
 void test("DashboardAgentRoster: renders section header with team icon", () => {
   assert.ok(
-    src.includes("Your AI Team") || src.includes("Agent Roster"),
+    src.includes("Your Specialists") || src.includes("Your AI Team") || src.includes("Agent Roster"),
     "Expected section header text",
   );
 });

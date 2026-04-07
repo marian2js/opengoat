@@ -19,7 +19,7 @@ export function DashboardAgentRoster({ specialists, onChat }: DashboardAgentRost
         <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/8">
           <UsersIcon className="size-3 text-primary" />
         </div>
-        <h2 className="section-label">Your AI Team</h2>
+        <h2 className="section-label">Your Specialists</h2>
         <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
           {specialists.length}
         </span>

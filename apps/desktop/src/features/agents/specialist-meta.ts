@@ -4,6 +4,8 @@ export interface SpecialistMeta {
   role: string;
   /** Outcome-focused "best for" statement shown on dashboard cards. */
   bestAt: string;
+  /** Concrete output noun-phrases this specialist helps produce. */
+  produces: string[];
   icon: string;
   starterSuggestions: [string, string, string];
 }
@@ -13,6 +15,7 @@ export const SPECIALIST_META: Record<string, SpecialistMeta> = {
     name: "CMO",
     role: "Top-level marketing lead who routes work, synthesizes across specialists, and helps when you're unsure where to start",
     bestAt: "Best for prioritizing your next move, coordinating specialists, and getting cross-channel strategy",
+    produces: ["Marketing priorities", "Cross-channel strategy", "Specialist coordination"],
     icon: "brain",
     starterSuggestions: [
       "What's the highest-leverage marketing move for my company right now?",
@@ -24,6 +27,7 @@ export const SPECIALIST_META: Record<string, SpecialistMeta> = {
     name: "Market Intel",
     role: "Competitor, community, customer-voice, and market-research specialist",
     bestAt: "Best for competitor research, community mapping, and understanding customer language",
+    produces: ["Competitor maps", "Community targets", "Customer language analysis"],
     icon: "search",
     starterSuggestions: [
       "Map my competitor landscape and find messaging gaps.",
@@ -35,6 +39,7 @@ export const SPECIALIST_META: Record<string, SpecialistMeta> = {
     name: "Positioning",
     role: "Sharpens how the company should be framed, differentiated, and messaged",
     bestAt: "Best for one-liners, differentiation angles, and ICP-specific messaging",
+    produces: ["Value props", "One-liners", "Category framing"],
     icon: "target",
     starterSuggestions: [
       "Sharpen my one-liner to stand out from competitors.",
@@ -46,6 +51,7 @@ export const SPECIALIST_META: Record<string, SpecialistMeta> = {
     name: "Website Conversion",
     role: "Improves the website's ability to convert visitors into users or customers",
     bestAt: "Best for homepage hero rewrites, CTA optimization, and conversion audits",
+    produces: ["Hero rewrites", "CTA rewrites", "Conversion audits"],
     icon: "layout",
     starterSuggestions: [
       "Rewrite my homepage hero with 3 variants.",
@@ -57,6 +63,7 @@ export const SPECIALIST_META: Record<string, SpecialistMeta> = {
     name: "SEO/AEO",
     role: "Owns search visibility and answer-engine visibility",
     bestAt: "Best for search wedges, comparison pages, and AI-answer opportunities",
+    produces: ["Search wedges", "Comparison pages", "Answer-engine opportunities"],
     icon: "globe",
     starterSuggestions: [
       "Find my best SEO quick wins by effort vs. impact.",
@@ -68,6 +75,7 @@ export const SPECIALIST_META: Record<string, SpecialistMeta> = {
     name: "Distribution",
     role: "Owns launches, communities, directories, and founder-led distribution",
     bestAt: "Best for Product Hunt launches, community posts, and channel strategy",
+    produces: ["Launch packs", "Community targets", "Launch sequencing"],
     icon: "megaphone",
     starterSuggestions: [
       "Create a Product Hunt launch pack.",
@@ -79,6 +87,7 @@ export const SPECIALIST_META: Record<string, SpecialistMeta> = {
     name: "Content",
     role: "Owns ongoing founder-led and product-led content production",
     bestAt: "Best for founder-led content ideas, editorial briefs, and repurposing plans",
+    produces: ["Content ideas", "Editorial briefs", "Repurposing plans"],
     icon: "pen-tool",
     starterSuggestions: [
       "Generate 10 founder-led content ideas with hooks.",
@@ -90,6 +99,7 @@ export const SPECIALIST_META: Record<string, SpecialistMeta> = {
     name: "Outbound",
     role: "Owns direct outreach and messaging sequences",
     bestAt: "Best for cold email sequences, subject lines, and segment-specific outreach",
+    produces: ["Cold outreach sequences", "Subject lines", "Outreach angles"],
     icon: "send",
     starterSuggestions: [
       "Draft a 3-email cold outreach sequence.",
