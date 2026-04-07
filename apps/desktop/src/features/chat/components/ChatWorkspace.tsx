@@ -800,8 +800,8 @@ function ChatSessionView({
       </div>
 
       {/* Chat input */}
-      <div className="border-t border-border/30 bg-card/30 px-4 py-3.5 lg:px-6">
-        <div className="mx-auto max-w-3xl rounded-xl bg-gradient-to-r from-border/40 via-border/40 to-border/40 p-[1px] transition-all duration-200 hover:from-border/60 hover:via-border/60 hover:to-border/60 focus-within:from-primary/40 focus-within:via-primary/20 focus-within:to-primary/40 focus-within:shadow-lg focus-within:shadow-primary/10 dark:from-white/[0.06] dark:via-white/[0.06] dark:to-white/[0.06] dark:hover:from-white/[0.10] dark:hover:via-white/[0.10] dark:hover:to-white/[0.10] dark:focus-within:from-primary/40 dark:focus-within:via-primary/20 dark:focus-within:to-primary/40 [&_[data-slot=input-group]]:border-0 [&_[data-slot=input-group]]:rounded-[11px]">
+      <div className="border-t border-border/20 bg-gradient-to-t from-card/60 to-card/20 px-4 py-4 backdrop-blur-sm dark:border-white/[0.03] dark:from-[#0D0D0F]/80 dark:to-transparent lg:px-6">
+        <div className="mx-auto max-w-3xl rounded-xl bg-gradient-to-r from-border/30 via-border/20 to-border/30 p-[1px] transition-all duration-200 hover:from-border/50 hover:via-border/40 hover:to-border/50 focus-within:from-primary/40 focus-within:via-primary/15 focus-within:to-primary/40 focus-within:shadow-lg focus-within:shadow-primary/8 dark:from-white/[0.06] dark:via-white/[0.04] dark:to-white/[0.06] dark:hover:from-white/[0.10] dark:hover:via-white/[0.08] dark:hover:to-white/[0.10] dark:focus-within:from-primary/35 dark:focus-within:via-primary/15 dark:focus-within:to-primary/35 [&_[data-slot=input-group]]:border-0 [&_[data-slot=input-group]]:rounded-[11px]">
         <PromptInput
           accept="image/*,.pdf,.txt,.md,.csv,.json,.js,.jsx,.ts,.tsx,.py,.rb,.go,.rs,.java,.c,.cpp,.h,.hpp,.cs,.swift,.kt,.sh,.bash,.zsh,.yaml,.yml,.toml,.xml,.html,.css,.scss,.sql,.r,.lua,.php,.pl,.ex,.exs,.hs,.ml,.scala,.clj,.dart,.vue,.svelte,.astro,.log,.env,.ini,.cfg,.conf,.diff,.patch"
           globalDrop
