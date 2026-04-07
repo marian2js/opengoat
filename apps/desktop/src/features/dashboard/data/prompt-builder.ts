@@ -68,3 +68,26 @@ export function buildActionPrompt(card: ActionCard): string {
 
   return sections.join("\n\n");
 }
+
+/**
+ * Builds an action prompt enriched with structured intake form values.
+ * Prepends a "## User Context" section with the intake values formatted
+ * as labeled key-value pairs, keeping the existing 7-part prompt intact.
+ */
+export function buildActionPromptWithIntake(
+  card: ActionCard,
+  intakeValues: Record<string, string>,
+): string {
+  const base = buildActionPrompt(card);
+  const entries = Object.entries(intakeValues).filter(([, v]) => v.trim());
+  if (entries.length === 0) return base;
+
+  const lines = entries.map(([k, v]) => `- **${formatKey(k)}**: ${v}`).join("\n");
+  return `## User Context\n${lines}\n\n${base}`;
+}
+
+/** Converts camelCase keys to readable labels (e.g. "targetBuyer" → "Target buyer") */
+function formatKey(key: string): string {
+  const spaced = key.replace(/([A-Z])/g, " $1").trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
+}

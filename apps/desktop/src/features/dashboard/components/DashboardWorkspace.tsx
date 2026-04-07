@@ -1,15 +1,17 @@
 import { LayoutDashboardIcon } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import type { AgentSession, ArtifactRecord } from "@opengoat/contracts";
 import type { SidecarClient } from "@/lib/sidecar/client";
 import { resolveDomain, buildFaviconSources } from "@/lib/utils/favicon";
 import { getActionMapping } from "@/lib/utils/action-map";
 import { useProjectMaturity } from "@/features/dashboard/hooks/useProjectMaturity";
 import { usePlaybookLauncher } from "@/features/dashboard/hooks/usePlaybookLauncher";
+import { useIntakeForm } from "@/features/dashboard/hooks/useIntakeForm";
 import { ContinueWhereYouLeftOff } from "@/features/dashboard/components/ContinueWhereYouLeftOff";
 import { CompanyUnderstandingHero } from "@/features/dashboard/components/CompanyUnderstandingHero";
 import { DashboardAgentRoster } from "@/features/dashboard/components/DashboardAgentRoster";
 import { PlaybookInputForm } from "@/features/dashboard/components/PlaybookInputForm";
+import { IntakeFormDialog } from "@/features/dashboard/components/IntakeFormDialog";
 import { RecommendedJobs } from "@/features/dashboard/components/RecommendedJobs";
 import { JobOrientedInput } from "@/features/dashboard/components/JobOrientedInput";
 import { useMeaningfulWork } from "@/features/dashboard/hooks/useMeaningfulWork";
@@ -138,6 +140,13 @@ function DashboardContent({
   // ── Maturity detection: controls section visibility ──
   const maturity = useProjectMaturity(meaningfulWork, runsResult, boardSummary, actionSessions);
 
+  // ── Intake form — intercepts clicks for actions with structured intake fields ──
+  const onSubmitAction = useCallback(
+    (actionId: string, prompt: string, label: string) => playbook.handleActionOrPlaybookClick(actionId, prompt, label),
+    [playbook],
+  );
+  const intake = useIntakeForm({ suggestedActions, onSubmitAction });
+
   function handleFreeTextSubmit(text: string) {
     onActionClick?.("free-text", text, text.slice(0, 50));
   }
@@ -177,7 +186,7 @@ function DashboardContent({
         <RecommendedJobs
           jobs={recommendedJobs.jobs}
           isLoading={recommendedJobs.isLoading}
-          onActionClick={(id, prompt, label) => { void playbook.handleActionOrPlaybookClick(id, prompt, label); }}
+          onActionClick={intake.handleJobCardClick}
         />
       </div>
 
@@ -236,6 +245,20 @@ function DashboardContent({
           optionalInputs={playbook.pendingPlaybook.optionalInputs}
           isSubmitting={playbook.isPlaybookStarting}
           onSubmit={playbook.handlePlaybookFormSubmit}
+        />
+      )}
+
+      {/* Structured intake form dialog */}
+      {intake.pendingIntakeFields && intake.pendingIntakeAction && (
+        <IntakeFormDialog
+          open={intake.intakeFormOpen}
+          onOpenChange={(open) => { if (!open) intake.closeIntakeForm(); }}
+          actionTitle={intake.pendingIntakeAction.title}
+          outputType={intake.pendingIntakeAction.outputType}
+          specialistName={intake.pendingIntakeAction.specialistId}
+          fields={intake.pendingIntakeFields}
+          companyData={data}
+          onSubmit={intake.handleIntakeFormSubmit}
         />
       )}
     </div>

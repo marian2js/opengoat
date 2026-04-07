@@ -30,6 +30,8 @@ export interface ActionCard {
   outputType?: string;
   /** Outcome-based CTA text, e.g. "Get rewrites". Falls back to "Start". */
   ctaLabel?: string;
+  /** Key into intakeFieldRegistry — when set, clicking the job opens a structured intake form */
+  intakeFields?: string;
 }
 
 /**
@@ -112,6 +114,7 @@ export const starterActions: ActionCard[] = [
     promise: "Tagline, one-liner, launch post draft, checklist, and outreach angles",
     outputType: "Launch copy bundle",
     ctaLabel: "Build launch pack",
+    intakeFields: "launch-product-hunt",
     description:
       "Creates ready-to-use Product Hunt launch assets including tagline options, description variants, first comment drafts, and maker story angles.",
     icon: RocketIcon,
@@ -139,6 +142,7 @@ Produce:
     promise: "3 hero variants, CTA options, and trust copy ideas",
     outputType: "3 hero rewrites",
     ctaLabel: "Get rewrites",
+    intakeFields: "rewrite-homepage-hero",
     description:
       "Analyzes your current homepage hero section and generates improved headline, subheadline, and CTA variants that better communicate your value proposition.",
     icon: MessageSquareIcon,
@@ -189,6 +193,7 @@ Produce:
     promise: "Audience angle, email sequence, subject lines, and follow-up ideas",
     outputType: "4-email sequence",
     ctaLabel: "Build sequence",
+    intakeFields: "build-outbound-sequence",
     description:
       "Creates a complete cold email outreach sequence using proven copy frameworks, with subject lines, body copy, follow-up timing, and personalization strategies.",
     icon: MailIcon,
