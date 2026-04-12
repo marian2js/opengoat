@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "OpenGoat",
   "version": "2026.4.12",
-  "identifier": "com.opengoat.app",
+  "identifier": "com.opengoat.desktop",
   "build": {
     "beforeDevCommand": "pnpm --dir ../../ desktop:frontend:dev",
     "devUrl": "http://localhost:1430",

@@ -209,97 +209,56 @@ jobs:
         shell: bash
         run: pnpm release:check-version
 
-      - name: Validate macOS signing credentials
-        if: runner.os == 'macOS'
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-        shell: bash
-        run: |
-          missing=0
-
-          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Missing required macOS release secret: $name"
-              missing=1
-            fi
-          done
-
-          has_api_key_auth=0
-          if [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_ISSUER" ] && [ -n "$APPLE_API_KEY_CONTENT" ]; then
-            has_api_key_auth=1
-          fi
-
-          has_apple_id_auth=0
-          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
-            has_apple_id_auth=1
-          fi
-
-          if [ "$has_api_key_auth" -ne 1 ] && [ "$has_apple_id_auth" -ne 1 ]; then
-            echo "::error::Missing macOS notarization credentials."
-            echo "::error::Set APPLE_API_KEY + APPLE_API_ISSUER + APPLE_API_KEY_CONTENT, or APPLE_ID + APPLE_PASSWORD + APPLE_TEAM_ID."
-            missing=1
-          fi
-
-          if [ "$missing" -ne 0 ]; then
-            exit 1
-          fi
-
-      - name: Materialize App Store Connect API key
-        if: runner.os == 'macOS'
-        env:
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-        shell: bash
-        run: |
-          if [ -z "$APPLE_API_KEY" ] || [ -z "$APPLE_API_ISSUER" ] || [ -z "$APPLE_API_KEY_CONTENT" ]; then
-            exit 0
-          fi
-          key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
-          printf '%s' "$APPLE_API_KEY_CONTENT" > "$key_path"
-          chmod 600 "$key_path"
-          echo "APPLE_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
-
       - name: Build desktop bundles
         env:
           CI: true
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
         shell: bash
-        run: pnpm --dir apps/desktop tauri build --target ${{ matrix.target }} --ci
-
-      - name: Validate macOS bundles
-        if: runner.os == 'macOS'
-        shell: bash
-        run: bash scripts/validate-macos-bundle.sh "apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle"
+        run: |
+          args=(--target "${{ matrix.target }}" --ci)
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            args+=(--no-sign)
+          fi
+          pnpm --dir apps/desktop tauri build "${args[@]}"
 
       - name: Upload desktop bundles to GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.release-info.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.release-info.outputs.version }}
           TARGET_TRIPLE: ${{ matrix.target }}
         shell: bash
         run: |
-          bundle_root="apps/desktop/src-tauri/target/$TARGET_TRIPLE/release/bundle"
-          mapfile -d '' assets < <(
-            find "$bundle_root" -type f \
-              \( -name '*.dmg' -o -name '*.app.tar.gz' -o -name '*.msi' -o -name '*_setup.exe' \) \
-              -print0
-          )
+          bundle_root="target/$TARGET_TRIPLE/release/bundle"
+          upload_dir="$RUNNER_TEMP/release-assets"
+          rm -rf "$upload_dir"
+          mkdir -p "$upload_dir"
+
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            dmg_path="$(find "$bundle_root/dmg" -type f -name '*.dmg' | head -n1)"
+            app_path="$(find "$bundle_root/macos" -type d -name '*.app' | head -n1)"
+
+            if [ -n "$dmg_path" ]; then
+              cp "$dmg_path" "$upload_dir/OpenGoat_${RELEASE_VERSION}_darwin_aarch64.dmg"
+            fi
+
+            if [ -n "$app_path" ]; then
+              app_name="$(basename "$app_path")"
+              tar -C "$(dirname "$app_path")" -czf "$upload_dir/OpenGoat_${RELEASE_VERSION}_darwin_aarch64.app.tar.gz" "$app_name"
+            fi
+          else
+            msi_path="$(find "$bundle_root" -type f -name '*.msi' | head -n1)"
+            exe_path="$(find "$bundle_root" -type f -name '*setup*.exe' | head -n1)"
+
+            if [ -n "$msi_path" ]; then
+              cp "$msi_path" "$upload_dir/OpenGoat_${RELEASE_VERSION}_windows_x64.msi"
+            fi
+
+            if [ -n "$exe_path" ]; then
+              cp "$exe_path" "$upload_dir/OpenGoat_${RELEASE_VERSION}_windows_x64_setup.exe"
+            fi
+          fi
+
+          mapfile -d '' assets < <(find "$upload_dir" -type f -print0)
 
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "::error::No release assets found under $bundle_root"

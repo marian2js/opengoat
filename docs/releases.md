@@ -41,19 +41,8 @@ The workflow also runs automatically on `v*` tag pushes. That makes it compatibl
 
 ## Signing
 
-Production macOS releases must be Developer ID signed and notarized. Ad-hoc signed macOS bundles are suitable for internal testing only and should not be attached to a public GitHub release.
+OpenGoat's current public macOS release path is unsigned. The release workflow explicitly uses `--no-sign` on macOS to avoid shipping Tauri's ad-hoc-signed bundles, which Gatekeeper can reject more harshly.
 
-The desktop release workflow now fails the macOS job unless these secrets are configured:
-
-- `APPLE_CERTIFICATE`
-- `APPLE_CERTIFICATE_PASSWORD`
-- notarization via either:
-- `APPLE_API_KEY`, `APPLE_API_ISSUER`, `APPLE_API_KEY_CONTENT`
-- or `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`
-
-Optional macOS secrets:
-
-- `APPLE_SIGNING_IDENTITY`
-- `APPLE_PROVIDER_SHORT_NAME`
+That means macOS users should still expect the normal unverified-app friction, such as right-click `Open` or the System Settings `Open Anyway` path. It does not provide Apple Developer ID verification or notarization.
 
 Windows code-signing is still optional, but recommended for public distribution.
