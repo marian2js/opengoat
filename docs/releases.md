@@ -29,6 +29,8 @@ The workflow will:
 5. Build macOS and Windows desktop bundles
 6. Upload the generated installers to that release
 
+If the requested tag already exists, the manual workflow reuses that existing tag and GitHub release entry. That makes it possible to rebuild and replace assets for the same version when fixing signing or packaging problems.
+
 The workflow also runs automatically on `v*` tag pushes. That makes it compatible with the existing Changesets-based npm release flow: once the npm release workflow tags a version, desktop artifacts are attached to the same GitHub release.
 
 ## Repository prerequisites
