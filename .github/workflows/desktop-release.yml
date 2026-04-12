@@ -214,11 +214,7 @@ jobs:
           CI: true
         shell: bash
         run: |
-          args=(--target "${{ matrix.target }}" --ci)
-          if [ "${{ runner.os }}" = "macOS" ]; then
-            args+=(--no-sign)
-          fi
-          pnpm --dir apps/desktop tauri build "${args[@]}"
+          pnpm --dir apps/desktop tauri build --target "${{ matrix.target }}" --ci
 
       - name: Upload desktop bundles to GitHub release
         env:

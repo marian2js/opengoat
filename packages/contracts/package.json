@@ -1,7 +1,7 @@
 {
   "name": "@opengoat/contracts",
   "private": false,
-  "version": "2026.4.12-1",
+  "version": "2026.4.12-2",
   "type": "module",
   "exports": {
     ".": {
