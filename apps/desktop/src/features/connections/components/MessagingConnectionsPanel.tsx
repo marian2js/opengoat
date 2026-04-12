@@ -1,663 +1,965 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  MessageSquareIcon,
-  PlusIcon,
-  Trash2Icon,
+  BotIcon,
+  ExternalLinkIcon,
+  LoaderIcon,
+  MessageSquareMoreIcon,
+  QrCodeIcon,
+  RefreshCcwIcon,
+  Settings2Icon,
   SmartphoneIcon,
-  SendIcon,
-  SettingsIcon,
-  PlayIcon,
+  Trash2Icon,
 } from "lucide-react";
-import type { MessagingConnection } from "@/app/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import type { SidecarClient } from "@/lib/sidecar/client";
+import type {
+  OpenClawMessagingChannel,
+  SidecarClient,
+} from "@/lib/sidecar/client";
 import { MESSAGING_CHANNEL_DESCRIPTIONS } from "./messaging-channel-descriptions";
-import { TelegramSetupFlow } from "./TelegramSetupFlow";
-import { WhatsAppSetupFlow } from "./WhatsAppSetupFlow";
 
 interface MessagingConnectionsPanelProps {
   client: SidecarClient | null;
 }
 
-const TYPE_META: Record<
-  string,
-  { label: string; icon: typeof SendIcon; color: string }
-> = {
+type ChannelId = "telegram" | "whatsapp";
+type PanelMode = "unavailable" | "default";
+
+const CHANNEL_META = {
   telegram: {
+    icon: BotIcon,
     label: "Telegram",
-    icon: SendIcon,
-    color: "text-blue-400",
   },
   whatsapp: {
-    label: "WhatsApp",
     icon: SmartphoneIcon,
-    color: "text-emerald-400",
+    label: "WhatsApp",
   },
-};
-
-const STATUS_DOT: Record<string, string> = {
-  connected: "bg-emerald-400",
-  pending: "bg-amber-400",
-  error: "bg-red-400",
-  disconnected: "bg-zinc-400",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  connected: "Connected",
-  pending: "Pending",
-  error: "Error",
-  disconnected: "Disconnected",
-};
+} satisfies Record<ChannelId, { icon: typeof BotIcon; label: string }>;
 
 export function MessagingConnectionsPanel({
   client,
 }: MessagingConnectionsPanelProps) {
-  const [connections, setConnections] = useState<MessagingConnection[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [channels, setChannels] = useState<OpenClawMessagingChannel[]>([]);
+  const [sheetChannelId, setSheetChannelId] = useState<ChannelId | null>(null);
+  const [telegramBotToken, setTelegramBotToken] = useState("");
+  const [whatsAppLog, setWhatsAppLog] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [showTypeSelector, setShowTypeSelector] = useState(false);
-  const [showTelegramSetup, setShowTelegramSetup] = useState(false);
-  const [showWhatsAppSetup, setShowWhatsAppSetup] = useState(false);
-  const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
+  const [panelMode, setPanelMode] = useState<PanelMode>("default");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSubmittingTelegram, setIsSubmittingTelegram] = useState(false);
+  const [isRemovingChannel, setIsRemovingChannel] = useState<ChannelId | null>(null);
+  const [isStartingWhatsAppLink, setIsStartingWhatsAppLink] = useState(false);
+  const whatsAppAbortRef = useRef<AbortController | null>(null);
 
-  const loadConnections = useCallback(async () => {
+  const channelById = useMemo(
+    () =>
+      Object.fromEntries(
+        channels.map((channel) => [channel.channelId, channel]),
+      ) as Partial<Record<ChannelId, OpenClawMessagingChannel>>,
+    [channels],
+  );
+
+  const loadChannels = useCallback(async () => {
     if (!client) {
+      setChannels([]);
       return;
     }
-    setIsLoading(true);
-    setErrorMessage(null);
-    try {
-      const result = await client.listMessagingConnections("default");
-      setConnections(result);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsLoading(false);
-    }
+
+    const nextChannels = await client.listOpenClawMessagingChannels();
+    setChannels(nextChannels);
+    setPanelMode("default");
   }, [client]);
 
-  useEffect(() => {
-    void loadConnections();
-  }, [loadConnections]);
-
-  async function handleCreate(type: "telegram" | "whatsapp"): Promise<void> {
+  const refreshChannels = useCallback(async () => {
     if (!client) {
-      return;
-    }
-    setShowTypeSelector(false);
-    setErrorMessage(null);
-
-    if (type === "telegram") {
-      setShowTelegramSetup(true);
+      setChannels([]);
       return;
     }
 
-    if (type === "whatsapp") {
-      setShowWhatsAppSetup(true);
-      return;
-    }
-  }
-
-  function handleTelegramSetupComplete(): void {
-    setShowTelegramSetup(false);
-    void loadConnections();
-  }
-
-  function handleWhatsAppSetupComplete(): void {
-    setShowWhatsAppSetup(false);
-    void loadConnections();
-  }
-
-  async function handleDelete(connectionId: string): Promise<void> {
-    if (!client) {
-      return;
-    }
-    setErrorMessage(null);
+    setIsRefreshing(true);
     try {
-      await client.deleteMessagingConnection(connectionId);
-      await loadConnections();
+      await loadChannels();
+      setErrorMessage(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : String(error));
+      if (isMissingOpenClawRouteError(error)) {
+        setPanelMode("unavailable");
+        setChannels([]);
+        setErrorMessage(
+          "OpenClaw messaging routes are unavailable in the current sidecar. Restart the dev sidecar, then refresh.",
+        );
+      } else {
+        setErrorMessage(getErrorMessage(error));
+      }
+    } finally {
+      setIsRefreshing(false);
     }
-  }
+  }, [client, loadChannels]);
+
+  useEffect(() => {
+    if (!client) {
+      setChannels([]);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    void loadChannels()
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return;
+        }
+        if (isMissingOpenClawRouteError(error)) {
+          setPanelMode("unavailable");
+          setChannels([]);
+          setErrorMessage(
+            "OpenClaw messaging routes are unavailable in the current sidecar. Restart the dev sidecar, then refresh.",
+          );
+          return;
+        }
+        setErrorMessage(getErrorMessage(error));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client, loadChannels]);
+
+  useEffect(() => {
+    return () => {
+      whatsAppAbortRef.current?.abort();
+    };
+  }, []);
+
+  const handleOpenSheet = useCallback((channelId: ChannelId) => {
+    setSheetChannelId(channelId);
+    setFeedback(null);
+    setErrorMessage((current) =>
+      current?.includes("OpenClaw messaging routes are unavailable") ? current : null,
+    );
+  }, []);
+
+  const handleRemove = useCallback(
+    async (channelId: ChannelId) => {
+      if (!client) {
+        return;
+      }
+
+      const label = CHANNEL_META[channelId].label;
+      if (!window.confirm(`Remove ${label} from OpenClaw?`)) {
+        return;
+      }
+
+      setErrorMessage(null);
+      setFeedback(null);
+      setIsRemovingChannel(channelId);
+
+      try {
+        if (channelId === "whatsapp") {
+          whatsAppAbortRef.current?.abort();
+          setWhatsAppLog("");
+        }
+
+        await client.removeOpenClawMessagingChannel(channelId);
+        await loadChannels();
+        setFeedback(`${label} removed.`);
+        setSheetChannelId(null);
+      } catch (error) {
+        setErrorMessage(getErrorMessage(error));
+      } finally {
+        setIsRemovingChannel(null);
+      }
+    },
+    [client, loadChannels],
+  );
+
+  const handleTelegramSave = useCallback(async () => {
+    if (!client) {
+      return;
+    }
+
+    const botToken = telegramBotToken.trim();
+    if (!botToken) {
+      setErrorMessage("Telegram bot token is required.");
+      return;
+    }
+
+    setErrorMessage(null);
+    setFeedback(null);
+    setIsSubmittingTelegram(true);
+
+    try {
+      const nextChannels = await client.connectOpenClawTelegram({ botToken });
+      setChannels(nextChannels);
+      setPanelMode("default");
+      setFeedback("Telegram configured in OpenClaw.");
+      setTelegramBotToken("");
+      setSheetChannelId("telegram");
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setIsSubmittingTelegram(false);
+    }
+  }, [client, telegramBotToken]);
+
+  const handleStartWhatsAppLink = useCallback(async () => {
+    if (!client) {
+      return;
+    }
+
+    whatsAppAbortRef.current?.abort();
+    const abortController = new AbortController();
+    whatsAppAbortRef.current = abortController;
+
+    setSheetChannelId("whatsapp");
+    setErrorMessage(null);
+    setFeedback(null);
+    setWhatsAppLog("");
+    setIsStartingWhatsAppLink(true);
+
+    try {
+      const response = await client.startOpenClawWhatsAppLoginStream(
+        abortController.signal,
+      );
+      await readTextStream(response, (chunk) => {
+        setWhatsAppLog((current) => current + chunk);
+      });
+      await loadChannels();
+      setFeedback("WhatsApp link flow finished. Refresh if you just scanned the QR.");
+    } catch (error) {
+      if (!isAbortError(error)) {
+        setErrorMessage(getErrorMessage(error));
+      }
+    } finally {
+      if (whatsAppAbortRef.current === abortController) {
+        whatsAppAbortRef.current = null;
+      }
+      setIsStartingWhatsAppLink(false);
+    }
+  }, [client, loadChannels]);
+
+  const handleStopWhatsAppLink = useCallback(() => {
+    whatsAppAbortRef.current?.abort();
+    whatsAppAbortRef.current = null;
+    setIsStartingWhatsAppLink(false);
+    setFeedback("WhatsApp link flow stopped.");
+  }, []);
+
+  const activeChannel = sheetChannelId
+    ? channelById[sheetChannelId] ?? createFallbackChannel(sheetChannelId)
+    : null;
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-xl border border-border/40 bg-card/80 shadow-sm shadow-black/[0.02] transition-colors hover:border-border/60 dark:border-white/[0.06] dark:shadow-black/10 dark:hover:border-white/[0.10]">
-      <div className="flex items-center justify-between gap-3 px-4 py-3.5 lg:px-5">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/8">
-            <MessageSquareIcon className="size-3.5 text-primary" />
+    <>
+      <section className="min-w-0 overflow-hidden rounded-xl border border-border/40 bg-card/80 shadow-sm shadow-black/[0.02] transition-colors hover:border-border/60 dark:border-white/[0.06] dark:shadow-black/10 dark:hover:border-white/[0.10]">
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5 lg:px-5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 shadow-sm ring-1 ring-primary/10">
+              <MessageSquareMoreIcon className="size-3.5 text-primary" />
+            </div>
+            <div>
+              <h2 className="section-label">Messaging Channels</h2>
+              <p className="mt-1 text-[11px] text-muted-foreground/70">
+                Telegram and WhatsApp are configured through the embedded OpenClaw runtime.
+              </p>
+            </div>
+            <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+              {channels.filter((channel) => channel.configured).length}
+            </span>
           </div>
-          <h2 className="section-label">Messaging Channels</h2>
-          <span className="rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
-            {connections.length}
-          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 rounded-md text-[11px] text-muted-foreground"
+            disabled={!client || isRefreshing}
+            onClick={() => {
+              void refreshChannels();
+            }}
+          >
+            <RefreshCcwIcon className={cn("size-3", isRefreshing && "animate-spin")} />
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Button>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 rounded-md text-[11px]"
-          onClick={() => setShowTypeSelector(!showTypeSelector)}
-        >
-          <PlusIcon className="size-3" />
-          Add channel
-        </Button>
-      </div>
 
-      {errorMessage ? (
-        <div className="border-t border-border/60 px-4 py-2 lg:px-5">
-          <div className="rounded-lg border border-warning/20 bg-warning/8 px-3.5 py-2.5 text-[13px] text-warning-foreground">
+        {errorMessage ? (
+          <Banner tone={panelMode === "unavailable" ? "warning" : "error"}>
             {errorMessage}
-          </div>
-        </div>
-      ) : null}
+          </Banner>
+        ) : null}
 
-      {showTelegramSetup && client ? (
-        <div className="border-t border-border/60 px-4 py-3 lg:px-5">
-          <TelegramSetupFlow
-            client={client}
-            sidecarBaseUrl={`http://localhost:${window.location.port || "3001"}`}
-            onComplete={handleTelegramSetupComplete}
-            onCancel={() => setShowTelegramSetup(false)}
-          />
-        </div>
-      ) : null}
+        {feedback ? <Banner tone="success">{feedback}</Banner> : null}
 
-      {showWhatsAppSetup && client ? (
-        <div className="border-t border-border/60 px-4 py-3 lg:px-5">
-          <WhatsAppSetupFlow
-            client={client}
-            sidecarBaseUrl={`http://localhost:${window.location.port || "3001"}`}
-            onComplete={handleWhatsAppSetupComplete}
-            onCancel={() => setShowWhatsAppSetup(false)}
-          />
-        </div>
-      ) : null}
-
-      {showTypeSelector && !showTelegramSetup && !showWhatsAppSetup ? (
-        <div className="border-t border-border/60 px-4 py-3 lg:px-5">
-          <p className="mb-2 text-[12px] text-muted-foreground">
-            Select a messaging platform to connect:
-          </p>
-          <div className="flex gap-2">
-            {(["telegram", "whatsapp"] as const).map((type) => {
-              const meta = TYPE_META[type]!;
-              const Icon = meta.icon;
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  className="flex items-center gap-2 rounded-md border border-border/50 bg-background px-3 py-2 text-[12px] font-medium text-foreground transition-colors hover:border-primary/30 hover:bg-primary/[0.03]"
-                  onClick={() => {
-                    void handleCreate(type);
-                  }}
-                >
-                  <Icon className={cn("size-4", meta.color)} />
-                  {meta.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {!isLoading && connections.length === 0 ? (
-        <div className="border-t border-border/60 px-4 py-6 lg:px-5">
-          <p className="mb-4 text-center text-[12px] leading-relaxed text-muted-foreground/70">
-            Chat with your AI CMO directly from your messaging apps.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(["telegram", "whatsapp"] as const).map((type) => {
-              const meta = TYPE_META[type]!;
-              const Icon = meta.icon;
-              const descriptions = MESSAGING_CHANNEL_DESCRIPTIONS;
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  className={cn(
-                    "group/platform flex flex-col items-center gap-3 rounded-xl border border-dashed px-4 py-5 text-center transition-all",
-                    "border-border/40 hover:border-primary/30 hover:bg-primary/[0.03]",
-                    "dark:border-white/[0.06] dark:hover:border-primary/20 dark:hover:bg-primary/[0.02]",
-                  )}
-                  onClick={() => void handleCreate(type)}
-                >
-                  <div className={cn(
-                    "flex size-10 items-center justify-center rounded-xl transition-colors",
-                    type === "telegram"
-                      ? "bg-blue-400/10 ring-1 ring-blue-400/15 group-hover/platform:bg-blue-400/15"
-                      : "bg-emerald-400/10 ring-1 ring-emerald-400/15 group-hover/platform:bg-emerald-400/15",
-                  )}>
-                    <Icon className={cn("size-5", meta.color)} />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[13px] font-medium text-foreground">
-                      {meta.label}
-                    </span>
-                    <p className="text-[11px] leading-relaxed text-muted-foreground/60">
-                      {descriptions[type]}
-                    </p>
-                  </div>
-                  <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-primary/60 transition-colors group-hover/platform:text-primary">
-                    Connect
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {connections.length > 0 ? (
-        <div className="border-t border-border/60">
-          <div className="divide-y divide-border/40">
-            {connections.map((connection) => {
-              // Disambiguate duplicate display names by type
-              const sameTypeConns = connections.filter(
-                (c) => c.type === connection.type && c.displayName === connection.displayName,
-              );
-              const disambiguatedName =
-                sameTypeConns.length > 1
-                  ? `${connection.displayName} #${sameTypeConns.indexOf(connection) + 1}`
-                  : connection.displayName;
-
-              return (
-              <div key={connection.connectionId}>
-                <MessagingConnectionRow
-                  connection={connection}
-                  resolvedName={disambiguatedName}
-                  isSelected={selectedConnection === connection.connectionId}
-                  onSelect={() =>
-                    setSelectedConnection(
-                      selectedConnection === connection.connectionId
-                        ? null
-                        : connection.connectionId,
-                    )
-                  }
-                  onDelete={handleDelete}
-                />
-                {selectedConnection === connection.connectionId &&
-                connection.type === "telegram" ? (
-                  <TelegramConnectionDetail connection={connection} />
-                ) : null}
-                {selectedConnection === connection.connectionId &&
-                connection.type === "whatsapp" ? (
-                  <WhatsAppConnectionDetail
-                    connection={connection}
-                    client={client}
-                    onReconnect={() => void loadConnections()}
+        <div className="border-t border-border/40 px-4 py-4 dark:border-white/[0.04] lg:px-5">
+          {isLoading ? (
+            <div className="py-6 text-[12px] text-muted-foreground">
+              Loading OpenClaw channels...
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {(["telegram", "whatsapp"] as const).map((channelId) => {
+                const channel = channelById[channelId] ?? createFallbackChannel(channelId);
+                return (
+                  <MessagingConnectionRow
+                    key={channelId}
+                    channel={channel}
+                    isUnavailable={panelMode === "unavailable"}
+                    isRemoving={isRemovingChannel === channelId}
+                    onOpen={() => {
+                      handleOpenSheet(channelId);
+                    }}
+                    onPrimaryAction={() => {
+                      handleOpenSheet(channelId);
+                    }}
+                    onRemove={() => {
+                      void handleRemove(channelId);
+                    }}
                   />
-                ) : null}
-              </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-      ) : null}
-    </section>
+      </section>
+
+      <Sheet
+        open={sheetChannelId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            whatsAppAbortRef.current?.abort();
+            setIsStartingWhatsAppLink(false);
+            setSheetChannelId(null);
+          }
+        }}
+      >
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+          {activeChannel ? (
+            <>
+              <SheetHeader className="border-b border-border/40 px-5 py-4">
+                <SheetTitle>{CHANNEL_META[activeChannel.channelId].label}</SheetTitle>
+                <SheetDescription>
+                  {activeChannel.channelId === "telegram"
+                    ? "Save or rotate the Telegram bot token that OpenClaw will use."
+                    : "Run the WhatsApp QR link flow owned by OpenClaw."}
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="space-y-5 px-5 py-5">
+                <StatusPanel channel={activeChannel} />
+
+                {activeChannel.channelId === "telegram" ? (
+                  <TelegramConnectionDetail
+                    botToken={telegramBotToken}
+                    channel={activeChannel}
+                    isSaving={isSubmittingTelegram}
+                    onBotTokenChange={setTelegramBotToken}
+                    onRefresh={() => {
+                      void refreshChannels();
+                    }}
+                    onSave={() => {
+                      void handleTelegramSave();
+                    }}
+                  />
+                ) : (
+                  <WhatsAppConnectionDetail
+                    channel={activeChannel}
+                    isLinking={isStartingWhatsAppLink}
+                    logOutput={whatsAppLog}
+                    onRefresh={() => {
+                      void refreshChannels();
+                    }}
+                    onStartLink={() => {
+                      void handleStartWhatsAppLink();
+                    }}
+                    onStopLink={handleStopWhatsAppLink}
+                  />
+                )}
+
+              </div>
+            </>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
 
 function MessagingConnectionRow({
-  connection,
-  resolvedName,
-  isSelected,
-  onSelect,
-  onDelete,
+  channel,
+  isUnavailable,
+  isRemoving,
+  onOpen,
+  onPrimaryAction,
+  onRemove,
 }: {
-  connection: MessagingConnection;
-  resolvedName: string;
-  isSelected: boolean;
-  onSelect: () => void;
-  onDelete: (connectionId: string) => Promise<void>;
+  channel: OpenClawMessagingChannel;
+  isUnavailable: boolean;
+  isRemoving: boolean;
+  onOpen: () => void;
+  onPrimaryAction: () => void;
+  onRemove: () => void;
 }) {
-  const meta = TYPE_META[connection.type] ?? {
-    label: connection.type,
-    icon: MessageSquareIcon,
-    color: "text-muted-foreground",
-  };
+  const meta = CHANNEL_META[channel.channelId];
   const Icon = meta.icon;
-  const statusDot = STATUS_DOT[connection.status] ?? "bg-zinc-400";
-  const statusLabel = STATUS_LABEL[connection.status] ?? connection.status;
-  const isPending = connection.status === "pending";
-  const isWhatsApp = connection.type === "whatsapp";
+  const statusTone = resolveStatusTone(channel);
+  const statusLabel = resolveStatusLabel(channel);
 
   return (
-    <div
-      className={cn(
-        "flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-muted/20 lg:px-5 cursor-pointer",
-        isSelected && "bg-muted/10",
-        isPending && "bg-amber-400/[0.03]",
-      )}
-      onClick={onSelect}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") onSelect();
-      }}
-    >
-      <div className={cn(
-        "flex size-9 shrink-0 items-center justify-center rounded-lg border",
-        isPending
-          ? "border-amber-400/20 bg-amber-400/8"
-          : "border-border/50 bg-background",
-      )}>
-        <Icon className={cn("size-4", isPending ? "text-amber-400" : meta.color)} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] font-medium text-foreground truncate">
-            {resolvedName}
-          </span>
-          <Badge
-            variant="secondary"
-            className="rounded-md bg-muted/50 px-1.5 text-[9px] font-medium text-muted-foreground"
-          >
-            {meta.label}
-          </Badge>
+    <div className="rounded-xl border border-border/40 bg-background/55 p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/10">
+          <Icon className="size-4.5 text-primary" />
         </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span
-            className={cn("inline-block size-1.5 rounded-full", statusDot)}
-          />
-          <span className={cn(
-            "font-mono text-[10px] uppercase tracking-wider",
-            isPending ? "font-semibold text-amber-400/80" : "text-muted-foreground/60",
-          )}>
-            {statusLabel}
-          </span>
-          {isPending && (
-            <span className="text-[11px] text-muted-foreground/50">
-              {isWhatsApp ? "— scan QR to link" : "— finish setup to activate"}
-            </span>
-          )}
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[14px] font-semibold text-foreground">{meta.label}</p>
+            <Badge
+              variant="secondary"
+              className={cn(
+                "rounded-md px-1.5 text-[9px] font-medium uppercase tracking-wide",
+                statusTone === "ready" && "bg-primary/10 text-primary",
+                statusTone === "active" &&
+                  "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+                statusTone === "pending" &&
+                  "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+              )}
+            >
+              {statusLabel}
+            </Badge>
+          </div>
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
+            {MESSAGING_CHANNEL_DESCRIPTIONS[channel.channelId]}
+          </p>
+          <p className="text-[11px] text-muted-foreground/70">{channel.summary}</p>
         </div>
       </div>
-      <div className="flex items-center gap-1">
-        {(connection.type === "telegram" || connection.type === "whatsapp") ? (
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <Button
+          type="button"
+          size="sm"
+          className="h-8 rounded-md text-[12px]"
+          disabled={isUnavailable}
+          onClick={onPrimaryAction}
+        >
+          {channel.channelId === "telegram"
+            ? channel.configured
+              ? "Manage Telegram"
+              : "Connect Telegram"
+            : channel.linked
+              ? "Manage WhatsApp"
+              : "Link WhatsApp"}
+        </Button>
+        <div className="flex items-center gap-1.5">
           <Button
             type="button"
-            variant={isPending ? "outline" : "ghost"}
+            variant="ghost"
             size="sm"
-            aria-label={isPending ? "Complete setup" : "Connection details"}
-            className={cn(
-              "h-7 rounded-md px-2.5 text-[11px]",
-              isPending
-                ? "border-amber-400/30 text-amber-400 hover:bg-amber-400/8 hover:text-amber-300"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect();
-            }}
+            className="h-8 rounded-md px-2 text-[11px] text-primary"
+            aria-label={`Details for ${meta.label}`}
+            onClick={onOpen}
           >
-            {isPending ? (
-              <>
-                <PlayIcon className="size-3" />
-                <span>Complete Setup</span>
-              </>
-            ) : (
-              <>
-                <SettingsIcon className="size-3" />
-                <span>Details</span>
-              </>
-            )}
+            <Settings2Icon className="size-3.5" />
+            <span>Details</span>
           </Button>
-        ) : null}
-        <Tooltip>
-          <TooltipTrigger asChild>
+          {channel.configured ? (
             <Button
               type="button"
               variant="ghost"
               size="sm"
+              className="h-8 rounded-md px-2 text-[11px] text-destructive"
               aria-label="Remove connection"
               title="Remove connection"
-              className="h-7 rounded-md px-2 text-[11px] text-muted-foreground/40 hover:bg-destructive/8 hover:text-destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                void onDelete(connection.connectionId);
-              }}
+              disabled={isUnavailable || isRemoving}
+              onClick={onRemove}
             >
-              <Trash2Icon className="size-3" />
+              {isRemoving ? (
+                <LoaderIcon className="size-3 animate-spin" />
+              ) : (
+                <Trash2Icon className="size-3" />
+              )}
+              <span>Remove</span>
             </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="px-2 py-1 text-xs">
-            Remove connection
-          </TooltipContent>
-        </Tooltip>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusPanel({
+  channel,
+}: {
+  channel: OpenClawMessagingChannel;
+}) {
+  return (
+    <div className="rounded-xl border border-border/50 bg-muted/[0.18] px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+            Current Status
+          </p>
+          <p className="mt-1 text-[13px] font-medium text-foreground">{channel.summary}</p>
+        </div>
+        <Badge
+          variant="secondary"
+          className={cn(
+            "rounded-md px-2 py-1 text-[10px] font-medium uppercase tracking-wide",
+            resolveStatusTone(channel) === "ready" && "bg-primary/10 text-primary",
+            resolveStatusTone(channel) === "active" &&
+              "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+            resolveStatusTone(channel) === "pending" &&
+              "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+          )}
+        >
+          {resolveStatusLabel(channel)}
+        </Badge>
       </div>
     </div>
   );
 }
 
 function WhatsAppConnectionDetail({
-  connection,
-  client,
-  onReconnect,
+  channel,
+  isLinking,
+  logOutput,
+  onRefresh,
+  onStartLink,
+  onStopLink,
 }: {
-  connection: MessagingConnection;
-  client: SidecarClient | null;
-  onReconnect: () => void;
+  channel: OpenClawMessagingChannel;
+  isLinking: boolean;
+  logOutput: string;
+  onRefresh: () => void;
+  onStartLink: () => void;
+  onStopLink: () => void;
 }) {
-  const [isReconnecting, setIsReconnecting] = useState(false);
-  const [qrError, setQrError] = useState<string | null>(null);
-  const isPending = connection.status === "pending";
-
-  async function handleStartQrLinking() {
-    if (!client) {
-      setQrError("Messaging service not running — start the sidecar to link WhatsApp");
-      return;
-    }
-    setQrError(null);
-    setIsReconnecting(true);
-    try {
-      await client.startWhatsAppSession(connection.connectionId);
-      onReconnect();
-    } catch {
-      setQrError("Messaging service not running — start the sidecar to link WhatsApp");
-    } finally {
-      setIsReconnecting(false);
-    }
-  }
-
-  async function handleReconnect() {
-    if (!client) return;
-    setIsReconnecting(true);
-    try {
-      await client.startWhatsAppSession(connection.connectionId);
-      onReconnect();
-    } catch (error) {
-      console.error("Failed to reconnect WhatsApp session", error);
-      setQrError("Failed to reconnect. Please try again.");
-    } finally {
-      setIsReconnecting(false);
-    }
-  }
-
-  async function handleUnlink() {
-    if (!client) return;
-    try {
-      await client.stopWhatsAppSession(connection.connectionId);
-      onReconnect();
-    } catch (error) {
-      console.error("Failed to unlink WhatsApp session", error);
-      setQrError("Failed to unlink session. Please try again.");
-    }
-  }
+  const qrPreview = useMemo(() => extractTerminalQr(logOutput), [logOutput]);
 
   return (
-    <div className="border-t border-border/30 bg-muted/10 px-4 py-3 lg:px-5">
-      <div className="space-y-3">
-        {isPending && (
-          <div className="space-y-2.5">
-            <span className="text-xs font-mono uppercase tracking-wider text-primary">
-              HOW TO CONNECT
-            </span>
-            <ol className="list-none space-y-1.5 pl-0">
-              <li className="text-sm text-muted-foreground">
-                <span className="mr-1.5 font-mono text-xs text-primary/70">1.</span>
-                {"Click \"Start QR Linking\" below"}
-              </li>
-              <li className="text-sm text-muted-foreground">
-                <span className="mr-1.5 font-mono text-xs text-primary/70">2.</span>
-                A QR code will appear — scan it with WhatsApp on your phone
-                <span className="mt-0.5 block pl-5 text-xs text-muted-foreground/60">
-                  WhatsApp → Settings → Linked Devices → Link a Device
-                </span>
-              </li>
-              <li className="text-sm text-muted-foreground">
-                <span className="mr-1.5 font-mono text-xs text-primary/70">3.</span>
-                Once linked, the status will update to Connected
-              </li>
-            </ol>
-            {qrError && (
-              <div className="rounded-lg border border-warning/20 bg-warning/8 px-3 py-2 text-[12px] text-warning-foreground">
-                {qrError}
-              </div>
-            )}
-          </div>
-        )}
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+          <QrCodeIcon className="size-4 text-primary" />
+        </div>
+        <div>
+          <h3 className="text-[13px] font-semibold text-foreground">
+            WhatsApp Link Flow
+          </h3>
+          <p className="text-[11px] text-muted-foreground/70">
+            OpenClaw prints the QR stream here while it owns the linked-device session.
+          </p>
+        </div>
+      </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground">Status</span>
-            <span className="text-[11px] font-medium text-foreground">
-              {STATUS_LABEL[connection.status] ?? connection.status}
-            </span>
+      <div className="rounded-lg border border-border/50 bg-background/80 px-3.5 py-3">
+        <p className="text-[12px] leading-relaxed text-muted-foreground">
+          Scan the QR from{" "}
+          <span className="font-medium text-foreground">
+            WhatsApp &gt; Settings &gt; Linked Devices
+          </span>
+          , then refresh once the phone completes pairing.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 rounded-md text-[12px]"
+          disabled={isLinking}
+          onClick={onRefresh}
+        >
+          <RefreshCcwIcon className="size-3.5" />
+          Refresh
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          className="h-8 rounded-md text-[12px]"
+          disabled={isLinking}
+          onClick={onStartLink}
+        >
+          {channel.linked ? "Relink WhatsApp" : "Start QR link"}
+        </Button>
+        {isLinking ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 rounded-md text-[12px]"
+            onClick={onStopLink}
+          >
+            Stop link
+          </Button>
+        ) : null}
+      </div>
+
+      {qrPreview ? (
+        <div className="space-y-3 overflow-hidden rounded-lg border border-border/50 bg-[#050505]">
+          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 text-[11px] text-zinc-400">
+            <span>WhatsApp QR</span>
+            {isLinking ? <span className="text-primary">ready to scan</span> : null}
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground">Project</span>
-            <span className="text-[11px] text-foreground">
-              {connection.defaultProjectId}
-            </span>
+          <div className="px-3 pt-3">
+            <div className="mx-auto w-full max-w-[340px] rounded-lg bg-white p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.08)]">
+              <div
+                className="grid aspect-square w-full overflow-hidden rounded-[4px] bg-black"
+                style={{
+                  gridTemplateColumns: `repeat(${String(qrPreview.width)}, minmax(0, 1fr))`,
+                  gridTemplateRows: `repeat(${String(qrPreview.height)}, minmax(0, 1fr))`,
+                }}
+              >
+                {qrPreview.cells.map((filled, index) => (
+                  <div
+                    key={index}
+                    className={filled ? "bg-black" : "bg-white"}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground">Created</span>
-            <span className="text-[10px] font-mono text-muted-foreground/70">
-              {new Date(connection.createdAt).toLocaleDateString()}
-            </span>
+          <div className="border-t border-white/10 px-3 pb-3 pt-2">
+            <p className="text-[11px] leading-relaxed text-zinc-400">
+              Scan this with WhatsApp on your phone. If it expires, start the link flow again.
+            </p>
           </div>
         </div>
+      ) : null}
 
-        {isPending && (
-          <div className="pt-1">
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 rounded-md bg-primary px-4 text-[12px] font-medium text-primary-foreground hover:bg-primary/90"
-              disabled={isReconnecting}
-              onClick={() => void handleStartQrLinking()}
-            >
-              <PlayIcon className="mr-1.5 size-3.5" />
-              {isReconnecting ? "Starting…" : "Start QR Linking"}
-            </Button>
+      {!qrPreview ? (
+        <div className="overflow-hidden rounded-lg border border-border/50 bg-[#050505]">
+          <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 text-[11px] text-zinc-400">
+            <span>WhatsApp QR</span>
+            {isLinking ? <span className="text-primary">waiting for scan...</span> : null}
           </div>
-        )}
-
-        {(connection.status === "disconnected" || connection.status === "error") && (
-          <div className="flex gap-2 pt-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 text-[11px]"
-              disabled={isReconnecting}
-              onClick={() => void handleReconnect()}
-            >
-              {isReconnecting ? "Reconnecting…" : "Reconnect"}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 text-[11px] text-destructive hover:text-destructive"
-              onClick={() => void handleUnlink()}
-            >
-              Unlink
-            </Button>
+          <div className="px-3 py-4">
+            <p className="text-[11px] leading-relaxed text-zinc-400">
+              No QR yet. Start the link flow and wait for OpenClaw to emit a fresh code.
+            </p>
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function TelegramConnectionDetail({
-  connection,
+  botToken,
+  channel,
+  isSaving,
+  onBotTokenChange,
+  onRefresh,
+  onSave,
 }: {
-  connection: MessagingConnection;
+  botToken: string;
+  channel: OpenClawMessagingChannel;
+  isSaving: boolean;
+  onBotTokenChange: (value: string) => void;
+  onRefresh: () => void;
+  onSave: () => void;
 }) {
-  const isPending = connection.status === "pending";
-  let config: { botToken?: string; secretToken?: string; webhookUrl?: string } =
-    {};
-  try {
-    if (connection.configRef) {
-      config = JSON.parse(connection.configRef);
-    }
-  } catch {
-    // Invalid config
-  }
-
   return (
-    <div className="border-t border-border/30 bg-muted/10 px-4 py-3 lg:px-5">
-      <div className="space-y-3">
-        {isPending && (
-          <div className="space-y-2.5">
-            <span className="text-xs font-mono uppercase tracking-wider text-primary">
-              COMPLETE SETUP
-            </span>
-            <ol className="list-none space-y-1.5 pl-0">
-              <li className="text-sm text-muted-foreground">
-                <span className="mr-1.5 font-mono text-xs text-primary/70">1.</span>
-                Create a bot with BotFather on Telegram
-              </li>
-              <li className="text-sm text-muted-foreground">
-                <span className="mr-1.5 font-mono text-xs text-primary/70">2.</span>
-                Paste the bot token into the setup form above
-              </li>
-              <li className="text-sm text-muted-foreground">
-                <span className="mr-1.5 font-mono text-xs text-primary/70">3.</span>
-                Configure the webhook URL and confirm the connection
-              </li>
-            </ol>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground">Status</span>
-            <span className="text-[11px] font-medium text-foreground">
-              {STATUS_LABEL[connection.status] ?? connection.status}
-            </span>
-          </div>
-          {config.webhookUrl ? (
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] text-muted-foreground">
-                Webhook URL
-              </span>
-              <span className="truncate text-[10px] font-mono text-muted-foreground/70">
-                {config.webhookUrl}
-              </span>
-            </div>
-          ) : null}
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground">Project</span>
-            <span className="text-[11px] text-foreground">
-              {connection.defaultProjectId}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground">Created</span>
-            <span className="text-[10px] font-mono text-muted-foreground/70">
-              {new Date(connection.createdAt).toLocaleDateString()}
-            </span>
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+          <BotIcon className="size-4 text-primary" />
         </div>
+        <div>
+          <h3 className="text-[13px] font-semibold text-foreground">
+            Telegram Bot Token
+          </h3>
+          <p className="text-[11px] text-muted-foreground/70">
+            Save the BotFather token into OpenClaw, then handle DM approvals through OpenClaw pairing.
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border/50 bg-background/80 px-3.5 py-3">
+        <p className="text-[12px] leading-relaxed text-muted-foreground">
+          Use <span className="font-medium text-foreground">@BotFather</span> to create or rotate the bot token.
+          OpenClaw expects the standard Telegram Bot API token format.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <label
+          htmlFor="telegram-bot-token"
+          className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70"
+        >
+          Telegram Bot Token
+        </label>
+        <Input
+          id="telegram-bot-token"
+          value={botToken}
+          placeholder={channel.configured ? "Paste a replacement token" : "123456789:AA..."}
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(event) => {
+            onBotTokenChange(event.target.value);
+          }}
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 rounded-md text-[12px]"
+          onClick={onRefresh}
+        >
+          <RefreshCcwIcon className="size-3.5" />
+          Refresh
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          className="h-8 rounded-md text-[12px]"
+          disabled={isSaving}
+          onClick={onSave}
+        >
+          {isSaving ? <LoaderIcon className="size-3.5 animate-spin" /> : null}
+          {channel.configured ? "Update token" : "Save token"}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 rounded-md text-[12px] text-muted-foreground"
+          onClick={() => {
+            window.open("https://t.me/BotFather", "_blank", "noopener,noreferrer");
+          }}
+        >
+          <ExternalLinkIcon className="size-3.5" />
+          Open BotFather
+        </Button>
       </div>
     </div>
   );
+}
+
+function Banner({
+  children,
+  tone,
+}: {
+  children: string;
+  tone: "error" | "success" | "warning";
+}) {
+  return (
+    <div
+      className={cn(
+        "border-t px-4 py-2.5 text-[12px] lg:px-5",
+        tone === "error" && "border-destructive/15 bg-destructive/8 text-destructive",
+        tone === "success" &&
+          "border-emerald-500/15 bg-emerald-500/8 text-emerald-600 dark:text-emerald-400",
+        tone === "warning" &&
+          "border-amber-500/15 bg-amber-500/8 text-amber-700 dark:text-amber-300",
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function createFallbackChannel(channelId: ChannelId): OpenClawMessagingChannel {
+  return {
+    accountId: "default",
+    channelId,
+    configured: false,
+    enabled: false,
+    label: CHANNEL_META[channelId].label,
+    ...(channelId === "whatsapp" ? { linked: false } : {}),
+    summary: "Not configured",
+  };
+}
+
+function resolveStatusTone(channel: OpenClawMessagingChannel): "active" | "pending" | "ready" {
+  if (!channel.configured) {
+    return "ready";
+  }
+
+  if (channel.channelId === "whatsapp" && !channel.linked) {
+    return "pending";
+  }
+
+  return "active";
+}
+
+function resolveStatusLabel(channel: OpenClawMessagingChannel): string {
+  if (!channel.configured) {
+    return "Not Set";
+  }
+
+  if (channel.channelId === "whatsapp" && !channel.linked) {
+    return "Needs QR";
+  }
+
+  return "Ready";
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isMissingOpenClawRouteError(error: unknown): boolean {
+  return /Sidecar request failed with status 404/.test(getErrorMessage(error));
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function extractTerminalQr(logOutput: string): {
+  cells: boolean[];
+  height: number;
+  width: number;
+} | null {
+  const normalized = stripAnsi(logOutput).replace(/\r\n?/g, "\n");
+  const lines = normalized.split("\n");
+  const startIndex = lines.findIndex((line) => /scan this qr/i.test(line));
+  if (startIndex < 0) {
+    return null;
+  }
+
+  const qrLines: string[] = [];
+  for (const line of lines.slice(startIndex + 1)) {
+    if (!line.trim()) {
+      if (qrLines.length > 0) {
+        break;
+      }
+      continue;
+    }
+
+    if (!isQrArtLine(line)) {
+      if (qrLines.length > 0) {
+        break;
+      }
+      continue;
+    }
+
+    qrLines.push(line.replace(/\s+$/g, ""));
+  }
+
+  if (qrLines.length < 8) {
+    return null;
+  }
+
+  const matrix = qrLines.flatMap((line) => expandQrLine(line));
+  if (matrix.length === 0) {
+    return null;
+  }
+
+  const width = Math.max(...matrix.map((row) => row.length));
+  const normalizedRows = matrix.map((row) =>
+    row.length < width ? [...row, ...new Array(width - row.length).fill(false)] : row,
+  );
+
+  return {
+    cells: normalizedRows.flat(),
+    height: normalizedRows.length,
+    width,
+  };
+}
+
+function stripAnsi(value: string): string {
+  return value.replace(/\u001B\[[0-9;?]*[ -/]*[@-~]/g, "");
+}
+
+function isQrArtLine(line: string): boolean {
+  const trimmed = line.trimEnd();
+  if (trimmed.length < 8) {
+    return false;
+  }
+
+  return /^[ \t\u2580-\u259f]+$/.test(trimmed);
+}
+
+function expandQrLine(line: string): boolean[][] {
+  const top: boolean[] = [];
+  const bottom: boolean[] = [];
+
+  for (const character of line) {
+    const [upper, lower] = expandQrCharacter(character);
+    top.push(upper);
+    bottom.push(lower);
+  }
+
+  return [top, bottom];
+}
+
+function expandQrCharacter(character: string): [boolean, boolean] {
+  switch (character) {
+    case " ":
+    case "\t":
+      return [false, false];
+    case "▀":
+      return [true, false];
+    case "▄":
+      return [false, true];
+    case "█":
+    case "▌":
+    case "▐":
+    case "▉":
+    case "▊":
+    case "▋":
+    case "▍":
+    case "▎":
+    case "▇":
+    case "▆":
+    case "▅":
+    case "▃":
+    case "▂":
+    case "▁":
+    case "▙":
+    case "▛":
+    case "▜":
+    case "▟":
+      return [true, true];
+    default:
+      return [false, false];
+  }
+}
+
+async function readTextStream(
+  response: Response,
+  onChunk: (chunk: string) => void,
+): Promise<void> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    return;
+  }
+
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      const trailing = decoder.decode();
+      if (trailing) {
+        onChunk(trailing);
+      }
+      return;
+    }
+
+    onChunk(decoder.decode(value, { stream: true }));
+  }
 }

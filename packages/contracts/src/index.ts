@@ -320,6 +320,29 @@ export const authSessionSchema = z.object({
   error: z.string().min(1).optional(),
 });
 
+export const openClawMessagingChannelIdSchema = z.enum([
+  "telegram",
+  "whatsapp",
+]);
+
+export const openClawMessagingChannelSchema = z.object({
+  accountId: z.string().min(1),
+  channelId: openClawMessagingChannelIdSchema,
+  configured: z.boolean(),
+  enabled: z.boolean(),
+  label: z.string().min(1),
+  linked: z.boolean().nullable().optional(),
+  summary: z.string().min(1),
+});
+
+export const openClawMessagingChannelListSchema = z.array(
+  openClawMessagingChannelSchema,
+);
+
+export const connectOpenClawTelegramRequestSchema = z.object({
+  botToken: z.string().min(1),
+});
+
 export type WorkspaceArea = z.infer<typeof workspaceAreaSchema>;
 export type AppManifest = z.infer<typeof appManifestSchema>;
 export type SidecarConnection = z.infer<typeof sidecarConnectionSchema>;
@@ -345,6 +368,15 @@ export type RespondAuthSessionRequest = z.infer<
 export type SetProviderModelRequest = z.infer<typeof setProviderModelRequestSchema>;
 export type AuthSessionStep = z.infer<typeof authSessionStepSchema>;
 export type AuthSession = z.infer<typeof authSessionSchema>;
+export type OpenClawMessagingChannelId = z.infer<
+  typeof openClawMessagingChannelIdSchema
+>;
+export type OpenClawMessagingChannel = z.infer<
+  typeof openClawMessagingChannelSchema
+>;
+export type ConnectOpenClawTelegramRequest = z.infer<
+  typeof connectOpenClawTelegramRequestSchema
+>;
 export type Agent = z.infer<typeof agentSchema>;
 export type AgentCatalog = z.infer<typeof agentCatalogSchema>;
 export type CreateAgentRequest = z.infer<typeof createAgentRequestSchema>;

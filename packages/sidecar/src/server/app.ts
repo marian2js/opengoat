@@ -15,6 +15,7 @@ import { createRunRoutes } from "./routes/runs.ts";
 import { createSignalRoutes } from "./routes/signals.ts";
 import { createTaskRoutes } from "./routes/tasks.ts";
 import { createMessagingRoutes } from "./routes/messaging.ts";
+import { createOpenClawChannelRoutes } from "./routes/openclaw-channels.ts";
 import { createTelegramWebhookRoutes } from "./routes/telegram-webhook.ts";
 import {
   createWhatsAppSessionRoutes,
@@ -110,6 +111,7 @@ export function createSidecarApp(runtime: SidecarRuntime): Hono<{
   app.route("/bundles", createBundleRoutes(runtime));
   app.route("/chat", createChatRoutes(runtime));
   app.route("/global", createGlobalRoutes(runtime));
+  app.route("/openclaw", createOpenClawChannelRoutes(runtime));
   app.route("/auth", createAuthRoutes(runtime));
   app.route("/memories", createMemoryRoutes(runtime));
   app.route("/objectives", createObjectiveRoutes(runtime));

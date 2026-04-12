@@ -17,7 +17,7 @@ interface EmbeddedGatewayProcessState {
   token: string;
 }
 
-const HOST_READY_TIMEOUT_MS = 20_000;
+const DEFAULT_HOST_READY_TIMEOUT_MS = 60_000;
 
 function resolveHostCommand(port: number, token: string): {
   args: string[];
@@ -42,17 +42,32 @@ function resolveHostCommand(port: number, token: string): {
   };
 }
 
-function createReadyUrl(port: number): string {
-  return `http://127.0.0.1:${String(port)}/ready`;
+function createHealthUrl(port: number): string {
+  return `http://127.0.0.1:${String(port)}/health`;
 }
 
-async function waitForReady(port: number): Promise<void> {
-  const readyUrl = createReadyUrl(port);
-  const deadline = Date.now() + HOST_READY_TIMEOUT_MS;
+function resolveHostReadyTimeoutMs(env: NodeJS.ProcessEnv): number {
+  const candidate = env.OPENGOAT_GATEWAY_READY_TIMEOUT_MS?.trim();
+  if (!candidate) {
+    return DEFAULT_HOST_READY_TIMEOUT_MS;
+  }
+
+  const parsed = Number.parseInt(candidate, 10);
+  return Number.isInteger(parsed) && parsed >= 1_000
+    ? parsed
+    : DEFAULT_HOST_READY_TIMEOUT_MS;
+}
+
+async function waitForReady(
+  port: number,
+  timeoutMs: number,
+): Promise<void> {
+  const healthUrl = createHealthUrl(port);
+  const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(readyUrl, { method: "GET" });
+      const response = await fetch(healthUrl, { method: "GET" });
       if (response.ok) {
         return;
       }
@@ -63,7 +78,9 @@ async function waitForReady(port: number): Promise<void> {
     await delay(150);
   }
 
-  throw new Error("Timed out waiting for the embedded gateway to become ready.");
+  throw new Error(
+    `Timed out waiting for the embedded gateway to become ready after ${String(timeoutMs)}ms.`,
+  );
 }
 
 function pipeLogs(child: ChildProcess, prefix: string): void {
@@ -119,6 +136,7 @@ export class EmbeddedGatewaySupervisor {
     await ensureEmbeddedGatewayDirectories(this.#paths);
     const token = await loadOrCreateGatewayToken(this.#paths.tokenPath);
     const port = await pickGatewayPort();
+    const hostReadyTimeoutMs = resolveHostReadyTimeoutMs(this.#env);
     await writeEmbeddedGatewayConfig({
       paths: this.#paths,
       port,
@@ -133,7 +151,6 @@ export class EmbeddedGatewaySupervisor {
         OPENGOAT_GATEWAY_TOKEN: token,
         OPENCLAW_CONFIG_PATH: this.#paths.configPath,
         OPENCLAW_SKIP_BROWSER_CONTROL_SERVER: "1",
-        OPENCLAW_SKIP_CHANNELS: "1",
         OPENCLAW_OAUTH_DIR: this.#paths.oauthDir,
         OPENCLAW_STATE_DIR: this.#paths.stateDir,
       },
@@ -156,7 +173,7 @@ export class EmbeddedGatewaySupervisor {
       });
     });
 
-    await Promise.race([waitForReady(port), exitPromise]);
+    await Promise.race([waitForReady(port, hostReadyTimeoutMs), exitPromise]);
 
     // Replace the startup-only exit handler with a persistent auto-restart handler.
     child.removeAllListeners("exit");

@@ -1,8 +1,15 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { EmbeddedGatewayPaths } from "./paths.ts";
+import { resolveGatewayPackageRoot } from "./package-paths.ts";
 
 type GatewayConfig = Record<string, unknown>;
+type EmbeddedChannelPluginId = "telegram" | "whatsapp";
+
+const EMBEDDED_CHANNEL_PLUGIN_IDS: EmbeddedChannelPluginId[] = [
+  "telegram",
+  "whatsapp",
+];
 
 function createEmptyConfig(): GatewayConfig {
   return {};
@@ -32,7 +39,9 @@ export async function writeEmbeddedGatewayConfig(params: {
   port: number;
   token: string;
 }): Promise<void> {
-  const payload = await loadExistingConfig(params.paths.configPath);
+  const payload = ensureEmbeddedChannelPlugins(
+    await loadExistingConfig(params.paths.configPath),
+  );
 
   await writeFile(
     params.paths.configPath,
@@ -103,4 +112,75 @@ export async function writeEmbeddedGatewayConfig(params: {
     )}\n`,
     "utf8",
   );
+}
+
+function ensureEmbeddedChannelPlugins(payload: GatewayConfig): GatewayConfig {
+  const plugins = asRecord(payload.plugins);
+  const load = asRecord(plugins.load);
+  const allowedIds = mergeNormalizedStrings(
+    readStringArray(plugins.allow),
+    EMBEDDED_CHANNEL_PLUGIN_IDS,
+  );
+  const deniedIds = readStringArray(plugins.deny).filter(
+    (candidate) => !EMBEDDED_CHANNEL_PLUGIN_IDS.includes(candidate.trim().toLowerCase() as EmbeddedChannelPluginId),
+  );
+  const pluginPaths = EMBEDDED_CHANNEL_PLUGIN_IDS.map((pluginId) =>
+    join(resolveGatewayPackageRoot(), "extensions", pluginId),
+  );
+
+  return {
+    ...payload,
+    plugins: {
+      ...plugins,
+      enabled: true,
+      allow: allowedIds,
+      ...(Array.isArray(plugins.deny) || deniedIds.length > 0
+        ? { deny: deniedIds }
+        : {}),
+      load: {
+        ...load,
+        paths: mergeNormalizedStrings(readStringArray(load.paths), pluginPaths),
+      },
+    },
+  };
+}
+
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter((entry) => entry.length > 0);
+}
+
+function mergeNormalizedStrings(existing: string[], additions: string[]): string[] {
+  const seen = new Set<string>();
+  const merged: string[] = [];
+
+  for (const candidate of [...existing, ...additions]) {
+    const normalized = candidate.trim();
+    if (!normalized) {
+      continue;
+    }
+
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    merged.push(normalized);
+  }
+
+  return merged;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
 }

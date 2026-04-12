@@ -2414,7 +2414,7 @@ dependencies = [
 
 [[package]]
 name = "opengoat-desktop"
-version = "2026.4.7-4"
+version = "2026.4.12"
 dependencies = [
  "reqwest",
  "serde",

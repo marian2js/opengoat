@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { writeEmbeddedGatewayConfig } from "./config.ts";
+import { resolveGatewayPackageRoot } from "./package-paths.ts";
 
 interface TestGatewayConfig {
   agents?: {
@@ -27,6 +28,14 @@ interface TestGatewayConfig {
     port: number;
   };
   logging: { file: string; level: string };
+  plugins?: {
+    enabled?: boolean;
+    allow?: string[];
+    deny?: string[];
+    load?: {
+      paths?: string[];
+    };
+  };
 }
 
 void describe("writeEmbeddedGatewayConfig", () => {
@@ -67,6 +76,16 @@ void describe("writeEmbeddedGatewayConfig", () => {
     assert.deepEqual(config.logging, {
       file: join(paths.logsDir, "gateway.log"),
       level: "info",
+    });
+    assert.deepEqual(config.plugins, {
+      enabled: true,
+      allow: ["telegram", "whatsapp"],
+      load: {
+        paths: [
+          join(resolveGatewayPackageRoot(), "extensions", "telegram"),
+          join(resolveGatewayPackageRoot(), "extensions", "whatsapp"),
+        ],
+      },
     });
     // The config writer no longer manages the agents section;
     // agent metadata is handled by the metadata store instead.
@@ -152,5 +171,15 @@ void describe("writeEmbeddedGatewayConfig", () => {
         workspace: "/tmp/research",
       },
     ]);
+    assert.deepEqual(config.plugins, {
+      enabled: true,
+      allow: ["telegram", "whatsapp"],
+      load: {
+        paths: [
+          join(resolveGatewayPackageRoot(), "extensions", "telegram"),
+          join(resolveGatewayPackageRoot(), "extensions", "whatsapp"),
+        ],
+      },
+    });
   });
 });

@@ -38,6 +38,7 @@ import { getDeEmphasizedSessionIds } from "@/lib/utils/session-rerun";
 import { humanizeSessionLabel } from "@/lib/utils/session-label";
 import { isUnnamedSession } from "@/lib/utils/unnamed-session";
 import { cn } from "@/lib/utils";
+import opengoatLogoSquare from "@/shared/assets/brand/opengoat-logo-square.png";
 import { getSpecialistMeta, getSpecialistColors } from "@/features/agents/specialist-meta";
 import { resolveSpecialistIcon } from "@/features/agents/specialist-icons";
 import {
@@ -157,9 +158,11 @@ export function AppSidebar({
               className="h-12 data-[slot=sidebar-menu-button]:!p-1.5 hover:bg-sidebar-accent/60 transition-colors duration-100"
             >
               <a href="#dashboard">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-primary shadow-sm shadow-primary/25 ring-1 ring-primary/15 text-primary-foreground">
-                  <LayoutDashboardIcon className="size-4" />
-                </div>
+                <img
+                  src={opengoatLogoSquare}
+                  alt="OpenGoat logo"
+                  className="size-8 shrink-0 rounded-lg object-cover shadow-sm shadow-primary/20 ring-1 ring-white/10"
+                />
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="font-display text-[14px] font-bold tracking-[-0.02em]">
                     OpenGoat

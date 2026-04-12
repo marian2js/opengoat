@@ -111,6 +111,26 @@ import {
 } from "@opengoat/contracts";
 import { z } from "zod";
 
+const openClawMessagingChannelSchema = z.object({
+  accountId: z.string().min(1),
+  channelId: z.enum(["telegram", "whatsapp"]),
+  configured: z.boolean(),
+  enabled: z.boolean(),
+  label: z.string().min(1),
+  linked: z.boolean().nullable().optional(),
+  summary: z.string().min(1),
+});
+
+const openClawMessagingChannelListSchema = z.array(openClawMessagingChannelSchema);
+
+const connectOpenClawTelegramRequestSchema = z.object({
+  botToken: z.string().min(1),
+});
+
+export type OpenClawMessagingChannel = z.infer<
+  typeof openClawMessagingChannelSchema
+>;
+
 export interface PhaseProgressDetail {
   name: string;
   description: string;
@@ -1174,6 +1194,41 @@ export class SidecarClient {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // OpenClaw Messaging Channels
+  // ---------------------------------------------------------------------------
+
+  async listOpenClawMessagingChannels(): Promise<OpenClawMessagingChannel[]> {
+    return openClawMessagingChannelListSchema.parse(
+      await this.request("/openclaw/channels"),
+    );
+  }
+
+  async connectOpenClawTelegram(payload: {
+    botToken: string;
+  }): Promise<OpenClawMessagingChannel[]> {
+    return openClawMessagingChannelListSchema.parse(
+      await this.request("/openclaw/channels/telegram/connect", {
+        body: JSON.stringify(connectOpenClawTelegramRequestSchema.parse(payload)),
+        method: "POST",
+      }),
+    );
+  }
+
+  async removeOpenClawMessagingChannel(channelId: "telegram" | "whatsapp"): Promise<void> {
+    await this.request(
+      `/openclaw/channels/${encodeURIComponent(channelId)}`,
+      { method: "DELETE" },
+    );
+  }
+
+  async startOpenClawWhatsAppLoginStream(signal?: AbortSignal): Promise<Response> {
+    return await this.requestRaw("/openclaw/channels/whatsapp/login", {
+      method: "POST",
+      ...(signal ? { signal } : {}),
+    });
+  }
+
   async deleteTasks(taskIds: string[]): Promise<DeleteTasksResponse> {
     return deleteTasksResponseSchema.parse(
       await this.request("/tasks", {
@@ -1226,5 +1281,26 @@ export class SidecarClient {
     }
 
     return (await response.json()) as unknown;
+  }
+
+  private async requestRaw(path: string, init?: RequestInit): Promise<Response> {
+    const headers = this.createAuthHeaders();
+    const initHeaders = new Headers(init?.headers);
+    for (const [key, value] of initHeaders.entries()) {
+      headers.set(key, value);
+    }
+
+    const response = await fetch(new URL(path, this.connection.url), {
+      ...init,
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Sidecar request failed with status ${String(response.status)}.`,
+      );
+    }
+
+    return response;
   }
 }
