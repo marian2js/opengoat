@@ -194,20 +194,108 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Install dependencies
+        shell: bash
         run: pnpm install --frozen-lockfile
 
       - name: Verify release version sync
+        shell: bash
         run: pnpm release:check-version
 
-      - uses: tauri-apps/tauri-action@v0.6.2
+      - name: Validate macOS signing credentials
+        if: runner.os == 'macOS'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: ./apps/desktop
-          tauriScript: pnpm tauri
-          releaseId: ${{ needs.create-release.outputs.release_id }}
-          tagName: ${{ needs.release-info.outputs.tag }}
-          args: --target ${{ matrix.target }} --ci
-          retryAttempts: 2
-          includeUpdaterJson: false
-          assetNamePattern: OpenGoat_[version]_[platform]_[arch][_setup].[ext]
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        shell: bash
+        run: |
+          missing=0
+
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing required macOS release secret: $name"
+              missing=1
+            fi
+          done
+
+          has_api_key_auth=0
+          if [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_ISSUER" ] && [ -n "$APPLE_API_KEY_CONTENT" ]; then
+            has_api_key_auth=1
+          fi
+
+          has_apple_id_auth=0
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            has_apple_id_auth=1
+          fi
+
+          if [ "$has_api_key_auth" -ne 1 ] && [ "$has_apple_id_auth" -ne 1 ]; then
+            echo "::error::Missing macOS notarization credentials."
+            echo "::error::Set APPLE_API_KEY + APPLE_API_ISSUER + APPLE_API_KEY_CONTENT, or APPLE_ID + APPLE_PASSWORD + APPLE_TEAM_ID."
+            missing=1
+          fi
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Materialize App Store Connect API key
+        if: runner.os == 'macOS'
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+        shell: bash
+        run: |
+          if [ -z "$APPLE_API_KEY" ] || [ -z "$APPLE_API_ISSUER" ] || [ -z "$APPLE_API_KEY_CONTENT" ]; then
+            exit 0
+          fi
+          key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+          printf '%s' "$APPLE_API_KEY_CONTENT" > "$key_path"
+          chmod 600 "$key_path"
+          echo "APPLE_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+
+      - name: Build desktop bundles
+        env:
+          CI: true
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+        shell: bash
+        run: pnpm --dir apps/desktop tauri build --target ${{ matrix.target }} --ci
+
+      - name: Validate macOS bundles
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/validate-macos-bundle.sh "apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle"
+
+      - name: Upload desktop bundles to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.release-info.outputs.tag }}
+          TARGET_TRIPLE: ${{ matrix.target }}
+        shell: bash
+        run: |
+          bundle_root="apps/desktop/src-tauri/target/$TARGET_TRIPLE/release/bundle"
+          mapfile -d '' assets < <(
+            find "$bundle_root" -type f \
+              \( -name '*.dmg' -o -name '*.app.tar.gz' -o -name '*.msi' -o -name '*_setup.exe' \) \
+              -print0
+          )
+
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "::error::No release assets found under $bundle_root"
+            exit 1
+          fi
+
+          gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber

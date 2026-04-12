@@ -27,9 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "macOS": {
-      "signingIdentity": "-"
-    },
+    "macOS": {},
     "windows": {
       "wix": {
         "version": "26.4.12.0"

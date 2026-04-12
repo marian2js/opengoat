@@ -39,9 +39,19 @@ The workflow also runs automatically on `v*` tag pushes. That makes it compatibl
 
 ## Signing
 
-Local and CI macOS builds use Tauri's ad-hoc signing identity (`-`) by default. That is suitable for internal testing only.
+Production macOS releases must be Developer ID signed and notarized. Ad-hoc signed macOS bundles are suitable for internal testing only and should not be attached to a public GitHub release.
 
-For broader production distribution, add platform signing credentials before relying on these artifacts:
+The desktop release workflow now fails the macOS job unless these secrets are configured:
 
-- macOS: Developer ID Application certificate and notarization credentials
-- Windows: code-signing certificate
+- `APPLE_CERTIFICATE`
+- `APPLE_CERTIFICATE_PASSWORD`
+- notarization via either:
+- `APPLE_API_KEY`, `APPLE_API_ISSUER`, `APPLE_API_KEY_CONTENT`
+- or `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`
+
+Optional macOS secrets:
+
+- `APPLE_SIGNING_IDENTITY`
+- `APPLE_PROVIDER_SHORT_NAME`
+
+Windows code-signing is still optional, but recommended for public distribution.
