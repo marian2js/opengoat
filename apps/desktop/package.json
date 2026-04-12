@@ -1,7 +1,7 @@
 {
   "name": "@opengoat/desktop",
   "private": true,
-  "version": "2026.4.12",
+  "version": "2026.4.12-1",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -182,4 +182,62 @@ void describe("writeEmbeddedGatewayConfig", () => {
       },
     });
   });
+
+  void it("replaces stale embedded channel plugin paths but preserves unrelated plugin paths", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opengoat-gateway-config-"));
+    const paths = {
+      configDir: rootDir,
+      configPath: join(rootDir, "runtime.json"),
+      deviceIdentityPath: join(rootDir, "identity", "device.json"),
+      logsDir: join(rootDir, "logs"),
+      metadataPath: join(rootDir, "metadata.json"),
+      oauthDir: join(rootDir, "oauth"),
+      rootDir,
+      stateDir: join(rootDir, "state"),
+      tokenPath: join(rootDir, "gateway-token"),
+      workspacesDir: join(rootDir, "workspaces"),
+    };
+
+    await writeFile(
+      paths.configPath,
+      `${JSON.stringify(
+        {
+          plugins: {
+            allow: ["slack"],
+            load: {
+              paths: [
+                "/Users/marian2js/workspace/opengoat/node_modules/openclaw/extensions/telegram",
+                "C:\\Users\\marian2js\\workspace\\opengoat\\node_modules\\openclaw\\extensions\\whatsapp",
+                "/custom/plugins/slack",
+              ],
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    await writeEmbeddedGatewayConfig({
+      paths,
+      port: 19111,
+      token: "secret-token",
+    });
+
+    const raw = await readFile(paths.configPath, "utf8");
+    const config = JSON.parse(raw) as TestGatewayConfig;
+
+    assert.deepEqual(config.plugins, {
+      enabled: true,
+      allow: ["slack", "telegram", "whatsapp"],
+      load: {
+        paths: [
+          "/custom/plugins/slack",
+          join(resolveGatewayPackageRoot(), "extensions", "telegram"),
+          join(resolveGatewayPackageRoot(), "extensions", "whatsapp"),
+        ],
+      },
+    });
+  });
 });

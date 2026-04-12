@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "OpenGoat",
-  "version": "2026.4.12",
+  "version": "2026.4.12-1",
   "identifier": "com.opengoat.desktop",
   "build": {
     "beforeDevCommand": "pnpm --dir ../../ desktop:frontend:dev",
@@ -30,7 +30,7 @@
     "macOS": {},
     "windows": {
       "wix": {
-        "version": "26.4.12.0"
+        "version": "26.4.12.1"
       }
     },
     "resources": {

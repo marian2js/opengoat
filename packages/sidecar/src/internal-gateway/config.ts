@@ -139,10 +139,28 @@ function ensureEmbeddedChannelPlugins(payload: GatewayConfig): GatewayConfig {
         : {}),
       load: {
         ...load,
-        paths: mergeNormalizedStrings(readStringArray(load.paths), pluginPaths),
+        paths: mergeNormalizedStrings(
+          stripEmbeddedChannelPluginPaths(readStringArray(load.paths)),
+          pluginPaths,
+        ),
       },
     },
   };
+}
+
+function stripEmbeddedChannelPluginPaths(paths: string[]): string[] {
+  return paths.filter((candidate) => !isEmbeddedChannelPluginPath(candidate));
+}
+
+function isEmbeddedChannelPluginPath(candidate: string): boolean {
+  const normalized = candidate.trim().replaceAll("\\", "/").toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  return EMBEDDED_CHANNEL_PLUGIN_IDS.some((pluginId) =>
+    normalized.endsWith(`/extensions/${pluginId}`),
+  );
 }
 
 function readStringArray(value: unknown): string[] {

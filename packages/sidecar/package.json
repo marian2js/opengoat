@@ -1,7 +1,7 @@
 {
   "name": "@opengoat/sidecar",
   "private": true,
-  "version": "2026.4.12",
+  "version": "2026.4.12-1",
   "type": "module",
   "exports": {
     ".": {
@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "bundle:prepare": "node scripts/prepare-bundle.mjs",
+    "bundle:prepare": "pnpm build && node scripts/prepare-bundle.mjs",
     "dev": "tsx src/cli.ts",
     "lint": "eslint src --ext .ts",
     "test": "tsx --test src/auth/*.test.ts src/chat/*.test.ts src/internal-gateway/*.test.ts src/server/routes/*.test.ts",
