@@ -258,7 +258,10 @@ jobs:
             fi
           fi
 
-          mapfile -d '' assets < <(find "$upload_dir" -type f -print0)
+          assets=()
+          while IFS= read -r -d '' asset; do
+            assets+=("$asset")
+          done < <(find "$upload_dir" -type f -print0)
 
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "::error::No release assets found under $bundle_root"
